@@ -30,4 +30,8 @@ Follow-up at `cc610cf`: `stop_remains_responsive_during_slow_integration_and_can
 
 Follow-up at `3c802c8`: an unchanged accepted patch now integrates after a separate job advances the run plan revision, while an affected job's old patch remains rejected. Patch, finished attempt and accept decision must agree on the retained job revision; the request must carry the current run revision. See [SWARM-21](SWARM-21.md). The offline suite passed 193 tests with 11 ignored.
 
+The 2026-09-27 Catalog scoped replay also checks an accepted retained patch under a
+later run revision: completion refuses it while unintegrated, then accepts the run
+only after the twelfth patch and combined backend check pass. See [S3](S3.md).
+
 Remaining: a stopped integration leaves a durable intent and staged patch for a future operator-controlled reconciliation path; it never claims success. An orphaned checker that never exits remains held and needs an operator-controlled termination path; the fixture checker is not a qualified live execution sandbox. Patch conflicts have no director resolution flow. Hook detection has a race against external hook changes. Live adapter permissions, unsaved buffers and service-side writes remain unqualified. This criterion stays unchecked.

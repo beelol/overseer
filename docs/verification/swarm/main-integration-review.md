@@ -8,8 +8,14 @@ Re-fetched `origin/main` on 2026-09-27 after the owner's later update; it still 
 to `7bccc3a`, which is an ancestor of the Swarm branch. The main checkout's older local
 `main` was left untouched. The latest Auto branch (`a7695fd`) also retains the same
 route/admission division. No further merge or change to the Swarm defaults, worker-count
-policy, or SWARM-01–64 wording is needed. The joined Gate S and Auto checks below remain
+policy is needed. The joined Gate S and Auto checks below remain
 open implementation dependencies, not new standalone Swarm criteria.
+
+The next fetch on 2026-09-27 again resolved to `7bccc3a`; no new main changes needed
+another merge. Subsequent S3 fixture work clarified SWARM-21's already required
+scope-narrowing check: the shared contract must keep excluded routes functional while
+the selected routes migrate. This clarification comes from the Catalog replay, not a
+new Gate S or Auto behavior.
 
 | Main addition | Current state on main | Swarm decision and required joined check |
 | --- | --- | --- |

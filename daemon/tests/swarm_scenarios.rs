@@ -137,6 +137,247 @@ fn catalog_s3_narrowing_to_twelve_modules_supersedes_the_other_twelve() {
         "evidence":["cursor-contract"]})).is_err());
 }
 
+// The scoped branch is a different product outcome from the 24-module run: only
+// the selected half may change, and completion must verify the combined result.
+#[test]
+#[ignore = "requires Node.js 24 and local socket permission"]
+fn catalog_s3_narrowed_branch_integrates_and_checks_twelve_modules() {
+    let fixture = repo_root().join("fixtures/swarm/catalog-v1");
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(fixture.join("manifest.json")).unwrap()).unwrap();
+    let names: Vec<String> = manifest["resource_modules"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|name| name.as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(names.len(), 24);
+    let node = std::env::split_paths(&std::env::var_os("PATH").unwrap())
+        .map(|directory| directory.join("node"))
+        .find(|path| path.is_file())
+        .expect("Node.js 24 executable on PATH");
+    let version = std::process::Command::new(&node)
+        .arg("--version")
+        .output()
+        .unwrap();
+    assert!(String::from_utf8_lossy(&version.stdout).starts_with("v24."));
+
+    let temp = tmp();
+    let verifier = temp.path().join("verify-catalog-scoped.sh");
+    std::fs::write(&verifier, format!(
+        "#!/bin/sh\nCATALOG_SCOPE=first12 exec '{}' --test --test-reporter=dot acceptance.test.ts\n",
+        node.display())).unwrap();
+    std::fs::set_permissions(&verifier, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let d = Daemon::start(&[("OVERSEER_SWARM_VERIFIER_PATH", verifier.to_str().unwrap())]);
+    let checkout = repo(&temp.path().join("catalog"));
+    copy_tree(&fixture, &checkout);
+    git(&checkout, &["add", "."]);
+    git(&checkout, &["commit", "-q", "-m", "Catalog v1 fixture"]);
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    let source_before = fingerprint(&checkout);
+
+    let made = d.call(
+        "swarm.create",
+        json!({"category":"Catalog scoped S3",
+        "objective":"Migrate only the first 12 resource routes",
+        "allowed_targets":["system-codex"],"source_change_permission":"isolated"}),
+    );
+    let run = made["id"].as_str().unwrap();
+    let contract = json!({"id":"contract","title":"Cursor contract",
+        "acceptance":"stable tuple cursor","deps":[]});
+    let job = |name: &str| {
+        json!({"id":name,"title":format!("Migrate {name}"),
+        "acceptance":"cursor pagination and response shape","deps":["contract"]})
+    };
+    let jobs: Vec<_> = std::iter::once(contract.clone())
+        .chain(names.iter().map(|name| job(name)))
+        .collect();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,"jobs":jobs}),
+    );
+    let contract_v2 = std::fs::read_to_string(fixture.join("reference/contract-v2.ts")).unwrap();
+    let patch = patch_from_replacement(&checkout, "src/pagination.ts", &contract_v2);
+    accept_patch(&d, run, 1, "contract", "contract-scoped", &patch);
+    let integrated = d.call(
+        "swarm.integrate",
+        json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"contract","artifact_id":"contract-scoped",
+        "repo":checkout,"base_revision":base}),
+    );
+    assert_eq!(integrated["status"], "integrated", "{integrated}");
+    let workspace = PathBuf::from(integrated["workspace_path"].as_str().unwrap());
+
+    let retained: Vec<_> = std::iter::once(contract)
+        .chain(names[..12].iter().map(|name| job(name)))
+        .collect();
+    let narrowed = d.call(
+        "swarm.revise",
+        json!({"id":run,"generation":1,
+        "expected_revision":1,"reason":"Owner narrowed Catalog to twelve routes",
+        "jobs":retained}),
+    );
+    assert_eq!(narrowed["revision"], 2);
+    assert_eq!(narrowed["superseded"], 12);
+
+    let at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64;
+    let snapshot = json!({"version":1,"observed_ms":at-1000,"expires_ms":at+120000,
+        "targets":[{"id":"system-codex","account_id":"fixture-account",
+            "pool_ids":["fixture-pool"],"capabilities":["code"],
+            "health":"up","auth":"ok"}],
+        "pools":[{"id":"fixture-pool","windows":[{"id":"week","unit":"points",
+            "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":at+120000}]}]});
+    let admitted = d.call(
+        "swarm.admit",
+        json!({"run_id":run,"generation":1,
+        "revision":2,"job_id":names[0],"target_id":"system-codex",
+        "request_id":"catalog-scoped-first","snapshot":snapshot,"now_ms":at,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"}),
+    );
+    assert_eq!(admitted["status"], "admitted", "{admitted}");
+    let template = std::fs::read_to_string(fixture.join("reference/module.ts.template")).unwrap();
+    let mut pending_final = None;
+    for (index, name) in names[..12].iter().enumerate() {
+        let patch = patch_from_replacement(
+            &checkout,
+            &format!("src/resources/{name}.ts"),
+            &template.replace("RESOURCE_NAME", name),
+        );
+        let artifact = format!("scoped-{name}");
+        let attempt = if index == 0 {
+            json!({"id":admitted["attempt_id"],"token":admitted["token"],"revision":1})
+        } else {
+            d.call(
+                "swarm.attempt.register",
+                json!({"run_id":run,
+                "generation":1,"revision":2,"job_id":name}),
+            )
+        };
+        assert_eq!(
+            attempt["revision"], 1,
+            "retained job keeps its source revision"
+        );
+        d.call(
+            "swarm.artifact.put",
+            json!({"run_id":run,"job_id":name,
+            "attempt_id":attempt["id"],"token":attempt["token"],
+            "artifact_id":artifact,"source_revision":1,"kind":"patch","content":patch}),
+        );
+        d.call(
+            "swarm.report",
+            json!({"run_id":run,"job_id":name,
+            "attempt_id":attempt["id"],"token":attempt["token"],
+            "message_id":format!("scoped-result-{name}"),"type":"result","revision":1,
+            "payload":{"artifact_ids":[artifact]}}),
+        );
+        d.call(
+            "swarm.decide",
+            json!({"run_id":run,"generation":1,"revision":2,
+            "job_id":name,"decision":"accept","evidence":[artifact]}),
+        );
+        d.call(
+            "swarm.attempt.confirm_exit",
+            json!({"run_id":run,"generation":1,
+            "revision":2,"job_id":name,"attempt_id":attempt["id"]}),
+        );
+        if index == 11 {
+            pending_final = Some((name.clone(), artifact));
+            continue;
+        }
+        let integrated_module = d.call(
+            "swarm.integrate",
+            json!({"run_id":run,"generation":1,
+            "revision":2,"job_id":name,"artifact_id":artifact,
+            "repo":checkout,"base_revision":base}),
+        );
+        assert_eq!(integrated_module["status"], "integrated", "{name}: {integrated_module}");
+        if index == 10 {
+            let partial = d.call(
+                "swarm.verify",
+                json!({"run_id":run,"generation":1,
+                "revision":2,"request_id":"scoped-eleven-of-twelve"}),
+            );
+            assert_eq!(partial["status"], "failed", "{partial}");
+        }
+    }
+    let final_jobs = d.call("swarm.jobs", json!({"id":run,"limit":100}));
+    let rows = final_jobs["jobs"].as_array().unwrap();
+    assert_eq!(
+        rows.iter()
+            .filter(|row| row["status"] == "accepted")
+            .count(),
+        13
+    );
+    assert_eq!(
+        rows.iter()
+            .filter(|row| row["status"] == "superseded")
+            .count(),
+        12
+    );
+
+    let review = d.call(
+        "swarm.director.claim_batch",
+        json!({"run_id":run,
+        "generation":1,"revision":2,"now_ms":at+10000}),
+    );
+    assert_eq!(review["status"], "claimed", "{review}");
+    assert_eq!(review["more_pending"], false);
+    let review_done = d.call(
+        "swarm.director.complete_batch",
+        json!({"run_id":run,
+        "generation":1,"turn_id":review["turn_id"],"token":review["token"],
+        "outcome":"progress"}),
+    );
+    assert_eq!(
+        d.call("swarm.get", json!({"id":run}))["status"],
+        "running",
+        "{review_done}"
+    );
+    let checks: Vec<_> = std::iter::once(json!({"job_id":"contract",
+        "outcome":"passed","evidence":["contract-scoped"]}))
+    .chain(names[..12].iter().map(|name| {
+        json!({"job_id":name,
+            "outcome":"passed","evidence":[format!("scoped-{name}")]})
+    }))
+    .collect();
+    let incomplete = d.try_call("swarm.complete", json!({"run_id":run,"generation":1,
+        "revision":2,"request_id":"catalog-scoped-too-early",
+        "summary":"Incomplete scoped migration","verification":"eleven routes only",
+        "checks":checks})).unwrap_err();
+    assert!(incomplete.contains("unintegrated patch"), "{incomplete}");
+    let (last_name,last_artifact) = pending_final.unwrap();
+    let last = d.call("swarm.integrate", json!({"run_id":run,"generation":1,
+        "revision":2,"job_id":last_name,"artifact_id":last_artifact,
+        "repo":checkout,"base_revision":base}));
+    assert_eq!(last["status"], "integrated", "{last}");
+    let verified = d.call("swarm.verify", json!({"run_id":run,"generation":1,
+        "revision":2,"request_id":"scoped-twelve-of-twelve"}));
+    assert_eq!(verified["status"], "passed", "{verified}");
+    assert_eq!(verified["commit"], last["commit"]);
+    let completed = d.call(
+        "swarm.complete",
+        json!({"run_id":run,"generation":1,
+        "revision":2,"request_id":"catalog-scoped-complete",
+        "summary":"Migrated twelve selected Catalog routes to cursor pagination",
+        "verification":"Combined scoped Catalog HTTP check passed; other routes stayed offset",
+        "checks":checks}),
+    );
+    assert_eq!(completed["status"], "completed", "{completed}");
+    assert_eq!(fingerprint(&checkout), source_before);
+    assert_eq!(
+        git(
+            &workspace,
+            &["rev-list", "--count", &format!("{base}..HEAD")]
+        ),
+        "13"
+    );
+}
+
 // Explicitly opt in because this real TypeScript backend requires Node 24 and
 // opens a localhost socket. It never contacts a provider or external service.
 #[test]

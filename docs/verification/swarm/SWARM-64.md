@@ -54,3 +54,12 @@ and the unchanged contract plus 12 retained modules remain the only required pla
 The separate 24-module backend replay still passes; the full serial offline Rust suite
 and 17 Atlas backend tests pass. This does not integrate or verify a 12-module branch,
 exercise live user-message intake, or qualify a model director. SWARM-64 stays partial.
+
+On 2026-09-27, a second opt-in Catalog replay integrates the narrowed 12-module
+branch and runs the scoped backend check. Eleven migrated routes fail, twelve pass,
+the excluded twelve retain their old pagination behavior, and the combined branch
+has thirteen isolated commits including the compatible shared contract. Premature
+completion with an accepted but unintegrated patch is rejected. The full 24-module
+Catalog replay also passes. These are scripted fixture decisions; S0, autonomous
+director behavior, live user-message intake and live communication qualification
+remain unverified, so SWARM-64 is partial.

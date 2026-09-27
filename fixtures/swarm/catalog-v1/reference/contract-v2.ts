@@ -5,6 +5,24 @@ export type CatalogPage = {
   meta: { hasMore: boolean; limit: number; nextCursor: string | null };
 };
 
+// Keep the legacy helper until every route using it has migrated. A scoped
+// twelve-route revision must leave the other twelve routes functional.
+export function offsetPage(rows: CatalogRow[], request: URLSearchParams): CatalogPage {
+  const limit = Math.min(20, Math.max(1, Number(request.get("limit") || 2)));
+  const page = Math.max(1, Number(request.get("page") || 1));
+  const offset = (page - 1) * limit;
+  const ordered = [...rows].sort((a, b) => b.createdAt - a.createdAt);
+  const data = ordered.slice(offset, offset + limit);
+  return {
+    data,
+    meta: {
+      hasMore: offset + limit < ordered.length,
+      limit,
+      nextCursor: offset + limit < ordered.length ? String(page + 1) : null
+    }
+  };
+}
+
 // The stable key is (createdAt, id), both descending. Rows inserted before an
 // existing cursor cannot shift older rows onto a different page.
 export function cursorPage(rows: CatalogRow[], request: URLSearchParams): CatalogPage {

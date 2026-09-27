@@ -43,3 +43,15 @@ Remaining: user-message intake and qualified live director/worker delivery are n
 connected. Reversing an already integrated excluded patch needs an explicit new
 integration plan; the daemon refuses silent exclusion. This local plan/revision boundary
 is partial evidence for SWARM-21, whose RFC box remains unchecked.
+
+Follow-up on 2026-09-27: the opt-in Catalog scoped replay integrates the contract
+and twelve retained patches into a thirteen-commit isolated branch. Retained module
+attempts keep source revision 1 while the run is at revision 2. The first joined
+replay exposed that `swarm.integrate` looked up accept decisions at the job revision
+instead of the run revision; it now checks the accepted attempt and artifact. The
+completion guard likewise finds unintegrated patches through the attempt's source
+revision. Premature completion is rejected, the eleven-route combined check fails,
+and the twelve-route check passes only after the last patch integrates. The shared
+contract keeps the excluded twelve routes working with their old page parameter.
+User-message intake, live director/worker delivery and reversal of already integrated
+excluded patches remain open; SWARM-21 is partial.

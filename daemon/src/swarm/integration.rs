@@ -198,8 +198,8 @@ pub fn integrate(store: &mut Store, p: &Value) -> Result<Value> {
         bail!("worker exit is not confirmed");
     }
     let accepted = store.conn.prepare(
-        "SELECT evidence FROM swarm_decisions WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3 AND revision=?4 AND decision='accept'"
-    )?.query_map(params![run,job,attempt,job_revision], |r| r.get::<_,String>(0))?
+        "SELECT evidence FROM swarm_decisions WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3 AND decision='accept'"
+    )?.query_map(params![run,job,attempt], |r| r.get::<_,String>(0))?
         .collect::<rusqlite::Result<Vec<_>>>()?.into_iter().any(|raw| {
             serde_json::from_str::<Vec<String>>(&raw).ok()
                 .is_some_and(|ids| ids.iter().any(|id| id == artifact))

@@ -9,6 +9,9 @@ import { createCatalogServer } from "./src/server.ts";
 const root = dirname(fileURLToPath(import.meta.url));
 const manifest = JSON.parse(readFileSync(join(root, "manifest.json"), "utf8"));
 const names: string[] = manifest.resource_modules;
+const scope = process.env.CATALOG_SCOPE || "all";
+assert.ok(["all", "first12"].includes(scope), `unknown Catalog test scope: ${scope}`);
+const selected = scope === "first12" ? names.slice(0, 12) : names;
 
 test("fixture pins 24 distinct TypeScript resource modules", () => {
   assert.equal(manifest.version, 1);
@@ -20,7 +23,7 @@ test("fixture pins 24 distinct TypeScript resource modules", () => {
   assert.deepEqual(actual, [...names].sort());
 });
 
-test("all Catalog routes preserve shape and cursor stability across a tied key and insertion", async (t) => {
+test(`${scope} Catalog routes preserve shape and cursor stability across a tied key and insertion`, async (t) => {
   const server = createCatalogServer();
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -30,7 +33,7 @@ test("all Catalog routes preserve shape and cursor stability across a tied key a
   assert.ok(address && typeof address !== "string");
   const base = `http://127.0.0.1:${address.port}`;
 
-  for (const resource of names) {
+  for (const resource of selected) {
     await t.test(resource, async () => {
       await fetch(`${base}/__fixture/reset?resource=${resource}`);
       const firstResponse = await fetch(`${base}/api/${resource}?limit=2`);
@@ -66,7 +69,15 @@ test("all Catalog routes preserve shape and cursor stability across a tied key a
     });
   }
   for (const query of ["page=2", "limit=0", "cursor=not-a-cursor"]) {
-    const invalid = await fetch(`${base}/api/${names[0]}?${query}`);
+    const invalid = await fetch(`${base}/api/${selected[0]}?${query}`);
     assert.equal(invalid.status, 400, `invalid pagination request was accepted: ${query}`);
+  }
+  if (scope === "first12") {
+    for (const resource of names.slice(12)) {
+      const oldRoute = await fetch(`${base}/api/${resource}?page=2&limit=2`);
+      assert.equal(oldRoute.status, 200, `${resource} was changed outside the narrowed scope`);
+      const page = await oldRoute.json();
+      assert.deepEqual(Object.keys(page).sort(), ["data", "meta"]);
+    }
   }
 });

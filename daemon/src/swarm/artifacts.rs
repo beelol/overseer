@@ -241,8 +241,9 @@ pub(super) fn pending_patch_integration(conn: &rusqlite::Connection, run: &str, 
         params![run,job], |r| r.get(0),
     )?;
     let mut stmt = conn.prepare(
-        "SELECT evidence FROM swarm_decisions WHERE run_id=?1 AND job_id=?2
-         AND revision=?3 AND decision='accept'",
+        "SELECT d.evidence FROM swarm_decisions d
+         JOIN swarm_attempts a ON a.id=d.attempt_id AND a.run_id=d.run_id
+         WHERE d.run_id=?1 AND d.job_id=?2 AND a.revision=?3 AND d.decision='accept'",
     )?;
     let reviewed = stmt.query_map(params![run,job,revision], |r| r.get::<_,String>(0))?
         .collect::<rusqlite::Result<Vec<_>>>()?;

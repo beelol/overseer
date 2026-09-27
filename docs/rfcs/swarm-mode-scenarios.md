@@ -175,6 +175,10 @@ contract revision history and test evidence. No automatic merge/push. Variants i
 conflicting patch, worker attempting a shared dependency upgrade, failure of combined tests,
 and user narrowing scope to 12 modules. Preserve conflicting artifacts, require director
 ownership for shared changes, reject failing integration, and supersede excluded work.
+For the 12-module variant, verify the combined branch against the selected routes while
+the excluded routes keep their original behavior. A shared contract change must remain
+compatible with those excluded routes; an accepted but unintegrated selected patch cannot
+count toward completion.
 
 Required: SWARM-05/07/18–21/29/32/34/35/42–46/48/56/64.
 
