@@ -34,9 +34,27 @@ fn preview_preserves_admitted_harness_identity_and_rejects_unknown_harness() {
     let d = Daemon::start(&[]);
     let mut target_snapshot = snapshot(Some(60000), true);
     target_snapshot["targets"][1]["harness"] = json!("claude");
+    target_snapshot["targets"][1]["profile_id"] = json!("system-claude");
+    target_snapshot["targets"][1]["model"] = json!("sonnet");
+    target_snapshot["targets"][1]["effort"] = json!("medium");
     let result = preview(&d, target_snapshot.clone(), &["qualified"], 1000, 0);
     assert_eq!(result["targets"]["qualified"]["harness"], "claude");
+    assert_eq!(result["targets"]["qualified"]["profile_id"], "system-claude");
+    assert_eq!(result["targets"]["qualified"]["model"], "sonnet");
+    assert_eq!(result["targets"]["qualified"]["effort"], "medium");
     assert_eq!(result["targets"]["cheap"]["harness"], "generic");
+    let mut no_effort = target_snapshot.clone();
+    no_effort["targets"][1]["effort"] = Value::Null;
+    let result = preview(&d, no_effort, &["qualified"], 1000, 0);
+    assert_eq!(result["targets"]["qualified"]["eligible"], true);
+    assert!(result["targets"]["qualified"]["effort"].is_null());
+    let mut incomplete = target_snapshot.clone();
+    incomplete["targets"][1]["model"] = Value::Null;
+    let error = d.try_call("swarm.policy.preview",json!({"snapshot":incomplete,
+        "request":{"now_ms":1200,"allowed_targets":["qualified"],
+            "required_capabilities":["write"],"purpose":"worker",
+            "estimate_milli":{"points":1000}}})).unwrap_err();
+    assert!(error.contains("incomplete or invalid target route"), "{error}");
     target_snapshot["targets"][1]["harness"] = json!("unknown");
     let error = d.try_call("swarm.policy.preview",json!({"snapshot":target_snapshot,
         "request":{"now_ms":1200,"allowed_targets":["qualified"],

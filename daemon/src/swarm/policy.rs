@@ -20,6 +20,12 @@ struct Target {
     id: String,
     #[serde(default = "default_fixture_harness")]
     harness: String,
+    #[serde(default)]
+    profile_id: Option<String>,
+    #[serde(default)]
+    model: Option<String>,
+    #[serde(default)]
+    effort: Option<String>,
     account_id: String,
     pool_ids: Vec<String>,
     capabilities: Vec<String>,
@@ -121,6 +127,15 @@ pub fn preview(p: &Value) -> Result<Value> {
             .contains(&target.harness.as_str())
         {
             bail!("invalid target harness");
+        }
+        let route_values = [&target.profile_id, &target.model, &target.effort];
+        if route_values.iter().filter_map(|value| value.as_deref()).any(|value| value.is_empty()
+            || value.len() > 128 || value.chars().any(char::is_control))
+            || (target.harness == "generic" && route_values.iter().any(|value| value.is_some()))
+            || (target.harness != "generic"
+                && (target.profile_id.is_none() || target.model.is_none()))
+        {
+            bail!("incomplete or invalid target route");
         }
         if target.auth == "revoked" {
             revoked_accounts.insert(target.account_id.as_str());
@@ -244,7 +259,8 @@ pub fn preview(p: &Value) -> Result<Value> {
         results.insert(
             target.id.clone(),
             json!({"eligible":reason.is_none(),"reason":reason,"account_id":target.account_id,
-                "harness":target.harness,"windows":windows}),
+                "harness":target.harness,"profile_id":target.profile_id,
+                "model":target.model,"effort":target.effort,"windows":windows}),
         );
     }
     let mut target_json = Map::new();

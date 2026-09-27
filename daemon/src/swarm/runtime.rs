@@ -252,6 +252,7 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
     }
     let digest = format!("{:x}", Sha256::digest(p.to_string().as_bytes()));
     let assigned_prompt;
+    let assigned_route;
     let attempt_revision;
     {
         let store = d.store.lock().unwrap();
@@ -282,13 +283,23 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
         if current["status"] != "running" && current["status"] != "planning" {
             bail!("swarm run is not launching workers");
         }
-        let admitted_harness: Option<String> = store.conn.query_row(
-            "SELECT target_harness FROM swarm_admissions
+        let admitted_route: Option<(Option<String>,Option<String>,Option<String>,Option<String>)> = store.conn.query_row(
+            "SELECT target_harness,target_profile_id,target_model,target_effort FROM swarm_admissions
              WHERE attempt_id=?1 AND run_id=?2 AND job_id=?3",
-            params![attempt,run,job], |row| row.get(0),
-        ).optional()?.flatten();
+            params![attempt,run,job], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?)),
+        ).optional()?;
+        let Some((admitted_harness, profile_id, model, effort)) = admitted_route else {
+            bail!("attempt has no admitted target route");
+        };
         if admitted_harness.as_deref() != Some(harness) {
             bail!("worker harness does not match admitted target harness");
+        }
+        if (harness != "generic" && (profile_id.is_none() || model.is_none()))
+            || [ ("profile_id",profile_id.as_deref()), ("model",model.as_deref()),
+                ("effort",effort.as_deref()) ].iter().any(|(key,selected)|
+                    p.get(*key).is_some() && p[*key].as_str() != *selected)
+        {
+            bail!("worker launch changes admitted target route");
         }
         let eligible: bool = store.conn.prepare(
             "SELECT 1 FROM swarm_admissions a JOIN swarm_jobs j ON j.run_id=a.run_id AND j.id=a.job_id
@@ -312,11 +323,15 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
                 params![attempt,run,job,digest,crate::daemon::now()],
             )?;
         }
+        // The admitted route is the source of profile and model choices; the
+        // caller's launch payload cannot replace them between selection and spawn.
+        assigned_route = (profile_id, model, effort);
     }
     let program_override = if harness == "generic" { json!(program) } else { Value::Null };
     let task = d.create_task_for_swarm(
         &json!({
             "repo":repo,"harness":harness,"workspace_mode":"worktree",
+            "profile_id":assigned_route.0,"model":assigned_route.1,"effort":assigned_route.2,
             "program":program_override,"args":args,"prompt":assigned_prompt,"title":title,
         }),
         &SwarmWorkerIdentity {

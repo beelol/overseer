@@ -357,6 +357,9 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           attempt_id TEXT NOT NULL REFERENCES swarm_attempts(id),
           target_id TEXT NOT NULL,
           target_harness TEXT,
+          target_profile_id TEXT,
+          target_model TEXT,
+          target_effort TEXT,
           created_ms INTEGER NOT NULL,
           PRIMARY KEY(run_id,request_id)
         );
@@ -598,6 +601,13 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         // cannot authorize a new worker process until reconciled.
         conn.execute_batch("ALTER TABLE swarm_admissions ADD COLUMN target_harness TEXT;")?;
     }
+    for column in ["target_profile_id", "target_model", "target_effort"] {
+        let exists = conn.prepare("SELECT 1 FROM pragma_table_info('swarm_admissions') WHERE name=?1")?
+            .exists([column])?;
+        if !exists {
+            conn.execute_batch(&format!("ALTER TABLE swarm_admissions ADD COLUMN {column} TEXT;"))?;
+        }
+    }
     let has_turn_applied_count = conn
         .prepare("SELECT 1 FROM pragma_table_info('swarm_director_turns') WHERE name='applied_count'")?
         .exists([])?;
@@ -634,11 +644,12 @@ mod tests {
             INSERT INTO swarm_admissions VALUES('run','request','hash','job','attempt','target',1);")
             .unwrap();
         migrate(&conn).unwrap();
-        let binding: Option<String> = conn.query_row(
-            "SELECT target_harness FROM swarm_admissions WHERE request_id='request'",
-            [], |row| row.get(0),
+        let binding: (Option<String>,Option<String>,Option<String>,Option<String>) = conn.query_row(
+            "SELECT target_harness,target_profile_id,target_model,target_effort
+             FROM swarm_admissions WHERE request_id='request'",
+            [], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?)),
         ).unwrap();
-        assert_eq!(binding,None);
+        assert_eq!(binding,(None,None,None,None));
         migrate(&conn).unwrap();
     }
 
