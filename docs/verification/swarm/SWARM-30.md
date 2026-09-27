@@ -55,3 +55,22 @@ SWARM-30 stays partial.
 
 Replay: `cargo test --offline -q -p overseerd --test swarm_director_loop --test swarm_director_process --test swarm_control --test swarm_director --test swarm_effects -- --test-threads=1`;
 `cargo test --workspace --offline -q -- --test-threads=1`.
+
+Startup no-spawn follow-up at `6f3dcdd1`: a scripted director launch under a
+one-agent global limit fails before a task, run, or supervisor request is
+created. The original focused test failed after daemon restart: generation 1
+still held an active, unlinked `reserved` owner, so the run could not launch a
+replacement. Startup now reconciles only that durable `reserved`/unlinked
+phase as `confirmed_no_spawn`, advances once to generation 2, and leaves the
+run visibly awaiting a replacement. A second restart does not advance it
+again; after the occupying ordinary process exits, generation 2 launches a
+supervised director. The older injected task-insertion failure now exercises
+the same automatic startup path. A linked pre-supervisor failure still needs
+explicit no-spawn reconciliation, while `spawn_requested` remains uncertain
+and reserved. The focused test was red before the fix and green after it;
+`cargo test -p overseerd --offline --test swarm_director_process --test
+swarm_director_owner --test swarm_director -q` passed 14, 3 and 11 tests.
+The neighboring director-loop and worker-runtime suites passed 8 and 24 tests;
+the coverage JSON, link check (699 links, zero broken), and diff check passed.
+This is local scripted recovery, not live model-director selection or shared
+Auto allowance admission. SWARM-30 remains partial.
