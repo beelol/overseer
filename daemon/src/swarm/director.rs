@@ -13,16 +13,19 @@ fn hash(token: &str) -> String {
     format!("{:x}", Sha256::digest(token.as_bytes()))
 }
 
-/// At daemon startup, an unlinked supervised owner still in `reserved` has
-/// never reached the task/run link or supervisor request. Only this exact
-/// state proves no process could have started; all later phases require the
-/// ordinary uncertain-spawn or confirmed-exit reconciliation path.
-pub fn recover_reserved_no_spawn(store: &mut Store) -> Result<usize> {
+/// At daemon startup, a supervised owner in `reserved` or `linked` has not
+/// committed a supervisor request. A linked run also needs a missing process
+/// directory. These are the only durable phases that prove no spawn; a later
+/// `spawn_requested` phase keeps its ownership and capacity uncertain.
+pub fn recover_proven_no_spawn(store: &mut Store) -> Result<usize> {
     let mut stmt = store.conn.prepare(
         "SELECT o.run_id,o.generation,s.revision FROM swarm_director_owners o
          JOIN swarm_runs s ON s.id=o.run_id AND s.generation=o.generation
+         LEFT JOIN runs r ON r.id=o.overseer_run_id
          WHERE o.status='active' AND o.supervised_launch=1
-           AND o.launch_phase='reserved' AND o.overseer_run_id IS NULL
+           AND ((o.launch_phase='reserved' AND o.overseer_run_id IS NULL)
+                OR (o.launch_phase='linked' AND o.overseer_run_id IS NOT NULL
+                    AND r.id IS NOT NULL AND r.run_dir IS NULL))
            AND (s.status IN ('planning','running','paused','draining')
                 OR (s.status='stalled' AND s.stall_reason='director_termination_unknown'))
          ORDER BY o.run_id",

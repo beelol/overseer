@@ -371,10 +371,9 @@ fn director_identity_is_durable_before_supervisor_launch() {
         "caller assertion cannot replace a director with an unconfirmed launch");
     d.kill9();
     d.spawn();
-    let recovered = d.call("swarm.director.recover",json!({"run_id":id,
-        "generation":1,"revision":0,"termination":"confirmed_no_spawn"}));
+    let recovered = d.call("swarm.get",json!({"id":id}));
     assert_eq!(recovered["generation"],2);
-    assert_eq!(recovered["replacement_pending"],true);
+    assert_eq!(recovered["stall_reason"],"director_replacement_pending");
 }
 
 #[test]
