@@ -1,6 +1,6 @@
 # Audio Mode verification (pull request #5)
 
-Criterion: [AC-142](AC-142.md), Gate O in [the RFC](../overseer-rfc.md). Design:
+Criterion: [AC-143](AC-143.md), Gate O in [the RFC](../overseer-rfc.md). Design:
 [side RFC](../rfcs/audio-mode.md). Tested implementation commit: `d7be0a3`; later commits on
 the branch change documents, comments and evidence only. Date: 2026-09-26, macOS 26.6.2 arm64.
 

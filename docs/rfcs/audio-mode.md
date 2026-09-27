@@ -1,7 +1,7 @@
 # Side RFC: Audio Mode — opt-in cues from the daemon
 
 Status: owner request (2026-09-26). Tracked by
-[AC-142](../overseer-rfc.md#gate-o--audio-mode-added-by-the-owner-2026-09-26) in the main RFC.
+[AC-143](../overseer-rfc.md#gate-o--audio-mode-added-by-the-owner-2026-09-26) in the main RFC.
 Built in pull request #5; evidence in [the audio ledger](../verification/audio-mode.md).
 
 ## Why
@@ -99,5 +99,5 @@ request #6) and spoken detail for every event.
 
 ## Acceptance
 
-AC-142 in the main RFC is the criterion. The [audio ledger](../verification/audio-mode.md)
+AC-143 in the main RFC is the criterion. The [audio ledger](../verification/audio-mode.md)
 maps each part of it to a test or a live check and records the results.

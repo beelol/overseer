@@ -1184,8 +1184,13 @@ rec(141, "Pair once", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
     actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
 
+# Brand (added by the owner on 2026-09-26; docs/design/brand.md). Not started: waits for the owner's image files.
+rec(142, "One Overseer mark everywhere", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Brand) and [docs/design/brand.md](../design/brand.md).",
+    actual="Not started.", live="—", blocker="Not started: the owner's two images need to be added to docs/design/brand/ as files; then the single-colour glyph is drawn for VS Code and approved.")
+
 # Gate O, Audio Mode (added by the owner on 2026-09-26; docs/rfcs/audio-mode.md). Built in its own pull request (#5).
-rec(142, "Opt-in audio cues owned by the daemon", "verified", date="2026-09-26",
+rec(143, "Opt-in audio cues owned by the daemon", "verified", date="2026-09-26",
     commit="d7be0a3 (branch codex/reactor-audio-mode, pull request #5); later commits on the branch change documents, comments and evidence only",
     harness="Fixture harnesses only (Claude fixture, Codex app-server fixture, generic programs); no paid tokens. Live playback through macOS `afplay` and `say`",
     fixture="Real Git repositories created per test; isolated OVERSEER_HOME; isolated VS Code profile for the UI scenario. The owner-approved pack: the owner's own copy (`cp -RL`) of `machines-voice-lab/output/reactor-selected-current`, made because macOS denies the agent's app access to `~/Downloads`",
@@ -1208,12 +1213,13 @@ rec(142, "Opt-in audio cues owned by the daemon", "verified", date="2026-09-26",
 - **Failing quietly:** with the cache blocked, or the Commander folder removed, the agent completes and the failure is in the daemon log; an unknown cue key is refused.
 - **Other platforms:** with the players taken away by a test switch the daemon reports `available: false`, refuses to turn on, to preview and to list voices, and an agent completes in silence even when the setting was already on.
 - **VS Code:** the Agents title bar is unchanged from main (New Agent, Search Agents, Toggle Agent Grid, VS Code's Collapse All); *Audio Mode and Reactor Cues…* is in the overflow menu; turning on, choosing a track and a preview go through the daemon. 10 of 10 checks.
-- **Merge:** the branch contains main (1493b5e); the virtual merge is clean.""",
+- **Merge:** the branch contains main (28fe118); the virtual merge is clean.""",
     evidence="[daemon tests](evidence/audio-mode/cargo-test-overseerd.txt), [extension and whitespace checks](evidence/audio-mode/extension-check.txt), [pack check](evidence/audio-mode/pack-check.txt), [live playback](evidence/audio-mode/live-playback.txt), [VS Code scenario](evidence/ui/audio/), [requirement by requirement](audio-mode.md)",
     live="Live macOS playback (`afplay`, `say`) and the packaged VSIX in VS Code; agents are fixtures.",
     limits="macOS only; no other platform was run (the unavailable path is exercised on macOS through a test switch; Linux belongs to AC-41). The Commander check used three generated beeps in a temporary private folder; the owner's recordings were not read. The pack was compared with the owner's copy of the approved folder, not the folder itself. Nobody listened: the checks prove that the approved files are the ones played, not how they sound.")
 
 SHORT_BLOCKERS = {
+    142: "not started: waits for the owner\'s logo files",
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
     12: "not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending",
     41: "deferred: no Linux environment",
