@@ -1,5 +1,5 @@
-$ git rev-parse --short HEAD   # daemon, extension and fixtures are identical to d7be0a3
-d668d32
+$ git rev-parse --short HEAD
+106d3e8
 $ python3 docs/verification/evidence/audio-mode/check-pack.py --approved <owner-approved folder>
 # <owner-approved folder>: a copy the owner made on 2026-09-26 of the voice lab's reactor-selected-current,
 # because the agent's tools cannot read the folder the voice lab is in.
