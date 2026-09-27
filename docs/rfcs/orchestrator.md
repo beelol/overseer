@@ -42,6 +42,10 @@ The owner's request (2026-09-27), in the owner's words where it matters:
 | Knowing each agent's progress | Overseer should always know how each agent is getting on. It checks in every now and then, counted in turns (every third turn), and when the agent is done. How closely it follows an agent is the owner's to direct. When the owner asks it for something, it gets up to speed first. |
 | How much Overseer may do alone | Three levels. **Ask first** is the default. **Steer** is wanted. **Auto** is an option: on Auto, Overseer steers on its own. |
 | What the owner types at Steer and Auto | It goes out without a yes, after a short window in which it can be corrected or cancelled. |
+| A check-in when something looks wrong | Yes. Besides the cadence, a check-in is due when one of the daemon's free checks trips. |
+| Caps | Overseer starts at most 100 turns a day by itself, check-ins included, and a watch wakes at most 12 times an hour. A turn that answers the owner is never counted and never refused. |
+| Which model runs Overseer | The default account's harness, as AC-107 does. It can be changed, and route picking chooses when it is on. |
+| Building | Nothing is started now; the criteria are on main. This gate and Voice Mode can be built in parallel. |
 | What Auto means | The Auto an agent has when it is left to work on its own (the permission mode). Overseer has that kind of Auto too. It is Overseer's own switch. |
 | Choosing who does the work | A different layer from Overseer's Auto, and it should perhaps have another name. It is the feature of pull request #2, called Auto mode there. This document calls it *route picking*. The owner's remark is passed on in a comment on that pull request; the name is theirs to settle. |
 | Who acts on what a watcher finds | Overseer. It acts for the watcher and tells the agent what to do. |
@@ -53,17 +57,18 @@ The owner's request (2026-09-27), in the owner's words where it matters:
 These are this RFC's choices, not the owner's. They stand until the owner changes them; a change
 is a recorded revision.
 
-- **Which model runs Overseer.** The default account's harness, as AC-107 does, configurable.
-  Route picking chooses when it is on.
-- **Caps.** At most 100 turns a day that the owner did not start, check-ins included, and 12 wakes
-  an hour per watch. What the owner asks is always answered.
-- **A check-in when something looks wrong.** Besides the owner's cadence, a check-in is due when
-  one of the daemon's free checks trips ([Keeping agents on task](#keeping-agents-on-task)).
 - **Briefings and the channel.** An agent is told about the others, and can message Overseer, only
   when more than one agent works in a repository
-  ([Agents that know about each other](#agents-that-know-about-each-other)).
-- **Permission requests.** Overseer never answers one by itself. The owner can answer one from the
-  conversation.
+  ([Agents that know about each other](#agents-that-know-about-each-other)). The owner is not
+  sure yet (2026-09-27). The other choice is every agent, always: simpler to explain, and a lone
+  agent then carries a paragraph and three commands it has no use for.
+- **Permission requests.** Overseer never answers one by itself, at any level. The owner can answer
+  one from the conversation. The owner is not sure yet (2026-09-27) and wondered whether Auto
+  should answer them. The reason for never: an agent that asks is an agent the owner told to ask.
+  To let an agent work without asking, the owner runs that agent on Auto, and then it sends no
+  request for Overseer to answer. If Overseer answered for it, it would loosen the agent's
+  permission mode behind the owner's back, which AC-16 and AC-138 rule out. Changing this is a
+  recorded revision of AC-185 and of AC-16.
 - **Hold on stop.** A watch can be set to hold its subject the instant the watcher raises a *stop*.
 - **The name.** *Route picking* is this document's word for choosing who does the work. Candidates
   for the product's name: *Routing*, *Match*. Nothing in this gate depends on it.
@@ -353,7 +358,7 @@ messages, the changed files) and gives one result, with its reason:
 | --- | --- |
 | Every third turn of the agent | The default. |
 | When the agent finishes | Its result is *done*, or *drifting* if it stopped short. |
-| When a free check trips | Proposed by this RFC. |
+| When a free check trips | Something looks wrong. Confirmed by the owner. |
 | As the owner directs | "Check on Phone every turn." "Leave Docs alone until it is done." Said in the conversation or set on the agent: every turn up to every twentieth, only when done, or off. |
 
 Check-ins for several agents within 5 s are one turn.
@@ -487,7 +492,7 @@ two describe one Overseer, so they share what follows.
 
 | Topic | Rule |
 | --- | --- |
-| One Overseer | Typed and spoken messages are one conversation with one memory, kept by the daemon. Gate R says the session moves from the extension into the daemon; this gate is where it is built (AC-181). If Voice Mode is built first, it builds the session and this gate extends it. |
+| One Overseer | Typed and spoken messages are one conversation with one memory, kept by the daemon. Gate R says the session moves from the extension into the daemon; this gate is where it is built (AC-181). The two can be built in parallel: the session's daemon methods are the contract, written down by whoever reaches that step first. |
 | What the orchestrator sees | Voice Mode's view for a request (roster, focus, recent events) is drawn from this gate's roster and digests. One source, so both know the same things about an agent. |
 | Classes | The four tiers of AC-171 are the four classes here. |
 | Delivery, states, cards | AC-167's add, redirect and stop; AC-169's states and card. A typed request and a spoken one leave the same record. |
@@ -578,9 +583,11 @@ decision).
   what the owner asked to be told about.
 - Events within 5 s are one turn (at most 20 items or 32 KiB). Never two turns at once. An
   unchanged state causes no turn. Swarm's director and route picking follow the same rule.
-- Turns the owner did not start are capped per day (proposed: 100, check-ins included). At the cap
-  Overseer says so and waits for the owner; what the owner asks is always answered, and the free
-  checks keep running.
+- **Two kinds of turn.** A turn that answers the owner (something typed or said) is never counted
+  and never refused. A turn Overseer starts by itself is counted: a check-in, or what it does
+  about a finding, a conflict or an agent's question.
+- Overseer starts at most 100 turns a day by itself. At the cap it says so and waits for the
+  owner, and the free checks keep running.
 - The conversation shows what Overseer and the watchers have used.
 - Verification follows the paid-turn rules: fixtures throughout, one tiny live run where a
   criterion asks for it, one attempt per step.
@@ -634,8 +641,11 @@ A snapshot of 2026-09-27; the implementing session rechecks at every step.
 | Gate P | merged (#13) | `scripts/test-all` is on main; this gate's tests join it (AC-201). |
 | Terminal UI | on main | Gains one key and three badges. |
 
-This gate, Voice Mode and AC-107 all touch the one Overseer session. Whoever builds first says so
-in its pull request, and the other two build on it.
+This gate and Voice Mode can be built in parallel (the owner, 2026-09-27). Most of each is its
+own: the listener, the floor and speech there; digests, conflicts, holds, check-ins and watches
+here. What they share is the one Overseer session in the daemon. Its daemon methods are the
+contract between them: whoever reaches that step first writes them down in its pull request, and
+the other builds on them, as the phone remote and Gate M did for the review's methods.
 
 ## Limits and out of scope
 
