@@ -154,6 +154,44 @@ describe('push on Android in this gate', () => {
   });
 });
 
+describe('push on iOS', () => {
+  test("a notification from Apple's service carries the sender's own keys, not only Expo's body", () => {
+    jest.isolateModules(() => {
+      const handlers: ((response: unknown) => void)[] = [];
+      jest.doMock('expo-notifications', () => ({
+        DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
+        IosAuthorizationStatus: { PROVISIONAL: 3, EPHEMERAL: 4 },
+        addNotificationResponseReceivedListener: (handler: (response: unknown) => void) => {
+          handlers.push(handler);
+          return { remove: () => undefined };
+        },
+      }));
+      const { createPush } = require('../native/push.ios') as typeof import('../native/push.ios');
+      const seen: unknown[] = [];
+      createPush().onResponse((response) => seen.push(response));
+      const overseer = { v: 1, kind: 'permission', run_id: 'r-1', task_id: 't-1', request_id: 'q-1' };
+      expect(handlers).toHaveLength(1);
+      handlers[0]?.({
+        actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+        notification: {
+          request: {
+            identifier: 'n-1',
+            // What expo-notifications gives for a remote notification without a `body` key.
+            content: { title: 'Claude · shop', body: 'Needs your permission', data: null, categoryIdentifier: 'OVERSEER_PERMISSION' },
+            trigger: { type: 'push', payload: { aps: { alert: { title: 'Claude · shop' } }, overseer } },
+          },
+        },
+      });
+      expect(seen).toEqual([
+        {
+          actionId: null,
+          notification: { id: 'n-1', title: 'Claude · shop', body: 'Needs your permission', categoryId: 'OVERSEER_PERMISSION', data: { overseer } },
+        },
+      ]);
+    });
+  });
+});
+
 describe('haptics', () => {
   const moments = ['selection', 'confirm', 'reject', 'warning', 'impact'] as const;
 

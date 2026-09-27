@@ -27,9 +27,24 @@ function toJson(value: unknown): Json {
   return null;
 }
 
+/**
+ * What a notification carries besides its text. For a notification from Apple's service,
+ * expo-notifications gives only the payload's `body` key as `content.data` (the shape of Expo's
+ * own push service); the whole payload is in the trigger. Everything but `aps` is taken from
+ * there, so a sender's own keys (the daemon's `overseer`) reach the app.
+ */
+function dataOf(request: Notifications.NotificationRequest): Json {
+  const trigger = request.trigger as { type?: unknown; payload?: unknown } | null;
+  const remote =
+    trigger !== null && trigger.type === 'push' && typeof trigger.payload === 'object' && trigger.payload !== null
+      ? Object.fromEntries(Object.entries(trigger.payload).filter(([key]) => key !== 'aps'))
+      : {};
+  return toJson({ ...remote, ...(request.content.data ?? {}) });
+}
+
 function toNotification(notification: Notifications.Notification): PushNotification {
   const { identifier, content } = notification.request;
-  const data = toJson(content.data ?? {});
+  const data = dataOf(notification.request);
   return {
     id: identifier,
     title: content.title,
