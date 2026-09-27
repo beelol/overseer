@@ -25,6 +25,23 @@
       }
     },
     {
+      "name": "until opened it is one line, Continuity is on · Got it, within the composer's text budget",
+      "ok": true,
+      "detail": {
+        "open": false,
+        "text": "Continuity is on Got it"
+      }
+    },
+    {
+      "name": "opened, it says what may happen and its Allow is one click",
+      "ok": true,
+      "detail": {
+        "open": true,
+        "allowVisible": true,
+        "line": "If the connection drops, agents keep wor"
+      }
+    },
+    {
       "name": "when downloads are first allowed, Overseer offers once to keep the best-fitting model ready, naming it and its size; Not now leaves prefetch off",
       "ok": true,
       "detail": {
@@ -53,7 +70,7 @@
           "allow_ollama_install": false,
           "enabled": true,
           "show": false,
-          "shown_ms": 1790518041288
+          "shown_ms": 1790520884040
         }
       }
     },
@@ -166,7 +183,7 @@
       "detail": [
         "Local model qwen3-coder:30b at a 64k context · 23.7 GiB, already loaded.",
         "This agent continues the work of another.Open the first agent",
-        "Continued from \"Rename the helpers\" after the connection was lost at 07:07."
+        "Continued from \"Rename the helpers\" after the connection was lost at 07:54."
       ]
     },
     {
@@ -204,7 +221,7 @@
       "detail": {
         "title": "Waiting for a connection",
         "line": "The connection to OpenAI failed: stream disconnected before completion: error sending request for url (https://chatgpt.com/backend-api/codex/responses): client error (Connect): dns error: failed to lookup address information. Your message is kept.",
-        "foot": "Next check in 7 s · waiting 4 s · gives up after 36 hours",
+        "foot": "Next check in 9 s · waiting 4 s · gives up after 36 hours",
         "actions": [
           "Use a local model now",
           "Retry now",
@@ -248,12 +265,12 @@
       "ok": true,
       "detail": {
         "taken": {
-          "at_ms": 1790518068613,
+          "at_ms": 1790520912207,
           "offered_ms": null,
-          "predecessor": "r-d992c2f7f648",
+          "predecessor": "r-d741cd226e6f",
           "reason": "user",
           "stay": false,
-          "successor": "r-1cae77dc2232"
+          "successor": "r-19b83560718f"
         },
         "takenDone": "completed",
         "shownNext": true
@@ -283,11 +300,11 @@
       "ok": true,
       "detail": {
         "backDone": "completed",
-        "session": "fixture-thread-91940",
+        "session": "fixture-thread-4881",
         "args": [
           "exec",
           "resume",
-          "fixture-thread-91940"
+          "fixture-thread-4881"
         ]
       }
     },

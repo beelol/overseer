@@ -175,6 +175,7 @@
     if (!data || !data.notice || !data.notice.show || s.enabled === false) return undefined;
     return {
       title: 'Continuity is on',
+      more: 'What Continuity does, and the download and install settings',
       text: 'If the connection drops, agents keep working: on another provider that can be reached, or on a local model that fits this machine\'s memory. When neither is possible they wait and retry.',
       switches: [
         { setting: 'allowModelDownloads', label: 'Download local models', on: !!s.allowModelDownloads, detail: 'Off: only models that are installed are used.' },

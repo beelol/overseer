@@ -322,7 +322,12 @@
     if (noticeEl && noticeEl.isConnected && key === noticeKey) return;
     noticeKey = key;
     const box = el('section', 'cont-notice'); box.dataset.continuity = 'notice'; box.setAttribute('aria-label', n.title);
-    const head = el('div', 'cont-head'); head.append(ui.icon('cloud', 'sm'), el('span', 'cont-title', n.title));
+    // Compact where it sits (AC-54's text budget): one line names the mode and Got it ends it; the
+    // explanation and the two settings unfold from that line, and their Allow is one click once open.
+    const details = el('details', 'cont-details');
+    const head = el('summary', 'cont-head'); head.title = n.more;
+    const chevron = ui.icon('chevron-down', 'sm'); chevron.classList.add('cont-chevron');
+    head.append(ui.icon('cloud', 'sm'), el('span', 'cont-title', n.title), chevron);
     const switches = el('div', 'cont-switches');
     for (const s of n.switches) {
       const row = el('div', 'cont-switch'); row.dataset.setting = s.setting;
@@ -332,13 +337,14 @@
       row.append(el('span', 'detail', s.on ? '' : s.detail));
       switches.append(row);
     }
-    const actions = el('div', 'cont-actions');
+    const actions = el('div', 'cont-actions'), inside = el('div', 'cont-actions');
     for (const a of n.actions) {
       const b = el('button', 'btn sm' + (a.primary ? ' primary' : ''), a.label); b.type = 'button'; b.dataset.continuity = a.id;
       b.addEventListener('click', () => window.OverseerContinuity.post({ type: 'command', command: 'overseer.continuity.act', args: { action: a.id } }));
-      actions.append(b);
+      (a.primary ? actions : inside).append(b);
     }
-    box.append(head, el('div', 'cont-line', n.text), switches, actions);
+    details.append(head, el('div', 'cont-line', n.text), switches, inside);
+    box.append(details, actions);
     if (noticeEl) noticeEl.replaceWith(box); else at.before(box);
     noticeEl = box;
   }

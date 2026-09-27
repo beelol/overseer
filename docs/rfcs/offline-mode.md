@@ -634,6 +634,11 @@ agent is started with Continuity on, while the user is looking, not at the momen
 
 - One card above the composer (and in New Task); dismissing it records `continuity.notice_shown` in the
   daemon's `meta` table, so it appears once across windows and reinstalls.
+- As built (2026-09-27, for AC-54's text budget: the composer may carry no more visible text than
+  Gate J's 133 characters, and the full card put it at 491): the card is **one line until opened**,
+  *Continuity is on* with **Got it**; the explanation, the two settings with their **Allow** and *Turn
+  Continuity off* unfold from that line (a details disclosure, its tooltip saying what is behind it).
+  Allow is one click once the line is open.
 - Turning Continuity off later is the one **Continuity** switch in the Accounts view and in settings.
 - The first actual transition is announced in the chat as described above; the notice is not repeated
   there.
@@ -745,8 +750,8 @@ As built (2026-09-26), in `extension/src/continuity.js` (the host), `extension/m
   not installed behind one entry. The badge is the guard's own answer (`local.models`). Offline, the
   online agents are disabled with the reason, a line above the field says so, and one click moves
   to the best local model; back online, the last online agent is the default again. A local agent
-  needs no account. The first-use notice sits above the field, once per machine, with the two Allow
-  switches and *Turn Continuity off*.
+  needs no account. The first-use notice sits above the field, once per machine, one line until
+  opened, with the two Allow switches and *Turn Continuity off* behind it.
 - **Chat and tiles:** the announcements are one quiet line each. A waiting agent shows one card:
   the title, *Your message is kept*, *Next check in 40 s · waiting 2 min · gives up after 36 hours*,
   and **Use a local model now** (or *Continue with Claude Code*), **Retry now**, **Stop**; a move

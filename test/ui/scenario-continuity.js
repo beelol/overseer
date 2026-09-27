@@ -89,6 +89,12 @@ const G = 2 ** 30;
     // ---- The first-use notice (AC-98): once, with Allow ----
     const notice = await dash.waitFor(`(() => { const n = document.querySelector('[data-continuity="notice"]'); return n && n.offsetParent ? { title: n.querySelector('.cont-title')?.textContent, switches: [...n.querySelectorAll('.cont-switch')].map(r => r.dataset.setting + ':' + r.querySelector('.state').textContent) } : null; })()`, 15000);
     check('the first time, one notice above the composer says what Continuity does and shows downloads and install as off', notice && notice.title === 'Continuity is on' && notice.switches.join(',') === 'allowModelDownloads:off,allowOllamaInstall:off', notice);
+    // Compact where it sits (AC-54): one line and Got it; the explanation and the settings unfold from it.
+    const compact = await dash.eval(`(() => { const n = document.querySelector('[data-continuity="notice"]'); const d = n && n.querySelector('details'); return d ? { open: d.open, text: n.innerText.replace(/\\s+/g, ' ').trim() } : null; })()`);
+    check('until opened it is one line, Continuity is on · Got it, within the composer\'s text budget', compact && !compact.open && compact.text.length <= 30, compact);
+    { const at = await s.webviewPoint(dash, '[data-continuity="notice"] summary'); await cdp.click(at.x, at.y); await delay(600); }
+    const unfolded = await dash.eval(`(() => { const n = document.querySelector('[data-continuity="notice"]'); const d = n.querySelector('details'); const b = n.querySelector('[data-continuity="allow:allowModelDownloads"]'); return { open: d.open, allowVisible: !!(b && b.offsetParent), line: n.querySelector('.cont-line')?.textContent.slice(0, 40) }; })()`);
+    check('opened, it says what may happen and its Allow is one click', unfolded && unfolded.open && unfolded.allowVisible && /^If the connection drops/.test(unfolded.line || ''), unfolded);
     await s.screenshot('notice-dark');
     { const at = await s.webviewPoint(dash, '[data-continuity="allow:allowModelDownloads"]'); await cdp.click(at.x, at.y); await delay(1200); }
     // Downloads first allowed: the one-time offer to keep the best-fitting model ready, declined.
