@@ -14,7 +14,7 @@ import { Notifications } from '@/notifications';
 import { perf, persistPerf, type PerfStored } from '@/perf';
 import { PlatformProvider, useCapabilities, useLive } from '@/platform';
 import { createNativeCapabilities } from '@/platform/native';
-import { createSession, SessionProvider, useSessionValue } from '@/session';
+import { createSession, holdable, SessionProvider, useSessionValue } from '@/session';
 import { useTheme } from '@/theme';
 
 // The system's launch screen stays until the door's first frame is drawn, so nothing flashes.
@@ -24,6 +24,9 @@ SplashScreen.preventAutoHideAsync().catch(() => undefined);
 // receives them through the providers, exactly as tests receive the fakes.
 const capabilities = createNativeCapabilities({ discovery: GATEWAY_DISCOVERY });
 const session = createSession({ capabilities, app: Constants.expoConfig?.version ?? '0' });
+// What the screens read. It holds still while the door opens: the Mac's first answer comes about
+// then, and drawing it (every row, new text) took frames from the opening on Android.
+const screens = holdable(session);
 const test = capabilities.keyValue.scope<TestSettings>('test');
 const door = coldStart() && doorEnabled(test);
 // Nothing unless the scenario run seeded it, to prove the run notices a slower start.
@@ -46,7 +49,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.fill}>
       <PlatformProvider capabilities={capabilities}>
-        <SessionProvider session={session}>
+        <SessionProvider session={screens}>
           <App />
         </SessionProvider>
       </PlatformProvider>
@@ -103,6 +106,19 @@ function App() {
     }),
     [background, launch, theme],
   );
+
+  // While the door opens, what the Mac sends is taken in but drawn once the door has gone. Never
+  // for longer than two openings, whatever happens to the door.
+  const opening = door && closed && ready && settled;
+  useEffect(() => {
+    if (!opening) return;
+    screens.hold();
+    const timer = setTimeout(() => screens.release(), theme.phone.motion.door.open * 2);
+    return () => {
+      clearTimeout(timer);
+      screens.release();
+    };
+  }, [opening, theme]);
 
   const shown = useCallback(() => {
     perf.mark('door.shown');

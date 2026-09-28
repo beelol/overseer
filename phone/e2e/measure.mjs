@@ -118,7 +118,10 @@ export function timeline(record) {
   const at = (name) => (m[name] === undefined ? 'not yet' : `${round(m[name] - start)}`);
   const stalls = [];
   for (let i = 1; record.summary[`door.stall.${i}.at`] !== undefined; i += 1) stalls.push(`${round(record.summary[`door.stall.${i}.at`].max)} (${round(record.summary[`door.stall.${i}.ms`]?.max ?? NaN)} ms)`);
-  return `from the opening's start at ${round(start)} ms: Mac online ${at('session.online')}, Mac's state ${at('session.state')}, list laid out ${at('screen.agents.list')}; late frames at ${stalls.length > 0 ? stalls.join(', ') : 'none'}`;
+  const waited = record.summary['door.waited']?.max;
+  const moving = record.summary['door.moving']?.max;
+  const ui = waited === undefined ? '' : ` (it waited ${round(waited)} ms for the UI thread to be calm, then moved for ${round(moving ?? NaN)} ms)`;
+  return `from the opening's start at ${round(start)} ms${ui}: Mac online ${at('session.online')}, Mac's state ${at('session.state')}, list laid out ${at('screen.agents.list')}; late frames at ${stalls.length > 0 ? stalls.join(', ') : 'none'}`;
 }
 
 function figures(records) {

@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useFrameCallback, useSharedValue } from 'react-native-reanimated';
+import { useFrameCallback, useSharedValue, type SharedValue } from 'react-native-reanimated';
 
 export interface FrameStats {
   /** Frames drawn while the monitor ran. */
@@ -41,18 +41,30 @@ const STALLS = 8;
  * Counts frames on the UI thread, where animations run: a frame that comes later than one and
  * a half frame times after the last counts as dropped, once for every frame time it missed.
  * It keeps counting while the app's logic is busy, which is what it is there to show.
+ *
+ * `counting` (given) may be set on the UI thread the moment what is measured starts and ends (the door's
+ * first and last frame): frames outside it belong to something else, however early `start` or
+ * late `stop` is called. `start({ counting: false })` waits for it to be set.
  */
-export function useFrameMonitor(): { start(): void; stop(): FrameStats; stalls(): readonly Stall[] } {
+export function useFrameMonitor(given?: SharedValue<boolean>): { start(options?: { counting?: boolean }): void; stop(): FrameStats; stalls(): readonly Stall[]; span(): { first: number; last: number } } {
   const frames = useSharedValue(0);
   const dropped = useSharedValue(0);
   const longest = useSharedValue(0);
   const total = useSharedValue(0);
   const period = useSharedValue(0);
   const late = useSharedValue<Stall[]>([]);
+  const own = useSharedValue(false);
+  const counting = given ?? own;
+  // The first and the last frame counted, on the UI thread's clock (milliseconds).
+  const first = useSharedValue(0);
+  const last = useSharedValue(0);
 
   const callback = useFrameCallback((info) => {
     'worklet';
     const between = info.timeSincePreviousFrame;
+    if (!counting.value) return;
+    if (first.value === 0) first.value = info.timestamp;
+    last.value = info.timestamp;
     if (between === null) return;
     frames.value += 1;
     total.value += between;
@@ -66,14 +78,17 @@ export function useFrameMonitor(): { start(): void; stop(): FrameStats; stalls()
     }
   }, false);
 
-  const start = useCallback(() => {
+  const start = useCallback((options?: { counting?: boolean }) => {
     frames.set(0);
     dropped.set(0);
     longest.set(0);
     total.set(0);
     late.set([]);
+    first.set(0);
+    last.set(0);
+    counting.set(options?.counting ?? true);
     callback.setActive(true);
-  }, [callback, frames, dropped, longest, total, late]);
+  }, [callback, frames, dropped, longest, total, late, counting, first, last]);
 
   const stop = useCallback(() => {
     callback.setActive(false);
@@ -82,5 +97,7 @@ export function useFrameMonitor(): { start(): void; stop(): FrameStats; stalls()
 
   const stalls = useCallback((): readonly Stall[] => late.get(), [late]);
 
-  return { start, stop, stalls };
+  const span = useCallback(() => ({ first: first.get(), last: last.get() }), [first, last]);
+
+  return { start, stop, stalls, span };
 }
