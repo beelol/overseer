@@ -69,7 +69,8 @@ const historyFile = () => path.join(deploysDir(), 'history.json');
 /** Production's environment: nothing that points at another Overseer (AC-212). */
 function cleanEnv(extra = {}) {
   const env = {};
-  for (const [k, v] of Object.entries(process.env)) if (!k.startsWith('OVERSEER_') && k !== 'OVERSEERD') env[k] = v;
+  // CARGO_TARGET_DIR would send the build's binary outside the clone, where the packaging step never looks.
+  for (const [k, v] of Object.entries(process.env)) if (!k.startsWith('OVERSEER_') && k !== 'OVERSEERD' && k !== 'CARGO_TARGET_DIR') env[k] = v;
   return Object.assign(env, extra);
 }
 
