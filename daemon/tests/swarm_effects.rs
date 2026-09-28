@@ -150,6 +150,19 @@ fn lost_side_effect_ack_blocks_retry_until_outcome_is_reconciled() {
         "revision":1,"job_id":"retry"})
         )
         .is_err());
+    // Independent work continues while the uncertain job is blocked (SWARM-58).
+    let independent = d.call("swarm.attempt.register", json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"independent"}));
+    d.call("swarm.artifact.put", json!({"run_id":id,"job_id":"independent",
+        "attempt_id":independent["id"],"token":independent["token"],"artifact_id":"signature-check",
+        "source_revision":1,"kind":"finding","content":"invalid signature rejected with 401"}));
+    d.call("swarm.report", json!({"run_id":id,"job_id":"independent",
+        "attempt_id":independent["id"],"token":independent["token"],"message_id":"independent-result",
+        "type":"result","revision":1,"payload":{"artifact_ids":["signature-check"],"audit_outcome":"negative"}}));
+    assert_eq!(d.call("swarm.decide", json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"independent","decision":"accept","evidence":["signature-check"]}))["status"], "accepted");
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":id,"job_id":"independent",
+        "attempt_id":independent["id"],"generation":1,"revision":1}));
 
     let counter: i64 = billing
         .query_row(

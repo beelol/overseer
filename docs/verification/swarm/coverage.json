@@ -739,7 +739,7 @@
       "blocker": null
     },
     "SWARM-58": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_effects.rs",
         "daemon/src/swarm/effects.rs",
@@ -748,9 +748,10 @@
         "fixtures/swarm/ledgerpay-v1/",
         "docs/verification/swarm/S2.md",
         "fixtures/swarm/ledgerpay-v1/session.py",
-        "fixtures/swarm/ledgerpay-v1/test_session.py"
+        "fixtures/swarm/ledgerpay-v1/test_session.py",
+        "daemon/tests/swarm_routing.rs"
       ],
-      "blocker": "A versioned LedgerPay fixture now connects a real PostgreSQL state probe to the durable daemon effect journal across restart: a lost ack leaves counter 1 and one duplicate queued, journal replay refuses execution, and a separate control proves blind redelivery would raise the counter to 2. The outcome is reconciled as applied through a submitted effect_probe. Arbitrary harness tool calls are not intercepted, absent outcomes lack a qualified adapter, cross-category identity and safe claim release remain open, and no live path is qualified."
+      "blocker": null
     },
     "SWARM-59": {
       "status": "verified",
