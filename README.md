@@ -21,7 +21,7 @@ Only the owner can do these (AC-160). Each is one step; the criterion it unblock
 - Work an hour using only Overseer [AC-64].
 - Mark the phone's door and motion on the [review page](https://claude.ai/artifact/FzD5ido4NdwX3annWoY9Uq): *Right* or *Needs work* for each [AC-136, AC-137].
 - Start Voice Mode: paste the goal in [voice-mode-goal.md](docs/rfcs/voice-mode-goal.md) into `/goal`. It builds everything it can with a simulated voice first, on top of Gate S's pull request #14, then sends you one list of live checks [Gate R, AC-162 to AC-177].
-- Turn Wi-Fi off and on while `node test/local/wifi-live.js` runs; it tells you when [AC-83].
+- Later, when no agent is running: turn Wi-Fi off and on while `node test/local/wifi-live.js` runs; it tells you when [AC-205].
 - Run *Overseer: Test Notification* in VS Code, allow notifications when macOS asks, and screenshot the banner and the helper (Overseer Notifier) in Finder [AC-179].
 - Later: a second Claude account [AC-53]; a Linux machine [AC-41]; the owner-confirmed session of the phone app when its agent finishes [AC-133].
 
