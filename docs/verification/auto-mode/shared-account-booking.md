@@ -1,6 +1,6 @@
 # Shared account booking: daemon integration seam
 
-Status: partial implementation on `claude/auto-swarm`. The account booking landed at `17666b80`, the launch booking (slot, writer, effects claimed once) at `6abf8d71`, and run binding, settlement and startup recovery at `8d67c07a`. AUTO-AC-17, AUTO-AC-24 and Swarm CONTRACT-01/05 remain open.
+Status: partial implementation on `claude/auto-swarm`. The account booking landed at `17666b80`, the launch booking (slot, writer, effects claimed once) at `6abf8d71`, run binding, settlement and startup recovery at `8d67c07a`, and the one app-slot count with Swarm admission on the booking at `dc8b37aa`. AUTO-AC-17, AUTO-AC-24 and Swarm CONTRACT-01/05 remain open.
 
 The account authority is the daemon's existing `auto_pool_claims` table. The name is historical: a new `shared_booking_intents` row and its `shared_booking_windows` commitments attach to the same claim, rather than creating a second account balance. Existing Auto root/child claims continue to hold an entire account pool while their draw is unknown. A known-window booking checks those claims, active runs and open follow-up turns before it commits. Conversely, existing Auto/manual checks see a shared booking as an occupied account pool. No provider allowance is inferred from token counts or estimated credits.
 
@@ -8,7 +8,7 @@ The account authority is the daemon's existing `auto_pool_claims` table. The nam
 
 ## Launch lifecycle
 
-`book_shared_launch_in_tx` adds the app slot (`agents.max_active`, default 9) and the planned workspace writer to the same transaction and returns a durable intent. `claim_shared_launch_effects` lets exactly one worker act on it: the phase moves from `booked` to `uncertain` before any Git or process effect, so a reconnecting caller replays the intent instead of attempting the launch again.
+`book_shared_launch_in_tx` adds the app slot (`agents.max_active`, default 9) and the planned workspace writer to the same transaction and returns a durable intent. The slot check reads the one app-slot count described below. `claim_shared_launch_effects` lets exactly one worker act on it: the phase moves from `booked` to `uncertain` before any Git or process effect, so a reconnecting caller replays the intent instead of attempting the launch again.
 
 | Step | Durable state | Slot | Writer | Account commitment |
 | --- | --- | --- | --- | --- |
@@ -23,11 +23,27 @@ A bound run must still be queued with no supervisor identity, on the booked prof
 
 Releasing a retained commitment on a later observation means the draw is now counted in that observation's reported usage, which every later booking must cite. It is not a qualified attribution of the draw to this work, and a provider's reporting delay could under-count it for a short time.
 
+## One app-slot count
+
+`app_slots_in_use` is the only count of `agents.max_active` occupants. Every admission path reads it inside its own transaction: an ordinary start or a follow-up that reactivates an ended run (which first takes a durable `app_slot_holds` row, deleted in the commit that inserts the run, or when the request stops), an Auto root or child (`insert_auto_root_selected`, `insert_auto_selected_decision`), a booked start (`consume_agent_slot`) and Swarm admission. Each occupant is counted once, by the first rule that holds it:
+
+| Occupant | Counted while |
+| --- | --- |
+| Slot hold (`app_slot_holds`) | the start has no run row yet; cleared at startup |
+| Shared booking with `slot_held` | unsettled, and unbound or bound to a run that may still own a process |
+| Pending Auto child | its claim is active or uncertain and no managed child is recorded |
+| Registered Swarm worker attempt | its `swarm/<attempt>` booking does not hold a slot (an unbooked fixture worker, or a settled booking) |
+| Active Swarm category | running, paused, stalled or stopping: its director slot |
+| Any other top-level or managed-delegation run | it may still own a process (`unknown` and `disconnected` included), unless a slot-holding booking, a registered attempt or an active category's director owner already counts it, or it is Overseer's own coordinating run |
+
+A director run bound to a booking made with `consume_agent_slot: false` is counted as a run while its category plans and as the category's director slot once it runs, never twice.
+
 ## Startup recovery
 
 `Store::reconcile_shared_launches_on_start` runs before supervisors are reattached:
 
-- **Booked, never claimed:** no effect was requested. Released (`released_unclaimed`); a replay is refused and must book a new attempt.
+- **Booked, never claimed:** no effect was requested. Released (`released_unclaimed`); a replay is refused and must book a new attempt. The exception is a Swarm worker's booking whose attempt is still registered: the admitted attempt, not the request, owns it, and dispatch recovery may still launch it. A Swarm booking whose attempt is no longer registered is released here and at every Swarm admission.
+- **Slot holds:** every `app_slot_holds` row is deleted; the requests that took them died with the daemon.
 - **Claimed, no bound run:** the Git effect is unknown, and no model process can exist. The slot and the account commitment are released; the writer stays held and the intent is kept for reconciliation (`effects_uncertain`). The effects claim can never be won again, so a replay does not retry it. No automatic path yet releases that writer.
 - **Bound run already ended** by any path: settled as above.
 - **Bound run that may still own a process:** left to supervisor reconciliation. A live supervisor is reattached with its binding unchanged (still one slot); a run whose supervisor and harness are gone becomes `disconnected` and settles; a queued bound run that never got a supervisor is failed and releases everything.
@@ -36,7 +52,11 @@ The same release happens in-process: a booked ordinary start that stops before i
 
 ## Callers
 
-The ordinary manual start (`task.create`) books a shared launch only when the caller supplies a qualified booking, and only behind the fixture gate `OVERSEER_SHARED_BOOKING_FIXTURE_API=1`, because no product path can yet qualify an upper draw. It then claims immediately before its first Git effect, binds the run in the run's own commit and returns the bound run to a repeated or concurrent request. Without a booking, manual and Auto launches keep their existing unknown-draw guards; they now also refuse a checkout or root workspace whose writer a shared launch holds. Auto roots and children are not converted to known-window commitments: Auto has no qualified per-window upper draw yet, and its own unknown-draw claims already live in the same claim table. Swarm's fixture reservations are on its branch and have not been moved onto this booking.
+The ordinary manual start (`task.create`) books a shared launch only when the caller supplies a qualified booking, and only behind the fixture gate `OVERSEER_SHARED_BOOKING_FIXTURE_API=1`, because no product path can yet qualify an upper draw. It then claims immediately before its first Git effect, binds the run in the run's own commit and returns the bound run to a repeated or concurrent request. Without a booking, manual and Auto launches keep their existing unknown-draw guards; they now also refuse a checkout or root workspace whose writer a shared launch holds. Auto roots and children are not converted to known-window commitments: Auto has no qualified per-window upper draw yet, and its own unknown-draw claims already live in the same claim table; they do consult the one app-slot count.
+
+Swarm admission of an account (native) target books `swarm/<attempt>` through `book_shared_launch_in_tx` inside its own admission transaction, again only with fixture booking inputs. It passes `allocation_remaining_milli`: the category's remaining allocation in each window of the cited observation, in the same unit. The category's cap in a window is frozen at its first booking there (its run allocation percentage of the reported remaining allowance) and never grows; a window with a new key after a reset starts from the tighter of its fresh share and the category's earlier caps in that account pool. The category's own active and uncertain bookings count against it (a booking in a window no longer reported counts against every current window), and a non-finishing job also leaves the finishing reserve. Without booking inputs the admission is refused `upper_draw_unknown`. The worker's launch claims the booking's effects before its worktree and binds its run in the run's own commit; a launch that stops before its claim keeps the booking with its admitted attempt. `swarm_reservations` keeps only Swarm's fixture (generic-target) pool policy and is no account authority. Scripted directors run the generic harness and book nothing.
+
+**Gap:** no code yet produces a qualified per-window upper draw, so no product path can book; every caller above uses fixture inputs behind `OVERSEER_SHARED_BOOKING_FIXTURE_API=1`, and live launches stay behind their existing fixture gates.
 
 The native unit is one thousandth of a reported percentage point, matching the structured `QuotaWindow.used_percent` source. It does not convert tokens, currency or estimated credits into that unit. Other native-unit meters need their own validated source projection. Cross-profile conflicting observations and proof that a learned upper draw applies to the selected account/model/window remain qualification work.
 
@@ -45,3 +65,5 @@ The native unit is one thousandth of a reported percentage point, matching the s
 Unit tests (`daemon/src/account_booking.rs`): the original four (two-connection window race, linked-profile replay, stale identity/snapshot and pre-effect release, slot/writer/claim-once) plus `bound_run_is_counted_once_and_settlement_releases_its_slot_and_writer`, `binding_needs_the_effects_claim_and_the_booked_profile_and_workspace`, `a_bound_run_that_never_got_a_supervisor_releases_its_account_commitment`, `startup_recovery_releases_unclaimed_keeps_uncertain_writers_and_settles_finished_runs` and `two_connections_claim_one_booked_launch_exactly_once`.
 
 Protocol tests against the real daemon, Git and the Codex app-server fixture (`daemon/tests/shared_launch.rs`): two concurrent identical booked starts produce one run and one model turn; with `agents.max_active=2` a running bound run and a second booked start both fit and a third is refused with `global_agent_limit`; the ended run releases its slot and writer but keeps its 30-point draw until a later observation; after `kill -9` of the daemon, a running bound run is reattached (one process generation, no second model turn, three reconnecting clients get the existing runs) and a run whose processes were killed settles; crash points after booking and after the effects claim recover as above and an ordinary writer on the held checkout is refused. Replacing the unbound-run exclusion with a no-op fails both count-once tests. All observations are fixtures; no subscription allowance was spent or measured.
+
+Step 3 (`dc8b37aa`): unit tests `one_count_takes_each_occupant_once_and_a_director_booking_takes_no_second_slot` and `four_admission_paths_race_for_the_last_slot_and_exactly_one_wins` (an ordinary hold, a booked launch, an Auto child and an Auto root on four SQLite connections: exactly one commits); protocol tests `ordinary_auto_swarm_and_booked_starts_race_for_the_last_slot_and_one_wins` (an ordinary start, an `auto.start` root, a Swarm admission and a booked start for the last of three slots: exactly one wins, the others are refused for the agent limit, the winner holds across `kill -9` and is released once) and `swarm_worker_admission_books_the_shared_account_and_binds_its_run`. See the [Auto ledger entry](README.md#swarm-on-the-booking-and-one-app-slot-authority-2026-09-27) and [CONTRACT-01](../swarm/CONTRACT-01.md).

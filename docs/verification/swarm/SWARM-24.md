@@ -17,3 +17,16 @@ Read-only update at Swarm `47c47a4` (2026-09-27): local Auto branch `d2e9d34` is
 Observation-fence follow-up: fixture admission now compares its submitted snapshot with the latest persisted availability observation for that run. A newer, smaller eligible observation cannot be bypassed by submitting an older, larger snapshot; the stale request returns `snapshot_superseded` before reserving capacity. The current snapshot then reaches the shared-pool headroom check, and a later larger observation permits admission. Observations with the same timestamp but different allowance data conflict, and migrated eligible observations without snapshot identity become blocked until reobserved. `daemon/tests/swarm_admission.rs` (`newer_allowance_observation_fences_stale_admission_snapshot`) and the schema migration test pass. This is still fixture-owned evidence; the live Auto producer and common cross-mode reservation transaction remain open.
 
 Main reconciliation at `7bccc3a` (2026-09-27): Gate S now confirms a cap of 100 Overseer-self-started turns per day. SWARM-24 adds a joined fixture requirement: exhaust that cap while an already approved category director is active, then prove the director continues inside its frozen allocation and that its turns do not increment Overseer's cap. Overseer's own turns and director turns must both still meter against their applicable account limits. This test is not implemented; the criterion remains partial. See `docs/verification/swarm/main-reconciliation-2026-09-27.md`.
+
+Step 3 of the handover on `claude/auto-swarm` (`dc8b37aa`, 2026-09-27): Swarm admission of
+an account target now books through Auto's shared booking (`book_shared_launch_in_tx`) inside its
+own IMMEDIATE admission transaction, passing the category's remaining allocation in the booking's
+own windows as `allocation_remaining_milli` (thousandths of a reported percentage point; nothing is
+converted from tokens, credits or fixture points). The worker launch claims the booking's effects
+before its worktree and binds the run in the run's commit. `swarm_reservations` is no longer an
+account authority for such a worker: it keeps Swarm's fixture (generic-target) pool policy only.
+Evidence: `daemon/tests/shared_launch.rs` (`swarm_worker_admission_books_the_shared_account_and_binds_its_run`),
+`daemon/src/swarm/admission.rs`, `docs/verification/swarm/CONTRACT-01.md`. Still partial: no code
+produces a qualified per-window upper draw, so the booking inputs are fixture-supplied behind
+`OVERSEER_SHARED_BOOKING_FIXTURE_API=1`; Auto's route producer is not yet consumed by Swarm
+(targets are still injected snapshots); Gate S's cap replay is not implemented.

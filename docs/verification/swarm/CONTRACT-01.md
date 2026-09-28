@@ -1,6 +1,6 @@
 # CONTRACT-01 — shared atomic admission
 
-Status: not started
+Status: in progress (step 3 of the handover on `claude/auto-swarm`; see the last section)
 Tested implementation commit: none; the Auto and Swarm branches are separate.
 Verification date and verifier: 2026-09-26, Swarm implementing agent (contract audit only).
 OS / architecture / VS Code / harness versions: not applicable to the proposed contract; pin versions when the integrated test runs.
@@ -64,3 +64,68 @@ Swarm worker for the last capacity in a shared short and long window and one
 writer, then replay the winner after restart. Until that test passes at one
 integrated revision, keep CONTRACT-01 and SWARM-08/24 partial. Do not copy
 Auto's collector or lift Swarm's fixture gate to make the merge appear usable.
+
+## Step 3 on `claude/auto-swarm`: one app-slot authority, Swarm on the booking — 2026-09-27
+
+Implementation commit: `dc8b37aa` (after merge `a87da0fa`). Fixtures only: every
+quota observation is a fixture row or the Codex app-server fixture, and no
+subscription allowance was spent or measured.
+
+What now holds, and the test that shows it:
+
+- **One app-slot count.** `account_booking::app_slots_in_use` is the only count of
+  `agents.max_active` occupants, read inside the admission transaction of every
+  path: ordinary starts and follow-ups (a durable `app_slot_holds` row replaces the
+  former in-memory pending counter and is deleted in the commit that inserts the
+  run), Auto roots and children (`insert_auto_root_selected`,
+  `insert_auto_selected_decision`, now IMMEDIATE), booked starts
+  (`book_shared_launch_in_tx`) and Swarm admission (now IMMEDIATE). Each occupant
+  is counted once: a hold, a slot-holding booking, a pending Auto child, a
+  registered Swarm worker attempt without a slot-holding booking, an active
+  category's director slot, or any other run that may still own a process.
+  Overseer's own coordinating run holds no slot, as this contract says.
+  Unit test `one_count_takes_each_occupant_once_and_a_director_booking_takes_no_second_slot`.
+- **Four paths race for the last slot; exactly one wins.** Daemon test
+  `ordinary_auto_swarm_and_booked_starts_race_for_the_last_slot_and_one_wins`
+  (`daemon/tests/shared_launch.rs`): a running category holds two of three slots;
+  an ordinary `task.create`, an `auto.start` root, a Swarm `swarm.admit` and a
+  fixture-booked `task.create` are sent at once on four connections. Exactly one
+  wins and each other is refused for the agent limit. After `kill -9` and a
+  restart the winner still holds its slot while its run or attempt lives (a late
+  start is refused), and a run winner's slot is released exactly once when it
+  ends. Unit test `four_admission_paths_race_for_the_last_slot_and_exactly_one_wins`
+  races an ordinary hold, a booked launch, an Auto child and an Auto root on four
+  SQLite connections.
+- **Swarm books through the shared booking.** Daemon test
+  `swarm_worker_admission_books_the_shared_account_and_binds_its_run`: admitting an
+  account (Claude) target books `swarm/<attempt>` with `book_shared_launch_in_tx`
+  inside Swarm's own admission transaction, holding the worker's slot (the attempt
+  is not counted again) and drawing each cited window in thousandths of a reported
+  percentage point. `allocation_remaining_milli` is the category's remaining
+  allocation in those same windows, so a draw above it is refused
+  `allocation_exhausted`; with no upper draw the admission is refused
+  `upper_draw_unknown`. An ordinary booked start on the same account sees the
+  Swarm draws and is refused `shared_pool_headroom`. `swarm_reservations` gets no
+  row for a booked worker.
+- **A director's linked run takes no second slot.** In the unit test, a director
+  run bound to a booking made with `consume_agent_slot: false` is counted once
+  while its category plans and once (as the category's director slot) after it
+  runs.
+
+Still open, so this stays unchecked:
+
+- No product code produces a qualified per-window upper draw. Every booking here
+  cites fixture inputs behind `OVERSEER_SHARED_BOOKING_FIXTURE_API=1`; without one
+  a Swarm account worker is refused `upper_draw_unknown`.
+- Auto roots and children still hold unknown-draw account claims rather than
+  per-window bookings, so the account-window race is shown for booked ordinary and
+  Swarm callers, not for Auto (Auto competes for the app slot only).
+- The writer race: a Swarm worker gets a new worktree, so it books no writer, and
+  no Swarm caller competes for an existing checkout yet.
+- A changed account generation between route and launch is refused by the booking
+  (the booking's own unit tests) but has not been replayed with a Swarm caller.
+- Scripted directors run the generic harness and book nothing; the
+  `consume_agent_slot: false` director path is shown in the count, not through a
+  director launch. Gate S's Overseer-started agents and watchers use `task.create`
+  and so the same count, but no Gate S-specific race was run.
+- Short and long live windows, and live providers.

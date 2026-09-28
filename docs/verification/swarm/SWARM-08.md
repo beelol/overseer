@@ -27,3 +27,14 @@ This closes the app-slot race tested here. The independent account-quota race re
 Further fixture checks: a stopped Swarm releases its director slot only after its registered attempt has a confirmed exit, allowing another waiting director to admit work. Lowering the app cap from three to two leaves two existing workers running; no new worker enters until enough attempts finish. Both focused tests pass. These verify slot accounting and drain behavior in the fixture API, not live director execution.
 
 Verification: `cargo test --workspace --offline -q -- --test-threads=1` passed 196 tests with 11 ignored. The parallel suite once failed the unrelated `workspace.tree` 2-second timing assertion at 2.38 seconds; that test passed alone and in the serialized full suite. A final focused app-limit rerun passed after the status-response adjustment. `cargo fmt --all --check` reports extensive pre-existing formatting differences across unrelated files, so this change did not reformat the repository.
+
+Step 3 of the handover on `claude/auto-swarm` (`dc8b37aa`, 2026-09-27): the app-wide
+cap is now one count shared with Auto and booked starts (`account_booking::app_slots_in_use`),
+read inside each admission transaction; Swarm's in-memory pending counter is replaced by
+durable slot holds in that count. A daemon race of an ordinary start, an Auto root, a Swarm
+worker admission and a booked start for the last slot admits exactly one and holds it across a
+restart (`daemon/tests/shared_launch.rs`,
+`ordinary_auto_swarm_and_booked_starts_race_for_the_last_slot_and_one_wins`). A Swarm account
+worker books the shared account windows (`swarm_worker_admission_books_the_shared_account_and_binds_its_run`).
+Still partial: bookings use fixture upper draws only (no qualified producer), Auto roots and
+children hold unknown-draw claims rather than per-window bookings, and live providers are untested.

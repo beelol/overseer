@@ -83,9 +83,11 @@
         "daemon/tests/swarm_admission.rs",
         "docs/verification/swarm/milestone-7.md",
         "docs/verification/swarm/SWARM-08.md",
-        "daemon/tests/swarm_runtime.rs"
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/tests/shared_launch.rs",
+        "daemon/src/account_booking.rs"
       ],
-      "blocker": "A single persisted app-level agent cap now handles ordinary starts and fixture Swarm admission, including concurrent manual starts. Atomic shared account-quota reservation across ordinary, Auto and Swarm launches remains unimplemented; linked profiles and live Auto Mode integration are unverified."
+      "blocker": "One app-slot count (account_booking::app_slots_in_use) is read in every admission transaction: ordinary starts and follow-ups (durable slot holds), Auto roots and children, booked starts and Swarm admission; a four-path race for the last slot admits exactly one and holds it across restart. Swarm account workers book the shared account windows with fixture upper draws only: no code produces a qualified per-window upper draw, Auto roots/children still hold unknown-draw claims, and linked profiles and live providers are unverified."
     },
     "SWARM-09": {
       "status": "partial",
@@ -298,9 +300,13 @@
         "docs/verification/swarm/milestone-7.md",
         "docs/rfcs/swarm-auto-contract.md",
         "docs/verification/swarm/SWARM-24.md",
-        "docs/verification/swarm/main-reconciliation-2026-09-27.md"
+        "docs/verification/swarm/main-reconciliation-2026-09-27.md",
+        "daemon/tests/shared_launch.rs",
+        "daemon/src/account_booking.rs",
+        "docs/verification/swarm/CONTRACT-01.md",
+        "docs/verification/swarm/CONTRACT-05.md"
       ],
-      "blocker": "The fixture admission revalidates a target snapshot, fences admissions against the latest persisted availability observation, and shares the app agent-slot lock; the proposed contract specifies job identity, attempts, category allocation and common proofs. The actual Auto Mode producer and shared account-quota authority are not integrated. Gate S's 100-self-started-turn cap has not been replayed alongside an approved Swarm director."
+      "blocker": "Swarm admission of an account target books Auto's shared booking inside its own admission transaction with its remaining category allocation per window (thousandths of a reported percentage point), and the worker launch claims effects and binds its run; swarm_reservations is no account authority for it. Still partial: the upper draw is fixture-supplied (no qualified producer exists), Swarm targets are injected snapshots rather than Auto's route producer, and Gate S's turn cap has not been replayed alongside an approved Swarm director."
     },
     "SWARM-25": {
       "status": "unverified",
