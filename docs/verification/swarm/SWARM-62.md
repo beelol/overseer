@@ -1,6 +1,6 @@
 # SWARM-62 — run deadline
 
-Status: partial. Revision: `c37ca47`.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. First revision: `c37ca47`.
 
 Input: two runs with a 1.5-second fixture deadline. One has a registered attempt and a queued job; the other has no approved target. Neither receives another admission request. A separate case presents an expired admission timestamp.
 
@@ -54,3 +54,19 @@ packaged UI scenario passed. Unrelated regenerated TUI snapshots were restored.
 SWARM-62 stays partial: deadline-specific unconfirmed-exit UI, qualified live
 harness and native-descendant control, and a live blocked/active extension path
 are still unverified.
+
+## Verified at fixture scope (2026-09-28)
+
+Earlier fixtures set short deadlines. `default_sixty_minute_deadline_stops_active_and_blocked_runs_but_nothing_else` (`daemon/tests/swarm_runtime.rs`, new; passed on first run) uses the built-in 60-minute deadline and moves only the runs' start times back by 60 minutes and 1 ms:
+
+| Clause | What the tests show |
+| --- | --- |
+| The default 60-minute deadline expires while active and while blocked | both runs report `deadline_ms: 3600000` by default; the daemon's own timer stops the active run (`stopping`) and the blocked one (`stopped`), each with `stop_reason: deadline`; `deadline_expires_without_another_admission_while_active_or_blocked` and the joined `atlas_s5_run_deadline_expires_while_all_targets_are_blocked` (passed again) cover short configured deadlines |
+| Checkpoint, cancel queued work, interrupt active work as supported | the queued job is `cancelled`; the active worker receives a `checkpoint` and a `stop` envelope and an interrupt request |
+| Show unconfirmed exits | while the worker ignores SIGINT, `swarm.get` shows `unconfirmed_exit_count: 1` naming its run; after the worker is killed its exit is confirmed, the count is 0 and the run is `stopped` |
+| Do not kill unrelated sessions or close VS Code | an ordinary agent on the same daemon and a third Swarm category keep running; the deadline acts only on the expired runs' linked workers (the daemon has no path that closes the editor) |
+| An explicit extension is recorded and does not enlarge the account allocation | `explicit_run_deadline_extension_survives_restart_without_new_account_allocation` (passed) |
+
+Rerun serially on 2026-09-28: `swarm_control` 6 passed, `swarm_admission explicit_run_deadline` 1, `swarm_runtime default_sixty` 1, the Atlas blocked-deadline replay against PostgreSQL 16.
+
+Boundary: native descendants of a live harness and the editor's own display of the deadline are not part of this fixture proof (SWARM-25, SWARM-23).

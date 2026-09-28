@@ -805,7 +805,7 @@
       "blocker": "Phone clause not in force: Gate N's gateway is not on main or this branch; re-open for the joined phone tests when it lands."
     },
     "SWARM-62": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_control.rs",
         "docs/verification/swarm/milestone-8.md",
@@ -820,7 +820,7 @@
         "test/ui/scenario-swarm-status.js",
         "docs/verification/evidence/ui/swarm-status/result.json"
       ],
-      "blocker": "A daemon timer checks run deadlines without admission requests, records a deadline reason, cancels queued work, interrupts a linked scripted worker and delivers its terminal event. A joined Atlas blocked-deadline replay queues a checkpoint request and Stop while a PostgreSQL-backed J4 call is held; the checkpoint is not confirmed. A related job-deadline fixture proves interruption retry for a linked director after daemon restart. An explicit owner extension now survives restart, is idempotently recorded, moves the run-deadline boundary, and leaves the frozen account allocation unchanged; a packaged VS Code control exercises it. A stopping-run readout exposes unconfirmed workers in a Stop fixture. Deadline-specific unconfirmed-exit UI, live harness/descendant control, and live blocked/active extension remain unverified."
+      "blocker": null
     },
     "SWARM-63": {
       "status": "unverified",
