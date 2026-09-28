@@ -30,6 +30,13 @@ pub const WAITING_FOR_CONNECTION: &str = "waiting_for_connection";
 pub const WAITING_FOR_MEMORY: &str = "waiting_for_memory";
 pub const HANDED_OFF: &str = "handed_off";
 
+fn ensure_not_swarm(d: &Daemon, run: &Run) -> Result<()> {
+    if d.store.lock().unwrap().is_swarm_linked_run(&run.id)? {
+        bail!("Swarm owns this run; route changes and retries require director admission");
+    }
+    Ok(())
+}
+
 pub fn ensure_tables(conn: &rusqlite::Connection) -> Result<()> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS continuity_waits(run_id TEXT PRIMARY KEY, turn_id TEXT NOT NULL, kind TEXT NOT NULL, provider TEXT NOT NULL, reason TEXT NOT NULL,
@@ -118,6 +125,10 @@ fn clip(s: &str, max: usize) -> String {
 /// Called when a turn's process has ended, before the run is marked. Returns true when the run
 /// was parked, in which case it is not marked as ended.
 pub fn park(d: &Daemon, run: &Run, status: &str, last_error: Option<&(String, String)>, dir: &Path) -> Result<bool> {
+    if d.store.lock().unwrap().is_swarm_linked_run(&run.id)? {
+        forget(d, &run.id);
+        return Ok(false);
+    }
     if run.parent_run_id.is_some() {
         return Ok(false);
     }
@@ -352,6 +363,7 @@ fn announce(d: &Daemon, run: &Run, text: &str) {
 /// Moves the work of `predecessor` to a successor run on `target`. The predecessor must have no
 /// process running. On success the predecessor is `handed_off`; on failure it stays as it was.
 pub fn handoff(d: &Arc<Daemon>, predecessor: &Run, target: &Target, reason: &str) -> Result<Run> {
+    ensure_not_swarm(d, predecessor)?;
     if ["starting", "running", "waiting_for_user"].contains(&predecessor.status.as_str()) {
         bail!("the agent is still working; stop it before moving its work");
     }
@@ -529,6 +541,13 @@ fn pass(d: &Arc<Daemon>) -> Result<()> {
     stalls(d, &status, &settings)?;
     for wait in waits(d) {
         let Ok(run) = d.run(&wait.run_id) else { continue };
+        if d.store.lock().unwrap().is_swarm_linked_run(&run.id)? {
+            forget(d, &run.id);
+            if run.status == WAITING_FOR_CONNECTION || run.status == WAITING_FOR_MEMORY {
+                d.mark_ended(&run, "failed", "Swarm owns recovery of this attempt after the connection failed")?;
+            }
+            continue;
+        }
         if run.status != WAITING_FOR_CONNECTION && run.status != WAITING_FOR_MEMORY {
             if wait.note.as_deref() != Some("expired") {
                 forget(d, &run.id);
@@ -606,6 +625,9 @@ fn stalls(d: &Arc<Daemon>, status: &Status, settings: &continuity::Settings) -> 
     let reconnect = ms("OVERSEER_TEST_RECONNECT_MS", limit.min(30_000));
     let runs = d.store.lock().unwrap().runs()?;
     for run in runs.iter().filter(|r| r.parent_run_id.is_none() && ["starting", "running"].contains(&r.status.as_str()) && KNOWN_PROVIDERS.contains(&provider_of(&r.harness))) {
+        if d.store.lock().unwrap().is_swarm_linked_run(&run.id)? {
+            continue;
+        }
         let provider = provider_of(&run.harness);
         let unreachable = offline || status.providers.get(provider).is_some_and(|h| h.reachable == Some(false));
         if !unreachable {
@@ -807,6 +829,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "continuity.waits" => json!({"waits": waits(d)}),
         "run.retry_now" => {
             let (run, wait) = run_and_wait(d, id()?)?;
+            ensure_not_swarm(d, &run)?;
             let wait = wait.ok_or_else(|| anyhow!("this agent is not waiting for a connection"))?;
             if run.status == "failed" {
                 // Given up after the limit: the wait starts again, and the message is still there.
@@ -825,6 +848,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         // Where this agent's work could go now, best first; nothing is moved.
         "run.targets" => {
             let run = d.run(id()?)?;
+            ensure_not_swarm(d, &run)?;
             let status = continuity::status().ok_or_else(|| anyhow!("Continuity has not started"))?;
             let local = match local_target(d, &run) {
                 Ok(t) => json!({"target": t}),
@@ -835,6 +859,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "run.handoff" => {
             let (run, wait) = run_and_wait(d, id()?)?;
+            ensure_not_swarm(d, &run)?;
             let to = p["to"].as_str().ok_or_else(|| anyhow!("missing string parameter to (local, back or a provider)"))?;
             let status = continuity::status().ok_or_else(|| anyhow!("Continuity has not started"))?;
             let mut target = match to {

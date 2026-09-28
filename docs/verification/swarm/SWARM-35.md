@@ -1,0 +1,33 @@
+# SWARM-35 — contract revision and dependent integration
+
+Status: partial. Revision: `14faa93`. Fixture version: local Git integration worktree and scripted accepted `patch` artifact.
+
+Input: a `contract` job produces an accepted patch, exits, and has a dependent `consumer` job. Inspect the dependent before and after `swarm.integrate` applies the patch. Existing plan fixtures cover rejected results and plan revisions separately.
+
+Expected: accepting a patch alone cannot release its dependent; only an integrated current-revision result may do so. A stale source commit or conflicting patch must not silently replace the accepted integration tree.
+
+Actual: the dependent remains `planned` after accepted review and confirmed exit; it becomes `ready` after the patch is applied in the isolated integration worktree. Source HEAD changes block new integration. Two conflicting accepted patches leave only the first integrated commit while retaining the second artifact. The focused test failed before the integration gate and then passed. The full offline Rust suite passed 166 tests.
+
+Replay: `cargo test --offline -p overseerd --test swarm_integration -- --nocapture`; `cargo test --workspace --offline -q`.
+
+Evidence: `daemon/tests/swarm_integration.rs` (`dependent_job_waits_for_accepted_patch_to_integrate`, `source_commit_change_blocks_stale_patch_integration`, `conflicting_accepted_patches_preserve_first_commit_and_second_artifact`), `daemon/src/swarm/artifacts.rs`, `daemon/src/swarm/integration.rs`, and the prior plan-revision fixtures in `daemon/tests/swarm_plan.rs`.
+
+Follow-up at `fca22c0`: interrupted patch integration now replays from a durable intent, preserving the accepted dependency artifact and one integration commit. This does not change the contract revision and session-reuse gaps.
+
+Follow-up at `089df35`: a combined checker attached to the current integration commit can now block final completion after individually valid patches produce an invalid combined tree.
+
+Follow-up with `catalog-v1`: the versioned S3 fixture revises a timestamp-only contract to a tuple cursor on attempt 2 of the same logical job, redirects one stale module result, rejects its acceptance, and integrates 24 module patches after the contract repair. A combined check fails after four modules and passes after all 24. Replay with `cargo test --offline -p overseerd --test swarm_scenarios -- --ignored`; see [S3](S3.md).
+
+Remaining: applied redirect acknowledgement, qualified session reuse, director-led conflict repair and the complete adaptive S3 run are not implemented. No live worker path has been replayed. This criterion stays unchecked.
+
+Follow-up at `498932c`: dependency eligibility now has one check for accepted status, no active attempt, and no pending accepted patch integration. Two new fixtures reproduced premature readiness before the fix: accepting an unrelated prerequisite and revising a plan to add or change dependents. Both stay `planned` until integration and become `ready` afterward. The complete offline workspace suite passed 207 tests, with 11 intentionally ignored. The remaining gaps above keep this criterion partial.
+
+Applied-directive gate at `9759b031`: a submitted result cannot be accepted
+while its attempt has a queued or delivered director redirect, advisory or
+retraction. A local broker regression keeps the dependent planned across a
+daemon restart, then makes it ready only after the directive's applied receipt,
+acceptance and confirmed exit. A final report also refuses an unapplied
+directive sent after review. The affected suites passed 70 tests; exact inputs,
+red failures and replay command are in [SWARM-43](SWARM-43.md). This is local
+receipt-state evidence, not qualified live session application or complete S3
+contract repair. SWARM-35 remains partial.

@@ -1,0 +1,168 @@
+{
+  "checks": [
+    {
+      "name": "the newer fixture allowance blocks a worker",
+      "ok": true
+    },
+    {
+      "name": "Capacity shows the last observed decrease in native units",
+      "ok": true,
+      "detail": [
+        {
+          "label": "Swarms",
+          "description": "1",
+          "level": 1,
+          "expanded": "true",
+          "selected": false,
+          "focused": false,
+          "aria": "Swarms 1"
+        },
+        {
+          "label": "Allowance audit",
+          "description": "0 working · 0 ready · 0 blocked",
+          "level": 2,
+          "expanded": "true",
+          "selected": false,
+          "focused": false,
+          "aria": "Allowance audit swarm, planning, 0 working · 0 ready · 0 blocked"
+        },
+        {
+          "label": "Director",
+          "description": "not started",
+          "level": 3,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Director not started"
+        },
+        {
+          "label": "Capacity",
+          "description": "0 selected · usage unknown",
+          "level": 3,
+          "expanded": "true",
+          "selected": false,
+          "focused": true,
+          "aria": "Swarm capacity, 0 selected · usage unknown"
+        },
+        {
+          "label": "Last eligibility: blocked",
+          "description": "finishing reserve",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Recorded 9/27/2026, 1:03:02 PM. This was the last eligibility observation; admission revalidates it."
+        },
+        {
+          "label": "pool-a · week",
+          "description": "0.5 points · down 99.5 points",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Last observed allowance for pool-a, week: 0.5 points · down 99.5 points"
+        },
+        {
+          "label": "No admission recorded",
+          "description": "current limit unknown",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "No admission recorded current limit unknown"
+        },
+        {
+          "label": "Provider usage unknown",
+          "description": "current allowance not reported",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Provider usage unknown current allowance not reported"
+        }
+      ]
+    },
+    {
+      "name": "an unknown later balance remains unknown",
+      "ok": true
+    },
+    {
+      "name": "Capacity shows unknown instead of zero or a fabricated change",
+      "ok": true,
+      "detail": [
+        {
+          "label": "Swarms",
+          "description": "1",
+          "level": 1,
+          "expanded": "true",
+          "selected": false,
+          "focused": false,
+          "aria": "Swarms 1"
+        },
+        {
+          "label": "Allowance audit",
+          "description": "0 working · 0 ready · 0 blocked",
+          "level": 2,
+          "expanded": "true",
+          "selected": false,
+          "focused": false,
+          "aria": "Allowance audit swarm, planning, 0 working · 0 ready · 0 blocked"
+        },
+        {
+          "label": "Director",
+          "description": "not started",
+          "level": 3,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Director not started"
+        },
+        {
+          "label": "Capacity",
+          "description": "0 selected · usage unknown",
+          "level": 3,
+          "expanded": "true",
+          "selected": false,
+          "focused": true,
+          "aria": "Swarm capacity, 0 selected · usage unknown"
+        },
+        {
+          "label": "Last eligibility: blocked",
+          "description": "unknown quota",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Recorded 9/27/2026, 1:03:03 PM. This was the last eligibility observation; admission revalidates it."
+        },
+        {
+          "label": "pool-a · week",
+          "description": "unknown",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Last observed allowance for pool-a, week: unknown"
+        },
+        {
+          "label": "No admission recorded",
+          "description": "current limit unknown",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "No admission recorded current limit unknown"
+        },
+        {
+          "label": "Provider usage unknown",
+          "description": "current allowance not reported",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Provider usage unknown current allowance not reported"
+        }
+      ]
+    }
+  ]
+}

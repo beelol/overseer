@@ -1,0 +1,890 @@
+{
+  "base_commit": "19edf57ca4c30b0b4788b5416bb5d949a2cdff6c",
+  "rfc_sha256": {
+    "swarm-mode.md": "49e5a32ee27b776c8309be698bc0d12e9b212c975da7c285cda111ab8c9415ad",
+    "swarm-mode-scenarios.md": "857ee07916d6d60b57435125dfc3547ecd37024a3948e6343a95a63cb972bbdf",
+    "swarm-mode-goal.md": "fb1bcf183e39e2edeb27b6d5f641eb8daf639bbaf271f5a4afbc15bcb01de08a"
+  },
+  "criteria": {
+    "SWARM-01": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": "Normal Auto/Manual \u00d7 Swarm launch paths and an opt-in UI are not wired; fixture planning cannot verify off-mode or one-agent fallback."
+    },
+    "SWARM-02": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_checkpoint.rs",
+        "daemon/tests/swarm_dispatch_incident.rs",
+        "docs/verification/swarm/SWARM-02.md"
+      ],
+      "blocker": "Fixture allowlists exclude a newly observed unselected account and require a destination-specific checkpoint grant before selected account B resumes. Live discovery/provider-context permissions, denied-only routing and ordinary fallback remain unverified."
+    },
+    "SWARM-03": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_plan.rs",
+        "daemon/tests/swarm_benefit.rs",
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-2.md",
+        "docs/verification/swarm/SWARM-03.md",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/S5.md",
+        "daemon/tests/swarm_runtime.rs"
+      ],
+      "blocker": "Supervised fixture processes now execute five jobs concurrently across two growth waves while holding a conflicting database writer without an attempt. A separate supervised root\u2192child\u2192leaf replay holds each dependent before accepted evidence and after acceptance until the parent process exits, then admits it. Real worktree writer enforcement, undeclared-resource discovery and a qualified live route remain incomplete."
+    },
+    "SWARM-04": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_policy.rs",
+        "daemon/tests/swarm_scheduler.rs",
+        "docs/verification/swarm/milestone-4.md",
+        "docs/verification/swarm/SWARM-04.md"
+      ],
+      "blocker": "A copied durable database replays the same Swarm job admission and blocked reason, and renaming only a provider label does not change eligibility for a fixture-supplied target. Auto Mode live target ranking and one shared ordinary/Auto/Swarm allowance transaction are not yet integrated, so whole-route replay remains unverified."
+    },
+    "SWARM-05": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_benefit.rs",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/SWARM-05.md"
+      ],
+      "blocker": "Fixture benefit decisions account for two worker waves when three jobs share two app slots, choose serial when the extra wave removes the gain, and refill completed slots. Current occupancy from other tasks, actual native usage and phase costs, undeclared-resource independence, live calibrated estimates and shared Auto Mode quota input remain absent."
+    },
+    "SWARM-06": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_policy.rs",
+        "docs/verification/swarm/milestone-4.md"
+      ],
+      "blocker": "Capability requirements reject a cheaper unqualified target in fixtures; real quality routing and launch gating are not implemented."
+    },
+    "SWARM-07": {
+      "status": "partial",
+      "evidence": [
+        "docs/verification/swarm/SWARM-07.md",
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-7.md",
+        "docs/verification/swarm/SWARM-08.md",
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/tests/swarm_director_process.rs",
+        "daemon/tests/swarm_dispatch.rs",
+        "test/ui/scenario-swarm-scale.js",
+        "daemon/tests/swarm_director_loop.rs",
+        "fixtures/swarm/director-loop-v1/serial.py"
+      ],
+      "blocker": "The app setting is the total-agent ceiling; fixtures cover manual reservations, native-child exclusion, lower-limit drain, a supervised director plus 32 live workers at a 33-slot cap, a supervised director plus two live workers at a three-slot cap with confirmed-exit reuse, director-first dispatch into the remaining slot at a two-agent cap, and a one-slot scripted director completing its own metered job without a worker launch. Stop interrupts an active one-slot director; confirmed death outside Stop now reconciles unsubmitted self-work, preserves submitted evidence for replacement review, and blocks unknown effects. Separate reviewer/watch and Overseer-started admission, coordinating-run allowance accounting, and live-harness qualification remain unverified."
+    },
+    "SWARM-08": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-7.md",
+        "docs/verification/swarm/SWARM-08.md",
+        "daemon/tests/swarm_runtime.rs"
+      ],
+      "blocker": "A single persisted app-level agent cap now handles ordinary starts and fixture Swarm admission, including concurrent manual starts. Atomic shared account-quota reservation across ordinary, Auto and Swarm launches remains unimplemented; linked profiles and live Auto Mode integration are unverified."
+    },
+    "SWARM-09": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_policy.rs",
+        "daemon/tests/swarm_availability.rs",
+        "docs/verification/swarm/milestone-4.md",
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-7.md",
+        "docs/verification/swarm/milestone-14.md",
+        "docs/verification/swarm/SWARM-09.md"
+      ],
+      "blocker": "Fixture targets sharing a pool share reservations across categories, and targets labeled as one account with no common pool fail closed. An explicit revoked auth status now blocks every target alias with that account ID and cancels admitted jobs on both routes while an independent account stays eligible. Live account identity discovery, cross-mode shared quota authority, and proof of independent real accounts remain unavailable."
+    },
+    "SWARM-10": {
+      "status": "verified",
+      "evidence": [
+        "daemon/tests/swarm_policy.rs",
+        "docs/verification/swarm/milestone-4.md",
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-7.md",
+        "docs/verification/swarm/milestone-16.md",
+        "docs/verification/swarm/SWARM-10.md"
+      ],
+      "blocker": null
+    },
+    "SWARM-11": {
+      "status": "verified",
+      "evidence": [
+        "daemon/tests/swarm_policy.rs",
+        "docs/verification/swarm/milestone-4.md",
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-7.md",
+        "docs/verification/swarm/SWARM-11.md"
+      ],
+      "blocker": null
+    },
+    "SWARM-12": {
+      "status": "verified",
+      "evidence": [
+        "daemon/tests/swarm_policy.rs",
+        "daemon/tests/swarm_admission.rs",
+        "daemon/tests/swarm_settings.rs",
+        "test/unit/swarm-view.js",
+        "docs/verification/swarm/SWARM-12.md"
+      ],
+      "blocker": null
+    },
+    "SWARM-13": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_runtime.rs",
+        "docs/rfcs/swarm-auto-contract.md",
+        "docs/verification/swarm/SWARM-13.md"
+      ],
+      "blocker": "Confirmed exit retains uncertain reservation, and the shared contract now distinguishes Auto percentage windows from estimated thread credits. Live adapter enforcement, attributable native-unit settlement, delayed-usage overrun replay and parent/child dedupe are still absent."
+    },
+    "SWARM-14": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_policy.rs",
+        "daemon/tests/swarm_availability.rs",
+        "docs/verification/swarm/milestone-4.md",
+        "docs/verification/swarm/SWARM-14.md",
+        "docs/verification/swarm/CONTRACT-03.md",
+        "daemon/src/swarm/policy.rs"
+      ],
+      "blocker": "Fixture health scopes now exclude endpoint aliases, account-auth aliases and every route needing a failed local harness; exact zero quota has a separate reason and a healthy OpenCode endpoint still admits work. Auto Mode live observations, model-window exclusions, actual harness failure/reconnect and active-process reconciliation remain unverified."
+    },
+    "SWARM-15": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_routing.rs",
+        "daemon/src/swarm/artifacts.rs",
+        "docs/verification/swarm/SWARM-15.md",
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/tests/swarm_director_process.rs",
+        "docs/verification/swarm/main-reconciliation-2026-09-27.md",
+        "daemon/tests/swarm_integration.rs",
+        "daemon/tests/swarm_availability.rs"
+      ],
+      "blocker": "Two-attempt cap across routes/revisions and daemon-level blocked-route polling without director turns pass local fixtures. A supervised director must still prove no unrecorded model calls while unchanged, and joined Auto routing/other live failures remain unverified."
+    },
+    "SWARM-16": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_checkpoint.rs",
+        "daemon/tests/swarm_dispatch_incident.rs",
+        "docs/verification/swarm/SWARM-16.md",
+        "docs/verification/swarm/S4.md",
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/tests/swarm_director_process.rs",
+        "docs/verification/swarm/main-reconciliation-2026-09-27.md"
+      ],
+      "blocker": "A worker-authored checkpoint and separately granted durable trace now reach a selected same-job replacement; unselected destinations fail, and trace revocation interrupts after daemon restart. The trace is not accepted dependent evidence. Automatic checkpoint creation after abrupt failure, live account/harness handoff and joined accepted-artifact/uncertain-effect reconciliation remain unverified. Gate L generic successor recovery stays barred until same-job reservation continuity is proved."
+    },
+    "SWARM-17": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/src/adapters.rs",
+        "docs/verification/swarm/SWARM-17.md"
+      ],
+      "blocker": "Fixture admission rejects worker transports without a daemon-owned native-delegation restriction, and synthetic Claude launches carry Agent/Task denial. Claude is additionally held for audit-only runs because that denial supplies no source-write boundary. No version-pinned live attempted-spawn proof, qualified Auto target identity, or normal launch path exists; the fake Claude stream can ignore the flag."
+    },
+    "SWARM-18": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_runtime.rs",
+        "docs/verification/swarm/SWARM-18.md",
+        "daemon/tests/swarm_integration.rs",
+        "daemon/tests/swarm_scenarios.rs",
+        "docs/verification/swarm/S3.md"
+      ],
+      "blocker": "A versioned S3 fixture integrates 26 contract/module commits in an isolated worktree and preserves its source checkout. Unsaved buffers, service-side writes, live worker isolation and normal launch-path enforcement remain unverified."
+    },
+    "SWARM-19": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_plan.rs",
+        "docs/verification/swarm/milestone-2.md",
+        "daemon/tests/swarm_integration.rs",
+        "docs/verification/swarm/SWARM-19.md",
+        "daemon/tests/swarm_scenarios.rs",
+        "docs/verification/swarm/S3.md",
+        "daemon/tests/swarm_conflict.rs",
+        "daemon/tests/swarm_state.rs",
+        "daemon/src/swarm/completion.rs",
+        "daemon/src/swarm/schema.rs"
+      ],
+      "blocker": "The versioned S3 fixture integrates both a full 24-module branch and a scoped 12-module branch. In the scoped run, completion refuses an accepted retained patch before integration, the combined check fails at 11 routes and passes at 12, and excluded routes keep working. A local daemon-crash replay holds an orphaned checker until exit and requires a fresh check. Stop remains responsive during a delayed integration and prevents acknowledgement, leaving an unresolved durable intent. A director can now close an unresolved or two-attempt-exhausted fixture run with a durable incomplete report in the Stop transaction; restart preserves it and the exhausted private patch without changing the source checkout. A completed run still reads complete only through its evidence-gated completion record. Live sandboxed verification, operator reconciliation of stopped integrations, termination of a permanently hung orphan, director conflict resolution and normal adapter integration remain unqualified."
+    },
+    "SWARM-20": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md",
+        "daemon/tests/swarm_control.rs",
+        "docs/verification/swarm/milestone-8.md",
+        "docs/verification/swarm/SWARM-61.md",
+        "daemon/tests/swarm_runtime.rs",
+        "docs/verification/swarm/SWARM-20.md",
+        "test/unit/swarm-controls.js",
+        "test/ui/scenario-swarm-status.js",
+        "test/ui/scenario-swarm-scale.js",
+        "docs/verification/evidence/ui/swarm-scale/result.json",
+        "daemon/tests/swarm_director_process.rs",
+        "daemon/tests/swarm_director_loop.rs"
+      ],
+      "blocker": "Local fixtures cover durable Stop/Off state, slow-signal lock release, retained reservations and restart reconciliation. Stop now interrupts a linked director, retries a missed signal after daemon restart, reports its unconfirmed exit, and cancels an unreviewed one-slot self-attempt only after confirmed exit. A job-deadline fixture also persists a linked director interruption, restarts the daemon before signaling, and confirms retry and terminalization. A packaged 100-job/32-live-worker scenario confirms Pause/Resume, active Swarm-off drain without interrupting workers, blocked new admission, owner-confirmed Stop, unconfirmed-exit display and process teardown. Live harness checkpoints, native-descendant control, changed-objective delivery and joined Overseer/phone paths remain unverified."
+    },
+    "SWARM-21": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "daemon/tests/swarm_plan.rs",
+        "daemon/tests/swarm_integration.rs",
+        "docs/verification/swarm/milestone-1.md",
+        "docs/verification/swarm/milestone-3.md",
+        "docs/verification/swarm/SWARM-21.md",
+        "daemon/tests/swarm_effects.rs",
+        "daemon/tests/swarm_scenarios.rs",
+        "docs/verification/swarm/S3.md",
+        "daemon/tests/swarm_director_loop.rs"
+      ],
+      "blocker": "Revision CAS, affected-job invalidation and stale-result rejection pass. A joined Catalog replay narrows 24 to 12 routes, supersedes excluded jobs, integrates only retained patches, keeps excluded routes functional under the shared contract, and rejects premature completion. A supervised one-slot director job excluded during execution now settles as superseded only after confirmed director exit. An integrated excluded patch or uncertain external effect cannot be hidden by omission. User-message intake, qualified live delivery and an explicit reversal path for already integrated excluded work remain unimplemented."
+    },
+    "SWARM-22": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md",
+        "docs/verification/swarm/milestone-10.md",
+        "docs/verification/swarm/SWARM-22.md",
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/tests/swarm_dispatch.rs",
+        "daemon/tests/swarm_integration.rs",
+        "daemon/src/store.rs"
+      ],
+      "blocker": "Fixture startup automatically drains already-admitted unlinked intents only while their snapshots and target permission remain valid; it retains stale or revoked reservations without launching. Local launch-failure fixtures close an unstarted queued run and reconcile an asynchronously failed worker attempt. Task/run/link/owner insertion rolls back atomically when the worker intent is missing. Director and worker spawn-record crash windows reattach private identity-matched live or exited local supervisors without duplicate worker attempts or completion; mismatched or missing evidence retains reservations. External worktree cleanup, full accepted-result replay, VS Code restart, live Auto Mode refresh, usage reconciliation and supported live harness recovery remain unverified."
+    },
+    "SWARM-23": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_control.rs",
+        "docs/verification/swarm/SWARM-23.md",
+        "daemon/tests/swarm_policy.rs",
+        "daemon/tests/swarm_state.rs",
+        "docs/verification/swarm/SWARM-37.md",
+        "test/unit/swarm-view.js",
+        "test/ui/scenario-swarm-status.js",
+        "test/ui/scenario-swarm-scale.js",
+        "docs/verification/evidence/ui/swarm-scale/result.json",
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/evidence/ui/swarm-scale/04-capacity-expanded.png",
+        "docs/verification/evidence/ui/swarm-status/result.json",
+        "docs/verification/evidence/ui/swarm-status/03-swarm-blocked-capacity.png",
+        "docs/verification/evidence/ui/swarm-status/04-swarm-serial-capacity.png",
+        "test/ui/scenario-swarm-allowance.js",
+        "docs/verification/evidence/ui/swarm-allowance/result.json"
+      ],
+      "blocker": "Packaged fixtures show aggregate work, nested workers, selected fixture target, frozen allocation and reserve, three-of-eight scaled and one-of-eight serial planning decisions, a blocked no-approved-target eligibility observation, the last held admission reason, and a selected-window allowance drop from 100 to 0.5 points followed by an unknown observation. These are past fixture observations, not a continuously current constraint or measured provider usage. Live Auto account usage and names, current constraint reconciliation, the remaining full UI matrix, and broader status/log credential-redaction evidence remain unverified."
+    },
+    "SWARM-24": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-7.md",
+        "docs/rfcs/swarm-auto-contract.md",
+        "docs/verification/swarm/SWARM-24.md",
+        "docs/verification/swarm/main-reconciliation-2026-09-27.md"
+      ],
+      "blocker": "The fixture admission revalidates a target snapshot, fences admissions against the latest persisted availability observation, and shares the app agent-slot lock; the proposed contract specifies job identity, attempts, category allocation and common proofs. The actual Auto Mode producer and shared account-quota authority are not integrated. Gate S's 100-self-started-turn cap has not been replayed alongside an approved Swarm director."
+    },
+    "SWARM-25": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": "No authorized version-pinned live two-worker, fallback, cancel and recovery matrix has been run."
+    },
+    "SWARM-26": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_evaluation.rs",
+        "fixtures/swarm/evaluation-v1/",
+        "docs/verification/swarm/SWARM-26.md"
+      ],
+      "blocker": "Evaluation v1 now runs paired one-worker and two-worker local executions for dependency, independent, exclusive-write and constrained-budget cases. All eight runs complete with 2/2 accepted evidence and 200 scripted fixture work units. Only the independent case executes in parallel and improves elapsed time in one machine run. Native provider usage, supported-harness qualification, and repeated quality/time comparison remain unverified."
+    },
+    "SWARM-27": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md",
+        "daemon/tests/swarm_dispatch.rs",
+        "daemon/tests/swarm_director_loop.rs",
+        "fixtures/swarm/director-loop-v1/",
+        "daemon/src/swarm/completion.rs",
+        "docs/verification/swarm/SWARM-27.md"
+      ],
+      "blocker": "Supervised scripted workers submit evidence/results into the director inbox, accepted contract work unlocks a dependent job, and fixture completion requires passed checks for every accepted job plus confirmed exits and an applied inbox. A separately supervised scripted director now plans two jobs, commits a synthetic benefit estimate, admits and launches both workers, forwards D1, reviews their artifact-backed results and records completion without test-runner worker launches. Its choices remain predetermined; a model director, Auto Mode route, arbitrary objective/backlog decomposition and live harness path remain unverified."
+    },
+    "SWARM-28": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/tests/swarm_policy.rs",
+        "daemon/tests/swarm_scheduler.rs",
+        "daemon/tests/swarm_plan.rs",
+        "daemon/src/swarm/schema.rs",
+        "docs/verification/swarm/SWARM-28.md"
+      ],
+      "blocker": "Fixture admission binds harness, profile, model and optional effort to worker launch and enforces persisted per-job capabilities. A two-account fixture routes code and browser jobs to qualified allowed targets. Explicit approved repositories and source commits now bind director/worker process launches, including after restart; normal launch still needs to supply that scope. Live Auto account-generation/provider/model-version revalidation, a manual single-target pool, ordinary launch integration and shared account admission remain unverified."
+    },
+    "SWARM-29": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md",
+        "daemon/tests/swarm_admission.rs",
+        "daemon/tests/swarm_runtime.rs",
+        "docs/verification/swarm/milestone-7.md",
+        "docs/verification/swarm/SWARM-29.md"
+      ],
+      "blocker": "A deterministic 100-job fixture admits 32 attempts at a time and accepts all 100 exactly once with intact synthetic evidence; a 130-job fixture now bounds the ready window to 100 and refills its durable backlog. A separate fixture runs 32 supervised local processes alongside a scripted active director turn, and quota headroom reduces effective concurrency with a reason. A working model director, executed checks and combined 100-job supervised/provider path remain unverified."
+    },
+    "SWARM-30": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_director.rs",
+        "daemon/tests/swarm_director_owner.rs",
+        "daemon/tests/swarm_director_process.rs",
+        "daemon/tests/swarm_director_loop.rs",
+        "fixtures/swarm/director-loop-v1/serial.py",
+        "fixtures/swarm/director-loop-v1/serial_review.py",
+        "docs/verification/swarm/SWARM-30.md",
+        "docs/verification/swarm/milestone-11.md"
+      ],
+      "blocker": "A fixture stalls on unknown director termination, preserves worker reservation/result and prior Pause state, and requeues an unapplied batch after confirmed replacement. Durable owner-token and lease tests fence plan, directive, review and inbox actions across restart; timeout retains ownership and blocks admission, active unowned turns cannot be taken over, and confirmed replacement waits for a newly bound generation. A supervised local scripted director receives a private credential and requires its recorded process exit before replacement, including after daemon restart. The owner/run link commits before spawn; startup automatically recovers proven no-spawn states in the unlinked reserved and linked pre-supervisor phases, while a requested spawn remains uncertain. Startup reattaches a live or exited orphan supervisor only when its private launch identity and process evidence match; missing or mismatched evidence stays stalled and reserved. The daemon refreshes a healthy linked scripted director's lease after a local control ping, including across restart, but will not revive an expired or exited owner. Confirmed death now requeues unsubmitted director self-work within the original attempt cap, preserves submitted evidence for replacement review, blocks unknown effects, waits for known native descendants, and settles scope-narrowed or expired self-work after confirmed exit. Model-director turns, qualified live process/descendant control, live replacement availability and provider-path death proof remain unverified."
+    },
+    "SWARM-31": {
+      "status": "partial",
+      "evidence": [
+        "docs/verification/swarm/SWARM-31.md",
+        "daemon/tests/swarm_runtime.rs"
+      ],
+      "blocker": "A scripted local launch remains separate from completion and replays to one run. Known child/grandchild rows hold confirmation and reservations until terminal receipts; a failed child blocks an accepted parent result. A synthetic Claude stream with a background Agent and interim result now passes through the fixture-only worker bridge without finishing the attempt or exposing its broker token. Captured live async receipts, silent/stale output, late append, late-discovered descendants and usage reconciliation remain unverified."
+    },
+    "SWARM-32": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-7.md"
+      ],
+      "blocker": "Fixture admission holds at eight submitted results and resumes below four with bounded waves; outage recovery and actual director review capacity remain unimplemented."
+    },
+    "SWARM-33": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_director.rs",
+        "docs/verification/swarm/milestone-5.md",
+        "docs/verification/swarm/SWARM-33.md",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/S5.md"
+      ],
+      "blocker": "A fixture batch claims at most 20 messages/32 KiB; an undecided result is requeued after turn completion and restart while routine progress applies. A joined Atlas replay acknowledges Stop in 7 ms during 2,000 duplicate progress updates and retains one director envelope. No live model turn, provider reservation, semantic review, or explicit unresolved disposition runs."
+    },
+    "SWARM-34": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_context.rs",
+        "docs/verification/swarm/SWARM-34.md"
+      ],
+      "blocker": "A 100-job fixture proves bounded director pages and worker briefs attached to scripted launch, including planned resources, target constraints, durable allocation/reserve and audit scope. Accepted-dependency references, destination-specific grants/revocation, chunked content retrieval and cursor-paged reference retrieval pass locally. Live harness delivery and credential-safe grants, observed resource/allowance updates, token accounting and on-demand director mediation remain unverified."
+    },
+    "SWARM-35": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_plan.rs",
+        "docs/verification/swarm/milestone-2.md",
+        "docs/verification/swarm/milestone-3.md",
+        "daemon/tests/swarm_integration.rs",
+        "docs/verification/swarm/SWARM-35.md",
+        "daemon/tests/swarm_scenarios.rs",
+        "docs/verification/swarm/S3.md",
+        "daemon/tests/swarm_broker.rs"
+      ],
+      "blocker": "Dependency readiness waits for accepted patch integration across review and plan revision paths. Local acceptance and completion now require applied director redirect/advisory/retraction receipts for the accepted attempt, with queued/delivered holds surviving restart. S3 contract repair uses attempt 2 of the same logical job, redirects one stale module result and integrates 24 module patches. Qualified live application, director conflict repair, session reuse and the complete S3 workflow remain unverified."
+    },
+    "SWARM-36": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_scheduler.rs",
+        "daemon/tests/swarm_dispatch.rs",
+        "docs/verification/swarm/SWARM-36.md"
+      ],
+      "blocker": "A fixture central queue fairly admits unequal category backlogs, skips a conflicting first job, and applies each saved capability requirement. A supervised two-repository replay starts both directors and workers, filters unapproved repository scopes before reservation, alternates B then A, and rejects a fifth process at a four-agent cap. It still takes injected route, quota snapshot and checkout inputs rather than selecting them from Auto Mode; cross-category handoffs and a shared live account authority remain unverified."
+    },
+    "SWARM-37": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "docs/verification/swarm/SWARM-37.md",
+        "test/unit/swarm-view.js",
+        "test/ui/scenario-swarm-status.js",
+        "test/ui/scenario-swarm-scale.js",
+        "docs/verification/evidence/ui/swarm-scale/result.json"
+      ],
+      "blocker": "The packaged VS Code scenario confirms one supervised director, 32 live workers and four blocked jobs among 100; bounded pages, blocked-state filtering, worker drilldown, Pause/Stop under two seconds, separate unconfirmed exits and clean teardown pass. Real provider account usage and the binding limit remain unavailable until the shared Auto observation and admission authority is integrated."
+    },
+    "SWARM-38": {
+      "status": "verified",
+      "evidence": [
+        "docs/verification/swarm/agetor-parity.md",
+        "docs/verification/swarm/SWARM-38.md"
+      ],
+      "blocker": null
+    },
+    "SWARM-39": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_policy.rs",
+        "docs/verification/swarm/milestone-4.md",
+        "daemon/tests/swarm_settings.rs",
+        "docs/verification/swarm/milestone-6.md",
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-16.md",
+        "daemon/tests/swarm_state.rs",
+        "daemon/src/swarm/limits.rs",
+        "docs/verification/swarm/SWARM-39.md"
+      ],
+      "blocker": "Built-in defaults, saved precedence, approved-target inheritance, immutable run snapshots, percentage override arithmetic, the 100-job ready window and configured nonterminal backlog cap pass in fixtures. Durable replay-safe run-limit revisions can lower the worker ceiling and raise the backlog cap without rewriting the initial allowance; lowering backlog below existing nonterminal jobs is rejected. Actual S0 launch, normal UI controls, one-time account selection, immediate revocation and full Auto Mode scheduler enforcement remain unimplemented."
+    },
+    "SWARM-40": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_policy.rs",
+        "docs/verification/swarm/milestone-4.md",
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-7.md"
+      ],
+      "blocker": "The fixture allocation freezes 10% of available native units, preserves at least 20% for finishing, and rejects zero estimates; all cost classes and live shared accounting remain incomplete."
+    },
+    "SWARM-41": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md",
+        "daemon/tests/swarm_director.rs",
+        "docs/verification/swarm/milestone-5.md",
+        "docs/verification/swarm/SWARM-41.md",
+        "daemon/tests/swarm_dispatch.rs",
+        "daemon/tests/swarm_atlas.rs",
+        "daemon/tests/swarm_director_loop.rs",
+        "fixtures/swarm/director-loop-v1/"
+      ],
+      "blocker": "The joined S1 replay deduplicates D1, claims it before J2 finishes, and records targeted J1/J4 advisory receipts; the guarded J7 fault replay records scripted retractions with receipts. A separately supervised scripted director now consumes J2's early D1, sends one targeted J4 advisory, and reviews both results; J2 waits for J4's applied receipt before completing. Live harness delivery, semantic recipient choice and actual director inference remain unimplemented."
+    },
+    "SWARM-42": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md",
+        "docs/verification/swarm/milestone-15.md",
+        "docs/verification/swarm/SWARM-42.md",
+        "daemon/tests/swarm_atlas.rs",
+        "daemon/tests/swarm_revision_replay.rs"
+      ],
+      "blocker": "Stable-ID dedupe, terminal exact-receipt replay after restart, stale generation checks, late finished-attempt result isolation and requeued undecided-result review pass; the joined S1 replay includes duplicate D1, and joined S5 collapses 2,000 J2 progress replays to one director envelope during Stop. A committed or no-change director plan revision now replays its exact result after restart without applying the plan twice, while changed input, stale fresh requests and forged owner tokens fail. Worker-inbox reads require the recipient's attempt token. Live dispatch/accounting and broader delayed/reordered cross-harness message traces remain untested."
+    },
+    "SWARM-43": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "daemon/tests/swarm_plan.rs",
+        "docs/verification/swarm/milestone-1.md",
+        "docs/verification/swarm/milestone-3.md",
+        "daemon/tests/swarm_dispatch.rs",
+        "daemon/tests/swarm_atlas.rs",
+        "daemon/tests/swarm_runtime.rs",
+        "docs/verification/swarm/SWARM-43.md",
+        "fixtures/swarm/atlas-v1/swarm-j4-long-worker.mjs"
+      ],
+      "blocker": "The joined S1 replay records delivered/applied advisories and J4 overlap redirect. Local acceptance and final completion hold unapplied director redirects, advisories and retractions; new directives to finished attempts are rejected while exact receipts replay. Daemon fixtures enforce the 30-second applied-ack timeout, and a joined Atlas S5 replay sends a revision-2 plan redirect while J4\u2019s PostgreSQL attachment probe is held: receipt remains delivered, dependent review stays held, a checkpoint is queued and the linked worker is interrupted without accepting a result. The complete six-job S1 revision-2 and stale-output trace, qualified live provider delivery/application, and exclusion of unsupported harness paths remain unverified."
+    },
+    "SWARM-44": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_plan.rs",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/milestone-2.md"
+      ],
+      "blocker": "Cross-category read/write claims and duplicate hypothesis ownership pass; joined S1 records J4 overlap and scripted redirect while J1 separately checks project middleware. Director redirection is not connected to live workers."
+    },
+    "SWARM-45": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_plan.rs",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/milestone-2.md"
+      ],
+      "blocker": "Joined S1 adds J7 after J2's task result and independently reproduces it from a fresh PostgreSQL schema within the worker ceiling. Director-selected budgeted creation, contradiction handling and finding merge remain unimplemented."
+    },
+    "SWARM-46": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_plan.rs",
+        "docs/verification/swarm/milestone-3.md",
+        "daemon/tests/swarm_scenarios.rs",
+        "docs/verification/swarm/S3.md",
+        "docs/verification/swarm/SWARM-46.md"
+      ],
+      "blocker": "The S3 fixture redirects one in-flight revision-1 module and rejects its stale result after contract repair. An S1 fault replay rejects stale J4 evidence and sends a scripted retraction to J2/J4 after contradictory J7 evidence. Applied acknowledgement across qualified live sessions, autonomous correction, and unrelated accepted-work preservation in this scenario remain unverified."
+    },
+    "SWARM-47": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_plan.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-2.md",
+        "daemon/tests/swarm_conflict.rs",
+        "daemon/tests/swarm_atlas.rs",
+        "fixtures/swarm/atlas-v1/src/probe.ts",
+        "daemon/src/swarm/conflicts.rs",
+        "daemon/src/swarm/coverage.rs",
+        "daemon/src/swarm/integration.rs",
+        "daemon/src/swarm/runtime.rs",
+        "daemon/tests/swarm_integration.rs",
+        "daemon/src/swarm/artifacts.rs",
+        "docs/verification/swarm/SWARM-47.md",
+        "daemon/src/swarm/completion.rs",
+        "daemon/src/swarm/mod.rs",
+        "daemon/src/swarm/schema.rs",
+        "daemon/tests/swarm_state.rs"
+      ],
+      "blocker": "A durable J2/J7 conflict preserves both chains, blocks acceptance and completion, and resolves only after one independent accepted J8 reproduction and confirmed exit; explicit unresolved state stays visible and blocked. A separate fixture registers a conflict after both findings were accepted, survives restart, and refuses to resolve against an accepted contradicted job until that job is revised. A transitive ready dependent is demoted and held at admission while its ancestor is disputed. A registered active dependent gets a durable checkpoint and targeted interrupt; confirmed exit leaves it blocked while unrelated work continues. Previously accepted dependent conclusions are invalidated as current coverage, kept as historical evidence, and require explicit revision and fresh review before descendants resume. A late conflict before a dependent patch's Git commit prevents acknowledgement. A post-commit/pre-ack restart reconciles the exact private patch effect; unfamiliar edits remain held for review and prevent plan revision. Acknowledged dependent patches remain in the private branch; an in-flight second integration is reconciled, and conflict ancestry plus artifact revision hold later integration and verification until fresh accepted repairs. A two-job integrated dependency chain repairs in order, retaining historical commits. A separate fixture exhausts two actual attempts, then shows a failed job and attempts_exhausted coverage after late conflict, refusing a third attempt and stale branch verification even after reproduction resolves the disagreement. A stopped unresolved run now reads incomplete after restart with both artifact chains and unrelated accepted coverage. A director-authored unresolved or attempts-exhausted partial report now closes the fixture run atomically with Stop, survives restart and cannot invent its reason from absent evidence. Independent overlapping multi-patch repair, a no-code disposition, autonomous semantic judgment and qualified live director review remain unverified."
+    },
+    "SWARM-48": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_plan.rs",
+        "daemon/tests/swarm_revision_replay.rs",
+        "daemon/tests/swarm_conflict.rs",
+        "daemon/tests/swarm_director.rs",
+        "daemon/src/swarm/schema.rs",
+        "docs/verification/swarm/milestone-2.md",
+        "daemon/tests/swarm_state.rs",
+        "docs/verification/swarm/SWARM-48.md"
+      ],
+      "blocker": "Fixture plan validation, independent subgraphs, two failed plan/repair validation turns, rejected superseded-job ID reuse across restart, exact request-ID replay of semantic and unknown-dependency repair rejections without a second count, recorded accepted-evidence and resolved-conflict progress, and durable two-turn no-progress stalls pass. Legacy active turns conservatively backfill accepted-decision and resolved-conflict snapshots on migration. No-ID retries, other material-progress and repair-error classes, live director behavior, and complete S3/S5 traces remain unverified."
+    },
+    "SWARM-49": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_broker.rs",
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-1.md",
+        "daemon/tests/swarm_director.rs",
+        "docs/verification/swarm/milestone-5.md",
+        "docs/verification/swarm/milestone-9.md",
+        "docs/verification/swarm/SWARM-49.md"
+      ],
+      "blocker": "Malformed or unauthorized worker reports get bounded non-leaking diagnostics and no inbox effect; payload/inbox bounds, dedupe of 2,000 local-socket replays, Stop under two seconds during that flood, bounded director batches, and admission hold at a full inbox pass in fixtures. Terminal reports remain durable and can bypass a full inbox up to 16 outstanding per attempt; overflow is unacknowledged, duplicate receipts remain idempotent, and applying a report frees room for a correction. Real-harness overflow retry, live inference/context controls and broader permission paths remain unverified."
+    },
+    "SWARM-50": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "daemon/tests/swarm_faults.rs",
+        "docs/verification/swarm/milestone-1.md",
+        "docs/verification/swarm/milestone-9.md",
+        "docs/verification/swarm/SWARM-50.md",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/S5.md"
+      ],
+      "blocker": "Real SQLite-full and write-fault fixtures block new admissions and replay dispatch, discovery and result IDs once. An Atlas-backed J2 reproduction now fails artifact persistence without acknowledgement, remains blocked across daemon restart, and replays the artifact and result IDs exactly once after capacity recovers; J4 admission then proceeds. External process creation under full storage, actual filesystem-full migration, and qualified live sender-held state remain unverified."
+    },
+    "SWARM-51": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/src/swarm/runtime.rs",
+        "docs/verification/swarm/SWARM-51.md",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/S5.md"
+      ],
+      "blocker": "Local supervised fixtures and a joined Atlas J4 probe now show that repeated evidence-free progress cannot extend an absolute job deadline or create acceptance. Other local fixtures distinguish output silence, interrupted transport, disconnected/unconfirmed exit, prompt suspect retry, crash between job-timeout persistence and interrupt, and a worker ignoring the first signal. Confirmed exit keeps the reservation binding as uncertain. A 60-second wall-clock outage, late launch/review race, worker ignoring all escalation, shared usage settlement, and qualified live harness behavior remain unverified."
+    },
+    "SWARM-52": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_admission.rs",
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/src/swarm/admission.rs",
+        "daemon/src/swarm/runtime.rs",
+        "daemon/tests/swarm_integration.rs",
+        "daemon/src/swarm/integration.rs",
+        "docs/verification/swarm/SWARM-52.md"
+      ],
+      "blocker": "The fixture integration API defaults runs to no source-change permission, retains it over restart, and requires an explicit isolated-write grant. Native targets without a qualified audit source-write boundary are now held before quota reservation and rechecked at process launch, including an old pending admission. Generic fixture workers still have writable worktrees; no qualified audit-only native harness sandbox, live-service mutation boundary, joined S1/S2/S4 audit replay or normal-launch permission path exists."
+    },
+    "SWARM-53": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_plan.rs",
+        "daemon/tests/swarm_admission.rs",
+        "daemon/tests/swarm_runtime.rs",
+        "docs/verification/swarm/milestone-2.md",
+        "docs/verification/swarm/milestone-13.md",
+        "docs/verification/swarm/SWARM-53.md",
+        "daemon/tests/swarm_atlas.rs",
+        "fixtures/swarm/atlas-v1/probe-shared.mjs",
+        "daemon/src/swarm/director.rs",
+        "docs/verification/swarm/S5.md"
+      ],
+      "blocker": "Planned write claims constrain admission; a joined Atlas replay now proves two scripted Express/PostgreSQL clients sharing one mutable schema contaminate each other, quarantine both submitted artifacts, and recover through one isolated retry per job. Quarantined result notifications no longer requeue indefinitely in the director inbox, with a non-ignored regression. Other fixtures preserve observations through exit/restart, invalidate a prior completed verdict, interrupt affected supervised workers, enforce retry bounds, and permit shared read-only access. Live resource discovery, alias canonicalization, external mutation detection, and independent live harness qualification remain unavailable."
+    },
+    "SWARM-54": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_plan.rs",
+        "daemon/tests/swarm_dispatch.rs",
+        "daemon/tests/swarm_context.rs",
+        "daemon/src/swarm/completion.rs",
+        "docs/verification/swarm/milestone-2.md",
+        "docs/verification/swarm/milestone-12.md",
+        "docs/verification/swarm/SWARM-54.md"
+      ],
+      "blocker": "Acceptance and fixture final completion revalidate stored evidence provenance and integrity, including tampering after review. Dependent context now excludes unreviewed artifacts and becomes unavailable after a late source result. Live filesystem provenance and permission-scoped replacement retrieval remain unimplemented."
+    },
+    "SWARM-55": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_broker.rs",
+        "daemon/tests/swarm_atlas.rs",
+        "fixtures/swarm/atlas-v1/probe.test.mjs",
+        "daemon/src/swarm/coverage.rs",
+        "docs/verification/swarm/SWARM-55.md",
+        "daemon/tests/swarm_ledgerpay.rs",
+        "fixtures/swarm/ledgerpay-v1/",
+        "docs/verification/swarm/S2.md"
+      ],
+      "blocker": "Versioned Atlas and LedgerPay backends now demonstrate missing PostgreSQL/Redis queues as environment-blocked in joined Swarm replays; negative signatures/stale events and a duplicate-grant defect remain distinct. Autonomous director decisions, a complete endpoint/permission matrix, independent reproduction enforcement and live harness paths remain unverified."
+    },
+    "SWARM-56": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_admission.rs",
+        "daemon/tests/swarm_runtime.rs",
+        "docs/verification/swarm/milestone-7.md",
+        "docs/verification/swarm/SWARM-56.md",
+        "test/ui/scenario-swarm-scale.js",
+        "docs/verification/evidence/ui/swarm-scale/result.json"
+      ],
+      "blocker": "Local fixtures enforce review pressure, preserve ten already-admitted results across restart, and launch 32 supervised workers with explicit ceilings. A packaged VS Code scenario now observes 32 live local worker PIDs in one 100-job category and proves all exit after teardown. Live account usage, machine limits and director/reviewer operation at 32-worker scale remain unverified."
+    },
+    "SWARM-57": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_context.rs",
+        "daemon/src/swarm/context.rs",
+        "docs/verification/swarm/SWARM-57.md",
+        "daemon/tests/swarm_checkpoint.rs",
+        "docs/verification/swarm/S4.md",
+        "daemon/tests/swarm_integration.rs",
+        "daemon/src/swarm/completion.rs",
+        "daemon/tests/swarm_state.rs",
+        "daemon/src/swarm/mod.rs",
+        "daemon/src/swarm/plan.rs",
+        "daemon/tests/swarm_sensitive_fields.rs",
+        "daemon/src/swarm/artifacts.rs",
+        "daemon/src/swarm/broker.rs"
+      ],
+      "blocker": "Durable grants and revocation protect accepted dependent evidence and a same-job checkpoint. A joined scripted Dispatch Go/PostgreSQL replay revokes B's grant during its active replacement, interrupts it, denies further context and admission, and retains the checkpoint. Known secret patterns are redacted in final text, and secret-shaped run/job definitions, artifact/message identifiers and completion metadata are rejected before persistence. Live cross-target ACL/credential isolation, complete raw-secret audits across broker/ledger/logs, peer bypass resistance and simultaneous native races remain unverified."
+    },
+    "SWARM-58": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_effects.rs",
+        "daemon/src/swarm/effects.rs",
+        "docs/verification/swarm/SWARM-58.md",
+        "daemon/tests/swarm_ledgerpay.rs",
+        "fixtures/swarm/ledgerpay-v1/",
+        "docs/verification/swarm/S2.md",
+        "fixtures/swarm/ledgerpay-v1/session.py",
+        "fixtures/swarm/ledgerpay-v1/test_session.py"
+      ],
+      "blocker": "A versioned LedgerPay fixture now connects a real PostgreSQL state probe to the durable daemon effect journal across restart: a lost ack leaves counter 1 and one duplicate queued, journal replay refuses execution, and a separate control proves blind redelivery would raise the counter to 2. The outcome is reconciled as applied through a submitted effect_probe. Arbitrary harness tool calls are not intercepted, absent outcomes lack a qualified adapter, cross-category identity and safe claim release remain open, and no live path is qualified."
+    },
+    "SWARM-59": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_availability.rs",
+        "daemon/tests/swarm_policy.rs",
+        "daemon/tests/swarm_admission.rs",
+        "daemon/src/swarm/availability.rs",
+        "docs/verification/swarm/SWARM-59.md",
+        "daemon/tests/swarm_dispatch_incident.rs",
+        "docs/verification/swarm/S4.md",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/S5.md",
+        "test/ui/scenario-swarm-allowance.js",
+        "docs/verification/evidence/ui/swarm-allowance/result.json"
+      ],
+      "blocker": "Fixture observations persist eligibility blocks and suppress unchanged-state wakes, including S4 after all qualified selected accounts disappear. An owner-confirmed fixture target change invalidates the prior assessment, waits for a fresh observation, wakes once, and preserves prior attempts and artifacts; an account newly selected after first admission cannot gain a new pool allocation. A joined Atlas replay blocks J4 after an injected external allowance reduction while preserving J2 backend evidence; a separate cross-category regression fences an older generous admission snapshot. The daemon preserves selected-window numeric allowance changes and an isolated packaged UI fixture displays a 100-to-0.5-point drop, then unknown without inventing zero. An injected explicit account revocation cancels admitted jobs on every selected route with the same account ID, records one durable revoke operation across replay, preserves an independent account's eligibility, and leaves usage uncertain. Director-wide availability messages remain readable with null job and attempt IDs. The Atlas replay now asserts native-unit before/after/change through status APIs; the packaged UI fixture remains separate. Live Auto Mode updates, verified account identity feeds, a normal owner target control and live director behavior remain unverified."
+    },
+    "SWARM-60": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md",
+        "docs/verification/swarm/SWARM-60.md"
+      ],
+      "blocker": "Worker discoveries reach a durable director inbox and fixture director advisories reach only selected peers with applied receipts. Worker-inbox reads now require the recipient's attempt token, so a peer cannot read a targeted directive using its attempt ID alone. Live peer delivery, automatic relevance selection and artifact permissions are not implemented."
+    },
+    "SWARM-61": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md",
+        "daemon/tests/swarm_director.rs",
+        "docs/verification/swarm/milestone-5.md",
+        "docs/verification/swarm/SWARM-61.md",
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/tests/swarm_plan.rs",
+        "daemon/tests/swarm_context.rs",
+        "daemon/tests/swarm_availability.rs",
+        "daemon/src/swarm/schema.rs",
+        "daemon/tests/swarm_atlas.rs",
+        "daemon/tests/swarm_create.rs",
+        "daemon/tests/swarm_stop_replay.rs",
+        "docs/verification/swarm/S5.md",
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_conflict.rs",
+        "daemon/tests/swarm_integration.rs"
+      ],
+      "blocker": "Scripted local and Atlas-backed final-result/Stop orderings persist one operation sequence, preserve the artifact and result, reject acceptance/completion, and deduplicate replay. Local selected-account revocation/result/review/Stop orderings record revocation in the same cancellation transaction. Start and versioned Stop request IDs now replay one durable effect across daemon restart; a stale phone-style Stop loses to newer Pause/Resume, limit or plan state in a local fixture. A director partial close uses the same ordered Stop transaction and request replay, and cannot attach a report after user Stop in an ordered fixture. No phone gateway yet derives request scope from an authenticated device or proves joined Full control/Watch only permissions, cross-surface races, native descendants, qualified live paths or explicit user resume."
+    },
+    "SWARM-62": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_control.rs",
+        "docs/verification/swarm/milestone-8.md",
+        "docs/verification/swarm/milestone-10.md",
+        "docs/verification/swarm/SWARM-62.md",
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/S5.md",
+        "daemon/tests/swarm_director_loop.rs",
+        "daemon/tests/swarm_admission.rs",
+        "test/unit/swarm-controls.js",
+        "test/ui/scenario-swarm-status.js",
+        "docs/verification/evidence/ui/swarm-status/result.json"
+      ],
+      "blocker": "A daemon timer checks run deadlines without admission requests, records a deadline reason, cancels queued work, interrupts a linked scripted worker and delivers its terminal event. A joined Atlas blocked-deadline replay queues a checkpoint request and Stop while a PostgreSQL-backed J4 call is held; the checkpoint is not confirmed. A related job-deadline fixture proves interruption retry for a linked director after daemon restart. An explicit owner extension now survives restart, is idempotently recorded, moves the run-deadline boundary, and leaves the frozen account allocation unchanged; a packaged VS Code control exercises it. A stopping-run readout exposes unconfirmed workers in a Stop fixture. Deadline-specific unconfirmed-exit UI, live harness/descendant control, and live blocked/active extension remain unverified."
+    },
+    "SWARM-63": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": "No ordinary backend Swarm run can launch yet; its absence cannot verify that product self-tests/editor control are excluded."
+    },
+    "SWARM-64": {
+      "status": "partial",
+      "evidence": [
+        "fixtures/swarm/catalog-v1/",
+        "daemon/tests/swarm_scenarios.rs",
+        "docs/verification/swarm/S3.md",
+        "fixtures/swarm/atlas-v1/",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/S1.md",
+        "docs/verification/swarm/SWARM-64.md",
+        "fixtures/swarm/ledgerpay-v1/",
+        "daemon/tests/swarm_ledgerpay.rs",
+        "docs/verification/swarm/S2.md",
+        "fixtures/swarm/ledgerpay-v1/session.py",
+        "fixtures/swarm/ledgerpay-v1/test_session.py",
+        "fixtures/swarm/dispatch-v1/",
+        "daemon/tests/swarm_dispatch_incident.rs",
+        "docs/verification/swarm/S4.md",
+        "daemon/tests/swarm_checkpoint.rs",
+        "docs/verification/swarm/SWARM-16.md",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/S5.md"
+      ],
+      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S3 includes both a full 24-module migration and an integrated 12-module scoped branch with excluded routes still functional. S5 joins fourteen named Atlas v1 faults. Autonomous director/routing, real account outage and usage feed, live communication, complete scenario traces and S0 remain unverified."
+    }
+  },
+  "scenarios": {
+    "S0": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": "No normal category + objective launch control or live director selection exists; policy defaults only have daemon fixture coverage."
+    },
+    "S1": {
+      "status": "partial",
+      "evidence": [
+        "fixtures/swarm/atlas-v1/manifest.json",
+        "fixtures/swarm/atlas-v1/acceptance.test.mjs",
+        "fixtures/swarm/atlas-v1/probe.test.mjs",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/S1.md"
+      ],
+      "blocker": "Versioned Express/PostgreSQL probes feed a joined scripted Swarm run with four initial workers, D1/overlap coordination, slot refill, J7 reproduction and seven accepted checks. Separate fault runs reject missing/stale evidence, use one J8 paired probe to resolve contradictory J2/J7 fixture variants after scripted retractions, and classify a missing export queue as blocked coverage. Profile/director choices, detailed report, source-text injection, autonomous contradiction judgment and live communication remain open."
+    },
+    "S2": {
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_effects.rs",
+        "docs/verification/swarm/SWARM-58.md",
+        "fixtures/swarm/ledgerpay-v1/manifest.json",
+        "fixtures/swarm/ledgerpay-v1/test_backend.py",
+        "fixtures/swarm/ledgerpay-v1/test_probe.py",
+        "daemon/tests/swarm_ledgerpay.rs",
+        "docs/verification/swarm/S2.md",
+        "fixtures/swarm/ledgerpay-v1/session.py",
+        "fixtures/swarm/ledgerpay-v1/test_session.py"
+      ],
+      "blocker": "Versioned FastAPI/PostgreSQL/Redis backend and joined scripted Swarm run prove signed ingress, K1-K3 admission, K4 refill, K2-to-director-to-K3 discovery, duplicate and protected delivery, stale-event denial and missing-Redis blocked coverage. A separate joined replay links a persistent real-database lost-ack probe to daemon effect reconciliation across restart and prevents blind redelivery. Director/routing choices and final prose are scripted; arbitrary harness commands are not journal-enforced, full report/fault trace and live communication remain unverified."
+    },
+    "S3": {
+      "status": "partial",
+      "evidence": [
+        "fixtures/swarm/catalog-v1/",
+        "daemon/tests/swarm_scenarios.rs",
+        "docs/verification/swarm/S3.md"
+      ],
+      "blocker": "The versioned Catalog fixture now joins both a 24-module migration and a 24-to-12 scope change to isolated integration and combined backend checks. The narrowed branch preserves excluded routes and rejects completion with an unintegrated retained patch. Autonomous director adaptation, live user intake, conflict repair and qualified harness paths remain unverified."
+    },
+    "S4": {
+      "status": "partial",
+      "evidence": [
+        "fixtures/swarm/dispatch-v1/",
+        "daemon/tests/swarm_dispatch_incident.rs",
+        "docs/verification/swarm/S4.md",
+        "daemon/tests/swarm_checkpoint.rs"
+      ],
+      "blocker": "Versioned Go/PostgreSQL fixture and joined scripted three-worker replay cover measured pool timeout, held transaction, queue redelivery, failed L2 worker, permission-gated attempt-2 checkpoint on another allowed target, cautious evidence-gated report and no-qualified-target block after restart. A second joined replay revokes B's checkpoint grant while its replacement runs, interrupting it and blocking later reads/admission. Live Auto Mode outage routing, automatic checkpoint assembly, live cross-account ACL and read-only harness enforcement remain unverified."
+    },
+    "S5": {
+      "status": "partial",
+      "evidence": [
+        "fixtures/swarm/atlas-v1/",
+        "daemon/tests/swarm_atlas.rs",
+        "daemon/tests/swarm_faults.rs",
+        "daemon/tests/swarm_admission.rs",
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/tests/swarm_availability.rs",
+        "docs/verification/swarm/S5.md",
+        "fixtures/swarm/atlas-v1/probe-shared.mjs"
+      ],
+      "blocker": "Atlas v1 joins fourteen named faults: J2 lost-result-receipt, director death after dispatch, held J4 redirect timeout, evidence-free J4 heartbeat through its deadline, invalid J8/J9/J99 dependencies rejected while valid J2 completes, two scripted clients sharing one mutable PostgreSQL schema before isolated retries, 2,000 duplicate progress messages during Stop, both scripted last-result/Stop orderings, full SQLite storage during an Atlas artifact write followed by recovery and replay, an injected external allowance reduction that holds J4 while J2 evidence survives, a blocked run deadline that requests a checkpoint and interrupts a held J4 probe, a run-specific worker ceiling reduction that drains two supervised backend probes, contradictory J2/J7 evidence resolved after one bounded J8 reproduction, and selected-account revocation that interrupts only its J4 worker while preserving J2's account-B evidence. Separate daemon fixtures cover SQLite-full result/dispatch failures, completed-run contamination and explicit unresolved conflict. Numeric allowance history is asserted in the joined Atlas status APIs and displayed by a separate packaged fixture; one joined UI recording remains absent. A full S1-sized ordered replay, live identity telemetry and provider communication remain unverified; automatic resource alias discovery is absent."
+    }
+  }
+}

@@ -5,8 +5,9 @@ use crate::git;
 use crate::paths;
 use crate::redact::redact;
 use crate::shim::{self, ExitInfo, LaunchFile, ShimInfo};
-use crate::store::{self, Event, Profile, Run, Snapshot, Store, Task, Turn, Workspace};
+use crate::store::{self, DirectorOwnerLink, Event, Profile, Run, Snapshot, Store, Task, Turn, Workspace};
 use anyhow::{anyhow, bail, Context, Result};
+use rusqlite::OptionalExtension;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashSet};
 use std::io::{Read, Seek, SeekFrom};
@@ -22,6 +23,51 @@ const RAW_SEGMENTS_KEPT: u64 = 4;
 pub const DEFAULT_AUTO_EXECUTION_BUDGET_MS: u64 = 300_000;
 pub const DEFAULT_AUTO_PARENT_BUDGET_MS: u64 = 1_800_000;
 const MANUAL_POOL_CONFLICT: &str = "automatic account pool is in use; retry the manual turn after it settles";
+
+#[derive(Debug)]
+pub struct AgentLimitError {
+    pub active: i64,
+    pub limit: i64,
+    pub running_agents: Vec<Value>,
+}
+
+impl std::fmt::Display for AgentLimitError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "agent limit reached: {} of {} slots active", self.active, self.limit)
+    }
+}
+
+impl std::error::Error for AgentLimitError {}
+
+struct AgentSlotReservation<'a> {
+    daemon: &'a Daemon,
+    pending: bool,
+}
+
+impl AgentSlotReservation<'_> {
+    fn insert_task_and_run(&mut self, task: &Task, run: &Run,
+        director: Option<DirectorOwnerLink<'_>>) -> Result<()> {
+        let mut pending = self.daemon.pending_agent_slots.lock().unwrap();
+        self.daemon.store.lock().unwrap().insert_task_and_run(task, run, None, director)?;
+        *pending -= 1;
+        self.pending = false;
+        Ok(())
+    }
+
+    fn release_after_start(&mut self) {
+        let mut pending = self.daemon.pending_agent_slots.lock().unwrap();
+        *pending -= 1;
+        self.pending = false;
+    }
+}
+
+impl Drop for AgentSlotReservation<'_> {
+    fn drop(&mut self) {
+        if self.pending {
+            *self.daemon.pending_agent_slots.lock().unwrap() -= 1;
+        }
+    }
+}
 
 pub fn now() -> i64 {
     shim::now_ms() as i64
@@ -118,8 +164,15 @@ pub struct Daemon {
     profile_gates: Mutex<BTreeMap<String, Arc<Mutex<()>>>>,
     workspace_gates: Mutex<BTreeMap<String, Arc<Mutex<()>>>>,
     work_unit_gates: Mutex<BTreeMap<String, std::sync::Weak<Mutex<()>>>>,
+    /// Manual starts reserve capacity before workspace preparation. Admission
+    /// reads this under the same lock, closing the gap before the queued row.
+    pub(crate) pending_agent_slots: Mutex<i64>,
     pub events: broadcast::Sender<Event>,
     tails: Mutex<HashSet<String>>,
+    pub(crate) swarm_launch_lock: Mutex<()>,
+    pub(crate) swarm_integration_lock: Mutex<()>,
+    /// Fail closed for Swarm launches after SQLite reports exhausted or unwritable storage.
+    pub(crate) swarm_storage_blocked: std::sync::atomic::AtomicBool,
     exe: PathBuf,
     pub started_ms: i64,
     /// Storage unavailable at startup; this cannot recover without reopening the store.
@@ -139,7 +192,7 @@ pub struct Daemon {
     pub ui_session: Mutex<(Option<std::time::Instant>, Option<Vec<String>>)>,
 }
 
-fn pid_alive(pid: u32) -> bool {
+pub(crate) fn pid_alive(pid: u32) -> bool {
     if pid == 0 {
         return false;
     }
@@ -151,7 +204,41 @@ fn control_socket_path(run: &str, generation: i64) -> PathBuf {
     paths::short_socket(&format!("c-{}-{generation}.sock", &run[..run.len().min(14)]))
 }
 
+/// A daemon-issued identity for a supervised, fixture-only Swarm worker.
+/// It is passed through the private launch file, never through the task prompt
+/// or user-visible launch metadata.
+pub(crate) struct SwarmWorkerIdentity {
+    pub run_id: String,
+    pub job_id: String,
+    pub attempt_id: String,
+    pub token: String,
+    pub revision: i64,
+}
+
+pub(crate) struct SwarmDirectorIdentity {
+    pub run_id: String,
+    pub generation: i64,
+    pub token: String,
+}
+
+enum SwarmLaunchIdentity<'a> {
+    Worker(&'a SwarmWorkerIdentity),
+    Director(&'a SwarmDirectorIdentity),
+}
+
 impl Daemon {
+    fn reserve_agent_slot(&self) -> Result<AgentSlotReservation<'_>> {
+        let mut pending = self.pending_agent_slots.lock().unwrap();
+        let store = self.store.lock().unwrap();
+        let active = store.active_agent_count()? + *pending;
+        let limit = store.agent_limit()?;
+        if active >= limit {
+            return Err(AgentLimitError { active, limit, running_agents: store.active_agents()? }.into());
+        }
+        *pending += 1;
+        Ok(AgentSlotReservation { daemon: self, pending: true })
+    }
+
     pub fn open() -> Result<Arc<Self>> {
         paths::ensure_private_dir(&paths::data_dir())?;
         paths::ensure_private_dir(&paths::runtime_dir())?;
@@ -160,12 +247,26 @@ impl Daemon {
         let learning_paused = !store.learning_persistent;
         let (tx, _) = broadcast::channel(4096);
         let exe = std::env::current_exe()?;
-        let daemon = Arc::new(Self { store: Mutex::new(store), profile_gates: Mutex::new(BTreeMap::new()), workspace_gates: Mutex::new(BTreeMap::new()), work_unit_gates: Mutex::new(BTreeMap::new()), events: tx, tails: Mutex::new(HashSet::new()), exe, started_ms: now(), learning_paused: std::sync::atomic::AtomicBool::new(learning_paused),
+        let daemon = Arc::new(Self { store: Mutex::new(store), pending_agent_slots: Mutex::new(0), profile_gates: Mutex::new(BTreeMap::new()), workspace_gates: Mutex::new(BTreeMap::new()), work_unit_gates: Mutex::new(BTreeMap::new()), events: tx, tails: Mutex::new(HashSet::new()), swarm_launch_lock: Mutex::new(()), swarm_integration_lock: Mutex::new(()), swarm_storage_blocked: std::sync::atomic::AtomicBool::new(false), exe, started_ms: now(), learning_paused: std::sync::atomic::AtomicBool::new(learning_paused),
             learning_usage_paused: std::sync::atomic::AtomicBool::new(false), learning_work_paused: std::sync::atomic::AtomicBool::new(false),
             learning_thread_paused: std::sync::atomic::AtomicBool::new(false), learning_account_paused: std::sync::atomic::AtomicBool::new(false),
             learning_maintenance_paused: std::sync::atomic::AtomicBool::new(false),
             ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0), ui_session: Mutex::new((None, None)) });
         daemon.ensure_system_profiles()?;
+        {
+            let mut store = daemon.store.lock().unwrap();
+            // A SQLite page ceiling is connection-local. This fixture reapplies
+            // it after restart so a still-full disk can be replayed reliably.
+            if std::env::var("OVERSEER_SWARM_FIXTURE_API").as_deref() == Ok("1")
+                && std::env::var("OVERSEER_TEST_SWARM_STORAGE_PAGE_LIMIT").as_deref() == Ok("current") {
+                let pages: i64 = store.conn.pragma_query_value(None, "page_count", |r| r.get(0))?;
+                store.conn.pragma_update(None, "max_page_count", pages)?;
+            }
+            if let Err(error) = store.probe_swarm_write_capacity() {
+                daemon.swarm_storage_blocked.store(true, std::sync::atomic::Ordering::SeqCst);
+                crate::log(&format!("swarm storage write probe failed at startup: {error}"));
+            }
+        }
         Ok(daemon)
     }
 
@@ -444,6 +545,18 @@ impl Daemon {
     }
 
     pub fn create_task(self: &Arc<Self>, p: &Value) -> Result<Value> {
+        self.create_task_internal(p, None)
+    }
+
+    pub(crate) fn create_task_for_swarm(self: &Arc<Self>, p: &Value, identity: &SwarmWorkerIdentity) -> Result<Value> {
+        self.create_task_internal(p, Some(SwarmLaunchIdentity::Worker(identity)))
+    }
+
+    pub(crate) fn create_task_for_swarm_director(self: &Arc<Self>, p: &Value, identity: &SwarmDirectorIdentity) -> Result<Value> {
+        self.create_task_internal(p, Some(SwarmLaunchIdentity::Director(identity)))
+    }
+
+    fn create_task_internal(self: &Arc<Self>, p: &Value, swarm_identity: Option<SwarmLaunchIdentity<'_>>) -> Result<Value> {
         let repo_in = p["repo"].as_str().ok_or_else(|| anyhow!("repo is required"))?;
         let harness = p["harness"].as_str().unwrap_or("codex");
         if !["codex", "codex-app", "claude", "opencode", "opencode-serve", "generic"].contains(&harness) {
@@ -468,6 +581,20 @@ impl Daemon {
         if prompt.is_empty() && harness != "generic" {
             bail!("prompt is required");
         }
+        let mut slot = match swarm_identity.as_ref() {
+            Some(SwarmLaunchIdentity::Worker(_)) => None,
+            Some(SwarmLaunchIdentity::Director(identity)) => {
+                // A running category already holds its director slot. Planning
+                // categories have no reserved slot yet, so their first director
+                // launch still competes with ordinary starts.
+                let reserved = self.store.lock().unwrap().conn.query_row(
+                    "SELECT status IN ('running','paused','stalled','stopping') FROM swarm_runs WHERE id=?1",
+                    [&identity.run_id], |row| row.get::<_, bool>(0),
+                )?;
+                if reserved { None } else { Some(self.reserve_agent_slot()?) }
+            }
+            None => Some(self.reserve_agent_slot()?),
+        };
         let title = p["title"].as_str().map(str::to_string).unwrap_or_else(|| prompt.chars().take(60).collect());
         let mode = p["workspace_mode"].as_str().unwrap_or("worktree");
         let repo = git::toplevel(Path::new(repo_in)).context("repository not found")?;
@@ -645,7 +772,8 @@ impl Daemon {
         };
         let mut generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "sandbox":sandbox, "extra_args": p["extra_args"].clone(),
             "auto_routing":auto_routing,"auto_allowed_profiles":auto_allowed_profiles,
-            "auto_parent_budget_ms":auto_parent_budget_ms});
+            "auto_parent_budget_ms":auto_parent_budget_ms,
+            "swarm_worker": matches!(swarm_identity.as_ref(), Some(SwarmLaunchIdentity::Worker(_)))});
         // Capture this parent's own route metadata before its app-server turn
         // owns the profile. A second metadata session during that turn is not
         // safe; the child still verifies its own account and tools at launch.
@@ -672,10 +800,29 @@ impl Daemon {
         }
         {
             // Task and run appear together: a state snapshot never shows a task without its run.
-            let store = self.store.lock().unwrap();
-            store.insert_task(&task)?;
-            store.insert_run(&run)?;
-            store.set_workspace_owner(&ws.id, Some(&run.id))?;
+            if let Some(reservation) = &mut slot {
+                let director = match swarm_identity.as_ref() {
+                    Some(SwarmLaunchIdentity::Director(identity)) => Some(DirectorOwnerLink {
+                        swarm_run_id: &identity.run_id,
+                        generation: identity.generation,
+                        token: &identity.token,
+                    }),
+                    _ => None,
+                };
+                reservation.insert_task_and_run(&task, &run, director)?;
+            } else {
+                let director = match swarm_identity.as_ref() {
+                    Some(SwarmLaunchIdentity::Director(identity)) => Some(DirectorOwnerLink {
+                        swarm_run_id: &identity.run_id,
+                        generation: identity.generation,
+                        token: &identity.token,
+                    }),
+                    _ => None,
+                };
+                self.store.lock().unwrap().insert_task_and_run(
+                    &task, &run, match swarm_identity.as_ref() { Some(SwarmLaunchIdentity::Worker(identity)) => Some(identity.attempt_id.as_str()), _ => None }, director
+                )?;
+            }
         }
         let opts = TurnOpts { model: None, ..TurnOpts::from_params(p)? };
         {
@@ -683,12 +830,29 @@ impl Daemon {
             store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1", rusqlite::params![run.id, generic.to_string()])?;
         }
         self.emit(Some(&task.id), Some(&run.id), "task_created", "daemon", "exact", json!({"task": task, "workspace": ws, "run": run}))?;
-        let started = self.start_turn(&run.id, &prompt, false, &opts);
+        let started = self.start_turn_internal(&run.id, &prompt, false, &opts, swarm_identity.as_ref());
+        if let Err(e) = started {
+            let current = self.run(&run.id)?;
+            let launch_uncertain = {
+                let store = self.store.lock().unwrap();
+                crate::swarm::mark_uncertain_director_spawn(&store, &run.id)?
+                    || store.mark_worker_spawn_uncertain(&run.id)?
+            };
+            // If no supervisor was recorded, a rejected initial turn must not
+            // consume an active slot forever. A process with a recorded run
+            // directory is left to normal exit/recovery reconciliation.
+            if !launch_uncertain && current.status == "queued"
+                && self.store.lock().unwrap().run_process(&run.id)?.is_none()
+            {
+                self.mark_ended(&current, "failed", &format!("launch failed: {}", redact(&e.to_string())))?;
+            }
+            let run = self.run(&run.id)?;
+            let task = self.task(&task.id)?;
+            return Ok(json!({"task": task, "run": run, "workspace": ws,
+                "launch_error": e.to_string(),"launch_uncertain":launch_uncertain}));
+        }
         let run = self.run(&run.id)?;
         let task = self.task(&task.id)?;
-        if let Err(e) = started {
-            return Ok(json!({"task": task, "run": run, "workspace": ws, "launch_error": e.to_string()}));
-        }
         Ok(json!({"task": task, "run": run, "workspace": ws}))
     }
 
@@ -1184,6 +1348,10 @@ impl Daemon {
 
     /// Start a work turn: fresh run-start snapshot, then launch (or stdin for live generic processes).
     pub fn start_turn(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool, opts: &TurnOpts) -> Result<Turn> {
+        self.start_turn_internal(run_id, prompt, follow_up, opts, None)
+    }
+
+    fn start_turn_internal(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool, opts: &TurnOpts, swarm_identity: Option<&SwarmLaunchIdentity<'_>>) -> Result<Turn> {
         let initial = self.run(run_id)?;
         let continuity = opts.retry_of.is_some() || opts.handoff;
         if follow_up && !continuity && initial.parent_run_id.is_none() {
@@ -1256,6 +1424,17 @@ impl Daemon {
         if run.parent_run_id.is_some() && !matches!(run.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation")) {
             bail!("follow-ups go to the top-level run; native children are controlled by their parent harness");
         }
+        if swarm_identity.is_none() {
+            let store = self.store.lock().unwrap();
+            if store.conn.prepare("SELECT 1 FROM swarm_worker_launches WHERE overseer_run_id=?1")?
+                .exists([run_id])? {
+                bail!("Swarm worker runs cannot receive ordinary follow-ups; continue through the Swarm director");
+            }
+            if store.conn.prepare("SELECT 1 FROM swarm_director_owners WHERE overseer_run_id=?1")?
+                .exists([run_id])? {
+                bail!("Swarm director runs cannot receive ordinary follow-ups; continue through Swarm coordination");
+            }
+        }
         let ws = self.workspace(&run.workspace_id)?;
         if ws.removed_ms.is_some() {
             bail!("workspace was removed");
@@ -1303,6 +1482,11 @@ impl Daemon {
                 }
             }
         }
+        let mut resume_slot = if follow_up && !ACTIVE.contains(&run.status.as_str()) {
+            Some(self.reserve_agent_slot()?)
+        } else {
+            None
+        };
         let launch_meta: Value = {
             let store = self.store.lock().unwrap();
             store.conn.query_row("SELECT launch FROM runs WHERE id=?1", [run_id], |r| r.get::<_, Option<String>>(0))?.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(Value::Null)
@@ -1454,6 +1638,7 @@ impl Daemon {
                 extra_args: &extra_args,
                 permission_mode: mode.as_deref(),
                 images: &images,
+                swarm_worker: generic_meta["swarm_worker"] == true,
             },
         )?;
         if generic_meta["auto_routing"] == true {
@@ -1481,6 +1666,39 @@ impl Daemon {
                 "-c".into(), format!("mcp_servers.overseer_auto.args={args}"),
                 "-c".into(), "mcp_servers.overseer_auto.required=true".into()]);
         }
+        if let Some(identity) = swarm_identity {
+            if std::env::var("OVERSEER_SWARM_FIXTURE_API").as_deref() != Ok("1")
+                || (run.harness != "generic" && !matches!(identity, SwarmLaunchIdentity::Worker(_))) {
+                bail!("scripted Swarm identity requires a fixture worker or generic director");
+            }
+            // Synthetic provider streams exercise lifecycle parsing without giving a
+            // model harness a worker command credential. Generic fixture scripts
+            // keep their private broker environment for scripted report/ack calls.
+            if run.harness == "generic" {
+                let mut private_env = vec![
+                    ("OVERSEER_HOME", paths::data_dir().display().to_string()),
+                    ("OVERSEER_SOCKET", paths::socket_path().display().to_string()),
+                    ("OVERSEER_BIN", self.exe.display().to_string()),
+                ];
+                match identity {
+                    SwarmLaunchIdentity::Worker(identity) => private_env.extend([
+                        ("OVERSEER_SWARM_RUN_ID", identity.run_id.clone()),
+                        ("OVERSEER_SWARM_JOB_ID", identity.job_id.clone()),
+                        ("OVERSEER_SWARM_ATTEMPT_ID", identity.attempt_id.clone()),
+                        ("OVERSEER_SWARM_TOKEN", identity.token.clone()),
+                        ("OVERSEER_SWARM_REVISION", identity.revision.to_string()),
+                    ]),
+                    SwarmLaunchIdentity::Director(identity) => private_env.extend([
+                        ("OVERSEER_SWARM_RUN_ID", identity.run_id.clone()),
+                        ("OVERSEER_SWARM_GENERATION", identity.generation.to_string()),
+                        ("OVERSEER_SWARM_DIRECTOR_TOKEN", identity.token.clone()),
+                    ]),
+                }
+                for (key, value) in private_env {
+                    launch.env.insert(key.to_string(), value);
+                }
+            }
+        }
         self.store.lock().unwrap().set_workspace_owner(&ws.id, Some(run_id))?;
         let app = json!({"prompt": prompt, "cwd": ws.path, "model": run.model, "effort": effort.as_deref().or(run.effort.as_deref()), "resume": resume, "approval": generic_meta["approval"].as_str().unwrap_or("on-request"),
             "sandbox":sandbox,
@@ -1501,6 +1719,9 @@ impl Daemon {
                     rusqlite::params![turn.id, run.id, now()])?;
             }
             return Err(error);
+        }
+        if let Some(reservation) = &mut resume_slot {
+            reservation.release_after_start();
         }
         Ok(turn)
     }
@@ -1559,6 +1780,8 @@ impl Daemon {
             self.store.lock().unwrap().set_run_process(&run.id,
                 &run_dir.display().to_string(), generation, &recorded_meta)?;
         }
+        self.store.lock().unwrap().mark_director_spawn_requested(&run.id)?;
+        self.store.lock().unwrap().mark_worker_spawn_requested(&run.id)?;
         let mut child = match cmd.spawn().context("starting run supervisor") {
             Ok(child) => child,
             Err(error) => {
@@ -2542,16 +2765,158 @@ impl Daemon {
 
     /// Called once at startup: reattach to surviving supervisors, finalize exited
     /// ones, and report lost sessions. Never relaunches work.
+    fn reattach_unrecorded_director(&self, run: &Run) -> Result<bool> {
+        let owner: Option<(String, i64, String, i64)> = self.store.lock().unwrap().conn.query_row(
+            "SELECT run_id,generation,token_sha256,lease_expires_ms FROM swarm_director_owners
+             WHERE overseer_run_id=?1 AND status='active' AND supervised_launch=1
+             AND launch_phase='spawn_requested'",
+            [&run.id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)),
+        ).optional()?;
+        let Some((swarm_run, generation, digest, lease_expires)) = owner else {
+            return Ok(false);
+        };
+        let dir = paths::runs_dir().join(&run.id).join(format!("p{}",run.process_generation+1));
+        if !std::fs::symlink_metadata(&dir).is_ok_and(|m| m.file_type().is_dir()) {
+            return Ok(false);
+        }
+        let launch_path = dir.join("launch.json");
+        use std::os::unix::fs::PermissionsExt;
+        let Ok(metadata) = std::fs::symlink_metadata(&launch_path) else { return Ok(false) };
+        if !metadata.file_type().is_file() || metadata.len() > 1_000_000
+            || metadata.permissions().mode() & 0o077 != 0 {
+            return Ok(false);
+        }
+        let Ok(raw) = std::fs::read(&launch_path) else { return Ok(false) };
+        let Ok(launch) = serde_json::from_slice::<LaunchFile>(&raw) else { return Ok(false) };
+        let Some(token) = launch.env.get("OVERSEER_SWARM_DIRECTOR_TOKEN") else { return Ok(false) };
+        let generation_text = generation.to_string();
+        use sha2::{Digest, Sha256};
+        if format!("{:x}",Sha256::digest(token.as_bytes())) != digest
+            || launch.env.get("OVERSEER_SWARM_RUN_ID").map(String::as_str) != Some(swarm_run.as_str())
+            || launch.env.get("OVERSEER_SWARM_GENERATION").map(String::as_str) != Some(generation_text.as_str())
+            || launch.cwd != self.workspace(&run.workspace_id)?.path {
+            return Ok(false);
+        }
+        let exited = std::fs::read(dir.join("exit.json")).ok()
+            .and_then(|raw| serde_json::from_slice::<ExitInfo>(&raw).ok()).is_some();
+        let live = std::fs::read(dir.join("shim.json")).ok()
+            .and_then(|raw| serde_json::from_slice::<ShimInfo>(&raw).ok())
+            .is_some_and(|info| pid_alive(info.shim_pid));
+        if !exited && !live {
+            return Ok(false);
+        }
+        let store = self.store.lock().unwrap();
+        let prior: Option<String> = store.conn.query_row(
+            "SELECT launch FROM runs WHERE id=?1", [&run.id], |r| r.get(0))?;
+        let generic: Value = prior.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(Value::Null);
+        let meta = json!({"generic":generic,"program":launch.program,
+            "args":launch.args.iter().map(|arg|redact(arg)).collect::<Vec<_>>(),
+            "env_keys":launch.env.keys().collect::<Vec<_>>(),"orphan_reconciled":true});
+        if let Err(error) = store.set_run_process(
+            &run.id,&dir.display().to_string(),run.process_generation+1,&meta) {
+            crate::log(&format!("director orphan reattachment deferred: {}",redact(&error.to_string())));
+            return Ok(false);
+        }
+        store.set_run_attention(&run.id,None)?;
+        if live && !exited {
+            store.update_run_status(&run.id,"running",None,None)?;
+            if lease_expires > now() {
+                store.conn.execute(
+                    "UPDATE swarm_runs SET status=stalled_from,stalled_from=NULL,
+                     stall_reason=NULL,updated_ms=?2 WHERE id=?1 AND status='stalled'
+                     AND stall_reason='director_termination_unknown'
+                     AND stalled_from IN ('planning','running','paused','draining')",
+                    rusqlite::params![swarm_run,now()],
+                )?;
+            }
+        }
+        Ok(true)
+    }
+
+    fn reattach_unrecorded_worker(&self, run: &Run) -> Result<bool> {
+        let identity: Option<(String,String,String,i64,String)> = self.store.lock().unwrap().conn.query_row(
+            "SELECT l.run_id,l.job_id,l.attempt_id,a.revision,a.token_sha256
+             FROM swarm_worker_launches l JOIN swarm_attempts a ON a.id=l.attempt_id
+             WHERE l.overseer_run_id=?1
+             AND (l.launch_phase='spawn_requested' OR l.launch_phase IS NULL)
+             AND a.status='registered' AND a.run_id=l.run_id AND a.job_id=l.job_id",
+            [&run.id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
+        ).optional()?;
+        let Some((swarm_run,job,attempt,revision,digest)) = identity else { return Ok(false) };
+        let dir = paths::runs_dir().join(&run.id).join(format!("p{}",run.process_generation+1));
+        if !std::fs::symlink_metadata(&dir).is_ok_and(|m| m.file_type().is_dir()) {
+            return Ok(false);
+        }
+        let launch_path = dir.join("launch.json");
+        use std::os::unix::fs::PermissionsExt;
+        let Ok(metadata) = std::fs::symlink_metadata(&launch_path) else { return Ok(false) };
+        if !metadata.file_type().is_file() || metadata.len() > 1_000_000
+            || metadata.permissions().mode() & 0o077 != 0 {
+            return Ok(false);
+        }
+        let Ok(raw) = std::fs::read(&launch_path) else { return Ok(false) };
+        let Ok(launch) = serde_json::from_slice::<LaunchFile>(&raw) else { return Ok(false) };
+        let Some(token) = launch.env.get("OVERSEER_SWARM_TOKEN") else { return Ok(false) };
+        let revision_text = revision.to_string();
+        use sha2::{Digest, Sha256};
+        if format!("{:x}",Sha256::digest(token.as_bytes())) != digest
+            || launch.env.get("OVERSEER_SWARM_RUN_ID").map(String::as_str) != Some(swarm_run.as_str())
+            || launch.env.get("OVERSEER_SWARM_JOB_ID").map(String::as_str) != Some(job.as_str())
+            || launch.env.get("OVERSEER_SWARM_ATTEMPT_ID").map(String::as_str) != Some(attempt.as_str())
+            || launch.env.get("OVERSEER_SWARM_REVISION").map(String::as_str) != Some(revision_text.as_str())
+            || launch.cwd != self.workspace(&run.workspace_id)?.path {
+            return Ok(false);
+        }
+        let exited = std::fs::read(dir.join("exit.json")).ok()
+            .and_then(|raw| serde_json::from_slice::<ExitInfo>(&raw).ok()).is_some();
+        let live = std::fs::read(dir.join("shim.json")).ok()
+            .and_then(|raw| serde_json::from_slice::<ShimInfo>(&raw).ok())
+            .is_some_and(|info| pid_alive(info.shim_pid));
+        if !exited && !live { return Ok(false) }
+        let store = self.store.lock().unwrap();
+        let prior: Option<String> = store.conn.query_row(
+            "SELECT launch FROM runs WHERE id=?1", [&run.id], |r| r.get(0))?;
+        let generic: Value = prior.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(Value::Null);
+        let meta = json!({"generic":generic,"program":launch.program,
+            "args":launch.args.iter().map(|arg|redact(arg)).collect::<Vec<_>>(),
+            "env_keys":launch.env.keys().collect::<Vec<_>>(),"orphan_reconciled":true});
+        if let Err(error) = store.set_run_process(
+            &run.id,&dir.display().to_string(),run.process_generation+1,&meta) {
+            crate::log(&format!("worker orphan reattachment deferred: {}",redact(&error.to_string())));
+            return Ok(false);
+        }
+        store.set_run_attention(&run.id,None)?;
+        if live && !exited { store.update_run_status(&run.id,"running",None,None)?; }
+        Ok(true)
+    }
+
     pub fn reconcile(self: &Arc<Self>) -> Result<Value> {
         self.store.lock().unwrap().release_stale_unstarted_auto_pool_claims()?;
         let runs = self.store.lock().unwrap().runs()?;
         let mut report = Vec::new();
         for run in runs.iter().filter(|r| (r.parent_run_id.is_none() || matches!(r.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation"))) && (ACTIVE.contains(&r.status.as_str()) || r.status == "disconnected")) {
-            let process = self.store.lock().unwrap().run_process(&run.id)?;
+            let mut process = self.store.lock().unwrap().run_process(&run.id)?;
+            if process.is_none() {
+                if self.reattach_unrecorded_director(run)? || self.reattach_unrecorded_worker(run)? {
+                    process = self.store.lock().unwrap().run_process(&run.id)?;
+                }
+            }
             let Some((dir, _, _)) = process else {
                 if ACTIVE.contains(&run.status.as_str()) {
-                    self.mark_ended(run, "failed", "daemon stopped before the run was launched")?;
-                    report.push(json!({"run": run.id, "result": "never launched"}));
+                    let uncertain = {
+                        let store = self.store.lock().unwrap();
+                        if crate::swarm::mark_uncertain_director_spawn(&store, &run.id)? {
+                            Some("director spawn uncertain")
+                        } else if store.mark_worker_spawn_uncertain(&run.id)? {
+                            Some("worker spawn uncertain")
+                        } else { None }
+                    };
+                    if let Some(reason) = uncertain {
+                        report.push(json!({"run": run.id, "result": reason}));
+                    } else {
+                        self.mark_ended(run, "failed", "daemon stopped before the run was launched")?;
+                        report.push(json!({"run": run.id, "result": "never launched"}));
+                    }
                 }
                 continue;
             };
@@ -2727,12 +3092,32 @@ impl Daemon {
     pub fn state(&self) -> Result<Value> {
         let store = self.store.lock().unwrap();
         let runs = store.runs()?;
+        let mut memberships = BTreeMap::new();
+        let mut links = store.conn.prepare(
+            "SELECT overseer_run_id,run_id,'worker',job_id FROM swarm_worker_launches
+             WHERE overseer_run_id IS NOT NULL
+             UNION ALL
+             SELECT overseer_run_id,run_id,'director',NULL FROM swarm_director_owners
+             WHERE overseer_run_id IS NOT NULL",
+        )?;
+        for row in links.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?,
+            r.get::<_, String>(2)?, r.get::<_, Option<String>>(3)?)))? {
+            let (process, run, role, job) = row?;
+            memberships.insert(process, json!({"role":role,"run_id":run,"job_id":job}));
+        }
+        let mut run_values = serde_json::to_value(&runs)?;
+        for run in run_values.as_array_mut().expect("runs serialize as an array") {
+            if let Some(link) = run["id"].as_str().and_then(|id| memberships.get(id)) {
+                run["swarm_membership"] = link.clone();
+            }
+        }
         let mut turns = serde_json::Map::new();
         for r in runs.iter().filter(|r| r.parent_run_id.is_none() || matches!(r.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation"))) {
             turns.insert(r.id.clone(), serde_json::to_value(store.turns(&r.id)?)?);
         }
-        Ok(json!({"cursor": store.max_seq()?, "tasks": store.tasks()?, "runs": runs, "workspaces": store.workspaces()?, "profiles": store.profiles()?, "turns": turns,
-            "daemon": {"pid": std::process::id(), "started_ms": self.started_ms, "version": env!("CARGO_PKG_VERSION"), "parser_version": adapters::PARSER_VERSION}}))
+        Ok(json!({"cursor": store.max_seq()?, "tasks": store.tasks()?, "runs": run_values, "workspaces": store.workspaces()?, "profiles": store.profiles()?, "turns": turns,
+            "daemon": {"pid": std::process::id(), "started_ms": self.started_ms, "version": env!("CARGO_PKG_VERSION"), "parser_version": adapters::PARSER_VERSION,
+                "swarm_storage": if self.swarm_storage_blocked.load(std::sync::atomic::Ordering::SeqCst) { "blocked" } else { "ready" }}}))
     }
 
     pub fn raw_output(&self, run_id: &str, max_bytes: usize) -> Result<Value> {

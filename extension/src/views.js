@@ -4,6 +4,11 @@ const path = require('path');
 
 const STATUS_ICON = {
   queued: ['clock', 'charts.yellow'], starting: ['loading~spin', 'charts.blue'], running: ['sync~spin', 'charts.blue'],
+  planned: ['clock', 'charts.yellow'], ready: ['clock', 'charts.yellow'], reserved: ['clock', 'charts.blue'],
+  launching: ['loading~spin', 'charts.blue'], submitted: ['inbox', 'charts.orange'], blocked: ['warning', 'charts.orange'],
+  accepted: ['pass', 'charts.green'], rejected: ['error', 'charts.red'],
+  cancel_requested: ['debug-stop', 'charts.orange'], cancelled: ['debug-stop', 'charts.orange'],
+  superseded: ['history', 'descriptionForeground'],
   waiting_for_user: ['bell-dot', 'charts.orange'], completed: ['pass', 'charts.green'], failed: ['error', 'charts.red'],
   interrupted: ['debug-stop', 'charts.orange'], disconnected: ['debug-disconnect', 'charts.red'], unknown: ['question', 'charts.purple'],
 };
@@ -31,11 +36,25 @@ class Model {
     this.emitter = new vscode.EventEmitter();
     this.onDidChange = this.emitter.event;
     this.profileStatus = new Map();
+    this.swarms = [];
+    this.swarmFetchMs = 0;
   }
-  async refresh() {
+  async refresh(forceSwarm = false) {
     try {
       this.all = await this.client.request('state'); for (const p of this.all.profiles || []) p.name = accountName(p);
       this.state = this.visible(this.all); this.error = undefined;
+      if (forceSwarm || Date.now() - this.swarmFetchMs >= 1000) {
+        try {
+          const page = await this.client.request('swarm.list', { limit: 20 });
+          this.swarms = page.runs || [];
+          this.swarmError = undefined;
+        } catch (error) {
+          // A newer extension can still view ordinary agents on an older daemon.
+          this.swarms = [];
+          this.swarmError = error.message;
+        }
+        this.swarmFetchMs = Date.now();
+      }
     }
     catch (error) { this.error = error.message; }
     this.emitter.fire();
@@ -44,10 +63,13 @@ class Model {
   scheduleRefresh() { if (!this.timer) this.timer = setTimeout(() => { this.timer = undefined; this.refresh(); }, 120); }
   hide(taskId) { if (taskId && !this.hidden.has(taskId)) { this.hidden.add(taskId); this.state = this.visible(this.all); this.emitter.fire(); } }
   visible(all) {
-    if (!this.hidden.size) return all;
-    const runs = (all.runs || []).filter(r => !this.hidden.has(r.task_id));
+    const swarmTasks = new Set((all.runs || []).filter(r => r.swarm_membership && !r.parent_run_id)
+      .map(r => r.task_id));
+    if (!this.hidden.size && !swarmTasks.size) return all;
+    const excluded = new Set([...this.hidden, ...swarmTasks]);
+    const runs = (all.runs || []).filter(r => !excluded.has(r.task_id));
     const used = new Set(runs.map(r => r.workspace_id));
-    return { ...all, tasks: (all.tasks || []).filter(t => !this.hidden.has(t.id)), runs, workspaces: (all.workspaces || []).filter(w => used.has(w.id) || !(all.runs || []).some(r => r.workspace_id === w.id)) };
+    return { ...all, tasks: (all.tasks || []).filter(t => !excluded.has(t.id)), runs, workspaces: (all.workspaces || []).filter(w => used.has(w.id) || !(all.runs || []).some(r => r.workspace_id === w.id)) };
   }
   // Lookups see every run, hidden ones included (the Overseer chat shows its own run).
   run(id) { return this.all.runs.find(r => r.id === id); }
@@ -82,15 +104,23 @@ function ago(ms) {
   return `${Math.floor(s / 86400)}d`;
 }
 
+function nativeAmount(milli, unit) {
+  return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 3 }).format((milli || 0) / 1000)} ${unit}`;
+}
+
+function unconfirmedExitLabel(count) { return `${count} exit${count === 1 ? '' : 's'} unconfirmed`; }
+
 /** The side bar's agents list (AC-67 to AC-71): Needs you, then agents by repository. */
 class AgentsProvider {
   constructor(model, memento, extensionUri, handlers = {}) {
     this.model = model; this.memento = memento; this.extensionUri = extensionUri; this.handlers = handlers;
     // Expansion is remembered per workspace (item ids are stable), so reloads keep the tree shape.
     this.collapsed = new Set(memento?.get('overseer.collapsed', []) || []);
+    this.expandedSwarms = new Set(memento?.get('overseer.expandedSwarms', []) || []);
     this.filter = undefined; // { query, taskIds: Set }
     this.showArchived = false;
     this.statusFilter = 'all'; // 'all' | 'working' | 'needs' | 'done' | 'failed' (the search field's filters)
+    this.swarmStatusFilter = 'all';
     this.emitter = new vscode.EventEmitter();
     this.onDidChangeTreeData = this.emitter.event;
     // Redraw only when something the list shows changed: a redraw between a click's mouse-down and
@@ -115,13 +145,23 @@ class AgentsProvider {
     return JSON.stringify([Math.floor(Date.now() / 30000), (st.tasks || []).map(t => [t.id, t.title, t.repo_root, t.archived_ms ? 1 : 0]),
       (st.runs || []).map(r => [r.id, r.status, r.parent_run_id, r.attention?.kind, r.harness, r.model, r.profile_id, r.workspace_id, r.title, r.exit_reason, r.ended_ms ? 1 : 0]),
       (st.profiles || []).map(p => [p.id, p.name]), (st.workspaces || []).map(w => [w.id, w.branch, w.kind]),
-      (this.handlers.attention?.() || []).map(a => [a.run_id, a.label, a.detail]), this.handlers.pinned?.() || [], (this.continuity?.data?.handoffs || []).length]);
+      (this.handlers.attention?.() || []).map(a => [a.run_id, a.label, a.detail]), this.handlers.pinned?.() || [],
+      this.model.swarms.map(s => [s.id, s.status, s.revision, s.active_worker_processes,
+        s.job_counts, s.unconfirmed_exit_count, s.benefit?.decision, s.benefit?.reason,
+        s.availability?.observed_ms, s.availability?.state, s.availability?.reason, s.capacity]),
+      (this.continuity?.data?.handoffs || []).length]);
   }
   getTreeItem(node) { return node.item; }
   getParent(node) { return node.parent; }
   refresh() { if (this.indexed) this.indexed.visible.clear(); this.emitter.fire(); }
+  setSwarmStatusFilter(status) { this.swarmStatusFilter = status; this.refresh(); }
   setCollapsed(node, collapsed) {
     const id = node?.item?.id; if (!id) return;
+    if (id.startsWith('swarm:')) {
+      if (collapsed) this.expandedSwarms.delete(id); else this.expandedSwarms.add(id);
+      this.memento?.update('overseer.expandedSwarms', [...this.expandedSwarms].slice(-500));
+      return;
+    }
     if (collapsed) this.collapsed.add(id); else this.collapsed.delete(id);
     this.memento?.update('overseer.collapsed', [...this.collapsed].slice(-500));
   }
@@ -181,7 +221,10 @@ class AgentsProvider {
     const chain = [];
     for (let r = this.model.run(runId), seen = new Set(); r && !seen.has(r.id); r = r.parent_run_id && this.model.run(r.parent_run_id)) { seen.add(r.id); chain.unshift(r); }
     const task = chain.length && this.model.task(chain[0].task_id);
-    if (!task) return undefined;
+    // A Swarm worker can be opened from its job, but its task is deliberately
+    // absent from the ordinary Agents tree. Never construct a node for a row
+    // that the tree cannot actually reveal.
+    if (!task || !this.visibleTasks().some(visible => visible.id === task.id)) return undefined;
     let node = this.agentNode(task, this.repoNode(task.repo_root));
     for (const run of chain.slice(1)) node = this.childNode(run, node);
     return node;
@@ -193,15 +236,205 @@ class AgentsProvider {
       const out = [];
       const needs = this.filter || this.showArchived || this.statusFilter !== 'all' ? [] : (this.handlers.attention?.() || []);
       if (needs.length) out.push(this.needsSection(needs));
+      if (m.swarms.length && !this.filter && !this.showArchived) out.push(this.swarmsSection());
       const repos = [...new Set(this.visibleTasks().map(t => t.repo_root))];
       for (const repo of repos) out.push(this.repoNode(repo));
       return out;
     }
     if (node.section === 'needs') return node.list.map(a => this.needsRow(a, node)).filter(Boolean);
+    if (node.section === 'swarms') return m.swarms.map(run => this.swarmNode(run, node));
+    if (node.swarm) return this.swarmPage(node.swarm, undefined, node, true);
+    if (node.swarmPage) return this.swarmPage(node.swarmPage.run, node.swarmPage.cursor, node, false);
+    if (node.swarmCapacity) return this.swarmCapacityRows(node.swarmCapacity, node);
+    if (node.job) return (node.job.worker_runs || []).map(worker => this.swarmWorkerNode(worker, node));
     if (node.repo) return this.visibleTasks().filter(t => t.repo_root === node.repo).map(t => this.agentNode(t, node));
     if (node.earlier) return [];
     if (node.run) return [...this.kidsOf(node.run.id).map(run => this.childNode(run, node)), ...this.earlier(node)];
     return [];
+  }
+  swarmsSection() {
+    const item = new vscode.TreeItem('Swarms', this.expansion('section:swarms'));
+    item.id = 'section:swarms';
+    item.iconPath = new vscode.ThemeIcon('organization');
+    item.description = String(this.model.swarms.length);
+    item.contextValue = 'section-swarms';
+    return { item, section: 'swarms' };
+  }
+  swarmNode(run, parent) {
+    const counts = run.job_counts?.by_status || {};
+    const working = run.active_worker_processes || 0;
+    const item = new vscode.TreeItem(run.category, this.expandedSwarms.has('swarm:' + run.id)
+      ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed);
+    item.id = 'swarm:' + run.id;
+    item.iconPath = new vscode.ThemeIcon('organization');
+    item.description = `${working} working · ${counts.ready || 0} ready · ${counts.blocked || 0} blocked` +
+      (run.unconfirmed_exit_count ? ` · ${unconfirmedExitLabel(run.unconfirmed_exit_count)}` : '');
+    item.tooltip = `${run.objective}\n${run.status} · ${run.job_counts?.total || 0} jobs\n${item.description}\nProvider usage ${run.capacity?.provider_usage_state || 'unknown'}`;
+    item.accessibilityInformation = { label: `${run.category} swarm, ${run.status}, ${item.description}` };
+    item.contextValue = 'swarm-run-' + run.status;
+    return { item, swarm: run, parent };
+  }
+  async swarmPage(run, cursor, parent, includeDirector) {
+    const page = await this.model.client.request('swarm.jobs', { id: run.id, cursor, limit: 50,
+      ...(this.swarmStatusFilter === 'all' ? {} : { status: this.swarmStatusFilter }) });
+    const rows = [];
+    if (includeDirector) {
+      const item = new vscode.TreeItem('Director');
+      item.id = 'swarm-director:' + run.id;
+      item.iconPath = new vscode.ThemeIcon('account');
+      item.description = run.director?.process_status || run.director?.owner_status || 'not started';
+      item.contextValue = 'swarm-director';
+      rows.push({ item, parent });
+      const capacity = new vscode.TreeItem('Capacity', vscode.TreeItemCollapsibleState.Collapsed);
+      capacity.id = 'swarm-capacity:' + run.id;
+      capacity.iconPath = new vscode.ThemeIcon('pulse');
+      const selected = run.capacity?.selected_targets?.length || 0;
+      capacity.description = `${selected}${run.capacity?.selected_targets_truncated ? '+' : ''} selected · usage ${run.capacity?.provider_usage_state || 'unknown'}`;
+      capacity.tooltip = 'Selected targets and frozen fixture commitments. Provider usage is not reported.';
+      capacity.accessibilityInformation = { label: `Swarm capacity, ${capacity.description}` };
+      rows.push({ item: capacity, swarmCapacity: run, parent });
+      if (run.unconfirmed_exit_count) {
+        const exits = new vscode.TreeItem(unconfirmedExitLabel(run.unconfirmed_exit_count));
+        exits.id = 'swarm-unconfirmed:' + run.id;
+        exits.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('charts.orange'));
+        exits.description = 'Stop requested · reservations held';
+        exits.tooltip = 'These swarm processes have not confirmed exit. Their reservations remain held.';
+        rows.push({ item: exits, parent });
+      }
+    }
+    for (const job of page.jobs || []) {
+      const workerRuns = job.worker_runs || [];
+      const active = workerRuns.find(worker => !worker.ended_ms &&
+        ['queued', 'starting', 'running', 'waiting_for_user'].includes(worker.status));
+      const item = new vscode.TreeItem(job.title, workerRuns.length
+        ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
+      item.id = `swarm-job:${run.id}:${job.id}`;
+      item.iconPath = statusIcon(active?.status || job.status);
+      item.description = active?.status === 'running' ? 'working' : active?.status || job.status;
+      item.tooltip = `${job.acceptance}\n${item.description} · ${job.attempt_count} attempts`;
+      item.accessibilityInformation = { label: `${job.title}, ${item.description}, ${job.attempt_count} attempts` };
+      item.contextValue = 'swarm-job';
+      rows.push({ item, job, parent });
+    }
+    if (page.next_cursor) {
+      const item = new vscode.TreeItem('More jobs…', vscode.TreeItemCollapsibleState.Collapsed);
+      item.id = `swarm-page:${run.id}:${page.next_cursor}`;
+      item.iconPath = new vscode.ThemeIcon('list-unordered');
+      rows.push({ item, swarmPage: { run, cursor: page.next_cursor }, parent });
+    }
+    return rows;
+  }
+  swarmCapacityRows(run, parent) {
+    const rows = [];
+    for (const target of run.capacity?.selected_targets || []) {
+      const item = new vscode.TreeItem(`Target: ${target.id}`);
+      item.iconPath = this.logo(target.harness);
+      const account = target.profile_id ? this.model.profile(target.profile_id)?.name || target.profile_id : 'account unknown';
+      item.description = `${target.harness || 'harness unknown'} · ${account} · ${target.attempts} attempt${target.attempts === 1 ? '' : 's'}`;
+      item.tooltip = [target.id, target.harness, account, target.model, target.effort].filter(Boolean).join(' · ');
+      rows.push({ item, parent });
+    }
+    if (run.capacity?.selected_targets_truncated) {
+      const item = new vscode.TreeItem('More selected targets');
+      item.description = 'readout capped at 32';
+      rows.push({ item, parent });
+    }
+    for (const window of run.capacity?.windows || []) {
+      const item = new vscode.TreeItem(`Allocation: ${window.pool_id} / ${window.window_id}`);
+      item.iconPath = new vscode.ThemeIcon('graph');
+      item.description = `${nativeAmount(window.allocation_milli, window.unit)} · finishing reserve ${nativeAmount(window.finishing_reserve_milli, window.unit)}`;
+      item.tooltip = `${item.description}\nOutstanding estimate: ${nativeAmount(window.outstanding_estimate_milli, window.unit)}. Fixture commitment, not measured provider usage.`;
+      rows.push({ item, parent });
+    }
+    if (run.capacity?.windows_truncated) {
+      const item = new vscode.TreeItem('More allocation windows');
+      item.description = 'readout capped at 32';
+      rows.push({ item, parent });
+    }
+    if (run.benefit?.decision) {
+      const item = new vscode.TreeItem(`Planning: ${run.benefit.decision}`);
+      item.iconPath = new vscode.ThemeIcon('lightbulb');
+      const reason = (run.benefit.reason || 'reason unknown').replaceAll('_', ' ');
+      const planned = run.benefit.max_parallel_workers;
+      const ceiling = run.policy?.effective?.max_workers;
+      item.description = Number.isSafeInteger(planned) && Number.isSafeInteger(ceiling) &&
+        planned < ceiling ? `${planned} of ${ceiling} worker ceiling · ${reason}` : reason;
+      item.tooltip = `Latest recorded planning decision. Current admission limit may differ. ${item.description}`;
+      rows.push({ item, parent });
+    }
+    if (run.availability?.state) {
+      const observation = run.availability;
+      const expired = !Number.isSafeInteger(observation.expires_ms) || observation.expires_ms <= Date.now();
+      const item = new vscode.TreeItem(`Last eligibility: ${expired ? 'expired' : observation.state}`);
+      item.iconPath = new vscode.ThemeIcon(expired ? 'question' :
+        observation.state === 'blocked' ? 'warning' : 'check');
+      item.description = (observation.reason ||
+        (expired ? 'refresh needed' : 'eligible when observed')).replaceAll('_', ' ');
+      item.tooltip = `Recorded ${new Date(observation.observed_ms).toLocaleString()}. ` +
+        (expired ? 'This observation has expired; refresh eligibility before admitting work.' :
+          'This was the last eligibility observation; admission revalidates it.');
+      rows.push({ item, parent });
+    }
+    for (const window of run.availability?.allowance_windows || []) {
+      const expired = !Number.isSafeInteger(run.availability.expires_ms) ||
+        run.availability.expires_ms <= Date.now();
+      const item = new vscode.TreeItem(`${window.pool_id} · ${window.window_id}${expired ? ' (expired)' : ''}`);
+      item.iconPath = new vscode.ThemeIcon(expired || window.remaining_milli == null ? 'question' : 'graph');
+      const amount = Number.isSafeInteger(window.remaining_milli) ?
+        nativeAmount(window.remaining_milli, window.unit) : 'unknown';
+      const confidence = window.confidence || 'unknown';
+      const change = Number.isSafeInteger(window.change_milli) ?
+        window.change_milli < 0 ? `down ${nativeAmount(-window.change_milli, window.unit)}` :
+          window.change_milli > 0 ? `up ${nativeAmount(window.change_milli, window.unit)}` : 'unchanged' : null;
+      const labeledAmount = confidence === 'unknown' ? 'unknown allowance' :
+        confidence === 'estimated' && amount !== 'unknown' ? `estimated ${amount}` : amount;
+      item.description = [labeledAmount, change].filter(Boolean).join(' · ');
+      const usable = Number.isSafeInteger(window.observed_usable_milli) ?
+        nativeAmount(window.observed_usable_milli, window.unit) : 'unknown';
+      item.tooltip = `${window.pool_id} / ${window.window_id} · ${confidence} observation\n` +
+        `Remaining ${amount}; unreserved and unprotected ${usable}. ` +
+        `Recorded ${new Date(run.availability.observed_ms).toLocaleString()}. ` +
+        (expired ? 'Expired; refresh before admitting work.' :
+          'Last observation, not live usage; admission revalidates it.');
+      item.accessibilityInformation = { label: `Last observed allowance for ${window.pool_id}, ${window.window_id}: ${item.description}${expired ? ', expired' : ''}` };
+      rows.push({ item, parent });
+    }
+    if (run.availability?.allowance_windows_truncated) {
+      const item = new vscode.TreeItem('More allowance windows');
+      item.description = `showing 100 of ${run.availability.allowance_window_count}`;
+      rows.push({ item, parent });
+    }
+    const last = run.capacity?.last_admission;
+    if (last) {
+      const held = last.status === 'blocked';
+      const item = new vscode.TreeItem(held ? 'Last admission held' : 'Last admission: admitted');
+      item.iconPath = new vscode.ThemeIcon(held ? 'warning' : 'check');
+      item.description = held ? String(last.reason || 'reason unknown').replaceAll('_', ' ') : `${last.job_id} → ${last.target_id}`;
+      item.tooltip = `Job ${last.job_id} · target ${last.target_id}\n${item.description}\nRecorded ${new Date(last.observed_ms).toLocaleString()}. Current eligibility may have changed.`;
+      rows.push({ item, parent });
+    } else {
+      const item = new vscode.TreeItem('No admission recorded');
+      item.iconPath = new vscode.ThemeIcon('question');
+      item.description = 'current limit unknown';
+      rows.push({ item, parent });
+    }
+    const usage = new vscode.TreeItem(`Provider usage ${run.capacity?.provider_usage_state || 'unknown'}`);
+    usage.iconPath = new vscode.ThemeIcon('question');
+    usage.description = 'current allowance not reported';
+    rows.push({ item: usage, parent });
+    return rows;
+  }
+  swarmWorkerNode(worker, parent) {
+    const item = new vscode.TreeItem('Worker');
+    item.id = `swarm-worker:${worker.overseer_run_id}`;
+    item.iconPath = this.logo(worker.harness);
+    item.description = worker.status === 'running' ? 'working' : worker.status;
+    const profile = worker.profile_id ? this.model.profile(worker.profile_id) : undefined;
+    item.tooltip = [worker.harness, profile?.name, worker.model, worker.status].filter(Boolean).join(' · ');
+    item.accessibilityInformation = { label: `Worker, ${item.tooltip}` };
+    item.contextValue = 'swarm-worker';
+    item.command = { command: 'overseer.selectRun', title: 'Open worker', arguments: [worker.overseer_run_id] };
+    return { item, worker, parent };
   }
   needsSection(list) {
     const item = new vscode.TreeItem('Needs you', this.expansion('section:needs'));

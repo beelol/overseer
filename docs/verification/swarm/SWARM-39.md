@@ -1,0 +1,25 @@
+# SWARM-39 — defaults and policy precedence
+
+Status: partial. Revision: `d844816`.
+
+Input: built-in 8-worker/9-global defaults, saved application and category policies, explicit run overrides, and an unconfigured run. A fixture run overrides allocation to 20% and finishing reserve to 30% on a 60,000-point compatible window.
+
+Expected: the run inherits approved targets and normal defaults without per-worker choices. Run overrides win over category and application settings, and a changed preset does not silently rewrite an active run. The effective allocation/reserve values must reach admission, not merely appear in settings.
+
+Actual: precedence and frozen settings were already tested. The new test initially blocked an 8,000-point worker because admission still used hardcoded 10%/20% arithmetic. It now admits that worker, freezes a 12,000-point allocation and 3,600-point reserve, and blocks a further 500-point worker outside the remaining non-finishing headroom. Preview displays applied percentages, and values above 100% are rejected. The workspace suite passed with 75 tests at revision `d844816`.
+
+Evidence: `daemon/tests/swarm_settings.rs`, `daemon/tests/swarm_policy.rs`, `daemon/tests/swarm_admission.rs`, `docs/verification/swarm/milestone-16.md`.
+
+Remaining: no normal S0 start UI or live director/worker launch, one-time account selection, immediate permission revocation or full scheduler integration exists. This remains a fixture-only policy result.
+
+Follow-up at `5b39f0f`: the 9-agent default is now the persisted application `agents.max_active` setting. The duplicate per-Swarm `max_executing` option was removed from policy defaults, preview and admission; new writes reject it. An older saved application policy with that key still loads, ignores the obsolete ceiling, and retains `max_workers` and approved targets. The full offline suite passed 198 tests with 11 ignored. S0 normal launch and the remaining items above are still unverified.
+
+Ready-window follow-up at `b8faa7d`: the existing `ready_materialized_max` policy now controls the number of ready jobs rather than only appearing in the effective-settings snapshot. A 130-job local fixture keeps 100 ready and 30 planned, refills after admission, and preserves the bound across restart and revision. The full offline suite passed 211 non-ignored tests. S0 launch and the remaining gaps above stay open.
+
+Backlog-limit follow-up at `6a833a0`: a run with a configured two-job backlog first accepted three planned jobs. The plan and revision paths now reject a result with too many nonterminal jobs; an accepted terminal job frees one slot, and a later over-limit revision rolls back without changing the existing plan. The state suite passed 14 tests, and the full offline workspace suite passed 212 non-ignored tests with 11 intentionally ignored. A policy snapshot may raise the default 1,000-job cap to at most 10,000; an active-run limit-change transition and S0 launch still need implementation.
+
+Worker-ceiling follow-up at `367d7e2`: `swarm.limit.set` now changes an active run's `max_workers` through a durable, replay-safe limit revision separate from the director's plan revision. It does not rewrite the initial allowance allocation. A focused test lowers two active fixture attempts to a ceiling of one, verifies the limit and duplicate request after daemon restart, holds a third until both attempts exit, and records one change event. A joined Atlas S5 replay uses two actual supervised backend probes and retains their evidence while draining. This covers only the worker ceiling; active-run backlog changes, a normal UI control, S0 launch, and immediate account-permission revocation remain open.
+
+Backlog follow-up at `873e4b4`: a run with a two-job backlog first rejects a three-job plan. A backlog-only `swarm.limit.set` request raises the active cap to three without changing the worker ceiling or initial allowance; the same plan then succeeds. Lowering the cap below three existing nonterminal jobs is rejected. The limit revision and request identity survive daemon restart: the same request replays once, while changed input or a stale revision is rejected. The new event columns migrate older databases, and worker-only limit requests retain their behavior. The focused test failed before the change with `missing worker ceiling`, then passed. `cargo test --offline -p overseerd --test swarm_settings --test swarm_admission --test swarm_state --quiet` passed 50 tests; `cargo test --offline -p overseerd -- --test-threads=1` passed the full non-ignored daemon suite. `git diff --check` passed. A workspace-wide `cargo fmt --all --check` remains red on extensive pre-existing formatting across unrelated files, so this change did not reformat the tree. Evidence: `daemon/tests/swarm_settings.rs`, `daemon/src/swarm/limits.rs`, `daemon/src/swarm/schema.rs`.
+
+Remaining: the backlog change is a daemon fixture control without a normal UI. S0 launch, one-time account selection, immediate permission revocation and full Auto Mode scheduler integration remain unverified. SWARM-39 stays partial.

@@ -32,6 +32,7 @@ mod redact;
 mod server;
 mod shim;
 mod store;
+mod swarm;
 mod sys;
 
 use std::io::{BufRead, BufReader, Write};
@@ -106,6 +107,12 @@ fn main() {
                 log(&format!("overseerd {} starting, data dir {}", env!("CARGO_PKG_VERSION"), paths::data_dir().display()));
                 let report = d.reconcile()?;
                 log(&format!("reconcile: {report}"));
+                match swarm::recover_proven_no_spawn(&mut d.store.lock().unwrap()) {
+                    Ok(count) => log(&format!("swarm unspawned director recovery: {count}")),
+                    Err(error) => log(&format!("swarm unspawned director recovery deferred: {error:#}")),
+                }
+                let dispatches = swarm::recover_pending_dispatches(&d)?;
+                log(&format!("swarm dispatch recovery: {dispatches}"));
                 if let Err(e) = continuity::start(d.clone()) {
                     log(&format!("continuity did not start: {e:#}"));
                 }

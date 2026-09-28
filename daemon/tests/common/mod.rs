@@ -33,6 +33,9 @@ impl Daemon {
         }
         let enable_auto = !env.iter().any(|(key, value)|
             key == "OVERSEER_TEST_AUTO_DISABLED" && value == "1");
+        if !env.iter().any(|(k, _)| k == "OVERSEER_SWARM_FIXTURE_API") {
+            env.push(("OVERSEER_SWARM_FIXTURE_API".to_string(), "1".to_string()));
+        }
         // Nor the network: Continuity's probes stay off unless a test brings its own network fixture.
         if !env.iter().any(|(k, _)| k == "OVERSEER_TEST_NET" || k == "OVERSEER_CONTINUITY_PROBES") {
             env.push(("OVERSEER_CONTINUITY_PROBES".to_string(), "off".to_string()));
@@ -232,6 +235,38 @@ pub fn tmp() -> tempfile::TempDir {
 
 pub fn run_id(created: &Value) -> String {
     created["run"]["id"].as_str().unwrap().to_string()
+}
+
+pub fn commit_beneficial_batch(d: &Daemon, run_id: &str, job_ids: &[String]) -> Value {
+    assert!(job_ids.len() >= 2);
+    let workers: Vec<Value> = job_ids.iter().map(|id| json!({
+        "id":id,"elapsed_ms":100,"usage_milli":{"points":10}
+    })).collect();
+    let serial = json!({
+        "planning":{"elapsed_ms":10,"usage_milli":{"points":1}},
+        "context":{"elapsed_ms":10,"usage_milli":{"points":1}},
+        "integration":{"elapsed_ms":10,"usage_milli":{"points":1}},
+        "review":{"elapsed_ms":10,"usage_milli":{"points":1}},
+        "retries":{"elapsed_ms":0,"usage_milli":{"points":1}},
+        "workers":workers
+    });
+    let parallel = json!({
+        "planning":{"elapsed_ms":10,"usage_milli":{"points":1}},
+        "context":{"elapsed_ms":20,"usage_milli":{"points":1}},
+        "integration":{"elapsed_ms":10,"usage_milli":{"points":1}},
+        "review":{"elapsed_ms":10,"usage_milli":{"points":1}},
+        "retries":{"elapsed_ms":0,"usage_milli":{"points":1}},
+        "workers":workers
+    });
+    let committed = d.call("swarm.benefit.commit",json!({
+        "run_id":run_id,"generation":1,"revision":1,
+        "estimate":{"independent":true,"max_workers":job_ids.len(),
+            "allocation_milli":{"points":100000},
+            "finishing_reserve_milli":{"points":20000},
+            "serial":serial,"parallel":parallel}
+    }));
+    assert_eq!(committed["decision"],"parallel","{committed}");
+    committed
 }
 
 pub fn ws_path(d: &Daemon, created: &Value) -> PathBuf {

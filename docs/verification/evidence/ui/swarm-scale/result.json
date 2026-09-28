@@ -1,0 +1,503 @@
+{
+  "checks": [
+    {
+      "name": "fixture benefit decision permits the planned 32-worker wave",
+      "ok": true,
+      "detail": {
+        "authoritative_admission": false,
+        "decision": "parallel",
+        "expected_time_benefit_ms": 3090,
+        "job_ids": [
+          "j000",
+          "j001",
+          "j002",
+          "j003",
+          "j004",
+          "j005",
+          "j006",
+          "j007",
+          "j008",
+          "j009",
+          "j010",
+          "j011",
+          "j012",
+          "j013",
+          "j014",
+          "j015",
+          "j016",
+          "j017",
+          "j018",
+          "j019",
+          "j020",
+          "j021",
+          "j022",
+          "j023",
+          "j024",
+          "j025",
+          "j026",
+          "j027",
+          "j028",
+          "j029",
+          "j030",
+          "j031"
+        ],
+        "max_parallel_workers": 32,
+        "parallel": {
+          "elapsed_ms": 150,
+          "finishing_usage_milli": {
+            "points": 3
+          },
+          "usage_milli": {
+            "points": 325
+          }
+        },
+        "reason": "beneficial",
+        "replay": false,
+        "revision": 1,
+        "run_id": "sw-5f16b950f4a8",
+        "serial": {
+          "affordable": true,
+          "elapsed_ms": 3240,
+          "finishing_usage_milli": {
+            "points": 3
+          },
+          "usage_milli": {
+            "points": 325
+          }
+        },
+        "wave": 1
+      }
+    },
+    {
+      "name": "an extra worker is held at the configured ceiling without an attempt",
+      "ok": true,
+      "detail": {
+        "reason": "worker_limit",
+        "status": "blocked"
+      }
+    },
+    {
+      "name": "32 distinct supervised fixture workers are alive",
+      "ok": true,
+      "detail": {
+        "active_worker_processes": 32,
+        "count": 32,
+        "live": 32
+      }
+    },
+    {
+      "name": "remaining jobs include four blockers while 32 attempts hold reservations",
+      "ok": true,
+      "detail": {
+        "by_status": {
+          "blocked": 4,
+          "ready": 64,
+          "reserved": 32
+        },
+        "total": 100
+      }
+    },
+    {
+      "name": "supervised category director is running alongside 32 workers",
+      "ok": true,
+      "detail": {
+        "overseer_run_id": "r-40486fdc8e53",
+        "owner_status": "active",
+        "process_status": "running"
+      }
+    },
+    {
+      "name": "daemon exposes only fixture commitments, with provider usage unknown",
+      "ok": true,
+      "detail": {
+        "last_admission": {
+          "job_id": "j036",
+          "observed_ms": 1790527199313,
+          "reason": "worker_limit",
+          "status": "blocked",
+          "target_id": "fixture-local"
+        },
+        "provider_usage_state": "unknown",
+        "selected_targets": [
+          {
+            "attempts": 32,
+            "effort": null,
+            "harness": "generic",
+            "id": "fixture-local",
+            "model": null,
+            "profile_id": null
+          }
+        ],
+        "selected_targets_truncated": false,
+        "source": "fixture_admission",
+        "windows": [
+          {
+            "allocation_milli": 100000,
+            "finishing_reserve_milli": 20000,
+            "outstanding_estimate_milli": 3200,
+            "pool_id": "fixture-pool",
+            "unit": "points",
+            "window_id": "run"
+          }
+        ],
+        "windows_truncated": false
+      }
+    },
+    {
+      "name": "packaged Agents sidebar shows 32 working, 64 ready and four blocked",
+      "ok": true,
+      "detail": [
+        {
+          "label": "Swarms",
+          "description": "1",
+          "level": 1
+        },
+        {
+          "label": "Large backend audit",
+          "description": "32 working · 64 ready · 4 blocked",
+          "level": 2
+        }
+      ]
+    },
+    {
+      "name": "workers are grouped under Swarm without duplicate ordinary agent rows",
+      "ok": true,
+      "detail": [
+        {
+          "label": "Swarms",
+          "description": "1",
+          "level": 1
+        },
+        {
+          "label": "Large backend audit",
+          "description": "32 working · 64 ready · 4 blocked",
+          "level": 2
+        }
+      ]
+    },
+    {
+      "name": "expanded category shows director and bounded job page",
+      "ok": true,
+      "detail": [
+        {
+          "label": "Swarms",
+          "description": "1",
+          "level": 1,
+          "expanded": "true",
+          "selected": false,
+          "focused": false,
+          "aria": "Swarms 1"
+        },
+        {
+          "label": "Large backend audit",
+          "description": "32 working · 64 ready · 4 blocked",
+          "level": 2,
+          "expanded": "true",
+          "selected": false,
+          "focused": true,
+          "aria": "Large backend audit swarm, running, 32 working · 64 ready · 4 blocked"
+        },
+        {
+          "label": "Director",
+          "description": "running",
+          "level": 3,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Director running"
+        },
+        {
+          "label": "Capacity",
+          "description": "1 selected · usage unknown",
+          "level": 3,
+          "expanded": "false",
+          "selected": false,
+          "focused": false,
+          "aria": "Swarm capacity, 1 selected · usage unknown"
+        },
+        {
+          "label": "Inspect route 0",
+          "description": "working",
+          "level": 3,
+          "expanded": "false",
+          "selected": false,
+          "focused": false,
+          "aria": "Inspect route 0, working, 1 attempts"
+        },
+        {
+          "label": "Inspect route 1",
+          "description": "working",
+          "level": 3,
+          "expanded": "false",
+          "selected": false,
+          "focused": false,
+          "aria": "Inspect route 1, working, 1 attempts"
+        },
+        {
+          "label": "Inspect route 2",
+          "description": "working",
+          "level": 3,
+          "expanded": "false",
+          "selected": false,
+          "focused": false,
+          "aria": "Inspect route 2, working, 1 attempts"
+        },
+        {
+          "label": "Inspect route 3",
+          "description": "working",
+          "level": 3,
+          "expanded": "false",
+          "selected": false,
+          "focused": false,
+          "aria": "Inspect route 3, working, 1 attempts"
+        }
+      ]
+    },
+    {
+      "name": "packaged state filter shows four blocked jobs and no ready or reserved job rows",
+      "ok": true,
+      "detail": [
+        "Swarms",
+        "Large backend audit",
+        "Director",
+        "Capacity",
+        "Inspect route 32",
+        "Inspect route 33",
+        "Inspect route 34",
+        "Inspect route 35",
+        "Blocked"
+      ]
+    },
+    {
+      "name": "expanded capacity names target, reserve, latest hold and planning decision without claiming live usage",
+      "ok": true,
+      "detail": [
+        {
+          "label": "Target: fixture-local",
+          "description": "generic · account unknown · 32 attempts",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "fixture-local · generic · account unknown"
+        },
+        {
+          "label": "Allocation: fixture-pool / run",
+          "description": "100 points · finishing reserve 20 points",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "100 points · finishing reserve 20 points\nOutstanding estimate: 3.2 points. Fixture commitment, not measured provider usage."
+        },
+        {
+          "label": "Planning: parallel",
+          "description": "beneficial",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Latest recorded planning decision. Current admission limit may differ. beneficial"
+        },
+        {
+          "label": "Last admission held",
+          "description": "worker limit",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Job j036 · target fixture-local\nworker limit\nRecorded 9/27/2026, 9:39:59 AM. Current eligibility may have changed."
+        },
+        {
+          "label": "Provider usage unknown",
+          "description": "current allowance not reported",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Provider usage unknown current allowance not reported"
+        }
+      ]
+    },
+    {
+      "name": "an active job opens its supervised worker without mounting all transcripts",
+      "ok": true,
+      "detail": [
+        {
+          "label": "Worker",
+          "description": "working",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Worker, generic · running"
+        }
+      ]
+    },
+    {
+      "name": "selecting one live Swarm worker opens its run view without an ordinary-row error",
+      "ok": true
+    },
+    {
+      "name": "Pause from the sidebar acknowledges within 2 seconds with 32 active workers",
+      "ok": true,
+      "detail": {
+        "status": "paused",
+        "active_worker_processes": 32,
+        "pause_ms": 94
+      }
+    },
+    {
+      "name": "Resume preserves the same 32 supervised workers",
+      "ok": true,
+      "detail": {
+        "status": "running",
+        "active_worker_processes": 32
+      }
+    },
+    {
+      "name": "Swarm off drains 32 active workers and cancels the queued backlog",
+      "ok": true,
+      "detail": {
+        "status": "draining",
+        "active_worker_processes": 32,
+        "job_counts": {
+          "by_status": {
+            "blocked": 4,
+            "cancelled": 64,
+            "reserved": 32
+          },
+          "total": 100
+        }
+      }
+    },
+    {
+      "name": "Swarm off rejects new worker admission",
+      "ok": true,
+      "detail": {
+        "reason": "run_not_admitting",
+        "status": "blocked"
+      }
+    },
+    {
+      "name": "Stop waits for owner confirmation while workers remain active",
+      "ok": true
+    },
+    {
+      "name": "confirmed Stop acknowledges within 2 seconds with 32 active workers",
+      "ok": true,
+      "detail": {
+        "status": "stopping",
+        "unconfirmed_exit_count": 6,
+        "stop_ms": 76
+      }
+    },
+    {
+      "name": "the SIGINT-resistant fixture worker remains unconfirmed with its estimate reserved",
+      "ok": true,
+      "detail": {
+        "unconfirmed_exit_count": 6,
+        "capacity": {
+          "last_admission": {
+            "job_id": "j036",
+            "observed_ms": 1790527208844,
+            "reason": "run_not_admitting",
+            "status": "blocked",
+            "target_id": "fixture-local"
+          },
+          "provider_usage_state": "unknown",
+          "selected_targets": [
+            {
+              "attempts": 32,
+              "effort": null,
+              "harness": "generic",
+              "id": "fixture-local",
+              "model": null,
+              "profile_id": null
+            }
+          ],
+          "selected_targets_truncated": false,
+          "source": "fixture_admission",
+          "windows": [
+            {
+              "allocation_milli": 100000,
+              "finishing_reserve_milli": 20000,
+              "outstanding_estimate_milli": 3200,
+              "pool_id": "fixture-pool",
+              "unit": "points",
+              "window_id": "run"
+            }
+          ],
+          "windows_truncated": false
+        }
+      }
+    },
+    {
+      "name": "sidebar shows unconfirmed exits separately while Stop is pending",
+      "ok": true,
+      "detail": [
+        {
+          "label": "Swarms",
+          "description": "1"
+        },
+        {
+          "label": "Large backend audit",
+          "description": "1 working · 0 ready · 4 blocked · 1 exit unconfirmed"
+        },
+        {
+          "label": "Director",
+          "description": "interrupted"
+        },
+        {
+          "label": "Capacity",
+          "description": "1 selected · usage unknown"
+        },
+        {
+          "label": "Target: fixture-local",
+          "description": "generic · account unknown · 32 attempts"
+        },
+        {
+          "label": "Allocation: fixture-pool / run",
+          "description": "100 points · finishing reserve 20 points"
+        },
+        {
+          "label": "Planning: parallel",
+          "description": "beneficial"
+        },
+        {
+          "label": "Last admission held",
+          "description": "run not admitting"
+        },
+        {
+          "label": "Provider usage unknown",
+          "description": "current allowance not reported"
+        }
+      ]
+    },
+    {
+      "name": "Stop escalation confirms the final worker exit and clears uncertainty",
+      "ok": true,
+      "detail": {
+        "status": "stopped",
+        "unconfirmed_exit_count": 0
+      }
+    },
+    {
+      "name": "fixture director also confirms exit during teardown",
+      "ok": true,
+      "detail": {
+        "status": "interrupted",
+        "ended_ms": 1790527209469
+      }
+    },
+    {
+      "name": "all fixture worker processes exit after Stop and teardown",
+      "ok": true,
+      "detail": {
+        "count": 32,
+        "live": 0,
+        "forced_cleanup": false
+      }
+    }
+  ]
+}

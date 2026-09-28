@@ -1,0 +1,9 @@
+# Swarm implementation milestone 4 — read-only target policy preview
+
+`swarm.policy.preview` evaluates a versioned, injected target snapshot without launching or reserving work. The fixture contract includes target/account/pool IDs, capabilities, health and authentication, expiry, quota windows in native units, confidence, and upper estimates. The policy filters to explicitly allowed and qualified targets, evaluates every binding window, and returns specific reasons for unknown/stale quota, missing estimates, unavailable targets and unaffordable work. It does not rank by provider name. Estimated quota needs an explicit request permission and stays labeled estimated.
+
+The built-in preview reports 8 workers per run, 9 executing agents globally, growth of 4 per 5 seconds, a 60-minute deadline, a 10% run allocation and a 20% minimum finishing reserve. With 60,000 milli-points available, it computes at most 6,000 milli-points for a run and 1,200 for finishing. A worker requiring 5,000 is rejected under that minimum reserve; a 4,000 worker is eligible when all other conditions hold. A tighter short window binds independently. No conversion is made between different units.
+
+Evidence: `daemon/tests/swarm_policy.rs` first failed for the missing preview method, then passed 4 policy cases covering the calculations, separate target failures, permission, stale/unknown data, incompatible units and provider-label replay. `cargo test --workspace --offline` passed 4 unit, 25 protocol, 5 broker, 5 plan, 4 policy and 3 state tests.
+
+This preview is deliberately **not authoritative admission**. Auto Mode's live snapshot producer and shared reservation transaction are absent, so it cannot freeze an allocation, account for simultaneous non-swarm launches, enforce a spend limit or start a worker. Those remain required before any quota or full acceptance criterion is claimed verified.

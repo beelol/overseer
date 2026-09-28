@@ -1,0 +1,138 @@
+use super::{get, required};
+use crate::store::Store;
+use anyhow::Result;
+use rusqlite::{params, OptionalExtension};
+use serde_json::{json, Value};
+
+pub fn report(store: &Store, p: &Value) -> Result<Value> {
+    let run = required(p, "run_id")?;
+    let current = get(store, run)?;
+    let mut stmt = store
+        .conn
+        .prepare("SELECT id,plan_revision,status,stop_reason,attempt_count
+            FROM swarm_jobs WHERE run_id=?1 ORDER BY id")?;
+    let jobs = stmt
+        .query_map(params![run], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, i64>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, Option<String>>(3)?,
+                r.get::<_, i64>(4)?,
+            ))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(stmt);
+    let mut rows = Vec::with_capacity(jobs.len());
+    for (job, revision, status, stop_reason, attempt_count) in jobs {
+        let mut results_stmt = store.conn.prepare(
+            "SELECT attempt_id,message_id,payload FROM swarm_messages WHERE run_id=?1 AND job_id=?2 AND revision=?3 AND sender=attempt_id AND kind='result' ORDER BY seq DESC",
+        )?;
+        let results = results_stmt
+            .query_map(params![run, job, revision], |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                ))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        drop(results_stmt);
+        let current_attempt = results.first().map(|item| item.0.as_str());
+        let mut selected = results.first();
+        for item in &results {
+            if Some(item.0.as_str()) != current_attempt {
+                continue;
+            }
+            let candidate: Value = serde_json::from_str(&item.2)?;
+            if candidate["audit_outcome"] == "environment_failure" {
+                selected = Some(item);
+                break;
+            }
+        }
+        let (attempt, message, payload) = match selected {
+            Some((attempt, message, raw)) => (
+                Some(attempt.clone()),
+                Some(message.clone()),
+                serde_json::from_str::<Value>(raw)?,
+            ),
+            None => (None, None, Value::Null),
+        };
+        let outcome = payload["audit_outcome"].as_str();
+        let contaminated = if let Some(attempt) = attempt.as_deref() {
+            store.conn.prepare("SELECT 1 FROM swarm_resource_contamination
+                WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3")?
+                .exists(params![run,job,attempt])?
+        } else { false };
+        let reviewed: Option<(String, i64)> = store.conn.query_row(
+            "SELECT attempt_id,reviewed_message_seq FROM swarm_decisions
+             WHERE run_id=?1 AND job_id=?2 AND decision='accept' ORDER BY id DESC LIMIT 1",
+            params![run, job],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        ).optional()?;
+        let review_stale = if status == "accepted" {
+            if let Some((accepted_attempt, reviewed_seq)) = reviewed {
+                let late: i64 = store.conn.query_row(
+                    "SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND job_id=?2
+                     AND attempt_id=?3 AND revision=?4 AND kind IN ('result','submit') AND seq>?5",
+                    params![run, job, accepted_attempt, revision, reviewed_seq],
+                    |r| r.get(0),
+                )?;
+                late > 0
+            } else {
+                true
+            }
+        } else {
+            false
+        };
+        let conflict_unresolved=store.conn.prepare(
+            "SELECT 1 FROM swarm_conflicts WHERE run_id=?1 AND status!='resolved'
+             AND (left_job_id=?2 OR right_job_id=?2)")?
+            .exists(params![run,job])?;
+        let state = if contaminated { "contaminated" }
+        else if conflict_unresolved { "conflict_unresolved" }
+        else if stop_reason.as_deref()==Some("evidence_conflict") { "dependency_conflict" }
+        else if status=="failed" && attempt_count>=2 { "attempts_exhausted" }
+        else if status == "superseded" { "excluded_by_scope" }
+        else { match outcome {
+            Some("environment_failure") => "environment_blocked",
+            _ if review_stale => "review_stale",
+            Some("negative") if status == "accepted" => "checked_negative",
+            Some("negative") => "negative_awaiting_review",
+            Some("confirmed_defect") if status == "accepted" => "confirmed_application_defect",
+            Some("confirmed_defect") => "defect_awaiting_review",
+            _ if payload.is_null() => "unreported",
+            _ => "unclassified",
+        }};
+        rows.push(json!({
+            "job_id":job,"plan_revision":revision,"job_status":status,
+            "attempt_count":attempt_count,"stop_reason":stop_reason,
+            "attempt_id":attempt,"message_id":message,
+            "audit_outcome":outcome,"coverage_state":state,
+            "unavailable_resource":payload["unavailable_resource"],
+            "artifact_ids":payload["artifact_ids"]
+        }));
+    }
+    // The per-job rows are durable evidence, but a stopped run must also give
+    // callers an explicit overall disposition. Only the separately gated
+    // completion record can establish a complete result. In particular, a
+    // stopped run with accepted checks or a director-declared unresolved
+    // conflict remains incomplete after restart.
+    let status = current["status"].as_str().unwrap_or("");
+    let outcome = match status {
+        "completed" if current["completion"]["valid"] == true => "complete",
+        "completed" | "invalidated" => "invalidated",
+        "stopped" => "incomplete",
+        "stopping" | "draining" => "settling",
+        "stalled" => "blocked",
+        _ if current["availability"]["state"] == "blocked" => "blocked",
+        _ => "in_progress",
+    };
+    let (unresolved_conflict_count,conflicts)=super::conflicts::unresolved_preview(store,run)?;
+    let conflicts_truncated=unresolved_conflict_count>conflicts.len() as i64;
+    Ok(json!({"run_id":run,"run_status":status,"outcome":outcome,
+        "stop_reason":current["stop_reason"],"completion":current["completion"],
+        "partial_report":current["partial_report"],
+        "unresolved_conflict_count":unresolved_conflict_count,
+        "conflicts_truncated":conflicts_truncated,"conflicts":conflicts,"rows":rows}))
+}

@@ -70,6 +70,9 @@ pub struct LaunchReq<'a> {
     pub permission_mode: Option<&'a str>,
     /// Images attached to this turn's prompt (private files in the run folder).
     pub images: &'a [(String, PathBuf)],
+    /// Swarm workers must not start unaccounted native subagents. This is
+    /// daemon-owned launch metadata, never a caller-supplied target capability.
+    pub swarm_worker: bool,
 }
 
 pub struct Launch {
@@ -83,6 +86,14 @@ pub struct Launch {
 pub enum InterruptPlan {
     Signal,
     StdinThenSignal(String),
+}
+
+/// This is a launch-time restriction, not live qualification under SWARM-17.
+/// Generic is available only through the fixture API; Claude is launched with
+/// Agent/Task denied. Other transports currently have no established way to
+/// prevent an unaccounted native child in a Swarm worker.
+pub fn swarm_worker_launch_supported(harness: &str) -> bool {
+    matches!(harness, "generic" | "claude")
 }
 
 /// Environment variables forwarded to harnesses. Everything else (notably API keys
@@ -260,6 +271,14 @@ pub fn validate_effort(harness: &str, effort: Option<&str>) -> Result<()> {
 
 pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
     validate_effort(harness, req.effort)?;
+    if req.swarm_worker {
+        if !req.extra_args.is_empty() {
+            bail!("Swarm worker cannot override native delegation controls");
+        }
+        if !swarm_worker_launch_supported(harness) {
+            bail!("Swarm worker native delegation is not controlled for {harness}");
+        }
+    }
     let program = match req.program_override {
         Some(p) => PathBuf::from(p),
         None => resolve_program(harness).ok_or_else(|| anyhow::anyhow!("{harness} executable not found"))?,
@@ -337,6 +356,9 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
             }
             if let Some(mode) = req.permission_mode {
                 args.extend(["--permission-mode".into(), mode.into()]);
+            }
+            if req.swarm_worker {
+                args.extend(["--disallowedTools".into(), "Agent,Task".into()]);
             }
             let content = if req.images.is_empty() {
                 json!(req.prompt)
@@ -1113,7 +1135,7 @@ mod tests {
                 cwd: Path::new("/tmp"), prompt: "work", model: Some("fixture-model"),
                 effort: Some("medium"), sandbox: Some("workspace-write"), profile_env: BTreeMap::new(),
                 resume_session: None, program_override: Some("/bin/true"),
-                args_override: None, extra_args: &[], permission_mode: None, images: &[],
+                args_override: None, extra_args: &[], permission_mode: None, images: &[], swarm_worker: false,
             }).unwrap();
             assert!(launch.args.iter().any(|arg| arg == expected), "{harness}: {:?}", launch.args);
             assert!(!launch.args.iter().any(|arg| arg.contains(";")));
@@ -1129,7 +1151,7 @@ mod tests {
                 cwd: Path::new("/tmp"), prompt: "inspect", model: Some("fixture-model"),
                 effort: Some("medium"), sandbox: Some("read-only"), profile_env: BTreeMap::new(),
                 resume_session: resume, program_override: Some("/bin/true"),
-                args_override: None, extra_args: &[], permission_mode: None, images: &[],
+                args_override: None, extra_args: &[], permission_mode: None, images: &[], swarm_worker: false,
             }).unwrap();
             let args = &launch.args;
             if resume.is_some() {
@@ -1147,7 +1169,38 @@ mod turn_option_tests {
 
     fn req<'a>(resume: Option<&'a str>, images: &'a [(String, PathBuf)]) -> LaunchReq<'a> {
         LaunchReq { cwd: Path::new("/tmp/w"), prompt: "do it", model: Some("gpt-5.6-luna"), sandbox: Some("workspace-write"), profile_env: BTreeMap::new(), resume_session: resume, program_override: Some("/bin/echo"),
-            args_override: None, extra_args: &[], effort: Some("high"), permission_mode: Some("read-only"), images }
+            args_override: None, extra_args: &[], effort: Some("high"), permission_mode: Some("read-only"), images, swarm_worker: false }
+    }
+
+    #[test]
+    fn swarm_worker_disables_native_claude_delegation_on_initial_and_resumed_turns() {
+        for session in [None, Some("session-1")] {
+            let mut request = req(session, &[]);
+            request.swarm_worker = true;
+            let launch = launch("claude", &request).unwrap();
+            assert!(launch.args.windows(2).any(|a| a == ["--disallowedTools", "Agent,Task"]),
+                "native delegation was not disabled: {:?}", launch.args);
+        }
+    }
+
+    #[test]
+    fn swarm_worker_rejects_unqualified_native_delegation_transports() {
+        let mut request = req(None, &[]);
+        request.swarm_worker = true;
+        for harness in ["codex", "codex-app", "opencode"] {
+            assert!(launch(harness, &request).err().unwrap().to_string()
+                .contains("native delegation is not controlled"), "{harness}");
+        }
+    }
+
+    #[test]
+    fn swarm_worker_cannot_override_delegation_deny_with_extra_arguments() {
+        let mut request = req(None, &[]);
+        request.swarm_worker = true;
+        let extra = ["--allowedTools".into(), "Agent".into()];
+        request.extra_args = &extra;
+        assert!(launch("claude", &request).err().unwrap().to_string()
+            .contains("cannot override native delegation controls"));
     }
 
     #[test]

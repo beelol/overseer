@@ -1,14 +1,18 @@
 //! Durable state in SQLite. The daemon is the only writer.
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use crate::auto_telemetry::{Measurement, StoredMeasurement};
 use crate::auto_quota::{QuotaSnapshot, StoredQuotaObservation};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::Serialize;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::path::Path;
 
-pub const SCHEMA_VERSION: i64 = 20;
+/// One `meta.schema_version` label covers both schemas. Auto Mode reached 20
+/// and Swarm Mode reached 5 on separate branches, each with idempotent,
+/// existence-checked migrations; 21 is their union (Auto v20 plus Swarm's tables).
+pub const SCHEMA_VERSION: i64 = 21;
 /// Retained normalized events per run before older ones are pruned (with a marker).
 pub const EVENTS_PER_RUN: i64 = 5000;
 
@@ -16,6 +20,12 @@ pub struct Store {
     pub conn: Connection,
     pub learning_conn: Connection,
     pub learning_persistent: bool,
+}
+
+pub struct DirectorOwnerLink<'a> {
+    pub swarm_run_id: &'a str,
+    pub generation: i64,
+    pub token: &'a str,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -159,6 +169,77 @@ fn json_col(row: &Row, idx: &str) -> rusqlite::Result<Value> {
 }
 
 impl Store {
+    /// A linked Swarm director or worker remains under its director's admission,
+    /// attempt and reservation authority even after its process has ended.
+    pub fn is_swarm_linked_run(&self, run_id: &str) -> Result<bool> {
+        Ok(self.conn.prepare(
+            "SELECT 1 WHERE EXISTS(SELECT 1 FROM swarm_worker_launches WHERE overseer_run_id=?1)
+             OR EXISTS(SELECT 1 FROM swarm_director_owners WHERE overseer_run_id=?1)",
+        )?.exists([run_id])?)
+    }
+
+    pub fn agent_limit(&self) -> Result<i64> {
+        let value: Option<String> = self.conn.query_row(
+            "SELECT value FROM meta WHERE key='agents.max_active'", [], |row| row.get(0)
+        ).optional()?;
+        Ok(value.and_then(|v| v.parse().ok()).unwrap_or(9))
+    }
+
+    pub fn set_agent_limit(&self, limit: i64) -> Result<()> {
+        if !(1..=256).contains(&limit) {
+            bail!("agents.max_active must be between 1 and 256");
+        }
+        self.conn.execute(
+            "INSERT INTO meta(key,value) VALUES('agents.max_active',?1) \
+             ON CONFLICT(key) DO UPDATE SET value=excluded.value", [limit.to_string()]
+        )?;
+        Ok(())
+    }
+
+    /// App slots: one per active top-level run, one per registered Swarm worker
+    /// attempt, and one per active director. A director-executed serial attempt
+    /// shares the director's slot; native children share their parent's slot.
+    pub fn active_agent_count(&self) -> Result<i64> {
+        Ok(self.conn.query_row(
+            "SELECT
+              (SELECT COUNT(*) FROM runs r WHERE r.parent_run_id IS NULL
+               AND r.status IN ('queued','starting','running','waiting_for_user')
+               AND NOT EXISTS (SELECT 1 FROM swarm_worker_launches l
+                 JOIN swarm_attempts a ON a.id=l.attempt_id
+                 WHERE l.overseer_run_id=r.id AND a.status='registered')
+               AND NOT EXISTS (SELECT 1 FROM swarm_director_owners o
+                 JOIN swarm_runs s ON s.id=o.run_id
+                 WHERE o.overseer_run_id=r.id AND s.status IN ('running','paused','stalled','stopping')))
+              + (SELECT COUNT(*) FROM swarm_attempts WHERE status='registered' AND executor='worker')
+              + (SELECT COUNT(*) FROM swarm_runs
+                 WHERE status IN ('running','paused','stalled','stopping'))",
+            [], |row| row.get(0)
+        )?)
+    }
+
+    pub fn active_agents(&self) -> Result<Vec<Value>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT r.id,r.title,r.status,'run' FROM runs r
+             WHERE r.parent_run_id IS NULL
+             AND r.status IN ('queued','starting','running','waiting_for_user')
+             AND NOT EXISTS (SELECT 1 FROM swarm_worker_launches l
+               JOIN swarm_attempts a ON a.id=l.attempt_id
+               WHERE l.overseer_run_id=r.id AND a.status='registered')
+             AND NOT EXISTS (SELECT 1 FROM swarm_director_owners o
+               JOIN swarm_runs s ON s.id=o.run_id
+               WHERE o.overseer_run_id=r.id AND s.status IN ('running','paused','stalled','stopping'))
+             UNION ALL SELECT id,job_id,status,'swarm_worker' FROM swarm_attempts
+               WHERE status='registered' AND executor='worker'
+             UNION ALL SELECT id,category,status,'swarm_director' FROM swarm_runs
+               WHERE status IN ('running','paused','stalled','stopping')"
+        )?;
+        let agents = stmt.query_map([], |row| {
+            Ok(serde_json::json!({"id":row.get::<_,String>(0)?,
+                "title":row.get::<_,String>(1)?,"status":row.get::<_,String>(2)?,
+                "kind":row.get::<_,String>(3)?}))
+        })?.collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(agents)
+    }
     pub fn open(path: &Path) -> Result<Self> {
         let conn = Connection::open(path)?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
@@ -207,6 +288,29 @@ impl Store {
             store.migrate_learning()?;
         }
         Ok(store)
+    }
+
+    /// An additional daemon-owned connection for operations that run slow external
+    /// tools between short SQLite writes. The database was migrated at startup.
+    pub fn connect_existing(path: &Path) -> Result<Self> {
+        let conn = Connection::open(path)?;
+        conn.pragma_update(None, "foreign_keys", "ON")?;
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
+        // Swarm integration uses this handle only for execution tables; Auto's
+        // learning store stays on the daemon's primary Store.
+        let store = Self { conn, learning_conn: Connection::open_in_memory()?, learning_persistent: false };
+        store.migrate_learning()?;
+        Ok(store)
+    }
+
+    /// Prove a fresh Swarm write can allocate database pages. A rolled-back
+    /// insert leaves no probe row, but still fails when SQLite cannot write.
+    pub fn probe_swarm_write_capacity(&mut self) -> Result<()> {
+        let tx = self.conn.transaction()?;
+        tx.execute("INSERT INTO meta(key,value) VALUES(?1,?2)",
+            params![format!("swarm.storage.probe.{}", uuid::Uuid::new_v4()), "x".repeat(32 * 1024)])?;
+        tx.rollback()?;
+        Ok(())
     }
 
     #[cfg(test)]
@@ -330,6 +434,17 @@ impl Store {
               ON shared_booking_windows(pool_id,window_key);
             "#,
         )?;
+        let old_version: Option<String> = self.conn.query_row(
+            "SELECT value FROM meta WHERE key='schema_version'",
+            [],
+            |row| row.get(0),
+        ).optional()?;
+        if let Some(version) = old_version {
+            let version: i64 = version.parse()?;
+            if version > SCHEMA_VERSION {
+                bail!("database schema version {version} is newer than this daemon supports");
+            }
+        }
         let has_pending: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='pending_parent_native'")?.exists([])?;
         if !has_pending {
             self.conn.execute_batch("ALTER TABLE runs ADD COLUMN pending_parent_native TEXT;")?;
@@ -454,6 +569,8 @@ impl Store {
              WHERE NOT (r.status IN ('completed','failed','interrupted') AND r.ended_ms IS NOT NULL)",
             [],
         )?;
+        // Swarm's tables (its v1..v5) are disjoint from Auto's; each check is idempotent.
+        crate::swarm::schema::migrate(&self.conn)?;
         self.conn.execute("INSERT INTO meta(key, value) VALUES('schema_version', ?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value", params![SCHEMA_VERSION.to_string()])?;
         Ok(())
     }
@@ -636,8 +753,14 @@ impl Store {
     }
 
     // ---- tasks
+    /// Auto's root admission inserts its task inside its own checks; Swarm's
+    /// launches use `insert_task_and_run`.
     pub fn insert_task(&self, t: &Task) -> Result<()> {
-        self.conn.execute(
+        Self::insert_task_row(&self.conn, t)
+    }
+
+    fn insert_task_row(conn: &Connection, t: &Task) -> Result<()> {
+        conn.execute(
             "INSERT INTO tasks(id,title,prompt,repo_root,target_ref,workspace_id,start_snapshot,fork_commit,fork_provenance,created_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
             params![t.id, t.title, t.prompt, t.repo_root, t.target_ref, t.workspace_id, t.start_snapshot, t.fork_commit, t.fork_provenance, t.created_ms],
         )?;
@@ -700,13 +823,110 @@ impl Store {
 
     // ---- runs
     pub fn insert_run(&self, r: &Run) -> Result<()> {
-        self.conn.execute(
+        Self::insert_run_row(&self.conn, r)
+    }
+
+    fn insert_run_row(conn: &Connection, r: &Run) -> Result<()> {
+        conn.execute(
             "INSERT INTO runs(id,task_id,parent_run_id,harness,harness_version,profile_id,model,effort,workspace_id,native_id,status,exit_reason,created_ms,ended_ms,title,relation_source,relation_confidence,capabilities,process_generation)
              VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)",
             params![r.id, r.task_id, r.parent_run_id, r.harness, r.harness_version, r.profile_id, r.model, r.effort, r.workspace_id, r.native_id,
                 r.status, r.exit_reason, r.created_ms, r.ended_ms, r.title, r.relation_source, r.relation_confidence, r.capabilities.to_string(), r.process_generation],
         )?;
         Ok(())
+    }
+
+    pub fn insert_task_and_run(&self, t: &Task, r: &Run, attempt_id: Option<&str>,
+        director: Option<DirectorOwnerLink<'_>>) -> Result<()> {
+        if attempt_id.is_some() && director.is_some() {
+            bail!("a run cannot be both a swarm worker and director");
+        }
+        let tx = self.conn.unchecked_transaction()?;
+        Self::insert_task_row(&tx, t)?;
+        Self::insert_run_row(&tx, r)?;
+        if let Some(attempt_id) = attempt_id {
+            let linked = tx.execute(
+                "UPDATE swarm_worker_launches SET overseer_run_id=?2,launch_phase='linked'
+                 WHERE attempt_id=?1 AND overseer_run_id IS NULL AND launch_phase='reserved'",
+                params![attempt_id, r.id],
+            )?;
+            if linked != 1 {
+                anyhow::bail!("swarm launch intent is missing or already linked");
+            }
+        }
+        if let Some(link) = director {
+            let token_hash = format!("{:x}", Sha256::digest(link.token.as_bytes()));
+            let linked = tx.execute(
+                "UPDATE swarm_director_owners SET overseer_run_id=?4,launch_phase='linked'
+                 WHERE run_id=?1 AND generation=?2 AND token_sha256=?3
+                 AND status='active' AND overseer_run_id IS NULL
+                 AND supervised_launch=1 AND launch_phase='reserved'",
+                params![link.swarm_run_id, link.generation, token_hash, r.id],
+            )?;
+            if linked != 1 {
+                bail!("director process could not be linked to its owner");
+            }
+        }
+        tx.execute("UPDATE workspaces SET owner_run_id=?2 WHERE id=?1",params![r.workspace_id,r.id])?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Persist the uncertainty boundary before a supervised director child can exist.
+    /// An owner left at reserved/linked can later prove that no spawn was requested.
+    pub fn mark_director_spawn_requested(&self, overseer_run_id: &str) -> Result<()> {
+        let owner_exists = self.conn.prepare(
+            "SELECT 1 FROM swarm_director_owners WHERE overseer_run_id=?1"
+        )?.exists([overseer_run_id])?;
+        if !owner_exists {
+            return Ok(());
+        }
+        let updated = self.conn.execute(
+            "UPDATE swarm_director_owners SET launch_phase='spawn_requested'
+             WHERE overseer_run_id=?1 AND status='active'
+             AND supervised_launch=1 AND launch_phase='linked'",
+            [overseer_run_id],
+        )?;
+        if updated != 1 {
+            bail!("director process cannot start without active linked ownership");
+        }
+        Ok(())
+    }
+
+    /// A worker's launch identity is durable before its supervisor can exist.
+    /// A legacy null phase is deliberately not upgraded into spawn proof.
+    pub fn mark_worker_spawn_requested(&self, overseer_run_id: &str) -> Result<()> {
+        let worker_exists = self.conn.prepare(
+            "SELECT 1 FROM swarm_worker_launches WHERE overseer_run_id=?1"
+        )?.exists([overseer_run_id])?;
+        if !worker_exists {
+            return Ok(());
+        }
+        let updated = self.conn.execute(
+            "UPDATE swarm_worker_launches SET launch_phase='spawn_requested'
+             WHERE overseer_run_id=?1 AND launch_phase='linked'
+             AND EXISTS(SELECT 1 FROM swarm_attempts a
+                        WHERE a.id=swarm_worker_launches.attempt_id AND a.status='registered')",
+            [overseer_run_id],
+        )?;
+        if updated != 1 {
+            bail!("worker process cannot start without an active linked attempt");
+        }
+        Ok(())
+    }
+
+    pub fn mark_worker_spawn_uncertain(&self, overseer_run_id: &str) -> Result<bool> {
+        let uncertain = self.conn.prepare(
+            "SELECT 1 FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id
+             JOIN swarm_attempts a ON a.id=l.attempt_id
+             WHERE r.id=?1 AND r.run_dir IS NULL AND a.status='registered'
+             AND (l.launch_phase='spawn_requested' OR l.launch_phase IS NULL)"
+        )?.exists([overseer_run_id])?;
+        if uncertain {
+            self.set_run_attention(overseer_run_id,
+                Some(&serde_json::json!({"reason":"worker_spawn_uncertain"})))?;
+        }
+        Ok(uncertain)
     }
 
     fn map_run(row: &Row) -> rusqlite::Result<Run> {
@@ -2830,6 +3050,92 @@ mod schema_migration_tests {
         assert!(has_effort);
     }
 
+    fn table_exists(conn: &Connection, name: &str) -> bool {
+        conn.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?1")
+            .unwrap().exists([name]).unwrap()
+    }
+
+    fn schema_label(conn: &Connection) -> String {
+        conn.query_row("SELECT value FROM meta WHERE key='schema_version'", [], |row| row.get(0)).unwrap()
+    }
+
+    #[test]
+    fn auto_v20_database_gains_swarm_tables() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("auto.sqlite");
+        {
+            // Shape an Auto-only v20 database: every Auto table, no Swarm table.
+            let store = Store::open(&path).unwrap();
+            let swarm: Vec<String> = store.conn.prepare(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'swarm%'").unwrap()
+                .query_map([], |row| row.get(0)).unwrap().collect::<rusqlite::Result<_>>().unwrap();
+            assert!(swarm.iter().any(|name| name == "swarm_reservations"));
+            store.conn.execute_batch("PRAGMA foreign_keys=OFF;").unwrap();
+            for table in swarm {
+                store.conn.execute_batch(&format!("DROP TABLE {table};")).unwrap();
+            }
+            store.conn.execute("UPDATE meta SET value='20' WHERE key='schema_version'", []).unwrap();
+        }
+        let upgraded = Store::open(&path).unwrap();
+        for table in ["swarm_runs", "swarm_reservations", "shared_booking_intents", "auto_pool_claims"] {
+            assert!(table_exists(&upgraded.conn, table), "{table}");
+        }
+        assert_eq!(schema_label(&upgraded.conn), SCHEMA_VERSION.to_string());
+    }
+
+    #[test]
+    fn swarm_v5_database_gains_auto_schema_without_losing_its_run() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("swarm.sqlite");
+        {
+            // Swarm's v5 base tables: runs has no effort column and no Auto table exists.
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch("
+                CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT);
+                CREATE TABLE workspaces(id TEXT PRIMARY KEY, path TEXT NOT NULL, repo_root TEXT NOT NULL,
+                  common_dir TEXT NOT NULL, kind TEXT NOT NULL, branch TEXT, owner_run_id TEXT,
+                  initial_dirty TEXT, created_ms INTEGER NOT NULL, removed_ms INTEGER);
+                CREATE TABLE tasks(id TEXT PRIMARY KEY, title TEXT NOT NULL, prompt TEXT NOT NULL,
+                  repo_root TEXT NOT NULL, target_ref TEXT, workspace_id TEXT NOT NULL REFERENCES workspaces(id),
+                  start_snapshot TEXT, fork_commit TEXT, fork_provenance TEXT, created_ms INTEGER NOT NULL,
+                  archived_ms INTEGER);
+                CREATE TABLE runs(id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id),
+                  parent_run_id TEXT REFERENCES runs(id), harness TEXT NOT NULL, harness_version TEXT,
+                  profile_id TEXT, model TEXT, workspace_id TEXT NOT NULL, native_id TEXT, status TEXT NOT NULL,
+                  exit_reason TEXT, created_ms INTEGER NOT NULL, ended_ms INTEGER, title TEXT NOT NULL,
+                  relation_source TEXT, relation_confidence TEXT, capabilities TEXT,
+                  process_generation INTEGER NOT NULL DEFAULT 0, run_dir TEXT, segment INTEGER NOT NULL DEFAULT 0,
+                  seg_offset INTEGER NOT NULL DEFAULT 0, attention TEXT, launch TEXT, pending_parent_native TEXT);
+                CREATE TABLE turns(id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs(id), n INTEGER NOT NULL,
+                  prompt TEXT NOT NULL, snapshot_id TEXT, started_ms INTEGER NOT NULL, ended_ms INTEGER, status TEXT NOT NULL);
+                CREATE TABLE snapshots(id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, kind TEXT NOT NULL, head TEXT,
+                  index_tree TEXT NOT NULL, worktree_tree TEXT NOT NULL, commit_sha TEXT NOT NULL, index_commit TEXT,
+                  created_ms INTEGER NOT NULL, dirty TEXT);
+                CREATE TABLE profiles(id TEXT PRIMARY KEY, name TEXT NOT NULL, harness TEXT NOT NULL, home TEXT,
+                  is_system INTEGER NOT NULL, created_ms INTEGER NOT NULL);
+                CREATE TABLE events(seq INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, task_id TEXT, run_id TEXT,
+                  kind TEXT NOT NULL, source TEXT NOT NULL, confidence TEXT NOT NULL, payload TEXT NOT NULL);
+                INSERT INTO workspaces VALUES('w-1','/tmp/w','/tmp/w','/tmp/w/.git','worktree',NULL,'r-1','{}',1,NULL);
+                INSERT INTO tasks VALUES('t-1','Kept','Check','/tmp/w',NULL,'w-1',NULL,NULL,NULL,1,NULL);
+                INSERT INTO runs(id,task_id,harness,workspace_id,status,created_ms,title)
+                  VALUES('r-1','t-1','generic','w-1','completed',1,'Kept');
+                INSERT INTO meta VALUES('schema_version','5');").unwrap();
+            crate::swarm::schema::migrate(&conn).unwrap();
+        }
+        let upgraded = Store::open(&path).unwrap();
+        let run = upgraded.run("r-1").unwrap().expect("the Swarm database's run survives");
+        assert_eq!(run.title, "Kept");
+        assert_eq!(run.effort, None);
+        for table in ["swarm_runs", "swarm_reservations", "shared_booking_intents", "auto_pool_claims",
+            "auto_root_intents"] {
+            assert!(table_exists(&upgraded.conn, table), "{table}");
+        }
+        assert_eq!(schema_label(&upgraded.conn), SCHEMA_VERSION.to_string());
+        drop(upgraded);
+        // Opening again is a no-op.
+        assert_eq!(schema_label(&Store::open(&path).unwrap().conn), SCHEMA_VERSION.to_string());
+    }
+
     #[test]
     fn prior_daily_summary_keeps_its_data_with_unknown_effort() {
         let conn = Connection::open_in_memory().unwrap();
@@ -3217,5 +3523,41 @@ mod auto_measurement_tests {
         assert_eq!(store.clear_auto_learning().unwrap(), 1);
         assert!(store.auto_measurements(10).unwrap().is_empty());
         assert_eq!(store.events_after(0, Some("r-1"), 10).unwrap().len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn failed_swarm_link_rolls_back_task() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(&dir.path().join("state.sqlite")).unwrap();
+        let workspace = Workspace {
+            id: "w-test".into(), path: "/tmp/test".into(), repo_root: "/tmp/test".into(),
+            common_dir: "/tmp/test/.git".into(), kind: "worktree".into(), branch: None,
+            owner_run_id: None, initial_dirty: json!({"clean":true}), created_ms: 1,
+            removed_ms: None,
+        };
+        store.insert_workspace(&workspace).unwrap();
+        let task = Task {
+            id: "t-test".into(), title: "Test".into(), prompt: "Check".into(),
+            repo_root: workspace.repo_root.clone(), target_ref: None,
+            workspace_id: workspace.id.clone(), start_snapshot: None,
+            fork_commit: None, fork_provenance: None, created_ms: 1, archived_ms: None,
+        };
+        let run = Run {
+            id: "r-test".into(), task_id: task.id.clone(), parent_run_id: None,
+            harness: "generic".into(), harness_version: None, profile_id: None, model: None, effort: None,
+            workspace_id: workspace.id.clone(), native_id: None, status: "queued".into(),
+            exit_reason: None, created_ms: 1, ended_ms: None, title: task.title.clone(),
+            relation_source: None, relation_confidence: None, capabilities: json!({}),
+            process_generation: 0, attention: None,
+        };
+        assert!(store.insert_task_and_run(&task, &run, Some("missing-attempt"), None).is_err());
+        assert!(store.task(&task.id).unwrap().is_none());
+        assert!(store.run(&run.id).unwrap().is_none());
     }
 }

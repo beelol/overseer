@@ -6,10 +6,11 @@
 use crate::daemon::{Daemon, ACTIVE};
 use crate::store::Store;
 use crate::paths;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use serde_json::{json, Value};
 use std::os::unix::io::AsRawFd;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, TryLockError};
+use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
@@ -36,6 +37,65 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
     }
     crate::log(&format!("listening on {}", path.display()));
+    let deadline_daemon = daemon.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            interval.tick().await;
+            let daemon = deadline_daemon.clone();
+            match tokio::task::spawn_blocking(move || {
+                crate::swarm::reconcile_control_verifications(&mut daemon.store.lock().unwrap())?;
+                if let Ok(_serial)=daemon.swarm_integration_lock.try_lock() {
+                    let mut store=crate::store::Store::connect_existing(&paths::db_path())?;
+                    crate::swarm::reconcile_invalidated_integrations(&mut store)?;
+                }
+                crate::swarm::refresh_linked_director_owners(&daemon)?;
+                crate::swarm::expire_director_owners(&mut daemon.store.lock().unwrap())?;
+                let (expired, timed_out_workers, redirect_timeouts) = {
+                    let _serial = daemon.swarm_launch_lock.lock().unwrap();
+                    let mut store = daemon.store.lock().unwrap();
+                    let now = crate::daemon::now();
+                    (crate::swarm::expire_due(&mut store, now)?,
+                     crate::swarm::expire_jobs_due(&mut store, now)?,
+                     crate::swarm::expire_redirects_due(&mut store, now)?)
+                };
+                // State is committed before control sockets are contacted. A slow
+                // or unreachable worker must not hold the launch lock while the
+                // timer interrupts, reconciles, or samples processes.
+                for run in expired {
+                    crate::swarm::interrupt_workers(&daemon, &run)?;
+                }
+                for worker in timed_out_workers {
+                    if let Err(error) = daemon.interrupt(&worker) {
+                        crate::log(&format!("swarm job deadline interrupt {worker} failed: {error}"));
+                    }
+                }
+                if let Some(workers) = redirect_timeouts["interrupt_pending"].as_array() {
+                    for worker in workers {
+                        if let Some(worker) = worker.as_str() {
+                            if let Err(error) = daemon.interrupt(worker) {
+                                crate::log(&format!("swarm redirect interrupt {worker} failed: {error}"));
+                            }
+                        }
+                    }
+                }
+                crate::swarm::retry_revoked_interrupts(&daemon)?;
+                crate::swarm::retry_stopping_interrupts(&daemon)?;
+                crate::swarm::retry_targeted_interrupts(&daemon)?;
+                crate::swarm::reconcile_terminal_workers(&daemon)?;
+                crate::swarm::reconcile_stopping_runs(&daemon)?;
+                crate::swarm::sample_due_workers(&daemon, crate::daemon::now())?;
+                Ok::<(), anyhow::Error>(())
+            })
+            .await
+            {
+                Ok(Ok(_)) => {}
+                Ok(Err(error)) => crate::log(&format!("swarm deadline check failed: {error}")),
+                Err(error) => crate::log(&format!("swarm deadline task failed: {error}")),
+            }
+        }
+    });
     let uid = unsafe { libc::getuid() };
     // Test-only: pretend the owner is another uid. It can only reject more peers (a peer must
     // still be this process's own uid), so it lets a test observe a "foreign" connection being
@@ -138,7 +198,15 @@ async fn connection_loop(
             };
             let reply = match result {
                 Ok(Ok(v)) => json!({"id": id, "result": v}),
-                Ok(Err(e)) => json!({"id": id, "error": {"code": "failed", "message": e.to_string()}}),
+                Ok(Err(e)) => {
+                    if let Some(limit) = e.downcast_ref::<crate::daemon::AgentLimitError>() {
+                        json!({"id": id, "error": {"code": "agent_limit", "message": e.to_string(),
+                            "active": limit.active, "limit": limit.limit,
+                            "running_agents": limit.running_agents}})
+                    } else {
+                        json!({"id": id, "error": {"code": "failed", "message": e.to_string()}})
+                    }
+                },
                 Err(e) => json!({"id": id, "error": {"code": "internal", "message": e.to_string()}}),
             };
             let _ = tx.send(reply).await;
@@ -854,6 +922,28 @@ fn recheck_claude_account_before_child(d: &Arc<Daemon>, profile_id: &str,
     Ok(())
 }
 
+fn fixture_only() -> Result<()> {
+    if std::env::var("OVERSEER_SWARM_FIXTURE_API").as_deref() == Ok("1") {
+        Ok(())
+    } else {
+        Err(anyhow!("fixture-only swarm transition; live runtime authority is not implemented"))
+    }
+}
+
+fn storage_fault(error: &anyhow::Error) -> bool {
+    error.chain().filter_map(|cause| cause.downcast_ref::<rusqlite::Error>())
+        .any(|error| matches!(error, rusqlite::Error::SqliteFailure(code, _)
+            if matches!(code.code, rusqlite::ErrorCode::DiskFull |
+                rusqlite::ErrorCode::SystemIoFailure | rusqlite::ErrorCode::ReadOnly)))
+}
+
+fn require_swarm_storage(d: &Daemon) -> Result<()> {
+    if d.swarm_storage_blocked.load(Ordering::SeqCst) {
+        bail!("swarm storage is blocked; recover write capacity before launching new work");
+    }
+    Ok(())
+}
+
 /// Select an initial route from repository-scoped evidence without creating a
 /// workspace. The eventual auto.start admission must revalidate this result;
 /// preview by itself never owns a process, Git resource, or allowance claim.
@@ -1184,6 +1274,14 @@ fn auto_root_launch_worker(d: &Arc<Daemon>, work_unit_id: &str,
 }
 
 pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
+    let result = dispatch_inner(d, method, p);
+    if method.starts_with("swarm.") && result.as_ref().is_err_and(storage_fault) {
+        d.swarm_storage_blocked.store(true, Ordering::SeqCst);
+    }
+    result
+}
+
+fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     Ok(match method {
         "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path()}),
         "state" => d.state()?,
@@ -1204,7 +1302,320 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             json!(list)
         }
         "profile.list" => json!(d.store.lock().unwrap().profiles()?),
+        "swarm.create" => crate::swarm::create(&mut d.store.lock().unwrap(), p)?,
+        "swarm.director.owner.begin" => {
+            fixture_only()?;
+            crate::swarm::begin_director_owner(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.director.owner.renew" => {
+            fixture_only()?;
+            crate::swarm::renew_director_owner(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.director.owner.refresh_linked" => {
+            fixture_only()?;
+            json!({"renewed":crate::swarm::refresh_linked_director_owners(d)?})
+        }
+        "swarm.director.owner.expire_due" => {
+            fixture_only()?;
+            json!({"stalled":crate::swarm::expire_director_owners(&mut d.store.lock().unwrap())?})
+        }
+        "swarm.director.launch" => {
+            fixture_only()?;
+            require_swarm_storage(d)?;
+            crate::swarm::launch_director(d,p)?
+        }
+        "swarm.storage.status" => json!({"state":if d.swarm_storage_blocked.load(Ordering::SeqCst) { "blocked" } else { "ready" }}),
+        "swarm.storage.recover" => {
+            let _serial = d.swarm_launch_lock.lock().unwrap();
+            let mut store = d.store.lock().unwrap();
+            store.probe_swarm_write_capacity()?;
+            d.swarm_storage_blocked.store(false, Ordering::SeqCst);
+            json!({"state":"ready"})
+        }
+        "swarm.storage.limit_pages" => {
+            fixture_only()?;
+            let store = d.store.lock().unwrap();
+            let pages: i64 = match p["mode"].as_str() {
+                Some("current") => store.conn.pragma_query_value(None, "page_count", |r| r.get(0))?,
+                Some("unlimited") => 4_294_967_294,
+                _ => bail!("invalid storage limit mode"),
+            };
+            store.conn.pragma_update(None, "max_page_count", pages)?;
+            json!({"max_page_count":pages})
+        }
+        "swarm.get" => crate::swarm::get(&d.store.lock().unwrap(), s(p, "id")?)?,
+        "swarm.list" => crate::swarm::list(&d.store.lock().unwrap(), p)?,
+        "swarm.plan" => {
+            fixture_only()?;
+            crate::swarm::plan(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.jobs" => crate::swarm::jobs(&d.store.lock().unwrap(), p)?,
+        "swarm.coverage" => crate::swarm::coverage_report(&d.store.lock().unwrap(), p)?,
+        "swarm.attempt.register" => {
+            fixture_only()?;
+            require_swarm_storage(d)?;
+            crate::swarm::register(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.report" => crate::swarm::report(&mut d.store.lock().unwrap(), p)?,
+        "swarm.direct" => {
+            fixture_only()?;
+            crate::swarm::direct(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.messages" => {
+            fixture_only()?;
+            crate::swarm::messages(&d.store.lock().unwrap(), p)?
+        }
+        "swarm.ack" => {
+            if p["recipient"] == "director" {
+                fixture_only()?;
+            }
+            crate::swarm::ack(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.stop" => {
+            let fault_interrupt_once = p["fault_interrupt_once"] == true;
+            if fault_interrupt_once { fixture_only()?; }
+            let mut stopped = {
+                let _serial = d.swarm_launch_lock.lock().unwrap();
+                crate::swarm::stop(&mut d.store.lock().unwrap(), p)?
+            };
+            // The stop transition is committed before socket control. Keeping the
+            // launch lock during an unresponsive worker's I/O would hold unrelated
+            // admission and safety controls behind that worker.
+            stopped["workers"] = crate::swarm::interrupt_workers_with_fault(
+                d, s(p,"run_id")?, fault_interrupt_once)?;
+            stopped
+        }
+        "swarm.partial" => {
+            fixture_only()?;
+            require_swarm_storage(d)?;
+            let mut closed = {
+                let _serial = d.swarm_launch_lock.lock().unwrap();
+                crate::swarm::partial(&mut d.store.lock().unwrap(), p)?
+            };
+            closed["workers"] = crate::swarm::interrupt_workers(d, s(p,"run_id")?)?;
+            closed
+        }
+        "swarm.pause" => crate::swarm::pause(&mut d.store.lock().unwrap(), p)?,
+        "swarm.resume" => crate::swarm::resume(&mut d.store.lock().unwrap(), p)?,
+        "swarm.off" => crate::swarm::off(&mut d.store.lock().unwrap(), p)?,
+        "swarm.claim" => {
+            fixture_only()?;
+            let claim = crate::swarm::claim(&mut d.store.lock().unwrap(), p)?;
+            if claim["status"] == "contaminated" {
+                if let Err(error) = crate::swarm::retry_targeted_interrupts(d) {
+                    crate::log(&format!("swarm contamination interrupt failed: {error}"));
+                }
+            }
+            claim
+        }
+        "swarm.artifact.put" => crate::swarm::put(&mut d.store.lock().unwrap(), p)?,
+        "swarm.integrate" => {
+            fixture_only()?;
+            let _serial = d.swarm_integration_lock.lock().unwrap();
+            let mut store = crate::store::Store::connect_existing(&paths::db_path())?;
+            crate::swarm::integrate(&mut store, p)?
+        }
+        "swarm.verify" => {
+            fixture_only()?;
+            let prepared = {
+                let mut store = d.store.lock().unwrap();
+                crate::swarm::prepare_verification(&mut store, p)?
+            };
+            match prepared {
+                crate::swarm::PreparedVerification::Existing(result) => result,
+                crate::swarm::PreparedVerification::Ready(plan) => {
+                    let outcome = crate::swarm::run_verification(&plan);
+                    crate::swarm::record_verification(&mut d.store.lock().unwrap(), &plan, outcome)?
+                }
+            }
+        }
+        "swarm.decide" => {
+            fixture_only()?;
+            crate::swarm::decide(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.conflict.open" => {
+            fixture_only()?;
+            let opened = crate::swarm::open_conflict(&mut d.store.lock().unwrap(), p)?;
+            if let Err(error) = crate::swarm::retry_targeted_interrupts(d) {
+                crate::log(&format!("swarm evidence conflict interrupt failed: {error}"));
+            }
+            opened
+        }
+        "swarm.conflict.resolve" => {
+            fixture_only()?;
+            crate::swarm::resolve_conflict(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.conflicts" => crate::swarm::list_conflicts(&d.store.lock().unwrap(), p)?,
+        "swarm.complete" => {
+            fixture_only()?;
+            crate::swarm::complete(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.attempt.confirm_exit" => {
+            fixture_only()?;
+            crate::swarm::confirm_exit(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.revise" => {
+            fixture_only()?;
+            crate::swarm::revise(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.policy.preview" => crate::swarm::preview(p)?,
+        "swarm.benefit.preview" => {
+            fixture_only()?;
+            crate::swarm::preview_benefit(p)?
+        }
+        "swarm.benefit.commit" => {
+            fixture_only()?;
+            crate::swarm::commit_benefit(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.availability.observe" => {
+            fixture_only()?;
+            let mut observation=crate::swarm::observe_availability(&mut d.store.lock().unwrap(), p)?;
+            if observation["revoked_jobs"].as_array().is_some_and(|jobs| !jobs.is_empty()) {
+                observation["workers"]=crate::swarm::retry_targeted_interrupts(d)?;
+            }
+            observation
+        }
+        "swarm.policy.set" => crate::swarm::set_policy(&mut d.store.lock().unwrap(), p)?,
+        "swarm.estimate.revoke" => {
+            let _serial = d.swarm_launch_lock.lock().unwrap();
+            crate::swarm::revoke_estimated_quota(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.targets.set" => {
+            fixture_only()?;
+            let _serial = d.swarm_launch_lock.lock().unwrap();
+            crate::swarm::set_run_targets(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.limit.set" => {
+            let _serial = d.swarm_launch_lock.lock().unwrap();
+            crate::swarm::set_run_limit(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.deadline.extend" => {
+            let _serial = d.swarm_launch_lock.lock().unwrap();
+            require_swarm_storage(d)?;
+            crate::swarm::extend_deadline(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.admit" => {
+            fixture_only()?;
+            let _serial = d.swarm_launch_lock.lock().unwrap();
+            require_swarm_storage(d)?;
+            let pending = d.pending_agent_slots.lock().unwrap();
+            crate::swarm::admit(&mut d.store.lock().unwrap(), p, *pending)?
+        }
+        "swarm.schedule.next" => {
+            fixture_only()?;
+            let _serial = d.swarm_launch_lock.lock().unwrap();
+            require_swarm_storage(d)?;
+            let pending = d.pending_agent_slots.lock().unwrap();
+            crate::swarm::schedule_next(&mut d.store.lock().unwrap(), p, *pending)?
+        }
+        "swarm.dispatch.next" => {
+            fixture_only()?;
+            require_swarm_storage(d)?;
+            crate::swarm::dispatch_next(d, p)?
+        }
+        "swarm.worker.launch" => {
+            fixture_only()?;
+            require_swarm_storage(d)?;
+            crate::swarm::launch_worker(d, p)?
+        }
+        "swarm.effect.begin" => {
+            fixture_only()?;
+            let begun = crate::swarm::begin_effect(&mut d.store.lock().unwrap(), p)?;
+            if p["fixture_drop_ack_after_commit"] == true {
+                return Err(anyhow!("injected effect acknowledgement loss after commit"));
+            }
+            begun
+        }
+        "swarm.effect.reconcile" => {
+            fixture_only()?;
+            crate::swarm::reconcile_effect(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.worker.brief" => {
+            fixture_only()?;
+            crate::swarm::worker_brief(&d.store.lock().unwrap(), p)?
+        }
+        "swarm.context.get" => {
+            fixture_only()?;
+            crate::swarm::artifact_chunk(&d.store.lock().unwrap(), p)?
+        }
+        "swarm.context.revoke" => {
+            fixture_only()?;
+            crate::swarm::revoke_artifact(d, p)?
+        }
+        "swarm.context.grant" => {
+            fixture_only()?;
+            crate::swarm::grant_artifact(d, p)?
+        }
+        "swarm.director.summary" => {
+            fixture_only()?;
+            crate::swarm::director_summary(&d.store.lock().unwrap(), p)?
+        }
+        "swarm.worker.reconcile" => {
+            fixture_only()?;
+            crate::swarm::reconcile_worker(d, p)?
+        }
+        "swarm.worker.liveness" => crate::swarm::liveness(&d.store.lock().unwrap(), p)?,
+        "swarm.worker.liveness.sample" => {
+            fixture_only()?;
+            crate::swarm::sample_liveness(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.worker.liveness.poll" => {
+            fixture_only()?;
+            let now_ms = p["now_ms"]
+                .as_i64()
+                .ok_or_else(|| anyhow!("missing poll time"))?;
+            if now_ms < 0 {
+                return Err(anyhow!("invalid poll time"));
+            }
+            json!({"sampled": crate::swarm::sample_due_workers(d, now_ms)?})
+        }
+        "swarm.job.deadline.persist_due" => {
+            fixture_only()?;
+            let now_ms = p["now_ms"]
+                .as_i64()
+                .ok_or_else(|| anyhow!("missing deadline time"))?;
+            if now_ms < 0 {
+                return Err(anyhow!("invalid deadline time"));
+            }
+            // Fault seam: commit the timeout and stop message but leave the external
+            // interrupt unsent, as if the daemon died between these two steps.
+            let pending = crate::swarm::expire_jobs_due(&mut d.store.lock().unwrap(), now_ms)?;
+            json!({"interrupt_pending": pending})
+        }
+        "swarm.redirect.persist_due" => {
+            fixture_only()?;
+            let now_ms = p["now_ms"].as_i64()
+                .ok_or_else(|| anyhow!("missing deadline time"))?;
+            if now_ms < 0 { return Err(anyhow!("invalid deadline time")); }
+            // Fault seam: persist timeout/checkpoint but leave the external
+            // interrupt unsent, as if the daemon died before signaling it.
+            crate::swarm::expire_redirects_due(&mut d.store.lock().unwrap(), now_ms)?
+        }
+        "swarm.director.claim_batch" => {
+            fixture_only()?;
+            crate::swarm::claim_batch(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.director.complete_batch" => {
+            fixture_only()?;
+            crate::swarm::complete_batch(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.director.recover" => {
+            fixture_only()?;
+            crate::swarm::recover(&mut d.store.lock().unwrap(), p)?
+        }
         "profile.create" => json!(d.create_profile(s(p, "name")?, s(p, "harness")?)?),
+        "agents.limit.get" => {
+            let pending = d.pending_agent_slots.lock().unwrap();
+            let store = d.store.lock().unwrap();
+            json!({"max_active": store.agent_limit()?, "active": store.active_agent_count()? + *pending})
+        }
+        "agents.limit.set" => {
+            let limit = p["max_active"].as_i64().ok_or_else(|| anyhow!("max_active must be an integer"))?;
+            let pending = d.pending_agent_slots.lock().unwrap();
+            let store = d.store.lock().unwrap();
+            store.set_agent_limit(limit)?;
+            json!({"max_active": store.agent_limit()?, "active": store.active_agent_count()? + *pending})
+        }
         "profile.rename" => {
             let name = s(p, "name")?.trim();
             if name.is_empty() || name.len() > 80 {

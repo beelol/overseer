@@ -1,0 +1,152 @@
+//! Fixture-only round-robin selection across eligible category backlogs.
+//! Target ranking remains Auto Mode's responsibility; this consumes one injected target.
+
+use super::{admission, required};
+use crate::store::Store;
+use anyhow::{bail, Result};
+use rusqlite::{params, OptionalExtension};
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+use std::path::Path;
+
+pub fn next(store: &mut Store, p: &Value, pending_slots: i64) -> Result<Value> {
+    let request_id = required(p, "request_id")?;
+    let target = required(p, "target_id")?;
+    if request_id.is_empty() || request_id.len() > 128 {
+        bail!("invalid scheduler request id");
+    }
+    let digest = format!("{:x}", Sha256::digest(p.to_string().as_bytes()));
+    // Dispatch knows the requested checkout before it chooses a category.
+    // Resolve it once, then exclude unrelated category scopes before admission;
+    // worker launch rechecks the same source authority after selection.
+    let requested_repo = p.get("repo").map(|value| -> Result<(String,String)> {
+        let path = value.as_str().ok_or_else(|| anyhow::anyhow!("invalid dispatch repository"))?;
+        let top = crate::git::toplevel(Path::new(path))?;
+        let common = crate::git::common_dir(&top)?;
+        let commit = crate::git::rev_parse(&top, "HEAD")
+            .ok_or_else(|| anyhow::anyhow!("repository has no source revision"))?;
+        Ok((common.to_string_lossy().into_owned(),commit))
+    }).transpose()?;
+    let previous: Option<(String, String, String, String, String)> = store
+        .conn
+        .query_row(
+            "SELECT request_sha256,run_id,job_id,attempt_id,target_id
+         FROM swarm_scheduler_admissions WHERE request_id=?1",
+            params![request_id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+        )
+        .optional()?;
+    if let Some((old, run, job, attempt, target_id)) = previous {
+        if old != digest {
+            bail!("scheduler request id reused with different input");
+        }
+        return Ok(
+            json!({"status":"already_admitted","run_id":run,"job_id":job,
+            "attempt_id":attempt,"target_id":target_id}),
+        );
+    }
+    let last: String = store
+        .conn
+        .query_row(
+            "SELECT last_category_key FROM swarm_scheduler_cursor WHERE id=1",
+            [],
+            |r| r.get(0),
+        )
+        .optional()?
+        .unwrap_or_default();
+    let mut stmt = store.conn.prepare(
+        "SELECT id,category_key,generation,revision,allowed_targets,repository_scope FROM swarm_runs
+         WHERE status IN ('planning','running')
+         AND NOT EXISTS(SELECT 1 FROM swarm_director_owners o
+                        WHERE o.run_id=swarm_runs.id AND
+                        (o.status!='active' OR o.generation!=swarm_runs.generation
+                         OR o.lease_expires_ms<=?1))
+         AND NOT EXISTS(SELECT 1 FROM swarm_availability v
+                        WHERE v.run_id=swarm_runs.id AND v.state='blocked')
+         AND EXISTS(SELECT 1 FROM swarm_jobs WHERE run_id=swarm_runs.id AND status='ready')
+         ORDER BY category_key,id",
+    )?;
+    let runs = stmt
+        .query_map([crate::daemon::now()], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, i64>(2)?,
+                r.get::<_, i64>(3)?,
+                r.get::<_, String>(4)?,
+                r.get::<_, Option<String>>(5)?,
+            ))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(stmt);
+    if runs.is_empty() {
+        return Ok(json!({"status":"blocked","reason":"no_ready_category"}));
+    }
+    let start = runs.iter().position(|r| r.1 > last).unwrap_or(0);
+    let mut blocked = Vec::new();
+    for n in 0..runs.len() {
+        let (run, key, generation, revision, allowed, scope) = &runs[(start + n) % runs.len()];
+        let repo_allowed = match (&requested_repo, scope) {
+            (None, _) => true,
+            (Some((common,commit)), Some(raw)) => {
+                let approved: Vec<Value> = serde_json::from_str(raw)?;
+                approved.iter().any(|source| source["common_dir"] == *common
+                    && source["source_commit"] == *commit)
+            }
+            (Some(_), None) => std::env::var("OVERSEER_SWARM_FIXTURE_API").as_deref() == Ok("1"),
+        };
+        if !repo_allowed {
+            if blocked.len() < 20 {
+                blocked.push(json!({"run_id":run,"reason":"repository_scope"}));
+            }
+            continue;
+        }
+        let allowed: Value = serde_json::from_str(allowed)?;
+        if !allowed
+            .as_array()
+            .is_some_and(|a| a.iter().any(|v| v == target))
+        {
+            continue;
+        }
+        let jobs = {
+            let mut stmt = store.conn.prepare(
+                "SELECT id FROM swarm_jobs WHERE run_id=?1 AND status='ready' ORDER BY id",
+            )?;
+            let ready = stmt.query_map(params![run], |r| r.get::<_, String>(0))?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            ready
+        };
+        let mut first_blocked = None;
+        for job in jobs {
+            let mut attempt = p.clone();
+            attempt["run_id"] = json!(run);
+            attempt["job_id"] = json!(job);
+            attempt["generation"] = json!(generation);
+            attempt["revision"] = json!(revision);
+            let result = admission::admit_scheduled(
+                store,
+                &attempt,
+                admission::ScheduledCommit {
+                    request_id,
+                    request_sha256: &digest,
+                    category_key: key,
+                },
+                pending_slots,
+            )?;
+            if result["status"] == "admitted" {
+                let mut result = result;
+                result["run_id"] = json!(run);
+                result["job_id"] = json!(job);
+                return Ok(result);
+            }
+            if first_blocked.is_none() {
+                first_blocked = Some(result["reason"].clone());
+            }
+        }
+        if blocked.len() < 20 {
+            blocked.push(json!({"run_id":run,
+                "reason":first_blocked.unwrap_or_else(||json!("no_ready_job"))}));
+        }
+    }
+    Ok(json!({"status":"blocked","reason":"all_categories_blocked","candidates":blocked}))
+}
