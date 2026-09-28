@@ -1,5 +1,12 @@
 # AC-146: merges
 
+## Pull request #20 (Gate S gaps), 2026-09-28
+
+- **Finished:** marked ready by its agent (head `90c7ea44`). AC-182, 187, 191, 193, 194, 197 and 198 verified; the rest of Gate S stays partial with gaps that need Swarm on main or PR #10's phone parts (now merged). Touched Continuity (`handoff.rs`), `redact.rs`, `daemon.rs`, `store.rs` and the extension's views, chat and home, as its PR says.
+- **Throwaway copy:** main merged in twice. The second time (`9d2857f9`), after #21 to #25, conflicts were in generated files: the README's and ledger README's counts (main's side kept, then regenerated: 171 verified) and home's evidence (this branch's side: it reworked the home scenario).
+- **Tests:** test-all `--jobs=3` on the first merge: 52 of 57. Rust ac45 (load) passed alone; a full `--no-fail-fast` Rust run had 463 passed and 5 misses during the owner's network breaks, each passing alone (TUI t08 and t10, overseer ac197, phone_methods ac129, protocol ac16). After #25, on the second merge: build, unit 9 of 9, VSIX, and UI home, sidebar-search, oversight, review-width and audit each passed alone.
+- **Merged:** squash, `88e6ab2f`.
+
 ## Pull request #25 (UI scenarios never take focus), 2026-09-28
 
 - **Why:** the owner could not work while scenario windows kept coming to the front; UI runs were paused on every branch until this merged.
