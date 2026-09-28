@@ -26,6 +26,7 @@ mod merge;
 mod net;
 mod ollama_install;
 mod opencode_bridge;
+mod overseer;
 mod paths;
 mod pr;
 mod redact;
@@ -48,7 +49,7 @@ pub fn log(msg: &str) {
 }
 
 fn usage() -> ! {
-    eprintln!("usage: overseerd serve | overseerd ctl <method> [json-params] | overseerd shim <run-dir> | overseerd auto-mcp <run-id> <capability-file> <socket> | overseerd version");
+    eprintln!("usage: overseerd serve | overseerd ctl <method> [json-params] | overseerd shim <run-dir> | overseerd auto-mcp <run-id> <capability-file> <socket> | overseerd mcp [--socket <path>] | overseerd version");
     std::process::exit(2);
 }
 
@@ -80,6 +81,12 @@ fn main() {
             let socket = args.get(4).unwrap_or_else(|| usage());
             if let Err(error) = auto_mcp::run(run_id, std::path::Path::new(capability), std::path::Path::new(socket)) {
                 eprintln!("Auto tool server stopped: {error:#}");
+                std::process::exit(1);
+            }
+        }
+        Some("mcp") => {
+            if let Err(e) = overseer::mcp::run(&args[2..]) {
+                eprintln!("mcp error: {e:#}");
                 std::process::exit(1);
             }
         }

@@ -271,7 +271,7 @@ pub struct Daemon {
     pub(crate) swarm_integration_lock: Mutex<()>,
     /// Fail closed for Swarm launches after SQLite reports exhausted or unwritable storage.
     pub(crate) swarm_storage_blocked: std::sync::atomic::AtomicBool,
-    exe: PathBuf,
+    pub(crate) exe: PathBuf,
     pub started_ms: i64,
     /// Storage unavailable at startup; this cannot recover without reopening the store.
     pub learning_paused: std::sync::atomic::AtomicBool,
@@ -288,6 +288,8 @@ pub struct Daemon {
     /// When VS Code windows went from none to some, and the runs the last background notice named:
     /// a brief reconnect after a notice (a probe, a crash-restart) does not repeat it.
     pub ui_session: Mutex<(Option<std::time::Instant>, Option<Vec<String>>)>,
+    /// What Overseer coordinates with no model: pending conflict scans and their caches.
+    pub coord: crate::overseer::conflicts::Coordination,
 }
 
 pub(crate) fn pid_alive(pid: u32) -> bool {
@@ -349,7 +351,8 @@ impl Daemon {
             learning_usage_paused: std::sync::atomic::AtomicBool::new(false), learning_work_paused: std::sync::atomic::AtomicBool::new(false),
             learning_thread_paused: std::sync::atomic::AtomicBool::new(false), learning_account_paused: std::sync::atomic::AtomicBool::new(false),
             learning_maintenance_paused: std::sync::atomic::AtomicBool::new(false),
-            ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0), ui_session: Mutex::new((None, None)) });
+            ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0), ui_session: Mutex::new((None, None)),
+            coord: crate::overseer::conflicts::Coordination::default() });
         daemon.ensure_system_profiles()?;
         {
             let mut store = daemon.store.lock().unwrap();
@@ -363,6 +366,22 @@ impl Daemon {
             if let Err(error) = store.probe_swarm_write_capacity() {
                 daemon.swarm_storage_blocked.store(true, std::sync::atomic::Ordering::SeqCst);
                 crate::log(&format!("swarm storage write probe failed at startup: {error}"));
+            }
+        }
+        // Test settings (AC-201): the suites run with briefings and the channel, and check-ins,
+        // off and on. OVERSEER_CHANNEL_DEFAULT is auto, on or off; OVERSEER_CHECK_INS is off,
+        // done or every:N. Only set when the variable is present; the owner's settings otherwise.
+        {
+            let store = daemon.store.lock().unwrap();
+            if let Ok(v) = std::env::var("OVERSEER_CHANNEL_DEFAULT") {
+                if ["auto", "on", "off"].contains(&v.as_str()) {
+                    store.conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.channel', ?1)", [&v])?;
+                }
+            }
+            if let Ok(v) = std::env::var("OVERSEER_CHECK_INS") {
+                if crate::overseer::checkin::Cadence::parse(&v).is_ok() {
+                    store.conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.check_ins', ?1)", [&v])?;
+                }
             }
         }
         Ok(daemon)
@@ -969,6 +988,10 @@ impl Daemon {
                     if let Some(reservation) = slot { reservation.release_after_start(); }
                     self.store.lock().unwrap().insert_task_and_run_bound(&task, &run, attempt, director, bind)?;
                 }
+            }
+            // A run of the daemon's own (Overseer, a watcher) carries its role from the start.
+            if let Some(role) = p["role"].as_str().filter(|r| ["overseer", "watcher"].contains(r)) {
+                self.store.lock().unwrap().conn.execute("INSERT OR REPLACE INTO run_roles(run_id, role) VALUES(?1, ?2)", rusqlite::params![run.id, role])?;
             }
         }
         if let Some(launch) = unbound_launch.as_mut() {
@@ -1741,7 +1764,11 @@ impl Daemon {
             None => {
                 let snap = self.take_snapshot(&ws, "run-start")?;
                 let n = self.store.lock().unwrap().turns(run_id)?.len() as i64 + 1;
-                let turn = Turn { id: format!("u-{}", short_id()), run_id: run_id.into(), n, prompt: prompt.into(), snapshot_id: Some(snap.id.clone()), started_ms: now(), ended_ms: None, status: "running".into() };
+                // Guardrails are repeated on later turns; the briefing about the agents beside this
+                // one goes with its task (AC-190).
+                let preface = if follow_up { self.guardrail_preface(run_id) } else { self.briefing_preface(run_id) };
+                let prompt_owned = if preface.is_empty() { prompt.to_string() } else { format!("{preface}\n\n{prompt}") };
+                let turn = Turn { id: format!("u-{}", short_id()), run_id: run_id.into(), n, prompt: prompt_owned, snapshot_id: Some(snap.id.clone()), started_ms: now(), ended_ms: None, status: "running".into() };
                 {
                     let store = self.store.lock().unwrap();
                     if let (None, Some(profile_id)) = (run.relation_source.as_deref(), run.profile_id.as_deref()) {
@@ -1756,6 +1783,9 @@ impl Daemon {
                 turn
             }
         };
+        // What the harness receives: the turn's prompt, with its preface when it has one.
+        let prompt_owned = turn.prompt.clone();
+        let prompt = prompt_owned.as_str();
         let mut external_effect_attempted = false;
         let launch_result = (|| -> Result<()> {
         if follow_up && !continuity && ACTIVE.contains(&run.status.as_str()) {
@@ -1804,7 +1834,12 @@ impl Daemon {
             }
         }
         let args: Option<Vec<String>> = generic_meta["args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect());
-        let extra_args: Vec<String> = generic_meta["extra_args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
+        let mut extra_args: Vec<String> = generic_meta["extra_args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
+        if follow_up {
+            extra_args.extend(self.guardrail_launch_args(run_id, &run.harness));
+        }
+        // The channel back to Overseer, on every turn of an agent that has one (AC-190).
+        extra_args.extend(self.channel_launch_args(run_id, &run.harness)?);
         let resume = if follow_up { run.native_id.clone() } else { None };
         if follow_up && resume.is_none() && run.harness != "generic" {
             bail!("no native session id was reported for this run, so it cannot be resumed");
@@ -2185,6 +2220,12 @@ impl Daemon {
         }
         self.emit(Some(&run.task_id), Some(run_id), "permission_answered", "user", "exact", json!({"request_id": request_id, "allow": allow}))?;
         self.emit(Some(&run.task_id), Some(run_id), "status", "daemon", "exact", json!({"status": "running"}))?;
+        if !allow {
+            // What the owner refused is remembered, so Overseer never has another agent do it (AC-196).
+            let input = &attention["input"];
+            let detail = input["command"].as_str().or(input["file_path"].as_str()).or(input["path"].as_str()).map(str::to_string).unwrap_or_else(|| input.to_string().chars().take(200).collect());
+            self.store.lock().unwrap().conn.execute("INSERT INTO denied_permissions(run_id, tool, detail, ts) VALUES(?1, ?2, ?3, ?4)", rusqlite::params![run_id, attention["tool"].as_str().unwrap_or(""), detail, now()])?;
+        }
         Ok(json!({"ok": true}))
     }
 
@@ -2590,6 +2631,15 @@ impl Daemon {
                 }
             }
             Norm::Permission { request_id, tool, input } => {
+                // The daemon's own tools (Overseer's reads, an agent's channel) are always allowed:
+                // the daemon decides what each token may do.
+                if tool.starts_with("mcp__overseer__") {
+                    if let Some(reply) = adapters::permission_reply(&run.harness, &request_id, true, &input, "") {
+                        state.sends.push(reply);
+                    }
+                    ev("permission", "daemon", "exact", json!({"kind": "permission", "request_id": request_id, "tool": tool, "auto_allowed": "Overseer's own tool"}), None)?;
+                    return Ok(());
+                }
                 let attention = json!({"kind": "permission", "request_id": request_id, "tool": tool, "input": input});
                 store.set_run_attention(&run.id, Some(&attention))?;
                 store.update_run_status(&run.id, "waiting_for_user", None, None)?;
@@ -3096,6 +3146,7 @@ impl Daemon {
     pub fn reconcile(self: &Arc<Self>) -> Result<Value> {
         self.store.lock().unwrap().release_stale_unstarted_auto_pool_claims()?;
         let mut report = self.store.lock().unwrap().reconcile_shared_launches_on_start()?;
+        self.reconcile_overseer()?;
         let runs = self.store.lock().unwrap().runs()?;
         for run in runs.iter().filter(|r| (r.parent_run_id.is_none() || matches!(r.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation"))) && (ACTIVE.contains(&r.status.as_str()) || r.status == "disconnected")) {
             let mut process = self.store.lock().unwrap().run_process(&run.id)?;
@@ -3195,6 +3246,9 @@ impl Daemon {
             Some(snap) => options.push(json!({"mode": "task_start", "label": "Since task start", "base": snap.commit_sha, "available": true,
                 "detail": format!("task-start snapshot {} (HEAD {} plus dirty contents at creation)", snap.id, snap.head.clone().unwrap_or_else(|| "none".into())), "provenance": "recorded"})),
             None => options.push(json!({"mode": "task_start", "label": "Since task start", "available": false, "detail": "task-start snapshot missing"})),
+        }
+        if let Some(snap) = self.redirect_snapshot(&root.workspace_id) {
+            options.push(json!({"mode": "redirect", "label": "Since the change of direction", "base": snap.commit_sha, "available": true, "detail": format!("snapshot {} taken when Overseer redirected this agent", snap.id), "provenance": "recorded", "snapshot": snap}));
         }
         match &task.fork_commit {
             Some(fork) if git::rev_parse(path, fork).is_some() => {
@@ -3300,8 +3354,26 @@ impl Daemon {
     }
 
     pub fn state(&self) -> Result<Value> {
+        self.state_for(false)
+    }
+
+    /// Overseer's own run (role `overseer`), its task and its workspace are listed in no agents
+    /// list: a client that shows the conversation asks for them with `include_hidden`.
+    pub fn state_for(&self, include_hidden: bool) -> Result<Value> {
         let store = self.store.lock().unwrap();
-        let runs = store.runs()?;
+        let hidden: std::collections::HashSet<String> = if include_hidden {
+            Default::default()
+        } else {
+            let mut stmt = store.conn.prepare("SELECT run_id FROM run_roles WHERE role='overseer'")?;
+            let ids: std::collections::HashSet<String> = stmt.query_map([], |r| r.get::<_, String>(0))?.flatten().collect();
+            ids
+        };
+        let all_runs = store.runs()?;
+        let hidden_tasks: std::collections::HashSet<String> = all_runs.iter().filter(|r| hidden.contains(&r.id)).map(|r| r.task_id.clone()).collect();
+        let hidden_ws: std::collections::HashSet<String> = all_runs.iter().filter(|r| hidden.contains(&r.id)).map(|r| r.workspace_id.clone()).collect();
+        let runs: Vec<_> = all_runs.into_iter().filter(|r| !hidden_tasks.contains(&r.task_id)).collect();
+        let tasks: Vec<_> = store.tasks()?.into_iter().filter(|t| !hidden_tasks.contains(&t.id)).collect();
+        let workspaces: Vec<_> = store.workspaces()?.into_iter().filter(|w| !hidden_ws.contains(&w.id)).collect();
         let mut memberships = BTreeMap::new();
         let mut links = store.conn.prepare(
             "SELECT overseer_run_id,run_id,'worker',job_id FROM swarm_worker_launches
@@ -3315,6 +3387,7 @@ impl Daemon {
             let (process, run, role, job) = row?;
             memberships.insert(process, json!({"role":role,"run_id":run,"job_id":job}));
         }
+        drop(links);
         let mut run_values = serde_json::to_value(&runs)?;
         for run in run_values.as_array_mut().expect("runs serialize as an array") {
             if let Some(link) = run["id"].as_str().and_then(|id| memberships.get(id)) {
@@ -3325,7 +3398,54 @@ impl Daemon {
         for r in runs.iter().filter(|r| r.parent_run_id.is_none() || matches!(r.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation"))) {
             turns.insert(r.id.clone(), serde_json::to_value(store.turns(&r.id)?)?);
         }
-        Ok(json!({"cursor": store.max_seq()?, "tasks": store.tasks()?, "runs": run_values, "workspaces": store.workspaces()?, "profiles": store.profiles()?, "turns": turns,
+        // Oversight per top-level run (held, watched, watching, open conflicts, area) and Overseer's
+        // own summary (the level, what waits for the owner), so every surface shows the same thing
+        // from one state (AC-199).
+        let mut oversight = serde_json::Map::new();
+        {
+            let mut holds = store.conn.prepare("SELECT run_id, reason FROM holds")?;
+            let held: std::collections::HashMap<String, String> = holds.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?.flatten().collect();
+            let mut watches = store.conn.prepare("SELECT subject, watcher, mode FROM watches WHERE ended_ms IS NULL")?;
+            let watching: Vec<(String, String, String)> = watches.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?)))?.flatten().collect();
+            let mut conflicts = store.conn.prepare("SELECT run_a, run_b, kind FROM conflicts WHERE state='open'")?;
+            let open: Vec<(String, Option<String>, String)> = conflicts.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?, r.get::<_, String>(2)?)))?.flatten().collect();
+            let mut areas = store.conn.prepare("SELECT run_id, path FROM areas ORDER BY path")?;
+            let mut area_of: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+            for (run, path) in areas.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?.flatten() {
+                area_of.entry(run).or_default().push(path);
+            }
+            let mut roles = store.conn.prepare("SELECT run_id, role FROM run_roles")?;
+            let role_of: std::collections::HashMap<String, String> = roles.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?.flatten().collect();
+            for r in runs.iter().filter(|r| r.parent_run_id.is_none()) {
+                let mine: Vec<&(String, Option<String>, String)> = open.iter().filter(|c| c.0 == r.id || c.1.as_deref() == Some(r.id.as_str())).collect();
+                let watched_by: Vec<&str> = watching.iter().filter(|w| w.0 == r.id).map(|w| w.1.as_str()).collect();
+                let watching_whom: Vec<&str> = watching.iter().filter(|w| w.1 == r.id).map(|w| w.0.as_str()).collect();
+                let held_reason = held.get(&r.id);
+                if held_reason.is_none() && watched_by.is_empty() && watching_whom.is_empty() && mine.is_empty() && !area_of.contains_key(&r.id) && !role_of.contains_key(&r.id) {
+                    continue;
+                }
+                oversight.insert(r.id.clone(), json!({
+                    "held": held_reason.is_some(), "hold_reason": held_reason,
+                    "watched": !watched_by.is_empty(), "watchers": watched_by, "watching": watching_whom,
+                    "conflicts": mine.len(), "needs_decision": mine.iter().any(|c| c.2 == "same_lines" || c.2 == "area_crossed"),
+                    "area": area_of.get(&r.id).cloned().unwrap_or_default(), "role": role_of.get(&r.id).cloned().unwrap_or_else(|| "agent".into()),
+                }));
+            }
+        }
+        let overseer = {
+            use rusqlite::OptionalExtension;
+            let session: Option<(String, String, Option<String>)> = store.conn.query_row("SELECT id, level, run_id FROM overseer_sessions WHERE archived_ms IS NULL ORDER BY started_ms DESC LIMIT 1", [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).optional()?;
+            match session {
+                Some((id, level, run_id)) => {
+                    let open: i64 = store.conn.query_row("SELECT COUNT(*) FROM overseer_proposals WHERE session_id=?1 AND state='open'", [&id], |r| r.get(0))?;
+                    let decisions: i64 = store.conn.query_row("SELECT COUNT(*) FROM conflicts WHERE state='open' AND kind IN ('same_lines', 'area_crossed')", [], |r| r.get(0))?;
+                    let last: Option<i64> = store.conn.query_row("SELECT MAX(ts) FROM overseer_messages WHERE session_id=?1", [&id], |r| r.get::<_, Option<i64>>(0)).ok().flatten();
+                    json!({"session": id, "level": level, "run_id": run_id, "open_proposals": open, "conflicts_needing_decision": decisions, "last_message_ms": last})
+                }
+                None => json!({"session": Value::Null, "level": "ask_first", "open_proposals": 0, "conflicts_needing_decision": 0}),
+            }
+        };
+        Ok(json!({"cursor": store.max_seq()?, "tasks": tasks, "runs": run_values, "workspaces": workspaces, "profiles": store.profiles()?, "turns": turns, "oversight": oversight, "overseer": overseer,
             "daemon": {"pid": std::process::id(), "started_ms": self.started_ms, "version": env!("CARGO_PKG_VERSION"), "parser_version": adapters::PARSER_VERSION,
                 "swarm_storage": if self.swarm_storage_blocked.load(std::sync::atomic::Ordering::SeqCst) { "blocked" } else { "ready" }}}))
     }

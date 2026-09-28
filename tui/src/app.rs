@@ -72,6 +72,8 @@ pub enum Mode {
     Audio,
     /// Private Commander folder path entry.
     AudioImport,
+    /// The conversation with Overseer (`o`): its messages, the proposals that wait, a composer.
+    Overseer,
 }
 
 /// A program to run in the terminal with the TUI suspended (a provider's own sign-in).
@@ -144,6 +146,9 @@ enum Pending {
     AudioGet,
     AudioSet,
     AudioPreview,
+    OverseerSession,
+    OverseerSend,
+    OverseerAnswer,
     AudioVoices,
     AudioImport,
 }
@@ -313,6 +318,10 @@ pub struct App {
     pub changes: ChangesView,
     /// Search text (`/`): agents whose title, repository, harness, model or prompt contain it.
     pub search: String,
+    /// The daemon's conversation with Overseer, as last loaded, and the words being typed to it.
+    pub overseer: Value,
+    pub overseer_draft: String,
+    pub overseer_scroll: usize,
     pub accounts: Vec<AccountRow>,
     pub account_sel: usize,
     pub audio: AudioSettings,
@@ -378,6 +387,9 @@ impl App {
             editing_repo: false,
             changes: ChangesView::default(),
             search: String::new(),
+            overseer: Value::Null,
+            overseer_draft: String::new(),
+            overseer_scroll: 0,
             accounts: Vec::new(),
             account_sel: 0,
             audio: AudioSettings::default(),
@@ -708,6 +720,10 @@ impl App {
             feed.add(&ev, child.as_deref());
             self.last_event.insert(root, Instant::now());
         }
+        // The conversation with Overseer follows its own events while it is open.
+        if matches!(self.mode, Mode::Overseer) && matches!(kind.as_str(), "overseer_message" | "proposal" | "proposal_answered" | "overseer_level" | "overseer_session") {
+            self.request("overseer.session", json!({}), Pending::OverseerSession);
+        }
         // Statuses, turns and new runs come from `state`, reloaded like VS Code does.
         if (matches!(kind.as_str(), "status" | "turn_started" | "turn_done" | "permission" | "permission_answered" | "child" | "child_reparented" | "task_created" | "workspace_removed" | "reattached")
             || (!run_id.is_empty() && self.state.run(&run_id).is_none()))
@@ -762,6 +778,18 @@ impl App {
                 self.state_inflight = false;
                 self.say(format!("state: {e}"), true);
             }
+            (Pending::OverseerSession, Ok(v)) => {
+                self.overseer = v;
+                self.dirty = true;
+            }
+            (Pending::OverseerSession, Err(e)) => self.say(format!("Overseer: {e}"), true),
+            (Pending::OverseerSend, Ok(_)) => self.request("overseer.session", json!({}), Pending::OverseerSession),
+            (Pending::OverseerSend, Err(e)) => self.say(format!("Overseer: {e}"), true),
+            (Pending::OverseerAnswer, Ok(v)) => {
+                self.say(v["result"].as_str().unwrap_or("answered").to_string(), false);
+                self.request("overseer.session", json!({}), Pending::OverseerSession);
+            }
+            (Pending::OverseerAnswer, Err(e)) => self.say(format!("Overseer: {e}"), true),
             (Pending::AudioGet, Ok(v)) => {
                 self.audio_inflight = false;
                 self.audio_due = Some(Instant::now() + AUDIO_REFRESH);
@@ -1271,6 +1299,49 @@ impl App {
 
     /// `S`: the panel opens on what the daemon said; without an answer yet it waits for one, and
     /// a daemon without audio methods changes nothing.
+    /// The conversation with Overseer (AC-199): one key opens it from the grid.
+    fn open_overseer(&mut self) {
+        self.mode = Mode::Overseer;
+        self.overseer_scroll = 0;
+        self.request("overseer.session", json!({}), Pending::OverseerSession);
+    }
+
+    /// Keys in the conversation: type and Enter sends; ctrl+y / ctrl+n answer the first proposal
+    /// that waits; j/k scroll when nothing is typed; esc closes (the draft is kept).
+    fn overseer_key(&mut self, k: KeyEvent) {
+        let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
+        match k.code {
+            KeyCode::Esc => self.mode = Mode::Grid,
+            KeyCode::Char('y') | KeyCode::Char('n') if ctrl => {
+                let yes = k.code == KeyCode::Char('y');
+                let open = self.overseer["proposals"].as_array().and_then(|p| p.iter().find(|x| x["state"] == "open")).map(|p| p["id"].as_str().unwrap_or("").to_string());
+                match open {
+                    Some(id) => self.request("overseer.answer", json!({"id": id, "yes": yes, "surface": "tui", "by": "owner"}), Pending::OverseerAnswer),
+                    None => self.say("No proposal waits for you", false),
+                }
+            }
+            KeyCode::Char('u') if ctrl => self.overseer_draft.clear(),
+            KeyCode::Char('r') if ctrl => self.request("overseer.session", json!({}), Pending::OverseerSession),
+            KeyCode::Enter if k.modifiers.contains(KeyModifiers::ALT) || k.modifiers.contains(KeyModifiers::SHIFT) => self.overseer_draft.push('\n'),
+            KeyCode::Enter => {
+                let text = self.overseer_draft.trim().to_string();
+                if text.is_empty() {
+                    return;
+                }
+                self.overseer_draft.clear();
+                self.request("overseer.send", json!({"text": text, "surface": "tui"}), Pending::OverseerSend);
+            }
+            KeyCode::Backspace => {
+                self.overseer_draft.pop();
+            }
+            KeyCode::Down | KeyCode::Char('j') if self.overseer_draft.is_empty() => self.overseer_scroll = self.overseer_scroll.saturating_sub(1),
+            KeyCode::Up | KeyCode::Char('k') if self.overseer_draft.is_empty() => self.overseer_scroll += 1,
+            KeyCode::Char(c) if !c.is_control() => self.overseer_draft.push(c),
+            _ => {}
+        }
+        self.dirty = true;
+    }
+
     fn open_audio(&mut self) {
         if !self.audio.known {
             self.audio_wanted = true;
@@ -1471,6 +1542,7 @@ impl App {
             Mode::Search => self.search_key(k),
             Mode::Accounts => self.accounts_key(k),
             Mode::Audio => self.audio_key(k),
+            Mode::Overseer => self.overseer_key(k),
             Mode::AudioImport => self.audio_import_key(k),
             Mode::Grid | Mode::Zoom { .. } => self.nav_key(k),
         }
@@ -1516,6 +1588,7 @@ impl App {
             KeyCode::Char('v') => self.open_changes(),
             KeyCode::Char('A') => self.open_accounts(),
             KeyCode::Char('S') => self.open_audio(),
+            KeyCode::Char('o') => self.open_overseer(),
             KeyCode::Char('P') => {
                 if let Some(run) = self.focused().cloned() {
                     if run.active() {

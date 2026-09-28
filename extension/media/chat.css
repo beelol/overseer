@@ -224,3 +224,14 @@ pre.code.error { color: var(--ov-failed); }
 .msg-from { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; font-size: var(--ov-font-xs); font-weight: var(--ov-weight-semibold); color: var(--ov-accent); }
 .msg.user.from-overseer { border: 1px solid var(--ov-accent-soft); }
 .msg-context { margin-top: 4px; font-size: var(--ov-font-xs); color: var(--ov-muted); }
+
+/* Oversight lines and the daemon's cards (Gate S, AC-199). */
+.sys.oversight { color: var(--ov-text); }
+.sys.briefing summary { display: flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; }
+.sys.briefing summary::-webkit-details-marker { display: none; }
+.briefing-text { margin: var(--ov-space-1) 0 0 22px; white-space: pre-wrap; color: var(--ov-muted); font-size: var(--ov-font-sm); }
+.card { margin: var(--ov-space-2) 0; padding: var(--ov-space-2) var(--ov-space-3); border: 1px solid var(--ov-border); border-radius: var(--ov-radius-card); background: var(--ov-raised); }
+.card-head { display: flex; align-items: center; gap: var(--ov-space-2); color: var(--ov-text); }
+.card-head .codicon { color: var(--ov-accent); }
+.card-detail { margin-top: 4px; color: var(--ov-muted); font-size: var(--ov-font-sm); }
+.card-finding .card-head .codicon, .card-cannot_answer .card-head .codicon { color: var(--ov-accent); }

@@ -41,7 +41,7 @@ class Model {
   }
   async refresh(forceSwarm = false) {
     try {
-      this.all = await this.client.request('state'); for (const p of this.all.profiles || []) p.name = accountName(p);
+      this.all = await this.client.request('state', { include_hidden: true }); for (const p of this.all.profiles || []) p.name = accountName(p);
       this.state = this.visible(this.all); this.error = undefined;
       if (forceSwarm || Date.now() - this.swarmFetchMs >= 1000) {
         try {
@@ -142,7 +142,7 @@ class AgentsProvider {
   /** What the list shows (relative times in 30-second steps). */
   signature() {
     const st = this.model.state || {};
-    return JSON.stringify([Math.floor(Date.now() / 30000), (st.tasks || []).map(t => [t.id, t.title, t.repo_root, t.archived_ms ? 1 : 0]),
+    return JSON.stringify([Math.floor(Date.now() / 30000), st.oversight || {}, st.overseer || {}, (st.tasks || []).map(t => [t.id, t.title, t.repo_root, t.archived_ms ? 1 : 0]),
       (st.runs || []).map(r => [r.id, r.status, r.parent_run_id, r.attention?.kind, r.harness, r.model, r.profile_id, r.workspace_id, r.title, r.exit_reason, r.ended_ms ? 1 : 0]),
       (st.profiles || []).map(p => [p.id, p.name]), (st.workspaces || []).map(w => [w.id, w.branch, w.kind]),
       (this.handlers.attention?.() || []).map(a => [a.run_id, a.label, a.detail]), this.handlers.pinned?.() || [],
@@ -446,6 +446,17 @@ class AgentsProvider {
     return { item, section: 'needs', list };
   }
   needsRow(a, parent) {
+    if (a.overseer) {
+      // Overseer needs the owner (AC-199): proposals that wait, conflicts that need a decision.
+      const item = new vscode.TreeItem('Overseer');
+      item.id = 'needs:overseer';
+      item.iconPath = new vscode.ThemeIcon('comment-discussion', new vscode.ThemeColor('charts.orange'));
+      item.description = a.label; item.tooltip = a.detail;
+      item.accessibilityInformation = { label: `Overseer, ${a.label}: ${a.detail}` };
+      item.contextValue = 'needs-overseer';
+      item.command = { command: 'overseer.talk', title: 'Open', arguments: [] };
+      return { item, parent, needs: a };
+    }
     const run = this.model.run(a.run_id); const task = run && this.model.task(run.task_id);
     if (!run) return undefined;
     // One row may stand for several agents (Continuity's waiting agents): it brings its own title.
@@ -481,14 +492,18 @@ class AgentsProvider {
     item.id = 'agent:' + task.id;
     item.iconPath = this.logo(run.harness);
     item.resourceUri = vscode.Uri.from({ scheme: 'overseer-agent', path: '/' + run.id });
-    // Working agents show their badge (●); finished ones say how long ago.
-    item.description = ACTIVE.has(run.status) ? '' : ago(run.ended_ms || run.created_ms);
+    // Working agents show their badge (●); finished ones say how long ago. Oversight (AC-199):
+    // held, watched, watching and in conflict, from the daemon's state.
+    const o = (m.state.overseer && m.state.overseer.run_id ? (m.state.oversight || {})[run.id] : undefined) || {};
+    const marks = [o.held && '⏸ held', o.watched && '◉ watched', o.watching && o.watching.length && '◉ watching', o.conflicts && `⚠ ${o.conflicts} conflict${o.conflicts === 1 ? '' : 's'}`].filter(Boolean);
+    item.description = [ACTIVE.has(run.status) ? '' : ago(run.ended_ms || run.created_ms), ...marks].filter(Boolean).join(' · ');
     const profile = run.profile_id ? m.profile(run.profile_id) : undefined;
     const ws = m.workspace(run.workspace_id);
     const status = STATUS_TEXT[run.status] || run.status;
     item.tooltip = new vscode.MarkdownString([`**${task.title}**`, `${status}${run.exit_reason && !ACTIVE.has(run.status) ? ` — ${run.exit_reason}` : ''}`,
       [run.harness, profile?.name, run.model].filter(Boolean).join(' · '), ws ? `${ws.kind === 'current' ? 'current checkout' : ws.branch} · ${path.basename(task.repo_root)}` : ''].filter(Boolean).join('\n\n'));
-    item.accessibilityInformation = { label: `${task.title}, ${status}, ${run.harness}${profile ? ', ' + profile.name : ''}` };
+    item.accessibilityInformation = { label: `${task.title}, ${status}, ${run.harness}${profile ? ', ' + profile.name : ''}${marks.length ? ', ' + marks.map(x => x.replace(/^\S+ /, '')).join(', ') : ''}` };
+    if (marks.length) item.tooltip.appendMarkdown(`\n\n${[o.held && `Held: ${o.hold_reason || ''}`, o.watched && 'Watched by another agent', o.watching && o.watching.length && 'Watching another agent', o.conflicts && `${o.conflicts} open conflict${o.conflicts === 1 ? '' : 's'}`, o.area && o.area.length && `Area: ${o.area.join(', ')}`].filter(Boolean).join('\n\n')}`);
     const pinned = (this.handlers.pinned?.() || []).includes(run.id);
     item.contextValue = `agent-${ACTIVE.has(run.status) ? 'active' : 'done'}${task.archived_ms ? '-archived' : ''}${pinned ? '-pinned' : ''}`;
     item.command = { command: 'overseer.selectRun', title: 'Open', arguments: [run.id] };

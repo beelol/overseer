@@ -12,8 +12,10 @@ use std::path::Path;
 /// One `meta.schema_version` label covers both schemas. Auto Mode reached 20
 /// and Swarm Mode reached 5 on separate branches, each with idempotent,
 /// existence-checked migrations. 21 was used twice (their union, and Auto's
-/// shared launch binding on its own branch); 22 is both together.
-pub const SCHEMA_VERSION: i64 = 22;
+/// shared launch binding on its own branch); 22 is both together. 23 adds
+/// main's Gate S (Overseer itself) tables, which main created without
+/// bumping its own label; every one is `CREATE TABLE IF NOT EXISTS`.
+pub const SCHEMA_VERSION: i64 = 23;
 /// Retained normalized events per run before older ones are pruned (with a marker).
 pub const EVENTS_PER_RUN: i64 = 5000;
 
@@ -433,6 +435,65 @@ impl Store {
               PRIMARY KEY(work_unit_id,pool_id,window_key));
             CREATE INDEX IF NOT EXISTS shared_booking_windows_pool
               ON shared_booking_windows(pool_id,window_key);
+            CREATE TABLE IF NOT EXISTS overseer_tokens(
+              sha TEXT PRIMARY KEY, run_id TEXT NOT NULL, role TEXT NOT NULL, created_ms INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS conflicts(
+              id TEXT PRIMARY KEY, key TEXT NOT NULL, kind TEXT NOT NULL, repo TEXT NOT NULL, run_a TEXT NOT NULL,
+              run_b TEXT, target TEXT, paths TEXT NOT NULL, first_ms INTEGER NOT NULL, last_ms INTEGER NOT NULL,
+              state TEXT NOT NULL, resolution TEXT, closed_ms INTEGER);
+            CREATE INDEX IF NOT EXISTS conflicts_key ON conflicts(key, state);
+            CREATE TABLE IF NOT EXISTS areas(
+              run_id TEXT NOT NULL, path TEXT NOT NULL, set_by TEXT NOT NULL, created_ms INTEGER NOT NULL, PRIMARY KEY(run_id, path));
+            CREATE TABLE IF NOT EXISTS run_roles(run_id TEXT PRIMARY KEY, role TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS turn_sources(turn_id TEXT PRIMARY KEY, source TEXT NOT NULL, detail TEXT);
+            CREATE TABLE IF NOT EXISTS overseer_sessions(
+              id TEXT PRIMARY KEY, started_ms INTEGER NOT NULL, archived_ms INTEGER, harness TEXT, model TEXT, run_id TEXT, task_id TEXT,
+              level TEXT NOT NULL DEFAULT 'ask_first', last_seq INTEGER NOT NULL DEFAULT 0, last_turn_ms INTEGER, last_cause TEXT);
+            CREATE TABLE IF NOT EXISTS overseer_messages(
+              seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT UNIQUE NOT NULL, session_id TEXT NOT NULL, ts INTEGER NOT NULL,
+              source TEXT NOT NULL, surface TEXT, text TEXT NOT NULL, card TEXT);
+            CREATE TABLE IF NOT EXISTS overseer_proposals(
+              id TEXT PRIMARY KEY, session_id TEXT NOT NULL, message_id TEXT, ts INTEGER NOT NULL, actions TEXT NOT NULL,
+              state TEXT NOT NULL, source TEXT, answered_by TEXT, answered_ms INTEGER, surface TEXT, result TEXT, settle_until INTEGER, cause TEXT);
+            CREATE TABLE IF NOT EXISTS overseer_pending(session_id TEXT NOT NULL, message_id TEXT, ts INTEGER NOT NULL, text TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS holds(
+              run_id TEXT PRIMARY KEY, set_by TEXT NOT NULL, reason TEXT NOT NULL, set_ms INTEGER NOT NULL, release_on TEXT NOT NULL, card_id TEXT);
+            CREATE TABLE IF NOT EXISTS guardrails(
+              id TEXT PRIMARY KEY, run_id TEXT NOT NULL, set_by TEXT NOT NULL, words TEXT NOT NULL, allow TEXT NOT NULL, deny TEXT NOT NULL,
+              hold_on_cross INTEGER NOT NULL, enforcement TEXT NOT NULL, created_ms INTEGER NOT NULL, removed_ms INTEGER);
+            CREATE TABLE IF NOT EXISTS guardrail_crossings(guardrail_id TEXT NOT NULL, run_id TEXT NOT NULL, paths TEXT NOT NULL, ts INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS dispatches(
+              id TEXT PRIMARY KEY, card_id TEXT NOT NULL, run_id TEXT NOT NULL, action TEXT NOT NULL, delivery TEXT NOT NULL, message TEXT NOT NULL,
+              why TEXT NOT NULL, state TEXT NOT NULL, held_ms INTEGER NOT NULL, sent_ms INTEGER, delivered_ms INTEGER, picked_ms INTEGER, answered_ms INTEGER, turn_id TEXT);
+            CREATE TABLE IF NOT EXISTS cadences(run_id TEXT PRIMARY KEY, cadence TEXT NOT NULL, set_by TEXT NOT NULL, set_ms INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS check_in_queue(run_id TEXT NOT NULL, reason TEXT NOT NULL, ts INTEGER NOT NULL, not_before INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS check_ins(run_id TEXT NOT NULL, ts INTEGER NOT NULL, result TEXT NOT NULL, reason TEXT NOT NULL, left_out TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS free_checks(run_id TEXT NOT NULL, kind TEXT NOT NULL, detail TEXT NOT NULL, ts INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS circles(run_id TEXT PRIMARY KEY, detail TEXT NOT NULL, count INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS tool_inputs(run_id TEXT NOT NULL, tool_id TEXT NOT NULL, input TEXT NOT NULL, PRIMARY KEY(run_id, tool_id));
+            CREATE TABLE IF NOT EXISTS overseer_turns(ts INTEGER NOT NULL, session_id TEXT NOT NULL, cause TEXT NOT NULL, turn_id TEXT);
+            CREATE TABLE IF NOT EXISTS queued_messages(
+              run_id TEXT NOT NULL, ts INTEGER NOT NULL, source TEXT NOT NULL, text TEXT NOT NULL, detail TEXT,
+              delivered_ms INTEGER, turn_id TEXT);
+            CREATE TABLE IF NOT EXISTS channels(run_id TEXT PRIMARY KEY, briefing INTEGER NOT NULL, channel INTEGER NOT NULL, set_by TEXT NOT NULL, set_ms INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS briefings(run_id TEXT NOT NULL, ts INTEGER NOT NULL, text TEXT NOT NULL, how TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS agent_messages(
+              id TEXT PRIMARY KEY, run_id TEXT NOT NULL, kind TEXT NOT NULL, ts INTEGER NOT NULL, body TEXT NOT NULL,
+              answer TEXT, answered_ms INTEGER);
+            CREATE TABLE IF NOT EXISTS shares(
+              id TEXT PRIMARY KEY, ts INTEGER NOT NULL, from_run TEXT, to_run TEXT NOT NULL, kind TEXT NOT NULL, source TEXT NOT NULL,
+              bytes INTEGER NOT NULL, inline_bytes INTEGER NOT NULL, file TEXT, proposal TEXT, content_id TEXT NOT NULL, withdrawn_ms INTEGER);
+            CREATE TABLE IF NOT EXISTS share_denials(run_id TEXT PRIMARY KEY, set_by TEXT NOT NULL, set_ms INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS watches(
+              id TEXT PRIMARY KEY, subject TEXT NOT NULL, watcher TEXT NOT NULL DEFAULT '', brief TEXT NOT NULL, mode TEXT NOT NULL, hold_on_stop INTEGER NOT NULL,
+              harness TEXT NOT NULL, model TEXT, set_by TEXT NOT NULL, created_ms INTEGER NOT NULL, last_seq INTEGER NOT NULL DEFAULT 0, last_snapshot TEXT,
+              wakes INTEGER NOT NULL DEFAULT 0, budget INTEGER NOT NULL, copy_workspace TEXT, copy_path TEXT, ended_ms INTEGER, end_reason TEXT);
+            CREATE TABLE IF NOT EXISTS watch_wakes(watch_id TEXT NOT NULL, ts INTEGER NOT NULL, reason TEXT NOT NULL, seq INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS watch_finish_queue(subject TEXT PRIMARY KEY, not_before INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS denied_permissions(run_id TEXT NOT NULL, tool TEXT NOT NULL, detail TEXT NOT NULL, ts INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS findings(
+              id TEXT PRIMARY KEY, watch_id TEXT NOT NULL, watcher TEXT NOT NULL, subject TEXT NOT NULL, ts INTEGER NOT NULL, result TEXT NOT NULL,
+              text TEXT NOT NULL, snapshot TEXT);
             "#,
         )?;
         let old_version: Option<String> = self.conn.query_row(
@@ -3105,6 +3166,25 @@ mod schema_migration_tests {
         }
         let upgraded = Store::open(&path).unwrap();
         for table in ["swarm_runs", "swarm_reservations", "shared_booking_intents", "auto_pool_claims"] {
+            assert!(table_exists(&upgraded.conn, table), "{table}");
+        }
+        assert_eq!(schema_label(&upgraded.conn), SCHEMA_VERSION.to_string());
+    }
+
+    #[test]
+    fn v22_database_gains_overseer_tables() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("v22.sqlite");
+        {
+            // Auto + Swarm at 22 had no Gate S table.
+            let store = Store::open(&path).unwrap();
+            for table in ["run_roles", "holds", "watches", "overseer_sessions", "conflicts"] {
+                store.conn.execute_batch(&format!("DROP TABLE {table};")).unwrap();
+            }
+            store.conn.execute("UPDATE meta SET value='22' WHERE key='schema_version'", []).unwrap();
+        }
+        let upgraded = Store::open(&path).unwrap();
+        for table in ["run_roles", "holds", "watches", "overseer_sessions", "conflicts", "shared_booking_intents", "swarm_runs"] {
             assert!(table_exists(&upgraded.conn, table), "{table}");
         }
         assert_eq!(schema_label(&upgraded.conn), SCHEMA_VERSION.to_string());

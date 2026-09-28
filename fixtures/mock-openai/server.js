@@ -45,11 +45,14 @@ function plan(body) {
     }
     return { text: `done after ${done} edits` };
   }
-  if (last.role === 'tool') return { text: 'done' };
+  if (last.role === 'tool') return { text: /roster/i.test(user) ? 'roster says: ' + textOf(last.content).split('\n')[0].slice(0, 120) : 'done' };
   if (/CHILD: delegate/.test(user) && (body.tools || []).some(t => t.function?.name === 'task')) {
     return { tool: 'task', args: { description: 'grandchild hi', prompt: 'CHILD: reply with hi', subagent_type: 'general' } };
   }
   if (/CHILD:/.test(user)) return { text: 'hi from child' };
+  // "roster" -> calls Overseer's MCP tool (OpenCode names it <server>_<tool>), then repeats its first line.
+  const roster = (body.tools || []).find(t => /overseer.*roster/.test(t.function?.name || ''));
+  if (/roster/i.test(user) && roster) return { tool: roster.function.name, args: {} };
   if (/delegate twice/i.test(user) && (body.tools || []).some(t => t.function?.name === 'task')) {
     return { tool: 'task', args: { description: 'child that delegates', prompt: 'CHILD: delegate once more', subagent_type: 'general' } };
   }

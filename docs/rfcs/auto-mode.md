@@ -6,6 +6,16 @@ Acceptance criteria: **14 / 40 core criteria verified**; AUTO-AC-30 remains cond
 
 Local revision: based on the complete fetched draft at `c76938360352909c6157aae359bf811fa8b7405e`. Preserve all original sections and AUTO-AC-01 through AUTO-AC-36. This revision adds local-only telemetry and AUTO-AC-37 through AUTO-AC-41; condensed chat drafts do not replace the full RFC. The owner has requested a draft PR once implementation and verification are complete. Until then, drafting and implementation stay local.
 
+## Handover and build order (2026-09-27)
+
+The owner stopped the Auto and Swarm agents on 2026-09-27 and gave both RFCs to the everything goal (`docs/goals/everything.md`), to build **together** on one branch, `claude/auto-swarm` (pull requests #2 and #3 keep their history; this branch continues from both). The owner's decisions:
+
+- **One account authority.** Auto Mode owns shared account booking (`daemon/src/account_booking.rs`: account claim, window draw, app slot and workspace writer committed in one transaction, and the effects of a booked launch claimed once). Swarm consumes it and keeps only its category allocation and its job and attempt policy; it keeps no account ledger of its own (`swarm_reservations` is retired as an account authority).
+- **Build order.** (1) the shared launch booking, tested (done at the handover: `6abf8d71`); (2) run and supervisor binding and recovery, so a held booking that becomes a process is counted once; (3) Swarm merged onto it, its admission moved to the shared booking; (4) the ordinary start, Auto and Swarm launch through the one transaction; (5) a normal "start a swarm" run end to end (Swarm's S0); (6) the remaining criteria, each only to the scope its evidence shows.
+- **Partial merges.** When a slice is finished and tested (for example the shared booking and its callers), it may merge to main before the whole RFC is done; what remains stays partial or becomes new criteria, as AC-204 says.
+
+State at the handover: Auto 14 of 40 core criteria verified (AUTO-AC-30 deferred); Swarm 4 of 64 verified, 57 partial, 3 unverified, S0 unverified and S1 to S5 partial. Most partial Swarm evidence runs on scripted workers and fixture policy; normal launches are not wired. Evidence indexes: `docs/verification/auto-mode/README.md` and `docs/verification/swarm/coverage.json` on the branch.
+
 ## Outcome
 
 A user chooses **Auto** and Overseer repeatedly assigns the next task or subtask to a strong, suitable agent at a sensible reasoning effort, using current account allowance and expected consumption. Auto is ongoing work allocation, not merely initial selection or outage failover. It can change agents while every service is healthy.
