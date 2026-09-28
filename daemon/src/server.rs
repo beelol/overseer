@@ -1439,6 +1439,10 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             closed["workers"] = crate::swarm::interrupt_workers(d, s(p,"run_id")?)?;
             closed
         }
+        "swarm.requirements.change" => {
+            require_swarm_storage(d)?;
+            crate::swarm::change_requirements(&mut d.store.lock().unwrap(), p)?
+        }
         "swarm.pause" => crate::swarm::pause(&mut d.store.lock().unwrap(), p)?,
         "swarm.resume" => crate::swarm::resume(&mut d.store.lock().unwrap(), p)?,
         "swarm.off" => crate::swarm::off(&mut d.store.lock().unwrap(), p)?,

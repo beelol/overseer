@@ -222,6 +222,11 @@ fn admit_inner(
     if current["status"] != "planning" && current["status"] != "running" {
         return Ok(blocked("run_not_admitting"));
     }
+    // The owner changed the requirements: nothing new starts under the old plan
+    // until the director has revised it against them (SWARM-21).
+    if super::requirements::pending(&tx, run)? {
+        return Ok(blocked("requirements_pending"));
+    }
     let observed_availability: Option<(String, String)> = tx
         .query_row(
             "SELECT state,snapshot_sha256 FROM swarm_availability WHERE run_id=?1",

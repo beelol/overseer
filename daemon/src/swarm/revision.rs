@@ -106,7 +106,9 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
             return Err(error);
         }
     };
+    let applied_requirements = super::requirements::requested(p)?;
     let tx = store.conn.transaction()?;
+    super::requirements::check_pending(&tx, id, &applied_requirements)?;
     let current: (i64, i64, String) = tx
         .query_row(
             "SELECT generation,revision,status FROM swarm_runs WHERE id=?1",
@@ -218,13 +220,19 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
     if affected.is_empty() && omitted.is_empty() && jobs.iter().all(|job| old.contains_key(&job.id)) {
         let mut result = json!({"id":id,"generation":generation,"revision":expected,
             "affected":0,"redirected":0,"unchanged":true});
+        // The director may find a requirement change needs no plan change; it is
+        // still applied, at the current revision.
+        super::requirements::mark_applied(&tx, id, &applied_requirements, expected, crate::daemon::now())?;
+        if !applied_requirements.is_empty() {
+            result["requirements_applied"] = json!(applied_requirements);
+        }
         if let Some(request_id) = request_id {
             result["duplicate"] = json!(false);
             tx.execute("INSERT INTO swarm_revision_requests(run_id,request_id,request_sha256,
                 result_json,created_ms) VALUES(?1,?2,?3,?4,?5)",
                 params![id,request_id,request_sha256,result.to_string(),crate::daemon::now()])?;
-            tx.commit()?;
         }
+        tx.commit()?;
         return Ok(result);
     }
     let now = crate::daemon::now();
@@ -333,8 +341,12 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
         params![id, revision, now],
     )?;
     super::materialize_ready(&tx, id, now)?;
+    super::requirements::mark_applied(&tx, id, &applied_requirements, revision, now)?;
     let mut result = json!({"id":id,"generation":generation,"revision":revision,
         "affected":affected.len(),"superseded":omitted.len(),"redirected":redirected});
+    if !applied_requirements.is_empty() {
+        result["requirements_applied"] = json!(applied_requirements);
+    }
     if let Some(request_id) = request_id {
         result["duplicate"] = json!(false);
         tx.execute("INSERT INTO swarm_revision_requests(run_id,request_id,request_sha256,

@@ -953,3 +953,109 @@ fn catalog_s3_starts_four_then_eight_and_waits_for_review() {
         .iter()
         .all(|job| job["status"] == "accepted"));
 }
+
+/// SWARM-21, S3's 24-to-12 variant as the owner's changed requirement. The
+/// owner's words enter the director's inbox as a `requirement`; until the
+/// director revises the plan against them, no module is admitted under the old
+/// plan. The director's revision names the request, narrows the plan to twelve
+/// modules (the others are superseded, the excluded in-flight attempt is
+/// stopped and its old result cannot be accepted) and keeps its generation.
+/// The run records which revision applied the owner's change; a retained
+/// module is admitted afterwards. The Catalog replays verify that only the
+/// retained patches integrate and that excluded routes keep working.
+#[test]
+fn catalog_s3_owner_requirement_change_becomes_a_recorded_plan_revision() {
+    let manifest: serde_json::Value = serde_json::from_slice(&std::fs::read(
+        repo_root().join("fixtures/swarm/catalog-v1/manifest.json")).unwrap()).unwrap();
+    let names: Vec<String> = manifest["resource_modules"].as_array().unwrap().iter()
+        .map(|name| name.as_str().unwrap().to_string()).collect();
+    let mut d = Daemon::start(&[]);
+    let made = d.call("swarm.create", json!({"category":"Catalog owner scope change",
+        "objective":"Migrate the twenty-four modules to cursor pagination",
+        "allowed_targets":["system-codex"],"source_change_permission":"isolated"}));
+    let run = made["id"].as_str().unwrap().to_string();
+    let mut jobs = vec![json!({"id":"contract","title":"Cursor contract","acceptance":"tuple cursor","deps":[]})];
+    jobs.extend(names.iter().map(|name| json!({"id":name,"title":format!("Migrate {name}"),
+        "acceptance":"cursor check","deps":["contract"]})));
+    d.call("swarm.plan", json!({"id":run,"generation":1,"revision":0,"jobs":jobs}));
+    let contract = d.call("swarm.attempt.register", json!({"run_id":run,"generation":1,"revision":1,"job_id":"contract"}));
+    d.call("swarm.artifact.put", json!({"run_id":run,"job_id":"contract","attempt_id":contract["id"],
+        "token":contract["token"],"artifact_id":"cursor-contract","source_revision":1,"kind":"contract",
+        "content":"stable (createdAt,id) cursor"}));
+    d.call("swarm.report", json!({"run_id":run,"job_id":"contract","attempt_id":contract["id"],
+        "token":contract["token"],"message_id":"contract-result","type":"result","revision":1,
+        "payload":{"artifact_ids":["cursor-contract"]}}));
+    d.call("swarm.decide", json!({"run_id":run,"generation":1,"revision":1,"job_id":"contract",
+        "decision":"accept","evidence":["cursor-contract"]}));
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"contract","attempt_id":contract["id"]}));
+    let excluded = names[20].clone();
+    let old = d.call("swarm.attempt.register", json!({"run_id":run,"generation":1,"revision":1,"job_id":excluded}));
+    d.call("swarm.report", json!({"run_id":run,"job_id":excluded,"attempt_id":old["id"],"token":old["token"],
+        "message_id":"excluded-result","type":"result","revision":1,"payload":{"note":"started before the change"}}));
+    // The owner changes the requirements.
+    let change = json!({"run_id":run,"request_id":"owner-twelve",
+        "text":"Only migrate the first twelve modules; leave the rest on page/offset"});
+    let taken = d.call("swarm.requirements.change", change.clone());
+    assert_eq!((taken["duplicate"].as_bool(), taken["admission"].as_str()), (Some(false), Some("held_until_revised")));
+    assert_eq!(d.call("swarm.requirements.change", change.clone())["duplicate"], true);
+    let mut changed = change.clone();
+    changed["text"] = json!("Migrate all modules");
+    assert!(d.try_call("swarm.requirements.change", changed).unwrap_err().contains("reused"));
+    let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
+    let admit = |d: &Daemon, job: &str, request: &str| d.call("swarm.admit", json!({"run_id":run,"generation":1,
+        "revision":d.call("swarm.get", json!({"id":run}))["revision"],"job_id":job,"target_id":"system-codex",
+        "request_id":request,"now_ms":at,
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"system-codex","account_id":"a","pool_ids":["p"],"capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"p","windows":[{"id":"w","unit":"points","remaining_milli":1000000,"protected_milli":0,
+                "reserved_milli":0,"confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(admit(&d, &names[0], "before-revision")["reason"], "requirements_pending");
+    // It reaches the director as its next inbox event.
+    let batch = d.call("swarm.director.claim_batch", json!({"run_id":run,"generation":1,"revision":1,
+        "now_ms":at+6000}));
+    let requirement = batch["messages"].as_array().unwrap().iter().find(|m| m["type"] == "requirement").unwrap().clone();
+    assert_eq!(requirement["payload"]["request_id"], "owner-twelve", "{batch}");
+    // Restart before the director answers: the change and the hold survive.
+    d.kill9();
+    d.spawn();
+    assert_eq!(admit(&d, &names[0], "after-restart")["reason"], "requirements_pending");
+    let mut retained = vec![json!({"id":"contract","title":"Cursor contract","acceptance":"tuple cursor","deps":[]})];
+    retained.extend(names[..12].iter().map(|name| json!({"id":name,"title":format!("Migrate {name}"),
+        "acceptance":"cursor check","deps":["contract"]})));
+    assert!(d.try_call("swarm.revise", json!({"id":run,"generation":1,"expected_revision":1,
+        "reason":"Owner narrowed scope","jobs":retained,"requirements":["someone-else"]}))
+        .unwrap_err().contains("unknown requirement change"));
+    let narrowed = d.call("swarm.revise", json!({"id":run,"generation":1,"expected_revision":1,
+        "reason":"Owner narrowed scope to twelve modules","jobs":retained,"requirements":["owner-twelve"]}));
+    assert_eq!((narrowed["revision"].as_i64(), narrowed["superseded"].as_i64(), narrowed["generation"].as_i64()),
+        (Some(2), Some(12), Some(1)), "{narrowed}");
+    d.call("swarm.director.complete_batch", json!({"run_id":run,"generation":1,"turn_id":batch["turn_id"],
+        "token":batch["token"],"outcome":"progress"}));
+    let state = d.call("swarm.get", json!({"id":run}));
+    assert_eq!(state["generation"], 1, "the director generation is unchanged");
+    let recorded = &state["requirement_changes"][0];
+    assert_eq!((recorded["request_id"].as_str(), recorded["applied_revision"].as_i64()),
+        (Some("owner-twelve"), Some(2)), "{state}");
+    // The excluded module's in-flight work is stopped and cannot be accepted.
+    let control = d.call("swarm.messages", json!({"run_id":run,"recipient":old["id"],"token":old["token"]}));
+    assert!(control["messages"].as_array().unwrap().iter().any(|m| m["type"] == "stop"));
+    assert!(d.try_call("swarm.decide", json!({"run_id":run,"generation":1,"revision":2,"job_id":excluded,
+        "decision":"accept","evidence":["cursor-contract"]})).is_err());
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":run,"generation":1,"revision":2,
+        "job_id":excluded,"attempt_id":old["id"]}));
+    assert_eq!(d.call("swarm.jobs", json!({"id":run,"status":"superseded"}))["jobs"].as_array().unwrap().len(), 12);
+    // Work resumes under the revised plan.
+    let cost = json!({"elapsed_ms":10,"usage_milli":{"points":1}});
+    let workers: Vec<serde_json::Value> = names[..12].iter().map(|id| json!({"id":id,"elapsed_ms":100,
+        "usage_milli":{"points":10}})).collect();
+    let serial = json!({"planning":cost,"context":cost,"integration":cost,"review":cost,"retries":cost,"workers":workers});
+    let mut parallel = serial.clone();
+    parallel["context"]["elapsed_ms"] = json!(20);
+    d.call("swarm.benefit.commit", json!({"run_id":run,"generation":1,"revision":2,"estimate":{
+        "independent":true,"max_workers":12,"allocation_milli":{"points":100000},
+        "finishing_reserve_milli":{"points":20000},"serial":serial,"parallel":parallel}}));
+    let resumed = admit(&d, &names[0], "after-revision");
+    assert_eq!(resumed["status"], "admitted", "{resumed}");
+}

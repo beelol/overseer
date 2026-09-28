@@ -18,6 +18,7 @@ mod verification;
 mod plan;
 mod policy;
 mod revision;
+mod requirements;
 mod route;
 mod runtime;
 mod scheduler;
@@ -31,6 +32,7 @@ pub use availability::observe as observe_availability;
 pub use benefit::preview as preview_benefit;
 pub use benefit::commit as commit_benefit;
 pub use broker::{ack, direct, messages, overseer_advisory, register, report};
+pub use requirements::change as change_requirements;
 pub use completion::complete;
 pub use conflicts::{list as list_conflicts, open as open_conflict, resolve as resolve_conflict};
 pub use coverage::report as coverage_report;
@@ -375,6 +377,7 @@ pub fn get(store: &Store, id: &str) -> Result<Value> {
     run["start"] = start::confirmation(store, id)?;
     run["benefit"] = benefit::get_state(store, id, run["revision"].as_i64().unwrap_or(0))?;
     run["capacity"] = capacity_readout(store, id)?;
+    run["requirement_changes"] = requirements::list(&store.conn, id)?;
     let mut job_counts = BTreeMap::<String, i64>::new();
     let mut stmt = store.conn.prepare(
         "SELECT status,COUNT(*) FROM swarm_jobs WHERE run_id=?1 GROUP BY status",
