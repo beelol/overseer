@@ -397,12 +397,13 @@
       "blocker": "A scripted local launch remains separate from completion and replays to one run. Known child/grandchild rows hold confirmation and reservations until terminal receipts; a failed child blocks an accepted parent result. A synthetic Claude stream with a background Agent and interim result now passes through the fixture-only worker bridge without finishing the attempt or exposing its broker token. Captured live async receipts, silent/stale output, late append, late-discovered descendants and usage reconciliation remain unverified."
     },
     "SWARM-32": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_admission.rs",
-        "docs/verification/swarm/milestone-7.md"
+        "docs/verification/swarm/milestone-7.md",
+        "docs/verification/swarm/SWARM-32.md"
       ],
-      "blocker": "Fixture admission holds at eight submitted results and resumes below four with bounded waves; outage recovery and actual director review capacity remain unimplemented."
+      "blocker": null
     },
     "SWARM-33": {
       "status": "verified",

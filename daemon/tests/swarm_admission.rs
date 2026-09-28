@@ -1689,3 +1689,96 @@ fn quota_headroom_explains_smaller_pool_than_worker_ceiling() {
     assert_eq!(third["status"],"blocked");
     assert_eq!(third["reason"],"finishing_reserve");
 }
+
+/// SWARM-32 on one 40-job fixture: review capacity 8, waves of 4. Waves are
+/// bounded (4, then 4 more after the 5-second cooldown, then 4). With eight
+/// results awaiting review, new admission holds `review_backlog`; the four
+/// already-running workers still submit, so twelve results are kept durably.
+/// Review drains the backlog below four and admission resumes in a bounded
+/// wave. Then an outage lowers capacity: an observation with no allowance
+/// blocks new admission; repeating that unchanged observation wakes no
+/// director and adds no inbox event (no replanning). Recovery wakes the
+/// director once and admission resumes, again in waves of at most four.
+#[test]
+fn forty_jobs_hold_at_eight_reviews_then_recover_from_an_outage_in_bounded_waves() {
+    let d = Daemon::start(&[]);
+    d.call("agents.limit.set", json!({"max_active":33}));
+    let run = d.call("swarm.create", json!({"category":"Forty ready jobs","objective":"Audit many checks",
+        "allowed_targets":["codex-a","opencode-a"],"policy":{"max_workers":32}}));
+    let id = run["id"].as_str().unwrap().to_string();
+    let names: Vec<String> = (0..40).map(|n| format!("j{n}")).collect();
+    let jobs: Vec<Value> = names.iter().map(|j| json!({"id":j,"title":j,"acceptance":"evidence","deps":[]})).collect();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":jobs}));
+    commit_beneficial_batch(&d, &id, &names);
+    let at = now();
+    let mut admitted: Vec<(usize, Value)> = Vec::new();
+    let mut try_admit = |n: usize, when: i64| admit(&d, &id, &format!("j{n}"), "codex-a",
+        &format!("forty-{n}-{when}"), when, 1_000_000_000, 100).unwrap();
+    // Bounded waves: four at a time, five seconds apart.
+    for wave in 0..3i64 {
+        let when = at + wave * 5_000;
+        for n in (wave as usize * 4)..(wave as usize * 4 + 4) {
+            let result = try_admit(n, when);
+            assert_eq!(result["status"], "admitted", "j{n}: {result}");
+            admitted.push((n, result));
+        }
+        let over = try_admit(wave as usize * 4 + 4, when);
+        assert_eq!(over["reason"], "growth_wave_full", "wave {wave}: {over}");
+    }
+    let submit = |n: usize, attempt: &Value| {
+        let artifact = format!("artifact-{n}");
+        d.call("swarm.artifact.put", json!({"run_id":id,"job_id":format!("j{n}"),"attempt_id":attempt["attempt_id"],
+            "token":attempt["token"],"artifact_id":artifact,"source_revision":1,"kind":"finding","content":"checked"}));
+        d.call("swarm.report", json!({"run_id":id,"job_id":format!("j{n}"),"attempt_id":attempt["attempt_id"],
+            "token":attempt["token"],"message_id":format!("result-{n}"),"type":"result","revision":1,
+            "payload":{"artifact_ids":[artifact]}}));
+    };
+    for (n, attempt) in admitted.iter().take(8) { submit(*n, attempt); }
+    let held = try_admit(12, at + 15_000);
+    assert_eq!(held["reason"], "review_backlog", "{held}");
+    // Already-running workers still submit: twelve durable results await review.
+    for (n, attempt) in admitted.iter().skip(8) { submit(*n, attempt); }
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let pending: i64 = db.query_row("SELECT COUNT(*) FROM swarm_jobs WHERE run_id=?1 AND status='submitted'",
+        [&id], |r| r.get(0)).unwrap();
+    assert_eq!(pending, 12, "in-flight results above the threshold are kept");
+    assert_eq!(try_admit(12, at + 20_000)["reason"], "review_backlog");
+    // Review drains below four; admission resumes in a bounded wave.
+    for (n, attempt) in admitted.iter().take(9) {
+        d.call("swarm.decide", json!({"run_id":id,"generation":1,"revision":1,"job_id":format!("j{n}"),
+            "decision":"accept","evidence":[format!("artifact-{n}")]}));
+        d.call("swarm.attempt.confirm_exit", json!({"run_id":id,"generation":1,"revision":1,
+            "job_id":format!("j{n}"),"attempt_id":attempt["attempt_id"]}));
+    }
+    let resume_at = at + 25_000;
+    for n in 12..16 { assert_eq!(try_admit(n, resume_at)["status"], "admitted", "j{n}"); }
+    assert_eq!(try_admit(16, resume_at)["reason"], "growth_wave_full");
+    // An outage lowers capacity: no allowance left in the pool.
+    let observe = |when: i64, remaining: i64| d.call("swarm.availability.observe", json!({"run_id":id,
+        "snapshot":snapshot(when, remaining),"now_ms":when,"required_capabilities":["code"],
+        "estimate_milli":{"points":100},"purpose":"worker"}));
+    let outage = observe(at + 30_000, 0);
+    assert_eq!(outage["state"], "blocked", "{outage}");
+    let blocked = try_admit(16, at + 30_000);
+    assert_ne!(blocked["status"], "admitted", "{blocked}");
+    let events_before: i64 = db.query_row("SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND recipient='director'",
+        [&id], |r| r.get(0)).unwrap();
+    for k in 1..=3 {
+        let again = observe(at + 30_000 + k * 1_000, 0);
+        assert_eq!((again["state"].as_str(), again["woken"].as_bool()), (Some("blocked"), Some(false)), "{again}");
+    }
+    let events_after: i64 = db.query_row("SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND recipient='director'",
+        [&id], |r| r.get(0)).unwrap();
+    assert_eq!(events_after, events_before, "unchanged observations do not wake or replan");
+    // Recovery: one wake, then bounded waves again.
+    let recovered = observe(at + 40_000, 1_000_000_000);
+    assert_eq!((recovered["state"].as_str(), recovered["woken"].as_bool()), (Some("eligible"), Some(true)), "{recovered}");
+    assert_eq!(observe(at + 41_000, 1_000_000_000)["woken"], false);
+    // Admission now carries the latest observed snapshot (an older or different one is fenced).
+    let after = |n: usize| d.call("swarm.admit", json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":format!("j{n}"),"target_id":"codex-a","request_id":format!("forty-{n}-recovered"),
+        "snapshot":snapshot(at + 41_000, 1_000_000_000),"now_ms":at + 45_000,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    for n in 16..20 { let r = after(n); assert_eq!(r["status"], "admitted", "j{n}: {r}"); }
+    assert_eq!(after(20)["reason"], "growth_wave_full");
+}
