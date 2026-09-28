@@ -1,5 +1,12 @@
 # AC-146: merges
 
+## Pull request #21 (the dev daemons feature, Gate T stage 2), 2026-09-28
+
+- **Finished:** marked ready by the dev daemons agent (head `0fef4d33`, main merged in with Voice Mode's `voice.subscribe` kept); AC-206 to AC-209 and AC-211 verified on main (`f6b6a053`).
+- **Throwaway copy:** main (with #10) merged in without conflicts (`84d420c8`).
+- **Tests:** `scripts/test-all --jobs=3`: 56 of 56 passed (Rust, unit, check, links, VSIX and every UI fixture scenario, audit included).
+- **Merged:** squash, `76d4ae85`. Stages 3 (guided owner tests, AC-215) and 4 (deploy, AC-214) follow as their own pull requests.
+
 ## Pull request #10 (phone remote, Gate N), 2026-09-28
 
 - **Finished:** marked ready by the phone agent (head `1488b4be`), with main merged in at `295f97f2` (Voice Mode and the production guard: conflicts in `server.rs`, `daemon-client.js`, `extension.js` and `Cargo.lock` kept both sides; Voice Mode's methods are Mac-only for phones). Its own records on main (`420853a4`): 15 verified, 7 partial, AC-128 and AC-133 not started.
