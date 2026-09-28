@@ -163,7 +163,7 @@ fn s0_world() -> World {
             {"id":"tasks","title":"Task mutation audit","acceptance":"local reproduction","deps":[],"required_capabilities":["audit"]},
             {"id":"members","title":"Membership role audit","acceptance":"role matrix evidence","deps":[],"required_capabilities":["audit"]}],
         "estimate":benefit(&["projects","tasks","members"]),
-        "offers":[{"job":"projects","target":"unapproved-local"},{"job":"members","target":"system-claude"}],
+        "offers":[{"job":"projects","target":"unapproved-local"},{"job":"members"}],
         "dispatch":[{"job":"projects","target":"fixture-local"},{"job":"tasks","target":"fixture-local"},
             {"job":"members","target":"fixture-local"}],
         "route":{"D1":{"job":"members","message_id":"D1-to-members",
@@ -207,8 +207,14 @@ fn assert_s0_outcome(w: &World, run: &str) {
     let offers: Vec<Value> = trace(&w.trace).into_iter().filter(|t| t["step"] == "offered").collect();
     assert_eq!((offers[0]["target"].as_str(), offers[0]["status"].as_str(), offers[0]["reason"].as_str()),
         (Some("unapproved-local"), Some("blocked"), Some("not_allowed")), "{offers:?}");
-    assert_eq!((offers[1]["target"].as_str(), offers[1]["status"].as_str(), offers[1]["reason"].as_str()),
-        (Some("system-claude"), Some("blocked"), Some("audit_source_boundary_unqualified")), "{offers:?}");
+    // The director names no account: Auto's selector finds none eligible in
+    // an audit, where no native worker has an audit-only source boundary.
+    assert_eq!((offers[1]["status"].as_str(), offers[1]["reason"].as_str()),
+        (Some("blocked"), Some("no_eligible_route")), "{offers:?}");
+    let excluded = offers[1]["decision"]["exclusions"].as_array().unwrap();
+    assert_eq!(excluded.len(), 2, "system-claude's two priors: {offers:?}");
+    assert!(excluded.iter().all(|e| e["reason"] == "audit_source_boundary_unqualified"
+        && e["route_id"].as_str().unwrap().starts_with("system-claude/")), "{offers:?}");
     let booked: i64 = db(d).query_row("SELECT COUNT(*) FROM shared_booking_intents WHERE caller='swarm'",
         [], |r| r.get(0)).unwrap();
     assert_eq!(booked, 0, "no worker account was booked in an audit");
@@ -359,7 +365,7 @@ fn native_workers_report_through_their_own_tokens_and_cannot_act_for_others() {
         "jobs":[{"id":"a","title":"Tenant lookup","acceptance":"evidence","deps":[]},
             {"id":"b","title":"Role checks","acceptance":"evidence","deps":[]}],
         "estimate":benefit(&["a","b"]),
-        "dispatch":[{"job":"a","target":workers_profile,"model":"sonnet"},{"job":"b","target":workers_profile,"model":"sonnet"}],
+        "dispatch":[{"job":"a"},{"job":"b"}],
         "answer":"Use the tenant id from the session",
         "complete":{"summary":"Two native workers reported","verification":"Evidence accepted per job"}}).to_string()).unwrap();
     std::fs::write(&w.workers, json!({
@@ -536,8 +542,9 @@ fn end_run(d: &Daemon, run: &str) {
 /// Mode's root) with Swarm off, and a normal Swarm start with Auto Mode off
 /// and on. Each cell records its launch path, what it booked and the app
 /// slots it held; Swarm off creates no Swarm run or worker, a Swarm keeps to
-/// its approved pool, and Auto Mode does not change how a Swarm launches
-/// (no Swarm route is chosen by Auto's selector).
+/// its approved pool, and Auto Mode does not change how a Swarm launches:
+/// with either setting, Auto's selector chooses each worker's route within
+/// the approved pool (SWARM-24), and no worker is an Auto root.
 #[test]
 fn four_way_launch_matrix_auto_manual_by_swarm_on_off() {
     let draws = tmp();
@@ -597,7 +604,7 @@ fn four_way_launch_matrix_auto_manual_by_swarm_on_off() {
             "jobs":[{"id":"a","title":"First","acceptance":"evidence","deps":[]},
                 {"id":"b","title":"Second","acceptance":"evidence","deps":[]}],
             "estimate":benefit(&["a","b"]),
-            "dispatch":[{"job":"a","target":workers_profile,"model":"sonnet"},{"job":"b","target":workers_profile,"model":"sonnet"}],
+            "dispatch":[{"job":"a"},{"job":"b"}],
             "complete":{"summary":"matrix cell","verification":"evidence accepted"}}).to_string()).unwrap();
         std::fs::write(&w.workers, json!({"trace":cell_trace,"gate":gate,"jobs":{
             "a":{"evidence":[{"id":"a-proof","kind":"finding","content":"a"}]},
@@ -663,4 +670,247 @@ fn four_way_launch_matrix_auto_manual_by_swarm_on_off() {
     assert_eq!(auto_on, swarm_expected(2, 4), "Auto Mode does not change how a Swarm launches");
     assert_eq!(manual_director, vec!["claude".to_string(), "system-claude".to_string()]);
     assert_eq!(auto_director, manual_director);
+}
+
+/// A world whose director plans and then waits: the test drives each
+/// dispatch through the director's own token (the same tool call its model
+/// would make). Claude profiles `names` are created; `accounts` gives each a
+/// fixture identity, a reading at `used` percent and a fixture draw of 3,000
+/// (thousandths of a point) per window; `pool` is the approved pool.
+struct Driven {
+    w: World,
+    worker_gate: PathBuf,
+    ids: std::collections::BTreeMap<String, String>,
+    _draws: tempfile::TempDir,
+}
+
+fn driven(names: &[&str], accounts: &[(&str, f64)], pool: &[&str], jobs: &[&str], worker_jobs: &[&str]) -> Driven {
+    let draw_dir = tmp();
+    let draw_file = draw_dir.path().join("draws.json");
+    let w = world(&[("OVERSEER_SWARM_FIXTURE_API", "0"), ("OVERSEER_SHARED_BOOKING_FIXTURE_API", "1"),
+        ("OVERSEER_SWARM_FIXTURE_DRAW", draw_file.to_str().unwrap())]);
+    let mut ids = std::collections::BTreeMap::new();
+    ids.insert("system-claude".to_string(), "system-claude".to_string());
+    for name in names {
+        let id = w.d.call("profile.create", json!({"name":name,"harness":"claude"}))["id"].as_str().unwrap().to_string();
+        ids.insert(name.to_string(), id);
+    }
+    let mut draws = serde_json::Map::new();
+    for (name, used) in accounts {
+        let id = &ids[*name];
+        draws.insert(id.clone(), fixture_account_booking(&w.d, id, &format!("{name}-account"), *used, 3_000));
+    }
+    std::fs::write(&draw_file, Value::Object(draws).to_string()).unwrap();
+    w.d.call("agents.limit.set", json!({"max_active":6}));
+    let approved: Vec<&String> = pool.iter().map(|name| &ids[*name]).collect();
+    w.d.call("swarm.policy.set", json!({"scope":"application","allowed_targets":approved}));
+    w.d.call("swarm.native_director.set", json!({"enabled":true}));
+    let worker_gate = w.dir.path().join("worker-gate");
+    let planned: Vec<Value> = jobs.iter().map(|job| json!({"id":job,"title":format!("Job {job}"),
+        "acceptance":"evidence","deps":[]})).collect();
+    std::fs::write(&w.script, json!({"trace":w.trace,"gate":w.gate,"jobs":planned,"estimate":benefit(jobs),
+        "dispatch":[],"complete":{"summary":"driven","verification":"driven"}}).to_string()).unwrap();
+    // A job missing from the worker script crashes its worker at once, before any effect.
+    let mut scripted = serde_json::Map::new();
+    for job in worker_jobs {
+        scripted.insert(job.to_string(), json!({"evidence":[{"id":format!("{job}-proof"),"kind":"finding","content":job}]}));
+    }
+    std::fs::write(&w.workers, json!({"trace":w.trace,"gate":worker_gate,"jobs":scripted}).to_string()).unwrap();
+    Driven { w, worker_gate, ids, _draws: draw_dir }
+}
+
+fn director_tool(d: &Daemon, director: &str, name: &str, arguments: Value) -> Value {
+    d.call("overseer.tool", json!({"token":member_token(d, director),"name":name,"arguments":arguments}))
+}
+
+fn dispatch_job(d: &Daemon, director: &str, arguments: Value) -> Value {
+    let reply = director_tool(d, director, "swarm_dispatch", arguments);
+    assert_eq!(reply["is_error"], false, "{reply}");
+    serde_json::from_str(reply["text"].as_str().unwrap()).unwrap()
+}
+
+/// Each admitted attempt of a job: (profile, model, effort).
+fn admitted_routes(d: &Daemon, run: &str, job: &str) -> Vec<(String, String, String)> {
+    let db = db(d);
+    let mut stmt = db.prepare("SELECT target_profile_id,target_model,target_effort FROM swarm_admissions
+        WHERE run_id=?1 AND job_id=?2 ORDER BY created_ms,rowid").unwrap();
+    let rows = stmt.query_map([run, job], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap().map(Result::unwrap).collect();
+    rows
+}
+
+/// The daemon's recorded route decisions for a job, oldest first.
+fn route_decisions(d: &Daemon, run: &str, job: &str) -> Vec<Value> {
+    let db = db(d);
+    let mut stmt = db.prepare("SELECT payload FROM events WHERE kind='swarm_route_decision'
+        AND json_extract(payload,'$.swarm_run_id')=?1 AND json_extract(payload,'$.job_id')=?2 ORDER BY seq").unwrap();
+    let rows = stmt.query_map([run, job], |r| r.get::<_, String>(0)).unwrap()
+        .map(|p| serde_json::from_str::<Value>(&p.unwrap()).unwrap()["trace"].clone()).collect();
+    rows
+}
+
+fn exclusion_reasons(trace: &Value) -> std::collections::BTreeMap<String, String> {
+    trace["decision"]["exclusions"].as_array().unwrap().iter()
+        .map(|e| (e["route_id"].as_str().unwrap().to_string(), e["reason"].as_str().unwrap().to_string())).collect()
+}
+
+/// SWARM-24: with Swarm on, Auto's selector chooses each job's route within
+/// the approved pool; the director only states requirements. The pool has
+/// two healthy accounts, one nearly used up, one never identified and the
+/// director's own (unidentified) profile; a sixth, healthy account is
+/// outside the pool. Every job draws 3,000 (thousandths of a point) per
+/// window; the category may use 10% of each account's remaining allowance
+/// less a 20% finishing reserve (8,000 of an untouched account).
+/// - Job a, no requirements: the general-tier default (Sonnet, medium) on
+///   the first eligible account.
+/// - Job b, `min_tier: frontier`: Opus, high, on the same account (5,000
+///   of its category allowance left).
+/// - Job c, no requirements: that account's category allowance (2,000 left)
+///   cannot take the draw, so the other account's Sonnet.
+/// The nearly used-up account is excluded on the account's own allowance,
+/// the unidentified ones on identity, and the outside account is never a
+/// candidate. A director that names an account is refused.
+#[test]
+fn auto_selects_each_jobs_route_within_the_approved_pool() {
+    let t = driven(&["alpha", "beta", "full", "unread", "outside"],
+        &[("alpha", 0.0), ("beta", 0.0), ("full", 97.0), ("outside", 0.0)],
+        &["system-claude", "alpha", "beta", "full", "unread"], &["a", "b", "c"], &["a", "b", "c"]);
+    let (w, ids) = (&t.w, &t.ids);
+    let (run, director, _) = start(w, "isolated", "auto-routes");
+    wait_trace(w, step("dispatched", "director"), "plan", 60);
+    let effective = &w.d.call("swarm.get", json!({"id":run}))["policy"]["effective"];
+    assert_eq!((effective["run_allocation_percent"].as_i64(), effective["finishing_reserve_percent"].as_i64()),
+        (Some(10), Some(20)), "{effective}");
+    let (first, second) = if ids["alpha"] < ids["beta"] { (&ids["alpha"], &ids["beta"]) } else { (&ids["beta"], &ids["alpha"]) };
+    let route = |profile: &str, model: &str, effort: &str| (profile.to_string(), model.to_string(), effort.to_string());
+
+    // A director that names an account is refused: Auto chooses it.
+    let named = director_tool(&w.d, &director, "swarm_dispatch", json!({"job_id":"a","target":first,"brief":"Job a: a"}));
+    assert_eq!(named["is_error"], true, "{named}");
+    assert!(named["text"].as_str().unwrap().contains("unknown argument (target)"), "{named}");
+
+    let a = dispatch_job(&w.d, &director, json!({"job_id":"a","brief":"Job a: a"}));
+    assert_eq!(a["status"], "launched", "{a}");
+    assert_eq!(admitted_routes(&w.d, &run, "a"), vec![route(first, "sonnet", "medium")]);
+    let b = dispatch_job(&w.d, &director, json!({"job_id":"b","brief":"Job b: b","requirements":{"min_tier":"frontier"}}));
+    assert_eq!(b["status"], "launched", "{b}");
+    assert_eq!(admitted_routes(&w.d, &run, "b"), vec![route(first, "opus", "high")]);
+    let c = dispatch_job(&w.d, &director, json!({"job_id":"c","brief":"Job c: c"}));
+    assert_eq!(c["status"], "launched", "{c}");
+    assert_eq!(admitted_routes(&w.d, &run, "c"), vec![route(second, "sonnet", "medium")]);
+
+    let decided = |job: &str| { let d = route_decisions(&w.d, &run, job); assert_eq!(d.len(), 1, "{job}: {d:?}"); d[0].clone() };
+    let (da, db_, dc) = (decided("a"), decided("b"), decided("c"));
+    for trace in [&da, &db_, &dc] {
+        assert_eq!(trace["selector_version"], "swarm-auto-route-v1");
+        assert_eq!(trace["inference"]["state"], "not_used");
+        let candidates = trace["selection_input"]["routes"].as_array().unwrap();
+        assert!(candidates.iter().all(|r| r["profile_id"] != ids["outside"].as_str()), "the pool bounds the candidates: {trace}");
+        let reasons = exclusion_reasons(trace);
+        for model in ["sonnet/medium", "opus/high"] {
+            assert_eq!(reasons[&format!("{}/{model}", ids["full"])], "estimated_draw_exceeds_allowance", "{trace}");
+            assert_eq!(reasons[&format!("{}/{model}", ids["unread"])], "unresolved_quota_pool_identity", "{trace}");
+            assert_eq!(reasons[&format!("system-claude/{model}")], "unresolved_quota_pool_identity", "{trace}");
+        }
+    }
+    assert_eq!(da["decision"]["selected"], format!("{first}/sonnet/medium"));
+    assert_eq!(da["decision"]["reason"], "eligible_task_suitable_default");
+    assert_eq!(db_["requirements"]["min_tier"], "frontier");
+    assert_eq!(exclusion_reasons(&db_)[&format!("{first}/sonnet/medium")], "insufficient_capability");
+    let reasons_c = exclusion_reasons(&dc);
+    for model in ["sonnet/medium", "opus/high"] {
+        assert_eq!(reasons_c[&format!("{first}/{model}")], "category_allocation_exceeded", "{dc}");
+    }
+    let fit_c = dc["fit"].as_array().unwrap().iter().find(|f| f["route_id"] == format!("{first}/sonnet/medium")).unwrap();
+    assert_eq!(fit_c["windows"][0]["category_remaining_milli"], 2_000, "{fit_c}");
+    assert_eq!(fit_c["windows"][0]["upper_draw_milli"], 3_000, "{fit_c}");
+    // Each worker runs where it was booked.
+    let db = db(&w.d);
+    for (job, profile) in [("a", first), ("b", first), ("c", second)] {
+        let (launched, bound): (String, Option<String>) = db.query_row(
+            "SELECT r.profile_id,i.run_id FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id
+             JOIN shared_booking_intents i ON i.work_unit_id='swarm/'||l.attempt_id
+             WHERE l.run_id=?1 AND l.job_id=?2", [&run, &job.to_string()], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+        assert_eq!(&launched, profile, "{job}");
+        assert!(bound.is_some(), "{job}: its booking is bound to its run");
+    }
+    std::fs::write(&t.worker_gate, "open").unwrap();
+}
+
+/// CONTRACT-04 on the Swarm side: one logical job, at most two attempts
+/// across routes and a daemon restart. A worker that fails before any
+/// effect returns its job to ready; the next dispatch's route is another
+/// eligible account. After the second failure the job is out of attempts:
+/// a dispatch is refused before any selection (no route decision, no
+/// launch), also after a restart. A job with an uncertain effect is
+/// refused the same way (`side_effect_unreconciled`).
+#[test]
+fn one_job_falls_back_once_then_stops_and_an_uncertain_effect_pauses() {
+    let mut t = driven(&["alpha", "beta"], &[("alpha", 0.0), ("beta", 0.0)],
+        &["system-claude", "alpha", "beta"], &["x", "y"], &[]);
+    let ids = t.ids.clone();
+    // The workers of this test fail at once (their jobs are not scripted).
+    std::fs::write(&t.worker_gate, "open").unwrap();
+    let (run, director, _) = start(&t.w, "isolated", "fallback");
+    wait_trace(&t.w, step("dispatched", "director"), "plan", 60);
+    let (first, second) = if ids["alpha"] < ids["beta"] { (&ids["alpha"], &ids["beta"]) } else { (&ids["beta"], &ids["alpha"]) };
+    let job_state = |d: &Daemon, job: &str| -> (String, i64) { db(d).query_row(
+        "SELECT status,attempt_count FROM swarm_jobs WHERE run_id=?1 AND id=?2", [&run, &job.to_string()],
+        |r| Ok((r.get(0)?, r.get(1)?))).unwrap() };
+    let wait_job = |d: &Daemon, job: &str, want: &str| {
+        let deadline = Instant::now() + Duration::from_secs(60);
+        while job_state(d, job).0 != want {
+            if Instant::now() >= deadline {
+                let db = db(d);
+                let mut stmt = db.prepare("SELECT r.id,r.status,r.ended_ms,a.status FROM swarm_worker_launches l
+                    JOIN runs r ON r.id=l.overseer_run_id JOIN swarm_attempts a ON a.id=l.attempt_id WHERE l.job_id=?1").unwrap();
+                let rows: Vec<(String, String, Option<i64>, String)> = stmt.query_map([job], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+                    .unwrap().map(Result::unwrap).collect();
+                panic!("{job} never became {want}: {:?} workers {rows:?}", job_state(d, job));
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    };
+
+    let one = dispatch_job(&t.w.d, &director, json!({"job_id":"x","brief":"Job x: x"}));
+    assert_eq!(one["status"], "launched", "{one}");
+    wait_job(&t.w.d, "x", "ready");
+    assert_eq!(job_state(&t.w.d, "x"), ("ready".into(), 1));
+    let two = dispatch_job(&t.w.d, &director, json!({"job_id":"x","brief":"Job x: x"}));
+    assert_eq!(two["status"], "launched", "{two}");
+    let routes = admitted_routes(&t.w.d, &run, "x");
+    assert_eq!(routes.iter().map(|r| r.0.as_str()).collect::<Vec<_>>(), vec![first.as_str(), second.as_str()],
+        "the second attempt is on another eligible account");
+    let decisions = route_decisions(&t.w.d, &run, "x");
+    assert_eq!(decisions.len(), 2);
+    assert_eq!(exclusion_reasons(&decisions[1])[&format!("{first}/sonnet/medium")], "earlier_attempt_failed_on_route");
+    wait_job(&t.w.d, "x", "failed");
+    assert_eq!(job_state(&t.w.d, "x"), ("failed".into(), 2));
+
+    let refused = dispatch_job(&t.w.d, &director, json!({"job_id":"x","brief":"Job x: x"}));
+    assert_eq!((refused["status"].as_str(), refused["reason"].as_str()), (Some("blocked"), Some("attempt_limit")), "{refused}");
+    assert_eq!(route_decisions(&t.w.d, &run, "x").len(), 2, "no selection for a job out of attempts");
+
+    // An uncertain effect on y (recorded by its first attempt) pauses it.
+    let one = dispatch_job(&t.w.d, &director, json!({"job_id":"y","brief":"Job y: y"}));
+    assert_eq!(one["status"], "launched", "{one}");
+    wait_job(&t.w.d, "y", "ready");
+    let attempt: String = db(&t.w.d).query_row("SELECT id FROM swarm_attempts WHERE run_id=?1 AND job_id='y'",
+        [&run], |r| r.get(0)).unwrap();
+    db(&t.w.d).execute("INSERT INTO swarm_effects(run_id,effect_id,job_id,attempt_id,revision,operation_sha256,outcome,created_ms,updated_ms)
+        VALUES(?1,'y-push','y',?2,1,'00','unknown',1,1)", [&run, &attempt]).unwrap();
+    let paused = dispatch_job(&t.w.d, &director, json!({"job_id":"y","brief":"Job y: y"}));
+    assert_eq!((paused["status"].as_str(), paused["reason"].as_str()), (Some("blocked"), Some("side_effect_unreconciled")), "{paused}");
+    assert_eq!(route_decisions(&t.w.d, &run, "y").len(), 1, "no selection while an effect is uncertain");
+
+    // After a restart: the same answers, and still two attempts for x, one for y.
+    t.w.d.kill9();
+    t.w.d.spawn();
+    let refused = dispatch_job(&t.w.d, &director, json!({"job_id":"x","brief":"Job x: x"}));
+    assert_eq!(refused["reason"], "attempt_limit", "{refused}");
+    let paused = dispatch_job(&t.w.d, &director, json!({"job_id":"y","brief":"Job y: y"}));
+    assert_eq!(paused["reason"], "side_effect_unreconciled", "{paused}");
+    let attempts = |job: &str| -> i64 { db(&t.w.d).query_row("SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND job_id=?2",
+        [&run, &job.to_string()], |r| r.get(0)).unwrap() };
+    assert_eq!((attempts("x"), attempts("y")), (2, 1));
+    assert_eq!(count(&t.w.d, "SELECT COUNT(*) FROM swarm_worker_launches WHERE run_id=?1", &run), 3);
 }

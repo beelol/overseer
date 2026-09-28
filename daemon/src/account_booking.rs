@@ -538,6 +538,23 @@ pub fn preview_account_fit(
     bucket: &crate::upper_draw::DrawBucket,
     now_ms: i64,
 ) -> Result<AccountFitPreview> {
+    preview_account_fit_with(conn, profile_id, PreviewDraw::Qualified(bucket), now_ms)
+}
+
+/// The draw a preview compares: the qualified draw of a bucket, or a fixture
+/// caller's draw citing one observation (behind the booking's fixture API).
+pub enum PreviewDraw<'a> {
+    Qualified(&'a crate::upper_draw::DrawBucket),
+    Fixture { quota_event_seq: i64, upper_draw_milli: &'a [i64] },
+}
+
+/// [`preview_account_fit`] for either kind of draw.
+pub fn preview_account_fit_with(
+    conn: &Connection,
+    profile_id: &str,
+    draw: PreviewDraw<'_>,
+    now_ms: i64,
+) -> Result<AccountFitPreview> {
     let fingerprint: Option<String> = conn
         .query_row(
             "SELECT fingerprint FROM auto_account_identity WHERE profile_id=?1",
@@ -572,15 +589,23 @@ pub fn preview_account_fit(
         Some(false) => return Ok(AccountFitPreview::Unknown("account_exhausted")),
         None => return Ok(AccountFitPreview::Unknown("account_allowance_unknown")),
     }
-    let (upper_draw_milli, sample_count) =
-        match crate::upper_draw::qualified_upper_draw_in_tx(conn, profile_id, event_seq, bucket, now_ms)? {
-            crate::upper_draw::UpperDraw::Qualified { upper_draw_milli, provenance } => {
-                (upper_draw_milli, provenance.sample_count)
+    let (upper_draw_milli, sample_count) = match draw {
+        PreviewDraw::Qualified(bucket) =>
+            match crate::upper_draw::qualified_upper_draw_in_tx(conn, profile_id, event_seq, bucket, now_ms)? {
+                crate::upper_draw::UpperDraw::Qualified { upper_draw_milli, provenance } => {
+                    (upper_draw_milli, provenance.sample_count)
+                }
+                crate::upper_draw::UpperDraw::Unknown { .. } => {
+                    return Ok(AccountFitPreview::Unknown("upper_draw_unknown"))
+                }
+            },
+        PreviewDraw::Fixture { quota_event_seq, upper_draw_milli } => {
+            if quota_event_seq != event_seq {
+                return Ok(AccountFitPreview::Unknown("snapshot_superseded"));
             }
-            crate::upper_draw::UpperDraw::Unknown { .. } => {
-                return Ok(AccountFitPreview::Unknown("upper_draw_unknown"))
-            }
-        };
+            (upper_draw_milli.to_vec(), 0)
+        }
+    };
     if quota.windows.is_empty() || quota.windows.len() > 32 || upper_draw_milli.len() != quota.windows.len() {
         return Ok(AccountFitPreview::Unknown("upper_draw_unknown"));
     }

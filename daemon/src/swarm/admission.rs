@@ -825,12 +825,12 @@ fn shared_booking_input(p: &Value) -> Result<Option<SharedBookingInput>> {
     }))
 }
 
-struct BookedWindow {
+pub(super) struct BookedWindow {
     pool: String,
     key: String,
     cap: i64,
     reserve: i64,
-    remaining: i64,
+    pub(super) remaining: i64,
 }
 
 /// This category's remaining allocation in each cited account window. The
@@ -841,7 +841,7 @@ struct BookedWindow {
 /// uncertain bookings count against it, and a booking in a window that is
 /// no longer reported (from before a reset) counts against every current
 /// window. A non-finishing job also leaves the finishing reserve.
-fn category_allocation(
+pub(super) fn category_allocation(
     conn: &rusqlite::Connection,
     run: &str,
     windows: &[(String, String, i64)],

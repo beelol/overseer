@@ -615,15 +615,20 @@ async function mcpClient() {
       if (planned.error) throw new Error('plan: ' + planned.error);
       trace('planned', { revision: planned.revision, benefit: planned.benefit });
       for (const offer of script.offers || []) {
-        const r = await call('swarm_dispatch', { job_id: offer.job, target: offer.target, brief: offer.brief || `Job ${offer.job}: ${offer.job}` });
-        trace('offered', { job: offer.job, target: offer.target, status: r.status, reason: r.reason, error: r.error });
+        const offered = { job_id: offer.job, brief: offer.brief || `Job ${offer.job}: ${offer.job}` };
+        if (offer.target) offered.target = offer.target;
+        if (offer.requirements) offered.requirements = offer.requirements;
+        const r = await call('swarm_dispatch', offered);
+        trace('offered', { job: offer.job, target: offer.target || r.target, status: r.status, reason: r.reason, error: r.error, decision: r.decision });
       }
       const accepted = {};
       for (const job of script.dispatch) {
-        const args = { job_id: job.job, target: job.target, brief: job.brief || `Job ${job.job}: ${job.job}` };
-        if (job.model) args.model = job.model;
+        // The director states requirements; Auto's selector chooses the account (a fixture target is named).
+        const args = { job_id: job.job, brief: job.brief || `Job ${job.job}: ${job.job}` };
+        if (job.target) args.target = job.target;
+        if (job.requirements) args.requirements = job.requirements;
         const r = await call('swarm_dispatch', args);
-        trace('launched', { job: job.job, target: job.target, status: r.status, reason: r.reason, error: r.error, attempt: r.attempt_id, worker: r.worker_run_id, shared_booking: r.shared_booking });
+        trace('launched', { job: job.job, target: job.target || r.target, route: r.route, status: r.status, reason: r.reason, error: r.error, attempt: r.attempt_id, worker: r.worker_run_id, shared_booking: r.shared_booking });
         if (r.status !== 'launched') throw new Error('dispatch ' + job.job + ': ' + JSON.stringify(r));
       }
       trace('dispatched', { active: (await call('swarm_status', {})).app_slots_in_use });

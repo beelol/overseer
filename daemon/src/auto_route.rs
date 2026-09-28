@@ -92,6 +92,14 @@ pub fn claude_auto_routes(
     if now_ms < auth.observed_ms || now_ms >= auth.observed_ms.saturating_add(60_000) {
         return Vec::new();
     }
+    claude_prior_routes(quota, profile_id, now_ms)
+}
+
+/// Claude's versioned capability priors on one profile, with the allowance
+/// its latest reading shows. The caller establishes the account identity
+/// (a fresh auth read for an Auto root; the recorded identity, which the
+/// booking rechecks, for a Swarm worker).
+pub fn claude_prior_routes(quota: Option<&QuotaSnapshot>, profile_id: &str, now_ms: i64) -> Vec<Route> {
     [("sonnet", "medium", CapabilityTier::General, true),
      ("opus", "high", CapabilityTier::Frontier, false)].into_iter()
         .map(|(model, effort, tier, recommended_default)| Route {

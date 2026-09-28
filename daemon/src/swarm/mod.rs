@@ -18,6 +18,7 @@ mod verification;
 mod plan;
 mod policy;
 mod revision;
+mod route;
 mod runtime;
 mod scheduler;
 mod settings;

@@ -550,7 +550,7 @@ fn auto_pending_response(work_unit_id: &str, route_id: &str, replayed: bool) -> 
         "actions":["refresh"]})
 }
 
-fn apply_account_pool(routes: &mut [crate::auto_select::Route], pool_id: &str,
+pub(crate) fn apply_account_pool(routes: &mut [crate::auto_select::Route], pool_id: &str,
     observations: &[crate::auto_quota::StoredQuotaObservation], now_ms: i64) {
     for route in routes {
         route.pool_id = pool_id.to_string();
@@ -951,7 +951,7 @@ fn require_swarm_storage(d: &Daemon) -> Result<()> {
 /// preview by itself never owns a process, Git resource, or allowance claim.
 /// Past a failure's cooldown, the first unit on an endpoint is its one
 /// shared recovery check; other routes on that endpoint wait for it.
-fn mark_endpoint_recovery(d: &Arc<Daemon>, routes: &mut [crate::auto_select::Route],
+pub(crate) fn mark_endpoint_recovery(d: &Arc<Daemon>, routes: &mut [crate::auto_select::Route],
     requesting_parent: Option<&str>) -> Result<Vec<crate::auto_health::RecoveringEndpoint>> {
     let store = d.store.lock().unwrap();
     let recovering = crate::auto_health::recovering_endpoints(&store, crate::daemon::now())?;
@@ -964,7 +964,7 @@ fn mark_endpoint_recovery(d: &Arc<Daemon>, routes: &mut [crate::auto_select::Rou
     Ok(recovering)
 }
 
-fn recovery_check_for(recovering: &[crate::auto_health::RecoveringEndpoint],
+pub(crate) fn recovery_check_for(recovering: &[crate::auto_health::RecoveringEndpoint],
     route: &crate::auto_select::Route) -> Option<Value> {
     recovering.iter().find(|r| r.provider == route.provider && r.endpoint == route.endpoint)
         .map(|r| json!({"provider":r.provider,"endpoint":r.endpoint,"failed_ms":r.failed_ms}))
