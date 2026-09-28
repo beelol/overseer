@@ -609,7 +609,11 @@ mod tests {
 
     impl Fixture {
         fn new() -> Self {
-            let store = Store::open(Path::new(":memory:")).unwrap();
+            Self::open(Path::new(":memory:"))
+        }
+
+        fn open(path: &Path) -> Self {
+            let store = Store::open(path).unwrap();
             store.record_auto_account_identity(PROFILE, &"a".repeat(64)).unwrap();
             let base = crate::daemon::now() - 20 * 60 * MINUTE;
             Self { store, base, reset: base + 48 * 60 * MINUTE }
@@ -1341,6 +1345,86 @@ mod tests {
         assert!(f.store.auto_root_intent("unit-late").unwrap().is_none());
         assert!(f.store.run("late").unwrap().is_none());
         assert!(!f.store.auto_pool_claimed(&pool_a).unwrap(), "no claim was left behind");
+    }
+
+    /// AUTO-AC-17 on the last window: two calibrated Auto children and a
+    /// Swarm worker, each on its own SQLite connection, race for room that
+    /// fits one 3,000 draw. Exactly one books; the Auto losers are refused as
+    /// unaffordable (no whole-account fallback) and the Swarm loser for
+    /// headroom. Nothing the losers tried is left behind.
+    #[test]
+    fn calibrated_auto_units_and_a_swarm_worker_race_for_the_last_window() {
+        use crate::account_booking::{AccountBookingRequest, BookingDecision, BookingDraw};
+        use std::sync::{Arc, Barrier};
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("race.sqlite");
+        let pool = format!("account/{}", "a".repeat(64));
+        {
+            let f = Fixture::open(&db);
+            f.store.set_auto_mode_enabled(true).unwrap();
+            for n in 0..5 {
+                f.auto_sample(&format!("sol-{n}"), n * 20, "browser_check");
+            }
+            // 95% used: 5,000 displayed, 4,000 after one reading error.
+            f.observe_at(PROFILE, crate::daemon::now(), [95.0, 2.0], "pro");
+            // The coordinating parent ran before any sample's readings.
+            f.run_full("parent", Some(PROFILE), "codex-app", "gpt-6-astra", Some("high"), "0.155",
+                -100, Some(-99), "completed");
+        }
+        let barrier = Arc::new(Barrier::new(3));
+        let handles: Vec<_> = (0..3).map(|path| {
+            let (db, pool, barrier) = (db.clone(), pool.clone(), barrier.clone());
+            std::thread::spawn(move || -> (String, bool, String) {
+                let store = Store::open(&db).unwrap();
+                let cited = store.latest_auto_quota(PROFILE).unwrap().unwrap().event_seq;
+                let parent = store.run("parent").unwrap().unwrap();
+                let trace = serde_json::json!({"selected_route":{"harness":"codex-app",
+                    "profile_id":PROFILE,"model":"gpt-6-sol","effort":"medium"},
+                    "selection_input":{"work":{"task_class":"browser_check"}}});
+                barrier.wait();
+                if path < 2 {
+                    let unit = format!("auto-{path}");
+                    match store.insert_auto_selected_decision(&unit, &parent, "hash",
+                        "codex-a/gpt-6-sol/medium", &pool, Some(1), 300_000, &trace) {
+                        Ok(Some(_)) => (unit, true, String::new()),
+                        Ok(None) => (unit, false, "pool_conflict".into()),
+                        Err(error) => (unit, false, if error.downcast_ref::<crate::daemon::AutoDrawExceedsAllowance>()
+                            .is_some() { "unaffordable".into() } else { error.to_string() }),
+                    }
+                } else {
+                    match store.book_shared_account(&AccountBookingRequest {
+                        id:"swarm/last", request_hash:"swarm/last", caller:"swarm",
+                        route_id:"codex-app/gpt-6-sol/medium", profile_id:PROFILE,
+                        quota_profile_id:PROFILE, account_generation:1, quota_event_seq:cited,
+                        now_ms:crate::daemon::now(), draw:BookingDraw::Fixture(&[3_000, 1_000]),
+                        allocation_remaining_milli:None }).unwrap() {
+                        BookingDecision::Booked => ("swarm".into(), true, String::new()),
+                        BookingDecision::Blocked(reason) => ("swarm".into(), false, reason.into()),
+                        BookingDecision::Replayed => ("swarm".into(), false, "replayed".into()),
+                    }
+                }
+            })
+        }).collect();
+        let outcomes: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+        assert_eq!(outcomes.iter().filter(|(_, won, _)| *won).count(), 1, "{outcomes:?}");
+        for (who, won, why) in &outcomes {
+            if *won { continue; }
+            let expected = if who == "swarm" { "shared_pool_headroom" } else { "unaffordable" };
+            assert_eq!(why, expected, "{outcomes:?}");
+        }
+        let store = Store::open(&db).unwrap();
+        let (intents, claims, windows): (i64, i64, i64) = store.conn.query_row(
+            "SELECT (SELECT COUNT(*) FROM shared_booking_intents),
+                (SELECT COUNT(*) FROM auto_pool_claims WHERE state IN ('active','uncertain')),
+                (SELECT COALESCE(MAX(total),0) FROM (SELECT SUM(w.amount_milli) AS total
+                    FROM shared_booking_windows w JOIN auto_pool_claims c ON c.work_unit_id=w.work_unit_id
+                    WHERE c.state IN ('active','uncertain') GROUP BY w.window_key))",
+            [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))).unwrap();
+        assert_eq!((intents, claims, windows), (1, 1, 3_000), "{outcomes:?}");
+        let launch_intents: i64 = store.conn.query_row("SELECT COUNT(*) FROM auto_launch_intents",
+            [], |row| row.get(0)).unwrap();
+        let auto_won = outcomes.iter().any(|(who, won, _)| *won && who != "swarm");
+        assert_eq!(launch_intents, auto_won as i64);
     }
 
     /// Claude Code's native `rate_limit_event`s arrive only during a run's
