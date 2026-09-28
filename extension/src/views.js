@@ -355,6 +355,15 @@ class AccountsProvider {
         else if (st.logged_in) detail = [st.identity?.plan, (st.identity?.account_fingerprint || st.identity?.fingerprint || '').slice(0, 8)].filter(Boolean).join(' · ') || 'signed in';
         else detail = 'signed out';
       }
+      // Local models run through Ollama on this machine: there is no account to sign in to (AC-95).
+      if (a.id === 'local-ollama') {
+        item.description = 'no account needed';
+        item.iconPath = new vscode.ThemeIcon('server');
+        item.accessibilityInformation = { label: `${a.name}, no account needed` };
+        item.tooltip = 'Local models through Ollama on this machine. No account, no network, no cost.';
+        item.contextValue = 'profile-local';
+        return { item, profile: p, account: a };
+      }
       const usage = this.model.accountUsage?.get(a.id);
       const near = usage?.reported ? (usage.windows || []).filter(w => w.used >= 0.8).sort((x, y) => y.used - x.used)[0] : undefined;
       item.description = `${detail}${a.kind === 'follows-app' ? ' · desktop' : ''}${near ? ` · ${Math.round(near.used * 100)}% of ${near.label}` : ''}`;

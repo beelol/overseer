@@ -1,0 +1,31 @@
+{
+  "checks": [
+    {
+      "name": "the lost connection is one quiet line with the number of attempts, not a stack of red alerts",
+      "ok": true,
+      "detail": {
+        "red": [],
+        "quiet": [
+          {
+            "text": "The connection was lost; the agent keeps trying to reconnect. · 12 attempts",
+            "tip": "Reconnecting... waiting for network (Connection failed: error sending request)"
+          }
+        ],
+        "notes": [
+          "The connection was lost; the agent keeps trying to reconnect. · 12 attempts",
+          "No answer while offline. Overseer interrupted the turn; your message is kept.",
+          "The work continues in another agent.Open it",
+          "Transitioning to qwen3-coder:30b (local, Ollama) because you've disconnected. Work continues in the same worktree."
+        ]
+      }
+    },
+    {
+      "name": "under Accounts, local models need no account",
+      "ok": true,
+      "detail": [
+        "no account needed"
+      ]
+    }
+  ],
+  "recorded": "ovs-ui-ryWrhd"
+}
