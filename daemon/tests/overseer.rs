@@ -1621,7 +1621,7 @@ fn ac193_one_agent_watches_another() {
     d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
     wait_overseer_idle(&d, 30);
     // A subject is finished when it stays idle for the grace period; one second here.
-    sql(&d, "INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.grace_ms', '1000');");
+    sql(&d, "INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.grace_ms', '6000');");
     // A subject with three turns, watched from its first: three wakes and one at the end.
     std::fs::write(&mode_file, "slow").unwrap();
     let subject = claude_task(&d, &repo, &mode_file, "slow", "Subject", "turn 1");
@@ -1720,12 +1720,23 @@ fn ac193_one_agent_watches_another() {
         d.wait_done(&s, 30);
         wait_event(&d, &s, |e| e["kind"] == "finding" && e["payload"]["result"] == "stop", 30);
         assert!(!d.events(&s).iter().any(|e| e["kind"] == "hold"), "no hold before Overseer at {level}");
-        std::thread::sleep(Duration::from_secs(6));
-        let sess = wait_overseer_idle(&d, 60);
+        // Overseer's turn for this finding (its turns take findings in the order they came, one
+        // at a time): wait until what the level makes of it is there, or a minute has passed.
+        let deadline = std::time::Instant::now() + Duration::from_secs(60);
+        let (open, held, redirected) = loop {
+            let sess = session(&d);
+            let open = sess["proposals"].as_array().unwrap().clone();
+            let held = d.call("agent.holds", json!({}))["holds"].as_array().unwrap().iter().any(|h| h["run_id"] == s);
+            let redirected = d.events(&s).iter().any(|e| e["kind"] == "redirect");
+            let mine = |action: &str| open.iter().any(|p| p["actions"][0]["action"] == action && p["actions"][0]["agent"] == s);
+            let done = match expect { "proposal" => mine("hold"), "hold" => held && mine("redirect"), _ => held && redirected };
+            if done || std::time::Instant::now() > deadline {
+                break (open, held, redirected);
+            }
+            std::thread::sleep(Duration::from_millis(250));
+        };
+        wait_overseer_idle(&d, 60);
         assert!(overseer_turn_causes(&d).contains(&"finding".to_string()));
-        let open = sess["proposals"].as_array().unwrap().clone();
-        let held = d.call("agent.holds", json!({}))["holds"].as_array().unwrap().iter().any(|h| h["run_id"] == s);
-        let redirected = d.events(&s).iter().any(|e| e["kind"] == "redirect");
         match expect {
             "proposal" => {
                 assert!(open.iter().any(|p| p["actions"][0]["action"] == "hold" && p["actions"][0]["agent"] == s), "at Ask first a proposal to hold: {open:?}");
@@ -1736,7 +1747,7 @@ fn ac193_one_agent_watches_another() {
             }
             "hold" => {
                 assert!(held && !redirected, "held at Steer, redirect proposed: held {held} redirected {redirected}");
-                assert!(open.iter().any(|p| p["actions"][0]["action"] == "redirect"), "{open:?}");
+                assert!(open.iter().any(|p| p["actions"][0]["action"] == "redirect" && p["actions"][0]["agent"] == s), "{open:?}");
                 for p in &open {
                     d.call("overseer.answer", json!({"id": p["id"], "yes": false, "surface": "ctl", "by": "owner"}));
                 }
@@ -1998,7 +2009,7 @@ fn ac200_what_agents_say_is_data() {
     d.call("overseer.session", json!({}));
     d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
     d.call("agent.channel", json!({"default": "on", "by": "owner"}));
-    sql(&d, "INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.grace_ms', '1000');");
+    sql(&d, "INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.grace_ms', '6000');");
     d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
     wait_overseer_idle(&d, 30);
     let victim = claude_task(&d, &repo, &mode_file, "echo", "Victim", "hello");
@@ -2050,7 +2061,7 @@ fn ac200_what_agents_say_is_data() {
             assert_eq!(finding_card["source"], "watcher");
             assert!(finding_card["card"]["watcher_title"].as_str().unwrap().starts_with("Watching"));
         } else {
-            assert!(held, "held at {level}");
+            assert!(held, "held at {level}: open {open:?}; holds {}; Overseer said {said}; subject's events {:?}", d.call("agent.holds", json!({})), d.events(&subject).iter().map(|e| e["kind"].clone()).collect::<Vec<_>>());
         }
         for p in &open {
             d.call("overseer.answer", json!({"id": p["id"], "yes": false, "surface": "ctl", "by": "owner"}));

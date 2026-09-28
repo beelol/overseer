@@ -33,11 +33,16 @@ pub struct Coordination {
     /// Changed files per workspace from the last scan: path → status letter.
     changes: Mutex<HashMap<String, Vec<(String, String)>>>,
     scanning: Mutex<HashSet<String>>,
+    /// Per run, what its worktree looked like at the last sweep (`worktree_fingerprint`).
+    fingerprints: Mutex<HashMap<String, String>>,
+    /// Per workspace, its captured trees and the fingerprint they were captured at: a scan
+    /// captures only the worktrees that changed, so it writes nothing for the rest.
+    trees: Mutex<HashMap<String, (String, git::SnapshotTrees, Instant)>>,
 }
 
 impl Default for Coordination {
     fn default() -> Self {
-        Self { dirty: Mutex::new(HashSet::new()), notify: tokio::sync::Notify::new(), scanned: Mutex::new(HashMap::new()), changes: Mutex::new(HashMap::new()), scanning: Mutex::new(HashSet::new()) }
+        Self { dirty: Mutex::new(HashSet::new()), notify: tokio::sync::Notify::new(), scanned: Mutex::new(HashMap::new()), changes: Mutex::new(HashMap::new()), scanning: Mutex::new(HashSet::new()), fingerprints: Mutex::new(HashMap::new()), trees: Mutex::new(HashMap::new()) }
     }
 }
 
@@ -55,6 +60,34 @@ fn git_out(cwd: &Path, args: &[&str]) -> Result<(i32, String)> {
     cmd.env("GIT_OPTIONAL_LOCKS", "0").env("GIT_TERMINAL_PROMPT", "0");
     let out = cmd.output()?;
     Ok((out.status.code().unwrap_or(-1), String::from_utf8_lossy(&out.stdout).to_string()))
+}
+
+/// What `git status` says about a worktree (read with optional locks off, so the index is not
+/// rewritten), with the size and modification time of every path it names: it changes when a
+/// file changes, and reading it writes nothing.
+fn worktree_fingerprint(cwd: &Path) -> Option<String> {
+    use sha2::Digest as _;
+    let (code, out) = git_out(cwd, &["status", "--porcelain=v2", "-z", "--untracked-files=all", "--no-renames", "--branch"]).ok()?;
+    if code != 0 {
+        return None;
+    }
+    let mut h = sha2::Sha256::new();
+    h.update(out.as_bytes());
+    for rec in out.split('\0').filter(|r| !r.is_empty()) {
+        let path = match rec.as_bytes()[0] {
+            b'1' => rec.splitn(9, ' ').nth(8),
+            b'u' => rec.splitn(11, ' ').nth(10),
+            b'?' | b'!' => rec.get(2..),
+            _ => None,
+        };
+        if let Some(path) = path {
+            if let Ok(m) = std::fs::symlink_metadata(cwd.join(path)) {
+                let mtime = m.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_nanos()).unwrap_or(0);
+                h.update(format!("{path}|{}|{mtime}\n", m.len()).as_bytes());
+            }
+        }
+    }
+    Some(format!("{:x}", h.finalize()))
 }
 
 /// `git merge-tree` of two trees from a base tree: the conflicted paths, or an empty list when
@@ -99,6 +132,8 @@ struct Party {
     ws: Workspace,
     head: String,
     tree: String,
+    /// The worktree's fingerprint when its trees were taken.
+    print: Option<String>,
 }
 
 impl Daemon {
@@ -115,6 +150,36 @@ impl Daemon {
         Ok(run)
     }
 
+    /// A worktree's trees and its fingerprint: captured again only when the fingerprint changed
+    /// since the last capture (a capture writes objects to the shared repository, or re-timestamps
+    /// them). A fingerprint checked within FRESH is taken as it is, so a burst of scans does not
+    /// ask every worktree's status again for each agent.
+    fn trees_of(&self, ws: &Workspace, tmp: &Path, fresh: bool) -> Option<(Option<String>, git::SnapshotTrees)> {
+        const FRESH: Duration = Duration::from_millis(1500);
+        if !fresh {
+            if let Some((seen, trees, at)) = self.coord.trees.lock().unwrap().get(&ws.id) {
+                if at.elapsed() < FRESH {
+                    return Some((Some(seen.clone()), trees.clone()));
+                }
+            }
+        }
+        let print = worktree_fingerprint(Path::new(&ws.path));
+        if let Some(print) = &print {
+            let mut cache = self.coord.trees.lock().unwrap();
+            if let Some((seen, trees, at)) = cache.get_mut(&ws.id) {
+                if seen == print {
+                    *at = Instant::now();
+                    return Some((Some(print.clone()), trees.clone()));
+                }
+            }
+        }
+        let trees = git::capture_trees(Path::new(&ws.path), tmp).ok()?;
+        if let Some(print) = &print {
+            self.coord.trees.lock().unwrap().insert(ws.id.clone(), (print.clone(), trees.clone(), Instant::now()));
+        }
+        Some((print, trees))
+    }
+
     /// The agents this run can collide with: top-level runs in the same repository, active or
     /// finished with their worktree still there, in another workspace.
     fn parties(&self, root: &Run) -> Result<(Option<Party>, Vec<Party>)> {
@@ -124,17 +189,18 @@ impl Daemon {
         };
         let me_task = tasks.iter().find(|t| t.id == root.task_id).cloned().ok_or_else(|| anyhow!("no task"))?;
         let tmp = crate::paths::data_dir().join("tmp");
-        let mut load = |r: &Run| -> Option<Party> {
+        // The scanned agent is always looked at afresh; another agent's trees may be up to FRESH
+        // old, since its own change makes its own scan compare it with everyone again.
+        let load = |r: &Run, fresh: bool| -> Option<Party> {
             let task = tasks.iter().find(|t| t.id == r.task_id)?.clone();
             let ws = workspaces.iter().find(|w| w.id == r.workspace_id)?.clone();
             if ws.removed_ms.is_some() || !Path::new(&ws.path).exists() {
                 return None;
             }
-            let trees = git::capture_trees(Path::new(&ws.path), &tmp).ok()?;
-            Some(Party { run: r.clone(), task, ws, head: trees.head?, tree: trees.worktree_tree })
+            let (print, trees) = self.trees_of(&ws, &tmp, fresh)?;
+            Some(Party { run: r.clone(), task, ws, head: trees.head?, tree: trees.worktree_tree, print })
         };
-        let me = load(root);
-        let mut others = Vec::new();
+        let mut candidates: Vec<&Run> = Vec::new();
         for r in runs.iter().filter(|r| r.parent_run_id.is_none() && r.id != root.id) {
             let Some(task) = tasks.iter().find(|t| t.id == r.task_id) else { continue };
             if task.repo_root != me_task.repo_root || r.workspace_id == root.workspace_id || task.archived_ms.is_some() {
@@ -142,10 +208,18 @@ impl Daemon {
             }
             let finished_but_here = !ACTIVE.contains(&r.status.as_str()) && workspaces.iter().any(|w| w.id == r.workspace_id && w.removed_ms.is_none());
             if ACTIVE.contains(&r.status.as_str()) || finished_but_here {
-                if let Some(p) = load(r) {
-                    others.push(p);
-                }
+                candidates.push(r);
             }
+        }
+        // The worktrees are read in parallel, a few at a time: each is its own git process.
+        let me = load(root, true);
+        let mut others = Vec::new();
+        for chunk in candidates.chunks(8) {
+            let loaded: Vec<Option<Party>> = std::thread::scope(|s| {
+                let handles: Vec<_> = chunk.iter().map(|r| s.spawn(|| load(r, false))).collect();
+                handles.into_iter().map(|h| h.join().ok().flatten()).collect()
+            });
+            others.extend(loaded.into_iter().flatten());
         }
         Ok((me, others))
     }
@@ -180,6 +254,10 @@ impl Daemon {
         };
         let cwd = Path::new(&me.ws.path);
         self.coord.scanned.lock().unwrap().insert(root.id.clone(), (Instant::now(), me.tree.clone()));
+        // What the sweep compares against next, so it does not scan this again for nothing.
+        if let Some(print) = &me.print {
+            self.coord.fingerprints.lock().unwrap().insert(root.id.clone(), print.clone());
+        }
         // This agent's own changes, cached for the digest and the roster.
         if let Some(base) = self.task_base(&me.task, cwd) {
             if let Ok(changed) = changed_between(cwd, &base, &me.tree) {
@@ -383,14 +461,18 @@ impl Daemon {
         self.coord.notify.notify_one();
     }
 
+    /// Whether an agent's worktree may have changed since the sweep last looked. It writes
+    /// nothing: a tree capture would write (or re-timestamp) objects in the shared repository
+    /// every sweep, and every tool watching that repository (VS Code's Git extension, the review)
+    /// would refresh each time.
     fn needs_sweep(&self, run: &Run) -> bool {
         let Ok(ws) = self.workspace(&run.workspace_id) else { return false };
         if ws.removed_ms.is_some() || !Path::new(&ws.path).exists() {
             return false;
         }
-        let Ok(trees) = git::capture_trees(Path::new(&ws.path), &crate::paths::data_dir().join("tmp")) else { return false };
-        let scanned = self.coord.scanned.lock().unwrap();
-        scanned.get(&run.id).map(|(_, t)| *t != trees.worktree_tree).unwrap_or(true)
+        // Compared with what this agent's own last scan saw; only a scan records it.
+        let Some(print) = worktree_fingerprint(Path::new(&ws.path)) else { return false };
+        self.coord.fingerprints.lock().unwrap().get(&run.id) != Some(&print)
     }
 }
 
