@@ -24,7 +24,7 @@
       "id": "1",
       "criteria": [],
       "title": "In a dev daemon",
-      "do": "Nothing to do: the runner started a dev daemon and an isolated dev VS Code built from the Voice Mode branch, beside your installed Overseer, and opened the Overseer view with two fixture agents in a scratch repository.",
+      "do": "Nothing to do: the runner started a dev daemon and an isolated dev VS Code built from main, beside your installed Overseer, and opened the Overseer view with two fixture agents in a scratch repository.",
       "watch": "The window's title starts with [dev-check-voice-mode] and its status bar reads \"Overseer dev-check-voice-mode\". Your own VS Code is unchanged.",
       "record": "Is the dev window open as described, and your own VS Code untouched?"
     },
