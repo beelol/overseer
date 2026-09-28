@@ -743,6 +743,29 @@ mark averaged 0.44 while speaking.
 Still to measure with the owner (step 4): echo cancellation through real speakers
 (VoiceProcessingIO), the microphone prompt naming Overseer, and the times from a real microphone.
 
+## The owner's checks
+
+What the simulated voice cannot show. About 20 minutes on the owner's Mac, plus the session (AC-176).
+Everything else in Gate R is tested with the simulated voice and fixtures.
+
+1. **Install**, when no agents are running: `node extension/scripts/package.js`, then install
+   `extension/overseer-0.1.0.vsix` and reload VS Code.
+2. **Turn it on (AC-163):** ⌘⌥⇧V (*Overseer: Voice Mode: Turn On or Off*). Accept the speech model
+   download (small.en, 465 MiB, once). macOS asks for the microphone: the prompt must name
+   **Overseer Listener**. Allow.
+3. **Mute (AC-163):** ⌘⌥⇧M. The orange microphone dot in the menu bar goes off within a second. ⌘⌥⇧M
+   again to unmute.
+4. **The mark (AC-177):** ⌘⌥V shows the voice view. Talk normally: the star grows and swings with
+   the voice. Tap the desk, type, cough: it stays at rest.
+5. **A quiet room (AC-164):** ten minutes of ordinary work (typing, moving, a video playing) with
+   Voice Mode on and nobody talking to Overseer: no request, no interruption.
+6. **Echo on speakers (AC-162):** on speakers, not headphones, say "what's running?". Overseer
+   answers aloud and its own voice does not come back as a request. While it talks, say
+   "Overseer, stop": it stops at the end of the phrase.
+7. **VS Code closed (AC-163):** quit VS Code and say "Overseer, what's running?". It answers aloud.
+8. **The session (AC-176):** real work by voice for a while; then the date, what worked, what did
+   not, and the friction points.
+
 ## Order of work
 
 One goal: [voice-mode-goal.md](voice-mode-goal.md), in two phases (owner, 2026-09-27). First

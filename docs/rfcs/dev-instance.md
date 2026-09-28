@@ -1,8 +1,10 @@
-# Side RFC: a dev Overseer next to the real one (Gate T)
+# Side RFC: Overseer develops Overseer — dev, production and deploy (Gate T)
 
-Status: requested by the owner on 2026-09-27. Criteria: AC-206 to AC-211 in the main RFC
+Status: requested by the owner on 2026-09-27. Criteria: AC-206 to AC-214 in the main RFC
 ([Gate T](../overseer-rfc.md#gate-t--overseer-develops-overseer-added-by-the-owner-2026-09-27)).
-Built on the branch `claude/dev-instance`.
+The goal is [dev-instance-goal.md](dev-instance-goal.md). Built in three stages, each its own
+pull request, each merged before the next starts: the production guard (`claude/prod-guard`),
+the dev tooling (`claude/dev-instance`) and the deploy (`claude/deploy`).
 
 ## Why
 
@@ -14,115 +16,167 @@ make its own dev-running version of the Rust client."*
 
 The core case: **the owner develops Overseer while using it.** The installed daemon, the owner's
 VS Code and the paired phone keep running normally, and agents, started from that very Overseer,
-build and test dev instances beside them, automatically and without asking.
+build and test dev instances beside them, automatically and without asking. The owner calls it
+"like a deployment stage": environments with one deliberate promotion path.
 
-## Goals
+## Environments
 
-1. **Build from any checkout.** A daemon (`overseerd`), the TUI (`overseer-tui`) and the VS Code
-   extension (VSIX) are built from the checkout the command runs in, or from `--repo <path>`
-   (another worktree, an agent's worktree).
-2. **Fully isolated from the installed Overseer.** Each dev instance has its own data folder,
-   socket, VS Code profile and extensions folder, gateway port and advertised identity. It never
-   uses the owner's daemon, data, logins, settings, keychain entries, launch agents or notifier
-   registration.
-3. **Several named instances side by side** (`a`, `pr-17`, `agent-3f2c`), each with its own name.
-4. **Point a client at a chosen instance**: an isolated VS Code, the TUI, and (after pull
-   request #10) the phone app on the iOS simulator or Android emulator.
-5. **Start, stop, status, list, logs and clean**, and nothing left running afterwards.
-6. **Discoverable by agents from the repository alone**: one command documented in `AGENTS.md`,
-   and `scripts/dev --help` complete on its own.
+| | **dev** | **production** |
+| --- | --- | --- |
+| What | any number of named instances an agent builds and tests from a checkout | the owner's installed Overseer |
+| Who starts it | any agent, without asking (`scripts/dev`) | the owner (VS Code, the TUI, the phone) |
+| Lifetime | disposable (`scripts/dev clean`) | kept; data and logins are the owner's |
+| Changes by | rebuilding from any checkout | **deploy** only |
 
-Non-goals: changing how the installed Overseer works; a relay or remote host; a second
-orchestrator. Dev instances are ordinary daemons with their own folder.
+**Deploy** is the only path from dev to production: a pull request is merged to `main` (AC-146),
+then `scripts/deploy` builds from `main` and installs it for the owner. Nothing else reaches
+production.
 
-## "Containerized": what isolation means on the Mac
+The owner set the order: **first, production can never point at a dev version; only then may
+anyone open dev versions; then deploy.**
+
+## Stage 1 — the production guard (AC-212, and AC-213 after pull request #10)
+
+### What is production
+
+- **The extension** installed in the owner's standard VS Code extensions folder
+  (`~/.vscode/extensions`; `~/.vscode-insiders/extensions` for Insiders). An extension loaded from
+  any other folder (`code --extensions-dir …`: the UI test harness, dev profiles) is not
+  production and keeps today's behaviour.
+- **The TUI** when no dev marker file sits next to its binary.
+- **The daemon** those two start.
+
+### The dev marker
+
+Everything dev is marked, explicitly, in two ways:
+
+1. `OVERSEER_INSTANCE=dev-<name>` in a dev daemon's environment (`<name>`:
+   `[a-z0-9][a-z0-9-]{0,31}`);
+2. a file `overseer-dev-instance` (its content: `dev-<name>`) next to the binaries `scripts/dev`
+   copies into an instance folder.
+
+A daemon is **dev** when either marker is present.
+
+### A dev build refuses the production home
+
+A dev daemon refuses to serve (exit code 4, one clear line) unless `OVERSEER_INSTANCE` is
+`dev-<name>` (and matches the marker file when both exist), `OVERSEER_HOME` is set, its data
+folder is not the standard one, and its socket is neither the standard socket nor inside the
+standard long-path fallback folder (`/tmp/overseer-<uid>/`). It checks before it creates any
+folder. It reports its instance in `hello` and skips the notifier's LaunchServices registration.
+
+### Production refuses anything marked dev
+
+Production clients (the extension and the TUI as defined above):
+
+- **use the standard instance even with dev variables leaked into their environment.** They
+  ignore `OVERSEER_HOME`, `OVERSEER_SOCKET` and `OVERSEER_INSTANCE` in their own environment and
+  remove them from the environment of every daemon command they run (`socket-path`, `serve`).
+  Example: VS Code opened with `code .` from a terminal where `scripts/dev env` was evaluated
+  still reaches the owner's daemon. The TUI's explicit `--home DIR` flag is a deliberate choice
+  and still works (its tests use it);
+- **never start or ask a daemon binary that carries the dev marker** (`overseer.daemonPath`,
+  `OVERSEERD`, `--daemon`); they say which binary and why;
+- **refuse a daemon whose `hello` reports an instance**: they disconnect at once, do not retry
+  into it and say so.
+
+The extension's dev pin settings (stage 2) are ignored in production and are `machine`-scoped,
+so a repository's `.vscode/settings.json` (this repository, opened in the owner's VS Code)
+cannot set them.
+
+Why these rules and not a container or a build flag: the environment is what leaks (a terminal,
+a launcher), so production must not trust it; the extensions folder is what VS Code itself uses
+to separate installations, and it is what the test harness already changes; a marker next to
+the copied binaries needs no second build of the daemon.
+
+### The phone (AC-213, after pull request #10)
+
+The phone app finds the Mac by Bonjour (`_overseer._tcp`, `fp=` in TXT) or a typed address.
+Production side: the release app browses only `_overseer._tcp` and refuses a gateway whose
+handshake reports a dev instance, even at a typed address; a dev daemon's gateway never
+advertises `_overseer._tcp` (only `_overseer-dev._tcp` with `inst=dev-<name>`, and only with
+`--mdns`) and reports its instance in the handshake. `phone/` and the gateway are being
+finished in pull request #10 by another agent and are not edited here.
+
+## Stage 2 — dev tooling (AC-206 to AC-211)
+
+### Isolation on the Mac ("containerized")
 
 A real container cannot host what Overseer is on the Mac: VS Code's window, macOS notifications
 (LaunchServices must launch the notifier), the keychain the harnesses keep their logins in, the
 iOS simulator, and Bonjour on the host network. Docker on macOS runs a Linux VM, so none of those
 reach it. **Decision:** isolation on the Mac is a separate:
 
-| Piece | Installed Overseer | Dev instance `x` |
+| Piece | Production | Dev instance `x` |
 | --- | --- | --- |
 | Data folder | `~/Library/Application Support/Overseer` | `<dev root>/x/home` (`OVERSEER_HOME`) |
-| Socket | `<data>/run/overseerd.sock` (or `/tmp/overseer-<uid>/…` for long paths) | `<dev root>/x/overseerd.sock` (`OVERSEER_SOCKET`) |
-| Binaries | inside the installed extension | copied to `<dev root>/x/bin/` at `up` |
+| Socket | `<data>/run/overseerd.sock` (or `/tmp/overseer-<uid>/…`) | `<dev root>/x/overseerd.sock` (`OVERSEER_SOCKET`) |
+| Binaries | inside the installed extension | copied to `<dev root>/x/bin/` with the dev marker |
 | VS Code | the owner's profile and extensions | `<dev root>/x/vscode/profile`, `…/extensions` |
-| Gateway (phone) | port 47810, `_overseer._tcp` | its own free port, `_overseer-dev._tcp` with `inst=x`, off unless asked |
+| Gateway (phone) | port 47810, `_overseer._tcp` | its own free port and key; `_overseer-dev._tcp` with `inst=dev-x`, off unless `--mdns` |
 | Harness logins | the owner's | none (fixture harnesses) unless `--owner-logins` for this instance |
 | Notifications | the Overseer notifier | a log file in the instance folder |
 | Ollama | the owner's server | none (pointed at a closed port) |
 
-The dev root is `~/.overseer-dev` (or `OVERSEER_DEV_ROOT`), outside the installed Overseer's
-folder. A dev instance is marked by `OVERSEER_INSTANCE=<name>` in its daemon's environment.
+The dev root is `~/.overseer-dev` (or `OVERSEER_DEV_ROOT`), outside production's folder.
 
 **Later step (not in Gate T):** a real Linux container (Docker) for the daemon, the TUI and the
 Rust and extension unit tests, `scripts/dev up --container`, which also gives AC-41 (Linux) its
 first environment. It cannot run VS Code UI scenarios or the phone simulators and does not
 replace the Mac isolation above.
 
-## Decisions
-
 ### One command: `scripts/dev`
 
 ```
-scripts/dev up     --name x [--repo <path>] [--release] [--no-build] [--owner-logins] [--mdns] [--json]
-scripts/dev down   --name x            stop its daemon, agents, VS Code and TUI
-scripts/dev status --name x [--json]   what runs, where, from which commit
-scripts/dev list   [--json]            every instance under the dev root
-scripts/dev logs   --name x [-f]       the daemon's log
-scripts/dev ctl    --name x <method> [json]   one request to that instance's daemon
-scripts/dev env    --name x            the environment lines that point a tool at it
-scripts/dev code   --name x [folder] [--vsix <file>]   an isolated VS Code pointed at it
-scripts/dev tui    --name x            the TUI pointed at it
-scripts/dev phone  --name x --platform ios|android   (after pull request #10)
-scripts/dev clean  --name x | --all    down, then remove the instance folder(s)
+scripts/dev up     --name x [--repo <path>] [--release] [--no-build] [--restart] [--owner-logins] [--mdns] [--json]
+scripts/dev down   --name x [--keep-clients]   stop its daemon and agents (and its VS Code and TUI)
+scripts/dev status --name x [--json]           what runs, where, from which commit
+scripts/dev list   [--json]                    every instance under the dev root
+scripts/dev logs   --name x [-f]               the daemon's log
+scripts/dev ctl    --name x <method> [json]    one request to that instance's daemon
+scripts/dev env    --name x                    shell lines that point a dev tool at it
+scripts/dev code   --name x [folder] [--vsix <file>] [--no-build]   an isolated VS Code pointed at it
+scripts/dev tui    --name x [--dry-run]        the instance's TUI pointed at it
+scripts/dev phone  --name x --platform ios|android   the simulator app pinned to it (after #10)
+scripts/dev clean  --name x | --all            down, then remove the instance folder(s)
 ```
 
 - `up` builds `overseerd` and `overseer-tui` from the checkout (`cargo build`, debug unless
-  `--release`), **copies** them into the instance's `bin/` (rebuilding the checkout never swaps a
-  running daemon's binary), starts the daemon detached with the instance environment, waits for
-  `hello`, and prints one block: name, repo, commit (and whether the tree was dirty), pid, socket,
-  data folder, gateway port, logins mode, and the next commands. `--json` prints the same as JSON.
-  `up` on a running instance says so and changes nothing; `up --restart` rebuilds and restarts it.
+  `--release`), **copies** them into the instance's `bin/` with the dev marker (replacing files by
+  rename, so rebuilding never changes a running daemon's binary), starts the daemon detached with
+  the instance environment, waits for `hello`, and prints one block: name, repo, commit (and
+  whether the tree was dirty), pid, socket, data folder, gateway port, logins mode, and the next
+  commands. `--json` prints the same as JSON. `up` on a running instance says so and changes
+  nothing; `--restart` rebuilds and restarts it (agents keep running and are reattached; open
+  windows reconnect).
 - Instance metadata lives in `<dev root>/x/instance.json`; `list` and `status` read it and check
-  the pid and socket are alive.
+  that the pid and socket are alive.
+- `down` stops the instance's agents and daemon (`daemon.stop_all`), then its VS Code windows and
+  TUI (unless `--keep-clients`), then anything still running from the instance folder.
 - `clean --all` is the one-line way to leave nothing behind.
 
 ### Safety
 
-- **Names**: `[a-z0-9][a-z0-9-]{0,31}`. The instance folder is always under the dev root.
-- **Refusals in the script**: a dev root inside the installed Overseer's folder; a socket path
-  equal to the installed one or under `/tmp/overseer-<uid>/`; a socket path over 100 bytes (it
-  names a shorter `OVERSEER_DEV_ROOT`); a `--repo` that is not an Overseer checkout.
-- **Refusals in the daemon** (`OVERSEER_INSTANCE` set): `serve` exits with a clear message when
-  `OVERSEER_HOME` is unset, or when the data folder or socket is the installed Overseer's, so a
-  dev daemon can never open the owner's data even if started by hand. It skips the notifier's
-  LaunchServices registration. `hello` reports the instance name.
-- **Logins**: by default the Claude harness is the repository's fixture, Codex and OpenCode are
+- **Refusals in the script:** a name that is not `[a-z0-9][a-z0-9-]{0,31}`; a dev root inside
+  production's folder; a socket path equal to production's or under `/tmp/overseer-<uid>/`; a
+  socket path over 100 bytes (it names a shorter `OVERSEER_DEV_ROOT`); a `--repo` that is not an
+  Overseer checkout. Inherited `OVERSEER_*` variables are dropped before the instance's are set.
+- **The daemon's own refusals** are stage 1's: a dev daemon never opens the production home.
+- **Logins:** by default the Claude harness is the repository's fixture, Codex and OpenCode are
   disabled, the "desktop" logins point at an empty folder inside the instance
   (`OVERSEER_TEST_SYSTEM_HOME`) and Ollama at a closed port. `--owner-logins` (per instance,
   recorded in `instance.json` and shown by `status`) uses the real harnesses with the owner's
-  logins; paid turns then follow `AGENTS.md` (ChatGPT: `gpt-5.6-luna` at low effort; Claude:
-  haiku, light use). Nothing is ever signed in or out by `scripts/dev`.
-- **Never the production daemon**: no command stops, restarts, reinstalls or connects to the
-  installed daemon; `down` and `clean` only act on pids and sockets recorded for that instance.
-- **Never the owner's VS Code**: `code` installs the VSIX only with `--user-data-dir` and
-  `--extensions-dir` inside the instance folder; the owner's profile, extensions and settings
-  are never written.
+  logins; paid turns then follow `AGENTS.md`. Nothing is ever signed in or out by `scripts/dev`.
+- **Never production:** no command stops, restarts, reinstalls or connects to the production
+  daemon; `down` and `clean` act only on pids, sockets and folders recorded for that instance.
+  `code` installs only with `--user-data-dir` and `--extensions-dir` inside the instance folder.
 
 ### One-way isolation
 
-The installed Overseer (daemon, extension, TUI, phone pairing) needs nothing from dev instances,
-knows nothing about them and never talks to one. All awareness is on the dev side:
-
-- Nothing in the daemon or TUI reads the dev root; dev sockets are never in the installed
-  daemon's runtime folder or its `/tmp/overseer-<uid>` fallback.
-- The extension's pin settings (below) are `machine`-scoped: a repository's
-  `.vscode/settings.json` (for example this repository, opened in the owner's VS Code) cannot
-  point the owner's extension at a dev instance. They are only written into dev profiles.
-- Dev instances never advertise `_overseer._tcp`, so the owner's phone never sees them; when
-  `--mdns` is given they advertise `_overseer-dev._tcp` with `inst=<name>`.
+Production needs nothing from dev instances, knows nothing about them and never talks to one.
+All awareness is on the dev side: nothing in the daemon or the TUI reads the dev root; dev
+sockets are never in production's runtime folder or its fallback; no file is shared; dev
+instances never advertise `_overseer._tcp`.
 
 ### VS Code pointed at an instance
 
@@ -132,37 +186,55 @@ the profile's settings and opens VS Code with them:
 
 - `overseer.daemonPath`: the instance's `bin/overseerd`;
 - `overseer.daemonSocket`: the instance's socket;
-- `overseer.devInstance`: `x` (the status bar reads **Overseer dev x**, the window title starts
-  with `[dev x]`).
+- `overseer.devInstance`: `dev-x` (the status bar reads **Overseer dev-x**, the window title
+  starts with `[dev-x]`).
 
-With `overseer.daemonSocket` set, the extension connects only to that socket. It never starts a
-daemon and never falls back to the socket `overseerd socket-path` would give: when the instance
-is not running it says *"Dev instance x is not running (socket …). Start it with
-`scripts/dev up --name x`."* and keeps retrying the same socket.
+With `overseer.daemonSocket` set (only honoured outside the standard extensions folder), the
+extension connects only to that socket and checks that `hello` reports `dev-x`. It never starts
+a daemon and never falls back to another socket: when the instance is not running it says
+*"Dev instance dev-x is not running (socket …). Start it with `scripts/dev up --name x`."* and
+keeps retrying the same socket, so `scripts/dev up --restart` is picked up by open windows.
 
 ### The TUI
 
 `scripts/dev tui --name x` runs the instance's `bin/overseer-tui --daemon bin/overseerd` with the
-instance environment, after checking the instance is up (the TUI would otherwise start a daemon).
+instance environment (a dev TUI, marked, honours it), after checking the instance is up.
 
-### The phone, on the simulators (after pull request #10)
+### The phone, on the simulators (AC-210, after pull request #10)
 
-The phone app finds the Mac by Bonjour (`_overseer._tcp`, `fp=` in TXT) or a typed address
-(`manual-address` flow). Each dev instance needs, and gets:
+Each dev instance gets its own gateway port (`up` picks a free one from 47900 up and sets
+`OVERSEER_GATEWAY_PORT`), its own gateway key (in its data folder, so its own `fp`), and no
+advertising (`OVERSEER_GATEWAY_MDNS=off`) unless `--mdns`. `scripts/dev phone --name x --platform
+ios|android` launches the installed simulator build with the instance's address as a launch
+argument (iOS simulator: `127.0.0.1:<port>`; Android emulator: `10.0.2.2:<port>`), the way
+`phone/e2e/lab.mjs` already runs its own daemon with mDNS off and the `manual-address` flow types
+an address. Dev builds of the app accept an instance filter for `_overseer-dev._tcp`; release
+builds never do (AC-213). Until #10 merges, `scripts/dev phone` prints the address to type.
 
-- **its own gateway port**: `up` picks a free port from 47900 up and sets `OVERSEER_GATEWAY_PORT`;
-- **its own identity**: the gateway's key lives in the instance's data folder (a different `fp`),
-  and advertising is off (`OVERSEER_GATEWAY_MDNS=off`) unless `--mdns`, which advertises
-  `_overseer-dev._tcp` with `inst=<name>` (a daemon change in `gateway/mod.rs` once #10 is on
-  main: with `OVERSEER_INSTANCE` set, never `_overseer._tcp`);
-- **a pin**: `scripts/dev phone --name x --platform ios|android` launches the installed simulator
-  build with the instance's address as a launch argument (iOS simulator: `127.0.0.1:<port>`;
-  Android emulator: `10.0.2.2:<port>`), the way `phone/e2e/lab.mjs` already runs its own daemon
-  with mDNS off and the `manual-address` flow types the address. Dev builds of the app accept an
-  instance filter (`inst=`) for `_overseer-dev._tcp`; release builds browse only `_overseer._tcp`.
+## Stage 3 — deploy (AC-214)
 
-Pull request #10 is being finished by another agent, so `phone/` is not edited on this branch:
-the app-side launch argument and filter are AC-210's work after #10 merges.
+`scripts/deploy` is the one path from dev to production. It is run by the owner, or by an agent
+only when the owner asked it to in that conversation; it asks before it changes anything
+(`--yes` skips the question).
+
+1. **Build from `main`:** fetch `origin/main` into a clean temporary worktree (never the owner's
+   checkout), install the pinned packaging tools there and run `node extension/scripts/package.js`:
+   the VSIX with the release daemon and the notifier, stamped with the commit.
+2. **Install the extension** into the owner's VS Code (`code --install-extension <vsix> --force`)
+   and register the notifier with LaunchServices.
+3. **Restart the daemon only when no runs are active** (AGENTS.md): it asks the daemon for its
+   active runs; with some active it waits (checking every 30 s, up to `--wait` minutes) or, with
+   `--no-wait`, stops and says how many are active and how to deploy later. With none it stops the
+   old daemon (`daemon.shutdown`) and starts the new one once. Open VS Code windows reconnect; a
+   reload picks up the new extension.
+4. **Keep data and logins:** it never writes the data folder except its own `deploys/` record, and
+   never touches harness logins or the keychain.
+5. **Record and roll back:** `deploys/history.json` in production's data folder lists each
+   deploy (commit, time, VSIX kept under `deploys/`); `scripts/deploy --rollback` reinstalls the
+   previous one the same way; `scripts/deploy --status` shows what is deployed.
+
+Tests deploy onto a temporary "production" (`HOME`, VS Code profile and extensions folder all
+temporary), never the owner's.
 
 ## Agents developing Overseer
 
@@ -176,16 +248,17 @@ scripts/dev code --name <short-name> <folder>     # when it needs the UI
 scripts/dev clean --name <short-name>             # always, when done
 ```
 
-It never touches the installed daemon, and `clean` leaves nothing running.
+It never touches production and never deploys unless the owner asked.
 
 ## Tests
 
-- `daemon/tests/dev_instance.rs`: a "production" daemon under a temporary default home, a dev
-  daemon beside it; the production daemon's socket, pid, state, data folder and clients are
-  unchanged; the daemon's refusals.
-- `test/dev/run.js` (in `scripts/test-all`): two instances through `scripts/dev` side by side
-  with a temporary `HOME` and dev root; the default home is never created; `--help` covers every
-  command; `clean --all` leaves no process, socket or folder.
-- `test/unit/dev-pin.js`: the extension's pinned socket never falls back and never spawns.
-- `test/ui/scenario-dev-instance.js`: an isolated VS Code pointed at instance A shows A's
-  agents, not B's; stopping A shows the "not running" notice and nothing connects elsewhere.
+- Stage 1: `daemon/tests/dev_instance.rs` (a dev daemon's refusals, beside a standard daemon
+  under a temporary default home that keeps its pid, socket, state and data);
+  `test/unit/production-guard.js` (a production extension with dev variables leaked in reaches
+  the standard socket, refuses a marked binary and a daemon reporting an instance);
+  `tui/src/locate.rs` and `tui/tests` (the same for the TUI).
+- Stage 2: `test/dev/run.js` in `scripts/test-all` (two instances side by side through
+  `scripts/dev` with a temporary `HOME` and dev root; `--help` complete; nothing left);
+  `test/ui/scenario-dev-instance.js` (an isolated VS Code pointed at A shows A's agents, not B's).
+- Stage 3: `test/deploy/run.js` (deploy onto a temporary production: waits for active runs,
+  restarts once, data and logins intact, recorded, rolled back).

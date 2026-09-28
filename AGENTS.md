@@ -33,6 +33,6 @@ Codex, Kilo and Claude all read this file (Claude through `CLAUDE.md`). The owne
 - Audio Mode (Gate O) and the TUI (`docs/rfcs/tui.md`): their RFCs under `docs/rfcs/`
 - Auto and Swarm: `docs/rfcs/auto-mode.md` and `docs/rfcs/swarm-mode.md`, built together by the everything goal on `claude/auto-swarm` since 2026-09-27. Auto owns the one shared account booking (`daemon/src/account_booking.rs`); nothing else keeps an account ledger
 - Voice Mode (Gate R): `docs/rfcs/voice-mode.md`, its goal `docs/rfcs/voice-mode-goal.md` and the mark's animation `docs/design/voice-mark/index.html`; audio is collected on the Rust side
-- Dev instances beside the installed Overseer (Gate T): `docs/rfcs/dev-instance.md`; being built on `claude/dev-instance`
+- Overseer develops Overseer (Gate T: dev instances, the production guard, deploy): `docs/rfcs/dev-instance.md` and its goal `docs/rfcs/dev-instance-goal.md`
 - Overseer itself (Gate S): `docs/rfcs/orchestrator.md`, its goal `docs/rfcs/orchestrator-goal.md`; one Overseer session in the daemon, shared with Voice Mode and Talk to Overseer (AC-107)
 - Follow-through and agent oversight (Gates P and Q): `docs/overseer-rfc.md`; the goal is `docs/goals/everything.md` and what it tracks is `docs/verification/tracker.md`
