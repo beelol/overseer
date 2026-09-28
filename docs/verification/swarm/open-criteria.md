@@ -147,7 +147,7 @@ D1 to D4 are decided and built at fixture scope on `claude/auto-swarm`: the Clau
 | SWARM-63 | (c) D1, D2, D3 | (b) a real Swarm run on the normal path with the owner's personal accounts |
 | SWARM-64 | (c) through S0 | S0 at fixture scope is complete on the product path; the live qualification of S0 to S5 stays (b) |
 | SWARM-52 | (c) D3 | (b) a live Claude worker in `plan` mode under Swarm; S1/S2/S4 replays with native audit workers (a); a live-service mutation boundary (none exists) |
-| SWARM-24, 40 | (c) D4, live | (a) the director's booking counted in the category allocation; (b) live calibration on the owner's personal Claude account |
+| SWARM-24, 40 | (c) D4, live | the director's booking now counts in the category allocation (built); (c) an owner choice for an uncalibrated or oversize director (hold fan-out, or refuse the director); (b) live calibration on the owner's personal Claude account |
 | S0 | (c) D1, D3, D4 | (b) a live director; S0's own fixtures still book no worker account (the only Claude account is the uncalibrated director's) |
 
 Tests, each file alone with `--test-threads=1`: daemon unit tests 265/265; `swarm_native` 14/14, `swarm_start` 4/4, `swarm_admission` 41/41, `swarm_runtime` 27/27, `swarm_broker` 24/24, `claude_readings` 1/1, `shared_launch` 7/7, `overseer` 24/24, `auto_gate_s` 2/2 and every other `swarm_*` file green (`swarm_director_process` failed one test once under load and passed 14/14 alone). No VS Code scenario ran; no paid turn or live account was used.

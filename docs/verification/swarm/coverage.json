@@ -339,7 +339,7 @@
         "daemon/src/swarm/route.rs",
         "daemon/tests/swarm_gate_s.rs"
       ],
-      "blocker": "Covered at fixture scope except metering: the native director's swarm/director draw is now qualified at fixture scope from its neighbour-bracketed runs and books its account (e7e9e18c), but that booking is an ordinary account booking, not counted against the run's category allocation, so its turns are not metered to the run's allocation, with or without Gate S's 100-turn cap. Needs the director's booking counted in the category allocation, and live calibration on the owner's personal Claude account."
+      "blocker": "Covered at fixture scope for metering and the cap: the same test runs the director at Overseer's exhausted daily cap of self-started turns; it plans and dispatches, and Overseer's count does not move. A calibrated native director books against the run's category allocation: its booking (swarm-director/<run>/...) freezes the run's caps and counts in its outstanding use, and a worker that would fit only without it is refused category_allocation_exceeded (the_directors_booking_draws_on_the_runs_allocation_and_works_at_overseers_cap, red first and red with the director's draw left out of the count). Open: an uncalibrated director, or one whose draw exceeds the allocation, still runs unbooked and unmetered (an owner choice: hold fan-out, or refuse the director); live calibration on the owner's personal Claude account. The rest of the criterion (the Auto producer behind a versioned adapter, changed eligibility between routing and launch) is as in the record."
     },
     "SWARM-25": {
       "status": "unverified",
@@ -517,7 +517,7 @@
         "docs/verification/swarm/milestone-7.md",
         "docs/verification/swarm/SWARM-40.md"
       ],
-      "blocker": "Covered at fixture scope except planning: in a run with workers the native director's own turns run unbooked (its swarm/director draw is not qualified), so they are not metered against the run's allocation. Needs the director's booking counted in the category allocation, and live calibration on the owner's personal Claude account."
+      "blocker": "Covered at fixture scope, planning included when the director's draw is qualified. A calibrated native director books against the run's category allocation: its booking (swarm-director/<run>/...) freezes the run's caps and counts in its outstanding use, and a worker that would fit only without it is refused category_allocation_exceeded (the_directors_booking_draws_on_the_runs_allocation_and_works_at_overseers_cap, red first and red with the director's draw left out of the count). Open: an uncalibrated director, or one whose draw exceeds the allocation, still runs unbooked and unmetered (an owner choice: hold fan-out, or refuse the director); live calibration on the owner's personal Claude account."
     },
     "SWARM-41": {
       "status": "verified",
