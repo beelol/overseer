@@ -4,6 +4,7 @@
 const vscode = require('vscode');
 const path = require('path');
 const crypto = require('crypto');
+const features = require('./features');
 const { execFile } = require('child_process');
 
 const INSTALL = { claude: 'https://docs.anthropic.com/en/docs/claude-code/setup', codex: 'https://developers.openai.com/codex/cli', opencode: 'https://opencode.ai/docs' };
@@ -52,6 +53,7 @@ class TaskLauncher {
     await this.refreshAccounts();
     return { repos: await this.repos(), harnesses, accounts: this.accounts(), trusted: vscode.workspace.isTrusted, defaults: this.defaults(),
       showAppServer: vscode.workspace.getConfiguration('overseer').get('showCodexAppServer', false),
+      autoRouting: features.enabled(vscode, 'autoRouting'),
       continuity: this.continuity ? this.continuity() : undefined };
   }
 
@@ -75,6 +77,7 @@ class TaskLauncher {
     const repo = String(f.repo || ''); const harness = String(f.harness || '');
     if (!repo) throw new Error('Choose a repository.');
     let program, args = [];
+    if (f.routing === 'auto' && !features.enabled(vscode, 'autoRouting')) throw new Error(features.offMessage('autoRouting'));
     if (f.routing === 'auto') {
       if (!String(f.prompt || '').trim()) throw new Error('Describe the task.');
       if (f.options?.images?.length) throw new Error('Auto starts cannot include images yet. Choose a manual agent for this task.');

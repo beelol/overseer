@@ -1,6 +1,7 @@
 // Side bar views: the agents list (Gate K) and account profiles; plus the shared state model.
 const vscode = require('vscode');
 const path = require('path');
+const features = require('./features');
 
 const STATUS_ICON = {
   queued: ['clock', 'charts.yellow'], starting: ['loading~spin', 'charts.blue'], running: ['sync~spin', 'charts.blue'],
@@ -43,7 +44,11 @@ class Model {
     try {
       this.all = await this.client.request('state', { include_hidden: true }); for (const p of this.all.profiles || []) p.name = accountName(p);
       this.state = this.visible(this.all); this.error = undefined;
-      if (forceSwarm || Date.now() - this.swarmFetchMs >= 1000) {
+      if (!features.enabled(vscode, 'swarm')) {
+        // Swarm is unfinished in this build and hidden until its setting is on.
+        this.swarms = [];
+        this.swarmError = undefined;
+      } else if (forceSwarm || Date.now() - this.swarmFetchMs >= 1000) {
         try {
           const page = await this.client.request('swarm.list', { limit: 20 });
           this.swarms = page.runs || [];

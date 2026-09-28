@@ -2,7 +2,10 @@ const assert = require('assert');
 const Module = require('module');
 const path = require('path');
 
-const vscode = { workspace: { isTrusted: true, textDocuments: [], workspaceFolders: [] }, window: {} };
+// Auto routing is behind `overseer.experimental.autoRouting` (AC-204).
+const settings = { 'experimental.autoRouting': true };
+const vscode = { workspace: { isTrusted: true, textDocuments: [], workspaceFolders: [],
+  getConfiguration: () => ({ get: (key, fallback) => key in settings ? settings[key] : fallback }) }, window: {} };
 const originalLoad = Module._load;
 Module._load = function (request, ...rest) { return request === 'vscode' ? vscode : originalLoad.call(this, request, ...rest); };
 const { TaskLauncher } = require('../../extension/src/task-launcher');
@@ -50,6 +53,13 @@ function fixture(reply) {
   assert.equal(pending.workUnitId, y.calls[1][1].work_unit_id);
   await assert.rejects(y.launcher.start(f), /allowance is exhausted/i);
   assert.equal(y.calls[3][1].work_unit_id, pending.workUnitId, 'retry must reuse its admitted work-unit identity');
+
+  // Off (the default): an Auto start is refused before any daemon request.
+  settings['experimental.autoRouting'] = false;
+  const off = fixture({ run: { id: 'never' } });
+  await assert.rejects(off.launcher.start(f), /overseer\.experimental\.autoRouting/);
+  assert.equal(off.calls.length, 0, 'Auto routing off: no auto.mode.set and no auto.start');
+  settings['experimental.autoRouting'] = true;
 
   const z = fixture();
   assert.equal(await z.launcher.start({ repo: f.repo, harness: 'codex', account: 'p-codex', prompt: 'manual' }), 'r-manual');

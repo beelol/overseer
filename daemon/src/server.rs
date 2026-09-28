@@ -1333,7 +1333,14 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             json!(list)
         }
         "profile.list" => json!(d.store.lock().unwrap().profiles()?),
-        "swarm.create" => crate::swarm::create(&mut d.store.lock().unwrap(), p)?,
+        "swarm.create" => {
+            // Outside the fixture API a Swarm run exists only with the proposed
+            // native director on (off by default; AC-204 keeps Swarm hidden).
+            if fixture_only().is_err() && !crate::swarm::native::enabled(&d.store.lock().unwrap())? {
+                bail!("Swarm is off: its native director setting (swarm.native_director) is off");
+            }
+            crate::swarm::create(&mut d.store.lock().unwrap(), p)?
+        }
         "swarm.start" => {
             require_swarm_storage(d)?;
             crate::swarm::start(d, p)?

@@ -12,6 +12,7 @@ const { Session, makeRepo, latestVsix } = require('./harness');
   };
   try {
     const repo = makeRepo(path.join(s.root, 'backend'), { dirty: false });
+    s.settings({ 'overseer.experimental.swarm': true });
     s.install(latestVsix());
     s.launch(repo, { OVERSEER_SWARM_FIXTURE_API: '1', OVERSEER_CODEX_PATH: '/nonexistent/codex',
       OVERSEER_CLAUDE_PATH: '/nonexistent/claude', OVERSEER_OPENCODE_PATH: '/nonexistent/opencode' });

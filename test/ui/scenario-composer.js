@@ -20,7 +20,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
   login('desk:pro', ['login']); login('deskclaude:max', ['auth', 'login']);
   try {
     const repo = makeRepo(path.join(s.root, 'composer-repo'), { dirty: false });
-    s.settings({ 'workbench.colorTheme': 'Overseer Dark' });
+    // Auto routing is behind its unfinished-feature setting (AC-204).
+    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'overseer.experimental.autoRouting': true });
     s.install(latestVsix());
     // Codex and Claude both run through the account fixture (signed in above); OpenCode is missing.
     s.launch(repo, { OVERSEER_CODEX_PATH: cli, OVERSEER_CLAUDE_PATH: cli, OVERSEER_OPENCODE_PATH: '/nonexistent/opencode', OVERSEER_TEST_SYSTEM_HOME: sys, FIXTURE_LOGIN_ACCOUNT_FILE: next,

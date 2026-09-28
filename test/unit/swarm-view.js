@@ -10,7 +10,10 @@ class EventEmitter {
 class TreeItem { constructor(label, collapsibleState) { this.label = label; this.collapsibleState = collapsibleState; } }
 class ThemeIcon { constructor(id) { this.id = id; } }
 class ThemeColor { constructor(id) { this.id = id; } }
+// Swarm is behind `overseer.experimental.swarm` (AC-204); these checks run with it on.
+const settings = { 'experimental.swarm': true };
 const vscode = { EventEmitter, TreeItem, ThemeIcon, ThemeColor,
+  workspace: { getConfiguration: () => ({ get: (key, fallback) => key in settings ? settings[key] : fallback }) },
   TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
   Uri: { from: value => value, joinPath: (...parts) => ({ parts }) },
   MarkdownString: class { constructor(value) { this.value = value; } } };
@@ -58,6 +61,14 @@ Module._load = originalLoad;
       : { jobs, next_cursor: 'j049' };
     throw new Error(`unexpected ${method}`);
   } };
+  // Off (the default): no Swarm request, no Swarms section.
+  settings['experimental.swarm'] = false;
+  const hidden = new Model(client);
+  await hidden.refresh(true);
+  assert.equal(calls.filter(([method]) => method === 'swarm.list').length, 0, 'Swarm off: swarm.list is never requested');
+  assert.equal(new AgentsProvider(hidden, { get: () => [], update: () => {} }).getChildren()
+    .filter(node => node.section === 'swarms').length, 0, 'Swarm off: no Swarms section');
+  settings['experimental.swarm'] = true;
   const model = new Model(client);
   await model.refresh();
   const provider = new AgentsProvider(model, { get: () => [], update: () => {} });

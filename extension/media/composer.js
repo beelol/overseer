@@ -168,7 +168,8 @@
         'sep', { label: 'Choose folder…', icon: 'folder-opened', run: () => post({ type: 'composerBrowse' }) }], { label: 'Repository' });
     }
     function menuAgent() {
-      const items = [{ head: 'Automatic selection' },
+      // Auto routing is unfinished in this build: offered only when its setting is on (AC-204).
+      const items = !data.autoRouting ? [] : [{ head: 'Automatic selection' },
         { label: 'Auto routing · any eligible agent', icon: 'sparkle', checked: form.routing === 'auto' && !form.preferredHarness,
           run: () => { form.routing = 'auto'; form.preferredHarness = ''; save(); } },
         ...[['codex-app', 'Codex'], ['claude', 'Claude Code'], ['opencode', 'OpenCode']].map(([value, label]) =>
@@ -253,7 +254,7 @@
       data(d) {
         data = d;
         const def = d.defaults || {};
-        form = { repo: form.repo || def.repo || d.repos[0]?.path, routing: form.routing || def.routing || 'manual', preferredHarness: form.preferredHarness ?? def.preferredHarness ?? '', harness: form.harness || def.harness, account: form.account || def.account, model: form.model ?? def.model ?? '', mode: form.mode || def.mode || 'worktree', approval: form.approval || def.approval, ref: form.ref || '' };
+        form = { repo: form.repo || def.repo || d.repos[0]?.path, routing: d.autoRouting ? (form.routing || def.routing || 'manual') : 'manual', preferredHarness: form.preferredHarness ?? def.preferredHarness ?? '', harness: form.harness || def.harness, account: form.account || def.account, model: form.model ?? def.model ?? '', mode: form.mode || def.mode || 'worktree', approval: form.approval || def.approval, ref: form.ref || '' };
         if (form.repo && !d.repos.some(r => r.path === form.repo)) form.repo = d.repos[0]?.path;
         // No remembered agent: prefer an installed harness with a signed-in account.
         if (!d.harnesses.some(h => h.harness === form.harness && h.installed)) {

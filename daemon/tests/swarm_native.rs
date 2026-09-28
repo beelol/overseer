@@ -314,6 +314,11 @@ fn gate_off_blocks_no_qualified_director_and_qualification_is_checked() {
     assert_eq!((refused["status"].as_str(), refused["reason"].as_str()), (Some("blocked"), Some("no_qualified_director")));
     assert_eq!(w.d.call("swarm.list", json!({}))["runs"], json!([]));
     assert_eq!(active(&w.d), 0);
+    // Off, no Swarm run can be created either (AC-204: Swarm stays hidden).
+    let created = w.d.try_call("swarm.create", json!({"category":"Backend security","objective":"x",
+        "repositories":[w.checkout]}));
+    assert!(created.unwrap_err().contains("swarm.native_director"), "swarm.create must be refused while off");
+    assert_eq!(w.d.call("swarm.list", json!({}))["runs"], json!([]));
 
     w.d.call("swarm.native_director.set", json!({"enabled":true}));
     let on = w.d.call("swarm.start", start_params(&w, "none"));

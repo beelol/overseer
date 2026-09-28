@@ -23,7 +23,7 @@ function benefitEstimate(ids, parallelContext = 20) {
   };
   try {
     const repo = makeRepo(path.join(s.root, 'backend'), { dirty: false });
-    s.settings({ 'window.menuStyle': 'custom' });
+    s.settings({ 'window.menuStyle': 'custom', 'overseer.experimental.swarm': true });
     s.install(latestVsix());
     s.launch(repo, { OVERSEER_SWARM_FIXTURE_API: '1', OVERSEER_CODEX_PATH: '/nonexistent/codex',
       OVERSEER_CLAUDE_PATH: '/nonexistent/claude', OVERSEER_OPENCODE_PATH: '/nonexistent/opencode' });

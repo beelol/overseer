@@ -64,7 +64,9 @@
     const repoItems = data.repos.map(r => ({ value: r.path, title: r.name, sub: r.branch || 'detached', subTitle: r.path, tip: `${r.path}${r.branch ? ' · ' + r.branch : ''}`, icon: ICON.repo, hints: [r.branch ? 'on ' + r.branch : 'detached', r.source] }));
     repoItems.push({ value: '__browse__', title: 'Choose…', sub: 'Any Git repository', icon: ICON.folder });
     tiles($('repos'), 'Repository', repoItems, form.repo, (v, moving) => { if (v === '__browse__') { if (!moving) vscode.postMessage({ type: 'browse' }); return; } form.repo = v; persist(); vscode.postMessage({ type: 'branches', repo: v }); render(); });
-    tiles($('harnesses'), 'Agent', [{ value: '__auto__', title: 'Auto routing', icon: 'sparkle', sub: 'Picks the agent, model and effort per work unit', tip: 'Uses available signed-in accounts and local usage evidence' }, ...data.harnesses.map(h => ({ value: h.harness, title: h.label, logo: ui.harnessMark(h.harness, 16), sub: h.installed ? String(h.version || 'installed').split(' ')[0] : 'not installed', tip: [h.label, h.version, ...(h.hints || [])].filter(Boolean).join(' · '),
+    // Auto routing is unfinished in this build: offered only when its setting is on (AC-204).
+    const autoTile = data.autoRouting ? [{ value: '__auto__', title: 'Auto routing', icon: 'sparkle', sub: 'Picks the agent, model and effort per work unit', tip: 'Uses available signed-in accounts and local usage evidence' }] : [];
+    tiles($('harnesses'), 'Agent', [...autoTile, ...data.harnesses.map(h => ({ value: h.harness, title: h.label, logo: ui.harnessMark(h.harness, 16), sub: h.installed ? String(h.version || 'installed').split(' ')[0] : 'not installed', tip: [h.label, h.version, ...(h.hints || [])].filter(Boolean).join(' · '),
       status: !h.installed ? { cls: 'off', text: 'missing' } : blocked(h.harness) ? { cls: 'warn', text: 'offline' } : { cls: 'ok', text: 'ready' }, hints: h.hints, disabled: !h.installed || !!blocked(h.harness), why: h.installed ? blocked(h.harness) || '' : 'Not installed' }))], form.routing === 'auto' ? '__auto__' : form.harness,
       v => { form.routing = v === '__auto__' ? 'auto' : 'manual'; if (v !== '__auto__') form.harness = v; if (local()) { form.account = C.LOCAL_ACCOUNT; if (!/^ollama\//.test(form.model)) form.model = ''; } else if (/^ollama\//.test(form.model)) form.model = ''; const ok = compatible().some(a => a.id === form.account); if (!ok) form.account = (compatible().find(a => a.signedIn) || {}).id; persist(); render(); });
     const accounts = compatible();
@@ -143,7 +145,7 @@
   $('prompt').addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); $('start').click(); } });
   window.addEventListener('message', e => {
     const m = e.data;
-    if (m.type === 'data') { data = { ...data, ...m.data }; if (!form.repo && data.repos[0]) { form.repo = data.repos[0].path; vscode.postMessage({ type: 'branches', repo: form.repo }); } render(); }
+    if (m.type === 'data') { data = { ...data, ...m.data }; if (!data.autoRouting && form.routing === 'auto') { form.routing = 'manual'; persist(); } if (!form.repo && data.repos[0]) { form.repo = data.repos[0].path; vscode.postMessage({ type: 'branches', repo: form.repo }); } render(); }
     else if (m.type === 'branches') { data.branches[m.repo] = m.info; render(); }
     else if (m.type === 'repoAdded') { if (!data.repos.some(r => r.path === m.repo.path)) data.repos.push(m.repo); form.repo = m.repo.path; persist(); vscode.postMessage({ type: 'branches', repo: form.repo }); render(); }
     else if (m.type === 'error') { $('error').textContent = m.message; $('error').hidden = false; }
