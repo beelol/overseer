@@ -389,6 +389,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           status TEXT NOT NULL CHECK(status IN ('active','complete')),
           accepted_decision_id_at_claim INTEGER NOT NULL DEFAULT 0,
           resolved_conflict_count_at_claim INTEGER NOT NULL DEFAULT 0,
+          message_seq_at_claim INTEGER NOT NULL DEFAULT 0,
           applied_count INTEGER NOT NULL DEFAULT 0,
           pending_review_count INTEGER NOT NULL DEFAULT 0,
           created_ms INTEGER NOT NULL,
@@ -759,6 +760,28 @@ pub fn migrate(conn: &Connection) -> Result<()> {
              ) WHERE status='active';",
         )?;
     }
+    // The last broker sequence when a turn was claimed: directives the director records
+    // after it are that turn's coordination. An active legacy turn is backfilled with the
+    // current sequence, so directives sent before the upgrade are not new progress.
+    let has_message_snapshot = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_director_turns') WHERE name='message_seq_at_claim'")?
+        .exists([])?;
+    if !has_message_snapshot {
+        conn.execute_batch(
+            "ALTER TABLE swarm_director_turns ADD COLUMN message_seq_at_claim INTEGER NOT NULL DEFAULT 0;",
+        )?;
+        let has_messages = conn
+            .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='swarm_messages'")?
+            .exists([])?;
+        if has_messages {
+            conn.execute_batch(
+                "UPDATE swarm_director_turns SET message_seq_at_claim=(
+                   SELECT COALESCE(MAX(seq),0) FROM swarm_messages m
+                   WHERE m.run_id=swarm_director_turns.run_id
+                 ) WHERE status='active';",
+            )?;
+        }
+    }
     let has_reviewed_message_seq = conn
         .prepare(
             "SELECT 1 FROM pragma_table_info('swarm_decisions') WHERE name='reviewed_message_seq'",
@@ -1120,15 +1143,22 @@ mod tests {
                reviewed_message_seq INTEGER NOT NULL DEFAULT 0);
              INSERT INTO swarm_director_turns VALUES('active-turn','run',1,1,'hash','active',0,0,1,NULL);
              INSERT INTO swarm_conflicts VALUES('run','resolved');
-             INSERT INTO swarm_decisions VALUES(1,'run','accept',0);",
+             INSERT INTO swarm_decisions VALUES(1,'run','accept',0);
+             CREATE TABLE swarm_messages(seq INTEGER PRIMARY KEY AUTOINCREMENT,run_id TEXT NOT NULL,
+               message_id TEXT NOT NULL,job_id TEXT,attempt_id TEXT,sender TEXT NOT NULL,recipient TEXT NOT NULL,
+               kind TEXT NOT NULL,revision INTEGER NOT NULL,payload TEXT NOT NULL,phase TEXT NOT NULL,
+               created_ms INTEGER NOT NULL,updated_ms INTEGER NOT NULL,UNIQUE(run_id,message_id));
+             INSERT INTO swarm_messages(run_id,message_id,sender,recipient,kind,revision,payload,phase,created_ms,updated_ms)
+               VALUES('run','a','director','att','advisory',1,'{}','applied',1,1),
+                     ('run','r','director','att','redirect',1,'{}','applied',1,1);",
         ).unwrap();
         migrate(&conn).unwrap();
-        let at_claim: (i64,i64) = conn.query_row(
-            "SELECT resolved_conflict_count_at_claim,accepted_decision_id_at_claim
+        let at_claim: (i64,i64,i64) = conn.query_row(
+            "SELECT resolved_conflict_count_at_claim,accepted_decision_id_at_claim,message_seq_at_claim
              FROM swarm_director_turns WHERE id='active-turn'",
-            [], |row| Ok((row.get(0)?,row.get(1)?)),
+            [], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
         ).unwrap();
-        assert_eq!(at_claim,(1,1),"pre-upgrade decisions are not new turn progress");
+        assert_eq!(at_claim,(1,1,2),"pre-upgrade decisions and directives are not new turn progress");
         migrate(&conn).unwrap();
     }
 

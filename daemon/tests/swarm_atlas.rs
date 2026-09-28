@@ -156,12 +156,43 @@ fn atlas_s1_backend_evidence_flows_through_swarm_review() {
                 "phase":phase,"revision":1}))["phase"],phase);
         }
     }
-    d.call("swarm.director.complete_batch",json!({"run_id":run,"generation":1,
-        "turn_id":batch["turn_id"],"token":batch["token"],"outcome":"progress"}));
+    // SWARM-41: J4's overlap arrives while the D1 turn is still in flight. It is
+    // queued for the next batch; no second director turn starts.
     d.call("swarm.report",json!({"run_id":run,"job_id":"j4",
         "attempt_id":a4["attempt_id"],"token":a4["token"],
         "message_id":"j4-overlap","type":"claim","revision":1,
         "payload":{"overlap_with":"j2","symbol":"TaskRepository.findById"}}));
+    assert_eq!(d.call("swarm.director.claim_batch",json!({"run_id":run,"generation":1,
+        "revision":1,"now_ms":at+7000}))["status"],"busy");
+    {
+        let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+        let turns:i64=db.query_row("SELECT COUNT(*) FROM swarm_director_turns WHERE run_id=?1",
+            [run],|r|r.get(0)).unwrap();
+        assert_eq!(turns,1,"one director turn while it is in flight");
+        // The advisory reached only J1 and J4.
+        let routed:Vec<String>={
+            let mut stmt=db.prepare("SELECT recipient FROM swarm_messages WHERE run_id=?1
+                AND message_id LIKE 'D1-to-%' ORDER BY recipient").unwrap();
+            let rows=stmt.query_map([run],|r|r.get(0)).unwrap().map(Result::unwrap).collect(); rows
+        };
+        let mut want=vec![a1["attempt_id"].as_str().unwrap().to_string(),a4["attempt_id"].as_str().unwrap().to_string()];
+        want.sort();
+        assert_eq!(routed,want);
+    }
+    for attempt in [&a2,&a3] {
+        let inbox=d.call("swarm.messages",json!({"run_id":run,"recipient":attempt["attempt_id"],
+            "token":attempt["token"]}));
+        assert!(inbox["messages"].as_array().unwrap().iter()
+            .all(|m| !m["message_id"].as_str().unwrap_or("").starts_with("D1-to")),"{inbox}");
+    }
+    d.call("swarm.director.complete_batch",json!({"run_id":run,"generation":1,
+        "turn_id":batch["turn_id"],"token":batch["token"],"outcome":"progress"}));
+    let next=d.call("swarm.director.claim_batch",json!({"run_id":run,"generation":1,
+        "revision":1,"now_ms":at+13000}));
+    assert_eq!(next["status"],"claimed","{next}");
+    assert_eq!(next["messages"][0]["message_id"],"j4-overlap");
+    // The director resolves the overlap in this turn: J2 keeps the helper trace,
+    // J4 is redirected to the signed-URL boundary and applies the redirect.
     d.call("swarm.direct",json!({"run_id":run,"generation":1,"revision":1,
         "job_id":"j4","attempt_id":a4["attempt_id"],"message_id":"j4-own-signed-url",
         "type":"redirect","payload":{"owner":"j2","focus":"signed URL boundary"}}));
@@ -169,6 +200,23 @@ fn atlas_s1_backend_evidence_flows_through_swarm_review() {
         d.call("swarm.ack",json!({"run_id":run,"message_id":"j4-own-signed-url",
             "recipient":a4["attempt_id"],"token":a4["token"],
             "phase":phase,"revision":1}));
+    }
+    let second=d.call("swarm.director.complete_batch",json!({"run_id":run,"generation":1,
+        "turn_id":next["turn_id"],"token":next["token"],"outcome":"progress"}));
+    // Two coordination turns (routing D1, resolving the overlap) are progress, not a stall.
+    assert_eq!(second["material_progress"],true,"{second}");
+    assert_eq!(second["status"],"running","{second}");
+    // An unchanged run makes no director turns however often it is polled.
+    for k in 0..3 {
+        let idle=d.call("swarm.director.claim_batch",json!({"run_id":run,"generation":1,
+            "revision":1,"now_ms":at+20000+k*10000}));
+        assert_eq!(idle["status"],"idle","{idle}");
+    }
+    {
+        let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+        let turns:i64=db.query_row("SELECT COUNT(*) FROM swarm_director_turns WHERE run_id=?1",
+            [run],|r|r.get(0)).unwrap();
+        assert_eq!(turns,2,"no periodic director turns in an unchanged run");
     }
 
     let j1 = atlas_probe("j1");

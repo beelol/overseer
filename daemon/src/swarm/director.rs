@@ -137,8 +137,11 @@ pub fn claim_batch(store: &mut Store, p: &Value) -> Result<Value> {
     let conflicts_at_claim: i64 = tx.query_row(
         "SELECT COUNT(*) FROM swarm_conflicts WHERE run_id=?1 AND status='resolved'",
         params![run], |r| r.get(0))?;
-    tx.execute("INSERT INTO swarm_director_turns(id,run_id,generation,revision,token_sha256,status,accepted_decision_id_at_claim,resolved_conflict_count_at_claim,created_ms) VALUES(?1,?2,?3,?4,?5,'active',?6,?7,?8)",
-        params![id,run,generation,revision,hash(&token),accepted_at_claim,conflicts_at_claim,now])?;
+    let message_seq_at_claim: i64 = tx.query_row(
+        "SELECT COALESCE(MAX(seq),0) FROM swarm_messages WHERE run_id=?1",
+        params![run], |r| r.get(0))?;
+    tx.execute("INSERT INTO swarm_director_turns(id,run_id,generation,revision,token_sha256,status,accepted_decision_id_at_claim,resolved_conflict_count_at_claim,message_seq_at_claim,created_ms) VALUES(?1,?2,?3,?4,?5,'active',?6,?7,?8,?9)",
+        params![id,run,generation,revision,hash(&token),accepted_at_claim,conflicts_at_claim,message_seq_at_claim,now])?;
     for seq in seqs {
         tx.execute(
             "INSERT INTO swarm_director_turn_messages(turn_id,seq) VALUES(?1,?2)",
@@ -436,9 +439,19 @@ pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
     let conflicts_now: i64 = tx.query_row(
         "SELECT COUNT(*) FROM swarm_conflicts WHERE run_id=?1 AND status='resolved'",
         params![run], |r| r.get(0))?;
+    // Coordination the director recorded during the turn is material progress too:
+    // routing a discovery (advisory), resolving an overlap (redirect) or withdrawing a
+    // conclusion (retract) each reaches a live worker as a durable directive (SWARM-41,
+    // S1). A label of "progress" alone, or a turn that recorded nothing, still is not.
+    let directed: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM swarm_messages m JOIN swarm_director_turns t ON t.id=?2
+         WHERE m.run_id=?1 AND m.sender='director' AND m.kind IN ('advisory','redirect','retract')
+           AND m.seq>t.message_seq_at_claim",
+        params![run, id], |r| r.get(0))?;
     let material_progress = current["revision"].as_i64().unwrap_or(0) > turn_revision
         || accepted_now > accepted_at_claim
-        || conflicts_now > conflicts_at_claim;
+        || conflicts_now > conflicts_at_claim
+        || directed > 0;
     let turns = if !material_progress {
         current["no_progress_turns"]
             .as_i64()

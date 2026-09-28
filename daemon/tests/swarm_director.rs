@@ -609,3 +609,50 @@ fn twenty_results_are_one_review_turn_and_stop_does_not_wait_for_it() {
         [&id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap();
     assert_eq!((decisions, results, extra), (20, 20, 0));
 }
+
+/// Regression (SWARM-41, S1): two director turns in a row that route a
+/// discovery and resolve an overlap are progress, not a stall. Before the
+/// fix, a turn counted as material only for a plan change, an acceptance or
+/// a resolved conflict, so S1's first two coordination turns (D1 advisories,
+/// then J4's redirect) stalled the run as `director_no_progress`. A turn that
+/// records nothing still counts against the stall limit.
+#[test]
+fn coordination_turns_that_direct_workers_are_progress_but_empty_turns_are_not() {
+    let d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Coordination progress","objective":"Audit",
+        "allowed_targets":["system-codex"]}));
+    let id = run["id"].as_str().unwrap().to_string();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"j2","title":"Tasks","acceptance":"evidence","deps":[]},
+        {"id":"j4","title":"Attachments","acceptance":"evidence","deps":[]}]}));
+    let j2 = d.call("swarm.attempt.register", json!({"run_id":id,"generation":1,"revision":1,"job_id":"j2"}));
+    let j4 = d.call("swarm.attempt.register", json!({"run_id":id,"generation":1,"revision":1,"job_id":"j4"}));
+    let report = |attempt: &serde_json::Value, job: &str, message: &str, kind: &str| d.call("swarm.report",
+        json!({"run_id":id,"job_id":job,"attempt_id":attempt["id"],"token":attempt["token"],
+            "message_id":message,"type":kind,"revision":1,"payload":{"symbol":"TaskRepository.findById"}}));
+    let turn = |message: &str, directive: Option<(&serde_json::Value, &str, &str)>| {
+        let batch = d.call("swarm.director.claim_batch", json!({"run_id":id,"generation":1,"revision":1,
+            "now_ms":now()+6000}));
+        assert_eq!(batch["status"], "claimed", "{batch}");
+        assert_eq!(batch["messages"][0]["message_id"], message);
+        if let Some((attempt, job, kind)) = directive {
+            d.call("swarm.direct", json!({"run_id":id,"generation":1,"revision":1,"job_id":job,
+                "attempt_id":attempt["id"],"message_id":format!("{message}-{kind}"),"type":kind,
+                "payload":{"focus":"signed URL boundary"}}));
+        }
+        d.call("swarm.director.complete_batch", json!({"run_id":id,"generation":1,
+            "turn_id":batch["turn_id"],"token":batch["token"],"outcome":"progress"}))
+    };
+    report(&j2, "j2", "D1", "discovery");
+    let first = turn("D1", Some((&j4, "j4", "advisory")));
+    assert_eq!((first["material_progress"].as_bool(), first["no_progress_turns"].as_i64()), (Some(true), Some(0)), "{first}");
+    report(&j4, "j4", "overlap", "claim");
+    let second = turn("overlap", Some((&j4, "j4", "redirect")));
+    assert_eq!((second["material_progress"].as_bool(), second["status"].as_str()), (Some(true), Some("planning")), "{second}");
+    // Turns that record nothing still stall after two.
+    report(&j2, "j2", "p1", "progress");
+    assert_eq!(turn("p1", None)["no_progress_turns"], 1);
+    report(&j2, "j2", "p2", "progress");
+    let stalled = turn("p2", None);
+    assert_eq!((stalled["status"].as_str(), stalled["no_progress_turns"].as_i64()), (Some("stalled"), Some(2)), "{stalled}");
+}
