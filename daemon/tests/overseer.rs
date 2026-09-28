@@ -2289,3 +2289,57 @@ fn ac198_one_turn_is_at_most_twenty_items_and_32_kib() {
     assert!(long.len() <= 32 * 1024, "{} bytes", long.len());
     assert!(long.ends_with("[cut at 32768 bytes; ask for a smaller range]") && long.contains("long-00 "), "{}", &long[long.len().saturating_sub(200)..]);
 }
+
+/// AC-191: a large diff shared within one repository arrives as a patch file and as a branch and
+/// commit the receiver can read with git, made from the source's worktree on its task's base with
+/// neither worktree touched; withdrawing the share removes the branch.
+#[test]
+fn ac191_a_large_diff_is_also_a_branch_and_commit() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call("overseer.level", json!({"level": "steer"}));
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    let beta = claude_task(&d, &repo, &mode_file, "channel", "Beta", "hello");
+    d.wait_done(&beta, 40);
+    let created = d.generic(&repo, "worktree", "/bin/sh", &["-c", "yes 'a line of text for the patch' | head -c 102400 > big.txt; echo tweak >> README.md"]);
+    let big = run_id(&created);
+    d.wait_done(&big, 30);
+    let big_ws = ws_path(&d, &created);
+    let beta_ws = PathBuf::from(d.call("agent.digest", json!({"run_id": beta}))["digest"]["worktree"].as_str().unwrap());
+    let (before_big, before_beta) = (fingerprint(&big_ws), fingerprint(&beta_ws));
+    let refs_before = git(&repo, &["for-each-ref", "--format=%(refname)"]);
+    d.call("overseer.propose", json!({"actions": [{"action": "share", "to": beta, "from": big, "what": "diff"}], "source": "ctl"}));
+    let t = wait_turn_with(&d, &beta, "on branch overseer/share/", 15);
+    let text = t["prompt"].as_str().unwrap().to_string();
+    let share = d.call("share.list", json!({"run_id": beta}))["shares"].as_array().unwrap().iter().find(|s| s["from"] == big).cloned().unwrap();
+    let (branch, commit) = (share["branch"].as_str().unwrap().to_string(), share["commit"].as_str().unwrap().to_string());
+    assert_eq!(branch, format!("overseer/share/{}", share["id"].as_str().unwrap()));
+    assert!(text.contains(&format!("as commit {commit} on branch {branch} (git show {commit})")) && share["file"].is_string(), "{text}");
+    assert!(text.len() <= 8 * 1024 + 512);
+    // The receiver reads it with git from its own worktree: the whole change, on the task's base.
+    assert_eq!(git(&beta_ws, &["rev-parse", &branch]).trim(), commit);
+    let files = git(&beta_ws, &["show", "--name-only", "--format=", &commit]);
+    assert_eq!(files.lines().collect::<Vec<_>>(), ["README.md", "big.txt"], "{files}");
+    let base = option(&d, &big, "task_start", None)["base"].as_str().unwrap().to_string();
+    assert_eq!(git(&beta_ws, &["rev-parse", &format!("{commit}^")]).trim(), base, "on the task's base");
+    assert_eq!(git(&beta_ws, &["diff", "--stat", &base, &commit]).lines().count(), 3, "the same change the review shows");
+    assert_eq!(git(&beta_ws, &["show", &format!("{commit}:big.txt")]).len(), 102400);
+    // Neither worktree changed; the only new ref is the share's branch.
+    assert_eq!((fingerprint(&big_ws), fingerprint(&beta_ws)), (before_big, before_beta));
+    let refs_after = git(&repo, &["for-each-ref", "--format=%(refname)"]);
+    // (The daemon's own snapshot refs of Beta's new turn aside.)
+    let new: Vec<&str> = refs_after.lines().filter(|l| !refs_before.lines().any(|b| b == *l) && !l.starts_with("refs/overseer/snapshots/")).collect();
+    assert_eq!(new, [format!("refs/heads/{branch}").as_str()]);
+    // A small diff, or a diff of one file, stays inline or a patch file: no branch.
+    assert!(d.call("share.list", json!({}))["shares"].as_array().unwrap().iter().filter(|s| s["id"] != share["id"]).all(|s| s["branch"].is_null()));
+    // Withdrawn: the branch goes.
+    d.wait_done(&beta, 30);
+    d.call("share.withdraw", json!({"id": share["id"], "by": "owner"}));
+    assert!(git(&repo, &["for-each-ref", "--format=%(refname)", &format!("refs/heads/{branch}")]).trim().is_empty(), "the withdrawn share's branch is removed");
+}
