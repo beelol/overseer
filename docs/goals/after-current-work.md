@@ -17,6 +17,14 @@ A very good-looking public page for Overseer, built by its own agent.
 
 Build the mods feature (`docs/rfcs/mods.md`, "The chosen approach") with its own agent: turn the draft into agreed criteria on main first, then build it criterion by criterion.
 
+## Usage telemetry (queued by the owner, 2026-09-28)
+
+Know which models and accounts are used most and how much each costs: per run and turn, the harness, model, effort, account (by Overseer's own id, never the login), tokens and cost when reported, quota readings, duration and outcome. It feeds Auto's route choices and the model-priority research.
+- **First, local only:** append-only files under Overseer's home (for example JSON lines per day), with a way to see and delete them, and nothing leaving the machine.
+- **Later:** an optional upload to something cheap or self-hosted that the owner runs (their Coolify), switched off by default and named in the settings.
+- **Never:** prompts, code, file contents, credentials or email addresses.
+- Its own RFC section and criteria before it is built, by its own agent.
+
 ## 3. Then: every open criterion, then usability
 
 - **Keep going** until every acceptance criterion is met or waits only on the owner (the everything goal, `docs/goals/everything.md`).
