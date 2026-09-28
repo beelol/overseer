@@ -36,22 +36,10 @@ appId: ${APP}
     visible:
       id: "file.hunk.reject"
     timeout: 30000
-# Reject, tapped again if the tap is lost (on Android the first tap on a hunk can land as the
-# file screen draws its hunks again). The question shows once a tap lands, so it is not repeated.
-- repeat:
-    times: 3
-    while:
-      notVisible:
-        id: "file.reject.confirm"
-    commands:
-      - tapOn:
-          id: "file.hunk.reject"
-          index: 0
-      - extendedWaitUntil:
-          visible:
-            id: "file.reject.confirm"
-          timeout: 6000
-          optional: true
+- tapOn:
+    id: "file.hunk.reject"
+    index: 0
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
       id: "file.reject.confirm"
