@@ -3419,7 +3419,7 @@ fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_p
     assert_eq!(recorded["selected_route"]["effort"], "medium");
     assert_eq!(recorded["selected_route"]["fit"], "unknown");
     assert_eq!(recorded["estimator"]["state"], "scoped_fit");
-    assert_eq!(recorded["estimator"]["version"], "v2");
+    assert_eq!(recorded["estimator"]["version"], "v3");
     assert_eq!(recorded["selector_version"], "multi-harness-preflight-v8");
     assert_eq!(recorded["ranking"]["version"], "v1");
     assert_eq!(recorded["ranking"]["complete_costs"].as_array().unwrap().len(), 2);
@@ -3514,6 +3514,10 @@ fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_p
     let trace = std::fs::read_to_string(trace).unwrap();
     assert_eq!(trace.matches("turn_model:gpt-6-sol").count(), 1);
     assert_eq!(trace.matches("turn_model:gpt-6-astra").count(), 2);
+    // The chosen effort is an execution parameter, not a label: the browser
+    // child's turn ran at medium, the parent and the diagnosis at high.
+    assert_eq!(trace.matches("turn_effort:medium").count(), 1, "{trace}");
+    assert_eq!(trace.matches("turn_effort:high").count(), 2, "{trace}");
 }
 
 #[test]
