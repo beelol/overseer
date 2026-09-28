@@ -896,4 +896,66 @@ export const scenarios = [
       c.log.say(`storage after the revoke: ${c.dev.keys().join(', ') || 'nothing'}`);
     },
   },
+  {
+    // An experiment, run only when named (`--only pair,tap-timing`): Maestro's first tap on a hunk
+    // was lost now and then on the Android emulator. Taps sent by adb itself, at set moments after
+    // the file screen shows its hunks, say whether the app drops a tap or only Maestro's.
+    name: 'tap-timing',
+    optIn: true,
+    criteria: ['AC-126'],
+    says: "experiment: a tap on a hunk's Accept, sent by adb the moment the file screen shows it, 1.2 s later and 3 s later: is any lost?",
+    platforms: ['android'],
+    skipped: 'an experiment for the Android emulator',
+    async run(c) {
+      const state = c.lab.call('state');
+      let found = null;
+      for (const r of state.runs.filter((x) => !x.parent_run_id)) {
+        const changes = c.lab.call('workspace.changes', { workspace_id: r.workspace_id });
+        if (changes.files > 0) {
+          found = { run: r.id, file: changes.names[0] };
+          break;
+        }
+      }
+      expect(found, 'no fixture agent has changed a file');
+      const adb = path.join(process.env.ANDROID_HOME || '/opt/homebrew/share/android-commandlinetools', 'platform-tools', 'adb');
+      const marked = () => c.lab.call('review.marks', { run_id: found.run }).keys.length;
+      const clear = () => {
+        for (const key of c.lab.call('review.marks', { run_id: found.run }).keys) c.lab.call('review.unaccept', { run_id: found.run, key });
+      };
+      // Where Accept is, read from the settled screen by Maestro's own view of it.
+      clear();
+      await c.flow('open-file', { RUN: found.run, FILE: found.file });
+      await c.sleep(3000);
+      const tree = execFileSync('maestro', ['--udid', c.dev.id, 'hierarchy'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: { ...process.env, MAESTRO_CLI_NO_ANALYTICS: '1' } });
+      const bounds = tree.match(/"resource-id"\s*:\s*"file\.hunk\.accept"[\s\S]*?"bounds"\s*:\s*"\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
+      expect(bounds, 'Accept was not found on the screen');
+      const x = Math.round((Number(bounds[1]) + Number(bounds[3])) / 2);
+      const y = Math.round((Number(bounds[2]) + Number(bounds[4])) / 2);
+      c.log.say(`  Accept is at ${x}, ${y}`);
+      const tally = {};
+      for (const wait of [0, 1200, 3000]) {
+        tally[wait] = { marked: 0, lost: 0 };
+        for (let i = 1; i <= 12; i += 1) {
+          clear();
+          await c.flow('open-file', { RUN: found.run, FILE: found.file });
+          if (wait > 0) await c.sleep(wait);
+          execFileSync(adb, ['-s', c.dev.id, 'shell', 'input', 'tap', String(x), String(y)]);
+          let landed = false;
+          const until = Date.now() + 5000;
+          while (Date.now() < until) {
+            if (marked() > 0) {
+              landed = true;
+              break;
+            }
+            await c.sleep(200);
+          }
+          tally[wait][landed ? 'marked' : 'lost'] += 1;
+          c.log.say(`  a tap ${wait} ms after the hunks showed, try ${i}: ${landed ? 'marked' : 'LOST'}`);
+        }
+      }
+      clear();
+      c.log.say(`  taps by adb: ${Object.entries(tally).map(([w, t]) => `${w} ms after: ${t.marked} marked, ${t.lost} lost`).join('; ')}`);
+      return tally;
+    },
+  },
 ];

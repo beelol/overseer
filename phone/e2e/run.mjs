@@ -207,6 +207,8 @@ async function platformRun(args, platform, summary) {
   try {
     for (const scenario of scenarios) {
       if (args.only && !args.only.includes(scenario.name) && !scenario.always) continue;
+      // Experiments run only when named.
+      if (scenario.optIn && !args.only?.includes(scenario.name)) continue;
       if (scenario.platforms && !scenario.platforms.includes(platform)) {
         log.say(`skip ${scenario.name}: ${scenario.skipped}`);
         results.push({ name: scenario.name, criteria: scenario.criteria, ok: null, note: scenario.skipped });
