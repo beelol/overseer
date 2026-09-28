@@ -8,11 +8,17 @@ import { Arrive, Tap } from '@/motion';
 import { useCapabilities, type Support } from '@/platform';
 import { routes } from '@/routes';
 import { useSession, useSessionValue, type Session } from '@/session';
-import { Logo, makeStyles, Txt } from '@/ui';
+import { IconButton, Logo, makeStyles, Txt } from '@/ui';
 
 import { actOf, CATEGORIES, SENTENCE, type NotificationAct, type NotificationKind } from './handle';
 
+/** How long a banner for news stays: an agent finished or failed. */
 const BANNER_MS = 6_000;
+/**
+ * Kinds that wait for the owner. Their banner stays until the owner opens the agent or dismisses
+ * it, or until the agent no longer waits: on a phone without push it is the only signal.
+ */
+const NEEDS: ReadonlySet<NotificationKind> = new Set(['permission', 'question']);
 
 /** Sends the owner's answer, or opens the agent. Used by taps on notifications and banners. */
 function useAct(session: Session): (act: NotificationAct) => void {
@@ -126,6 +132,11 @@ function Banners({ onAct }: { readonly onAct: (act: NotificationAct) => void }) 
     lookingRef.current = looking;
   }, [looking]);
   const [banner, setBanner] = useState<Banner | null>(null);
+  const shown = useRef<Banner | null>(null);
+  const show = useCallback((next: Banner | null) => {
+    shown.current = next;
+    setBanner(next);
+  }, []);
 
   useEffect(() => {
     let before = session.getSnapshot();
@@ -136,6 +147,9 @@ function Banners({ onAct }: { readonly onAct: (act: NotificationAct) => void }) 
       // History is not news: what was stored, or replayed after time away, rings nothing.
       if (now.fromCache || was.fromCache || now.connection !== 'online' || now.state === was.state) return;
       const settings = session.notificationSettings();
+      // A banner that waited for the owner goes once the agent no longer waits for that answer.
+      const current = shown.current;
+      if (current && NEEDS.has(current.kind) && store.run(now.state, current.run.id)?.attention?.request_id !== current.run.attention?.request_id) show(null);
       if (!now.macNotifications || !settings.enabled) return;
       for (const run of store.rows(now.state.runs)) {
         const earlier = store.run(was.state, run.id);
@@ -144,18 +158,20 @@ function Banners({ onAct }: { readonly onAct: (act: NotificationAct) => void }) 
         if (!kind || !settings.kinds[kind] || lookingRef.current === run.id || run.parent_run_id) continue;
         const task = store.task(now.state, run.task_id);
         const repo = task?.repo_root.split('/').filter(Boolean).pop() ?? '';
+        // News never covers what waits for the owner.
+        if (shown.current && NEEDS.has(shown.current.kind) && !NEEDS.has(kind)) continue;
         haptics.play(kind === 'finished' ? 'confirm' : 'warning');
-        setBanner({ key: `${run.id}.${kind}.${run.attention?.request_id ?? run.status}`, run, kind, title: [run.harness, repo].filter(Boolean).join(' · ') });
+        show({ key: `${run.id}.${kind}.${run.attention?.request_id ?? run.status}`, run, kind, title: [run.harness, repo].filter(Boolean).join(' · ') });
         return;
       }
     });
-  }, [session, haptics]);
+  }, [session, haptics, show]);
 
   useEffect(() => {
-    if (!banner) return;
-    const timer = setTimeout(() => setBanner(null), BANNER_MS);
+    if (!banner || NEEDS.has(banner.kind)) return;
+    const timer = setTimeout(() => show(null), BANNER_MS);
     return () => clearTimeout(timer);
-  }, [banner]);
+  }, [banner, show]);
 
   if (!banner) return null;
   return (
@@ -168,7 +184,7 @@ function Banners({ onAct }: { readonly onAct: (act: NotificationAct) => void }) 
           scales={false}
           style={styles.banner}
           onPress={() => {
-            setBanner(null);
+            show(null);
             onAct({ do: 'open', runId: banner.run.id });
           }}
         >
@@ -181,6 +197,7 @@ function Banners({ onAct }: { readonly onAct: (act: NotificationAct) => void }) 
               {SENTENCE[banner.kind]}
             </Txt>
           </View>
+          {NEEDS.has(banner.kind) ? <IconButton testID="notification.banner.dismiss" accessibilityLabel={`Dismiss: ${banner.title}`} icon="close" haptic="selection" onPress={() => show(null)} /> : null}
         </Tap>
       </Arrive>
     </View>
