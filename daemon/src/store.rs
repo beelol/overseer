@@ -667,6 +667,8 @@ impl Store {
         )?;
         // Swarm's tables (its v1..v5) are disjoint from Auto's; each check is idempotent.
         crate::swarm::schema::migrate(&self.conn)?;
+        // One broker ledger over Swarm's and Gate S's envelopes (SWARM-60).
+        crate::broker::migrate(&self.conn)?;
         self.conn.execute("INSERT INTO meta(key, value) VALUES('schema_version', ?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value", params![SCHEMA_VERSION.to_string()])?;
         Ok(())
     }

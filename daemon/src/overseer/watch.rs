@@ -473,7 +473,22 @@ impl Daemon {
             let sid = session["id"].as_str().unwrap_or_default().to_string();
             let card = json!({"kind": "finding", "id": id, "watch": w.id, "result": result, "text": text, "snapshot": w.last_snapshot, "watcher": watcher, "watcher_title": watcher_run.title, "subject": w.subject, "subject_title": subject.title, "held": held});
             self.append_session_message(&sid, "watcher", None, &format!("{} on {}: {result}{} — {text}", watcher_run.title, subject.title, if held { " (held at once)" } else { "" }), Some(&card))?;
-            self.check_in_due_at(&w.subject, &format!("finding:{id}"), 0)?;
+            // A Swarm worker is steered only by its director (SWARM-60): the finding goes on to
+            // the director as a sourced advisory, and Overseer checks in on the director.
+            let advised = crate::swarm::watcher_advisory(&mut self.store.lock().unwrap(), &w.subject, &id, watcher, result, &text)?;
+            if let Some(advised) = advised {
+                use rusqlite::OptionalExtension;
+                let director: Option<String> = self.store.lock().unwrap().conn.query_row(
+                    "SELECT overseer_run_id FROM swarm_director_owners WHERE run_id=?1",
+                    [advised["run_id"].as_str().unwrap_or_default()], |r| r.get(0)).optional()?.flatten();
+                self.emit(Some(&subject.task_id), Some(&w.subject), "swarm_advisory", "watcher", "exact",
+                    json!({"swarm_run_id": advised["run_id"], "message_id": advised["message_id"], "finding": id}))?;
+                if let Some(director) = director {
+                    self.check_in_due_at(&director, &format!("finding:{id}"), 0)?;
+                }
+            } else {
+                self.check_in_due_at(&w.subject, &format!("finding:{id}"), 0)?;
+            }
         }
         Ok(format!("Recorded{}.", if held { "; the subject is held" } else { "" }))
     }

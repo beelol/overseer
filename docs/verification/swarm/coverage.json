@@ -801,16 +801,20 @@
       "blocker": null
     },
     "SWARM-60": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
         "docs/verification/swarm/milestone-1.md",
         "docs/verification/swarm/SWARM-60.md",
         "daemon/tests/swarm_gate_s.rs",
-        "daemon/src/overseer/session.rs"
+        "daemon/src/overseer/session.rs",
+        "daemon/src/broker.rs",
+        "daemon/tests/swarm_scheduler.rs",
+        "daemon/tests/swarm_context.rs",
+        "daemon/src/overseer/watch.rs"
       ],
-      "blocker": "Overseer's worker-directed actions are refused and its advice reaches the director's inbox as an advisory (866b0a58). Not built: one broker and one claim ledger shared by ordinary agents (Gate S agent_messages/areas) and Swarm; no joined watcher-finding test."
+      "blocker": null
     },
     "SWARM-61": {
       "status": "verified",

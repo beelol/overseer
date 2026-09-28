@@ -300,6 +300,10 @@ impl Daemon {
     /// however often it is repeated. Returns the id and whether it was new.
     fn channel_message(&self, run_id: &str, kind: &str, body: &Value) -> Result<(String, bool)> {
         let canonical = serde_json::to_string(body)?;
+        // The one broker's rules (SWARM-60): a body is bounded like a Swarm envelope.
+        if canonical.len() > crate::broker::MAX_BODY_BYTES {
+            bail!("a {kind} is at most 32 KiB");
+        }
         let id = format!("{kind}-{}", short_sha(&format!("{run_id}|{kind}|{canonical}")));
         let store = self.store.lock().unwrap();
         let n = store.conn.execute("INSERT OR IGNORE INTO agent_messages(id, run_id, kind, ts, body) VALUES(?1, ?2, ?3, ?4, ?5)", rusqlite::params![id, run_id, kind, crate::daemon::now(), canonical])?;
@@ -346,6 +350,7 @@ impl Daemon {
                 text.push_str(&format!(" Blocked by: {b}"));
             }
             self.append_session_message(&self.session_id()?, "agent", None, &text, Some(&card))?;
+            crate::broker::mark(&self.store.lock().unwrap().conn, &crate::broker::agent_id(&id), "delivered")?;
             // A report Overseer asked for wakes it (one turn for those within the window).
             let asked: i64 = self.store.lock().unwrap().conn.query_row("SELECT COUNT(*) FROM dispatches WHERE run_id=?1 AND action='report' AND state NOT IN ('answered', 'failed', 'cancelled', 'not_sent')", [run_id], |r| r.get(0))?;
             if asked > 0 {
@@ -369,6 +374,7 @@ impl Daemon {
             self.emit(Some(&run.task_id), Some(run_id), "ask", "agent", "exact", json!({"id": id, "question": question, "title": run.title}))?;
             let card = json!({"kind": "ask", "id": id, "agent": run_id, "title": run.title, "question": question, "answer": Value::Null});
             self.append_session_message(&self.session_id()?, "agent", None, &format!("{} asks: {question}", run.title), Some(&card))?;
+            crate::broker::mark(&self.store.lock().unwrap().conn, &crate::broker::agent_id(&id), "delivered")?;
             self.check_in_due_at(run_id, &format!("ask:{id}"), 0)?;
         }
         Ok("Asked Overseer; its answer arrives as a message from Overseer. Carry on meanwhile.".into())
@@ -394,6 +400,7 @@ impl Daemon {
             // is refused, whole claim or nothing, and both sides are told.
             let held = ledger_refusals(&store.conn, run_id, &paths)?;
             if !held.is_empty() {
+                crate::broker::mark(&store.conn, &crate::broker::agent_id(&id), "refused")?;
                 drop(store);
                 self.notify_claim_refusals()?;
                 bail!("{}", crate::claims::refusal_text(&held));
@@ -401,6 +408,7 @@ impl Daemon {
             for p in &paths {
                 store.conn.execute("INSERT OR IGNORE INTO areas(run_id, path, set_by, created_ms) VALUES(?1, ?2, 'agent', ?3)", rusqlite::params![run_id, p, crate::daemon::now()])?;
             }
+            crate::broker::mark(&store.conn, &crate::broker::agent_id(&id), "applied")?;
         }
         if new {
             self.emit(Some(&run.task_id), Some(run_id), "claim", "agent", "exact", json!({"id": id, "paths": paths, "title": run.title}))?;

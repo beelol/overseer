@@ -349,6 +349,11 @@ fn report_is_durable_before_ack_and_replay_is_idempotent() {
     assert_eq!(inbox["messages"].as_array().unwrap().len(), 1);
     assert_eq!(inbox["messages"][0]["message_id"], "discovery-1");
     assert_eq!(d.call("swarm.report", report)["duplicate"], true);
+    // One envelope in the daemon's broker ledger, received once across the restart.
+    let envelopes = d.call("broker.envelopes", json!({"origin":"swarm","scope":run_id}))["envelopes"].clone();
+    assert_eq!(envelopes.as_array().unwrap().len(), 1, "{envelopes}");
+    assert_eq!(envelopes[0]["id"], format!("swarm/{run_id}/discovery-1"));
+    assert_eq!(envelopes[0]["phase"], "queued");
 }
 
 #[test]
@@ -369,6 +374,9 @@ fn directive_delivery_and_application_are_distinct() {
     assert_eq!(inbox["messages"].as_array().unwrap().len(), 1);
     let delivered=d.call("swarm.ack",json!({"run_id":run_id,"message_id":"redirect-2","recipient":attempt_id,"token":token,"phase":"delivered","revision":1}));
     assert_eq!(delivered["phase"], "delivered");
+    let ledger=d.call("broker.envelopes",json!({"origin":"swarm","scope":run_id}))["envelopes"].clone();
+    let row=ledger.as_array().unwrap().iter().find(|e| e["message_id"]=="redirect-2").unwrap().clone();
+    assert_eq!((row["phase"].as_str(),row["applied_ms"].is_null()),(Some("delivered"),true),"{row}");
     let applied=d.call("swarm.ack",json!({"run_id":run_id,"message_id":"redirect-2","recipient":attempt_id,"token":token,"phase":"applied","revision":1}));
     assert_eq!(applied["phase"], "applied");
     assert_eq!(d.call("swarm.redirect.persist_due",json!({"now_ms":i64::MAX-1}))["timed_out"],0);
@@ -376,6 +384,16 @@ fn directive_delivery_and_application_are_distinct() {
         "message_id":"redirect-2","generation":1,"revision":1,"type":"redirect","payload":{"focus":"pagination"}}));
     assert_eq!(replay["phase"], "applied");
     assert_eq!(replay["duplicate"], true);
+    // SWARM-60: the daemon's one broker ledger has this directive once, under a
+    // stable id, with delivery and application kept apart.
+    let envelopes=d.call("broker.envelopes",json!({"origin":"swarm","scope":run_id}))["envelopes"].clone();
+    let mine: Vec<&serde_json::Value>=envelopes.as_array().unwrap().iter()
+        .filter(|e| e["message_id"]=="redirect-2").collect();
+    assert_eq!(mine.len(),1,"{envelopes}");
+    assert_eq!(mine[0]["id"],format!("swarm/{run_id}/redirect-2"));
+    assert_eq!((mine[0]["sender"].as_str(),mine[0]["recipient"].as_str(),mine[0]["phase"].as_str()),
+        (Some("director"),Some(attempt_id.as_str()),Some("applied")));
+    assert!(mine[0]["delivered_ms"].as_i64().unwrap()<=mine[0]["applied_ms"].as_i64().unwrap());
     assert!(d.try_call("swarm.ack",json!({"run_id":run_id,"message_id":"redirect-2","recipient":attempt_id,"token":token,"phase":"applied","revision":0})).is_err());
     assert!(d.try_call("swarm.direct",json!({"run_id":run_id,"job_id":"routes","attempt_id":attempt_id,"message_id":"stale","generation":0,"revision":1,"type":"redirect","payload":{}})).is_err());
 }

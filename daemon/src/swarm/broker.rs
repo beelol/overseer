@@ -294,6 +294,34 @@ pub fn overseer_advisory(store: &mut Store, director_run: &str, text: &str, prop
     Ok(Some(json!({"run_id":run,"message_id":message_id,"seq":seq,"phase":"queued","duplicate":false})))
 }
 
+/// A read-only watcher's finding about a Swarm worker (Gate S's "Watching a worker": the
+/// finding goes to Overseer, then to the director as an advisory; SWARM-60). The envelope is
+/// from `overseer` with the watcher as its source, names the finding and which job it was
+/// about, and carries no job or attempt: it is advice for the director's next turn and assigns
+/// nothing. `None` when the subject is not a Swarm worker. The finding's id makes a replay one
+/// envelope.
+pub fn watcher_advisory(store: &mut Store, worker_run: &str, finding: &str, watcher: &str, result: &str, text: &str)
+    -> Result<Option<Value>> {
+    let found: Option<(String, String)> = store.conn.query_row(
+        "SELECT run_id, job_id FROM swarm_worker_launches WHERE overseer_run_id=?1",
+        params![worker_run], |r| Ok((r.get(0)?, r.get(1)?))).optional()?;
+    let Some((run, job)) = found else { return Ok(None) };
+    let current = get(store, &run)?;
+    if matches!(current["status"].as_str(), Some("stopped" | "completed" | "invalidated")) {
+        return Ok(None);
+    }
+    let text: String = crate::redact::redact(text.trim()).chars().take(4096).collect();
+    let message_id = format!("watcher-finding-{finding}");
+    let payload = json!({"source":"watcher","finding":finding,"watcher":watcher,"result":result,
+        "about_job":job,"text":text}).to_string();
+    let revision = current["revision"].as_i64().unwrap_or(0);
+    let now = crate::daemon::now();
+    store.conn.execute("INSERT OR IGNORE INTO swarm_messages(run_id,message_id,job_id,attempt_id,sender,recipient,kind,revision,payload,phase,created_ms,updated_ms)
+        VALUES(?1,?2,NULL,NULL,'overseer','director','advisory',?3,?4,'queued',?5,?5)",
+        params![run, message_id, revision, payload, now])?;
+    Ok(Some(json!({"run_id":run,"message_id":message_id})))
+}
+
 pub fn report(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
     let job = required(p, "job_id")?;

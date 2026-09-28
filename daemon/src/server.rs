@@ -1456,6 +1456,7 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "swarm.resume" => crate::swarm::resume(&mut d.store.lock().unwrap(), p)?,
         "swarm.off" => crate::swarm::off(&mut d.store.lock().unwrap(), p)?,
         "claims.ledger" => crate::claims::ledger(&d.store.lock().unwrap().conn)?,
+        "broker.envelopes" => crate::broker::envelopes(&d.store.lock().unwrap().conn, p)?,
         "swarm.claim" => {
             fixture_only()?;
             let claim = crate::swarm::claim(&mut d.store.lock().unwrap(), p);
