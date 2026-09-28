@@ -11,6 +11,10 @@ class Voice {
   constructor(context, client, { selectRun } = {}) {
     this.context = context; this.client = client; this.selectRun = selectRun;
     this.voice = null;
+    this.targeted = new Set(); // agents that open spoken requests are for (a voice mark, AC-169)
+    this.heard = '';
+    this.asking = false; // a read-back or a plan waits for a yes
+    this.listeners = [];
     this.status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 49);
     this.status.command = 'overseer.voice.open';
     context.subscriptions.push(this.status);
@@ -21,14 +25,35 @@ class Voice {
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => { if (e.affectsConfiguration('workbench.reduceMotion')) this.refresh(); }));
   }
 
+  /** Called when what the side bar, the grid or home show of Voice Mode changes. */
+  onChange(cb) { this.listeners.push(cb); }
+  changed(what = 'strip') { for (const cb of this.listeners) { try { cb(what); } catch { /* a view that is gone */ } } }
+
+  /** What home's voice strip shows (AC-174): the state, the words as they are heard, mute. */
+  summary() {
+    const v = this.voice;
+    if (!v || !v.enabled) return { on: false };
+    const state = v.state || 'starting';
+    return { on: true, state, label: LABEL[state] || state, reason: v.reason || '', heard: this.heard, muted: !!v.muted, target: v.target_title || 'Overseer', asking: this.asking };
+  }
+
+  setAsking(on) {
+    if (this.asking === on) return;
+    this.asking = on;
+    vscode.commands.executeCommand('setContext', 'overseer.voiceAsking', on);
+    this.changed();
+  }
+
   async refresh() {
     try { this.voice = await this.client.request('voice.get'); } catch { this.voice = null; }
+    this.targeted = new Set(this.voice?.targeted || []);
     await this.titleTarget();
     vscode.commands.executeCommand('setContext', 'overseer.voiceSimulated', !!this.voice?.simulated);
     vscode.commands.executeCommand('setContext', 'overseer.voiceOn', !!this.voice?.enabled);
     this.render();
     this.post({ type: 'snapshot', voice: this.voice, reducedMotion: vscode.workspace.getConfiguration('workbench').get('reduceMotion') === 'on' });
     if (this.panel) this.sendRequests();
+    this.changed('targets');
   }
 
   async titleTarget() {
@@ -51,21 +76,48 @@ class Voice {
 
   live(m) {
     if (!m) return;
-    if (m.kind === 'state' && this.voice) { this.voice.state = m.state; this.voice.reason = m.reason; if (m.state === 'off') this.voice.enabled = false; this.render(); }
-    if (m.kind === 'target' && this.voice) { this.voice.target = m.target; this.titleTarget().then(() => { this.render(); this.post({ type: 'live', msg: { ...m, target_title: this.voice.target_title } }); }); return; }
-    if (m.kind === 'toast') this.toast(m);
+    if (m.kind === 'state' && this.voice) { this.voice.state = m.state; this.voice.reason = m.reason; if (m.state === 'off') this.voice.enabled = false; this.render(); this.changed(); }
+    if (m.kind === 'target' && this.voice) { this.voice.target = m.target; this.titleTarget().then(() => { this.render(); this.changed(); this.post({ type: 'live', msg: { ...m, target_title: this.voice.target_title } }); }); return; }
+    if (m.kind === 'targets') { this.targeted = new Set(m.runs || []); this.changed('targets'); }
+    if (m.kind === 'heard' || m.kind === 'not_meant') { this.heard = m.text || ''; this.changed(); }
+    if (m.kind === 'read_back') this.setAsking(!m.lapsed && !!m.agent);
+    if (m.kind === 'confirm' && m.lapsed) this.setAsking(false);
+    if (m.kind === 'request' && m.request) {
+      if (m.request.state === 'waiting') this.setAsking(true);
+      else if (this.asking && ['sent', 'not_sent', 'cancelled', 'partly_sent', 'done'].includes(m.request.state)) this.setAsking(false);
+    }
+    if (m.kind === 'toast') { if (m.cancel) this.setAsking(false); this.toast(m); }
+    if (m.kind === 'open') this.openPlace(m.place);
     if (m.kind === 'download') this.downloadProgress?.(m.progress);
     if (m.kind === 'request' && m.request?.proposal) this.fetchCard(m.request.proposal);
     this.post({ type: 'live', msg: m });
   }
 
+  /** A permission answered by voice (AC-171): the toast with Cancel inside the window, then Sent. */
   async toast(m) {
     if (m.cancel) {
       const pick = await vscode.window.showInformationMessage(m.text, 'Cancel');
       if (pick === 'Cancel') await this.client.request('voice.cancel', { id: m.request }).catch(e => vscode.window.showWarningMessage(`Overseer: ${e.message}`));
     } else {
-      vscode.window.setStatusBarMessage(`$(check) ${m.text}`, 6000);
+      vscode.window.showInformationMessage(m.text);
     }
+  }
+
+  /** What is not done by voice opens its place in the UI (AC-171). */
+  openPlace(place) {
+    const run = (cmd, ...args) => vscode.commands.executeCommand(cmd, ...args).then(undefined, () => {});
+    if (place === 'accounts') return run('overseer.accounts.focus');
+    if (place === 'continuity') return run('overseer.continuity.show');
+    if (place === 'cleanup') return run('overseer.agents.focus');
+    if (place === 'daemon') return run('workbench.action.quickOpen', '>Overseer: Stop Agents and Daemon');
+    if (place === 'phone') return run('workbench.action.openSettings', 'overseer phone');
+    if (place === 'rules') return run('workbench.action.openSettings', 'overseer voice');
+  }
+
+  /** Yes or no from the keyboard to what was read back (AC-171, AC-174). */
+  async answer(yes) {
+    await this.client.request('voice.answer', { yes });
+    this.setAsking(false);
   }
 
   post(m) { this.panel?.webview.postMessage(m); }
@@ -95,12 +147,16 @@ class Voice {
     <span class="voice-state" id="voice-state" role="status">Off</span>
     <button class="voice-target" id="voice-target" aria-label="Who you are talking to">Overseer</button>
     <span class="grow"></span>
-    <button id="voice-cancel" hidden>Cancel</button>
+    <button id="voice-yes" hidden title="Yes to what Overseer read back (Voice Mode: Yes)">Yes</button>
+    <button id="voice-no" hidden title="No to what Overseer read back (Voice Mode: No)">No</button>
+    <button id="voice-cancel" hidden title="Cancel the open request (Voice Mode: Cancel the Request)">Cancel</button>
     <button id="voice-mute" aria-pressed="false" aria-label="Mute"><i class="codicon codicon-mic" aria-hidden="true"></i></button>
   </header>
   <section class="voice-stage">
     <div class="voice-mark"><canvas id="voice-canvas" role="img" aria-label="The Overseer mark: it moves when Overseer hears you"></canvas><div class="voice-sign" id="voice-sign" hidden></div></div>
     <p class="voice-heard" id="voice-heard" aria-live="polite"></p>
+    <p class="voice-said" id="voice-said" aria-live="polite"></p>
+    <p class="voice-error" id="voice-error" role="alert" hidden></p>
     <div class="voice-meter" id="voice-meter" hidden aria-hidden="true"><i></i></div>
     <div class="voice-off" id="voice-off" hidden><span>Voice Mode is off.</span><span id="voice-off-reason"></span><button id="voice-on">Turn on</button></div>
   </section>
@@ -119,6 +175,7 @@ class Voice {
     if (m.type === 'toggle') return this.toggle();
     if (m.type === 'target') return this.talkTo();
     if (m.type === 'cancel') return this.client.request('voice.cancel', { id: m.id });
+    if (m.type === 'answer') return this.answer(!!m.yes);
     if (m.type === 'open' && m.run && this.selectRun) return this.selectRun(m.run, { reveal: true });
   }
 

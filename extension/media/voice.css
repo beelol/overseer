@@ -10,7 +10,9 @@ main.voice { display: flex; flex-direction: column; min-height: 100vh; box-sizin
 #voice-mute { background: transparent; border: 0; color: var(--ov-icon); width: 28px; height: 28px; border-radius: var(--ov-radius-control); cursor: pointer; display: grid; place-items: center; }
 #voice-mute:hover { background: var(--ov-hover); }
 #voice-mute[aria-pressed="true"] { color: var(--ov-accent); }
-#voice-cancel { font: inherit; font-size: var(--ov-font-sm); background: var(--ov-raised); color: var(--ov-text); border: 1px solid var(--ov-border-strong); border-radius: var(--ov-radius-control); padding: 2px var(--ov-space-3); cursor: pointer; }
+#voice-cancel, #voice-yes, #voice-no { font: inherit; font-size: var(--ov-font-sm); background: var(--ov-raised); color: var(--ov-text); border: 1px solid var(--ov-border-strong); border-radius: var(--ov-radius-control); padding: 2px var(--ov-space-3); cursor: pointer; }
+#voice-yes { background: var(--ov-accent); color: var(--ov-accent-fg); border-color: var(--ov-accent); }
+#voice-cancel[hidden], #voice-yes[hidden], #voice-no[hidden] { display: none; }
 .voice-stage { display: flex; flex-direction: column; align-items: center; gap: var(--ov-space-2); padding-top: var(--ov-space-4); }
 .voice-mark { position: relative; width: min(440px, 80vw, 55vh); aspect-ratio: 1; }
 .voice-mark canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -20,6 +22,9 @@ main.voice[data-state="paused"] .voice-mark canvas, main.voice[data-state="faile
 .voice-heard { min-height: 2.8em; max-width: 60ch; margin: 0; text-align: center; font-size: var(--ov-font-xl); line-height: var(--ov-line-tight); color: var(--ov-muted); }
 .voice-heard.final { color: var(--ov-text); }
 .voice-heard.aside { color: var(--ov-faint); font-style: italic; }
+.voice-said { margin: 0; max-width: 60ch; text-align: center; font-size: var(--ov-font-sm); color: var(--ov-muted); min-height: 1.4em; }
+.voice-error { margin: 0; max-width: 60ch; text-align: center; font-size: var(--ov-font-sm); color: var(--ov-failed); }
+.voice-error[hidden] { display: none; }
 .voice-meter { width: min(240px, 60vw); height: 6px; border-radius: var(--ov-radius-pill); background: var(--ov-raised-2); overflow: hidden; }
 .voice-meter i { display: block; height: 100%; width: 0; background: var(--ov-accent); }
 .voice-off { text-align: center; color: var(--ov-muted); display: flex; flex-direction: column; align-items: center; gap: var(--ov-space-3); }

@@ -714,7 +714,14 @@ impl Daemon {
             let outcome = self.perform(a, id, by);
             done.push(match outcome {
                 Ok(text) => text,
-                Err(e) => format!("{} failed: {e}", a["action"].as_str().unwrap_or("action")),
+                Err(e) => {
+                    // A new agent that could not start is a row in the card with its fix (AC-168).
+                    if a["action"] == "start" {
+                        let fix = crate::voice::request::start_fix(&e.to_string());
+                        let _ = self.dispatch_record(id, "", "start", "start", &format!("{}\n\nNot started: {e}\nFix: {fix}", a["prompt"].as_str().unwrap_or("")), a["why"].as_str().unwrap_or("new agent"), "failed");
+                    }
+                    format!("{} failed: {e}", a["action"].as_str().unwrap_or("action"))
+                }
             });
         }
         let result = format!("Done: {}.", done.join("; "));
@@ -847,9 +854,24 @@ impl Daemon {
             }
             "start" => {
                 let harness = a["harness"].as_str().map(str::to_string).or_else(|| self.overseer_session().ok().and_then(|s| s["harness"].as_str().map(str::to_string))).unwrap_or_else(|| "claude".into());
+                // A harness that is not on this Mac, a signed-out account or a workspace VS Code does not
+                // trust is a problem to show now, not a run that fails later (Voice Mode, AC-168).
+                if harness != "generic" && crate::adapters::resolve_program(&harness).is_none() {
+                    bail!("the {harness} harness is not installed on this Mac");
+                }
+                if a["untrusted"] == true {
+                    bail!("this workspace is not trusted in VS Code");
+                }
+                if let Some(pid) = a["profile_id"].as_str().filter(|p| !p.is_empty()) {
+                    let status = self.profile_status(pid)?;
+                    if status["logged_in"] == false {
+                        let name = self.profile(pid).map(|p| p.name).unwrap_or_else(|_| pid.to_string());
+                        bail!("the account {name} is signed out");
+                    }
+                }
                 let prompt = format!("{FROM_OVERSEER}{}", a["prompt"].as_str().unwrap_or(""));
                 let title = a["title"].as_str().map(str::to_string).unwrap_or_else(|| a["prompt"].as_str().unwrap_or("").chars().take(60).collect());
-                let created = self.create_task(&json!({"repo": a["repo"], "harness": harness, "prompt": prompt, "title": title}))?;
+                let created = self.create_task(&json!({"repo": a["repo"], "harness": harness, "prompt": prompt, "title": title, "profile_id": a["profile_id"], "model": a["model"], "workspace_mode": a["workspace_mode"]}))?;
                 let run = created["run"]["id"].as_str().unwrap_or("").to_string();
                 {
                     let store = self.store.lock().unwrap();

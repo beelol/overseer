@@ -69,6 +69,20 @@ pub fn addressed(text: &str, agent_names: &[String], awaiting_answer: bool) -> b
     {
         return true;
     }
+    // "Three agents should each write a note", "two new agents should…".
+    const COUNT: &[&str] = &[
+        "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "1", "2", "3", "4",
+        "5", "6", "7", "8", "9",
+    ];
+    if words.len() > 3
+        && COUNT.contains(&words[0].as_str())
+        && (words[1] == "agents"
+            || words[1] == "agent"
+            || (words[1] == "new" && words[2].starts_with("agent")))
+        && words.iter().any(|w| w == "should")
+    {
+        return true;
+    }
     if words.len() > 3
         && words[0] == "we"
         && words[1] == "need"
@@ -231,5 +245,11 @@ mod tests {
         assert!(addressed("we need someone to fix the build", &names, false));
         assert!(!addressed("someone left the door open", &names, false));
         assert!(!addressed("we need milk", &names, false));
+        assert!(addressed(
+            "three agents should each write a release note",
+            &names,
+            false
+        ));
+        assert!(!addressed("three friends should come over", &names, false));
     }
 }

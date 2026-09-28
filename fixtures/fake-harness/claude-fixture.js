@@ -14,7 +14,8 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
-if (process.argv.includes('auth') && process.argv.includes('status')) { console.log(JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', email: 'fixture@example.invalid', subscriptionType: 'max' })); process.exit(0); }
+// A profile folder holding a `signed-out` file reads as signed out (Voice Mode's problem rows, AC-168).
+if (process.argv.includes('auth') && process.argv.includes('status')) { console.log(JSON.stringify({ loggedIn: !(process.env.CLAUDE_CONFIG_DIR && fs.existsSync(path.join(process.env.CLAUDE_CONFIG_DIR, 'signed-out'))), authMethod: 'claude.ai', email: 'fixture@example.invalid', subscriptionType: 'max' })); process.exit(0); }
 if (!process.argv.includes('-p')) { console.log('claude-fixture 0.0.0 (synthetic)'); process.exit(0); }
 // CLAUDE_FIXTURE_MODE_FILE lets one test session give each task its own mode (read at start).
 const modeFile = process.env.CLAUDE_FIXTURE_MODE_FILE;
@@ -267,6 +268,7 @@ async function mcpClient() {
     const text = Array.isArray(content) ? content.filter(c => c.type === 'text').map(c => c.text).join('\n') : String(content);
     const state = /Agents \(JSON\):\n([\s\S]*?)\n<\/overseer-state>/.exec(text);
     let agents = state ? JSON.parse(state[1]) : [];
+    const stateAgents = agents; // with their repositories (the roster read over MCP has none)
     const said = text.replace(/^<overseer-state>[\s\S]*?<\/overseer-state>\s*/, '').trim();
     const mcp = process.env.CLAUDE_FIXTURE_NO_MCP ? null : await mcpClient();
     let n = 0;
@@ -388,7 +390,16 @@ async function mcpClient() {
     if (voiceReqs.length && mcp) {
       const replies = [];
       for (const voiceReq of voiceReqs) {
-        const words = voiceReq[2].trim();
+        let words = voiceReq[2].trim();
+        // New agents: "…, and someone should write the note", "three agents should each …".
+        const words0 = words;
+        const count = { one: 1, two: 2, three: 3, four: 4, five: 5, nine: 9 };
+        const several = /\b(one|two|three|four|five|nine|\d+) (?:new )?agents? should (?:each )?(.+?)[.!?]*$/i.exec(words0);
+        const someone = /,?\s*(?:and )?(?:someone|somebody) should (.+?)[.!?]*$/i.exec(words0);
+        const starts = [];
+        const repoOf = stateAgents.find(a => a.repo)?.repo;
+        if (several && repoOf) { const n = count[several[1].toLowerCase()] || Number(several[1]); for (let i = 0; i < n; i++) starts.push({ action: 'start', repo: repoOf, title: `${several[2].split(' ').slice(0, 3).join(' ')} ${i + 1}`, prompt: `Please ${several[2]}.`, confidence: 'high' }); words = words0.slice(0, several.index).trim(); }
+        else if (someone && repoOf) { starts.push({ action: 'start', repo: repoOf, title: someone[1].split(' ').slice(0, 3).join(' '), prompt: `Please ${someone[1]}.`, confidence: 'high' }); words = words0.slice(0, someone.index).trim(); }
         const marks = [...said.slice(0, voiceReq.index).matchAll(/\(Candidates from the daemon: (?:(none named)|(.*?)\. Choose among them)/g)];
         const mark = marks[marks.length - 1];
         const list = mark && mark[2] ? mark[2].split('; ').map(c => /^(.*) \(([^()]+)\): (.+)$/.exec(c)).filter(Boolean).map(m => ({ title: m[1], id: m[2], why: m[3] })) : [];
@@ -401,14 +412,19 @@ async function mcpClient() {
           else task = taskOf(c) || task;
         }
         if (!task && /^(yes|go ahead|ok|okay)\b/i.test(words)) task = 'go ahead';
+        if (starts.length && !list.length) {
+          await call('propose', { actions: starts }).catch(e => replies.push('refused: ' + e.message));
+          replies.push(`Starting ${starts.length === 1 ? 'one agent' : starts.length + ' agents'}.`);
+          continue;
+        }
         if (!list.length) replies.push('Who should I tell?');
         else if (/^archive\b/i.test(words)) {
           await call('propose', { actions: list.map(c => ({ action: 'archive', agent: c.id, confidence: 'high', why: c.why })) });
           replies.push(`Archiving ${list.map(c => c.title).join(' and ')}.`);
         } else if (!task) replies.push(`What should I tell ${list.map(c => c.title).join(' and ')}?`);
         else {
-          await call('propose', { actions: list.map(c => ({ action: 'message', agent: c.id, text: `Please ${task}.`, confidence: 'high', why: c.why })) });
-          replies.push(`Telling ${list.map(c => c.title).join(' and ')} to ${task}.`);
+          await call('propose', { actions: [...list.map(c => ({ action: 'message', agent: c.id, text: `Please ${task}.`, confidence: 'high', why: c.why })), ...starts] });
+          replies.push(`Telling ${list.map(c => c.title).join(' and ')} to ${task}${starts.length ? ', and starting one agent' : ''}.`);
         }
       }
       reply = replies.join(' ');

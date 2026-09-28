@@ -1204,7 +1204,7 @@ fn received(env: &Env, run: &str) -> Vec<String> {
         env.d
             .events(run)
             .iter()
-            .filter(|e| e["kind"] == "queued")
+            .filter(|e| e["kind"] == "queued" && e["source"] == "overseer")
             .filter_map(|e| e["payload"]["text"].as_str().map(String::from)),
     );
     out
@@ -2247,7 +2247,8 @@ exec /usr/bin/sandbox-exec -p "$P" "{}" "$@"
     env.d.call("voice.set", json!({"settle_seconds": 1}));
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
-    let phone = agent(&env.d, &repo, "Phone");
+    // Busy for the whole test (the other tests' agents sleep a minute).
+    let phone = env.d.call("task.create", json!({"repo": repo, "harness": "generic", "workspace_mode": "worktree", "program": "/bin/sleep", "args": ["900"], "prompt": "", "title": "Phone"}))["run"]["id"].as_str().unwrap().to_string();
     let live = listening(&env);
     let pid = env.d.call("voice.get", json!({}))["listener"]["pid"].clone();
     let mut ids = Vec::new();
@@ -2257,11 +2258,18 @@ exec /usr/bin/sandbox-exec -p "$P" "{}" "$@"
             "voice.simulate",
             json!({"speechlike": 1.0, "words": format!("Tell Phone to do task {i}.")}),
         );
+        // The next new request; it goes out before the next is said, so none joins another
+        // inside its settle window (AC-170).
+        let known = ids.clone();
         let taken = live.wait("taken", 90, |v| {
             v["kind"] == "request"
-                && v["request"]["words"] == json!(format!("Tell Phone to do task {i}."))
+                && v["request"]["id"]
+                    .as_str()
+                    .is_some_and(|id| !known.iter().any(|k| k == id))
         });
-        ids.push(taken["request"]["id"].as_str().unwrap().to_string());
+        let id = taken["request"]["id"].as_str().unwrap().to_string();
+        wait_state(&live, &id, "sent");
+        ids.push(id);
     }
     let deadline = Instant::now() + Duration::from_secs(180);
     while ids.iter().any(|id| request(&env.d, id)["state"] != "sent") {
@@ -2292,7 +2300,354 @@ exec /usr/bin/sandbox-exec -p "$P" "{}" "$@"
         .unwrap();
     let words = String::from_utf8_lossy(&out.stdout);
     assert_eq!(words.lines().count(), 20);
-    assert!(words
-        .lines()
-        .all(|l| l.starts_with("Tell Phone to do task ")));
+    assert!(words.lines().all(|l| l.starts_with("Tell Phone to do")));
+    let _ = env.d.try_call("run.interrupt", json!({"run_id": phone}));
+}
+
+/// AC-166 with the fixture orchestrator: an ambiguous request asks one question and sends nothing;
+/// "everyone" reaches each active top-level agent once; a follow-on reaches the previous targets;
+/// "yes, do that" reaches the agent that asked; the target switches by voice; with one agent
+/// chosen, ten sentences reach only it, each with its card, and naming Overseer reaches Overseer.
+#[test]
+fn ac166_the_right_agents_with_the_fixture_orchestrator() {
+    let env = voice_daemon(&[]);
+    env.d.call("voice.set", json!({"settle_seconds": 1}));
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let phone = agent(&env.d, &repo, "Phone");
+    let cont = agent(&env.d, &repo, "Continuity");
+    let swarm = agent(&env.d, &repo, "Swarm");
+    let live = listening(&env);
+    let counts = || [&phone, &cont, &swarm].map(|a| received(&env, a).len());
+    // Ambiguous: one short question, nothing sent.
+    let a = say(&env, "please add tests");
+    wait_state(&live, &a, "answered");
+    assert_eq!(request(&env.d, &a)["answer"], "Who should I tell?");
+    live.wait("the question is said", 20, |v| {
+        v["kind"] == "say" && v["text"] == "Who should I tell?"
+    });
+    assert_eq!(counts(), [0, 0, 0]);
+    // Everyone: each active agent once.
+    let b = say(&env, "Tell everyone to pull main before they push.");
+    wait_state(&live, &b, "sent");
+    assert_eq!(counts(), [1, 1, 1]);
+    // Two named, then "them also": the same two.
+    let c = say(&env, "Tell Phone and Continuity to rebase onto main.");
+    wait_state(&live, &c, "sent");
+    let d = say(&env, "Tell them also to update the ledger.");
+    wait_state(&live, &d, "sent");
+    assert_eq!(counts(), [3, 3, 1]);
+    let card = env.d.call(
+        "overseer.card",
+        json!({"id": request(&env.d, &d)["proposal"]}),
+    );
+    assert!(
+        card["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|r| r["why"] == "previous"),
+        "{card}"
+    );
+    // "Yes, do that": the agent that asked.
+    let asks = permission_agent(&env, &repo, "Asks");
+    std::fs::write(env.mode_file(), "overseer").unwrap();
+    let e = say(&env, "yes, do that");
+    wait_state(&live, &e, "sent");
+    assert_eq!(received(&env, &asks).len(), 1, "the agent that asked");
+    assert_eq!(counts(), [3, 3, 1], "nobody else");
+    // Switching by voice, then ten sentences to the chosen agent only, each with its card.
+    let t = env
+        .d
+        .call("voice.say", json!({"text": "talk to Continuity"}));
+    assert_eq!(t["target"], json!(cont), "{t}");
+    assert_eq!(env.d.call("voice.get", json!({}))["target"], json!(cont));
+    let sentences = [
+        "add a test for the gateway",
+        "write the changelog next",
+        "check the build before you push",
+        "run the migrations again",
+        "fix the flaky test",
+        "remove the old flag",
+        "make the error message clearer",
+        "send me a short summary",
+        "add a note to the readme",
+        "check your branch is up to date",
+    ];
+    for s in sentences {
+        let r = env.d.call("voice.say", json!({"text": s}));
+        assert_eq!(r["direct"], true, "{s}: {r}");
+        let id = r["request"].as_str().unwrap().to_string();
+        let sent = wait_state(&live, &id, "sent");
+        let card = env
+            .d
+            .call("overseer.card", json!({"id": sent["request"]["proposal"]}));
+        let rows = card["rows"].as_array().unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["run_id"], json!(cont), "{s}");
+    }
+    assert_eq!(counts(), [3, 13, 1], "only Continuity");
+    // Naming Overseer still reaches Overseer.
+    let o = env.d.call(
+        "voice.say",
+        json!({"text": "Overseer, what is everyone doing?"}),
+    );
+    assert!(o["direct"].is_null(), "{o}");
+    let oid = o["request"].as_str().unwrap().to_string();
+    wait_state(&live, &oid, "answered");
+    assert!(request(&env.d, &oid)["answer"]
+        .as_str()
+        .unwrap_or("")
+        .contains("everyone is doing"));
+    assert_eq!(counts(), [3, 13, 1]);
+    // Back to Overseer by voice.
+    env.d.call("voice.say", json!({"text": "back to Overseer"}));
+    assert_eq!(env.d.call("voice.get", json!({}))["target"], "overseer");
+}
+
+fn sha(text: &str) -> String {
+    use sha2::Digest;
+    format!("{:x}", sha2::Sha256::digest(text.as_bytes()))
+}
+
+/// AC-168: a request starts one agent, and three, each with a prompt written for it, the
+/// repository from the context and the composer's remembered choices; four wait for a yes; a
+/// harness that is not installed is a row with its fix while the other target is still sent.
+#[test]
+fn ac168_new_agents_from_a_request() {
+    let env = voice_daemon(&[("OVERSEER_OPENCODE_PATH", "/nonexistent/opencode")]);
+    env.d.call("voice.set", json!({"settle_seconds": 1, "start_defaults": {"harness": "claude", "model": "fixture-model", "workspace_mode": "worktree"}}));
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let phone = agent(&env.d, &repo, "Phone");
+    let live = listening(&env);
+    let runs = || {
+        env.d.call("state", json!({}))["runs"]
+            .as_array()
+            .unwrap()
+            .clone()
+    };
+    let before = runs().len();
+    // One new agent beside a message.
+    let a = say(
+        &env,
+        "Tell Phone to add tests, and someone should write the migration note.",
+    );
+    let sent = wait_state(&live, &a, "sent");
+    let card = env
+        .d
+        .call("overseer.card", json!({"id": sent["request"]["proposal"]}));
+    let rows = card["rows"].as_array().unwrap();
+    assert_eq!(rows.len(), 2, "{card}");
+    let start = rows
+        .iter()
+        .find(|r| r["action"] == "start")
+        .expect("a start row");
+    assert_eq!(start["why"], "new agent");
+    let new = start["run_id"].as_str().unwrap();
+    let run = env.d.run(new);
+    assert_eq!(run["harness"], "claude", "the composer's harness");
+    assert_eq!(run["model"], "fixture-model", "the composer's model");
+    let first = env.d.call("run.turns", json!({"run_id": new}))[0]["prompt"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        first.contains("For you: Please write the migration note."),
+        "{first}"
+    );
+    assert!(first.contains("The owner said: “Tell Phone to add tests, and someone should write the migration note.”"), "{first}");
+    assert_eq!(received(&env, &phone).len(), 1);
+    // Three new agents: no yes needed.
+    let b = say(&env, "Three agents should each write a release note.");
+    wait_state(&live, &b, "sent");
+    assert_eq!(runs().len(), before + 4, "one and three new agents");
+    // Four wait for a yes, and "no" sends nothing.
+    let c = say(&env, "Four agents should each review a file.");
+    wait_state(&live, &c, "waiting");
+    env.d.call("voice.say", json!({"text": "no"}));
+    wait_state(&live, &c, "not_sent");
+    assert_eq!(runs().len(), before + 4, "none of the four started");
+    // A harness that is not installed: a row with its fix; Phone is still sent its message.
+    env.d.call(
+        "voice.set",
+        json!({"start_defaults": {"harness": "opencode", "workspace_mode": "worktree"}}),
+    );
+    let d = say(
+        &env,
+        "Tell Phone to rebase, and someone should write the changelog.",
+    );
+    let done = live.wait("done", 60, |v| {
+        v["kind"] == "request"
+            && v["request"]["id"] == json!(d)
+            && ["partly_sent", "sent"].contains(&v["request"]["state"].as_str().unwrap_or(""))
+    });
+    let card = env
+        .d
+        .call("overseer.card", json!({"id": done["request"]["proposal"]}));
+    let failed: Vec<&Value> = card["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|r| r["state"] == "failed")
+        .collect();
+    let started: Vec<&Value> = card["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|r| r["action"] == "start" && r["state"] != "failed")
+        .collect();
+    let fixed = failed.iter().any(|r| {
+        r["message"]
+            .as_str()
+            .unwrap_or("")
+            .contains("Fix: install the harness")
+    }) || started
+        .iter()
+        .any(|r| env.d.run(r["run_id"].as_str().unwrap_or(""))["status"] == "failed");
+    assert!(fixed, "the problem is shown: {card}");
+    assert_eq!(
+        received(&env, &phone).len(),
+        2,
+        "the other target was still sent"
+    );
+    // A signed-out account and an untrusted workspace: the same.
+    let profile = env.d.call(
+        "profile.create",
+        json!({"name": "Work", "harness": "claude"}),
+    );
+    let home = profile["home"].as_str().unwrap();
+    std::fs::write(Path::new(home).join("claude").join("signed-out"), "").unwrap();
+    for (defaults, fix) in [
+        (
+            json!({"harness": "claude", "profile_id": profile["id"], "workspace_mode": "worktree"}),
+            "Fix: sign in to the account",
+        ),
+        (
+            json!({"harness": "claude", "workspace_mode": "worktree", "trusted": false}),
+            "Fix: trust the workspace",
+        ),
+    ] {
+        env.d.call("voice.set", json!({"start_defaults": defaults}));
+        let before = received(&env, &phone).len();
+        let e = say(
+            &env,
+            "Tell Phone to add a test, and someone should write the release notes.",
+        );
+        let done = live.wait("done", 60, |v| {
+            v["kind"] == "request"
+                && v["request"]["id"] == json!(e)
+                && v["request"]["state"] == "partly_sent"
+        });
+        let card = env
+            .d
+            .call("overseer.card", json!({"id": done["request"]["proposal"]}));
+        assert!(
+            card["rows"].as_array().unwrap().iter().any(
+                |r| r["state"] == "failed" && r["message"].as_str().unwrap_or("").contains(fix)
+            ),
+            "{fix}: {card}"
+        );
+        assert_eq!(
+            received(&env, &phone).len(),
+            before + 1,
+            "Phone still got its message"
+        );
+    }
+    live.wait("the problem is said", 5, |v| {
+        v["kind"] == "say"
+            && v["text"]
+                .as_str()
+                .unwrap_or("")
+                .contains("could not be sent")
+    });
+}
+
+/// AC-169: two agents in flight and one new agent: the hash of each message in the card equals
+/// the hash of the message the agent got; each names who else was told; the card is the same after
+/// a daemon kill and restart, and a word of the quote finds the request.
+#[test]
+fn ac169_two_agents_in_flight_and_a_new_one_get_the_card_s_text_byte_for_byte() {
+    let mut env = voice_daemon(&[
+        ("FIXTURE_SLOW_MS", "120000"),
+        (
+            "OVERSEER_HARNESS_ENV_PASSTHROUGH",
+            "CLAUDE_FIXTURE_MODE_FILE,FIXTURE_SLOW_MS",
+        ),
+    ]);
+    env.d.call("voice.set", json!({"settle_seconds": 1, "start_defaults": {"harness": "claude", "workspace_mode": "worktree"}}));
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    std::fs::write(env.mode_file(), "slow").unwrap();
+    let mk = |title: &str| {
+        let created = env.d.call(
+            "task.create",
+            json!({"repo": repo, "harness": "claude", "prompt": "keep working", "title": title}),
+        );
+        let id = created["run"]["id"].as_str().unwrap().to_string();
+        env.d.wait_status(&id, |s| s == "running", 30);
+        id
+    };
+    let phone = mk("Phone");
+    let cont = mk("Continuity");
+    std::fs::write(env.mode_file(), "echo").unwrap();
+    let live = listening(&env);
+    let id = say(&env, "Tell Phone and Continuity to use the new wire format, and someone should write the migration note.");
+    let sent = wait_state(&live, &id, "sent");
+    let proposal = sent["request"]["proposal"].as_str().unwrap().to_string();
+    let card = env.d.call("overseer.card", json!({"id": proposal}));
+    let rows = card["rows"].as_array().unwrap().clone();
+    assert_eq!(rows.len(), 3, "{card}");
+    let mut hashes = Vec::new();
+    for row in &rows {
+        let run = row["run_id"].as_str().unwrap();
+        let message = row["message"].as_str().unwrap();
+        let got: Vec<String> = if row["action"] == "start" {
+            // Its first turn: Gate S's briefing, then Overseer's message.
+            let prompt = env.d.call("run.turns", json!({"run_id": run}))[0]["prompt"]
+                .as_str()
+                .unwrap()
+                .to_string();
+            vec![prompt.rsplit("From Overseer: ").next().unwrap().to_string()]
+        } else {
+            env.d
+                .events(run)
+                .iter()
+                .filter(|e| e["kind"] == "queued" && e["source"] == "overseer")
+                .filter_map(|e| e["payload"]["text"].as_str().map(String::from))
+                .collect()
+        };
+        assert_eq!(got.len(), 1, "{run}: {got:?}");
+        assert_eq!(
+            sha(&got[0]),
+            sha(message),
+            "{run}: the card's text is the text sent:\n{}\n---\n{message}",
+            got[0]
+        );
+        assert!(message.contains("Also told: "), "{message}");
+        hashes.push(sha(message));
+    }
+    assert!(
+        rows.iter().any(|r| r["run_id"] == json!(phone))
+            && rows.iter().any(|r| r["run_id"] == json!(cont))
+    );
+    // The same after a kill and a restart; a word of the quote finds the request.
+    env.d.kill9();
+    std::thread::sleep(Duration::from_millis(300));
+    env.d.spawn();
+    let again = env.d.call("overseer.card", json!({"id": proposal}));
+    let after: Vec<String> = again["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| sha(r["message"].as_str().unwrap()))
+        .collect();
+    assert_eq!(after, hashes);
+    let found = env
+        .d
+        .call("voice.requests", json!({"query": "migration note"}));
+    assert_eq!(found["requests"][0]["id"], json!(id));
+    for run in [&phone, &cont] {
+        let _ = env.d.try_call("run.interrupt", json!({"run_id": run}));
+    }
 }

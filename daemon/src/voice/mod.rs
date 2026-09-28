@@ -574,6 +574,8 @@ pub fn get(d: &Arc<Daemon>) -> Result<Value> {
     let s = settings(d)?;
     let v = get_voice()?;
     let (state, reason) = v.state(&s);
+    // Before the state's lock: the targets read the request list and the cards.
+    let targeted = request::targeted(d);
     let st = v.st.lock().unwrap();
     let model_path = model::path(&s.model);
     Ok(json!({
@@ -589,8 +591,10 @@ pub fn get(d: &Arc<Daemon>) -> Result<Value> {
             "floor": s.floor, "delivery": s.delivery, "settle_seconds": s.settle_seconds, "speak": s.speak, "voice": s.voice, "rate": s.rate,
             "permission_answers": s.permission_answers, "new_agents_per_request": s.new_agents_per_request, "requests_per_hour": s.requests_per_hour,
             "keep_days": s.keep_days, "model": s.model,
+            "start_defaults": meta(d, "voice.start_defaults").ok().flatten().and_then(|j| serde_json::from_str::<Value>(&j).ok()),
         },
         "model": {"name": s.model, "downloaded": model_path.exists() || simulated(), "bytes": model::size(&s.model), "download": st.download},
+        "targeted": targeted,
         "listener": {"running": st.pid.is_some(), "pid": st.pid, "restarts": st.restarts.len(),
             "last_error": st.last_error.as_ref().map(|(m, at)| json!({"message": m, "at": at}))},
     }))
@@ -700,6 +704,27 @@ pub fn set(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     if let Some(v) = p.get("target") {
         let t = v.as_str().ok_or_else(|| anyhow!("target must be text"))?;
         changes.push(("voice.target", request::check_target(d, t)?));
+    }
+    // The composer's remembered choices (AC-59), which agents started by voice take (AC-168).
+    if let Some(v) = p.get("start_defaults") {
+        let o = v
+            .as_object()
+            .ok_or_else(|| anyhow!("start_defaults must be an object"))?;
+        let mut kept = serde_json::Map::new();
+        for k in ["harness", "profile_id", "model", "workspace_mode"] {
+            if let Some(x) = o.get(k).and_then(|x| x.as_str()).filter(|x| !x.is_empty()) {
+                kept.insert(k.into(), json!(x));
+            }
+        }
+        if let Some(t) = o.get("trusted").and_then(|t| t.as_bool()) {
+            kept.insert("trusted".into(), json!(t));
+        }
+        if let Some(m) = kept.get("workspace_mode").and_then(|m| m.as_str()) {
+            if !["worktree", "current"].contains(&m) {
+                bail!("workspace_mode must be worktree or current");
+            }
+        }
+        changes.push(("voice.start_defaults", Value::Object(kept).to_string()));
     }
     if changes.is_empty() {
         bail!(

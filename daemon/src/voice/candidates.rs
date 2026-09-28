@@ -49,8 +49,13 @@ fn words(text: &str) -> Vec<String> {
 
 /// Words of a name that identify it (short words like "the" or "app" do not).
 fn significant(name: &str) -> Vec<String> {
+    // Words that name no one: short words, and the verbs a task title starts with ("write the
+    // migration note" is named by "migration", not by "write").
     const WEAK: &[&str] = &[
-        "the", "and", "for", "app", "agent", "new", "fix", "add", "a", "an", "of", "to", "in", "on",
+        "the", "and", "for", "app", "agent", "new", "fix", "add", "a", "an", "of", "to", "in",
+        "on", "write", "review", "check", "update", "make", "build", "test", "tests", "change",
+        "run", "remove", "send", "read", "look", "find", "keep", "stop", "start", "use", "move",
+        "rename", "clean", "delete", "create", "open", "close", "each", "note", "please",
     ];
     name.to_lowercase()
         .split(|c: char| !c.is_alphanumeric())
@@ -402,6 +407,32 @@ mod tests {
                 ids(text, None, &[])
             );
         }
+        // A task's verb names no one: "write the migration note" is not named by "write a note".
+        let mut b = agents();
+        b.push(Agent {
+            id: "r-mig".into(),
+            title: "write the migration".into(),
+            repository: "/w/overseer".into(),
+            branch: None,
+            active: true,
+            just_asked: false,
+            files: vec![],
+        });
+        let ctx = Context {
+            agents: &b,
+            focus: None,
+            previous: &[],
+        };
+        let got: Vec<_> = candidates("three agents should each write a release note", &ctx)
+            .into_iter()
+            .map(|c| c.id)
+            .collect();
+        assert!(got.is_empty(), "{got:?}");
+        let got: Vec<_> = candidates("the migration should wait", &ctx)
+            .into_iter()
+            .map(|c| c.id)
+            .collect();
+        assert_eq!(got, vec!["r-mig".to_string()]);
         // A name of an agent that is not active is never a candidate.
         let mut a = agents();
         a[0].active = false;

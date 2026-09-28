@@ -78,6 +78,8 @@ struct Requests {
     last_targets: Vec<String>,
     /// The last request that went out, for a correction after the send (AC-170): id, words, when.
     last_sent: Option<(String, String, Instant)>,
+    /// The targets last announced, so the mark changes are sent once.
+    targets_shown: Vec<String>,
     /// Requests taken while four were open: they begin as others close (AC-173).
     waiting: VecDeque<(String, String, String)>,
     /// A follow-up's id and the sent request it replaces, until it begins.
@@ -381,6 +383,41 @@ fn announce(v: &Voice, id: &str) {
     if let Some(r) = row(&v.d, id) {
         v.emit(json!({"kind": "request", "request": r}));
     }
+    // The agents targeted by open requests carry a voice mark in the side bar and the grid.
+    let now = targeted(&v.d);
+    let changed = {
+        let mut r = req().lock().unwrap();
+        let changed = r.targets_shown != now;
+        r.targets_shown = now.clone();
+        changed
+    };
+    if changed {
+        v.emit(json!({"kind": "targets", "runs": now}));
+    }
+}
+
+/// The agents that open spoken requests are for (their plans settle or wait for a yes, AC-169).
+pub fn targeted(d: &Daemon) -> Vec<String> {
+    let proposals: Vec<String> = req()
+        .lock()
+        .unwrap()
+        .open
+        .iter()
+        .filter_map(|o| o.proposal.clone())
+        .collect();
+    let mut out: Vec<String> = Vec::new();
+    for p in proposals {
+        if let Ok(card) = d.card(&p) {
+            for a in card["actions"].as_array().into_iter().flatten() {
+                if let Some(id) = a["agent"].as_str() {
+                    if !out.iter().any(|x| x == id) {
+                        out.push(id.to_string());
+                    }
+                }
+            }
+        }
+    }
+    out
 }
 
 /// Lines waiting for a free floor (the speech queue, AC-173).
@@ -641,7 +678,22 @@ impl Voice {
         let to_agent = s.target != "overseer"
             && (p.split(' ').any(|w| w == "you" || w == "your")
                 || (p.split(' ').count() >= 3 && p.split(' ').any(|w| floor::is_command_verb(w))));
-        let meant = floor::addressed(&text, &self.agent_names(), awaiting) || to_agent;
+        // "Yes, do that" / "go ahead" while an agent waits on the owner answers that agent (AC-166).
+        let answers_an_agent = [
+            "yes do that",
+            "yes go ahead",
+            "go ahead",
+            "do that",
+            "yes please do that",
+            "ok do that",
+            "okay do that",
+            "sure go ahead",
+        ]
+        .iter()
+        .any(|a| p == *a || p.starts_with(&format!("{a} ")))
+            && agents_for(&self.d).iter().any(|a| a.just_asked);
+        let meant =
+            floor::addressed(&text, &self.agent_names(), awaiting) || to_agent || answers_an_agent;
         if !meant {
             let mut r = req().lock().unwrap();
             r.context.push_back(Heard {
@@ -723,7 +775,7 @@ impl Voice {
     }
 
     /// A taken request goes to Overseer (or to the agent spoken to).
-    fn begin(self: &Arc<Self>, id: &str, words: &str, via: &str) -> Value {
+    fn begin(self: &Arc<Self>, id: &str, words: &str, _via: &str) -> Value {
         let d = self.d.clone();
         let id = id.to_string();
         let s = match settings(&d) {
@@ -901,6 +953,64 @@ impl Voice {
     /// mute, what's running.
     fn built_in(self: &Arc<Self>, p: &str, text: &str, via: &str) -> Option<Value> {
         let d = self.d.clone();
+        // Who is spoken to, by voice (AC-166): "talk to Continuity", "back to Overseer".
+        if matches!(
+            p,
+            "back to overseer" | "talk to overseer" | "talk to overseer again" | "overseer again"
+        ) {
+            let _ = super::set(&d, &json!({"target": "overseer"}));
+            heard_signal(self);
+            speak_when_free(self, "Back to Overseer.");
+            return Some(json!({"taken": true, "built_in": "target", "target": "overseer"}));
+        }
+        if let Some(name) = p
+            .strip_prefix("talk to ")
+            .or_else(|| p.strip_prefix("switch to "))
+            .or_else(|| p.strip_prefix("let me talk to "))
+            .map(|n| {
+                n.trim_start_matches("the ")
+                    .trim_end_matches(" agent")
+                    .to_string()
+            })
+            .filter(|n| !n.is_empty())
+        {
+            let found: Vec<(String, String)> = d
+                .roster()
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|l| {
+                    crate::daemon::ACTIVE.contains(&l.status.as_str())
+                        && plain(&l.title).contains(&name)
+                })
+                .map(|l| (l.id, l.title))
+                .collect();
+            heard_signal(self);
+            return Some(match found.as_slice() {
+                [(id, title)] => match super::set(&d, &json!({"target": id})) {
+                    Ok(_) => {
+                        speak_when_free(self, &format!("Talking to {title}."));
+                        json!({"taken": true, "built_in": "target", "target": id})
+                    }
+                    Err(e) => json!({"taken": false, "why": e.to_string()}),
+                },
+                [] => {
+                    speak_when_free(self, &format!("No agent called {name} is running."));
+                    json!({"taken": false, "why": "no such agent"})
+                }
+                many => {
+                    let names: Vec<String> = many.iter().map(|(_, t)| t.clone()).collect();
+                    speak_when_free(
+                        self,
+                        &format!(
+                            "Which one: {}?",
+                            join_names(&names).replace(" and ", " or ")
+                        ),
+                    );
+                    self.st.lock().unwrap().awaiting_answer = true;
+                    json!({"taken": false, "why": "more than one agent has that name"})
+                }
+            });
+        }
         if matches!(p, "mute" | "stop listening" | "mute yourself") {
             let _ = super::set(&d, &json!({"muted": true}));
             return Some(json!({"taken": true, "built_in": "mute"}));
@@ -1677,6 +1787,25 @@ pub fn decorate(d: &Daemon, actions: &mut [Value]) -> Result<bool> {
         if a["confidence"] == "low" {
             bail!("a low-confidence action is not sent: ask the owner one short question instead");
         }
+        // A new agent takes the composer's remembered harness, account, model and workspace mode
+        // (AC-168), unless Overseer chose one.
+        if a["action"] == "start" {
+            let defaults: Value = super::meta(d, "voice.start_defaults")
+                .ok()
+                .flatten()
+                .and_then(|j| serde_json::from_str(&j).ok())
+                .unwrap_or(json!({}));
+            for k in ["harness", "profile_id", "model", "workspace_mode"] {
+                if a[k].as_str().unwrap_or("").is_empty() {
+                    if let Some(v) = defaults[k].as_str() {
+                        a[k] = json!(v);
+                    }
+                }
+            }
+            if defaults["trusted"] == false {
+                a["untrusted"] = json!(true);
+            }
+        }
         let text_key = if a["action"] == "start" {
             "prompt"
         } else {
@@ -1724,6 +1853,34 @@ pub fn decorate(d: &Daemon, actions: &mut [Value]) -> Result<bool> {
         }
     }
     Ok(needs_yes)
+}
+
+/// What to do about a new agent that could not start (AC-168): one line, shown in its row.
+pub fn start_fix(error: &str) -> &'static str {
+    let e = error.to_lowercase();
+    if e.contains("not a git")
+        || e.contains("no such file")
+        || e.contains("does not exist")
+        || e.contains("repository")
+    {
+        "check the repository path, or say which repository"
+    } else if e.contains("sign")
+        || e.contains("logged out")
+        || e.contains("login")
+        || e.contains("auth")
+    {
+        "sign in to the account in Accounts, or choose another in the composer"
+    } else if e.contains("not installed")
+        || e.contains("not found")
+        || e.contains("no such harness")
+        || e.contains("cannot run")
+    {
+        "install the harness, or choose another in the composer"
+    } else if e.contains("trust") {
+        "trust the workspace in VS Code"
+    } else {
+        "start it from the composer to see what it needs"
+    }
 }
 
 /// Medium confidence waits longer, with every target named (AC-166).

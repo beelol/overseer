@@ -51,7 +51,8 @@ async function activate(context) {
   client = new DaemonClient(binary, say);
   const model = new Model(client);
   // The side bar's agents list (Gate K): Needs you, then agents by repository.
-  const agents = new AgentsProvider(model, context.workspaceState, context.extensionUri, { attention: () => attention(), pinned: () => pinned() });
+  let voiceTargeted = () => new Set(); // set once Voice Mode is up (below)
+  const agents = new AgentsProvider(model, context.workspaceState, context.extensionUri, { attention: () => attention(), pinned: () => pinned(), voiceTargeted: () => voiceTargeted() });
   const accounts = new AccountsProvider(model, context.extensionUri);
   const agentsView = vscode.window.createTreeView('overseer.agents', { treeDataProvider: agents, showCollapseAll: true, dragAndDropController: agentDrag() });
   // The search field above the Agents list (AC-112): typing filters the list through the daemon's search.
@@ -209,6 +210,20 @@ async function activate(context) {
   const newTaskPanel = new NewTaskPanel(context, client, model, { selectRun: (...a) => selectRun(...a), launcher, column: () => vscode.ViewColumn.Beside });
   // Voice Mode (Gate R): the voice view, its status bar item and toasts; the daemon listens.
   const voice = new Voice(context, client, { selectRun: (...a) => selectRun(...a) });
+  // The voice mark on targeted agents (side bar and grid) and home's voice strip follow it.
+  voiceTargeted = () => voice.targeted;
+  center.voiceSource = voice;
+  voice.onChange(what => { if (what === 'targets') agents.refresh(); center.pushVoice(); });
+  // Agents started by voice take the composer's remembered choices and this window's workspace
+  // trust (AC-168): sent to the daemon on connect and whenever the composer remembers new ones.
+  const sendStartDefaults = () => {
+    const d = launcher.defaults();
+    client.request('voice.set', { start_defaults: { harness: d.harness || '', profile_id: d.harness === 'generic' ? '' : d.account || '', model: d.model || '', workspace_mode: d.mode === 'current' ? 'current' : 'worktree', trusted: vscode.workspace.isTrusted } }).catch(() => {});
+  };
+  client.on('connected', sendStartDefaults);
+  const rememberDefaults = launcher.saveDefaults.bind(launcher);
+  launcher.saveDefaults = async d => { const r = await rememberDefaults(d); sendStartDefaults(); return r; };
+  context.subscriptions.push(vscode.workspace.onDidGrantWorkspaceTrust(sendStartDefaults));
   // An agent dragged from the side bar into the editor opens its chat there (AC-71): a read-only
   // virtual file per agent (overseer-chat:/<run id>/<title>.overseer-chat) shown by a custom editor.
   context.subscriptions.push(
@@ -775,6 +790,8 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.voice.mute', guard(() => voice.mute())),
     vscode.commands.registerCommand('overseer.voice.talkTo', guard(() => voice.talkTo())),
     vscode.commands.registerCommand('overseer.voice.cancel', guard(() => voice.cancel())),
+    vscode.commands.registerCommand('overseer.voice.yes', guard(() => voice.answer(true))),
+    vscode.commands.registerCommand('overseer.voice.no', guard(() => voice.answer(false))),
     vscode.commands.registerCommand('overseer.voice.simulate', guard(() => voice.simulate())),
     vscode.commands.registerCommand('overseer.resetGridLayout', guard(() => center.panel?.webview.postMessage({ type: 'gridReset' }))),
     vscode.commands.registerCommand('overseer.toggleGrid', guard(async () => {

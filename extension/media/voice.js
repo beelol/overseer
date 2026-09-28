@@ -10,7 +10,7 @@
   const layerUris = JSON.parse(main.dataset.layers);
   const LABEL = { off: 'Off', starting: 'Starting', listening: 'Listening', hearing: 'Hearing you', thinking: 'Thinking', speaking: 'Speaking', muted: 'Muted', paused: 'Paused for a call', failed: 'Stopped' };
   const MARK_STATE = { off: 'muted', starting: 'listening', listening: 'listening', hearing: 'hearing', thinking: 'thinking', speaking: 'speaking', muted: 'muted', paused: 'paused', failed: 'muted' };
-  const STATE_LABEL = { taken: 'Taken', thinking: 'Working on it', settling: 'Going out', waiting: 'Waits for your yes', sent: 'Sent', partly_sent: 'Partly sent', cancelled: 'Cancelled', corrected: 'Corrected', joined: 'Joined', not_sent: 'Not sent', answered: 'Answered', done: 'Done', not_for_overseer: 'Not for Overseer' };
+  const STATE_LABEL = { taken: 'Taken', thinking: 'Working on it', settling: 'Going out', waiting: 'Waits for your yes', waiting_turn: 'Waits its turn', sent: 'Sent', partly_sent: 'Partly sent', cancelled: 'Cancelled', corrected: 'Corrected', superseded: 'Superseded', joined: 'Joined', not_sent: 'Not sent', answered: 'Answered', done: 'Done', not_for_overseer: 'Not for Overseer' };
   const SIGN = {
     mute: '<i class="codicon codicon-mute" aria-hidden="true"></i>',
     pause: '<i class="codicon codicon-debug-pause" aria-hidden="true"></i>',
@@ -34,6 +34,15 @@
   });
   reducedQuery.addEventListener('change', () => mark && mark.setReduced(reducedQuery.matches || reducedSetting));
   window.__voice = { mark: null, messages: 0 };
+
+  // A read-back or a plan that waits for a yes: Yes and No in the strip (and on the keyboard).
+  function setAsking(on) { $('voice-yes').hidden = !on; $('voice-no').hidden = !on; }
+  // The listener's or the recognizer's last error, for ten minutes (AC-175).
+  function showError(message, at) {
+    const fresh = message && (!at || Date.now() - at < 600000);
+    $('voice-error').hidden = !fresh;
+    $('voice-error').textContent = fresh ? `Voice Mode had a problem: ${message}` : '';
+  }
 
   function applyState() {
     const state = voice ? voice.state : 'off';
@@ -110,6 +119,8 @@
       reducedSetting = !!m.reducedMotion;
       if (mark) mark.setReduced(reducedQuery.matches || reducedSetting);
       $('voice-meter').hidden = !(reducedQuery.matches || reducedSetting);
+      const err = voice && voice.listener && voice.listener.last_error;
+      showError(err && err.message, err && err.at);
       applyState();
     } else if (m.type === 'requests') {
       for (const r of m.list) requests.set(r.id, r);
@@ -139,7 +150,22 @@
         const el = $('voice-heard'); el.textContent = v.text; el.classList.add('aside'); el.title = 'Not meant for Overseer: kept in memory only';
       } else if (v.kind === 'request' && v.request) {
         requests.set(v.request.id, v.request);
+        if (v.request.state === 'waiting') setAsking(true);
+        else if (['sent', 'not_sent', 'cancelled', 'partly_sent', 'done'].includes(v.request.state)) setAsking(false);
         renderRequests();
+      } else if (v.kind === 'say') {
+        // Every spoken line is also text (AC-174).
+        $('voice-said').textContent = `Overseer: ${v.text}`;
+      } else if (v.kind === 'spoke' && v.event === 'card_only') {
+        $('voice-said').textContent = `Overseer (in the card, not said): ${v.text}`;
+      } else if (v.kind === 'listener' && v.event === 'error') {
+        showError(v.message, Date.now());
+      } else if (v.kind === 'read_back') {
+        setAsking(!v.lapsed && !!v.agent);
+      } else if (v.kind === 'confirm' && v.lapsed) {
+        setAsking(false);
+      } else if (v.kind === 'toast' && v.cancel) {
+        setAsking(false);
       } else if (v.kind === 'target' && voice) { voice.target = v.target; voice.target_title = v.target_title || (v.target === 'overseer' ? 'Overseer' : voice.target_title); applyState(); }
     }
   });
@@ -147,6 +173,8 @@
   $('voice-on').addEventListener('click', () => vscode.postMessage({ type: 'toggle' }));
   $('voice-target').addEventListener('click', () => vscode.postMessage({ type: 'target' }));
   $('voice-cancel').addEventListener('click', e => vscode.postMessage({ type: 'cancel', id: e.currentTarget.dataset.id }));
+  $('voice-yes').addEventListener('click', () => { setAsking(false); vscode.postMessage({ type: 'answer', yes: true }); });
+  $('voice-no').addEventListener('click', () => { setAsking(false); vscode.postMessage({ type: 'answer', yes: false }); });
   vscode.postMessage({ type: 'ready' });
   void heardFinal;
 })();
