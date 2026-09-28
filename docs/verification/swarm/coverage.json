@@ -618,7 +618,7 @@
       "blocker": null
     },
     "SWARM-50": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
@@ -629,7 +629,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "Real SQLite-full and write-fault fixtures block new admissions and replay dispatch, discovery and result IDs once. An Atlas-backed J2 reproduction now fails artifact persistence without acknowledgement, remains blocked across daemon restart, and replays the artifact and result IDs exactly once after capacity recovers; J4 admission then proceeds. External process creation under full storage, actual filesystem-full migration, and qualified live sender-held state remain unverified."
+      "blocker": null
     },
     "SWARM-51": {
       "status": "partial",
