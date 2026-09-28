@@ -28,17 +28,27 @@ export function frameStats(frames: number, dropped: number, longest: number, tot
   };
 }
 
+/** A frame that came late: when, in milliseconds after the monitor's first frame, and how late. */
+export interface Stall {
+  readonly at: number;
+  readonly ms: number;
+}
+
+/** The most stalls one run keeps: enough to see where an opening lost its frames. */
+const STALLS = 8;
+
 /**
  * Counts frames on the UI thread, where animations run: a frame that comes later than one and
  * a half frame times after the last counts as dropped, once for every frame time it missed.
  * It keeps counting while the app's logic is busy, which is what it is there to show.
  */
-export function useFrameMonitor(): { start(): void; stop(): FrameStats } {
+export function useFrameMonitor(): { start(): void; stop(): FrameStats; stalls(): readonly Stall[] } {
   const frames = useSharedValue(0);
   const dropped = useSharedValue(0);
   const longest = useSharedValue(0);
   const total = useSharedValue(0);
   const period = useSharedValue(0);
+  const late = useSharedValue<Stall[]>([]);
 
   const callback = useFrameCallback((info) => {
     'worklet';
@@ -49,7 +59,11 @@ export function useFrameMonitor(): { start(): void; stop(): FrameStats } {
     // The display's own frame time: the shortest seen, no faster than 120 Hz.
     if (period.value === 0 || (between < period.value && between > 8)) period.value = between;
     if (between > longest.value) longest.value = between;
-    if (period.value > 0 && between > period.value * 1.5) dropped.value += Math.round(between / period.value) - 1;
+    if (period.value > 0 && between > period.value * 1.5) {
+      dropped.value += Math.round(between / period.value) - 1;
+      // Where the frame before this one should have come.
+      if (late.value.length < STALLS) late.value = [...late.value, { at: Math.round(total.value - between), ms: Math.round(between) }];
+    }
   }, false);
 
   const start = useCallback(() => {
@@ -57,13 +71,16 @@ export function useFrameMonitor(): { start(): void; stop(): FrameStats } {
     dropped.set(0);
     longest.set(0);
     total.set(0);
+    late.set([]);
     callback.setActive(true);
-  }, [callback, frames, dropped, longest, total]);
+  }, [callback, frames, dropped, longest, total, late]);
 
   const stop = useCallback(() => {
     callback.setActive(false);
     return frameStats(frames.get(), dropped.get(), longest.get(), total.get(), period.get() || 1000 / 60);
   }, [callback, frames, dropped, longest, total, period]);
 
-  return { start, stop };
+  const stalls = useCallback((): readonly Stall[] => late.get(), [late]);
+
+  return { start, stop, stalls };
 }

@@ -34,6 +34,14 @@ const measured = capabilities.keyValue.scope<PerfStored>('perf');
 // Started before the first draw: reading what is stored takes a few milliseconds.
 session.start().catch(() => undefined);
 
+// When the Mac first answered, and when its state replaced what was stored: the moments the
+// door's opening is measured against.
+session.subscribe(() => {
+  const now = session.getSnapshot();
+  if (now.connection === 'online') perf.mark('session.online');
+  if (now.ready && !now.fromCache && now.stateAt !== null) perf.mark('session.state');
+});
+
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.fill}>

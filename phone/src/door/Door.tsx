@@ -96,6 +96,11 @@ export function Door({ ready, onShown, onOpened }: DoorProps) {
       perf.record('door.frames', drawn.frames);
       perf.record('door.dropped', drawn.dropped);
       perf.record('door.longestFrame', drawn.longest);
+      // Where in the opening each late frame came, and how late: what held the UI thread then.
+      frames.stalls().forEach((stall, i) => {
+        perf.record(`door.stall.${i + 1}.at`, stall.at);
+        perf.record(`door.stall.${i + 1}.ms`, stall.ms);
+      });
       onOpened();
     };
     const done = (finished?: boolean) => {
