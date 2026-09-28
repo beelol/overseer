@@ -93,6 +93,7 @@ async function series(dev, runs, settle, log) {
     last = record.launch;
     const m = record.marks;
     log(`  ${label}: first screen ${round(m['screen.agents.shown'] ?? NaN)} ms, interactive ${round(m['screen.agents.interactive'] ?? NaN)} ms, door shown ${round(m['door.shown'] ?? NaN)} ms, opening ${round(record.summary['door.opening']?.max ?? NaN)} ms, dropped ${record.summary['door.dropped']?.max ?? 'n/a'}`);
+    if (m['door.opening'] !== undefined) log(`    ${timeline(record)}`);
     return record;
   };
   await once('on', 'warm-up launch (not counted)');
@@ -104,6 +105,22 @@ async function series(dev, runs, settle, log) {
   await sleep(300);
   dev.write('test.door', 'on');
   return kinds;
+}
+
+/**
+ * One opening beside what else happened then, in milliseconds from its start: the Mac's first
+ * answer, its state replacing what was stored, the list's first layout, and each late frame
+ * (when, and how long the UI thread held it).
+ */
+export function timeline(record) {
+  const m = record.marks;
+  const start = m['door.opening'];
+  const at = (name) => (m[name] === undefined ? 'not yet' : `${round(m[name] - start)}`);
+  const stalls = [];
+  for (let i = 1; record.summary[`door.stall.${i}.at`] !== undefined; i += 1) stalls.push(`${round(record.summary[`door.stall.${i}.at`].max)} (${round(record.summary[`door.stall.${i}.ms`]?.max ?? NaN)} ms)`);
+  const waited = record.summary['door.waited']?.max;
+  const ui = waited === undefined ? '' : ` (it waited ${round(waited)} ms for the UI thread to be calm)`;
+  return `from the opening's start at ${round(start)} ms${ui}: Mac online ${at('session.online')}, Mac's state ${at('session.state')}, list laid out ${at('screen.agents.list')}; late frames at ${stalls.length > 0 ? stalls.join(', ') : 'none'}`;
 }
 
 function figures(records) {

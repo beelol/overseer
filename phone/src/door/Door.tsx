@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Image, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Animated, { cancelAnimation, Easing, runOnJS, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import Animated, { cancelAnimation, Easing, runOnJS, useAnimatedStyle, useFrameCallback, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
 import { useMotion } from '@/motion';
 import { perf, useFrameMonitor } from '@/perf';
@@ -71,7 +71,8 @@ export function Door({ ready, onShown, onOpened }: DoorProps) {
   const lit = useSharedValue(0); // the gradient and the seam, fading in over the launch screen
   const light = useSharedValue(0); // the light's place along the seam, 0 to 1
   const [shown, setShown] = useState(false);
-  const frames = useFrameMonitor();
+  const counting = useSharedValue(false); // the frame monitor counts the opening's frames only
+  const frames = useFrameMonitor(counting);
 
   // A square that covers the screen at any angle; the seam is its middle line.
   const side = Math.ceil(Math.hypot(width, height)) + theme.space[10];
@@ -86,27 +87,83 @@ export function Door({ ready, onShown, onOpened }: DoorProps) {
     };
   }, [lit, light, motion, tokens]);
 
+  // The opening waits for the UI thread to be calm: the first screen's views are mounted and
+  // drawn there a moment after the app's logic has laid them out, and the system's launch screen
+  // leaves then too. It starts on the UI thread itself after a few frames on time in a row, or
+  // after the fade's time at the latest, so it never waits long.
+  const armed = useSharedValue(false);
+  const calm = useSharedValue(0);
+  const waited = useSharedValue(0);
+  const period = useSharedValue(0);
+  const startedAt = useSharedValue(0); // the frame the opening started on, UI thread's clock
+  const timing = motion.reduced ? motion.timing(tokens.fade) : { duration: tokens.open, easing: motion.ease };
+  const longest = tokens.fade;
+
+  const finish = useCallback(() => {
+    // The opening, as the UI thread drew it: from the frame it started on to its last frame, and
+    // every frame it missed. Timed there, not by the app's logic, which may hear of either late.
+    const drawn = frames.stop();
+    const { last } = frames.span();
+    perf.record('door.opening', last - startedAt.get());
+    perf.record('door.frames', drawn.frames);
+    perf.record('door.dropped', drawn.dropped);
+    perf.record('door.longestFrame', drawn.longest);
+    // Where in the opening each late frame came, and how late: what held the UI thread then.
+    frames.stalls().forEach((stall, i) => {
+      perf.record(`door.stall.${i + 1}.at`, stall.at);
+      perf.record(`door.stall.${i + 1}.ms`, stall.ms);
+    });
+    onOpened();
+  }, [frames, onOpened, startedAt]);
+
+  const began = useCallback(
+    (at: number, wait: number) => {
+      // When it started on the display. Frame times share the clock of `performance.now()`;
+      // should a platform's not, the moment the app's logic heard of it stands in.
+      const now = performance.now();
+      perf.markAt('door.opening', Math.abs(now - at) < 1_000 ? at : now);
+      perf.record('door.waited', wait);
+      haptics.play('impact');
+    },
+    [haptics],
+  );
+
+  const done = useCallback(
+    (finished?: boolean) => {
+      'worklet';
+      // The door has stopped moving: what the UI thread does from here is not the opening's.
+      counting.set(false);
+      if (finished) runOnJS(finish)();
+    },
+    [counting, finish],
+  );
+
+  const onFrame = useFrameCallback((info) => {
+    'worklet';
+    if (!armed.value) return;
+    const between = info.timeSincePreviousFrame;
+    if (between === null) return;
+    waited.value += between;
+    // The display's own frame time: the shortest seen, no faster than 120 Hz.
+    if (period.value === 0 || (between < period.value && between > 8)) period.value = between;
+    calm.value = between <= period.value * 1.5 ? calm.value + 1 : 0;
+    if (calm.value < 3 && waited.value < longest) return;
+    armed.value = false;
+    startedAt.set(info.timestamp);
+    counting.set(true);
+    open.value = withTiming(1, timing, done);
+    runOnJS(began)(info.timestamp, Math.round(waited.value));
+  }, false);
+
   useEffect(() => {
     if (!ready || !shown) return;
-    haptics.play('impact');
-    const finish = () => {
-      // The opening, as the UI thread drew it: how long it took and every frame it missed.
-      perf.end('door.opening');
-      const drawn = frames.stop();
-      perf.record('door.frames', drawn.frames);
-      perf.record('door.dropped', drawn.dropped);
-      perf.record('door.longestFrame', drawn.longest);
-      onOpened();
-    };
-    const done = (finished?: boolean) => {
-      'worklet';
-      if (finished) runOnJS(finish)();
-    };
-    perf.mark('door.opening');
-    perf.begin('door.opening');
-    frames.start();
-    open.set(motion.reduced ? withTiming(1, motion.timing(tokens.fade), done) : withTiming(1, { duration: tokens.open, easing: motion.ease }, done));
-  }, [ready, shown, open, motion, tokens, haptics, onOpened, frames]);
+    calm.set(0);
+    waited.set(0);
+    frames.start({ counting: false });
+    armed.set(true);
+    // Once it has opened it does nothing more, and it goes with the door.
+    onFrame.setActive(true);
+  }, [ready, shown, frames, armed, calm, waited, onFrame]);
 
   const reduced = motion.reduced;
   const whole = useAnimatedStyle(() => ({ opacity: reduced ? 1 - open.value : 1 }));

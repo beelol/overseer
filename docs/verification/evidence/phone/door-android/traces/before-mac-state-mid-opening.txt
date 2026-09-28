@@ -1,0 +1,71 @@
+# Before (main + measurement): Overseer_API_35, 15 fixture agents, load about 8. App marks (ms after RN start): door.opening 397, session.state 1058; one late frame 783 ms into the opening (33 ms).
+# Trace clock (ms from bindApplication). The first screen's mount, just before the opening:
+long main-thread slices (> 40.0 ms), ms from the first app event:
+    459.5 +  57.6 ms  Choreographer#doFrame 525513
+      459.5 +  20.4 ms  animation
+        461.3 +  18.4 ms  MountItemDispatcher::mountViews mountItems to execute
+          461.3 +  18.4 ms  IntBufferBatchMountItem::mountViews
+            461.5 +   4.2 ms  IntBufferBatchMountItem::mountInstructions::INSERT numInstructions=238
+            466.0 +   5.2 ms  IntBufferBatchMountItem::mountInstructions::UPDATE_STATE numInstructions=80
+            471.2 +   7.9 ms  IntBufferBatchMountItem::mountInstructions::UPDATE_LAYOUT numInstructions=261
+      479.9 +  37.2 ms  traversal
+        482.8 +  11.0 ms  draw-VRI[MainActivity]
+          483.0 +   8.0 ms  Record View#draw()
+          490.9 +   2.8 ms  postAndWait
+gaps between frames > 25 ms:
+
+# The Mac's state drawn mid-opening: UI thread (188 prop updates) then the RenderThread rasterising new text (44 ms frame)
+  1260.7 +  2.2 Choreographer#doFrame 526091
+  1260.7 +  2.2   animation
+  1260.9 +  1.6     MountItemDispatcher::premountViews
+  1277.2 + 13.1 Choreographer#doFrame 526099
+  1277.2 +  2.9   animation
+  1277.3 +  2.3     MountItemDispatcher::mountViews mountItems to execute
+  1277.3 +  2.3       IntBufferBatchMountItem::mountViews
+  1277.7 +  0.9         IntBufferBatchMountItem::mountInstructions::UPDATE_PROPS numInstructions=188
+  1278.6 +  0.5         IntBufferBatchMountItem::mountInstructions::UPDATE_STATE numInstructions=10
+  1280.0 + 10.2   traversal
+  1280.1 + 10.2     draw-VRI[MainActivity]
+  1280.1 +  5.3       Record View#draw()
+  1285.4 +  4.9       postAndWait
+  1294.7 + 36.2 Choreographer#doFrame 526106
+  1294.7 +  3.9   animation
+  1297.4 +  1.0     MountItemDispatcher::mountViews mountItems to execute
+  1297.4 +  0.9       IntBufferBatchMountItem::mountViews
+  1297.4 +  0.9         IntBufferBatchMountItem::mountInstructions::UPDATE_PROPS numInstructions=98
+  1298.6 + 32.3   traversal
+  1298.7 + 32.2     draw-VRI[MainActivity]
+  1298.8 + 32.1       postAndWait
+  1331.1 + 13.9 Choreographer#doFrame 526120
+  1331.1 + 13.9   Choreographer#doFrame - resynced to 526122 in 28.9ms
+  1331.1 +  1.6     animation
+  1332.7 + 12.3     traversal
+  1332.8 + 12.2       draw-VRI[MainActivity]
+  1332.8 + 12.2         postAndWait
+  1286.3 + 44.3 DrawFrames 526099
+  1286.3 +  3.5   syncFrameState
+  1286.4 +  3.4     prepareTree
+  1287.7 +  0.7       glActiveTexture encode
+  1290.3 + 40.4   Drawing  0.00  0.00 1080.00 2400.00
+  1307.1 + 22.9     flush commands
+  1307.2 +  6.8       auto skgpu::ganesh::OpsTask::onPrepare(GrOpFlushState *)::(anonymous class)::operator()() 
+  1308.0 +  1.2         AtlasTextOp
+  1309.3 +  1.6         AtlasTextOp
+  1310.9 +  3.0         AtlasTextOp
+  1314.0 +  0.7       glBufferDataSyncAEMU encode
+  1316.0 +  1.2       glBufferDataSyncAEMU encode
+  1317.3 +  5.7       Texture upload(33) 440x46
+  1317.3 +  5.2         glTexSubImage2D encode
+  1323.1 +  6.9       auto skgpu::ganesh::OpsTask::onExecute(GrOpFlushState *)::(anonymous class)::operator()() 
+  1324.2 +  2.8         FillRectOp
+  1327.7 +  0.9         CircularRRectOp
+  1328.6 +  0.6         CircularRRectOp
+  1330.0 +  0.7     eglSwapBuffersWithDamageKHR
+  1330.7 + 14.1 DrawFrames 526106
+  1330.9 + 14.0   Drawing  0.00  0.00 1080.00 2400.00
+  1331.1 +  1.2     flush commands
+  1331.6 +  0.6       auto skgpu::ganesh::OpsTask::onExecute(GrOpFlushState *)::(anonymous class)::operator()() 
+  1332.3 + 12.5     eglSwapBuffersWithDamageKHR
+  1332.3 +  0.7       rcCreateSyncKHR encode
+  1333.3 + 11.4         dequeueBuffer
+  1333.3 + 11.4       dequeueBuffer - VRI[MainActivity]#0(BLAST Consumer)0

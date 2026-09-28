@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 
 import { text, type agents } from '@/model';
+import { perf } from '@/perf';
 import { routes } from '@/routes';
 import { useSession, useSessionValue } from '@/session';
 import { useTheme } from '@/theme';
@@ -30,6 +31,8 @@ const useStyles = makeStyles((theme) => ({
 const keyOf = (row: Row): string => row.id;
 const typeOf = (row: Row): string => row.kind;
 const isHeading = (row: Row): boolean => row.kind === 'section' || row.kind === 'repo' || row.kind === 'notice';
+/** The list has drawn every row it shows: its first layout is done. */
+const listLoaded = (): void => perf.mark('screen.agents.list');
 
 /**
  * Agents, the app's first screen: every agent the Mac runs, those that need the owner first,
@@ -183,6 +186,7 @@ export function AgentsScreen() {
           renderItem={renderItem}
           keyExtractor={keyOf}
           getItemType={typeOf}
+          onLoad={listLoaded}
           extraData={extra}
           refreshControl={refresh}
           contentContainerStyle={styles.content}
