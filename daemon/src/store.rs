@@ -11,8 +11,9 @@ use std::path::Path;
 
 /// One `meta.schema_version` label covers both schemas. Auto Mode reached 20
 /// and Swarm Mode reached 5 on separate branches, each with idempotent,
-/// existence-checked migrations; 21 is their union (Auto v20 plus Swarm's tables).
-pub const SCHEMA_VERSION: i64 = 21;
+/// existence-checked migrations. 21 was used twice (their union, and Auto's
+/// shared launch binding on its own branch); 22 is both together.
+pub const SCHEMA_VERSION: i64 = 22;
 /// Retained normalized events per run before older ones are pruned (with a marker).
 pub const EVENTS_PER_RUN: i64 = 5000;
 
@@ -489,6 +490,9 @@ impl Store {
             ("slot_held", "INTEGER NOT NULL DEFAULT 0"),
             ("writer_held", "INTEGER NOT NULL DEFAULT 0"),
             ("effects_claimed_ms", "INTEGER"),
+            // v21: the run a claimed launch became, and how its holds settled.
+            ("run_id", "TEXT"), ("bound_ms", "INTEGER"),
+            ("settled_ms", "INTEGER"), ("outcome", "TEXT"),
         ] {
             let present = self.conn.prepare("SELECT 1 FROM pragma_table_info('shared_booking_intents') WHERE name=?1")?
                 .exists([column])?;
@@ -497,7 +501,9 @@ impl Store {
             }
         }
         self.conn.execute_batch("CREATE INDEX IF NOT EXISTS shared_booking_writer
-            ON shared_booking_intents(workspace_path,writer_held);")?;
+            ON shared_booking_intents(workspace_path,writer_held);
+            CREATE UNIQUE INDEX IF NOT EXISTS shared_booking_run
+            ON shared_booking_intents(run_id) WHERE run_id IS NOT NULL;")?;
         let has_measurement_effort: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('auto_measurements') WHERE name='effort'")?.exists([])?;
         if !has_measurement_effort {
             self.conn.execute_batch("ALTER TABLE auto_measurements ADD COLUMN effort TEXT;")?;
@@ -544,7 +550,9 @@ impl Store {
                 CREATE INDEX auto_pool_claims_active ON auto_pool_claims(pool_id,state);")?;
             tx.commit()?;
         }
-        self.conn.execute_batch("DROP TRIGGER IF EXISTS auto_pool_claim_owner;
+        // Concurrent openers must not interleave the drop and the create.
+        self.conn.execute_batch("BEGIN IMMEDIATE;
+            DROP TRIGGER IF EXISTS auto_pool_claim_owner;
             CREATE TRIGGER auto_pool_claim_owner
             BEFORE INSERT ON auto_pool_claims BEGIN
               SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM auto_launch_intents
@@ -554,7 +562,8 @@ impl Store {
                 AND NOT EXISTS(SELECT 1 FROM shared_booking_intents
                   WHERE work_unit_id=NEW.work_unit_id)
               THEN RAISE(ABORT,'automatic pool claim has no launch intent') END;
-            END;")?;
+            END;
+            COMMIT;")?;
         // A pre-v15 daemon may have admitted a child without a pool claim.
         // Its old route/account evidence cannot prove a shared pool after
         // restart, so occupy a single conservative legacy pool until every
@@ -838,6 +847,13 @@ impl Store {
 
     pub fn insert_task_and_run(&self, t: &Task, r: &Run, attempt_id: Option<&str>,
         director: Option<DirectorOwnerLink<'_>>) -> Result<()> {
+        self.insert_task_and_run_bound(t, r, attempt_id, director, None)
+    }
+
+    /// As `insert_task_and_run`, and a booked shared launch is bound to the run in
+    /// the same commit, so its held slot and writer become the run's occupancy.
+    pub fn insert_task_and_run_bound(&self, t: &Task, r: &Run, attempt_id: Option<&str>,
+        director: Option<DirectorOwnerLink<'_>>, shared_launch: Option<(&str, i64)>) -> Result<()> {
         if attempt_id.is_some() && director.is_some() {
             bail!("a run cannot be both a swarm worker and director");
         }
@@ -868,6 +884,9 @@ impl Store {
             }
         }
         tx.execute("UPDATE workspaces SET owner_run_id=?2 WHERE id=?1",params![r.workspace_id,r.id])?;
+        if let Some((launch, at)) = shared_launch {
+            crate::account_booking::bind_shared_launch_run_in_tx(&tx, launch, &r.id, at)?;
+        }
         tx.commit()?;
         Ok(())
     }
@@ -1046,6 +1065,7 @@ impl Store {
             return Err(anyhow!("automatic work-unit identity was already used"));
         }
         if self.auto_pool_claimed(pool_id)? { return Ok(None); }
+        if self.shared_writer_hold(&workspace.path, None, None)?.is_some() { return Ok(None); }
         let writer: bool = self.conn.query_row(
             "SELECT EXISTS(SELECT 1 FROM runs r JOIN workspaces w ON w.id=r.workspace_id
                 WHERE w.path=?1 AND w.removed_ms IS NULL
@@ -1150,6 +1170,9 @@ impl Store {
     /// an Auto launch. A selected Auto root owns its own claim, and a parent
     /// may coordinate the child it explicitly admitted under its budget.
     pub fn auto_claim_conflicts_with_run(&self, profile_id: &str, run_id: &str) -> Result<bool> {
+        // A run bound to an unsettled shared launch was admitted by that
+        // booking; its own and other known-window claims are already counted.
+        if self.shared_launch_bound_unsettled(run_id)? { return Ok(false); }
         let Some(pool_id) = self.auto_account_pool_id(profile_id)? else { return Ok(false) };
         Ok(self.conn.query_row(
             "SELECT EXISTS(SELECT 1 FROM auto_pool_claims c
@@ -1766,6 +1789,10 @@ impl Store {
             "INSERT OR IGNORE INTO auto_quota_observations(event_seq,pool_id,source,observed_ms,snapshot) VALUES(?1,?2,?3,?4,?5)",
             params![event_seq, pool_id, source, snapshot.observed_ms, serde_json::to_string(snapshot)?],
         )?;
+        if inserted == 1 {
+            crate::account_booking::release_observed_settled_bookings(
+                &self.conn, pool_id, snapshot, crate::daemon::now())?;
+        }
         if inserted == 1 && event_seq % 100 == 0 {
             self.prune_auto_quotas(crate::daemon::now(), 5000)?;
         }
