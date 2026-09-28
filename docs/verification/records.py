@@ -2241,9 +2241,19 @@ rec(205, "Offline on a real Wi-Fi toggle (owner step)", "not started", date="—
     actual="Not started: split from AC-83 by the owner on 2026-09-27. The same check passes with the network simulated (AC-83); this criterion is macOS's own signal on a real toggle.", live="—",
     blocker="Owner, when no agents are in flight: run `node test/local/wifi-live.js`, switch Wi-Fi off when it asks and on again when it says Overseer is offline (about a minute). It writes `evidence/ac-205/`; then this record is updated.")
 
-rec(212, "Production can never point at a dev version (stage 1)", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
-    actual="Not started: added by the owner on 2026-09-27; stage 1, being built on `claude/prod-guard`.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
+rec(212, "Production can never point at a dev version (stage 1)", "verified", commit="93ea210b (branch claude/prod-guard, pull request #19)", date="2026-09-28",
+    steps="""1. `cargo test -p overseerd --test dev_instance`: a standard daemon under a temporary HOME (no OVERSEER_HOME); dev daemons beside it marked by `OVERSEER_INSTANCE` and by a copied binary with the `overseer-dev-instance` file; refusals checked for no home, the standard home, the standard socket, the standard long-path socket folder, a bad name, a marked binary with no environment and a mismatched one; two proper dev daemons run busy and are stopped.
+2. `node test/unit/production-guard.js`: fake daemons on Unix sockets; a production client (standard extensions folder) with OVERSEER_HOME, OVERSEER_SOCKET and OVERSEER_INSTANCE leaked in; a marked `daemonPath`; a daemon whose hello reports `dev-q`; a non-production client with the same environment.
+3. `cargo test -p overseer-tui --lib ac212`: the TUI's command environment, a marked `--daemon`, and a fake dev daemon.
+4. `cargo test --workspace --no-fail-fast` and `node scripts/test-all --jobs=2` (the full fixture UI suite), with the load failures rerun alone ([reruns](evidence/ac-212/reruns.md)).""",
+    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md#stage-1--the-production-guard-ac-212-and-ac-213-after-pull-request-10).",
+    actual="""- **A dev build refuses the production home:** every refusal exits 4 with its reason and creates nothing (the fresh and long homes do not exist afterwards); a marked binary will not even print the standard socket. Proper dev daemons report `dev-a`/`dev-b` in hello.
+- **The standard daemon is untouched:** its pid, socket, `state` (tasks, runs, profiles), `daemon.clients` and data folder listing are identical while the dev daemons run and after they stop; its log never mentions them.
+- **Production refuses dev:** with the three variables leaked in, the production client reaches the standard socket and the dev socket sees no connection; a marked `daemonPath` is refused without being run; a daemon reporting `dev-q` is refused once, with no retry and no daemon started. A client loaded from another extensions folder still honours OVERSEER_SOCKET (the UI harness keeps working). The TUI does the same (leaked variables dropped, `--home` kept, a marked `--daemon` refused, a dev daemon refused without retry).
+- **Regressions:** the full fixture UI suite and the Rust suites pass; the checks that failed under load (average 80 to 130) passed alone, and the two that also failed alone under load (tui `t10`, UI `arrangement`) passed at load 4.5, as main does ([reruns](evidence/ac-212/reruns.md)).""",
+    evidence="[targeted tests](evidence/ac-212/targeted.txt), [cargo workspace](evidence/ac-212/cargo-workspace.txt), [test-all](evidence/ac-212/test-all-jobs2.txt), [reruns](evidence/ac-212/reruns.md), pull request #19",
+    live="Fixtures and fake daemons; no paid turns. The owner's installed daemon, VS Code and data were never involved.",
+    limits="The phone's side is AC-213 (after pull request #10). Production is decided by the extension's folder (the standard `~/.vscode/extensions`); an owner who installs Overseer with a custom `--extensions-dir` would get the non-production behaviour.")
 rec(213, "The production phone app never pairs with a dev daemon (after pull request #10)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
     actual="Not started: the phone app and the gateway are being finished in pull request #10 by another agent; this criterion starts after #10 is on main.", live="—", blocker="After PR #10: the phone app and the gateway must be on main first.")
@@ -2406,7 +2416,7 @@ SHORT_BLOCKERS = {
     201: "partial: the gate's tests and scenarios are in the suites and pass with the new behaviour off and on (pull request #14); the clean-clone run waits for the merge",
     202: "not started (Gate S, added by the owner on 2026-09-27)",
     204: "not started (Gate Q, added by the owner on 2026-09-27)",
-    212: "not started (Gate T, added by the owner on 2026-09-27)",
+    212: "verified",
     213: "not started: after PR #10 (the phone app and the gateway)",
     206: "not started (Gate T, added by the owner on 2026-09-27)",
     207: "not started (Gate T, added by the owner on 2026-09-27)",

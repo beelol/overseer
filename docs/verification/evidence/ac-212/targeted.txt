@@ -1,0 +1,20 @@
+$ cargo test -p overseerd --test dev_instance   (commit 93ea210b)
+test ac212_hello_reports_no_instance_for_a_test_daemon ... ok
+test ac212_dev_daemons_refuse_the_standard_instance_and_leave_it_untouched ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.66s
+
+$ cargo test -p overseer-tui --lib ac212
+test locate::tests::ac212_production_drops_leaked_variables_and_keeps_an_explicit_home ... ok
+test locate::tests::ac212_production_refuses_a_daemon_binary_marked_dev ... ok
+test client::tests::ac212_a_dev_tui_and_a_standard_daemon_connect ... ok
+test client::tests::ac212_the_installed_tui_refuses_a_dev_daemon_and_does_not_retry ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 1.20s
+
+$ node test/unit/production-guard.js
+ok   production is the standard extensions folder, and only that
+ok   production drops OVERSEER_HOME, OVERSEER_SOCKET and OVERSEER_INSTANCE
+ok   production with dev variables leaked in reaches the standard socket, never the dev one
+ok   an isolated (non-production) extension keeps honouring OVERSEER_SOCKET
+ok   production never runs a daemon binary marked dev
+ok   production refuses a daemon that reports a dev instance, once, and does not retry
+all passed
