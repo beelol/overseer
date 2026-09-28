@@ -270,6 +270,61 @@ pub fn reconcile_invalidated(store: &mut Store) -> Result<usize> {
     Ok(cleared)
 }
 
+/// The paths a unified diff changes (both sides of a rename).
+fn patch_paths(patch: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for line in patch.lines() {
+        let path = line.strip_prefix("+++ b/").or_else(|| line.strip_prefix("--- a/"));
+        if let Some(path) = path {
+            let path = path.trim_end().to_string();
+            if !path.is_empty() && !out.contains(&path) {
+                out.push(path);
+            }
+        }
+    }
+    out
+}
+
+/// A dependency manifest or lockfile: a change to one is shared by every job.
+fn dependency_manifest(path: &str) -> bool {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    matches!(name, "package.json" | "package-lock.json" | "npm-shrinkwrap.json" | "yarn.lock" | "pnpm-lock.yaml"
+        | "bun.lockb" | "Cargo.toml" | "Cargo.lock" | "go.mod" | "go.sum" | "pyproject.toml" | "poetry.lock"
+        | "uv.lock" | "Pipfile" | "Pipfile.lock" | "Gemfile" | "Gemfile.lock" | "composer.json" | "composer.lock"
+        | "pom.xml" | "build.gradle" | "build.gradle.kts")
+        || (name.starts_with("requirements") && name.ends_with(".txt"))
+}
+
+/// Shared changes need the director's ownership (S3): a patch may not change a file another
+/// live job owns (its planned write claim), nor a dependency manifest unless the director
+/// assigned that file to this job. The artifact is kept either way; only integration waits.
+fn ensure_director_owned(conn: &rusqlite::Connection, run: &str, job: &str, patch: &str) -> Result<()> {
+    let mut stmt = conn.prepare("SELECT id,resource_claims FROM swarm_jobs WHERE run_id=?1
+        AND status NOT IN ('superseded','cancelled')")?;
+    let jobs = stmt.query_map([run], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let mut mine = Vec::new();
+    let mut others = Vec::new();
+    for (id, raw) in jobs {
+        let claims: Vec<super::plan::ResourceClaim> = serde_json::from_str(&raw).unwrap_or_default();
+        for claim in claims.into_iter().filter(|c| c.mode == "write") {
+            if id == job { mine.push(claim.resource) } else { others.push((id.clone(), claim.resource)) }
+        }
+    }
+    for path in patch_paths(patch) {
+        if mine.iter().any(|owned| crate::claims::overlaps(owned, &path)) {
+            continue;
+        }
+        if let Some((owner, _)) = others.iter().find(|(_, owned)| crate::claims::overlaps(owned, &path)) {
+            bail!("patch changes {path}, which job {owner} owns; a shared change needs the director to assign it before it can integrate");
+        }
+        if dependency_manifest(&path) {
+            bail!("patch changes the shared dependency file {path}; a dependency change needs the director to assign that file to this job before it can integrate");
+        }
+    }
+    Ok(())
+}
+
 pub fn integrate(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
     super::owner::require(store,run,p)?;
@@ -363,6 +418,7 @@ pub fn integrate(store: &mut Store, p: &Value) -> Result<Value> {
     if uncertain > 0 {
         bail!("unreconciled side effect blocks integration");
     }
+    ensure_director_owned(&store.conn, run, job, &content)?;
     let duplicate: Option<String> = store
         .conn
         .query_row(

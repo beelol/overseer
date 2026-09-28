@@ -1059,3 +1059,120 @@ fn catalog_s3_owner_requirement_change_becomes_a_recorded_plan_revision() {
     let resumed = admit(&d, &names[0], "after-revision");
     assert_eq!(resumed["status"], "admitted", "{resumed}");
 }
+
+/// A patch that creates `relative` with `content` (a new file), as a worker would submit it.
+fn patch_adding_file(checkout: &Path, relative: &str, content: &str) -> String {
+    let path = checkout.join(relative);
+    std::fs::write(&path, content).unwrap();
+    git(checkout, &["add", "-N", relative]);
+    let patch = format!("{}\n", git(checkout, &["diff", "--", relative]));
+    git(checkout, &["reset", "-q", "--", relative]);
+    std::fs::remove_file(&path).unwrap();
+    assert_eq!(git(checkout, &["status", "--porcelain=v1"]), "");
+    patch
+}
+
+/// S3's patch variants on the versioned Catalog fixture: a conflicting patch,
+/// a worker attempting a shared dependency upgrade, and a worker editing the
+/// shared contract it does not own. Conflicting artifacts are preserved; a
+/// shared change enters integration only once the director has assigned that
+/// file to the job (its planned write claim); nothing refused is lost, and
+/// completion waits for the accepted work to integrate. The combined-test
+/// failure variant is `catalog_s3_twenty_four_patches_need_a_combined_cursor_check`.
+#[test]
+fn catalog_s3_patch_variants_preserve_conflicts_and_need_director_ownership_for_shared_changes() {
+    let fixture = repo_root().join("fixtures/swarm/catalog-v1");
+    let temp = tmp();
+    let d = Daemon::start(&[]);
+    let checkout = repo(&temp.path().join("catalog"));
+    copy_tree(&fixture, &checkout);
+    git(&checkout, &["add", "."]);
+    git(&checkout, &["commit", "-q", "-m", "Catalog v1 fixture"]);
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    let source_before = fingerprint(&checkout);
+    let made = d.call("swarm.create", json!({"category":"Catalog variants S3",
+        "objective":"Migrate endpoints to stable cursor pagination",
+        "allowed_targets":["system-codex"],"source_change_permission":"isolated"}));
+    let run = made["id"].as_str().unwrap();
+    let module = |name: &str| json!({"id":name,"title":format!("Migrate {name}"),
+        "acceptance":"cursor pagination and response shape","deps":["contract"],
+        "resource_claims":[{"resource":format!("src/resources/{name}.ts"),"mode":"write"}]});
+    let mut jobs = vec![json!({"id":"contract","title":"Cursor contract","acceptance":"stable tuple cursor",
+        "deps":[],"resource_claims":[{"resource":"src/pagination.ts","mode":"write"}]})];
+    jobs.extend(["addresses", "auditEvents"].map(module));
+    // Two takes on accounts.ts that the director assigned without an owner.
+    for (id, title) in [("accounts", "Migrate accounts"), ("accounts-rewrite", "Second take on accounts")] {
+        jobs.push(json!({"id":id,"title":title,"acceptance":"cursor pagination","deps":["contract"]}));
+    }
+    d.call("swarm.plan", json!({"id":run,"generation":1,"revision":0,"jobs":jobs}));
+    let integrate = |revision: i64, job: &str, artifact: &str| d.try_call("swarm.integrate", json!({"run_id":run,
+        "generation":1,"revision":revision,"job_id":job,"artifact_id":artifact,"repo":checkout,"base_revision":base}));
+    let artifact_kept = |artifact: &str| -> bool {
+        let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+        db.query_row("SELECT COUNT(*) FROM swarm_artifacts WHERE run_id=?1 AND id=?2", [run, artifact],
+            |r| r.get::<_, i64>(0)).unwrap() == 1
+    };
+    let contract_v2 = std::fs::read_to_string(fixture.join("reference/contract-v2.ts")).unwrap();
+    let template = std::fs::read_to_string(fixture.join("reference/module.ts.template")).unwrap();
+    let contract_patch = patch_from_replacement(&checkout, "src/pagination.ts", &contract_v2);
+    accept_patch(&d, run, 1, "contract", "patch-contract", &contract_patch);
+    let integrated = integrate(1, "contract", "patch-contract").unwrap();
+    assert_eq!(integrated["status"], "integrated", "{integrated}");
+    let workspace = PathBuf::from(integrated["workspace_path"].as_str().unwrap());
+
+    // A conflicting patch: two accepted takes on accounts.ts. The first
+    // integrates; the second does not apply, and its artifact is kept.
+    let accounts = patch_from_replacement(&checkout, "src/resources/accounts.ts", &template.replace("RESOURCE_NAME", "accounts"));
+    accept_patch(&d, run, 1, "accounts", "patch-accounts", &accounts);
+    let first = integrate(1, "accounts", "patch-accounts").unwrap();
+    let rewrite = patch_from_replacement(&checkout, "src/resources/accounts.ts",
+        &template.replace("RESOURCE_NAME", "accounts").replace("export function", "export async function"));
+    accept_patch(&d, run, 1, "accounts-rewrite", "patch-accounts-rewrite", &rewrite);
+    let conflict = integrate(1, "accounts-rewrite", "patch-accounts-rewrite").unwrap_err();
+    assert!(conflict.contains("git apply"), "{conflict}");
+    assert_eq!(git(&workspace, &["rev-parse", "HEAD"]), first["commit"].as_str().unwrap());
+    assert!(artifact_kept("patch-accounts-rewrite"), "the conflicting artifact is preserved");
+
+    // A worker upgrades a shared dependency: its patch adds a dependency
+    // manifest it was never assigned. The artifact is kept; integration is
+    // refused until the director assigns the manifest.
+    let manifest = "{\n  \"name\": \"catalog\",\n  \"dependencies\": { \"cursor-codec\": \"^2.0.0\" }\n}\n";
+    let mut upgrade = patch_from_replacement(&checkout, "src/resources/addresses.ts", &template.replace("RESOURCE_NAME", "addresses"));
+    upgrade.push_str(&patch_adding_file(&checkout, "package.json", manifest));
+    accept_patch(&d, run, 1, "addresses", "patch-addresses-with-upgrade", &upgrade);
+    let refused = integrate(1, "addresses", "patch-addresses-with-upgrade").unwrap_err();
+    assert!(refused.contains("package.json") && refused.contains("director"), "{refused}");
+    assert_eq!(git(&workspace, &["rev-parse", "HEAD"]), first["commit"].as_str().unwrap(), "nothing entered integration");
+    assert!(artifact_kept("patch-addresses-with-upgrade"));
+
+    // A worker edits the shared contract it does not own: refused, naming the owner.
+    let mut widened = patch_from_replacement(&checkout, "src/resources/auditEvents.ts",
+        &template.replace("RESOURCE_NAME", "auditEvents"));
+    // (a patch against the pinned base, as a worker's is; it is refused for
+    // ownership before any apply is tried)
+    let edited = format!("{contract_v2}\nexport const DEFAULT_LIMIT = 50;\n");
+    widened.push_str(&patch_from_replacement(&checkout, "src/pagination.ts", &edited));
+    accept_patch(&d, run, 1, "auditEvents", "patch-audit-events", &widened);
+    let owned = integrate(1, "auditEvents", "patch-audit-events").unwrap_err();
+    assert!(owned.contains("src/pagination.ts") && owned.contains("contract"), "{owned}");
+    assert!(artifact_kept("patch-audit-events"));
+
+    // Completion waits: accepted patches that did not integrate block it.
+    let incomplete = d.try_call("swarm.complete", json!({"run_id":run,"generation":1,"revision":1,
+        "request_id":"s3-variants-too-early","summary":"variants","verification":"none",
+        "checks":[{"job_id":"contract","outcome":"passed","evidence":["patch-contract"]}]}));
+    assert!(incomplete.is_err(), "{incomplete:?}");
+
+    // The director assigns the manifest: a dependency job that owns it.
+    let mut revised = jobs.clone();
+    revised.push(json!({"id":"dependency-upgrade","title":"Upgrade the cursor codec","acceptance":"lockstep upgrade",
+        "deps":["contract"],"resource_claims":[{"resource":"package.json","mode":"write"}]}));
+    assert_eq!(d.call("swarm.revise", json!({"id":run,"generation":1,"expected_revision":1,
+        "reason":"a dependency upgrade is a shared change; assign it","jobs":revised}))["revision"], 2);
+    let owned_upgrade = patch_adding_file(&checkout, "package.json", manifest);
+    accept_patch(&d, run, 2, "dependency-upgrade", "patch-dependency-upgrade", &owned_upgrade);
+    let upgraded = integrate(2, "dependency-upgrade", "patch-dependency-upgrade").unwrap();
+    assert_eq!(upgraded["status"], "integrated", "{upgraded}");
+    assert!(workspace.join("package.json").exists());
+    assert_eq!(fingerprint(&checkout), source_before, "the pinned source checkout is unchanged");
+}
