@@ -73,6 +73,27 @@ if (args[0] === 'exec') {
 if (args[0] === 'login' && args[1] === 'status') {
   if (fs.existsSync(auth)) { console.log('Logged in using ChatGPT'); process.exit(0); }
   console.log('Not logged in'); process.exit(1);
+} else if (args[0] === 'login' && args.includes('--device-auth') && process.env.FIXTURE_DEVICE_APPROVAL_FILE) {
+  // The device-code flow as the live CLI prints it: an address and a one-time code, then it waits
+  // until the person approves in a browser (here: until $FIXTURE_DEVICE_APPROVAL_FILE exists).
+  console.log('Follow these steps to sign in with ChatGPT using device code authorization:\n');
+  console.log('1. Open this link in your browser and sign in to your account');
+  console.log('   \x1b[94mhttps://auth.example.invalid/codex/device\x1b[0m\n');
+  console.log('2. Enter this one-time code (expires in 15 minutes)');
+  console.log('   \x1b[1mFXTR-C0DE1\x1b[0m\n');
+  const started = Date.now();
+  const timer = setInterval(() => {
+    if (fs.existsSync(process.env.FIXTURE_DEVICE_APPROVAL_FILE)) {
+      clearInterval(timer);
+      const a = next(); fs.mkdirSync(dir, { recursive: true });
+      const claims = { sub: 'user-' + a.name, 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-' + a.name, chatgpt_user_id: 'user-' + a.name, chatgpt_plan_type: a.plan } };
+      fs.writeFileSync(auth, JSON.stringify({ auth_mode: 'chatgpt', tokens: { id_token: `${b64({ alg: 'none' })}.${b64(claims)}.`, access_token: 'fixture', refresh_token: 'fixture' } }));
+      console.log(`Successfully logged in with a device code (fixture account ${a.name}).`);
+      process.exit(0);
+    }
+    if (Date.now() - started > 60000) { console.log('The code expired.'); process.exit(1); }
+  }, 100);
+  return;
 } else if (args[0] === 'login') {
   const a = next(); fs.mkdirSync(dir, { recursive: true });
   const claims = { sub: 'user-' + a.name, 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-' + a.name, chatgpt_user_id: 'user-' + a.name, chatgpt_plan_type: a.plan } };

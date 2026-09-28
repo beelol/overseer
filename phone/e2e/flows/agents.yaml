@@ -1,0 +1,27 @@
+# Every agent of the Mac, those that need the owner first, children under their parents.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "agents.row.${SHOWCASE}"
+    timeout: 30000
+- assertVisible:
+    id: "agents.needs.${PERMISSION}"
+- assertVisible:
+    id: "agents.row.${PERMISSION}"
+- tapOn:
+    id: "agents.filter.needs"
+- assertVisible:
+    id: "agents.needs.${PERMISSION}"
+- assertNotVisible:
+    id: "agents.row.${SHOWCASE}"
+- tapOn:
+    id: "agents.filter.all"
+- assertVisible:
+    id: "agents.row.${SHOWCASE}"

@@ -108,11 +108,11 @@
         "groups": 2,
         "sizes": [
           {
-            "w": 556,
+            "w": 470,
             "h": 731
           },
           {
-            "w": 286,
+            "w": 372,
             "h": 731
           }
         ]
@@ -172,6 +172,7 @@
         "files.autoSave": "off",
         "update.mode": "none",
         "workbench.tips.enabled": false,
+        "overseer.sideBar.openOnStartup": false,
         "chat.disableAIFeatures": true,
         "window.restoreWindows": "none",
         "editor.minimap.enabled": false,
@@ -185,8 +186,8 @@
       "name": "no setting changed (user settings identical apart from VS Code's own migration)",
       "ok": true,
       "detail": {
-        "before": "{\"telemetry.telemetryLevel\":\"off\",\"extensions.autoUpdate\":\"off\",\"extensions.autoCheckUpdates\":false,\"git.autofetch\":false,\"git.openRepositoryInParentFolders\":\"always\",\"workbench.startupEditor\":\"none\",\"security.workspace.trust.enabled\":false,\"files.autoSave\":\"off\",\"update.mode\":\"none\",\"workbench.tips.enabled\":false,\"chat.disableAIFeatures\":true,\"window.restoreWindows\":\"none\",\"editor.minimap.enabled\":false,\"workbench.secondarySideBar.defaultVisibility\":\"hidden\",\"window.dialogStyle\":\"custom\",\"workbench.colorTheme\":\"Overseer Dark\",\"breadcrumbs.enabled\":true}",
-        "after": "{\"telemetry.telemetryLevel\":\"off\",\"extensions.autoUpdate\":\"off\",\"extensions.autoCheckUpdates\":false,\"git.autofetch\":false,\"git.openRepositoryInParentFolders\":\"always\",\"workbench.startupEditor\":\"none\",\"security.workspace.trust.enabled\":false,\"files.autoSave\":\"off\",\"update.mode\":\"none\",\"workbench.tips.enabled\":false,\"chat.disableAIFeatures\":true,\"window.restoreWindows\":\"none\",\"editor.minimap.enabled\":false,\"workbench.secondarySideBar.defaultVisibility\":\"hidden\",\"window.dialogStyle\":\"custom\",\"workbench.colorTheme\":\"Overseer Dark\",\"breadcrumbs.enabled\":true}"
+        "before": "{\"telemetry.telemetryLevel\":\"off\",\"extensions.autoUpdate\":\"off\",\"extensions.autoCheckUpdates\":false,\"git.autofetch\":false,\"git.openRepositoryInParentFolders\":\"always\",\"workbench.startupEditor\":\"none\",\"security.workspace.trust.enabled\":false,\"files.autoSave\":\"off\",\"update.mode\":\"none\",\"workbench.tips.enabled\":false,\"overseer.sideBar.openOnStartup\":false,\"chat.disableAIFeatures\":true,\"window.restoreWindows\":\"none\",\"editor.minimap.enabled\":false,\"workbench.secondarySideBar.defaultVisibility\":\"hidden\",\"window.dialogStyle\":\"custom\",\"workbench.colorTheme\":\"Overseer Dark\",\"breadcrumbs.enabled\":true}",
+        "after": "{\"telemetry.telemetryLevel\":\"off\",\"extensions.autoUpdate\":\"off\",\"extensions.autoCheckUpdates\":false,\"git.autofetch\":false,\"git.openRepositoryInParentFolders\":\"always\",\"workbench.startupEditor\":\"none\",\"security.workspace.trust.enabled\":false,\"files.autoSave\":\"off\",\"update.mode\":\"none\",\"workbench.tips.enabled\":false,\"overseer.sideBar.openOnStartup\":false,\"chat.disableAIFeatures\":true,\"window.restoreWindows\":\"none\",\"editor.minimap.enabled\":false,\"workbench.secondarySideBar.defaultVisibility\":\"hidden\",\"window.dialogStyle\":\"custom\",\"workbench.colorTheme\":\"Overseer Dark\",\"breadcrumbs.enabled\":true}"
       }
     },
     {

@@ -78,7 +78,7 @@
           "groups": [
             {
               "share": 1,
-              "active": "Overseer"
+              "active": ""
             }
           ],
           "sidebar": true,
@@ -194,11 +194,11 @@
           "groups": [
             {
               "share": 0.66,
-              "active": "Review"
+              "active": ""
             },
             {
               "share": 0.34,
-              "active": "Overseer"
+              "active": ""
             }
           ],
           "sidebar": true,

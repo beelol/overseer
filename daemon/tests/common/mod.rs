@@ -9,6 +9,13 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
+// The gateway tests' reference phone speaks the daemon's own Noise code.
+#[path = "../../src/gateway/base32.rs"]
+pub mod base32;
+#[path = "../../src/gateway/noise.rs"]
+pub mod noise;
+pub mod phone;
+
 pub const BIN: &str = env!("CARGO_BIN_EXE_overseerd");
 
 pub fn repo_root() -> PathBuf {
@@ -40,12 +47,26 @@ impl Daemon {
         if !env.iter().any(|(k, _)| k == "OVERSEER_TEST_NET" || k == "OVERSEER_CONTINUITY_PROBES") {
             env.push(("OVERSEER_CONTINUITY_PROBES".to_string(), "off".to_string()));
         }
+        // OVERSEER_TEST_PHONE_ACCESS=on runs a whole suite with phone access turned on (AC-116):
+        // what passed with it off must pass with it on.
+        // The suites that switch phone access themselves (gateway, phone_methods) start from
+        // off, as the owner's daemon does: for them the setting changes nothing.
+        let own = std::env::current_exe().ok().and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string())).unwrap_or_default();
+        let switches_itself = own.starts_with("gateway-") || own.starts_with("phone_methods-");
+        let phone_access = !switches_itself && std::env::var("OVERSEER_TEST_PHONE_ACCESS").as_deref() == Ok("on");
+        if phone_access && !env.iter().any(|(k, _)| k == "OVERSEER_GATEWAY_MDNS") {
+            env.push(("OVERSEER_GATEWAY_MDNS".to_string(), "off".to_string()));
+        }
         let mut d = Daemon { home, child: None, env };
         d.spawn();
         if enable_auto {
             // Most existing Auto protocol fixtures opt in explicitly; the
             // default-off regression opts out through this test-only flag.
             d.call("auto.mode.set", json!({"enabled":true}));
+        }
+        if phone_access {
+            let status = d.call("gateway.enable", json!({"port": 0}));
+            assert_eq!(status["enabled"], true);
         }
         d
     }

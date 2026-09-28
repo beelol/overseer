@@ -1,0 +1,82 @@
+# scripts/test-all --jobs=2 from a clean clone of claude/gate-s-gaps at 211a82c5
+# (git clone --branch claude/gate-s-gaps https://github.com/beelol/overseer.git; the two npm tooling
+# folders taken from a checkout with the same package-lock.json files, as `npm ci --ignore-scripts`
+# would install them; its own fresh cargo target). Output as printed:
+Mon Sep 28 07:13:15 PDT 2026
+▶ Rust (cargo test --workspace) … FAILED (819s) 247 passed, 1 failed
+    test ac197_a_handed_off_agent_stays_one_agent_to_overseer ... FAILED
+    thread 'ac197_a_handed_off_agent_stays_one_agent_to_overseer' panicked at daemon/tests/overseer_continuity.rs:234:108:
+    test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.47s
+    error: test failed, to rerun pass `-p overseerd --test overseer_continuity`
+▶ Unit (test/unit) … ok (2s) 5 of 5 passed
+▶ Check (extension sources) … ok (0s)
+▶ Links (README and ledger) … ok (0s) 762 links checked in 219 files; 0 broken
+▶ Build the VSIX … ok (55s)
+(UI scenarios, 2 at a time)
+▶ UI arrangement … ok (37s)
+▶ UI accounts … ok (61s)
+▶ UI audio … ok (34s)
+▶ UI brand … ok (26s)
+▶ UI center … ok (50s)
+▶ UI audit … FAILED (106s)
+    [2026-09-28T14:30:37.789Z] FAIL review: no more visible text than Gate J (175 → 178) {"view":"review","gatej":175,"gatek":178}
+    SCENARIO FAILED /private/tmp/ovs-ui-Y53nKN
+▶ UI chat … ok (38s)
+▶ UI composer … ok (51s)
+▶ UI continuity … ok (71s)
+▶ UI continuity-settings … ok (55s)
+▶ UI conversation … ok (29s)
+▶ UI dragout … ok (20s)
+▶ UI dashboard … ok (52s)
+▶ UI endings … ok (38s)
+▶ UI first-click … ok (38s)
+▶ UI follow … ok (43s)
+▶ UI followups … FAILED (107s)
+    [2026-09-28T14:34:52.239Z] FAIL with no agent working or pinned, the grid command goes to the home composer with a one-line note (no empty grid screen) {"mode":"composer","note":"","emptyText":false}
+    SCENARIO FAILED /private/tmp/ovs-ui-8ffRmq
+▶ UI grid … ok (42s)
+▶ UI gallery … ok (129s)
+▶ UI grid-track … ok (29s)
+▶ UI grid-drag … ok (70s)
+▶ UI home … ok (88s)
+▶ UI hunks … ok (43s)
+▶ UI inventory … ok (53s)
+▶ UI keyboard … ok (33s)
+▶ UI history … ok (285s)
+▶ UI look … ok (80s)
+▶ UI main … ok (68s)
+▶ UI modes … ok (54s)
+▶ UI narrow-chat … ok (42s)
+▶ UI notify … ok (15s)
+▶ UI parity … ok (26s)
+▶ UI oversight … ok (70s)
+▶ UI place … ok (37s)
+▶ UI pr … ok (60s)
+▶ UI restore … ok (68s)
+▶ UI review-files … ok (35s)
+▶ UI review-width … ok (28s)
+▶ UI review … ok (79s)
+▶ UI sidebar … ok (33s)
+▶ UI scopes … ok (44s)
+▶ UI signin … ok (34s)
+▶ UI talk … ok (25s)
+▶ UI theme … ok (72s)
+▶ UI trust … ok (11s)
+▶ UI sidebar-search … ok (166s)
+▶ UI usage … ok (25s)
+▶ UI windows … ok (52s)
+▶ UI voice … ok (256s)
+(not run: background, claude-live, codex-approval, codex-follow, codex-live, conversation-live, live-gatej, merge, offline-session, perf, talk-live; LIVE ones need --live, perf needs --perf)
+
+51 of 54 passed; failed: Rust (cargo test --workspace), UI audit, UI followups
+exit 1
+Mon Sep 28 07:54:35 PDT 2026
+
+# Afterwards, on the branch:
+# - overseer_continuity: the failing check read the watcher's successor's launch before its process
+#   had started; the test now waits for the start (01b1742a); `cargo test -p overseerd --test
+#   overseer_continuity` passes (4 of 4).
+# - followups, run alone: ok (105s): the note was cleared under the load of two scenarios at a time.
+# - audit: the review view's text grew by three characters because its file list now shows each
+#   file's +/− counts; this branch does not change the review, and the audit's last passing evidence
+#   (2026-09-26) is older than main's review changes of 2026-09-27 that this branch starts from.

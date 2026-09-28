@@ -383,6 +383,8 @@ pub struct Daemon {
     /// When VS Code windows went from none to some, and the runs the last background notice named:
     /// a brief reconnect after a notice (a probe, a crash-restart) does not repeat it.
     pub ui_session: Mutex<(Option<std::time::Instant>, Option<Vec<String>>)>,
+    /// The phone gateway (Gate N). Off until the owner turns phone access on.
+    pub gateway: crate::gateway::Gateway,
     /// What Overseer coordinates with no model: pending conflict scans and their caches.
     pub coord: crate::overseer::conflicts::Coordination,
 }
@@ -443,7 +445,7 @@ impl Daemon {
             learning_usage_paused: std::sync::atomic::AtomicBool::new(false), learning_work_paused: std::sync::atomic::AtomicBool::new(false),
             learning_thread_paused: std::sync::atomic::AtomicBool::new(false), learning_account_paused: std::sync::atomic::AtomicBool::new(false),
             learning_maintenance_paused: std::sync::atomic::AtomicBool::new(false),
-            ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0), ui_session: Mutex::new((None, None)),
+            ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0), ui_session: Mutex::new((None, None)), gateway: crate::gateway::Gateway::new(),
             coord: crate::overseer::conflicts::Coordination::default() });
         daemon.ensure_system_profiles()?;
         {
@@ -488,6 +490,9 @@ impl Daemon {
 
     pub fn emit(&self, task: Option<&str>, run: Option<&str>, kind: &str, source: &str, confidence: &str, payload: Value) -> Result<Event> {
         let payload = redact_value(payload);
+        // What a person did from a phone says which phone (Gate N).
+        let actor = if source == "user" { crate::server::actor() } else { None };
+        let source = actor.as_deref().unwrap_or(source);
         let event = self.store.lock().unwrap().insert_event(now(), task, run, kind, source, confidence, &payload)?;
         let _ = self.events.send(event.clone());
         Ok(event)
@@ -1956,6 +1961,8 @@ impl Daemon {
                 // Guardrails are repeated on later turns; the briefing about the agents beside this
                 // one goes with its task (AC-190).
                 let preface = if follow_up { self.guardrail_preface(run_id) } else { self.briefing_preface(run_id) };
+                // A successor's first turn carries the guardrails it took over (AC-187, AC-197).
+                let preface = if opts.handoff && !follow_up { [self.guardrail_preface(run_id), preface].into_iter().filter(|p| !p.is_empty()).collect::<Vec<_>>().join("\n\n") } else { preface };
                 let prompt_owned = if preface.is_empty() { prompt.to_string() } else { format!("{preface}\n\n{prompt}") };
                 let turn = Turn { id: format!("u-{}", short_id()), run_id: run_id.into(), n, prompt: prompt_owned, snapshot_id: Some(snap.id.clone()), started_ms: now(), ended_ms: None, status: "running".into() };
                 {
@@ -2024,7 +2031,7 @@ impl Daemon {
         }
         let args: Option<Vec<String>> = generic_meta["args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect());
         let mut extra_args: Vec<String> = generic_meta["extra_args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
-        if follow_up {
+        if follow_up || opts.handoff {
             extra_args.extend(self.guardrail_launch_args(run_id, &run.harness));
         }
         // The channel back to Overseer, on every turn of an agent that has one (AC-190).
@@ -2407,19 +2414,32 @@ impl Daemon {
 
     pub fn answer_permission(&self, run_id: &str, request_id: &str, allow: bool, message: &str) -> Result<Value> {
         let run = self.run(run_id)?;
-        let attention = run.attention.clone().ok_or_else(|| anyhow!("run has no pending permission request"))?;
-        if attention["request_id"].as_str() != Some(request_id) {
+        // Several surfaces can answer the same request (VS Code, the terminal, a phone). The
+        // request is claimed under the store's lock, so exactly one answer reaches the harness;
+        // a later one is told what the first one was.
+        let by = crate::server::actor().unwrap_or_else(|| "the Mac".to_string());
+        let claimed = self.store.lock().unwrap().claim_run_attention(run_id, request_id, allow, &by, now())?;
+        let Some(attention) = claimed else {
+            if let Some(first) = self.store.lock().unwrap().permission_answer(run_id, request_id)? {
+                let by = first["by"].as_str().unwrap_or("someone").to_string();
+                let what = if first["allow"].as_bool() == Some(true) { "allowed" } else { "denied" };
+                return Err(crate::server::ProtoError::new("already_answered", format!("this request was already {what} by {by}")).with_data(first).into());
+            }
+            if run.attention.is_none() {
+                bail!("run has no pending permission request");
+            }
             bail!("permission request {request_id} is not pending");
+        };
+        let sent = adapters::permission_reply(&run.harness, request_id, allow, &attention["input"], if message.is_empty() { "Denied by user in Overseer" } else { message })
+            .ok_or_else(|| anyhow!("{} does not support permission replies", run.harness))
+            .and_then(|reply| self.send_stdin(&run, &reply));
+        if let Err(e) = sent {
+            // Nothing reached the harness: the request is still pending.
+            self.store.lock().unwrap().unclaim_run_attention(run_id, request_id, &attention)?;
+            return Err(e);
         }
-        let reply = adapters::permission_reply(&run.harness, request_id, allow, &attention["input"], if message.is_empty() { "Denied by user in Overseer" } else { message })
-            .ok_or_else(|| anyhow!("{} does not support permission replies", run.harness))?;
-        self.send_stdin(&run, &reply)?;
-        {
-            let store = self.store.lock().unwrap();
-            store.set_run_attention(run_id, None)?;
-            store.update_run_status(run_id, "running", None, None)?;
-        }
-        self.emit(Some(&run.task_id), Some(run_id), "permission_answered", "user", "exact", json!({"request_id": request_id, "allow": allow}))?;
+        self.store.lock().unwrap().update_run_status(run_id, "running", None, None)?;
+        self.emit(Some(&run.task_id), Some(run_id), "permission_answered", "user", "exact", json!({"request_id": request_id, "allow": allow, "by": by}))?;
         self.emit(Some(&run.task_id), Some(run_id), "status", "daemon", "exact", json!({"status": "running"}))?;
         if !allow {
             // What the owner refused is remembered, so Overseer never has another agent do it (AC-196).

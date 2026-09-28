@@ -6,4 +6,5 @@ pub mod client;
 pub mod feed;
 pub mod locate;
 pub mod model;
+pub mod qr;
 pub mod ui;

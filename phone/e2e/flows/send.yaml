@@ -1,0 +1,25 @@
+# A message typed on the phone: it is in the conversation at once and reaches the agent once.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- runFlow:
+    file: open-agent.yaml
+    env:
+      RUN: ${SHOWCASE}
+- extendedWaitUntil:
+    visible:
+      id: "agent.composer.text"
+    timeout: 30000
+- tapOn:
+    id: "agent.composer.text"
+- inputText: ${MESSAGE}
+- tapOn:
+    id: "agent.composer.send"
+- extendedWaitUntil:
+    visible: ".*${MESSAGE}.*"
+    timeout: 5000

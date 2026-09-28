@@ -1,0 +1,1002 @@
+{
+  "checks": [
+    {
+      "name": "the pairing panel and phone access sources use theme tokens only (no colours of their own)",
+      "ok": true,
+      "detail": {
+        "files": 4,
+        "hits": [],
+        "foreign": []
+      }
+    },
+    {
+      "name": "1. the status bar says \"Phone access off\", with a phone icon and an accessible name",
+      "ok": true,
+      "detail": {
+        "text": "Phone access off",
+        "aria": "Phone access off",
+        "icon": "device-mobile",
+        "x": 395.08203125,
+        "y": 884,
+        "background": "rgba(0, 0, 0, 0)",
+        "color": "rgb(167, 163, 185)",
+        "otherColor": "rgb(167, 163, 185)",
+        "otherBackground": "rgba(0, 0, 0, 0)",
+        "afterOverseer": true,
+        "classes": "statusbar-item left has-command"
+      }
+    },
+    {
+      "name": "1. off is quiet: the item has no colour of its own (same colours as the Overseer item beside it)",
+      "ok": true,
+      "detail": {
+        "text": "Phone access off",
+        "aria": "Phone access off",
+        "icon": "device-mobile",
+        "x": 395.08203125,
+        "y": 884,
+        "background": "rgba(0, 0, 0, 0)",
+        "color": "rgb(167, 163, 185)",
+        "otherColor": "rgb(167, 163, 185)",
+        "otherBackground": "rgba(0, 0, 0, 0)",
+        "afterOverseer": true,
+        "classes": "statusbar-item left has-command"
+      }
+    },
+    {
+      "name": "1. phone access is off in the daemon and nothing listens on its port",
+      "ok": true,
+      "detail": {
+        "enabled": false,
+        "port": null,
+        "configured": 50648,
+        "refused": true
+      }
+    },
+    {
+      "name": "1. clicking it offers Turn On, Pair a Phone, Show Devices and the notifications switch (not Turn Off)",
+      "ok": true,
+      "detail": [
+        "device-mobile  Turn On Phone Access, Let paired phones connect to this Mac.",
+        "add  Pair a Phone…, Turns phone access on first.",
+        "list-unordered  Show Devices, No phone is paired yet.",
+        "bell-slash  Turn Off Notifications to Phones, Phones are told when an agent needs you."
+      ]
+    },
+    {
+      "name": "2. Turn On Phone Access from the command palette: the status bar says \"Phone access on\"",
+      "ok": true,
+      "detail": {
+        "text": "Phone access on",
+        "aria": "Phone access on, no phone connected",
+        "icon": "device-mobile",
+        "x": 394.2421875,
+        "y": 884,
+        "background": "rgba(0, 0, 0, 0)",
+        "color": "rgb(167, 163, 185)",
+        "otherColor": "rgb(167, 163, 185)",
+        "otherBackground": "rgba(0, 0, 0, 0)",
+        "afterOverseer": true,
+        "classes": "statusbar-item left has-command"
+      }
+    },
+    {
+      "name": "2. the daemon says phone access is on, and its port listens",
+      "ok": true,
+      "detail": {
+        "enabled": true,
+        "port": 50648
+      }
+    },
+    {
+      "name": "2. on has no colour of its own either",
+      "ok": true,
+      "detail": {
+        "text": "Phone access on",
+        "aria": "Phone access on, no phone connected",
+        "icon": "device-mobile",
+        "x": 394.2421875,
+        "y": 884,
+        "background": "rgba(0, 0, 0, 0)",
+        "color": "rgb(167, 163, 185)",
+        "otherColor": "rgb(167, 163, 185)",
+        "otherBackground": "rgba(0, 0, 0, 0)",
+        "afterOverseer": true,
+        "classes": "statusbar-item left has-command"
+      }
+    },
+    {
+      "name": "2. now the menu offers Turn Off, and no longer Turn On",
+      "ok": true,
+      "detail": [
+        "add  Pair a Phone…, Show a code to scan or type on the phone.",
+        "list-unordered  Show Devices, No phone is paired yet.",
+        "bell-slash  Turn Off Notifications to Phones, Phones are told when an agent needs you.",
+        "circle-slash  Turn Off Phone Access, No phone can connect."
+      ]
+    },
+    {
+      "name": "3. Pair a Phone shows the code as text: it starts with OVSR1-, names this Mac's key and port",
+      "ok": true,
+      "detail": {
+        "code": "OVSR1-AG5EXTQZ5N6N4PVANAQQLKKE6UNA6ELUZCUKKNPWA3NGUUDJL26XPGPNHRNRSSZT4PCEOIU5NI5BIGOF3ABAWMJXGIXDEMBOGEYC4MYJGEZDOLRQFYYC4MI",
+        "port": 50648,
+        "addresses": [
+          "172.20.10.3",
+          "127.0.0.1"
+        ],
+        "key": "1e6beb525f4bcc5a"
+      }
+    },
+    {
+      "name": "3. the text is the code, character for character, in groups for the eye, and can be selected",
+      "ok": true,
+      "detail": {
+        "groups": 31,
+        "selectable": "all"
+      }
+    },
+    {
+      "name": "3. the QR code drawn in the panel reads back as exactly the code shown as text",
+      "ok": true,
+      "detail": {
+        "version": 8,
+        "level": "M",
+        "mask": 4,
+        "modules": 49,
+        "quiet": 4
+      }
+    },
+    {
+      "name": "3. the panel shows the Mac's name, three numbered steps, the time left and a Copy button",
+      "ok": true,
+      "detail": {
+        "mac": "With MacBook-Pro",
+        "steps": [
+          "Open Overseer on your phone.",
+          "Scan this code, or type it.",
+          "Confirm the phone here, on this Mac."
+        ],
+        "left": "Works once, for 0:45 more.",
+        "copy": {
+          "text": "Copy",
+          "name": "Copy"
+        },
+        "qr": {
+          "w": 264,
+          "h": 264,
+          "shown": true
+        }
+      }
+    },
+    {
+      "name": "3. the time left counts down",
+      "ok": true,
+      "detail": {
+        "first": "Works once, for 0:45 more.",
+        "later": "Works once, for 0:43 more."
+      }
+    },
+    {
+      "name": "3. the daemon has pairing open, for this code only",
+      "ok": true,
+      "detail": {
+        "failures": 0,
+        "open": true,
+        "remaining_ms": 42527,
+        "waiting": []
+      }
+    },
+    {
+      "name": "3. in Overseer Dark, Overseer Light and a stock theme the code is dark on light, from the theme's own colours",
+      "ok": true,
+      "detail": {
+        "Overseer Dark": {
+          "paper": "rgb(232, 230, 240)",
+          "ink": "rgb(23, 22, 29)",
+          "contrast": 14.55
+        },
+        "Overseer Light": {
+          "paper": "rgb(251, 250, 253)",
+          "ink": "rgb(28, 26, 38)",
+          "contrast": 16.48
+        },
+        "Default Dark Modern": {
+          "paper": "rgb(204, 204, 204)",
+          "ink": "rgb(31, 31, 31)",
+          "contrast": 10.26
+        }
+      }
+    },
+    {
+      "name": "3. in each theme: nothing overflows, no long unbroken text, every icon-only control is named",
+      "ok": true,
+      "detail": {
+        "Overseer Dark": {
+          "chars": 286,
+          "overflow": [],
+          "unnamed": [],
+          "longRuns": []
+        },
+        "Overseer Light": {
+          "chars": 286,
+          "overflow": [],
+          "unnamed": [],
+          "longRuns": []
+        },
+        "Default Dark Modern": {
+          "chars": 286,
+          "overflow": [],
+          "unnamed": [],
+          "longRuns": []
+        }
+      }
+    },
+    {
+      "name": "3. the Mac's own QR reader reads the screenshot of each theme as exactly the code",
+      "ok": true,
+      "detail": {
+        "Overseer Dark": [
+          true
+        ],
+        "Overseer Light": [
+          true
+        ],
+        "Default Dark Modern": [
+          true
+        ]
+      }
+    },
+    {
+      "name": "3. when its time is over the panel says the code has expired and offers \"New code\"",
+      "ok": true,
+      "detail": {
+        "over": "This code has expired.",
+        "newCode": "New code",
+        "afterMs": 44731
+      }
+    },
+    {
+      "name": "3. an expired code pairs nothing",
+      "ok": true,
+      "detail": {
+        "lateAnswer": "the gateway closed the connection without an answer"
+      }
+    },
+    {
+      "name": "4. New code shows another code, and its QR code reads back as that code",
+      "ok": true,
+      "detail": {
+        "changed": true
+      }
+    },
+    {
+      "name": "4. the Mac asks: Pair \"Bilal's iPhone\"? with the platform, the address and the phone's key",
+      "ok": true,
+      "detail": {
+        "text": "Don't Pair\nPair\nPair \"Bilal's iPhone\"?\niPhone · 127.0.0.1\nKey 59cd 7069 aa6a 03de\n\nIt will be able to watch and control your agents. You can make it watch only, or revoke it, in Devices.",
+        "message": "Pair \"Bilal's iPhone\"?",
+        "detail": "iPhone · 127.0.0.1\nKey 59cd 7069 aa6a 03de\n\nIt will be able to watch and control your agents. You can make it watch only, or revoke it, in Devices.",
+        "buttons": [
+          "Don't Pair",
+          "Pair"
+        ]
+      }
+    },
+    {
+      "name": "4. the choices are Pair and Don't Pair",
+      "ok": true,
+      "detail": [
+        "Don't Pair",
+        "Pair"
+      ]
+    },
+    {
+      "name": "4. the panel says the phone is asking, and no longer shows the used code",
+      "ok": true,
+      "detail": "\"Bilal's iPhone\" is asking to pair. Answer on this Mac."
+    },
+    {
+      "name": "4. nothing is paired before the owner answers",
+      "ok": true,
+      "detail": {
+        "failures": 0,
+        "open": false,
+        "remaining_ms": 44393,
+        "waiting": [
+          {
+            "address": "127.0.0.1",
+            "fingerprint": "59cd7069aa6a03de",
+            "name": "Bilal's iPhone",
+            "platform": "ios",
+            "request": "bf827735-a108-4511-a032-16929261c803"
+          }
+        ]
+      }
+    },
+    {
+      "name": "5. after Pair the phone's handshake completes: it has its device id and full control",
+      "ok": true,
+      "detail": {
+        "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
+        "fingerprint": "1e6beb525f4bcc5a",
+        "gateway": "MacBook-Pro",
+        "protocol": 1,
+        "scope": "full"
+      }
+    },
+    {
+      "name": "5. the panel says it is paired, with Done and Pair Another Phone",
+      "ok": true,
+      "detail": {
+        "phase": "paired",
+        "title": "Pair a phone",
+        "mac": "With MacBook-Pro",
+        "code": "",
+        "groups": [],
+        "left": "",
+        "steps": [
+          "Open Overseer on your phone.",
+          "Scan this code, or type it.",
+          "Confirm the phone here, on this Mac."
+        ],
+        "d": "",
+        "side": 0,
+        "quiet": 0,
+        "qr": {
+          "w": 0,
+          "h": 0,
+          "shown": false
+        },
+        "paper": null,
+        "ink": null,
+        "copy": null,
+        "over": "Paired with \"Bilal's iPhone\".",
+        "newCode": "Pair Another Phone",
+        "done": "Done",
+        "selectable": "all"
+      }
+    },
+    {
+      "name": "5. the status bar says \"1 phone\"",
+      "ok": true,
+      "detail": {
+        "text": "1 phone",
+        "aria": "Phone access on, 1 phone connected",
+        "icon": "device-mobile",
+        "x": 369.4609375,
+        "y": 884,
+        "background": "rgba(0, 0, 0, 0)",
+        "color": "rgb(167, 163, 185)",
+        "otherColor": "rgb(167, 163, 185)",
+        "otherBackground": "rgba(0, 0, 0, 0)",
+        "afterOverseer": true,
+        "classes": "statusbar-item left has-command"
+      }
+    },
+    {
+      "name": "5. Devices is a view of the Overseer side bar, after Accounts",
+      "ok": true,
+      "detail": [
+        "Search",
+        "Agents",
+        "Accounts",
+        "Devices"
+      ]
+    },
+    {
+      "name": "5. the Devices view lists the phone as connected, with its scope and a phone icon",
+      "ok": true,
+      "detail": {
+        "label": "Bilal's iPhone",
+        "description": "connected · Full control",
+        "aria": "Bilal's iPhone, iPhone, connected, Full control",
+        "level": 1,
+        "expanded": "false",
+        "icon": "device-mobile",
+        "iconColor": "rgb(76, 195, 138)",
+        "actions": [
+          {
+            "name": "Rename…",
+            "icon": "edit"
+          },
+          {
+            "name": "Make Watch Only",
+            "icon": "eye"
+          },
+          {
+            "name": "Revoke Device…",
+            "icon": "trash"
+          }
+        ]
+      }
+    },
+    {
+      "name": "5. opened, the row shows the phone, its scope, when it was paired, when it was last seen, its address and its key",
+      "ok": true,
+      "detail": {
+        "Phone": "iPhone · Overseer 0.1.0-test",
+        "Scope": "Full control",
+        "Paired": "Sep 28, 2026, 9:32 AM",
+        "Last seen": "connected now",
+        "Address": "127.0.0.1",
+        "Key": "59cd 7069 aa6a 03de"
+      }
+    },
+    {
+      "name": "5. the row's icons are named: Rename…, Make Watch Only, Revoke Device…",
+      "ok": true,
+      "detail": [
+        {
+          "name": "Rename…",
+          "icon": "edit"
+        },
+        {
+          "name": "Make Watch Only",
+          "icon": "eye"
+        },
+        {
+          "name": "Revoke Device…",
+          "icon": "trash"
+        }
+      ]
+    },
+    {
+      "name": "5. the whole list fits the side bar: name, connected, scope and the six details",
+      "ok": true,
+      "detail": {
+        "text": "connected · Full control",
+        "cut": [],
+        "right": 322,
+        "edge": 343,
+        "icons": 0,
+        "rows": 7
+      }
+    },
+    {
+      "name": "6. Don't Pair: the second phone gets no answer, and nothing is added",
+      "ok": true,
+      "detail": {
+        "answer2": "the gateway closed the connection without an answer",
+        "devices": [
+          "Bilal's iPhone"
+        ]
+      }
+    },
+    {
+      "name": "6. the panel says the phone was not paired and offers a new code",
+      "ok": true,
+      "detail": "\"Unknown Pixel\" was not paired."
+    },
+    {
+      "name": "6. answered elsewhere first: this window's answer is taken quietly (no error), and the phone is paired once",
+      "ok": true,
+      "detail": {
+        "quiet1": "\"Spare Phone\" is no longer waiting to pair.",
+        "errors1": [],
+        "devices": [
+          "Bilal's iPhone",
+          "Spare Phone"
+        ]
+      }
+    },
+    {
+      "name": "6. the status bar says \"2 phones\"",
+      "ok": true,
+      "detail": {
+        "text": "2 phones",
+        "aria": "Phone access on, 2 phones connected",
+        "icon": "device-mobile",
+        "x": 372.6015625,
+        "y": 884,
+        "background": "rgba(0, 0, 0, 0)",
+        "color": "rgb(167, 163, 185)",
+        "otherColor": "rgb(167, 163, 185)",
+        "otherBackground": "rgba(0, 0, 0, 0)",
+        "afterOverseer": true,
+        "classes": "statusbar-item left has-command"
+      }
+    },
+    {
+      "name": "6. a question nobody answers: the phone stops waiting, the owner is told quietly, and a late Pair pairs nothing",
+      "ok": true,
+      "detail": {
+        "answer5": "the gateway closed the connection without an answer",
+        "quiet2": "\"Slow Phone\" stopped waiting to pair.",
+        "quiet3": "\"Slow Phone\" is no longer waiting to pair.",
+        "over": "\"Slow Phone\" was not paired.",
+        "errors2": []
+      }
+    },
+    {
+      "name": "closing the panel cancels pairing in the daemon",
+      "ok": true,
+      "detail": {
+        "pairing": null,
+        "cancelled": [
+          "cancelled on the Mac"
+        ]
+      }
+    },
+    {
+      "name": "7. the row's menu offers Make Watch Only, Rename… and Revoke Device…",
+      "ok": true,
+      "detail": [
+        "Make Watch Only",
+        "Rename…",
+        "Revoke Device…"
+      ]
+    },
+    {
+      "name": "7. Make Watch Only: the row says Watch only, the daemon agrees, and the phone may watch but not control",
+      "ok": true,
+      "detail": {
+        "row": "connected · Watch only",
+        "refusal": {
+          "code": "watch_only",
+          "message": "this phone may watch but not control; change its scope on the Mac"
+        },
+        "canRead": true,
+        "actions": [
+          "Rename…",
+          "Give Full Control",
+          "Revoke Device…"
+        ]
+      }
+    },
+    {
+      "name": "7. a watch-only phone offers Give Full Control instead",
+      "ok": true,
+      "detail": [
+        "Give Full Control",
+        "Rename…",
+        "Revoke Device…"
+      ]
+    },
+    {
+      "name": "7. Rename…: the list and the daemon show the new name",
+      "ok": true,
+      "detail": [
+        "Spare Phone",
+        "Work iPhone",
+        "Phone",
+        "Scope",
+        "Paired",
+        "Last seen",
+        "Address",
+        "Key"
+      ]
+    },
+    {
+      "name": "the window tells the daemon which agent it shows, and no phone is notified about that agent",
+      "ok": true,
+      "detail": {
+        "looking": true,
+        "aboutWatched": {
+          "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
+          "fields": [],
+          "kind": "finished",
+          "name": "Work iPhone",
+          "outcome": "not_sent",
+          "route": "none",
+          "why": "the owner is looking at this agent on the Mac"
+        }
+      }
+    },
+    {
+      "name": "an agent the window does not show is announced to the phone",
+      "ok": true,
+      "detail": {
+        "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
+        "fields": [
+          "aps.alert.body",
+          "aps.alert.title",
+          "aps.category",
+          "aps.interruption-level",
+          "aps.sound",
+          "aps.thread-id",
+          "overseer.device",
+          "overseer.kind",
+          "overseer.run_id",
+          "overseer.task_id",
+          "overseer.v"
+        ],
+        "kind": "finished",
+        "name": "Work iPhone",
+        "outcome": "sent",
+        "route": "files",
+        "why": ""
+      }
+    },
+    {
+      "name": "showing another agent tells the daemon so",
+      "ok": true,
+      "detail": {
+        "moved": true
+      }
+    },
+    {
+      "name": "a command from a phone shows in the agent's chat with the phone's name, and the daemon records the phone as its source",
+      "ok": true,
+      "detail": {
+        "stop": "ok",
+        "chat": {
+          "sys": [
+            "Stopped from Spare Phone"
+          ]
+        },
+        "commands": [
+          {
+            "source": "phone:Spare Phone",
+            "method": "run.interrupt"
+          }
+        ]
+      }
+    },
+    {
+      "name": "notifications to every phone are switched on the Mac: off in the daemon, offered as Turn On, then on again",
+      "ok": true,
+      "detail": {
+        "notifyOff": false,
+        "menuNotify": [
+          "add  Pair a Phone…, Show a code to scan or type on the phone.",
+          "list-unordered  Show Devices, 2 phones paired, 2 connected.",
+          "bell  Turn On Notifications to Phones, Nothing is sent to any phone.",
+          "circle-slash  Turn Off Phone Access, Disconnects 2 phones."
+        ],
+        "after": true
+      }
+    },
+    {
+      "name": "with the Mac's switch off nothing is sent: the daemon's record says why, and no payload was written",
+      "ok": true,
+      "detail": {
+        "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
+        "fields": [],
+        "kind": "finished",
+        "name": "Work iPhone",
+        "outcome": "not_sent",
+        "route": "none",
+        "why": "notifications to phones are off on the Mac"
+      }
+    },
+    {
+      "name": "on again, the phone is told again",
+      "ok": true,
+      "detail": {
+        "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
+        "fields": [
+          "aps.alert.body",
+          "aps.alert.title",
+          "aps.category",
+          "aps.interruption-level",
+          "aps.sound",
+          "aps.thread-id",
+          "overseer.device",
+          "overseer.kind",
+          "overseer.run_id",
+          "overseer.task_id",
+          "overseer.v"
+        ],
+        "kind": "finished",
+        "name": "Work iPhone",
+        "outcome": "sent",
+        "route": "files",
+        "why": ""
+      }
+    },
+    {
+      "name": "turning phone access off with phones connected asks first and names them; they are told, then disconnected",
+      "ok": true,
+      "detail": {
+        "detail": "2 phones will be disconnected: Work iPhone, Spare Phone.\nPaired phones connect again when you turn phone access back on.",
+        "ended": [
+          true,
+          true
+        ],
+        "notices": [
+          [
+            "off"
+          ],
+          [
+            "off"
+          ]
+        ],
+        "bar": "Phone access off"
+      }
+    },
+    {
+      "name": "on again: the paired phone connects by itself, with no pairing and no question",
+      "ok": true,
+      "detail": {
+        "again": {
+          "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
+          "fingerprint": "1e6beb525f4bcc5a",
+          "gateway": "MacBook-Pro",
+          "protocol": 1,
+          "scope": "watch"
+        },
+        "bar": "1 phone"
+      }
+    },
+    {
+      "name": "after the daemon restarts: phone access is on again at the same port, the list shows both phones as last seen, and a phone connects by itself",
+      "ok": true,
+      "detail": {
+        "dropped": true,
+        "restarted": true,
+        "bar": [
+          "Phone access on",
+          "1 phone"
+        ],
+        "resting": [
+          [
+            "Work iPhone",
+            "last seen just now · Watch only"
+          ],
+          [
+            "Spare Phone",
+            "last seen just now · Full control"
+          ]
+        ],
+        "helloAgain": {
+          "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
+          "fingerprint": "1e6beb525f4bcc5a",
+          "gateway": "MacBook-Pro",
+          "protocol": 1,
+          "scope": "watch"
+        }
+      }
+    },
+    {
+      "name": "after the window reloads: the status bar and the Devices view say the same again",
+      "ok": true,
+      "detail": {
+        "bar": "1 phone",
+        "rows": [
+          [
+            "Work iPhone",
+            "connected · Watch only"
+          ],
+          [
+            "Spare Phone",
+            "last seen just now · Full control"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "7. Revoke… asks and names the device; its session ends, it leaves the list, and its key gets no session again",
+      "ok": true,
+      "detail": {
+        "revoke": "It is disconnected now. Its key never works again. To use this phone again, pair it again.",
+        "gone": true,
+        "noticed": true,
+        "afterRevoke": {
+          "handshake": "answered",
+          "serves": false,
+          "ended": true,
+          "notices": [
+            "off",
+            "revoked",
+            "revoked"
+          ]
+        },
+        "rows": [
+          "Spare Phone"
+        ]
+      }
+    },
+    {
+      "name": "7. with every phone revoked the list is empty: one sentence and Pair a Phone",
+      "ok": true,
+      "detail": {
+        "text": "No phone is paired. Pair one to watch and answer your agents from it.\n\nPair a Phone",
+        "buttons": [
+          "Pair a Phone"
+        ]
+      }
+    },
+    {
+      "name": "7. the status bar says phone access is on and no phone is connected",
+      "ok": true,
+      "detail": {
+        "text": "Phone access on",
+        "aria": "Phone access on, no phone connected",
+        "icon": "device-mobile",
+        "x": 394.2421875,
+        "y": 884,
+        "background": "rgba(0, 0, 0, 0)",
+        "color": "rgb(167, 163, 185)",
+        "otherColor": "rgb(167, 163, 185)",
+        "otherBackground": "rgba(0, 0, 0, 0)",
+        "afterOverseer": true,
+        "classes": "statusbar-item left has-command"
+      }
+    },
+    {
+      "name": "a phone paired and revoked outside VS Code appears in, and leaves, the list and the status bar without a refresh",
+      "ok": true,
+      "detail": {
+        "bar": "1 phone"
+      }
+    },
+    {
+      "name": "8. Turn Off Phone Access (no phone connected: no question): the status bar says off and the port refuses",
+      "ok": true,
+      "detail": {
+        "bar": "Phone access off",
+        "enabled": false
+      }
+    },
+    {
+      "name": "every change was the daemon's: on, off, on, on (the daemon restarted), off",
+      "ok": true,
+      "detail": [
+        "on",
+        "off",
+        "on",
+        "on",
+        "off"
+      ]
+    },
+    {
+      "name": "nothing on screen says \"gateway\"",
+      "ok": true,
+      "detail": []
+    }
+  ],
+  "themes": {
+    "Overseer Dark": {
+      "paper": "rgb(232, 230, 240)",
+      "ink": "rgb(23, 22, 29)",
+      "contrast": 14.55,
+      "darkOnLight": true,
+      "audit": {
+        "chars": 286,
+        "overflow": [],
+        "unnamed": [],
+        "longRuns": []
+      },
+      "camera": [
+        "OVSR1-AG5EXTQZ5N6N4PVANAQQLKKE6UNA6ELUZCUKKNPWA3NGUUDJL26XPGPNHRNRSSZT4PCEOIU5NI5BIGOF3ABAWMJXGIXDEMBOGEYC4MYJGEZDOLRQFYYC4MI"
+      ]
+    },
+    "Overseer Light": {
+      "paper": "rgb(251, 250, 253)",
+      "ink": "rgb(28, 26, 38)",
+      "contrast": 16.48,
+      "darkOnLight": true,
+      "audit": {
+        "chars": 286,
+        "overflow": [],
+        "unnamed": [],
+        "longRuns": []
+      },
+      "camera": [
+        "OVSR1-AG5EXTQZ5N6N4PVANAQQLKKE6UNA6ELUZCUKKNPWA3NGUUDJL26XPGPNHRNRSSZT4PCEOIU5NI5BIGOF3ABAWMJXGIXDEMBOGEYC4MYJGEZDOLRQFYYC4MI"
+      ]
+    },
+    "Default Dark Modern": {
+      "paper": "rgb(204, 204, 204)",
+      "ink": "rgb(31, 31, 31)",
+      "contrast": 10.26,
+      "darkOnLight": true,
+      "audit": {
+        "chars": 286,
+        "overflow": [],
+        "unnamed": [],
+        "longRuns": []
+      },
+      "camera": [
+        "OVSR1-AG5EXTQZ5N6N4PVANAQQLKKE6UNA6ELUZCUKKNPWA3NGUUDJL26XPGPNHRNRSSZT4PCEOIU5NI5BIGOF3ABAWMJXGIXDEMBOGEYC4MYJGEZDOLRQFYYC4MI"
+      ]
+    }
+  },
+  "pushes": [
+    {
+      "run": "r-aff497b4947c",
+      "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
+      "fields": [
+        "aps.alert.body",
+        "aps.alert.title",
+        "aps.category",
+        "aps.interruption-level",
+        "aps.sound",
+        "aps.thread-id",
+        "overseer.device",
+        "overseer.kind",
+        "overseer.run_id",
+        "overseer.task_id",
+        "overseer.v"
+      ],
+      "kind": "finished",
+      "name": "Work iPhone",
+      "outcome": "sent",
+      "route": "files",
+      "why": ""
+    },
+    {
+      "run": "r-aff497b4947c",
+      "device": "8eb6d5a5-3852-4657-b5a1-ceb95deee3a6",
+      "fields": [],
+      "kind": "finished",
+      "name": "Spare Phone",
+      "outcome": "not_sent",
+      "route": "none",
+      "why": "notifications are off on this phone"
+    },
+    {
+      "run": "r-e87dc86abb42",
+      "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
+      "fields": [],
+      "kind": "finished",
+      "name": "Work iPhone",
+      "outcome": "not_sent",
+      "route": "none",
+      "why": "the owner is looking at this agent on the Mac"
+    },
+    {
+      "run": "r-e87dc86abb42",
+      "device": "8eb6d5a5-3852-4657-b5a1-ceb95deee3a6",
+      "fields": [],
+      "kind": "finished",
+      "name": "Spare Phone",
+      "outcome": "not_sent",
+      "route": "none",
+      "why": "notifications are off on this phone"
+    },
+    {
+      "run": "r-11087bec80db",
+      "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
+      "fields": [],
+      "kind": "finished",
+      "name": "Work iPhone",
+      "outcome": "not_sent",
+      "route": "none",
+      "why": "notifications to phones are off on the Mac"
+    },
+    {
+      "run": "r-11087bec80db",
+      "device": "8eb6d5a5-3852-4657-b5a1-ceb95deee3a6",
+      "fields": [],
+      "kind": "finished",
+      "name": "Spare Phone",
+      "outcome": "not_sent",
+      "route": "none",
+      "why": "notifications to phones are off on the Mac"
+    },
+    {
+      "run": "r-d43e37098fd7",
+      "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
+      "fields": [
+        "aps.alert.body",
+        "aps.alert.title",
+        "aps.category",
+        "aps.interruption-level",
+        "aps.sound",
+        "aps.thread-id",
+        "overseer.device",
+        "overseer.kind",
+        "overseer.run_id",
+        "overseer.task_id",
+        "overseer.v"
+      ],
+      "kind": "finished",
+      "name": "Work iPhone",
+      "outcome": "sent",
+      "route": "files",
+      "why": ""
+    },
+    {
+      "run": "r-d43e37098fd7",
+      "device": "8eb6d5a5-3852-4657-b5a1-ceb95deee3a6",
+      "fields": [],
+      "kind": "finished",
+      "name": "Spare Phone",
+      "outcome": "not_sent",
+      "route": "none",
+      "why": "notifications are off on this phone"
+    }
+  ]
+}

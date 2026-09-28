@@ -6,7 +6,7 @@
       "detail": [
         "OpenAI / ChatGPT, codex, codex-app, Sign-in: ChatGPT sign-in in the browser, or a device code",
         "Anthropic / Claude, claude, Sign-in: Claude account sign-in (claude auth login)",
-        "OpenCode (local models), opencode, Sign-in: none: local providers and mocks (owner decision 2026-09-25)",
+        "OpenCode (local models), opencode, opencode-serve, Sign-in: none: local providers and mocks (owner decision 2026-09-25)",
         "Devin, unavailable, Devin has no account-login CLI yet (only API keys, which Overseer does not use)"
       ]
     },

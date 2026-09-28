@@ -1,0 +1,56 @@
+$ node e2e/run.mjs --platform android --skip-build --skip-measure --only tap-open --out <scratch>   (2026-09-28 03:39:50, app from a673dee, load { 2.93 3.97 4.09 })
+10:39:50 $ cargo build -p overseerd
+10:39:50 The phone's scenarios on android. Commit a673dee.
+10:39:53 scenario pair (AC-117, AC-118, AC-141): a code typed on the phone, confirmed on the Mac, and the agents list
+10:39:53 flow pair
+10:40:35 ok   pair
+10:40:35 scenario tap-open (AC-126): experiment: the file opened by adb from the changes list, Accept tapped by adb 300, 600, 1000 and 2000 ms later: is any tap lost?
+10:40:36 flow open-changes
+10:41:18   the row is at 540, 921, Accept at 724, 442
+10:41:20   opened by adb, Accept tapped 300 ms later, try 1: marked; the phone sent review.accept
+10:41:24   opened by adb, Accept tapped 300 ms later, try 2: marked; the phone sent review.accept
+10:41:28   opened by adb, Accept tapped 300 ms later, try 3: marked; the phone sent review.accept
+10:41:31   opened by adb, Accept tapped 300 ms later, try 4: marked; the phone sent review.accept
+10:41:35   opened by adb, Accept tapped 300 ms later, try 5: marked; the phone sent review.accept
+10:41:39   opened by adb, Accept tapped 300 ms later, try 6: marked; the phone sent review.accept
+10:41:42   opened by adb, Accept tapped 300 ms later, try 7: marked; the phone sent review.accept
+10:41:46   opened by adb, Accept tapped 300 ms later, try 8: marked; the phone sent review.accept
+10:41:50   opened by adb, Accept tapped 300 ms later, try 9: marked; the phone sent review.accept
+10:41:53   opened by adb, Accept tapped 300 ms later, try 10: marked; the phone sent review.accept
+10:41:57   opened by adb, Accept tapped 600 ms later, try 1: marked; the phone sent review.accept
+10:42:01   opened by adb, Accept tapped 600 ms later, try 2: marked; the phone sent review.accept
+10:42:10   opened by adb, Accept tapped 600 ms later, try 3: LOST; the phone sent nothing
+10:42:14   opened by adb, Accept tapped 600 ms later, try 4: marked; the phone sent review.accept
+10:42:18   opened by adb, Accept tapped 600 ms later, try 5: marked; the phone sent review.accept
+10:42:22   opened by adb, Accept tapped 600 ms later, try 6: marked; the phone sent review.accept
+10:42:26   opened by adb, Accept tapped 600 ms later, try 7: marked; the phone sent review.accept
+10:42:29   opened by adb, Accept tapped 600 ms later, try 8: marked; the phone sent review.accept
+10:42:33   opened by adb, Accept tapped 600 ms later, try 9: marked; the phone sent review.accept
+10:42:37   opened by adb, Accept tapped 600 ms later, try 10: marked; the phone sent review.accept
+10:42:42   opened by adb, Accept tapped 1000 ms later, try 1: marked; the phone sent review.accept
+10:42:46   opened by adb, Accept tapped 1000 ms later, try 2: marked; the phone sent review.accept
+10:42:50   opened by adb, Accept tapped 1000 ms later, try 3: marked; the phone sent review.accept
+10:42:54   opened by adb, Accept tapped 1000 ms later, try 4: marked; the phone sent review.accept
+10:42:59   opened by adb, Accept tapped 1000 ms later, try 5: marked; the phone sent review.accept
+10:43:03   opened by adb, Accept tapped 1000 ms later, try 6: marked; the phone sent review.accept
+10:43:07   opened by adb, Accept tapped 1000 ms later, try 7: marked; the phone sent review.accept
+10:43:12   opened by adb, Accept tapped 1000 ms later, try 8: marked; the phone sent review.accept
+10:43:16   opened by adb, Accept tapped 1000 ms later, try 9: marked; the phone sent review.accept
+10:43:20   opened by adb, Accept tapped 1000 ms later, try 10: marked; the phone sent review.accept
+10:43:26   opened by adb, Accept tapped 2000 ms later, try 1: marked; the phone sent review.accept
+10:43:31   opened by adb, Accept tapped 2000 ms later, try 2: marked; the phone sent review.accept
+10:43:36   opened by adb, Accept tapped 2000 ms later, try 3: marked; the phone sent review.accept
+10:43:42   opened by adb, Accept tapped 2000 ms later, try 4: marked; the phone sent review.accept
+10:43:47   opened by adb, Accept tapped 2000 ms later, try 5: marked; the phone sent review.accept
+10:43:52   opened by adb, Accept tapped 2000 ms later, try 6: marked; the phone sent review.accept
+10:43:58   opened by adb, Accept tapped 2000 ms later, try 7: marked; the phone sent review.accept
+10:44:03   opened by adb, Accept tapped 2000 ms later, try 8: marked; the phone sent review.accept
+10:44:08   opened by adb, Accept tapped 2000 ms later, try 9: marked; the phone sent review.accept
+10:44:14   opened by adb, Accept tapped 2000 ms later, try 10: marked; the phone sent review.accept
+10:44:15   opened and tapped by adb: 300 ms after: 10 marked, 0 lost; 600 ms after: 9 marked, 1 lost; 1000 ms after: 10 marked, 0 lost; 2000 ms after: 10 marked, 0 lost
+10:44:15 ok   tap-open
+
+android  ok   pair
+android  ok   tap-open
+
+Every scenario passed and every budget held.

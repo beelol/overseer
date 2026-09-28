@@ -70,7 +70,7 @@
           "allow_ollama_install": false,
           "enabled": true,
           "show": false,
-          "shown_ms": 1790549462289
+          "shown_ms": 1790612557903
         }
       }
     },
@@ -183,7 +183,7 @@
       "detail": [
         "Local model qwen3-coder:30b at a 64k context · 23.7 GiB, already loaded.",
         "This agent continues the work of another.Open the first agent",
-        "Continued from \"Rename the helpers\" after the connection was lost at 15:51."
+        "Continued from \"Rename the helpers\" after the connection was lost at 09:22."
       ]
     },
     {
@@ -222,7 +222,7 @@
       "detail": {
         "title": "Waiting for a connection",
         "line": "The connection to OpenAI failed: stream disconnected before completion: error sending request for url (https://chatgpt.com/backend-api/codex/responses): client error (Connect): dns error: failed to lookup address information. Your message is kept.",
-        "foot": "Next check in 9 s · waiting 4 s · gives up after 36 hours",
+        "foot": "Next check in 8 s · waiting 5 s · gives up after 36 hours",
         "actions": [
           "Use a local model now",
           "Retry now",
@@ -269,12 +269,12 @@
       "ok": true,
       "detail": {
         "taken": {
-          "at_ms": 1790549499897,
+          "at_ms": 1790612586776,
           "offered_ms": null,
-          "predecessor": "r-5d2507d1081d",
+          "predecessor": "r-bd95f6fea709",
           "reason": "user",
           "stay": false,
-          "successor": "r-145216d01a19"
+          "successor": "r-e2d1043b42d9"
         },
         "takenDone": "completed",
         "shownNext": true
@@ -304,11 +304,11 @@
       "ok": true,
       "detail": {
         "backDone": "completed",
-        "session": "fixture-thread-12512",
+        "session": "fixture-thread-25707",
         "args": [
           "exec",
           "resume",
-          "fixture-thread-12512"
+          "fixture-thread-25707"
         ]
       }
     },
@@ -328,7 +328,7 @@
           "unnamed": 0
         },
         "agents": {
-          "chars": 425,
+          "chars": 432,
           "overflow": 0,
           "offlineLine": 58,
           "waitingRow": 32,
@@ -347,7 +347,7 @@
           "unnamed": 0
         },
         "agents": {
-          "chars": 425,
+          "chars": 432,
           "overflow": 0,
           "offlineLine": 58,
           "waitingRow": 32,
@@ -371,7 +371,7 @@
       "unnamed": 0
     },
     "agents": {
-      "chars": 425,
+      "chars": 432,
       "overflow": 0,
       "offlineLine": 58,
       "waitingRow": 32,

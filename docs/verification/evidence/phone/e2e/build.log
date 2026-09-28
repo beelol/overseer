@@ -1,0 +1,53 @@
+12:08:31 $ cargo build -p overseerd
+
+warning: function `method_class` is never used
+  --> daemon/src/overseer/control.rs:82:8
+   |
+82 | pub fn method_class(method: &str) -> Option<&'static str> {
+   |        ^^^^^^^^^^^^
+
+warning: function `is_session_event` is never used
+    --> daemon/src/overseer/session.rs:1051:8
+     |
+1051 | pub fn is_session_event(kind: &str) -> bool {
+     |        ^^^^^^^^^^^^^^^^
+
+warning: methods `set_task_start_snapshot` and `child_by_native` are never used
+   --> daemon/src/store.rs:354:12
+    |
+123 | impl Store {
+    | ---------- methods in this implementation
+...
+354 |     pub fn set_task_start_snapshot(&self, id: &str, snap: &str) -> Result<()> {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+...
+407 |     pub fn child_by_native(&self, parent: &str, native: &str) -> Result<Option<Run>> {
+    |            ^^^^^^^^^^^^^^^
+
+warning: function `parse_meminfo` is never used
+   --> daemon/src/sys.rs:114:8
+    |
+114 | pub fn parse_meminfo(text: &str) -> Result<(u64, u64)> {
+    |        ^^^^^^^^^^^^^
+
+warning: function `parse_psi` is never used
+   --> daemon/src/sys.rs:127:8
+    |
+127 | pub fn parse_psi(text: &str) -> Pressure {
+    |        ^^^^^^^^^
+
+warning: `overseerd` (bin "overseerd") generated 18 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.49s
+12:08:42 $ node /private/tmp/claude-501/-Users-bilal-projects-overseer--claude-worktrees-phone-remote-vscode-control-b48a34/ae4a24d6-748d-49fa-a70f-dacf90a6c148/scratchpad/clean-clone/phone/scripts/run-ios.mjs --release
+Simulator: iPhone 17 Pro, iOS 26.5 (E6105FAE-0651-4D7B-801A-40FF49980468)
+Build output: ios/build/xcodebuild-Release.log
+xcodebuild Release: 142.4 s
+com.beelol.overseer.phone: 92142
+com.beelol.overseer.phone (Release) is open on iPhone 17 Pro
+12:11:06 $ node /private/tmp/claude-501/-Users-bilal-projects-overseer--claude-worktrees-phone-remote-vscode-control-b48a34/ae4a24d6-748d-49fa-a70f-dacf90a6c148/scratchpad/clean-clone/phone/scripts/run-android.mjs --release
+Emulator: Overseer_API_35 (emulator-5554, arm64-v8a)
+Build output: android/build/gradle-release.log
+gradle :app:assembleRelease: 42.5 s
+Performing Streamed Install
+Success
+com.beelol.overseer.phone (release) is open on Overseer_API_35

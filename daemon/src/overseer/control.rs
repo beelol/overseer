@@ -55,6 +55,7 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     ("agent.digest", "read"), ("agents.roster", "read"), ("conflicts.list", "read"), ("overseer.session", "read"), ("overseer.messages", "read"), ("agent.check_ins", "read"),
     ("overseer.tools", "read"), ("overseer.tool", "read"), ("run.queued", "read"), ("overseer.card", "read"), ("agent.holds", "read"), ("agent.guardrails", "read"),
     ("channel.messages", "read"), ("agent.briefings", "read"), ("overseer.rally", "read"), ("share.list", "read"), ("watch.list", "read"), ("watch.findings", "read"),
+    ("workspace.file", "read"), ("workspace.hunks", "read"), ("review.marks", "read"), ("repo.known", "read"),
     // What Overseer's Steer actions reach.
     ("task.create", STEER), ("run.follow_up", STEER), ("run.queue", STEER), ("run.unqueue", STEER), ("run.redirect", STEER), ("run.interrupt", STEER),
     ("agent.hold", STEER), ("agent.release", STEER), ("agent.guardrail", STEER), ("agent.guardrail_remove", STEER), ("agent.redirect", STEER),
@@ -103,6 +104,10 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     ("auto.bridge.submit", NEVER), ("auto.bridge.result", NEVER), ("auto.dispatch", NEVER), ("auto.models.refresh", NEVER),
     ("auto.opencode.local.inspect", NEVER), ("auto.tools.inspect", NEVER), ("auto.quota.refresh", NEVER),
     ("auto.usage.thread.refresh", NEVER), ("auto.usage.export", NEVER), ("auto.usage.clear", NEVER),
+    // What the owner does from VS Code or a phone (Gate N): their review marks, putting lines back,
+    // a pull request, a sign-in and stopping everyone at once are not Overseer's to do.
+    ("review.accept", NEVER), ("review.unaccept", NEVER), ("review.import", NEVER), ("review.reject", NEVER),
+    ("workspace.pr_open", NEVER), ("profile.device_login", NEVER), ("runs.stop_all", NEVER),
 ];
 
 pub fn action_class(action: &str) -> Option<&'static str> {
@@ -357,7 +362,17 @@ impl Daemon {
         detail["redirect"] = json!(true);
         detail["snapshot"] = json!(snap.id);
         let prompt = if source == "overseer" { format!("{}{text}", super::session::FROM_OVERSEER) } else { text.to_string() };
-        self.emit(Some(&run.task_id), Some(run_id), "redirect", source, "exact", json!({"text": text, "snapshot": snap.id, "stopped": active, "detail": detail}))?;
+        let waits = run.status == crate::handoff::WAITING_FOR_CONNECTION || run.status == crate::handoff::WAITING_FOR_MEMORY;
+        self.emit(Some(&run.task_id), Some(run_id), "redirect", source, "exact", json!({"text": text, "snapshot": snap.id, "stopped": active && !waits, "waiting": waits, "detail": detail}))?;
+        if waits {
+            // Nothing runs to be stopped: the direction takes the place of the message the run
+            // kept and goes once, when the wait ends or to the agent Continuity moves the work to.
+            let preface = self.guardrail_preface(run_id);
+            let prompt = if preface.is_empty() { prompt } else { format!("{preface}\n\n{prompt}") };
+            let turn = crate::handoff::replace_waiting_turn(self, &run, &prompt)?;
+            self.store.lock().unwrap().conn.execute("INSERT OR REPLACE INTO turn_sources(turn_id, source, detail) VALUES(?1, ?2, ?3)", rusqlite::params![turn.id, source, detail.to_string()])?;
+            return Ok(json!({"run_id": run_id, "snapshot": snap.id, "delivery": "when the agent can run again", "turn": turn.id}));
+        }
         if active {
             // Queued first, so the turn that starts when the stop lands carries the direction.
             self.store.lock().unwrap().conn.execute("INSERT INTO queued_messages(run_id, ts, source, text, detail) VALUES(?1, ?2, ?3, ?4, ?5)", rusqlite::params![run_id, crate::daemon::now(), source, prompt, detail.to_string()])?;
@@ -439,7 +454,8 @@ impl Daemon {
             .collect::<rusqlite::Result<_>>()?;
         let mut card = proposal;
         card["rows"] = json!(rows);
-        Ok(card)
+        // Titles come from agents (a generic run's title is its command line): redacted (AC-200).
+        Ok(serde_json::from_str(&crate::redact::redact(&card.to_string())).unwrap_or(card))
     }
 
     /// A conflict's card actions (AC-192): assign, sequence, dismiss; share follows with AC-191.

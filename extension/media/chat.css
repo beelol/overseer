@@ -235,3 +235,13 @@ pre.code.error { color: var(--ov-failed); }
 .card-head .codicon { color: var(--ov-accent); }
 .card-detail { margin-top: 4px; color: var(--ov-muted); font-size: var(--ov-font-sm); }
 .card-finding .card-head .codicon, .card-cannot_answer .card-head .codicon { color: var(--ov-accent); }
+/* What Overseer did (AC-185): a row per agent with why, delivery, state and time. */
+.card-by { margin-left: auto; color: var(--ov-muted); font-size: var(--ov-font-xs); font-weight: normal; }
+.card-rows { display: flex; flex-direction: column; gap: 2px; margin-top: var(--ov-space-1); }
+.card-row { display: flex; align-items: center; gap: var(--ov-space-2); min-width: 0; padding: 2px var(--ov-space-2); border-radius: var(--ov-radius-card); background: var(--ov-raised-2); font-size: var(--ov-font-sm); }
+.card-row-agent { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ov-text); }
+.card-row-meta { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ov-muted); font-size: var(--ov-font-xs); }
+.card-row-state { flex: none; color: var(--ov-muted); }
+.card-row-state.state-delivered, .card-row-state.state-picked_up, .card-row-state.state-answered { color: var(--ov-done); }
+.card-row-state.state-failed, .card-row-state.state-not_sent { color: var(--ov-failed); }
+.card-row-time { flex: none; color: var(--ov-muted); font-size: var(--ov-font-xs); font-variant-numeric: tabular-nums; }

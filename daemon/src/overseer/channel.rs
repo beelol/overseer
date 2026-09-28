@@ -592,8 +592,9 @@ impl Daemon {
         Ok(json!({"run_id": run_id, "denied": denied}))
     }
 
-    /// A run's diff against its task's base: one file, or everything.
-    fn diff_of(&self, run_id: &str, path: Option<&str>) -> Result<String> {
+    /// A run's worktree, its task's base and the tree of everything in its worktree now
+    /// (uncommitted changes included), read without touching its index or checkout.
+    fn base_and_tree(&self, run_id: &str) -> Result<(std::path::PathBuf, String, String)> {
         let run = self.run(run_id)?;
         let ws = self.workspace(&run.workspace_id)?;
         let root = std::fs::canonicalize(&ws.path).map_err(|_| anyhow!("the worktree of {} is gone", run.title))?;
@@ -605,7 +606,29 @@ impl Daemon {
         .or_else(|| crate::git::head(&root))
         .ok_or_else(|| anyhow!("no base to diff against"))?;
         let trees = crate::git::capture_trees(&root, &crate::paths::data_dir().join("tmp"))?;
-        let mut args = vec!["diff", "--no-color", &base, &trees.worktree_tree];
+        Ok((root, base, trees.worktree_tree))
+    }
+
+    /// A large diff shared within one repository is also a commit on a branch of its own
+    /// (`overseer/share/<id>`), made from the source's worktree as it is, on its task's base:
+    /// the receiving agent reads it with git (AC-191). Nothing in either worktree changes.
+    fn share_branch(&self, from: &str, to: &str, id: &str, source: &str) -> Result<Option<(String, String)>> {
+        let (a, b) = (self.workspace(&self.run(from)?.workspace_id)?, self.workspace(&self.run(to)?.workspace_id)?);
+        if a.common_dir != b.common_dir {
+            return Ok(None);
+        }
+        let (root, base, tree) = self.base_and_tree(from)?;
+        let message = format!("Shared by Overseer {source} (share {id})");
+        let sha = crate::git::git(&root, &["-c", "user.name=Overseer", "-c", "user.email=overseer@localhost", "-c", "commit.gpgsign=false", "commit-tree", &tree, "-p", &base, "-m", &message])?.trim().to_string();
+        let branch = format!("overseer/share/{id}");
+        crate::git::git(&root, &["update-ref", &format!("refs/heads/{branch}"), &sha])?;
+        Ok(Some((branch, sha)))
+    }
+
+    /// A run's diff against its task's base: one file, or everything.
+    fn diff_of(&self, run_id: &str, path: Option<&str>) -> Result<String> {
+        let (root, base, tree) = self.base_and_tree(run_id)?;
+        let mut args = vec!["diff", "--no-color", &base, &tree];
         if let Some(p) = path {
             if p.is_empty() || p.starts_with('/') || p.split('/').any(|c| c == "..") {
                 bail!("{p:?} is not a path inside the worktree");
@@ -669,7 +692,11 @@ impl Daemon {
             }
             other => bail!("share carries a diff, a report, messages, a note or a finding, not {other:?}"),
         };
+        let raw_len = content.len();
+        let raw_id = short_sha(&content);
         let content = crate::redact::redact(&content);
+        // Nothing was redacted: the piece may also travel as a commit (a commit carries the files as they are).
+        let clean = content.len() == raw_len && short_sha(&content) == raw_id;
         let source = match &from_title {
             Some(t) => format!("from {t} ({label})"),
             None => format!("(Overseer's {label})"),
@@ -690,16 +717,29 @@ impl Daemon {
             }
             (format!("{}\n[… the first part of {bytes} bytes; the whole piece is in {}]", cut(&content, SHARE_INLINE_BYTES - 256), path.display()), Some(path.display().to_string()))
         };
-        let msg = format!("Shared by Overseer {source}{}:\n{inline}", file.as_ref().map(|f| format!(", {bytes} bytes, the whole piece at {f}")).unwrap_or_default());
+        // The whole of a large diff of everything is also a commit the receiver can read with git.
+        let branch = match (what, from, &file, a["path"].as_str().filter(|p| !p.is_empty())) {
+            // A branch that cannot be made (a ref in the way) leaves the patch file, which is enough.
+            ("diff", Some(f), Some(_), None) if clean => self.share_branch(f, to, &id, &source).unwrap_or_else(|e| {
+                crate::log(&format!("share {id}: no branch: {e:#}"));
+                None
+            }),
+            _ => None,
+        };
+        let msg = format!(
+            "Shared by Overseer {source}{}{}:\n{inline}",
+            file.as_ref().map(|f| format!(", {bytes} bytes, the whole piece at {f}")).unwrap_or_default(),
+            branch.as_ref().map(|(b, c)| format!(", and as commit {c} on branch {b} (git show {c})")).unwrap_or_default()
+        );
         let delivery = self.queue_message(to, &msg, "overseer", json!({"proposal": proposal, "by": by, "share": id}))?;
         {
             let store = self.store.lock().unwrap();
             store.conn.execute(
-                "INSERT INTO shares(id, ts, from_run, to_run, kind, source, bytes, inline_bytes, file, proposal, content_id) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-                rusqlite::params![id, crate::daemon::now(), from, to, what, source, bytes as i64, inline.len() as i64, file, proposal, content_id],
+                "INSERT INTO shares(id, ts, from_run, to_run, kind, source, bytes, inline_bytes, file, proposal, content_id, branch, commit_sha) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                rusqlite::params![id, crate::daemon::now(), from, to, what, source, bytes as i64, inline.len() as i64, file, proposal, content_id, branch.as_ref().map(|b| b.0.clone()), branch.as_ref().map(|b| b.1.clone())],
             )?;
         }
-        self.emit(Some(&to_run.task_id), Some(to), "share", "overseer", "exact", json!({"id": id, "from": from, "what": what, "source": source, "bytes": bytes, "inline_bytes": inline.len(), "file": file, "proposal": proposal, "by": by}))?;
+        self.emit(Some(&to_run.task_id), Some(to), "share", "overseer", "exact", json!({"id": id, "from": from, "what": what, "source": source, "bytes": bytes, "inline_bytes": inline.len(), "file": file, "branch": branch.as_ref().map(|b| b.0.clone()), "commit": branch.as_ref().map(|b| b.1.clone()), "proposal": proposal, "by": by}))?;
         self.dispatch_record(proposal, to, "share", "add", &format!("{source}: {bytes} bytes"), a["why"].as_str().unwrap_or("named"), if delivery == "queued" { "held" } else { "delivered" })?;
         Ok(format!("shared {source} with {}{}", to_run.title, if delivery == "queued" { " (queued until its turn ends)" } else { "" }))
     }
@@ -721,6 +761,13 @@ impl Daemon {
         let mut told = Vec::new();
         for (sid, to, source) in &rows {
             self.store.lock().unwrap().conn.execute("UPDATE shares SET withdrawn_ms=?2 WHERE id=?1", rusqlite::params![sid, crate::daemon::now()])?;
+            // A withdrawn share's branch goes too, so nobody builds on it later.
+            let branch: Option<(String, String)> = self.store.lock().unwrap().conn.query_row("SELECT branch, from_run FROM shares WHERE id=?1 AND branch IS NOT NULL", [sid], |r| Ok((r.get(0)?, r.get(1)?))).optional()?;
+            if let Some((b, from)) = branch {
+                if let Ok(ws) = self.run(&from).and_then(|r| self.workspace(&r.workspace_id)) {
+                    let _ = crate::git::git(std::path::Path::new(&ws.path), &["update-ref", "-d", &format!("refs/heads/{b}")]);
+                }
+            }
             let msg = format!("Withdrawn: what Overseer shared {source} (share {sid}) was wrong; do not rely on it.");
             self.queue_message(to, &msg, "overseer", json!({"withdraw": sid, "by": by}))?;
             if let Ok(run) = self.run(to) {
@@ -735,10 +782,10 @@ impl Daemon {
 
     pub fn shares_list(&self, run_id: Option<&str>) -> Result<Value> {
         let store = self.store.lock().unwrap();
-        let mut stmt = store.conn.prepare("SELECT id, ts, from_run, to_run, kind, source, bytes, inline_bytes, file, proposal, withdrawn_ms FROM shares WHERE (?1 IS NULL OR to_run=?1 OR from_run=?1) ORDER BY ts")?;
+        let mut stmt = store.conn.prepare("SELECT id, ts, from_run, to_run, kind, source, bytes, inline_bytes, file, proposal, withdrawn_ms, branch, commit_sha FROM shares WHERE (?1 IS NULL OR to_run=?1 OR from_run=?1) ORDER BY ts")?;
         let rows: Vec<Value> = stmt
             .query_map([run_id], |r| {
-                Ok(json!({"id": r.get::<_, String>(0)?, "ts": r.get::<_, i64>(1)?, "from": r.get::<_, Option<String>>(2)?, "to": r.get::<_, String>(3)?, "kind": r.get::<_, String>(4)?, "source": r.get::<_, String>(5)?, "bytes": r.get::<_, i64>(6)?, "inline_bytes": r.get::<_, i64>(7)?, "file": r.get::<_, Option<String>>(8)?, "proposal": r.get::<_, Option<String>>(9)?, "withdrawn_ms": r.get::<_, Option<i64>>(10)?}))
+                Ok(json!({"id": r.get::<_, String>(0)?, "ts": r.get::<_, i64>(1)?, "from": r.get::<_, Option<String>>(2)?, "to": r.get::<_, String>(3)?, "kind": r.get::<_, String>(4)?, "source": r.get::<_, String>(5)?, "bytes": r.get::<_, i64>(6)?, "inline_bytes": r.get::<_, i64>(7)?, "file": r.get::<_, Option<String>>(8)?, "proposal": r.get::<_, Option<String>>(9)?, "withdrawn_ms": r.get::<_, Option<i64>>(10)?, "branch": r.get::<_, Option<String>>(11)?, "commit": r.get::<_, Option<String>>(12)?}))
             })?
             .collect::<rusqlite::Result<_>>()?;
         Ok(json!({"shares": rows}))
@@ -746,6 +793,54 @@ impl Daemon {
 }
 
 impl Daemon {
+    /// For a run of the daemon's own (Overseer's run, a watcher): whether it runs read-only. A
+    /// watcher with a copy to check in runs under its own permission mode; the others read only.
+    pub fn own_read_only(&self, run_id: &str) -> Option<bool> {
+        match self.run_role(run_id).as_str() {
+            "overseer" => Some(true),
+            "watcher" => Some(self.watch_of_watcher(run_id).map(|w| w.copy_workspace.is_none()).unwrap_or(true)),
+            _ => None,
+        }
+    }
+
+    /// Continuity is about to start `successor` in place of `predecessor`. A run of the daemon's
+    /// own keeps its role (Overseer's run stays hidden and stays the conversation's; a watcher stays
+    /// the watch's), gets a token of its own and the launch that gives its role's tools on the new
+    /// harness, read-only as before (AC-197). Returns the permission mode that launch needs, or
+    /// None for an agent, whose mode Continuity carries itself.
+    pub fn carry_role(&self, predecessor: &str, successor: &crate::store::Run, harness: &str) -> Result<Option<Option<String>>> {
+        let role = self.run_role(predecessor);
+        let Some(read_only) = self.own_read_only(predecessor) else { return Ok(None) };
+        let dir = std::path::PathBuf::from(self.workspace(&successor.workspace_id)?.path);
+        let token = self.overseer_token(&successor.id, &role)?["token"].as_str().unwrap_or_default().to_string();
+        let (extra_args, mut mode) = self.tools_launch(harness, &dir, &token, &role, read_only)?;
+        // OpenCode's local server has no tools of the daemon's; its plan agent reads and never edits.
+        if read_only && !["claude", "codex", "opencode"].contains(&harness) {
+            mode = Some("plan");
+        }
+        let mode = mode.map(str::to_string);
+        {
+            let store = self.store.lock().unwrap();
+            store.conn.execute("INSERT OR REPLACE INTO run_roles(run_id, role) VALUES(?1, ?2)", rusqlite::params![successor.id, role])?;
+            store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1", rusqlite::params![successor.id, json!({"extra_args": extra_args, "opts": {"mode": mode}}).to_string()])?;
+            // The predecessor's token speaks for nobody now.
+            store.conn.execute("DELETE FROM overseer_tokens WHERE run_id=?1", [predecessor])?;
+            if role == "overseer" {
+                store.conn.execute("UPDATE overseer_sessions SET run_id=?2 WHERE run_id=?1", rusqlite::params![predecessor, successor.id])?;
+            }
+        }
+        self.emit(Some(&successor.task_id), Some(&successor.id), "role_moved", "daemon", "exact", json!({"from": predecessor, "role": role, "read_only": read_only, "harness": harness, "mode": mode}))?;
+        Ok(read_only.then_some(mode))
+    }
+
+    /// A handoff that could not start: the conversation goes back to the run that holds the work.
+    pub fn uncarry_role(&self, successor: &str, predecessor: &str) -> Result<()> {
+        if self.run_role(successor) == "overseer" {
+            self.store.lock().unwrap().conn.execute("UPDATE overseer_sessions SET run_id=?2 WHERE run_id=?1", rusqlite::params![successor, predecessor])?;
+        }
+        Ok(())
+    }
+
     /// Continuity handed an agent off: its holds, guardrails, area, watches, conflicts, cadence,
     /// channel setting and queued messages move to the successor, so it stays one agent to
     /// Overseer (AC-197).
@@ -766,6 +861,11 @@ impl Daemon {
             return Ok(());
         }
         let run = self.run(successor)?;
+        // A guardrail reads enforced only where the new harness itself refuses the write (AC-187).
+        self.store.lock().unwrap().conn.execute(
+            "UPDATE guardrails SET enforcement=CASE WHEN ?2='claude' AND deny<>'[]' THEN 'enforced' ELSE 'watched' END WHERE run_id=?1 AND removed_ms IS NULL",
+            rusqlite::params![successor, run.harness],
+        )?;
         self.emit(Some(&run.task_id), Some(successor), "oversight_moved", "daemon", "exact", json!({"from": predecessor, "moved": moved.iter().map(|(t, n)| json!({"table": t, "rows": n})).collect::<Vec<_>>()}))?;
         self.conflicts_touch(successor);
         Ok(())

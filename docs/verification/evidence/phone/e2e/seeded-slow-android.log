@@ -1,0 +1,33 @@
+22:18:14 The phone's scenarios on android. Commit 6fbd9614.
+22:18:14 scenario pair (AC-117, AC-118, AC-141): a code typed on the phone, confirmed on the Mac, and the agents list
+22:18:14 flow opened
+Running on Overseer_API_35
+ > Flow opened
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: pair.code is not visible... COMPLETED
+Assert that id: pair.submit is not visible... COMPLETED
+22:19:00 ok   pair
+22:19:02 seeded: every start is held for 400 ms; the budgets must notice
+Measuring on android (emulator-5554), 3 cold starts, 2026-09-27T22:19:02.631Z
+Load average (1, 5, 15 min) at the start: 29.1 34.8 55.6
+With the door:
+  launch 1: first screen 2443 ms, interactive 2623.5 ms, door shown 2443.4 ms, opening 940.9 ms, dropped 12
+  launch 2: first screen 1942.8 ms, interactive 2157.5 ms, door shown 1581.9 ms, opening 950.3 ms, dropped 14
+  launch 3: first screen 1733.2 ms, interactive 2053.7 ms, door shown 1733.6 ms, opening 852 ms, dropped 17
+With the door turned off by the test setting:
+  launch 1: first screen 2126.1 ms, interactive 2240.5 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 2: first screen 1938.1 ms, interactive 2135.1 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 3: first screen 2308.6 ms, interactive 2630.6 ms, door shown NaN ms, opening NaN ms, dropped n/a
+Load average (1, 5, 15 min) at the end: 30.3 34.4 54.6
+
+ok   every launch reaches the agents list: 3 (limit 3)
+ok   launches that showed pairing or any other question, of 6: 0 (limit 0)
+FAIL agents list interactive, p95 (ms): 2623.5 (limit 2000)
+ok   the door is on screen with the first screen or before it, worst launch (ms after the first screen): 0.4 (limit 17) — 3 of 3 launches marked both
+ok   the door opens in 600 ms within 60 ms, shortest (ms): 852 (limit 540)
+FAIL the door opens in 600 ms within 60 ms, longest (ms): 950.3 (limit 660)
+FAIL frames dropped while the door opens, worst launch (%): 56.7 (limit 1) — 17 of 30 frames
+ok   the door makes the first screen no later, median (ms): 2157.5 (limit 2484.6) — without the door 2240.5 ms
+3 budgets missed
+22:19:37 FAIL budgets

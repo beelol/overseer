@@ -1,0 +1,18 @@
+{
+  "name": "fixture",
+  "title": "A fixture owner check",
+  "gate": "T",
+  "criteria": ["AC-215"],
+  "source": "test/dev/guided.js",
+  "ref": "self",
+  "prepare": {
+    "vscode": false,
+    "scratch_repo": true,
+    "fixture_agents": [{ "title": "Fixture agent", "mode": "nested", "prompt": "go" }]
+  },
+  "steps": [
+    { "id": "1", "criteria": ["AC-215"], "title": "Look", "do": "Look at the agent.", "watch": "It is there.", "record": "Is it there?" },
+    { "id": "2", "criteria": [], "title": "Skip me", "do": "Nothing.", "record": "Anything?" },
+    { "id": "3", "criteria": ["AC-215"], "title": "Last", "do": "Say something.", "record": "What did you say?" }
+  ]
+}

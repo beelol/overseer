@@ -1,0 +1,21 @@
+Rerun of the scenarios that failed under load (2026-09-27 12:15:35, load 14.20 7.90 5.86, commit 6eda771)
+=== keyboard (phone access off) 12:15:35
+FAIL keyboard
+[2026-09-27T19:16:12.740Z] FAIL Enter in the chat composer sends a follow-up {"turns":1}
+SCENARIO FAILED /private/tmp/ovs-ui-p78Zma
+=== perf (phone access off) 12:16:19
+FAIL perf
+[2026-09-27T19:18:30.257Z] ERROR Error: Webview not found for probe document.getElementById('workspace-note')?.textContent.includes("/private/tmp/ovs-ui-Uh3vaG/overseer-home/worktrees/big-aaf5a6c9/load-run-0")
+SCENARIO FAILED /private/tmp/ovs-ui-Uh3vaG
+=== restore (phone access off) 12:18:32
+FAIL restore
+[2026-09-27T19:19:00.163Z] ERROR Error: Timed out waiting for run row R3 removed later (last: null)
+SCENARIO FAILED /private/tmp/ovs-ui-cAAXpT
+=== arrangement (phone access on) 12:19:02
+PASS arrangement
+SCENARIO PASSED /private/tmp/ovs-ui-dqd4n4
+=== files (phone access on) 12:19:41
+FAIL files
+[2026-09-27T19:20:26.016Z] ERROR Error: Timed out in webview waiting for [...document.querySelectorAll('#files .row')].some(r => r.dataset.path === 'pkg/m39/x99.txt') (last: false)
+SCENARIO FAILED /private/tmp/ovs-ui-zkdKdm
+done 12:20:27

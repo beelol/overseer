@@ -68,6 +68,9 @@ class Model {
   scheduleRefresh() { if (!this.timer) this.timer = setTimeout(() => { this.timer = undefined; this.refresh(); }, 120); }
   hide(taskId) { if (taskId && !this.hidden.has(taskId)) { this.hidden.add(taskId); this.state = this.visible(this.all); this.emitter.fire(); } }
   visible(all) {
+    // Overseer's own run is known from the daemon's state too (its role), so it stays out of the
+    // lists even before the docked chat has loaded the session (and after a handoff, AC-197).
+    for (const r of all.runs || []) if ((all.oversight || {})[r.id]?.role === 'overseer') this.hidden.add(r.task_id);
     const swarmTasks = new Set((all.runs || []).filter(r => r.swarm_membership && !r.parent_run_id)
       .map(r => r.task_id));
     if (!this.hidden.size && !swarmTasks.size) return all;

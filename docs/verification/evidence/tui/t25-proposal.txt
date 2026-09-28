@@ -1,4 +1,4 @@
- ◆ Overseer  page 1/1 · 2 agents · ● 1 active                                                                                                                           ● connected 
+ ◆ Overseer  page 1/1 · 2 agents · ● 1 active                                                                                                        phone access off · ● connected 
 ┏ 1 ● Sleeper ━━━━━━━━━━━━━━━━━━━━━╭ ◆ Overseer · Ask first ────────────────────────────────────────────────────────────────────────────────────╮───────────────────── claude · 0s ╮
 ┃ working…                         │ ▶ started: Started API tests (claude) in repo                                                              │                                  │
 ┃                                  │ ▶ started: Started Sleeper (generic) in repo                                                               │                                  │

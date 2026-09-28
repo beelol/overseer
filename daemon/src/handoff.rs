@@ -289,7 +289,8 @@ pub fn failover_targets(d: &Daemon, run: &Run, status: &Status) -> Vec<Target> {
         }
         // The model last used on that harness, otherwise the harness's own default.
         let model = runs.iter().rev().find(|r| r.harness == harness && r.model.is_some()).and_then(|r| r.model.clone());
-        let (mode, difference) = carry_mode(&run.harness, mode_of(d, run).as_deref(), harness);
+        // A read-only run of the daemon's own is launched read-only on any harness it moves to.
+        let (mode, difference) = if d.own_read_only(&run.id) == Some(true) { (None, None) } else { carry_mode(&run.harness, mode_of(d, run).as_deref(), harness) };
         found.push(Target { to: provider.clone(), harness: harness.into(), profile_id: Some(account.id.clone()), account: Some(account.name.clone()), model, mode, resume: None, difference, label: harness_name(harness).into() });
     }
     found
@@ -417,13 +418,22 @@ pub fn handoff(d: &Arc<Daemon>, predecessor: &Run, target: &Target, reason: &str
         attention: None,
     };
     d.store.lock().unwrap().insert_run(&successor)?;
+    // Overseer's view moves with the work before the successor's first turn (AC-197): the role of
+    // a run of the daemon's own (Overseer, a watcher) with its tools and its read-only launch, and
+    // the agent's holds, guardrails, area, watches, conflicts and queued messages.
+    let own_mode = d.carry_role(&predecessor.id, &successor, &target.harness)?;
+    d.adopt_successor(&predecessor.id, &successor.id)?;
+    let mode = own_mode.unwrap_or_else(|| target.mode.clone());
     // The one-shot OpenCode transport takes no mode of its own.
-    let opts = TurnOpts { mode: target.mode.clone().filter(|_| target.harness != "opencode"), handoff: true, ..Default::default() };
+    let opts = TurnOpts { mode: mode.filter(|_| target.harness != "opencode"), handoff: true, ..Default::default() };
     if let Err(e) = d.start_turn(&successor.id, &prompt, target.resume.is_some(), &opts) {
         let current = d.run(&successor.id)?;
         if ACTIVE.contains(&current.status.as_str()) {
             d.mark_ended(&current, "failed", &format!("not launched: {e}"))?;
         }
+        // What moved goes back to the run that holds the work.
+        d.uncarry_role(&successor.id, &predecessor.id)?;
+        d.adopt_successor(&successor.id, &predecessor.id)?;
         // The worktree goes back to the run that holds the work.
         d.store.lock().unwrap().set_workspace_owner(&ws.id, Some(&predecessor.id))?;
         return Err(e);
@@ -800,6 +810,23 @@ pub fn before_follow_up(d: &Arc<Daemon>, run: &Run, prompt: &str, opts: &TurnOpt
     d.store.lock().unwrap().insert_turn(&kept)?;
     let successor = handoff(d, run, &target, "back_online")?;
     Ok(d.store.lock().unwrap().turns(&successor.id)?.pop())
+}
+
+/// A redirect to a run that waits (AC-197): it has no process to stop, so the direction takes the
+/// place of the message it kept. The wait goes on with the direction as its turn, which is sent
+/// once when the wait ends, or travels as the pending message when the work is handed off.
+pub fn replace_waiting_turn(d: &Daemon, run: &Run, prompt: &str) -> Result<Turn> {
+    let _one = PASS.lock().unwrap_or_else(|e| e.into_inner());
+    let wait = wait_of(d, &run.id).ok_or_else(|| anyhow!("the agent is not waiting any more"))?;
+    let store = d.store.lock().unwrap();
+    let n = store.turns(&run.id)?.len() as i64 + 1;
+    let turn = Turn { id: format!("u-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]), run_id: run.id.clone(), n, prompt: prompt.into(), snapshot_id: None, started_ms: now(), ended_ms: None, status: "waiting".into() };
+    store.insert_turn(&turn)?;
+    store.conn.execute("UPDATE turns SET status='interrupted', ended_ms=COALESCE(ended_ms, ?2) WHERE id=?1", rusqlite::params![wait.turn_id, now()])?;
+    store.conn.execute("UPDATE continuity_waits SET turn_id=?2 WHERE run_id=?1", rusqlite::params![run.id, turn.id])?;
+    drop(store);
+    d.emit(Some(&run.task_id), Some(&run.id), "turn_replaced", "daemon", "exact", json!({"replaced": wait.turn_id, "turn": turn, "while": run.status}))?;
+    Ok(turn)
 }
 
 // ------------------------------------------------------------------ what the user asks for

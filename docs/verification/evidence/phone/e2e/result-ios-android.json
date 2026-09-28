@@ -1,0 +1,686 @@
+{
+  "at": "2026-09-28T13:10:13.669Z",
+  "seededSlow": 0,
+  "ok": false,
+  "platforms": {
+    "ios": [
+      {
+        "name": "pair",
+        "criteria": [
+          "AC-117",
+          "AC-118",
+          "AC-141"
+        ],
+        "ok": true,
+        "seconds": 27.2
+      },
+      {
+        "name": "agents",
+        "criteria": [
+          "AC-124"
+        ],
+        "ok": true,
+        "seconds": 45.2,
+        "figures": {
+          "agents": 9,
+          "children": 2
+        }
+      },
+      {
+        "name": "delay",
+        "criteria": [
+          "AC-124"
+        ],
+        "ok": true,
+        "seconds": 48.9,
+        "figures": {
+          "delay": {
+            "count": 320,
+            "p50": 27,
+            "p95": 34,
+            "max": 49,
+            "clockOffsetMs": 0,
+            "load": 7.4
+          }
+        }
+      },
+      {
+        "name": "conversation",
+        "criteria": [
+          "AC-124"
+        ],
+        "ok": true,
+        "seconds": 33.7
+      },
+      {
+        "name": "permission",
+        "criteria": [
+          "AC-125"
+        ],
+        "ok": true,
+        "seconds": 20.6
+      },
+      {
+        "name": "send",
+        "criteria": [
+          "AC-122",
+          "AC-125"
+        ],
+        "ok": true,
+        "seconds": 36.8
+      },
+      {
+        "name": "image",
+        "criteria": [
+          "AC-125"
+        ],
+        "ok": true,
+        "seconds": 30.9,
+        "figures": {
+          "mime": "image/jpeg",
+          "bytes": 172411
+        }
+      },
+      {
+        "name": "review",
+        "criteria": [
+          "AC-126"
+        ],
+        "ok": true,
+        "seconds": 27
+      },
+      {
+        "name": "diff",
+        "criteria": [
+          "AC-126"
+        ],
+        "ok": true,
+        "seconds": 25.1,
+        "figures": {
+          "lines": 4,
+          "hunks": 1
+        }
+      },
+      {
+        "name": "reject",
+        "criteria": [
+          "AC-126",
+          "AC-130"
+        ],
+        "ok": true,
+        "seconds": 26.4
+      },
+      {
+        "name": "big-repo",
+        "criteria": [
+          "AC-126",
+          "AC-135"
+        ],
+        "ok": true,
+        "seconds": 57,
+        "figures": {
+          "files": 500,
+          "scroll": {
+            "scrolls": 9,
+            "frames": 1362,
+            "dropped": 0,
+            "droppedPercent": 0,
+            "longest": 16.7,
+            "seconds": 22.6
+          }
+        }
+      },
+      {
+        "name": "cleanup",
+        "criteria": [
+          "AC-130",
+          "AC-127"
+        ],
+        "ok": true,
+        "seconds": 23.3,
+        "figures": {
+          "removed_ms": 1790597914207
+        }
+      },
+      {
+        "name": "merge",
+        "criteria": [
+          "AC-130",
+          "AC-127"
+        ],
+        "ok": true,
+        "seconds": 51.1,
+        "figures": {
+          "aborted": "r-7eb8992fb509",
+          "completed": "r-bf5f36a126a3"
+        }
+      },
+      {
+        "name": "safety",
+        "criteria": [
+          "AC-130"
+        ],
+        "ok": true,
+        "seconds": 156.3,
+        "figures": {
+          "appLock": true,
+          "unlockBeforeChanges": true
+        }
+      },
+      {
+        "name": "backup",
+        "criteria": [
+          "AC-130"
+        ],
+        "ok": true,
+        "seconds": 6.1,
+        "figures": {
+          "files": 27,
+          "keychain": [
+            {
+              "group": "FQ6YGD7554.com.beelol.overseer.phone",
+              "accessible": "cku"
+            }
+          ]
+        }
+      },
+      {
+        "name": "new",
+        "criteria": [
+          "AC-125"
+        ],
+        "ok": true,
+        "seconds": 16.7
+      },
+      {
+        "name": "accounts",
+        "criteria": [
+          "AC-127"
+        ],
+        "ok": true,
+        "seconds": 13.1
+      },
+      {
+        "name": "notifications",
+        "criteria": [
+          "AC-129"
+        ],
+        "ok": true,
+        "seconds": 33.3
+      },
+      {
+        "name": "banner",
+        "criteria": [
+          "AC-129"
+        ],
+        "ok": null,
+        "note": "iOS shows the system's own notification (the scenario push)"
+      },
+      {
+        "name": "push",
+        "criteria": [
+          "AC-129"
+        ],
+        "ok": true,
+        "seconds": 56.5
+      },
+      {
+        "name": "stop-all",
+        "criteria": [
+          "AC-125",
+          "AC-130"
+        ],
+        "ok": true,
+        "seconds": 37.1
+      },
+      {
+        "name": "update",
+        "criteria": [
+          "AC-141"
+        ],
+        "ok": true,
+        "seconds": 10.3
+      },
+      {
+        "name": "reopen",
+        "criteria": [
+          "AC-141",
+          "AC-130"
+        ],
+        "ok": true,
+        "seconds": 54
+      },
+      {
+        "name": "restart",
+        "criteria": [
+          "AC-141"
+        ],
+        "ok": true,
+        "seconds": 31.4
+      },
+      {
+        "name": "off-and-on",
+        "criteria": [
+          "AC-116",
+          "AC-121"
+        ],
+        "ok": true,
+        "seconds": 23.7
+      },
+      {
+        "name": "queued",
+        "criteria": [
+          "AC-122",
+          "AC-121"
+        ],
+        "ok": true,
+        "seconds": 38.4
+      },
+      {
+        "name": "unreachable",
+        "criteria": [
+          "AC-123",
+          "AC-116",
+          "AC-121"
+        ],
+        "ok": true,
+        "seconds": 20.7
+      },
+      {
+        "name": "manual-address",
+        "criteria": [
+          "AC-120"
+        ],
+        "ok": true,
+        "seconds": 23.7
+      },
+      {
+        "name": "away",
+        "criteria": [
+          "AC-121"
+        ],
+        "ok": true,
+        "seconds": 351.2
+      },
+      {
+        "name": "tour",
+        "criteria": [
+          "AC-131"
+        ],
+        "ok": true,
+        "seconds": 205.7
+      },
+      {
+        "name": "busy",
+        "criteria": [
+          "AC-135",
+          "AC-137"
+        ],
+        "ok": true,
+        "seconds": 21.1
+      },
+      {
+        "name": "watch-only",
+        "criteria": [
+          "AC-119"
+        ],
+        "ok": true,
+        "seconds": 29.7
+      },
+      {
+        "name": "budgets",
+        "criteria": [
+          "AC-135",
+          "AC-136"
+        ],
+        "ok": true,
+        "note": ""
+      },
+      {
+        "name": "revoke",
+        "criteria": [
+          "AC-119"
+        ],
+        "ok": true,
+        "seconds": 10
+      }
+    ],
+    "android": [
+      {
+        "name": "pair",
+        "criteria": [
+          "AC-117",
+          "AC-118",
+          "AC-141"
+        ],
+        "ok": true,
+        "seconds": 42.3
+      },
+      {
+        "name": "agents",
+        "criteria": [
+          "AC-124"
+        ],
+        "ok": true,
+        "seconds": 23,
+        "figures": {
+          "agents": 9,
+          "children": 2
+        }
+      },
+      {
+        "name": "delay",
+        "criteria": [
+          "AC-124"
+        ],
+        "ok": true,
+        "seconds": 46.9,
+        "figures": {
+          "delay": {
+            "count": 346,
+            "p50": 0,
+            "p95": 0,
+            "max": 400,
+            "clockOffsetMs": -292,
+            "load": 2.3
+          }
+        }
+      },
+      {
+        "name": "conversation",
+        "criteria": [
+          "AC-124"
+        ],
+        "ok": true,
+        "seconds": 23.3
+      },
+      {
+        "name": "permission",
+        "criteria": [
+          "AC-125"
+        ],
+        "ok": true,
+        "seconds": 12.9
+      },
+      {
+        "name": "send",
+        "criteria": [
+          "AC-122",
+          "AC-125"
+        ],
+        "ok": true,
+        "seconds": 33.1
+      },
+      {
+        "name": "image",
+        "criteria": [
+          "AC-125"
+        ],
+        "ok": true,
+        "seconds": 34.3,
+        "figures": {
+          "mime": "image/jpeg",
+          "bytes": 79999
+        }
+      },
+      {
+        "name": "review",
+        "criteria": [
+          "AC-126"
+        ],
+        "ok": true,
+        "seconds": 32.2
+      },
+      {
+        "name": "diff",
+        "criteria": [
+          "AC-126"
+        ],
+        "ok": true,
+        "seconds": 27.5,
+        "figures": {
+          "lines": 4,
+          "hunks": 1
+        }
+      },
+      {
+        "name": "reject",
+        "criteria": [
+          "AC-126",
+          "AC-130"
+        ],
+        "ok": true,
+        "seconds": 31.7
+      },
+      {
+        "name": "big-repo",
+        "criteria": [
+          "AC-126",
+          "AC-135"
+        ],
+        "ok": true,
+        "seconds": 48.3,
+        "figures": {
+          "files": 500,
+          "scroll": {
+            "scrolls": 9,
+            "frames": 575,
+            "dropped": 0,
+            "droppedPercent": 0,
+            "longest": 16.7,
+            "seconds": 9.6
+          }
+        }
+      },
+      {
+        "name": "cleanup",
+        "criteria": [
+          "AC-130",
+          "AC-127"
+        ],
+        "ok": true,
+        "seconds": 25.3,
+        "figures": {
+          "removed_ms": 1790599688076
+        }
+      },
+      {
+        "name": "merge",
+        "criteria": [
+          "AC-130",
+          "AC-127"
+        ],
+        "ok": true,
+        "seconds": 60.1,
+        "figures": {
+          "aborted": "r-eafa5ef15e0a",
+          "completed": "r-f882e6d9d56c"
+        }
+      },
+      {
+        "name": "safety",
+        "criteria": [
+          "AC-130"
+        ],
+        "ok": true,
+        "seconds": 106.4,
+        "figures": {
+          "appLock": true,
+          "unlockBeforeChanges": true
+        }
+      },
+      {
+        "name": "backup",
+        "criteria": [
+          "AC-130"
+        ],
+        "ok": true,
+        "seconds": 2.8,
+        "figures": {
+          "files": 27,
+          "keychain": []
+        }
+      },
+      {
+        "name": "new",
+        "criteria": [
+          "AC-125"
+        ],
+        "ok": true,
+        "seconds": 18.5
+      },
+      {
+        "name": "accounts",
+        "criteria": [
+          "AC-127"
+        ],
+        "ok": true,
+        "seconds": 11.7
+      },
+      {
+        "name": "notifications",
+        "criteria": [
+          "AC-129"
+        ],
+        "ok": true,
+        "seconds": 28.2
+      },
+      {
+        "name": "banner",
+        "criteria": [
+          "AC-129"
+        ],
+        "ok": true,
+        "seconds": 25.2
+      },
+      {
+        "name": "push",
+        "criteria": [
+          "AC-129"
+        ],
+        "ok": null,
+        "note": "Android shows its notifications itself while the app is open, in this gate"
+      },
+      {
+        "name": "stop-all",
+        "criteria": [
+          "AC-125",
+          "AC-130"
+        ],
+        "ok": true,
+        "seconds": 24.8
+      },
+      {
+        "name": "update",
+        "criteria": [
+          "AC-141"
+        ],
+        "ok": true,
+        "seconds": 9
+      },
+      {
+        "name": "reopen",
+        "criteria": [
+          "AC-141",
+          "AC-130"
+        ],
+        "ok": true,
+        "seconds": 39.9
+      },
+      {
+        "name": "restart",
+        "criteria": [
+          "AC-141"
+        ],
+        "ok": true,
+        "seconds": 26.3
+      },
+      {
+        "name": "off-and-on",
+        "criteria": [
+          "AC-116",
+          "AC-121"
+        ],
+        "ok": true,
+        "seconds": 14.5
+      },
+      {
+        "name": "queued",
+        "criteria": [
+          "AC-122",
+          "AC-121"
+        ],
+        "ok": true,
+        "seconds": 35.6
+      },
+      {
+        "name": "unreachable",
+        "criteria": [
+          "AC-123",
+          "AC-116",
+          "AC-121"
+        ],
+        "ok": true,
+        "seconds": 14
+      },
+      {
+        "name": "manual-address",
+        "criteria": [
+          "AC-120"
+        ],
+        "ok": true,
+        "seconds": 23.2
+      },
+      {
+        "name": "away",
+        "criteria": [
+          "AC-121"
+        ],
+        "ok": true,
+        "seconds": 347.2
+      },
+      {
+        "name": "tour",
+        "criteria": [
+          "AC-131"
+        ],
+        "ok": true,
+        "seconds": 293.3
+      },
+      {
+        "name": "busy",
+        "criteria": [
+          "AC-135",
+          "AC-137"
+        ],
+        "ok": true,
+        "seconds": 26.9
+      },
+      {
+        "name": "watch-only",
+        "criteria": [
+          "AC-119"
+        ],
+        "ok": true,
+        "seconds": 29.8
+      },
+      {
+        "name": "budgets",
+        "criteria": [
+          "AC-135",
+          "AC-136"
+        ],
+        "ok": false,
+        "note": "a budget was missed (see the measurements above)"
+      },
+      {
+        "name": "revoke",
+        "criteria": [
+          "AC-119"
+        ],
+        "ok": true,
+        "seconds": 7.3
+      }
+    ]
+  }
+}

@@ -18,7 +18,7 @@
             "status": "running"
           }
         ],
-        "summary": "What is everyone doing?\nShared the state of 3 agents\nUsed\nmcp__overseer__roster\n\nHere is what everyone is doing:\n\nBuild watcher: running\nFrontend fixer: completed\nAPI tests: completed\nDone\n0s\n2 tokens\nWorking…"
+        "summary": "What is everyone doing?\nShared the state of 3 agents\nUsed\nmcp__overseer__roster\n\nHere is what everyone is doing:\n\nBuild watcher: running\nFrontend fixer: completed\nAPI tests: completed\nDone\n0s\n2 tokens"
       }
     },
     {

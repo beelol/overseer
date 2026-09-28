@@ -19,8 +19,10 @@ mod broker;
 mod claims;
 mod continuity;
 mod daemon;
+mod device_login;
 mod downloads;
 mod files;
+mod gateway;
 mod usage;
 mod voice;
 mod git;
@@ -34,6 +36,7 @@ mod overseer;
 mod paths;
 mod pr;
 mod redact;
+mod review;
 mod server;
 mod shim;
 mod store;
@@ -81,7 +84,10 @@ fn main() {
         dev_guard();
     }
     match args.get(1).map(String::as_str) {
-        Some("version") | Some("--version") => println!("overseerd {} (protocol {})", env!("CARGO_PKG_VERSION"), server::PROTOCOL_VERSION),
+        Some("version") | Some("--version") => match server::BUILD {
+            Some(build) => println!("overseerd {} (protocol {}, build {build})", env!("CARGO_PKG_VERSION"), server::PROTOCOL_VERSION),
+            None => println!("overseerd {} (protocol {})", env!("CARGO_PKG_VERSION"), server::PROTOCOL_VERSION),
+        },
         Some("socket-path") => println!("{}", paths::socket_path().display()),
         Some("shim") => {
             let dir = args.get(2).unwrap_or_else(|| usage());

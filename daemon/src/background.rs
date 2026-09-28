@@ -149,6 +149,51 @@ impl Daemon {
         Ok(Some(payload))
     }
 
+    /// Interrupts every active agent and leaves the daemon running (what a phone may do; stopping
+    /// the daemon itself stays on the Mac).
+    pub fn stop_all_runs(self: &Arc<Self>) -> Result<Value> {
+        let mut interrupted = Vec::new();
+        let mut failed = Vec::new();
+        for run in self.active_roots()? {
+            match self.interrupt(&run.id) {
+                Ok(_) => interrupted.push(run.id),
+                Err(e) => failed.push(json!({"run_id": run.id, "message": e.to_string()})),
+            }
+        }
+        Ok(json!({"interrupted": interrupted, "failed": failed}))
+    }
+
+    /// The repositories Overseer has used: where a phone may start an agent.
+    pub fn known_repos(&self) -> Result<Value> {
+        let store = self.store.lock().unwrap();
+        let mut seen: Vec<(String, i64)> = Vec::new();
+        for task in store.tasks()? {
+            match seen.iter_mut().find(|(root, _)| *root == task.repo_root) {
+                Some(entry) => entry.1 = entry.1.max(task.created_ms),
+                None => seen.push((task.repo_root.clone(), task.created_ms)),
+            }
+        }
+        seen.sort_by_key(|(_, last)| std::cmp::Reverse(*last));
+        let repos: Vec<Value> = seen
+            .into_iter()
+            .map(|(root, last)| {
+                let path = std::path::Path::new(&root);
+                json!({"root": root, "name": path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(), "last_used_ms": last, "exists": path.is_dir(),
+                       "branch": crate::git::head_branch(path), "default_branch": crate::git::default_branch(path)})
+            })
+            .collect();
+        Ok(json!({"repos": repos}))
+    }
+
+    pub fn repo_is_known(&self, path: &str) -> Result<bool> {
+        if path.is_empty() {
+            return Ok(false);
+        }
+        let Ok(root) = crate::git::toplevel(std::path::Path::new(path)) else { return Ok(false) };
+        let root = root.to_string_lossy().to_string();
+        Ok(self.store.lock().unwrap().tasks()?.iter().any(|t| t.repo_root == root))
+    }
+
     /// Interrupts every active run, waits for their processes, forces stragglers, and reports.
     /// The caller exits the daemon afterwards.
     pub fn stop_all(self: &Arc<Self>) -> Result<Value> {

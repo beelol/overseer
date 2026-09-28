@@ -1,0 +1,4 @@
+# The app leaves the screen, as when the owner goes home.
+appId: ${APP}
+---
+- pressKey: home

@@ -1,29 +1,29 @@
-[2026-09-27T05:55:42.167Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-27T05:56:05.997Z] screenshot docs/verification/evidence/ui/gallery/01-chat-and-review-overseer-dark.png
-[2026-09-27T05:56:09.207Z] screenshot docs/verification/evidence/ui/gallery/02-review-all-files-overseer-dark.png
-[2026-09-27T05:56:15.880Z] screenshot docs/verification/evidence/ui/gallery/03-grid-tracking-overseer-dark.png
-[2026-09-27T05:56:22.427Z] screenshot docs/verification/evidence/ui/gallery/04-composer-overseer-dark.png
-[2026-09-27T05:56:25.037Z] screenshot docs/verification/evidence/ui/gallery/05-talk-overseer-dark.png
-[2026-09-27T05:56:30.611Z] screenshot docs/verification/evidence/ui/gallery/06-where-am-i-overseer-dark.png
-[2026-09-27T05:56:35.234Z] screenshot docs/verification/evidence/ui/gallery/07-dashboard-overseer-dark.png
-[2026-09-27T05:56:44.684Z] screenshot docs/verification/evidence/ui/gallery/08-chat-and-review-overseer-light.png
-[2026-09-27T05:56:47.662Z] screenshot docs/verification/evidence/ui/gallery/09-review-all-files-overseer-light.png
-[2026-09-27T05:56:54.339Z] screenshot docs/verification/evidence/ui/gallery/10-grid-tracking-overseer-light.png
-[2026-09-27T05:57:00.884Z] screenshot docs/verification/evidence/ui/gallery/11-composer-overseer-light.png
-[2026-09-27T05:57:03.499Z] screenshot docs/verification/evidence/ui/gallery/12-talk-overseer-light.png
-[2026-09-27T05:57:09.073Z] screenshot docs/verification/evidence/ui/gallery/13-where-am-i-overseer-light.png
-[2026-09-27T05:57:13.670Z] screenshot docs/verification/evidence/ui/gallery/14-dashboard-overseer-light.png
-[2026-09-27T05:57:23.275Z] screenshot docs/verification/evidence/ui/gallery/15-chat-and-review-overseer.png
-[2026-09-27T05:57:26.198Z] screenshot docs/verification/evidence/ui/gallery/16-review-all-files-overseer.png
-[2026-09-27T05:57:33.033Z] screenshot docs/verification/evidence/ui/gallery/17-grid-tracking-overseer.png
-[2026-09-27T05:57:39.800Z] screenshot docs/verification/evidence/ui/gallery/18-composer-overseer.png
-[2026-09-27T05:57:42.652Z] screenshot docs/verification/evidence/ui/gallery/19-talk-overseer.png
-[2026-09-27T05:57:48.343Z] screenshot docs/verification/evidence/ui/gallery/20-where-am-i-overseer.png
-[2026-09-27T05:57:53.108Z] screenshot docs/verification/evidence/ui/gallery/21-dashboard-overseer.png
-[2026-09-27T05:57:56.071Z] PASS chat and review: reached in Overseer Dark, Overseer Light, Overseer {"Overseer Dark":true,"Overseer Light":true,"Overseer":true}
-[2026-09-27T05:57:56.071Z] PASS review, all files: reached in Overseer Dark, Overseer Light, Overseer {"Overseer Dark":true,"Overseer Light":true,"Overseer":true}
-[2026-09-27T05:57:56.071Z] PASS grid tracking: reached in Overseer Dark, Overseer Light, Overseer {"Overseer Dark":true,"Overseer Light":true,"Overseer":true}
-[2026-09-27T05:57:56.071Z] PASS composer: reached in Overseer Dark, Overseer Light, Overseer {"Overseer Dark":true,"Overseer Light":true,"Overseer":true}
-[2026-09-27T05:57:56.071Z] PASS talk to Overseer: reached in Overseer Dark, Overseer Light, Overseer {"Overseer Dark":true,"Overseer Light":true,"Overseer":true}
-[2026-09-27T05:57:56.071Z] PASS where am I: reached in Overseer Dark, Overseer Light, Overseer {"Overseer Dark":true,"Overseer Light":true,"Overseer":true}
-[2026-09-27T05:57:56.071Z] PASS dashboard: reached in Overseer Dark, Overseer Light, Overseer {"Overseer Dark":true,"Overseer Light":true,"Overseer":true}
+[2026-09-28T16:24:58.150Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-28T16:25:17.993Z] screenshot docs/verification/evidence/ui/gallery/01-chat-and-review-overseer-dark.png
+[2026-09-28T16:25:21.123Z] screenshot docs/verification/evidence/ui/gallery/02-review-all-files-overseer-dark.png
+[2026-09-28T16:25:27.703Z] screenshot docs/verification/evidence/ui/gallery/03-grid-tracking-overseer-dark.png
+[2026-09-28T16:25:34.182Z] screenshot docs/verification/evidence/ui/gallery/04-composer-overseer-dark.png
+[2026-09-28T16:25:36.730Z] screenshot docs/verification/evidence/ui/gallery/05-talk-overseer-dark.png
+[2026-09-28T16:25:42.213Z] screenshot docs/verification/evidence/ui/gallery/06-where-am-i-overseer-dark.png
+[2026-09-28T16:25:46.730Z] screenshot docs/verification/evidence/ui/gallery/07-dashboard-overseer-dark.png
+[2026-09-28T16:25:56.114Z] screenshot docs/verification/evidence/ui/gallery/08-chat-and-review-overseer-light.png
+[2026-09-28T16:25:58.624Z] screenshot docs/verification/evidence/ui/gallery/09-review-all-files-overseer-light.png
+[2026-09-28T16:26:05.258Z] screenshot docs/verification/evidence/ui/gallery/10-grid-tracking-overseer-light.png
+[2026-09-28T16:26:11.743Z] screenshot docs/verification/evidence/ui/gallery/11-composer-overseer-light.png
+[2026-09-28T16:26:14.344Z] screenshot docs/verification/evidence/ui/gallery/12-talk-overseer-light.png
+[2026-09-28T16:26:19.849Z] screenshot docs/verification/evidence/ui/gallery/13-where-am-i-overseer-light.png
+[2026-09-28T16:26:24.369Z] screenshot docs/verification/evidence/ui/gallery/14-dashboard-overseer-light.png
+[2026-09-28T16:26:33.882Z] screenshot docs/verification/evidence/ui/gallery/15-chat-and-review-overseer.png
+[2026-09-28T16:26:36.922Z] screenshot docs/verification/evidence/ui/gallery/16-review-all-files-overseer.png
+[2026-09-28T16:26:43.684Z] screenshot docs/verification/evidence/ui/gallery/17-grid-tracking-overseer.png
+[2026-09-28T16:26:50.313Z] screenshot docs/verification/evidence/ui/gallery/18-composer-overseer.png
+[2026-09-28T16:26:53.059Z] screenshot docs/verification/evidence/ui/gallery/19-talk-overseer.png
+[2026-09-28T16:26:58.648Z] screenshot docs/verification/evidence/ui/gallery/20-where-am-i-overseer.png
+[2026-09-28T16:27:03.299Z] screenshot docs/verification/evidence/ui/gallery/21-dashboard-overseer.png
+[2026-09-28T16:27:06.255Z] PASS chat and review: reached in Overseer Dark, Overseer Light, Overseer {"Overseer Dark":true,"Overseer Light":true,"Overseer":true}
+[2026-09-28T16:27:06.255Z] PASS review, all files: reached in Overseer Dark, Overseer Light, Overseer {"Overseer Dark":true,"Overseer Light":true,"Overseer":true}
+[2026-09-28T16:27:06.255Z] PASS grid tracking: reached in Overseer Dark, Overseer Light, Overseer {"Overseer Dark":true,"Overseer Light":true,"Overseer":true}
+[2026-09-28T16:27:06.255Z] PASS composer: reached in Overseer Dark, Overseer Light, Overseer {"Overseer Dark":true,"Overseer Light":true,"Overseer":true}
+[2026-09-28T16:27:06.255Z] PASS talk to Overseer: reached in Overseer Dark, Overseer Light, Overseer {"Overseer Dark":true,"Overseer Light":true,"Overseer":true}
+[2026-09-28T16:27:06.255Z] PASS where am I: reached in Overseer Dark, Overseer Light, Overseer {"Overseer Dark":true,"Overseer Light":true,"Overseer":true}
+[2026-09-28T16:27:06.255Z] PASS dashboard: reached in Overseer Dark, Overseer Light, Overseer {"Overseer Dark":true,"Overseer Light":true,"Overseer":true}

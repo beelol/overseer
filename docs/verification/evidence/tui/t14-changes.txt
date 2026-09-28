@@ -1,4 +1,4 @@
- ◆ Overseer  page 1/1 · 1 agent · ● 1 active                                                                                                        ● connected 
+ ◆ Overseer  page 1/1 · 1 agent · ● 1 active                                                                                     phone access off · ● connected 
 ┏ changes · Edits two files · Latest run · 2 files +2 −0 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃› M README.md +1 −0                             │ @@ -1 +1,2 @@                                                                                               ┃
 ┃  A src/deep/nested/new.rs +1 −0                │  # fixture                                                                                                  ┃

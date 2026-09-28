@@ -1,0 +1,77 @@
+Measuring on android (emulator-5554), 20 cold starts, 2026-09-28T19:54:51.910Z
+Load average (1, 5, 15 min) at the start: 10.0 15.9 24.5
+Cold starts with the door and without it (turned off by the test setting), in turn; the door opens in 1000 ms:
+  warm-up launch (not counted): first screen 322.2 ms, interactive 360.4 ms, door shown 322.3 ms, opening 1062.6 ms, dropped 0
+    from the opening's start at 365.9 ms: Mac online 443.2, Mac's state 467, list laid out -42; late frames at none
+  launch 1 with the door: first screen 342.2 ms, interactive 392.5 ms, door shown 342.3 ms, opening 1050 ms, dropped 0
+    from the opening's start at 398.2 ms: Mac online 918, Mac's state 940.4, list laid out -54.3; late frames at none
+  launch 1 without the door: first screen 380.3 ms, interactive 398.8 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 2 with the door: first screen 310.7 ms, interactive 344.8 ms, door shown 310.8 ms, opening 1027.5 ms, dropped 0
+    from the opening's start at 373 ms: Mac online 583.6, Mac's state 614.9, list laid out -28.4; late frames at none
+  launch 2 without the door: first screen 293.7 ms, interactive 312.3 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 3 with the door: first screen 304.8 ms, interactive 338.1 ms, door shown 304.9 ms, opening 1032.1 ms, dropped 0
+    from the opening's start at 360.5 ms: Mac online 855.4, Mac's state 877.3, list laid out -22.5; late frames at none
+  launch 3 without the door: first screen 333.3 ms, interactive 373.5 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 4 with the door: first screen 405.3 ms, interactive 463.4 ms, door shown 405.6 ms, opening 1081.1 ms, dropped 0
+    from the opening's start at 470.3 ms: Mac online 845.4, Mac's state 876.6, list laid out -62.6; late frames at none
+  launch 4 without the door: first screen 401.7 ms, interactive 470.1 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 5 with the door: first screen 308.1 ms, interactive 349.2 ms, door shown 308.2 ms, opening 1020 ms, dropped 2
+    from the opening's start at 354.8 ms: Mac online 506.1, Mac's state 527.3, list laid out -44.5; late frames at 917 (50 ms)
+  launch 5 without the door: first screen 331.5 ms, interactive 381.5 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 6 with the door: first screen 333.3 ms, interactive 365.5 ms, door shown 333.4 ms, opening 1029.7 ms, dropped 0
+    from the opening's start at 389.5 ms: Mac online 509.2, Mac's state 533.3, list laid out -24.1; late frames at none
+  launch 6 without the door: first screen 292 ms, interactive 339.6 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 7 with the door: first screen 280.1 ms, interactive 308 ms, door shown 280.2 ms, opening 1023.3 ms, dropped 0
+    from the opening's start at 326.9 ms: Mac online 633.6, Mac's state 655.7, list laid out -19; late frames at none
+  launch 7 without the door: first screen 280.5 ms, interactive 309.3 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 8 with the door: first screen 282.3 ms, interactive 341.3 ms, door shown 282.4 ms, opening 1019.6 ms, dropped 0
+    from the opening's start at 344.4 ms: Mac online 645.4, Mac's state 667.4, list laid out -51.4; late frames at none
+  launch 8 without the door: first screen 389.7 ms, interactive 407 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 9 with the door: first screen 280.1 ms, interactive 367.1 ms, door shown 280.1 ms, opening 1026.4 ms, dropped 0
+    from the opening's start at 370.9 ms: Mac online 891.7, Mac's state 915.1, list laid out -58.4; late frames at none
+  launch 9 without the door: first screen 319 ms, interactive 339.6 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 10 with the door: first screen 311.6 ms, interactive 405.8 ms, door shown 311.7 ms, opening 1053.7 ms, dropped 2
+    from the opening's start at 408.9 ms: Mac online 856.1, Mac's state 893.1, list laid out -57; late frames at 983 (50 ms)
+  launch 10 without the door: first screen 290.6 ms, interactive 330.3 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 11 with the door: first screen 319.7 ms, interactive 374.8 ms, door shown 319.9 ms, opening 1053 ms, dropped 0
+    from the opening's start at 379.7 ms: Mac online 466.3, Mac's state 492.5, list laid out -58.1; late frames at none
+  launch 11 without the door: first screen 346.7 ms, interactive 382.9 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 12 with the door: first screen 392.3 ms, interactive 471.6 ms, door shown 392.4 ms, opening 1030.3 ms, dropped 0
+    from the opening's start at 478.7 ms: Mac online 674, Mac's state 701.5, list laid out -84.2; late frames at none
+  launch 12 without the door: first screen 379.6 ms, interactive 410 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 13 with the door: first screen 410.9 ms, interactive 447.5 ms, door shown 411 ms, opening 1062.7 ms, dropped 0
+    from the opening's start at 454.6 ms: Mac online 464.3, Mac's state 491.2, list laid out -41.5; late frames at none
+  launch 13 without the door: first screen 521.9 ms, interactive 618.2 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 14 with the door: first screen 522.8 ms, interactive 609.5 ms, door shown 522.9 ms, opening 1036.2 ms, dropped 0
+    from the opening's start at 619.1 ms: Mac online 684.8, Mac's state 720.2, list laid out -93.3; late frames at none
+  launch 14 without the door: first screen 478.5 ms, interactive 528.6 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 15 with the door: first screen 687.7 ms, interactive 793.3 ms, door shown 688 ms, opening 1117.7 ms, dropped 0
+    from the opening's start at 805.4 ms: Mac online 762.9, Mac's state 836.2, list laid out -114.3; late frames at none
+  launch 15 without the door: first screen 833.6 ms, interactive 1066.6 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 16 with the door: first screen 1633.7 ms, interactive 1970.6 ms, door shown 1633.9 ms, opening 1105.6 ms, dropped 12
+    from the opening's start at 1978.7 ms: Mac online 357, Mac's state 454.3, list laid out -339; late frames at 33 (33 ms), 567 (33 ms), 600 (33 ms), 650 (50 ms), 800 (33 ms), 833 (33 ms), 867 (33 ms), 900 (33 ms)
+  launch 16 without the door: first screen 1138 ms, interactive 1288.6 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 17 with the door: first screen 946.7 ms, interactive 1078.8 ms, door shown 947.1 ms, opening 1197.2 ms, dropped 12
+    from the opening's start at 1098.2 ms: Mac online 433.1, Mac's state 536.5, list laid out -147.3; late frames at 183 (50 ms), 383 (33 ms), 583 (33 ms), 717 (50 ms), 767 (50 ms), 867 (33 ms), 917 (33 ms), 950 (33 ms)
+  launch 17 without the door: first screen 865.4 ms, interactive 1028.3 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 18 with the door: first screen 1005.3 ms, interactive 1160.8 ms, door shown 1005.5 ms, opening 1174.3 ms, dropped 6
+    from the opening's start at 1182 ms: Mac online 780.9, Mac's state 841, list laid out -172.8; late frames at 83 (33 ms), 883 (100 ms)
+  launch 18 without the door: first screen 1546.1 ms, interactive 1737.3 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 19 with the door: first screen 912.4 ms, interactive 993.7 ms, door shown 912.6 ms, opening 1350.4 ms, dropped 17
+    from the opening's start at 1011.9 ms: Mac online 623.6, Mac's state 695.3, list laid out -96.5; late frames at 183 (50 ms), 583 (33 ms), 667 (33 ms), 750 (33 ms), 850 (50 ms), 900 (33 ms), 1000 (167 ms)
+  launch 19 without the door: first screen 1361.8 ms, interactive 1573.8 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 20 with the door: first screen 1476.9 ms, interactive 2279 ms, door shown 1477.1 ms, opening 1168.5 ms, dropped 29
+    from the opening's start at 2290.7 ms: Mac online 6.2, Mac's state 102.9, list laid out -803.3; late frames at 33 (83 ms), 217 (33 ms), 300 (33 ms), 333 (33 ms), 433 (33 ms), 550 (50 ms), 633 (33 ms), 667 (33 ms)
+  launch 20 without the door: first screen 1346.4 ms, interactive 1496.1 ms, door shown NaN ms, opening NaN ms, dropped n/a
+Load average (1, 5, 15 min) at the end: 24.7 17.4 23.2
+
+ok   every launch reaches the agents list: 20 (limit 20)
+ok   launches that showed pairing or any other question, of 40: 0 (limit 0)
+ok   agents list interactive, p95 (ms): 1970.6 (limit 2000)
+FAIL agents list interactive against the baseline, p95 (ms): 1970.6 (limit 350.4) — baseline 318.5 ms + 10%
+ok   the door is on screen with the first screen or before it, worst launch (ms after the first screen): 0.4 (limit 17) — 20 of 20 launches marked both
+ok   the door opens in 1000 ms within 60 ms, shortest (ms): 1019.6 (limit 940)
+FAIL the door opens in 1000 ms within 60 ms, longest (ms): 1350.4 (limit 1060)
+FAIL frames dropped while the door opens, all launches, against the baseline (%): 6.7 (limit 0) — 80 of 1203 frames; baseline 0% + 10%; worst launch 43.9% (29 of 66 frames)
+ok   the door makes the first screen no later, median (ms): 405.8 (limit 467.7) — without the door 407 ms
+3 budgets missed
