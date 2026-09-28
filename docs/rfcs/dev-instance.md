@@ -1,10 +1,16 @@
-# Side RFC: Overseer develops Overseer — dev, production and deploy (Gate T)
+# Side RFC: Overseer develops Overseer — the dev daemons feature, production and deploy (Gate T)
 
-Status: requested by the owner on 2026-09-27. Criteria: AC-206 to AC-214 in the main RFC
+Status: requested by the owner on 2026-09-27. Criteria: AC-206 to AC-215 in the main RFC
 ([Gate T](../overseer-rfc.md#gate-t--overseer-develops-overseer-added-by-the-owner-2026-09-27)).
-The goal is [dev-instance-goal.md](dev-instance-goal.md). Built in three stages, each its own
+The goal is [dev-instance-goal.md](dev-instance-goal.md). Built in four stages, each its own
 pull request, each merged before the next starts: the production guard (`claude/prod-guard`),
-the dev tooling (`claude/dev-instance`) and the deploy (`claude/deploy`).
+the dev daemons tooling (`claude/dev-instance`), guided owner tests (`claude/guided-tests`) and
+the deploy (`claude/deploy`).
+
+**The name (owner, 2026-09-27): "dev daemons".** *The dev daemons feature* runs developer versions
+of Overseer (a daemon, and VS Code, the TUI or a simulator pointed at it) without colliding with
+each other or with the production extension the owner has installed. One dev daemon is also called
+an instance: it has a name `x` and runs as `dev-x`.
 
 ## Why
 
@@ -16,7 +22,7 @@ make its own dev-running version of the Rust client."*
 
 The core case: **the owner develops Overseer while using it.** The installed daemon, the owner's
 VS Code and the paired phone keep running normally, and agents, started from that very Overseer,
-build and test dev instances beside them, automatically and without asking. The owner calls it
+build and test dev daemons beside them, automatically and without asking. The owner calls it
 "like a deployment stage": environments with one deliberate promotion path.
 
 ## Environments
@@ -98,7 +104,7 @@ advertises `_overseer._tcp` (only `_overseer-dev._tcp` with `inst=dev-<name>`, a
 `--mdns`) and reports its instance in the handshake. `phone/` and the gateway are being
 finished in pull request #10 by another agent and are not edited here.
 
-## Stage 2 — dev tooling (AC-206 to AC-211)
+## Stage 2 — the dev daemons tooling (AC-206 to AC-211)
 
 ### Isolation on the Mac ("containerized")
 
@@ -173,7 +179,7 @@ scripts/dev clean  --name x | --all            down, then remove the instance fo
 
 ### One-way isolation
 
-Production needs nothing from dev instances, knows nothing about them and never talks to one.
+Production needs nothing from dev daemons, knows nothing about them and never talks to one.
 All awareness is on the dev side: nothing in the daemon or the TUI reads the dev root; dev
 sockets are never in production's runtime folder or its fallback; no file is shared; dev
 instances never advertise `_overseer._tcp`.
@@ -202,7 +208,7 @@ instance environment (a dev TUI, marked, honours it), after checking the instanc
 
 ### The phone, on the simulators (AC-210, after pull request #10)
 
-Each dev instance gets its own gateway port (`up` picks a free one from 47900 up and sets
+Each dev daemon gets its own gateway port (`up` picks a free one from 47900 up and sets
 `OVERSEER_GATEWAY_PORT`), its own gateway key (in its data folder, so its own `fp`), and no
 advertising (`OVERSEER_GATEWAY_MDNS=off`) unless `--mdns`. `scripts/dev phone --name x --platform
 ios|android` launches the installed simulator build with the instance's address as a launch
@@ -211,7 +217,34 @@ argument (iOS simulator: `127.0.0.1:<port>`; Android emulator: `10.0.2.2:<port>`
 an address. Dev builds of the app accept an instance filter for `_overseer-dev._tcp`; release
 builds never do (AC-213). Until #10 merges, `scripts/dev phone` prints the address to type.
 
-## Stage 3 — deploy (AC-214)
+## Stage 3 — guided owner tests (AC-215)
+
+Owner request (2026-09-27): the owner says to any agent "let's start the voice mode test" (or any
+owner check a gate lists), and the agent runs it for them in a dev daemon:
+
+1. starts a dev daemon and an isolated dev VS Code built from the right branch (or main), never
+   touching production;
+2. pulls up what the test needs: the view, the settings, a scratch repository, fixture agents;
+3. walks the owner through the steps one at a time, recording each answer or observation into the
+   gate's evidence;
+4. cleans up at the end.
+
+**Data.** Each gate's owner checks live in `docs/owner-checks/<name>.json`: the gate and criteria,
+the ref to build (a branch or `main`), what to prepare (settings, a scratch repository, fixture
+agents, a VS Code command to open the right view), and the steps (what to do, what to watch for,
+what to record, and the criterion each serves). Voice Mode's checks
+([voice-mode.md](voice-mode.md#the-owners-checks), steps 1 to 8) are the first.
+
+**Runner.** `scripts/dev test <name>` runs one. An agent mediates the conversation, so the runner
+works one step per call: `--start` builds and prepares everything and prints step 1; `--record
+"<what the owner said or saw>"` records it and prints the next step; `--skip "<why>"` records a
+skipped step; `--status` repeats where the test is; `--finish` writes the evidence (Markdown and
+JSON under `docs/verification/evidence/owner-checks/<name>/<date>/`) and cleans the dev daemon up.
+In a terminal (a TTY) `scripts/dev test <name>` walks the owner through the same steps by itself.
+`scripts/dev test --list` names every check. `AGENTS.md` tells agents to use it whenever the owner
+asks for an owner check.
+
+## Stage 4 — deploy (AC-214)
 
 `scripts/deploy` is the one path from dev to production. It is run by the owner, or by an agent
 only when the owner asked it to in that conversation; it asks before it changes anything
@@ -260,5 +293,7 @@ It never touches production and never deploys unless the owner asked.
 - Stage 2: `test/dev/run.js` in `scripts/test-all` (two instances side by side through
   `scripts/dev` with a temporary `HOME` and dev root; `--help` complete; nothing left);
   `test/ui/scenario-dev-instance.js` (an isolated VS Code pointed at A shows A's agents, not B's).
-- Stage 3: `test/deploy/run.js` (deploy onto a temporary production: waits for active runs,
+- Stage 3: `test/dev/guided.js` (every owner-check file is valid; a fixture check run through
+  `--start`, `--record`, `--skip` and `--finish` writes its evidence and leaves nothing running).
+- Stage 4: `test/deploy/run.js` (deploy onto a temporary production: waits for active runs,
   restarts once, data and logins intact, recorded, rolled back).

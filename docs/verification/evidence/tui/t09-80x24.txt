@@ -21,4 +21,4 @@
 │                              │┃                                              ┃
 │                              │┃                                              ┃
 ╰──────────────────────────────╯┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
- i message   z zoom   a/d answer   n new   ? keys   q quit                      
+ i message   z zoom   a/d answer   n new   o Overseer   ? keys   q quit         

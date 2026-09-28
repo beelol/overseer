@@ -19,6 +19,10 @@ pub const ACTIONS: &[&str] = &["message", "stop", "start", "pin", "hold", "relea
 pub const SETTLE_MS: i64 = 2000;
 const TURN_BYTES: usize = 32 * 1024;
 pub const FROM_OVERSEER: &str = "From Overseer: ";
+/// Held from "is Overseer busy?" to its turn starting, so two turns never start at once (an
+/// owner's message, a check-in and the queued messages at a turn's end come from different
+/// threads; Voice Mode's requests make that common).
+pub(crate) static TURN_START: std::sync::Mutex<()> = std::sync::Mutex::new(());
 pub const OPEN: &str = "<overseer-state>";
 pub const CLOSE: &str = "</overseer-state>";
 
@@ -245,6 +249,15 @@ impl Daemon {
             store.conn.execute("UPDATE overseer_tokens SET run_id=?1 WHERE run_id='pending' AND role='overseer'", [&run_id])?;
             store.conn.execute("UPDATE overseer_sessions SET run_id=?2, harness=?3, model=?4, task_id=?5 WHERE id=?1", rusqlite::params![sid, run_id, harness, model, task_id])?;
         }
+        // A harness that cannot start (not installed, no login) ends the run with the reason, so it
+        // never sits queued with nobody told; the next message tries again from the start.
+        if let Some(e) = created["launch_error"].as_str() {
+            if let Ok(run) = self.run(&run_id) {
+                let _ = self.mark_ended(&run, "failed", &format!("not launched: {e}"));
+            }
+            self.store.lock().unwrap().conn.execute("UPDATE overseer_sessions SET run_id=NULL, task_id=NULL WHERE id=?1", [&sid])?;
+            bail!("Overseer could not start on {harness}: {e}");
+        }
         Ok(run_id)
     }
 
@@ -321,6 +334,8 @@ impl Daemon {
         let sid = session["id"].as_str().unwrap().to_string();
         let msg = self.append_message(&sid, "owner", Some(surface), text, None)?;
         let harness = harness.filter(|h| !h.is_empty()).map(str::to_string).or_else(|| session["harness"].as_str().map(str::to_string)).unwrap_or_else(|| "claude".into());
+        let _one_at_a_time = TURN_START.lock().unwrap_or_else(|e| e.into_inner());
+        let session = self.overseer_session()?;
         let run_id = session["run_id"].as_str().map(str::to_string);
         let busy = run_id.as_deref().and_then(|r| self.run(r).ok()).map(|r| ACTIVE.contains(&r.status.as_str())).unwrap_or(false);
         if busy {
@@ -328,7 +343,8 @@ impl Daemon {
             store.conn.execute("INSERT INTO overseer_pending(session_id, message_id, ts, text) VALUES(?1, ?2, ?3, ?4)", rusqlite::params![sid, msg["id"].as_str(), crate::daemon::now(), text])?;
             return Ok(json!({"message": msg, "queued": true, "run_id": run_id}));
         }
-        let turn = self.overseer_turn(&session, &[text.to_string()], &harness, model)?;
+        let cause = if surface == "voice" { "voice" } else { "owner" };
+        let turn = self.overseer_turn(&session, &[text.to_string()], &harness, model, cause)?;
         Ok(json!({"message": msg, "queued": false, "run_id": turn["run_id"], "turn": turn["turn"]}))
     }
 
@@ -356,7 +372,7 @@ impl Daemon {
     }
 
     /// One turn of Overseer's run with the owner's words.
-    fn overseer_turn(self: &Arc<Self>, session: &Value, texts: &[String], harness: &str, model: Option<&str>) -> Result<Value> {
+    fn overseer_turn(self: &Arc<Self>, session: &Value, texts: &[String], harness: &str, model: Option<&str>, cause: &str) -> Result<Value> {
         let sid = session["id"].as_str().unwrap().to_string();
         let joined = texts.join("\n\n");
         let first = session["run_id"].is_null();
@@ -374,8 +390,8 @@ impl Daemon {
         let turn = turns.last().map(|t| t.id.clone());
         {
             let store = self.store.lock().unwrap();
-            store.conn.execute("UPDATE overseer_sessions SET last_seq=?2, last_turn_ms=?3, last_cause='owner' WHERE id=?1", rusqlite::params![sid, cursor, crate::daemon::now()])?;
-            store.conn.execute("INSERT INTO overseer_turns(ts, session_id, cause, turn_id) VALUES(?1, ?2, 'owner', ?3)", rusqlite::params![crate::daemon::now(), sid, turn])?;
+            store.conn.execute("UPDATE overseer_sessions SET last_seq=?2, last_turn_ms=?3, last_cause=?4 WHERE id=?1", rusqlite::params![sid, cursor, crate::daemon::now(), cause])?;
+            store.conn.execute("INSERT INTO overseer_turns(ts, session_id, cause, turn_id) VALUES(?1, ?2, ?3, ?4)", rusqlite::params![crate::daemon::now(), sid, cause, turn])?;
         }
         Ok(json!({"run_id": run_id, "turn": turn}))
     }
@@ -387,6 +403,11 @@ impl Daemon {
             return Ok(());
         }
         let sid = session["id"].as_str().unwrap().to_string();
+        let _one_at_a_time = TURN_START.lock().unwrap_or_else(|e| e.into_inner());
+        // Another turn may have started meanwhile; the queue waits for its end.
+        if self.run(run_id).map(|r| ACTIVE.contains(&r.status.as_str())).unwrap_or(false) {
+            return Ok(());
+        }
         let pending: Vec<(i64, String)> = {
             let store = self.store.lock().unwrap();
             let mut stmt = store.conn.prepare("SELECT rowid, text FROM overseer_pending WHERE session_id=?1 ORDER BY rowid")?;
@@ -398,7 +419,12 @@ impl Daemon {
         }
         let texts: Vec<String> = pending.iter().map(|(_, t)| t.clone()).collect();
         let harness = session["harness"].as_str().unwrap_or("claude").to_string();
-        self.overseer_turn(&session, &texts, &harness, session["model"].as_str())?;
+        // Spoken words among them make it a spoken turn (Voice Mode's rules, AC-186).
+        let spoken: bool = {
+            let store = self.store.lock().unwrap();
+            store.conn.query_row("SELECT COUNT(*) FROM overseer_pending p JOIN overseer_messages m ON m.id=p.message_id WHERE p.session_id=?1 AND m.surface='voice'", [&sid], |r| r.get::<_, i64>(0)).unwrap_or(0) > 0
+        };
+        self.overseer_turn(&session, &texts, &harness, session["model"].as_str(), if spoken { "voice" } else { "owner" })?;
         let store = self.store.lock().unwrap();
         for (rowid, _) in pending {
             store.conn.execute("DELETE FROM overseer_pending WHERE rowid=?1", [rowid])?;
@@ -500,7 +526,8 @@ impl Daemon {
         }
         let mut checked = Vec::new();
         let cause: String = self.store.lock().unwrap().conn.query_row("SELECT COALESCE(last_cause, 'owner') FROM overseer_sessions WHERE id=?1", [&sid], |r| r.get(0)).unwrap_or_else(|_| "owner".into());
-        let owner_asked = cause == "owner";
+        let owner_asked = cause == "owner" || cause == "voice";
+        let voice = cause == "voice";
         for a in &list {
             let kind = a["action"].as_str().unwrap_or("");
             if !ACTIONS.contains(&kind) {
@@ -593,11 +620,25 @@ impl Daemon {
                 bail!("the owner denied {tool} {detail} to {title}; Overseer does not have another agent do it");
             }
         }
-        let confirm = checked.iter().any(|a| super::control::action_class(a["action"].as_str().unwrap_or("")) == Some(super::control::CONFIRM) || a["class"] == super::control::CONFIRM);
+        // A spoken request (Gate R): the owner's words quoted in each message, the delivery setting,
+        // more new agents than the owner's limit wait for a yes.
+        let mut needs_yes = false;
+        if voice {
+            needs_yes = crate::voice::request::decorate(self, &mut checked)?;
+        }
+        let confirm = needs_yes || checked.iter().any(|a| super::control::action_class(a["action"].as_str().unwrap_or("")) == Some(super::control::CONFIRM) || a["class"] == super::control::CONFIRM);
         // At Ask first everything waits for a yes. At Steer and Auto what the owner asked for goes
         // out after the settle window; what Overseer starts by itself goes at once when the level
         // allows it (quiet actions at Steer, every Steer action at Auto), else it is a proposal.
-        let (at_once, settle) = if confirm || level == "ask_first" {
+        // What the owner says by voice follows Gate R at every level: it goes out after the settle
+        // window, a stop at once, and a Confirm action waits for a yes.
+        let (at_once, settle) = if confirm {
+            (false, false)
+        } else if voice {
+            // Stop and the Look tier (pin) happen at once; the rest of Steer settles (AC-171).
+            let now_ok = checked.iter().all(|a| a["action"] == "stop" || super::control::action_class(a["action"].as_str().unwrap_or("")) == Some(super::control::LOOK));
+            (now_ok, !now_ok)
+        } else if level == "ask_first" {
             (false, false)
         } else if owner_asked {
             (false, true)
@@ -614,7 +655,8 @@ impl Daemon {
         let last_message: Option<String> = self.store.lock().unwrap().conn.query_row("SELECT id FROM overseer_messages WHERE session_id=?1 AND source='overseer' ORDER BY seq DESC LIMIT 1", [&sid], |r| r.get(0)).ok();
         self.store.lock().unwrap().conn.execute("INSERT INTO overseer_proposals(id, session_id, message_id, ts, actions, state, source) VALUES(?1, ?2, ?3, ?4, ?5, 'open', ?6)", rusqlite::params![id, sid, last_message, now, serde_json::to_string(&checked)?, source])?;
         let state = if settle { "settling" } else { "open" };
-        let settle_until = if settle { Some(now + SETTLE_MS) } else { None };
+        let settle_ms = if voice { crate::voice::request::settle_ms(self, &checked) } else { SETTLE_MS };
+        let settle_until = if settle { Some(now + settle_ms) } else { None };
         self.store.lock().unwrap().conn.execute("UPDATE overseer_proposals SET state=?2, settle_until=?3, cause=?4 WHERE id=?1", rusqlite::params![id, state, settle_until, cause])?;
         let card = json!({"id": id, "actions": checked, "lines": lines, "state": state, "level": level, "via": source, "cause": cause, "settle_until": settle_until, "confirm": confirm,
             "note": if source == "text" { "Proposed in text: this harness has no tools, so the state was sent with the message." } else { "" }});
@@ -625,7 +667,7 @@ impl Daemon {
             return Ok(json!({"proposal": id, "state": result["state"], "done": true, "result": result["result"]}));
         }
         if settle {
-            return Ok(json!({"proposal": id, "state": "settling", "done": false, "result": format!("Going out in {} s unless the owner cancels.", SETTLE_MS / 1000)}));
+            return Ok(json!({"proposal": id, "state": "settling", "done": false, "result": format!("Going out in {} s unless the owner cancels.", settle_ms / 1000)}));
         }
         if confirm {
             return Ok(json!({"proposal": id, "state": "open", "done": false, "result": "Read back to the owner; it needs their yes."}));
@@ -692,12 +734,26 @@ impl Daemon {
             let outcome = self.perform(a, id, by);
             done.push(match outcome {
                 Ok(text) => text,
-                Err(e) => format!("{} failed: {e}", a["action"].as_str().unwrap_or("action")),
+                Err(e) => {
+                    // A new agent that could not start is a row in the card with its fix (AC-168).
+                    if a["action"] == "start" {
+                        let fix = crate::voice::request::start_fix(&e.to_string());
+                        let _ = self.dispatch_record(id, "", "start", "start", &format!("{}\n\nNot started: {e}\nFix: {fix}", a["prompt"].as_str().unwrap_or("")), a["why"].as_str().unwrap_or("new agent"), "failed");
+                    }
+                    format!("{} failed: {e}", a["action"].as_str().unwrap_or("action"))
+                }
             });
         }
         let result = format!("Done: {}.", done.join("; "));
         let _ = session;
         finish("yes", &result)
+    }
+
+    /// The cause of what Overseer proposes next (Voice Mode's built-in phrases propose directly).
+    pub fn overseer_set_cause(&self, cause: &str) -> Result<()> {
+        let session = self.overseer_session()?;
+        self.store.lock().unwrap().conn.execute("UPDATE overseer_sessions SET last_cause=?2 WHERE id=?1", rusqlite::params![session["id"].as_str(), cause])?;
+        Ok(())
     }
 
     /// Inside the settle window: nothing has gone out yet, and nothing will.
@@ -818,9 +874,24 @@ impl Daemon {
             }
             "start" => {
                 let harness = a["harness"].as_str().map(str::to_string).or_else(|| self.overseer_session().ok().and_then(|s| s["harness"].as_str().map(str::to_string))).unwrap_or_else(|| "claude".into());
+                // A harness that is not on this Mac, a signed-out account or a workspace VS Code does not
+                // trust is a problem to show now, not a run that fails later (Voice Mode, AC-168).
+                if harness != "generic" && crate::adapters::resolve_program(&harness).is_none() {
+                    bail!("the {harness} harness is not installed on this Mac");
+                }
+                if a["untrusted"] == true {
+                    bail!("this workspace is not trusted in VS Code");
+                }
+                if let Some(pid) = a["profile_id"].as_str().filter(|p| !p.is_empty()) {
+                    let status = self.profile_status(pid)?;
+                    if status["logged_in"] == false {
+                        let name = self.profile(pid).map(|p| p.name).unwrap_or_else(|_| pid.to_string());
+                        bail!("the account {name} is signed out");
+                    }
+                }
                 let prompt = format!("{FROM_OVERSEER}{}", a["prompt"].as_str().unwrap_or(""));
                 let title = a["title"].as_str().map(str::to_string).unwrap_or_else(|| a["prompt"].as_str().unwrap_or("").chars().take(60).collect());
-                let created = self.create_task(&json!({"repo": a["repo"], "harness": harness, "prompt": prompt, "title": title}))?;
+                let created = self.create_task(&json!({"repo": a["repo"], "harness": harness, "prompt": prompt, "title": title, "profile_id": a["profile_id"], "model": a["model"], "workspace_mode": a["workspace_mode"]}))?;
                 let run = created["run"]["id"].as_str().unwrap_or("").to_string();
                 {
                     let store = self.store.lock().unwrap();

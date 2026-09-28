@@ -503,7 +503,7 @@ fn ac181_restart_keeps_the_conversation_and_never_repeats_an_action() {
     let db = d.home.path().join("overseer.sqlite");
     d.kill9();
     let sql = format!("UPDATE overseer_proposals SET state='answering', answered_by='owner', answered_ms=1 WHERE id='{proposal}';");
-    let out = Command::new("sqlite3").arg(&db).arg(&sql).output().unwrap();
+    let out = Command::new("sqlite3").args(["-cmd", ".timeout 5000"]).arg(&db).arg(&sql).output().unwrap();
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     d.spawn();
     let s = session(&d);
@@ -655,7 +655,7 @@ fn ac184_quotes_diffs_bounds_turns_and_falls_back_without_tools() {
 /// The SQL the tests use to put the daemon's store into a state a client cannot ask for.
 fn sql(d: &Daemon, statement: &str) {
     let db = d.home.path().join("overseer.sqlite");
-    let out = Command::new("sqlite3").arg(&db).arg(statement).output().unwrap();
+    let out = Command::new("sqlite3").args(["-cmd", ".timeout 5000"]).arg(&db).arg(statement).output().unwrap();
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
 }
 
@@ -1083,7 +1083,7 @@ fn ac188_redirect_and_the_queue() {
 /// Turns Overseer's own run has taken, and the reasons it started them.
 fn overseer_turn_causes(d: &Daemon) -> Vec<String> {
     let db = d.home.path().join("overseer.sqlite");
-    let out = Command::new("sqlite3").arg(&db).arg("SELECT cause FROM overseer_turns ORDER BY ts;").output().unwrap();
+    let out = Command::new("sqlite3").args(["-cmd", ".timeout 5000"]).arg(&db).arg("SELECT cause FROM overseer_turns ORDER BY ts;").output().unwrap();
     String::from_utf8_lossy(&out.stdout).lines().map(str::to_string).collect()
 }
 
@@ -2144,9 +2144,13 @@ fn ac198_quiet_and_bounded() {
     assert_eq!(overseer_turn_causes(&d).len(), before + 1);
     assert_eq!(d.call("overseer.cap", json!({}))["self_started_today"].as_i64().unwrap(), so_far, "the owner's turn is not counted");
     assert!(s["messages"].as_array().unwrap().iter().rev().find(|m| m["source"] == "overseer").map(|m| m["text"].as_str().unwrap_or("").contains("everyone is doing")).unwrap_or(false), "and answered");
-    let fenced = claude_task(&d, &repo, &mode_file, "showcase", "Fenced", "tidy");
+    // The guardrail is set during a turn that writes nothing; the next turn writes in src/.
+    let fenced = claude_task(&d, &repo, &mode_file, "slow", "Fenced", "tidy");
     d.wait_status(&fenced, |st| st == "running", 20);
     d.call("agent.guardrail", json!({"run_id": fenced, "words": "docs only", "deny": ["src"], "hold_on_cross": true, "by": "owner"}));
+    d.wait_done(&fenced, 30);
+    std::fs::write(&mode_file, "showcase").unwrap();
+    d.call("run.follow_up", json!({"run_id": fenced, "prompt": "now write the sessions code"}));
     d.wait_done(&fenced, 30);
     wait_event(&d, &fenced, |e| e["kind"] == "guardrail_crossed", 20);
     assert!(d.call("agent.holds", json!({}))["holds"].as_array().unwrap().iter().any(|h| h["run_id"] == fenced), "a guardrail still holds its agent at the cap");

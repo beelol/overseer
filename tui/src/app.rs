@@ -695,11 +695,15 @@ impl App {
 
     /// Where a feed's paths are shortened from: its workspace and repository.
     fn locate_feed(state: &State, root: &str, feed: &mut Feed) {
-        if feed.root.is_none() {
+        let unlocated = feed.root.is_none();
+        if unlocated {
             feed.root = state.run(root).and_then(|r| state.workspace(&r.workspace_id)).map(|w| w.path.clone());
         }
         if feed.repo.is_none() {
             feed.repo = state.run(root).and_then(|r| state.task(&r.task_id)).map(|t| (t.repo_root.clone(), t.repo_root.rsplit('/').next().unwrap_or_default().to_string()));
+        }
+        if unlocated && feed.root.is_some() {
+            feed.relocate();
         }
     }
 

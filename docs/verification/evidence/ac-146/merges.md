@@ -1,5 +1,12 @@
 # AC-146: merges
 
+## Pull request #16 (Voice Mode, Gate R), 2026-09-28
+
+- **Finished:** marked ready by the Voice Mode agent, with main merged in.
+- **Throwaway copy:** merged into current main without conflicts.
+- **Tests:** `scripts/test-all --jobs=2` at load 44 to 59: 46 of 53. At load 6 to 12, accounts, continuity and center pass here and on main. Review's conflict check is flaky on both (one fail, one pass alone). Arrangement, audit's review count and the TUI's t10 miss only under load, as on main.
+- **Merged:** squash, `b8be3812`. Records on main: AC-165 to AC-175 verified. AC-162, 163, 164 and 177 are partial and AC-176 is not started: all wait on the owner's checks, run in a dev daemon through Gate T's guided test.
+
 ## Pull request #15 (Continuity follow-up), 2026-09-28
 
 - **Finished:** marked ready by the Continuity agent.

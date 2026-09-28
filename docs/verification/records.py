@@ -1982,55 +1982,104 @@ rec(161, "Everything merged into one main", "not started", date="—", commit="�
     expected="See the RFC criterion (Gate Q).",
     actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
 
-# Gate R, Voice Mode (added by the owner on 2026-09-27). Not started.
-rec(162, "Voice spike before lock-in", "not started", date="—", commit="—",
+# Gate R, Voice Mode (added by the owner on 2026-09-27). Built on claude/voice-mode, pull request #16,
+# with the simulated voice: the real listener in a simulated room, speech-like sound and a live
+# script for its words, the Claude fixture as Overseer and as agents. The owner's part is in
+# docs/rfcs/voice-mode.md#the-owners-checks.
+GR = "8b903bab (branch claude/voice-mode, pull request #16)"
+GRFIX = "Simulated voice (OVERSEER_VOICE_SIMULATE=1) and the Claude fixture as Overseer and agents; generic programs; no microphone and no paid turns"
+GRT = "`cargo test -p overseerd --test voice`"
+GRL = "`cargo test -p overseer-listener`"
+GRUI = "`node extension/scripts/package.js`, then `node test/ui/scenario-voice.js` ([evidence](https://github.com/beelol/overseer/blob/8b903bab09aa710640c17094487ae8474b4c4f4e/docs/verification/evidence/ui/voice/))"
+GROWN = "the owner's checks (docs/rfcs/voice-mode.md#the-owners-checks)"
+# The owner runs them later in a dev daemon, through Gate T's guided test (not a branch build in their own VS Code).
+GRDEV = " Run later in a dev daemon through Gate T's guided test (docs/rfcs/dev-instance.md), once that feature is built."
+rec(162, "Voice spike before lock-in", "partial", commit=GR, date="2026-09-28",
+    harness="whisper.cpp (whisper-rs 0.16, Metal) on speech made by macOS `say` at test time; Claude Haiku through Claude Code 2.1.246 for the orchestrator's timing (two turns)",
+    proven="the measurement table with the versions and the machine, and eight decisions with the revised budgets, in the side RFC; the words recorded from the chosen recognizer (small.en with the hint) as `voice/tests/fixtures/words-small-en.json` (text only), all 36 utterances replayed through the local rules by `voice::request::tests::the_recorded_words_replay_through_the_local_rules`; no recorded or generated voice file in the repository (the only audio is Audio Mode's twelve approved MP3s, per its pack check)",
+    deferred="echo cancellation through real speakers, which needs the owner's Mac (" + GROWN + ", step 6)",
+    steps="`cargo run --release -p overseer-listener --example spike_recognizer -- <model> [hint]` for tiny.en, base.en and small.en; two timed Claude Haiku turns; `cargo test -p overseerd --bin overseerd voice::` (the replay).",
     expected="See the RFC criterion (Gate R).",
-    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27; the goal's first step).")
-rec(163, "Owned by the daemon, heard in Rust, off until asked", "not started", date="—", commit="—",
+    actual="small.en with the hint: 4.5% word errors, 148 ms an utterance (p95 221 ms), 708 MiB. The orchestrator's first sentence takes 3.9 to 4.7 s, so \"On it.\" comes from the daemon at once. The replay passes: every command reads as meant; a name heard right is a candidate and a misheard one is not; a yes or a cancel counts only when heard right, so a mishearing is no answer.",
+    evidence="[side RFC: the spike](../rfcs/voice-mode.md#the-spike-measurements-and-decisions), `voice/tests/fixtures/words-small-en.json`, `voice/examples/spike_recognizer.rs`",
+    live="The spike's two Haiku turns.", blocker="The owner: echo through real speakers (the owner's checks, step 6)." + GRDEV)
+rec(163, "Owned by the daemon, heard in Rust, off until asked", "partial", commit=GR, date="2026-09-28", harness=GRFIX,
+    proven="off by default and kept across a daemon kill; no listener process while off or muted; one utterance makes exactly one request with no window open and with two; a second listener with the daemon's lock is refused; a killed listener leaves the daemon and a running agent untouched, and a fourth death in ten minutes turns Voice Mode off with the reason; the listener is its own process, spawned with responsibility disclaimed so macOS names it, and sends words and one level, never audio",
+    deferred="live on macOS: the prompt names Overseer, the indicator goes off within 1 s of mute, a spoken request with VS Code closed (" + GROWN + ", steps 2, 3 and 7)",
+    steps=GRT + ": `ac163_off_by_default_kept_across_a_kill_and_muted_means_no_listener`, `ac163_one_utterance_one_request_and_a_second_listener_is_refused`, `ac175_a_dying_listener_never_touches_an_agent_and_four_deaths_turn_voice_off`.",
+    expected="See the RFC criterion (Gate R).", actual="The protocol tests pass.",
+    evidence="`daemon/tests/voice.rs`, `daemon/src/voice/`, `voice/src/main.rs`", live="Fixtures only.",
+    blocker="The owner: the microphone prompt, the indicator after mute, a request with VS Code closed (the owner's checks, steps 2, 3 and 7)." + GRDEV)
+rec(164, "Holds the floor; noise never interrupts", "partial", commit=GR, date="2026-09-28", harness=GRFIX,
+    proven="every noise (taps, clicks, typing, a chair, a door, a cup, a cough, a laugh, a fan, music) 100 times each: while nobody speaks it never opens the gate or moves the mark; while Overseer speaks it makes no utterance, no lowering, no stop and no level; speech still opens the gate after noise; a pause in mid-thought stays one utterance; Overseer's own voice coming back and a cue make no utterance; side talk and a phone call make no request and no answer, and Overseer returns to full voice and finishes; the lowering, the stop at the end of a phrase and the stop words are measured by the listener's tests (the lowering budget revised by the spike); a line due while the owner speaks waits and is then spoken, and one kept waiting past the limit goes to the card alone",
+    deferred="ten minutes of an ordinary room on the owner's Mac (" + GROWN + ", step 5)",
+    steps=GRL + " (`speech_gate.rs`; `listener.rs`: `every_noise_100_times_while_overseer_speaks_changes_nothing`, `a_pause_in_mid_thought_stays_one_utterance`, `talking_over_overseer_lowers_its_voice_and_it_comes_back`, `stop_stops_overseer_at_once`, `overseer_s_own_voice_coming_back_is_not_the_owner`, `a_suppressed_moment_is_not_heard`); " + GRT + ": `ac164_noise_never_moves_the_mark_and_speech_does`, `ac164_side_talk_over_overseer_lets_it_finish_and_addressed_words_stop_it`, `ac164_lines_wait_for_the_owner_and_side_talk_makes_no_request`.",
+    expected="See the RFC criterion (Gate R).", actual="All pass.", evidence="`voice/tests/`, `daemon/tests/voice.rs`", live="Fixtures only.",
+    blocker="The owner: ten minutes of an ordinary room (the owner's checks, step 5)." + GRDEV)
+rec(165, "A quick answer that it is working on it", "verified", commit=GR, date="2026-09-28", harness=GRFIX + "; the live run on the default Claude account with Haiku",
+    steps=GRT + ": `ac165_the_three_answers_over_fifty_requests` (`OVERSEER_VOICE_TIMING_OUT` writes the times), `ac165_the_holding_line_once_and_a_failed_dispatch_is_spoken`, `ac165_a_spoken_request_is_taken_at_once_planned_and_sent_with_the_owner_s_words`; live: `OVERSEER_VOICE_LIVE=1 cargo test -p overseerd --test voice_live`.",
+    expected="See the RFC criterion (Gate R), with the budgets revised by the spike (\"On it.\" from the daemon at once; the holding line at 8 s).",
+    actual="Over 50 requests through the simulated listener, from the end of each thought: the heard signal at p50 1 ms and p95 4 ms; Overseer's voice starting \"On it.\" at p50 0 ms and p95 18 ms; \"Sent.\" at p50 1692 ms and p95 2140 ms with a 1 s settle window and the fixture orchestrator. A slow orchestrator gets \"Still working on it.\" exactly once; a dispatch that fails (a new agent in a repository that does not exist) is spoken and shown as failed with its fix while the other target is sent. Live, one request on the default account with Haiku: heard 5 ms, \"On it.\" 20 ms, the plan line 4377 ms and \"Sent.\" 6227 ms after the end of the thought (state sent, sent to Continuity).",
+    evidence="[answer times](https://github.com/beelol/overseer/blob/8b903bab09aa710640c17094487ae8474b4c4f4e/docs/verification/evidence/voice/answer-times.json), [live run](https://github.com/beelol/overseer/blob/8b903bab09aa710640c17094487ae8474b4c4f4e/docs/verification/evidence/voice/live.json), `daemon/tests/voice.rs`", live="One request on the default Claude account (Haiku).")
+rec(166, "The right agents, from context, or the one you chose", "verified", commit=GR, date="2026-09-28", harness=GRFIX + "; a live sample of ten on the default Claude account with Haiku",
+    steps="`cargo test -p overseerd --bin overseerd voice::candidates` (40 utterances over six agents in two repositories); " + GRT + ": `ac166_the_right_agents_with_the_fixture_orchestrator`, `ac166_talking_to_one_chosen_agent`; " + GRUI + " (the strip, the command and voice); live: `OVERSEER_VOICE_LIVE=1 cargo test -p overseerd --test voice_live`.",
     expected="See the RFC criterion (Gate R).",
-    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
-rec(164, "Holds the floor; noise never interrupts", "not started", date="—", commit="—",
+    actual="The daemon's candidates match all 40 utterances, with their reasons (named by title, repository, branch or criterion; everyone; the previous targets; the agent that asked; the file mentioned; the selected one). With the fixture orchestrator an ambiguous request asks one question and sends nothing, \"everyone\" reaches each active agent once, \"them also\" the previous targets, \"yes, do that\" the agent that asked; chatter makes no request; talking to one agent, ten sentences reach only it, each with its card, \"Overseer, what is everyone doing?\" reaches Overseer, and archiving the agent returns the target to Overseer once; the target switches from the strip, by command and by voice. Live sample of ten: 8 of 10 exactly right, 0 message(s) to a wrong agent; the misses: Tell Continuity to use the new wire format.; Everybody, pull main before you push. (the first repeated the timed request just before, and Haiku answered that it was already sent; the \"Everybody\" sentence was not taken as meant, since fixed and tested).",
+    evidence="[live sample](https://github.com/beelol/overseer/blob/8b903bab09aa710640c17094487ae8474b4c4f4e/docs/verification/evidence/voice/live.json), `daemon/src/voice/candidates.rs`, `daemon/tests/voice.rs`, [voice scenario](https://github.com/beelol/overseer/blob/8b903bab09aa710640c17094487ae8474b4c4f4e/docs/verification/evidence/ui/voice/result.json)", live="Ten requests on the default Claude account (Haiku), one attempt each.")
+rec(167, "Redirect without trampling", "verified", commit=GR, date="2026-09-28", harness=GRFIX,
+    steps=GRT + ": `ac167_additions_wait_and_arrive_as_one_message_a_redirect_stops_the_turn`, `ac167_stop_by_voice_interrupts_within_a_second`, `ac167_ac168_delivery_setting_and_new_agent_limits`; the harness support in [docs/compatibility.md](../compatibility.md#voice-mode-delivery-ac-167).",
     expected="See the RFC criterion (Gate R).",
-    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
-rec(165, "A quick answer that it is working on it", "not started", date="—", commit="—",
+    actual="Three additions to a Claude agent in mid-turn wait, never interrupt it, and arrive as one message in the order spoken; with delivery set to redirect a spoken change stops the turn and the next one starts with the additions and the direction; \"stop Phone\" stops the turn within a second; both forced settings are honoured; the support per harness is recorded (Claude by fixture, the others by the shared delivery path of Gate S).",
+    evidence="`daemon/tests/voice.rs`, [compatibility](../compatibility.md#voice-mode-delivery-ac-167)", live="Fixtures only.")
+rec(168, "New agents from a request", "verified", commit=GR, date="2026-09-28", harness=GRFIX + "; a tiny live start on the default Claude account with Haiku",
+    steps=GRT + ": `ac168_new_agents_from_a_request`, `ac167_ac168_delivery_setting_and_new_agent_limits`, `ac165_the_holding_line_once_and_a_failed_dispatch_is_spoken`; " + GRUI + " (the new agent in the side bar); live: `OVERSEER_VOICE_LIVE=1 cargo test -p overseerd --test voice_live`.",
     expected="See the RFC criterion (Gate R).",
-    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
-rec(166, "The right agents, from context, or the one you chose", "not started", date="—", commit="—",
+    actual="A request starts one agent beside a message, and three, each with its own prompt (the owner's words quoted), the repository from the context and the composer's remembered harness, account, model and workspace mode (sent to the daemon by VS Code); four wait for a yes and \"no\" starts none; more than eight are refused. An unknown repository, a harness that is not installed, a signed-out account and an untrusted workspace are each a failed row with its fix while the other target is still sent, and spoken. The new agent appears in the side bar with its prompt. Live, on the default account with Haiku: the first attempt was answered with a question ('Which agent should write it?'), because the daemon's note told Overseer to ask \"who?\" whenever no agent was named (fixed: new work starts a new agent); the next asked which repository, rightly, with agents in two; with the repository named, the request went sent and a new agent, 'Write NOTES.md', started on claude with haiku (the composer's choices) and was waiting_for_user for its first permission when the check ended.",
+    evidence="[live run](https://github.com/beelol/overseer/blob/8b903bab09aa710640c17094487ae8474b4c4f4e/docs/verification/evidence/voice/live.json), [live start](https://github.com/beelol/overseer/blob/8b903bab09aa710640c17094487ae8474b4c4f4e/docs/verification/evidence/voice/live-ac168.json), `daemon/tests/voice.rs`, [voice scenario](https://github.com/beelol/overseer/blob/8b903bab09aa710640c17094487ae8474b4c4f4e/docs/verification/evidence/ui/voice/result.json)", live="One new agent on the default Claude account (Haiku), three attempts as described.")
+rec(169, "Evidence for every word sent", "verified", commit=GR, date="2026-09-28", harness=GRFIX,
+    steps=GRT + ": `ac169_two_agents_in_flight_and_a_new_one_get_the_card_s_text_byte_for_byte`, `ac169_the_card_holds_the_exact_text_the_agent_got`; " + GRUI + ".",
     expected="See the RFC criterion (Gate R).",
-    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
-rec(167, "Redirect without trampling", "not started", date="—", commit="—",
+    actual="For a request to two Claude agents in mid-turn and one new agent, the SHA-256 of each message in the card equals the SHA-256 of the message in that agent's run (the queued message event, or the new agent's first turn after Gate S's briefing); each names who else was told; rows advance only on the daemon's events (held, then delivered or answered); the card is the same after a daemon kill and restart, and a word of the quote finds the request. The scenario shows the card with three rows and each agent's chat with the owner's words in the three Overseer themes, and the voice mark on targeted agents in the side bar and the grid while the request is open.",
+    evidence="`daemon/tests/voice.rs`, [voice scenario](https://github.com/beelol/overseer/blob/8b903bab09aa710640c17094487ae8474b4c4f4e/docs/verification/evidence/ui/voice/result.json) (card-three-targets-*, chat-*-* screenshots)", live="Fixtures only.")
+rec(170, "Correct and cancel", "verified", commit=GR, date="2026-09-28", harness=GRFIX,
+    steps=GRT + ": `ac170_cancel_or_correct_inside_the_window`, `ac170_a_correction_changes_the_targets_and_after_the_send_supersedes`, `ac169_the_card_holds_the_exact_text_the_agent_got` (an addition joins).",
     expected="See the RFC criterion (Gate R).",
-    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
-rec(168, "New agents from a request", "not started", date="—", commit="—",
+    actual="\"Cancel\" inside the window sends nothing and the card reads cancelled; \"I meant tell Continuity\" and \"not Phone\" change the targets and only the new ones get a message; words added inside the window join the one message; a correction after the send goes to the same agents, names the request it replaces, and the first reads superseded.",
+    evidence="`daemon/tests/voice.rs`", live="Fixtures only.")
+rec(171, "What voice may do", "verified", commit=GR, date="2026-09-28", harness=GRFIX,
+    steps=GRT + ": `ac171_each_action_by_its_tier_whatever_the_plan_claims`, `ac171_a_confirm_plan_waits_for_a_clear_yes_by_voice`, `ac171_permissions_one_at_a_time_with_silence_maybe_and_the_toast_s_cancel`, `ac171_a_permission_answered_by_voice_with_a_cue_a_toast_and_a_window`, `ac171_an_agent_s_words_add_no_target`, `ac171_a_command_during_a_read_back_is_still_taken`; " + GRUI + ".",
     expected="See the RFC criterion (Gate R).",
-    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
-rec(169, "Evidence for every word sent", "not started", date="—", commit="—",
+    actual="Look happens at once, Steer settles (stop at once), Confirm waits for a yes, whatever the plan claims; actions that are not Overseer's are refused, and things not done by voice open their place and say so; a read-back left in silence or answered \"maybe\" is no answer and a yes carries it out; \"allow everything\" is refused; an instruction in an agent's output adds no target and sends nothing. Permissions: with Audio Mode on exactly one `agent_unblocked` per allow and one `agent_stopped` per deny, none with it off, the toast either way; a cancel by voice or by the toast inside the window leaves the request waiting; an answer left alone reaches the agent once; two requests are answered one at a time. Screenshots of the toast before and after the window in the three themes.",
+    evidence="`daemon/tests/voice.rs`, [voice scenario](https://github.com/beelol/overseer/blob/8b903bab09aa710640c17094487ae8474b4c4f4e/docs/verification/evidence/ui/voice/result.json) (toast-before-window-*, toast-sent-*)", live="Fixtures only.")
+rec(172, "One speaker at a time", "verified", commit=GR, date="2026-09-28", harness=GRFIX,
+    steps="`cargo test -p overseerd --test audio` (unchanged file); " + GRT + ": `ac172_cues_wait_for_overseer_s_phrase_and_give_way_to_the_owner`, `ac172_an_attention_cue_waits_for_the_thought_and_nothing_overlaps`, `ac171_a_permission_answered_by_voice_with_a_cue_a_toast_and_a_window`; `python3 docs/verification/evidence/audio-mode/check-pack.py`.",
     expected="See the RFC criterion (Gate R).",
-    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
-rec(170, "Correct and cancel", "not started", date="—", commit="—",
+    actual="Audio Mode's suite passes unchanged (15 tests, and its 7 unit tests); a cue during speech plays after the phrase and Overseer's voice holds while it plays; an attention cue during an utterance plays after it; the permission cue plays with Audio Mode on and not off; across 100 mixed events no cue plays over Overseer's voice or over the owner; the pack check passes.",
+    evidence="`daemon/tests/voice.rs`, `daemon/tests/audio.rs`", live="Fixtures only.")
+rec(173, "Private and bounded", "verified", commit=GR, date="2026-09-28", harness=GRFIX + "; the offline recognition check with ggml-base.en",
+    steps=GRT + ": `ac173_twenty_requests_with_the_listener_writing_nothing_and_connecting_nowhere`, `ac173_levels_and_side_talk_are_never_stored`, `ac173_a_call_pauses_voice_mode_and_it_resumes`, `ac173_each_bound_holds`, `ac173_a_model_above_the_memory_budget_is_refused`; " + GRL + ": `the_output_carries_no_audio`, `a_long_utterance_keeps_every_word_and_holds_thirty_seconds_at_most`, `memspeech::tests`; `OVERSEER_LISTENER_TEST_MODEL=<ggml-base.en.bin> cargo test -p overseer-listener --test offline`.",
     expected="See the RFC criterion (Gate R).",
-    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
-rec(171, "What voice may do", "not started", date="—", commit="—",
+    actual="The daemon's listener runs under a macOS sandbox that kills it at any connection or at any file write but its lock: 20 requests go through with no restart. Overseer's voice is made in memory (no file). The database holds the words of requests only; levels and side talk are never stored. A second app recording (a fixture) pauses Voice Mode within 2 s and it resumes after. Each bound holds: four open requests (a fifth waits), requests per hour, one message of 4,000 characters, records (5,000 or the kept days), the speech queue, audio held 30 s at most with 90 s utterances, levels 25 a second, listener restarts. A model above Gate L's memory budget is refused. With the network off and nothing writable, the listener speaks and base.en recognizes speech (the GPU shader cache is the one folder written, and holds no audio).",
+    evidence="`daemon/tests/voice.rs`, `voice/tests/`", live="Fixtures, plus base.en offline.")
+rec(174, "Voice in the UI", "verified", commit=GR, date="2026-09-28", harness=GRFIX, steps=GRUI + ".",
     expected="See the RFC criterion (Gate R).",
-    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
-rec(172, "One speaker at a time", "not started", date="—", commit="—",
+    actual="The scenario passes 29 of 29 checks: every state (off, starting, listening, hearing, thinking, speaking, muted, paused for a call, stopped with its reason) in the voice view and the status bar, in the three themes and grayscale; a card filling in as its dispatches advance (held, then answered); mute, cancel and yes by keyboard only; home's voice strip with the words as they are heard, and in the conversation the spoken request marked as spoken, with Overseer's plan for it; the voice mark on targeted agents in the side bar and the grid; every spoken line also as text; screenshots at 360, 900 and 1280 px in the three themes with no overflow; the accessible-name audit (every control named, with a tooltip); the visible-text audit (the view's own text within 60 characters, home's strip within 60).",
+    evidence="[voice scenario](https://github.com/beelol/overseer/blob/8b903bab09aa710640c17094487ae8474b4c4f4e/docs/verification/evidence/ui/voice/result.json) and its screenshots", live="Fixtures only.")
+rec(175, "Keeps working when things fail", "verified", commit=GR, date="2026-09-28", harness=GRFIX,
+    steps=GRT + ": `ac175_orchestrator_and_recognizer_failures_send_nothing_and_touch_no_agent`, `ac175_a_dying_listener_never_touches_an_agent_and_four_deaths_turn_voice_off`, `ac175_built_in_phrases_work_with_no_model`, `a_check_in_turn_is_not_the_answer_to_a_spoken_request`; " + GRUI + " (four crashes, the reason shown).",
     expected="See the RFC criterion (Gate R).",
-    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
-rec(173, "Private and bounded", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate R).",
-    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
-rec(174, "Voice in the UI", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate R).",
-    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
-rec(175, "Keeps working when things fail", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate R).",
-    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+    actual="With the orchestrator rate-limited, each request reads not sent, Overseer says so once, a running Claude agent finishes its turn untouched, and nothing is sent after recovery; a failing recognizer is shown in the strip and sends nothing; a dying listener never touches an agent; stop, stop everyone, mute and what's running work with no model; a fourth crash in ten minutes turns Voice Mode off and the view says why.",
+    evidence="`daemon/tests/voice.rs`, [voice scenario](https://github.com/beelol/overseer/blob/8b903bab09aa710640c17094487ae8474b4c4f4e/docs/verification/evidence/ui/voice/result.json)", live="Fixtures only.")
 rec(176, "Voice Mode by voice (owner-confirmed)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R).",
-    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
-rec(177, "The mark shows it is hearing you", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate R).",
-    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+    actual="Waits for the owner's session.", live="—", blocker="The owner's session (" + GROWN + ", step 8)." + GRDEV)
+rec(177, "The mark shows it is hearing you", "partial", commit=GR, date="2026-09-28", harness=GRFIX,
+    proven="the Star motion ported unchanged, its poses equal the reference's within 1% for every state (`test/unit/voice-mark.js`); in the packaged UI the mark is centred (measured), the star follows the level curve with a 40 ms lag (best-aligned, r 0.88), noise leaves it at rest, each state in screenshots in the three themes and in grayscale, frame work p95 0.2 ms beside a streaming chat at the display's rate, no frame while hidden, reduced motion shows the still mark and a meter; two windows get the same levels from one listener; the listener's output carries levels and no audio, and nothing of them is stored",
+    deferred="the owner speaks with Voice Mode on and sees the star follow their real voice and stay at rest for taps and typing (" + GROWN + ", step 4)",
+    steps="`node test/unit/voice-mark.js`; " + GRUI + "; " + GRT + ": `ac177_two_windows_see_the_same_levels_from_one_listener`, `ac173_levels_and_side_talk_are_never_stored`; " + GRL + ": `the_output_carries_no_audio`.",
+    expected="See the RFC criterion (Gate R).", actual="All pass.",
+    evidence="[voice scenario](https://github.com/beelol/overseer/blob/8b903bab09aa710640c17094487ae8474b4c4f4e/docs/verification/evidence/ui/voice/result.json), `extension/media/voice-mark.js`", live="Fixtures only.",
+    blocker="The owner: the star with their real voice, and a dated confirmation (the owner's checks, step 4)." + GRDEV)
 rec(180, "Spikes before lock-in", "verified (research criterion)", commit="aee0b5b (branch claude/orchestrator-agent-control-rfc-8e2009)", date="2026-09-27",
     harness="Claude Code 2.1.246 on the owner's claude.ai login (haiku, 2 tiny turns); Codex 0.155.0-alpha.16.4 on the owner's ChatGPT login (gpt-5.6-luna, low effort, 2 tiny turns); OpenCode 1.15.13 with the mock model (no paid turn)",
     fixture="An isolated OVERSEER_HOME with 4, then 16, fixture agents (Claude fixture, `showcase`); `overseerd mcp` as the MCP server; a generated 10,000-file repository with two agents' commits",
@@ -2192,33 +2241,46 @@ rec(205, "Offline on a real Wi-Fi toggle (owner step)", "not started", date="—
     actual="Not started: split from AC-83 by the owner on 2026-09-27. The same check passes with the network simulated (AC-83); this criterion is macOS's own signal on a real toggle.", live="—",
     blocker="Owner, when no agents are in flight: run `node test/local/wifi-live.js`, switch Wi-Fi off when it asks and on again when it says Overseer is offline (about a minute). It writes `evidence/ac-205/`; then this record is updated.")
 
-rec(212, "Production can never point at a dev version (stage 1)", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
-    actual="Not started: added by the owner on 2026-09-27; stage 1, being built on `claude/prod-guard`.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
-rec(213, "The production phone app never pairs with a dev instance (after pull request #10)", "not started", date="—", commit="—",
+rec(212, "Production can never point at a dev version (stage 1)", "verified", commit="93ea210b (branch claude/prod-guard, pull request #19)", date="2026-09-28",
+    steps="""1. `cargo test -p overseerd --test dev_instance`: a standard daemon under a temporary HOME (no OVERSEER_HOME); dev daemons beside it marked by `OVERSEER_INSTANCE` and by a copied binary with the `overseer-dev-instance` file; refusals checked for no home, the standard home, the standard socket, the standard long-path socket folder, a bad name, a marked binary with no environment and a mismatched one; two proper dev daemons run busy and are stopped.
+2. `node test/unit/production-guard.js`: fake daemons on Unix sockets; a production client (standard extensions folder) with OVERSEER_HOME, OVERSEER_SOCKET and OVERSEER_INSTANCE leaked in; a marked `daemonPath`; a daemon whose hello reports `dev-q`; a non-production client with the same environment.
+3. `cargo test -p overseer-tui --lib ac212`: the TUI's command environment, a marked `--daemon`, and a fake dev daemon.
+4. `cargo test --workspace --no-fail-fast` and `node scripts/test-all --jobs=2` (the full fixture UI suite), with the load failures rerun alone ([reruns](evidence/ac-212/reruns.md)).""",
+    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md#stage-1--the-production-guard-ac-212-and-ac-213-after-pull-request-10).",
+    actual="""- **A dev build refuses the production home:** every refusal exits 4 with its reason and creates nothing (the fresh and long homes do not exist afterwards); a marked binary will not even print the standard socket. Proper dev daemons report `dev-a`/`dev-b` in hello.
+- **The standard daemon is untouched:** its pid, socket, `state` (tasks, runs, profiles), `daemon.clients` and data folder listing are identical while the dev daemons run and after they stop; its log never mentions them.
+- **Production refuses dev:** with the three variables leaked in, the production client reaches the standard socket and the dev socket sees no connection; a marked `daemonPath` is refused without being run; a daemon reporting `dev-q` is refused once, with no retry and no daemon started. A client loaded from another extensions folder still honours OVERSEER_SOCKET (the UI harness keeps working). The TUI does the same (leaked variables dropped, `--home` kept, a marked `--daemon` refused, a dev daemon refused without retry).
+- **Regressions:** the full fixture UI suite and the Rust suites pass; the checks that failed under load (average 80 to 130) passed alone, and the two that also failed alone under load (tui `t10`, UI `arrangement`) passed at load 4.5, as main does ([reruns](evidence/ac-212/reruns.md)).""",
+    evidence="[targeted tests](evidence/ac-212/targeted.txt), [cargo workspace](evidence/ac-212/cargo-workspace.txt), [test-all](evidence/ac-212/test-all-jobs2.txt), [reruns](evidence/ac-212/reruns.md), pull request #19",
+    live="Fixtures and fake daemons; no paid turns. The owner's installed daemon, VS Code and data were never involved.",
+    limits="The phone's side is AC-213 (after pull request #10). Production is decided by the extension's folder (the standard `~/.vscode/extensions`); an owner who installs Overseer with a custom `--extensions-dir` would get the non-production behaviour.")
+rec(213, "The production phone app never pairs with a dev daemon (after pull request #10)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
     actual="Not started: the phone app and the gateway are being finished in pull request #10 by another agent; this criterion starts after #10 is on main.", live="—", blocker="After PR #10: the phone app and the gateway must be on main first.")
-rec(206, "One command gives a dev Overseer (stage 2)", "not started", date="—", commit="—",
+rec(206, "One command gives a dev daemon (stage 2)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
     actual="Not started: added by the owner on 2026-09-27; stage 2, built on `claude/dev-instance` after stage 1 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
-rec(207, "A dev instance never interferes with the running Overseer (stage 2)", "not started", date="—", commit="—",
+rec(207, "A dev daemon never interferes with the running Overseer (stage 2)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
     actual="Not started: added by the owner on 2026-09-27; stage 2, built on `claude/dev-instance` after stage 1 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
-rec(208, "Production knows nothing of dev instances (stage 2)", "not started", date="—", commit="—",
+rec(208, "Production knows nothing of dev daemons (stage 2)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
     actual="Not started: added by the owner on 2026-09-27; stage 2, built on `claude/dev-instance` after stage 1 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
-rec(209, "VS Code and the TUI pointed at one instance (stage 2)", "not started", date="—", commit="—",
+rec(209, "VS Code and the TUI pointed at one dev daemon (stage 2)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
     actual="Not started: added by the owner on 2026-09-27; stage 2, built on `claude/dev-instance` after stage 1 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
-rec(210, "The phone simulators pinned to a dev instance (after pull request #10)", "not started", date="—", commit="—",
+rec(210, "The phone simulators pinned to a dev daemon (after pull request #10)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
     actual="Not started: the phone app and the gateway are being finished in pull request #10 by another agent; this criterion starts after #10 is on main.", live="—", blocker="After PR #10: the phone app and the gateway must be on main first.")
 rec(211, "Agents learn it from the repository, and leave nothing running (stage 2)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
     actual="Not started: added by the owner on 2026-09-27; stage 2, built on `claude/dev-instance` after stage 1 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
-rec(214, "Deploy: the one path from dev to production (stage 3)", "not started", date="—", commit="—",
+rec(215, "Guided owner tests in a dev daemon (stage 3)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md#stage-3--guided-owner-tests-ac-215).",
+    actual="Not started: added by the owner on 2026-09-27; stage 3, built on `claude/guided-tests` after stage 2 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
+rec(214, "Deploy: the one path from dev to production (stage 4)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
-    actual="Not started: added by the owner on 2026-09-27; stage 3, built on `claude/deploy` after stage 2 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
+    actual="Not started: added by the owner on 2026-09-27; stage 4, built on `claude/deploy` after stage 3 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
 
 SHORT_BLOCKERS = {
     154: "verified",
@@ -2312,22 +2374,22 @@ SHORT_BLOCKERS = {
     136: "not started (Gate N, added by the owner on 2026-09-26)",
     137: "not started (Gate N, added by the owner on 2026-09-26)",
     141: "not started (Gate N, added by the owner on 2026-09-26)",
-    162: "not started (Gate R, added by the owner on 2026-09-27; the goal's first step)",
-    163: "not started (Gate R, added by the owner on 2026-09-27)",
-    164: "not started (Gate R, added by the owner on 2026-09-27)",
-    165: "not started (Gate R, added by the owner on 2026-09-27)",
-    166: "not started (Gate R, added by the owner on 2026-09-27)",
-    167: "not started (Gate R, added by the owner on 2026-09-27)",
-    168: "not started (Gate R, added by the owner on 2026-09-27)",
-    169: "not started (Gate R, added by the owner on 2026-09-27)",
-    170: "not started (Gate R, added by the owner on 2026-09-27)",
-    171: "not started (Gate R, added by the owner on 2026-09-27)",
-    172: "not started (Gate R, added by the owner on 2026-09-27)",
-    173: "not started (Gate R, added by the owner on 2026-09-27)",
-    174: "not started (Gate R, added by the owner on 2026-09-27)",
-    175: "not started (Gate R, added by the owner on 2026-09-27)",
-    176: "not started (Gate R, added by the owner on 2026-09-27)",
-    177: "not started (Gate R, added by the owner on 2026-09-27)",
+    162: "partial: the spike's measurements, decisions and words-layer fixture (pull request #16); echo on real speakers waits for the owner (in a dev daemon, Gate T's guided test)",
+    163: "partial: the protocol tests pass (pull request #16); the microphone prompt, mute indicator and VS Code closed wait for the owner (in a dev daemon, Gate T's guided test)",
+    164: "partial: the audio-layer tests pass (pull request #16); ten minutes of an ordinary room wait for the owner (in a dev daemon, Gate T's guided test)",
+    165: "verified (pull request #16)",
+    166: "verified (pull request #16)",
+    167: "verified (pull request #16)",
+    168: "verified (pull request #16)",
+    169: "verified (pull request #16)",
+    170: "verified (pull request #16)",
+    171: "verified (pull request #16)",
+    172: "verified (pull request #16)",
+    173: "verified (pull request #16)",
+    174: "verified (pull request #16)",
+    175: "verified (pull request #16)",
+    176: "not started: waits for the owner's session (in a dev daemon, Gate T's guided test)",
+    177: "partial: the port, the scenario and the traces (pull request #16); the owner's real voice waits for the owner (in a dev daemon, Gate T's guided test)",
     178: "not started (Brand, added by the owner on 2026-09-27): the phone app's agent uses the owner's files",
     179: "partial: the helper's icon is built from the owner's mark and checked as installed; the banner and Finder screenshots need the owner",
     180: "verified",
@@ -2354,7 +2416,7 @@ SHORT_BLOCKERS = {
     201: "partial: the gate's tests and scenarios are in the suites and pass with the new behaviour off and on (pull request #14); the clean-clone run waits for the merge",
     202: "not started (Gate S, added by the owner on 2026-09-27)",
     204: "not started (Gate Q, added by the owner on 2026-09-27)",
-    212: "not started (Gate T, added by the owner on 2026-09-27)",
+    212: "verified",
     213: "not started: after PR #10 (the phone app and the gateway)",
     206: "not started (Gate T, added by the owner on 2026-09-27)",
     207: "not started (Gate T, added by the owner on 2026-09-27)",
@@ -2363,6 +2425,7 @@ SHORT_BLOCKERS = {
     210: "not started: after PR #10 (the phone app and the gateway)",
     211: "not started (Gate T, added by the owner on 2026-09-27)",
     214: "not started (Gate T, added by the owner on 2026-09-27)",
+    215: "not started (Gate T, added by the owner on 2026-09-27)",
 }
 TOTAL = 53
 

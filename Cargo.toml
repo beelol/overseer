@@ -1,3 +1,9 @@
 [workspace]
-members = ["daemon", "tui"]
+members = ["daemon", "tui", "voice"]
 resolver = "2"
+
+# Voice Mode: audio analysis and speech recognition are far too slow unoptimized, also in tests.
+[profile.dev.package.overseer-listener]
+opt-level = 3
+[profile.dev.package.whisper-rs-sys]
+opt-level = 3

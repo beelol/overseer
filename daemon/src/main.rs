@@ -7,6 +7,7 @@ mod daemon;
 mod downloads;
 mod files;
 mod usage;
+mod voice;
 mod git;
 mod handoff;
 mod local;

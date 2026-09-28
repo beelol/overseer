@@ -317,6 +317,23 @@ pub fn preview(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     Ok(json!({"queued": true, "key": selected}))
 }
 
+/// A cue Voice Mode plays (the heard signal, a permission answered by voice), under Audio Mode's
+/// rules: only while Audio Mode is on, through the same lanes and the arbiter (AC-172).
+pub fn cue(d: &Arc<Daemon>, key: &str) {
+    let Some(key) = KEYS.iter().copied().find(|k| *k == key) else { return };
+    match selection(d) {
+        Ok(selected) => {
+            let _ = enqueue(key, false, selected);
+        }
+        Err(e) => crate::log(&format!("audio selection failed: {e}")),
+    }
+}
+
+/// Whether an installed macOS voice has this name (Voice Mode's `voice` setting).
+pub fn voice_installed(name: &str) -> Result<bool> {
+    Ok(test_sink() || installed_voices()?.iter().any(|(n, _)| n == name))
+}
+
 fn enqueue(key: &'static str, preview: bool, selection: Selection) -> bool {
     // Both lanes are bounded; attention cannot be displaced by routine bursts.
     RUNTIME
@@ -370,7 +387,14 @@ pub fn start(d: Arc<Daemon>) -> Result<()> {
             {
                 continue;
             }
-            match tokio::task::spawn_blocking(move || play(cue.key, &cue.selection)).await {
+            // One speaker at a time (AC-172): Voice Mode may hold a cue for the end of Overseer's
+            // phrase or the owner's thought, or drop a routine one while the owner speaks.
+            let cue_ms = match cue.selection.track {
+                Track::Reactor => 600,
+                Track::System => 2500,
+                Track::Commander => 3000,
+            };
+            match tokio::task::spawn_blocking(move || if cue.preview || crate::voice::before_cue(cue.key, cue_ms) { play(cue.key, &cue.selection) } else { Ok(()) }).await {
                 Ok(Ok(())) => {}
                 Ok(Err(e)) => crate::log(&format!("audio playback failed: {e}")),
                 Err(e) => crate::log(&format!("audio worker ended: {e}")),

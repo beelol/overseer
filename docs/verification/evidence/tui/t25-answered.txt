@@ -1,10 +1,10 @@
- ◆ Overseer  page 1/1 · 2 agents · ● 1 active                                                                                                                           ● connected 
-┏ 1 ● Sleeper ━━━━━━━━━━━━━━━━━━━━━╭ ◆ Overseer · Ask first ────────────────────────────────────────────────────────────────────────────────────╮───────────────────── claude · 0s ╮
+ ◆ Overseer  page 1/1 · 2 agents · ● 2 active                                                                                                                           ● connected 
+┏ 1 ● Sleeper ━━━━━━━━━━━━━━━━━━━━━╭ ◆ Overseer · Ask first ────────────────────────────────────────────────────────────────────────────────────╮───────────────────── claude · 2s ╮
 ┃ working…                         │ ▶ started: Started API tests (claude) in repo                                                              │                                  │
 ┃                                  │ ▶ started: Started Sleeper (generic) in repo                                                               │                                  │
 ┃                                  │ you › Tell API tests to add tests                                                                          │t-format","stream-json","--verbose│
 ┃                                  │ ◆ I proposed sending API tests this message: "Please add tests." Proposed to the owner; nothing happens    │],"text":"write the API"}         │
-┃                                  │   until they say yes. (proposal p-d39bc6e166a7)                                                            │                                  │
+┃                                  │   until they say yes. (proposal p-60b83ac3a31a)                                                            │                                  │
 ┃                                  │──────────────────────────────────────────────────────────────────────────────────────────────────────────  │                                  │
 ┃                                  │ › type a message for Overseer                                                                              │                                  │
 ┃                                  │                                                                                                            │                                  │

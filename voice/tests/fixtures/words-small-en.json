@@ -1,0 +1,259 @@
+{
+  "about": "Words recorded from the chosen recognizer in the Voice Mode spike (AC-162): whisper.cpp small.en (ggml-small.en.bin, SHA-256 c6138d6d…) through whisper-rs 0.16 with Metal and the vocabulary hint, on speech made by macOS `say` at test time with three system voices. Text only: no audio is kept. Replayed by the daemon's tests (voice::replay).",
+  "machine": "Mac17,6, Apple M5 Max, 128 GiB, macOS 26.6.2 (25G83); load average about 300 from other agents",
+  "recognizer": "small.en with the hint",
+  "utterances": [
+    {
+      "voice": "Daniel",
+      "said": "Tell Continuity to use the new wire format.",
+      "heard": "Tell Continuity to use the new wire format.",
+      "recognize_ms": 85,
+      "audio_s": 2.7
+    },
+    {
+      "voice": "Daniel",
+      "said": "Phone and Continuity should both use the new wire format, and someone should write the migration note.",
+      "heard": "Phone and Continuity should both use the new wire format, and someone should write the migration note.",
+      "recognize_ms": 115,
+      "audio_s": 5.8
+    },
+    {
+      "voice": "Daniel",
+      "said": "Stop the phone agent.",
+      "heard": "Stop the phone agent.",
+      "recognize_ms": 77,
+      "audio_s": 1.3
+    },
+    {
+      "voice": "Daniel",
+      "said": "What is everyone doing?",
+      "heard": "What is everyone doing?",
+      "recognize_ms": 77,
+      "audio_s": 1.4
+    },
+    {
+      "voice": "Daniel",
+      "said": "Redirect Codex to fix the failing test in the worktree.",
+      "heard": "redirect, codex to fix the failing test in the worktree.",
+      "recognize_ms": 108,
+      "audio_s": 3.3
+    },
+    {
+      "voice": "Daniel",
+      "said": "Whoever has AC 116 should add tests for the gateway.",
+      "heard": "Whoever has AC-116 should add tests for the gateway.",
+      "recognize_ms": 106,
+      "audio_s": 3.9
+    },
+    {
+      "voice": "Daniel",
+      "said": "Yes, allow it.",
+      "heard": "Yes, allow it.",
+      "recognize_ms": 88,
+      "audio_s": 1.4
+    },
+    {
+      "voice": "Daniel",
+      "said": "Cancel that.",
+      "heard": "Cancel that.",
+      "recognize_ms": 88,
+      "audio_s": 0.8
+    },
+    {
+      "voice": "Daniel",
+      "said": "Talk to Continuity.",
+      "heard": "Talk to Continuity.",
+      "recognize_ms": 100,
+      "audio_s": 1.4
+    },
+    {
+      "voice": "Daniel",
+      "said": "Back to Overseer.",
+      "heard": "Back to Overseer.",
+      "recognize_ms": 112,
+      "audio_s": 1.0
+    },
+    {
+      "voice": "Daniel",
+      "said": "Merge back the review branch when the tests pass.",
+      "heard": "Merge back the review branch when the tests pass.",
+      "recognize_ms": 144,
+      "audio_s": 3.0
+    },
+    {
+      "voice": "Daniel",
+      "said": "Overseer, hold the swarm until the grid is green.",
+      "heard": "Overseer, hold the swarm until the grid is green.",
+      "recognize_ms": 176,
+      "audio_s": 3.0
+    },
+    {
+      "voice": "Eddy (English (US))",
+      "said": "Tell Continuity to use the new wire format.",
+      "heard": "Tell Continuity to use the new wire format.",
+      "recognize_ms": 188,
+      "audio_s": 3.3
+    },
+    {
+      "voice": "Eddy (English (US))",
+      "said": "Phone and Continuity should both use the new wire format, and someone should write the migration note.",
+      "heard": "Phone and Continuity should both use the new wire format, and someone should write the migration note.",
+      "recognize_ms": 259,
+      "audio_s": 6.3
+    },
+    {
+      "voice": "Eddy (English (US))",
+      "said": "Stop the phone agent.",
+      "heard": "Stop the phone agent.",
+      "recognize_ms": 187,
+      "audio_s": 1.8
+    },
+    {
+      "voice": "Eddy (English (US))",
+      "said": "What is everyone doing?",
+      "heard": "What is everyone doing?",
+      "recognize_ms": 179,
+      "audio_s": 1.7
+    },
+    {
+      "voice": "Eddy (English (US))",
+      "said": "Redirect Codex to fix the failing test in the worktree.",
+      "heard": "redirect, codex to fix the failing test in the worktree.",
+      "recognize_ms": 221,
+      "audio_s": 3.8
+    },
+    {
+      "voice": "Eddy (English (US))",
+      "said": "Whoever has AC 116 should add tests for the gateway.",
+      "heard": "Whoever has AC-116 should add tests for the gateway.",
+      "recognize_ms": 201,
+      "audio_s": 4.6
+    },
+    {
+      "voice": "Eddy (English (US))",
+      "said": "Yes, allow it.",
+      "heard": "Yes, allow it.",
+      "recognize_ms": 162,
+      "audio_s": 1.6
+    },
+    {
+      "voice": "Eddy (English (US))",
+      "said": "Cancel that.",
+      "heard": "Cancel that.",
+      "recognize_ms": 148,
+      "audio_s": 1.3
+    },
+    {
+      "voice": "Eddy (English (US))",
+      "said": "Talk to Continuity.",
+      "heard": "Talk to Continuity.",
+      "recognize_ms": 167,
+      "audio_s": 1.8
+    },
+    {
+      "voice": "Eddy (English (US))",
+      "said": "Back to Overseer.",
+      "heard": "Back to Overseer.",
+      "recognize_ms": 173,
+      "audio_s": 1.7
+    },
+    {
+      "voice": "Eddy (English (US))",
+      "said": "Merge back the review branch when the tests pass.",
+      "heard": "Merge back the review branch when the tests pass.",
+      "recognize_ms": 195,
+      "audio_s": 3.3
+    },
+    {
+      "voice": "Eddy (English (US))",
+      "said": "Overseer, hold the swarm until the grid is green.",
+      "heard": "Overseer, hold this swarm until the grid is green.",
+      "recognize_ms": 199,
+      "audio_s": 3.6
+    },
+    {
+      "voice": "Flo (English (UK))",
+      "said": "Tell Continuity to use the new wire format.",
+      "heard": "Tell Continuity to use the new wire format.",
+      "recognize_ms": 178,
+      "audio_s": 3.4
+    },
+    {
+      "voice": "Flo (English (UK))",
+      "said": "Phone and Continuity should both use the new wire format, and someone should write the migration note.",
+      "heard": "Phone and Continuity should both use the new IO format, and someone should write a migration note.",
+      "recognize_ms": 210,
+      "audio_s": 6.4
+    },
+    {
+      "voice": "Flo (English (UK))",
+      "said": "Stop the phone agent.",
+      "heard": "Stop the phonation.",
+      "recognize_ms": 140,
+      "audio_s": 1.8
+    },
+    {
+      "voice": "Flo (English (UK))",
+      "said": "What is everyone doing?",
+      "heard": "What is everyone doing?",
+      "recognize_ms": 141,
+      "audio_s": 1.7
+    },
+    {
+      "voice": "Flo (English (UK))",
+      "said": "Redirect Codex to fix the failing test in the worktree.",
+      "heard": "redirect, codex to fix the failing test in the worktree.",
+      "recognize_ms": 176,
+      "audio_s": 3.9
+    },
+    {
+      "voice": "Flo (English (UK))",
+      "said": "Whoever has AC 116 should add tests for the gateway.",
+      "heard": "Whoever has AC-116 should add tests for the gateway.",
+      "recognize_ms": 162,
+      "audio_s": 4.7
+    },
+    {
+      "voice": "Flo (English (UK))",
+      "said": "Yes, allow it.",
+      "heard": "Yes, I'm out.",
+      "recognize_ms": 124,
+      "audio_s": 1.5
+    },
+    {
+      "voice": "Flo (English (UK))",
+      "said": "Cancel that.",
+      "heard": "That's all that.",
+      "recognize_ms": 119,
+      "audio_s": 1.3
+    },
+    {
+      "voice": "Flo (English (UK))",
+      "said": "Talk to Continuity.",
+      "heard": "Talk to Continuity.",
+      "recognize_ms": 119,
+      "audio_s": 1.8
+    },
+    {
+      "voice": "Flo (English (UK))",
+      "said": "Back to Overseer.",
+      "heard": "Back to Overseer.",
+      "recognize_ms": 125,
+      "audio_s": 1.6
+    },
+    {
+      "voice": "Flo (English (UK))",
+      "said": "Merge back the review branch when the tests pass.",
+      "heard": "Merge back the review branch when the tests pass.",
+      "recognize_ms": 144,
+      "audio_s": 3.3
+    },
+    {
+      "voice": "Flo (English (UK))",
+      "said": "Overseer, hold the swarm until the grid is green.",
+      "heard": "Overseer, hold the swarm until the grid is green.",
+      "recognize_ms": 153,
+      "audio_s": 3.4
+    }
+  ]
+}
