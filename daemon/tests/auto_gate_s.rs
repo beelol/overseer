@@ -76,3 +76,60 @@ fn overseer_starts_manual_and_auto_launches_share_one_admission() {
     assert_eq!(d.runs().len(), runs + 1);
     assert_eq!(d.wait_done(&run_id(&admitted), 20)["status"], "completed");
 }
+
+/// AUTO-AC-32 with Gate S present: Overseer's own model turns enter the
+/// same local metering path as any run. Each usage event of its run gives
+/// exactly one local measurement (harness and run attributed), a second
+/// Overseer turn adds only its own, and a daemon restart, which replays the
+/// run's event log, adds none.
+#[test]
+fn overseer_turns_enter_the_same_metering_path_once() {
+    let r = tmp();
+    let mode_file = r.path().join("mode");
+    std::fs::write(&mode_file, "overseer").unwrap();
+    let mut d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", fixture("fake-harness/claude-fixture.js").as_str()),
+        ("CLAUDE_FIXTURE_MODE_FILE", mode_file.to_str().unwrap()),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE")]);
+    d.call("overseer.session", json!({}));
+    let idle = |d: &Daemon| -> String {
+        let deadline = std::time::Instant::now() + Duration::from_secs(30);
+        loop {
+            let s = d.call("overseer.session", json!({}));
+            let status = s["run_status"].as_str().unwrap_or("");
+            if !s["run_id"].is_null() && !["queued", "starting", "running", "waiting_for_user"].contains(&status) {
+                return s["run_id"].as_str().unwrap().to_string();
+            }
+            assert!(std::time::Instant::now() < deadline, "Overseer's run did not finish: {s}");
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    };
+    let measured = |d: &Daemon, run: &str| -> Vec<Value> {
+        d.call("auto.usage.list", json!({"limit":5000}))["measurements"].as_array().unwrap().iter()
+            .filter(|m| m["run_id"] == run).cloned().collect()
+    };
+    let usage_events = |d: &Daemon, run: &str| d.events(run).iter().filter(|e| e["kind"] == "usage").count();
+
+    d.call("overseer.send", json!({"text":"What is everyone doing?","surface":"ctl","harness":"claude"}));
+    let run = idle(&d);
+    let first = usage_events(&d, &run);
+    assert!(first >= 1, "Overseer's turn reported usage");
+    let rows = measured(&d, &run);
+    assert_eq!(rows.len(), first, "one measurement per usage event: {rows:?}");
+    assert!(rows.iter().all(|m| m["harness"] == "claude"), "{rows:?}");
+
+    d.call("overseer.send", json!({"text":"Anything new?","surface":"ctl","harness":"claude"}));
+    std::thread::sleep(Duration::from_millis(300));
+    let run_again = idle(&d);
+    let total: usize = [&run, &run_again].into_iter().collect::<std::collections::BTreeSet<_>>()
+        .into_iter().map(|id| usage_events(&d, id)).sum();
+    let measured_total: usize = [&run, &run_again].into_iter().collect::<std::collections::BTreeSet<_>>()
+        .into_iter().map(|id| measured(&d, id).len()).sum();
+    assert!(total > first, "the second turn reported its own usage");
+    assert_eq!(measured_total, total, "the second turn adds only its own measurements");
+
+    d.kill9();
+    d.spawn();
+    let after: usize = [&run, &run_again].into_iter().collect::<std::collections::BTreeSet<_>>()
+        .into_iter().map(|id| measured(&d, id).len()).sum();
+    assert_eq!(after, total, "a restart replays no measurement");
+}

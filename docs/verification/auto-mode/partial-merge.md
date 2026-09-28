@@ -41,7 +41,7 @@ The packaged scenarios that exercise these features turn their setting on: `scen
 
 Every unfinished part keeps its gap in its own record; none is marked done by this merge.
 
-## What the full test run must cover (after 02:45)
+## What the full test run must cover (not before 03:30)
 
 Run `scripts/test-all` on a throwaway copy with main merged (main is 38 commits ahead of this branch's merge base). It must include:
 
