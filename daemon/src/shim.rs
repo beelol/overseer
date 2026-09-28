@@ -143,6 +143,58 @@ fn private_metadata_response(line: &[u8], pending: &MetadataReplies) -> bool {
     true
 }
 
+/// The daemon's own Codex account reads (`ovs-account`, `ovs-auto-quota`)
+/// travel on the harness's stdout, so their replies would enter the
+/// append-only transcript verbatim: the login e-mail, the raw account id and
+/// the credit balance. Before recording, keep only what the daemon uses: the
+/// account type and plan, the rate-limit windows and a domain-separated
+/// account fingerprint in place of the raw id. A fingerprint supplied by the
+/// harness itself is discarded; only one computed here from the id is kept.
+fn redact_account_reply(line: &[u8]) -> Option<Vec<u8>> {
+    const IDS: [&str; 2] = ["\"ovs-account\"", "\"ovs-auto-quota\""];
+    if !IDS.iter().any(|id| line.windows(id.len()).any(|window| window == id.as_bytes())) {
+        return None;
+    }
+    let mut value: serde_json::Value = if line.len() <= 1024 * 1024 {
+        serde_json::from_slice(line).ok()?
+    } else { return Some(b"{\"id\":\"ovs-account-redacted\"}\n".to_vec()) };
+    match value["id"].as_str() {
+        Some("ovs-account") => {
+            if let Some(account) = value.pointer_mut("/result/account").and_then(|a| a.as_object_mut()) {
+                account.retain(|key, _| matches!(key.as_str(), "type" | "planType"));
+            }
+        }
+        Some("ovs-auto-quota") => {
+            if let Some(result) = value.get_mut("result").and_then(|r| r.as_object_mut()) {
+                result.remove(crate::auto_quota::ACCOUNT_FINGERPRINT_FIELD);
+                let fingerprint = crate::auto_quota::account_fingerprint(
+                    &serde_json::Value::Object(result.clone())).ok();
+                result.remove("accountId");
+                result.remove("credits");
+                if let Some(fingerprint) = fingerprint {
+                    result.insert(crate::auto_quota::ACCOUNT_FINGERPRINT_FIELD.into(),
+                        serde_json::Value::String(fingerprint));
+                }
+                for key in ["rateLimitsByLimitId", "rateLimits"] {
+                    match result.get_mut(key) {
+                        Some(serde_json::Value::Object(limits)) if key == "rateLimitsByLimitId" => {
+                            for limit in limits.values_mut() {
+                                if let Some(limit) = limit.as_object_mut() { limit.remove("credits"); }
+                            }
+                        }
+                        Some(serde_json::Value::Object(limit)) => { limit.remove("credits"); }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        _ => return None,
+    }
+    let mut out = serde_json::to_vec(&value).ok()?;
+    out.push(b'\n');
+    Some(out)
+}
+
 fn pump<R: Read + Send + 'static>(reader: R, stream: &'static str,
     out: Arc<Mutex<SegmentWriter>>, pending: Option<MetadataReplies>) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
@@ -155,6 +207,12 @@ fn pump<R: Read + Send + 'static>(reader: R, stream: &'static str,
                 Ok(_) => {
                     if pending.as_ref().is_some_and(|pending|
                         private_metadata_response(&buf, pending)) { continue; }
+                    if stream == "o" {
+                        if let Some(redacted) = redact_account_reply(&buf) {
+                            out.lock().unwrap().record(stream, &redacted);
+                            continue;
+                        }
+                    }
                     out.lock().unwrap().record(stream, &buf);
                 }
             }
@@ -429,4 +487,35 @@ pub fn control_with_timeout(socket: &Path, msg: &serde_json::Value, timeout: Dur
     let mut line = String::new();
     reader.read_line(&mut line)?;
     Ok(serde_json::from_str(&line)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn account_replies_are_recorded_without_identity_or_balance() {
+        let quota = serde_json::json!({"id":"ovs-auto-quota","result":{"accountId":"acct-raw-1",
+            "overseerAccountFingerprint":"f".repeat(64),"credits":{"balance":"9"},
+            "rateLimitsByLimitId":{"codex":{"limitId":"codex","planType":"pro",
+                "primary":{"usedPercent":35},"credits":{"balance":"secret"}}}}});
+        let line = format!("{quota}\n");
+        let redacted: serde_json::Value = serde_json::from_slice(&redact_account_reply(line.as_bytes()).unwrap()).unwrap();
+        let text = redacted.to_string();
+        assert!(!text.contains("acct-raw-1") && !text.contains("secret") && !text.contains("\"9\""), "{text}");
+        let expected = crate::auto_quota::account_fingerprint(&serde_json::json!({"accountId":"acct-raw-1"})).unwrap();
+        assert_eq!(crate::auto_quota::account_fingerprint(&redacted["result"]).unwrap(), expected,
+            "the recorded reply keeps the same account identity, not the forged one");
+        assert_eq!(redacted["result"]["rateLimitsByLimitId"]["codex"]["primary"]["usedPercent"], 35);
+        // A forged fingerprint with no id is dropped: identity unavailable.
+        let forged = format!("{}\n", serde_json::json!({"id":"ovs-auto-quota","result":{
+            "overseerAccountFingerprint":"f".repeat(64)}}));
+        let forged: serde_json::Value = serde_json::from_slice(&redact_account_reply(forged.as_bytes()).unwrap()).unwrap();
+        assert!(crate::auto_quota::account_fingerprint(&forged["result"]).is_err());
+        let account = format!("{}\n", serde_json::json!({"id":"ovs-account","result":{"requiresOpenaiAuth":true,
+            "account":{"type":"chatgpt","email":"private@example.invalid","planType":"pro"}}}));
+        let account = String::from_utf8(redact_account_reply(account.as_bytes()).unwrap()).unwrap();
+        assert!(!account.contains("private@example.invalid") && account.contains("chatgpt") && account.contains("pro"));
+        assert!(redact_account_reply(b"{\"id\":\"ovs-turn\",\"result\":{}}\n").is_none());
+    }
 }

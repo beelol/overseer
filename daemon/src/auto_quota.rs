@@ -199,7 +199,17 @@ impl QuotaSnapshot {
 }
 
 /// Bound and digest provider identity before it reaches durable state or the protocol.
+/// Set by the run supervisor in place of the raw Codex account id before a
+/// reply is recorded (`shim::redact_account_reply`).
+pub const ACCOUNT_FINGERPRINT_FIELD: &str = "overseerAccountFingerprint";
+
 pub fn account_fingerprint(value: &Value) -> Result<String> {
+    if value.get("accountId").is_none() {
+        if let Some(fingerprint) = value.get(ACCOUNT_FINGERPRINT_FIELD).and_then(Value::as_str)
+            .filter(|f| f.len() == 64 && f.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())) {
+            return Ok(fingerprint.to_string());
+        }
+    }
     let account = value
         .get("accountId")
         .and_then(Value::as_str)
