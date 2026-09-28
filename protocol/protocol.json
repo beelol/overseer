@@ -111,6 +111,8 @@
       "workspaces": "Workspace[]",
       "profiles": "Profile[]",
       "turns": "record<Turn[]>",
+      "oversight": "record<json>",
+      "overseer": "json",
       "daemon": {
         "pid": "number",
         "started_ms": "number",
@@ -1421,6 +1423,358 @@
       "summary": "Age a wait (tests only)",
       "phone": "mac_only",
       "reason": "A test hook",
+      "params": "json",
+      "result": "json"
+    },
+    "agents.roster": {
+      "class": "mac_only",
+      "summary": "Every agent, as Overseer sees them",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "agent.digest": {
+      "class": "mac_only",
+      "summary": "A digest of what an agent did",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "agent.area": {
+      "class": "mac_only",
+      "summary": "Set or read the area an agent works in",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "agent.briefings": {
+      "class": "mac_only",
+      "summary": "The briefings an agent was given",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "agent.cadence": {
+      "class": "mac_only",
+      "summary": "Set how often an agent checks in",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "agent.channel": {
+      "class": "mac_only",
+      "summary": "Turn briefings and the channel on or off",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "agent.check_ins": {
+      "class": "mac_only",
+      "summary": "An agent's check-ins",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "agent.guardrail": {
+      "class": "mac_only",
+      "summary": "Add a guardrail to an agent",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "agent.guardrail_remove": {
+      "class": "mac_only",
+      "summary": "Remove a guardrail",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "agent.guardrails": {
+      "class": "mac_only",
+      "summary": "An agent's guardrails",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "agent.hold": {
+      "class": "mac_only",
+      "summary": "Hold an agent",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "agent.holds": {
+      "class": "mac_only",
+      "summary": "The agents on hold",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "agent.release": {
+      "class": "mac_only",
+      "summary": "Release a held agent",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "agent.redirect": {
+      "class": "mac_only",
+      "summary": "Redirect an agent",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "agent.share_deny": {
+      "class": "mac_only",
+      "summary": "Refuse shares to an agent",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "run.redirect": {
+      "class": "mac_only",
+      "summary": "Redirect an agent",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "run.queue": {
+      "class": "mac_only",
+      "summary": "Queue a message for an agent",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "run.queued": {
+      "class": "mac_only",
+      "summary": "An agent's queued messages",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "run.unqueue": {
+      "class": "mac_only",
+      "summary": "Remove a queued message",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "channel.messages": {
+      "class": "mac_only",
+      "summary": "The agents' channel",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "conflicts.list": {
+      "class": "mac_only",
+      "summary": "Conflicts between agents",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "conflict.dismiss": {
+      "class": "mac_only",
+      "summary": "Dismiss a conflict between agents",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "conflict.resolve": {
+      "class": "mac_only",
+      "summary": "Resolve a conflict between agents",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "share.list": {
+      "class": "mac_only",
+      "summary": "What agents shared",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "share.withdraw": {
+      "class": "mac_only",
+      "summary": "Withdraw a share",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "watch.start": {
+      "class": "mac_only",
+      "summary": "Start a watch on an agent",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "watch.end": {
+      "class": "mac_only",
+      "summary": "End a watch",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "watch.list": {
+      "class": "mac_only",
+      "summary": "The watches",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "watch.findings": {
+      "class": "mac_only",
+      "summary": "What a watch found",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "overseer.session": {
+      "class": "mac_only",
+      "summary": "Overseer's session",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "overseer.messages": {
+      "class": "mac_only",
+      "summary": "The conversation with Overseer",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "overseer.send": {
+      "class": "mac_only",
+      "summary": "Say something to Overseer",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "overseer.propose": {
+      "class": "mac_only",
+      "summary": "Propose actions for the owner to approve",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "overseer.answer": {
+      "class": "mac_only",
+      "summary": "Answer one of Overseer's proposals",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "overseer.cancel": {
+      "class": "mac_only",
+      "summary": "Cancel one of Overseer's proposals",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "overseer.card": {
+      "class": "mac_only",
+      "summary": "One of Overseer's cards",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "overseer.level": {
+      "class": "mac_only",
+      "summary": "Set how much Overseer does on its own",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "overseer.cap": {
+      "class": "mac_only",
+      "summary": "Set Overseer's spending cap",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "overseer.fresh": {
+      "class": "mac_only",
+      "summary": "Start a fresh Overseer conversation",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "overseer.rally": {
+      "class": "mac_only",
+      "summary": "Rally the agents",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "overseer.scan": {
+      "class": "mac_only",
+      "summary": "Scan an agent for conflicts",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "overseer.token": {
+      "class": "mac_only",
+      "summary": "A token for an agent's Overseer tools",
+      "phone": "mac_only",
+      "reason": "It is for the agents' own Overseer tools, never a phone",
+      "params": "json",
+      "result": "json"
+    },
+    "overseer.tools": {
+      "class": "mac_only",
+      "summary": "The Overseer tools an agent may use",
+      "phone": "mac_only",
+      "reason": "It is for the agents' own Overseer tools, never a phone",
+      "params": "json",
+      "result": "json"
+    },
+    "overseer.tool": {
+      "class": "mac_only",
+      "summary": "Run one of Overseer's tools for an agent",
+      "phone": "mac_only",
+      "reason": "It is for the agents' own Overseer tools, never a phone",
       "params": "json",
       "result": "json"
     }

@@ -26,7 +26,11 @@ try {
   fs.mkdirSync(path.join(app, 'Contents/MacOS'), { recursive: true });
   fs.mkdirSync(path.join(app, 'Contents/Resources'), { recursive: true });
   run('lipo', ['-create', path.join(tmp, 'notifier-arm64'), path.join(tmp, 'notifier-x86_64'), '-output', path.join(app, 'Contents/MacOS/notifier')]);
-  fs.copyFileSync(path.join(here, 'Info.plist'), path.join(app, 'Contents/Info.plist'));
+  // The build number follows the icon and the code: macOS keeps showing a helper's old icon
+  // (in notifications too) while its bundle version stays the same (AC-179).
+  const digest = require('crypto').createHash('sha256').update(fs.readFileSync(path.join(here, 'AppIcon.png'))).update(fs.readFileSync(path.join(here, 'main.swift'))).digest();
+  const build = `1.${digest.readUInt32BE(0)}`;
+  fs.writeFileSync(path.join(app, 'Contents/Info.plist'), fs.readFileSync(path.join(here, 'Info.plist'), 'utf8').replace('<key>CFBundleVersion</key><string>1</string>', `<key>CFBundleVersion</key><string>${build}</string>`));
   // Icon: every size macOS asks for, from the 1024 px master (docs/design/brand/exports/overseer-app-icon-macos-1024.png).
   const master = path.join(here, 'AppIcon.png');
   const set = path.join(tmp, 'AppIcon.iconset'); fs.mkdirSync(set);

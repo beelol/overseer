@@ -76,3 +76,29 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .composer-hero > .composer-choices .chip[hidden] { display: none; }
 .composer-hero > .composer-choices .chip .chip-label { flex: 1; text-align: left; white-space: nowrap; }
 .composer.big .composer-row .spacer { flex: 1; }
+
+/* Home (AC-182): the conversation with Overseer above the composer. */
+.home { display: flex; flex-direction: column; gap: var(--ov-space-2); margin: 0 auto var(--ov-space-4); max-width: 760px; width: 100%; }
+.home[hidden] { display: none; }
+.home-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: var(--ov-space-2); padding: var(--ov-space-1) 0; background: var(--ov-bg); color: var(--ov-muted); font-size: var(--ov-font-sm); }
+.home-title { font-weight: var(--ov-weight-semibold); color: var(--ov-text); }
+.home-level { padding: 0 6px; border: 1px solid var(--ov-border); border-radius: 999px; }
+.home-list { display: flex; flex-direction: column; gap: var(--ov-space-2); max-height: 45vh; overflow: auto; padding: var(--ov-space-1); }
+.home-msg { padding: var(--ov-space-2) var(--ov-space-3); border-radius: var(--ov-radius-card); background: var(--ov-raised); }
+.home-msg.from-owner { align-self: flex-end; max-width: 80%; background: var(--ov-accent-soft); }
+.home-from { display: flex; align-items: center; gap: 6px; font-size: var(--ov-font-xs); color: var(--ov-muted); margin-bottom: 2px; }
+.home-text { white-space: pre-wrap; }
+.home-msg .link, .home-card .link { margin-top: 4px; font-size: var(--ov-font-sm); }
+.home-empty { color: var(--ov-muted); font-size: var(--ov-font-sm); text-align: center; }
+.home-list .proposal { margin: 0; }
+.composer-view { display: flex; flex-direction: column; }
+.tile-marks { display: inline-flex; gap: 6px; margin-left: 6px; font-size: var(--ov-font-xs); color: var(--ov-muted); }
+.tile-mark { display: inline-flex; align-items: center; gap: 2px; }
+.tile.held .tile-head { border-left: 3px solid var(--ov-accent); }
+.tile.conflict .tile-marks .codicon-warning { color: var(--ov-accent); }
+.composer-view .composer.big { position: relative; }
+.agent-mentions { position: absolute; left: var(--ov-space-3); right: var(--ov-space-3); top: 100%; z-index: 5; display: flex; flex-direction: column; margin-top: 4px; padding: 4px; border: 1px solid var(--ov-border-strong); border-radius: var(--ov-radius-card); background: var(--ov-raised); box-shadow: 0 4px 16px var(--ov-shadow); }
+.agent-mentions[hidden] { display: none; }
+.agent-mention { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: 0; background: none; color: var(--ov-text); text-align: left; border-radius: 4px; }
+.agent-mention.active, .agent-mention:hover { background: var(--ov-hover); }
+.agent-mention-hint { margin-left: auto; color: var(--ov-muted); font-size: var(--ov-font-xs); }

@@ -165,6 +165,65 @@ impl Store {
               seq INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, task_id TEXT, run_id TEXT, kind TEXT NOT NULL,
               source TEXT NOT NULL, confidence TEXT NOT NULL, payload TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS events_run ON events(run_id, seq);
+            CREATE TABLE IF NOT EXISTS overseer_tokens(
+              sha TEXT PRIMARY KEY, run_id TEXT NOT NULL, role TEXT NOT NULL, created_ms INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS conflicts(
+              id TEXT PRIMARY KEY, key TEXT NOT NULL, kind TEXT NOT NULL, repo TEXT NOT NULL, run_a TEXT NOT NULL,
+              run_b TEXT, target TEXT, paths TEXT NOT NULL, first_ms INTEGER NOT NULL, last_ms INTEGER NOT NULL,
+              state TEXT NOT NULL, resolution TEXT, closed_ms INTEGER);
+            CREATE INDEX IF NOT EXISTS conflicts_key ON conflicts(key, state);
+            CREATE TABLE IF NOT EXISTS areas(
+              run_id TEXT NOT NULL, path TEXT NOT NULL, set_by TEXT NOT NULL, created_ms INTEGER NOT NULL, PRIMARY KEY(run_id, path));
+            CREATE TABLE IF NOT EXISTS run_roles(run_id TEXT PRIMARY KEY, role TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS turn_sources(turn_id TEXT PRIMARY KEY, source TEXT NOT NULL, detail TEXT);
+            CREATE TABLE IF NOT EXISTS overseer_sessions(
+              id TEXT PRIMARY KEY, started_ms INTEGER NOT NULL, archived_ms INTEGER, harness TEXT, model TEXT, run_id TEXT, task_id TEXT,
+              level TEXT NOT NULL DEFAULT 'ask_first', last_seq INTEGER NOT NULL DEFAULT 0, last_turn_ms INTEGER, last_cause TEXT);
+            CREATE TABLE IF NOT EXISTS overseer_messages(
+              seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT UNIQUE NOT NULL, session_id TEXT NOT NULL, ts INTEGER NOT NULL,
+              source TEXT NOT NULL, surface TEXT, text TEXT NOT NULL, card TEXT);
+            CREATE TABLE IF NOT EXISTS overseer_proposals(
+              id TEXT PRIMARY KEY, session_id TEXT NOT NULL, message_id TEXT, ts INTEGER NOT NULL, actions TEXT NOT NULL,
+              state TEXT NOT NULL, source TEXT, answered_by TEXT, answered_ms INTEGER, surface TEXT, result TEXT, settle_until INTEGER, cause TEXT);
+            CREATE TABLE IF NOT EXISTS overseer_pending(session_id TEXT NOT NULL, message_id TEXT, ts INTEGER NOT NULL, text TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS holds(
+              run_id TEXT PRIMARY KEY, set_by TEXT NOT NULL, reason TEXT NOT NULL, set_ms INTEGER NOT NULL, release_on TEXT NOT NULL, card_id TEXT);
+            CREATE TABLE IF NOT EXISTS guardrails(
+              id TEXT PRIMARY KEY, run_id TEXT NOT NULL, set_by TEXT NOT NULL, words TEXT NOT NULL, allow TEXT NOT NULL, deny TEXT NOT NULL,
+              hold_on_cross INTEGER NOT NULL, enforcement TEXT NOT NULL, created_ms INTEGER NOT NULL, removed_ms INTEGER);
+            CREATE TABLE IF NOT EXISTS guardrail_crossings(guardrail_id TEXT NOT NULL, run_id TEXT NOT NULL, paths TEXT NOT NULL, ts INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS dispatches(
+              id TEXT PRIMARY KEY, card_id TEXT NOT NULL, run_id TEXT NOT NULL, action TEXT NOT NULL, delivery TEXT NOT NULL, message TEXT NOT NULL,
+              why TEXT NOT NULL, state TEXT NOT NULL, held_ms INTEGER NOT NULL, sent_ms INTEGER, delivered_ms INTEGER, picked_ms INTEGER, answered_ms INTEGER, turn_id TEXT);
+            CREATE TABLE IF NOT EXISTS cadences(run_id TEXT PRIMARY KEY, cadence TEXT NOT NULL, set_by TEXT NOT NULL, set_ms INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS check_in_queue(run_id TEXT NOT NULL, reason TEXT NOT NULL, ts INTEGER NOT NULL, not_before INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS check_ins(run_id TEXT NOT NULL, ts INTEGER NOT NULL, result TEXT NOT NULL, reason TEXT NOT NULL, left_out TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS free_checks(run_id TEXT NOT NULL, kind TEXT NOT NULL, detail TEXT NOT NULL, ts INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS circles(run_id TEXT PRIMARY KEY, detail TEXT NOT NULL, count INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS tool_inputs(run_id TEXT NOT NULL, tool_id TEXT NOT NULL, input TEXT NOT NULL, PRIMARY KEY(run_id, tool_id));
+            CREATE TABLE IF NOT EXISTS overseer_turns(ts INTEGER NOT NULL, session_id TEXT NOT NULL, cause TEXT NOT NULL, turn_id TEXT);
+            CREATE TABLE IF NOT EXISTS queued_messages(
+              run_id TEXT NOT NULL, ts INTEGER NOT NULL, source TEXT NOT NULL, text TEXT NOT NULL, detail TEXT,
+              delivered_ms INTEGER, turn_id TEXT);
+            CREATE TABLE IF NOT EXISTS channels(run_id TEXT PRIMARY KEY, briefing INTEGER NOT NULL, channel INTEGER NOT NULL, set_by TEXT NOT NULL, set_ms INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS briefings(run_id TEXT NOT NULL, ts INTEGER NOT NULL, text TEXT NOT NULL, how TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS agent_messages(
+              id TEXT PRIMARY KEY, run_id TEXT NOT NULL, kind TEXT NOT NULL, ts INTEGER NOT NULL, body TEXT NOT NULL,
+              answer TEXT, answered_ms INTEGER);
+            CREATE TABLE IF NOT EXISTS shares(
+              id TEXT PRIMARY KEY, ts INTEGER NOT NULL, from_run TEXT, to_run TEXT NOT NULL, kind TEXT NOT NULL, source TEXT NOT NULL,
+              bytes INTEGER NOT NULL, inline_bytes INTEGER NOT NULL, file TEXT, proposal TEXT, content_id TEXT NOT NULL, withdrawn_ms INTEGER);
+            CREATE TABLE IF NOT EXISTS share_denials(run_id TEXT PRIMARY KEY, set_by TEXT NOT NULL, set_ms INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS watches(
+              id TEXT PRIMARY KEY, subject TEXT NOT NULL, watcher TEXT NOT NULL DEFAULT '', brief TEXT NOT NULL, mode TEXT NOT NULL, hold_on_stop INTEGER NOT NULL,
+              harness TEXT NOT NULL, model TEXT, set_by TEXT NOT NULL, created_ms INTEGER NOT NULL, last_seq INTEGER NOT NULL DEFAULT 0, last_snapshot TEXT,
+              wakes INTEGER NOT NULL DEFAULT 0, budget INTEGER NOT NULL, copy_workspace TEXT, copy_path TEXT, ended_ms INTEGER, end_reason TEXT);
+            CREATE TABLE IF NOT EXISTS watch_wakes(watch_id TEXT NOT NULL, ts INTEGER NOT NULL, reason TEXT NOT NULL, seq INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS watch_finish_queue(subject TEXT PRIMARY KEY, not_before INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS denied_permissions(run_id TEXT NOT NULL, tool TEXT NOT NULL, detail TEXT NOT NULL, ts INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS findings(
+              id TEXT PRIMARY KEY, watch_id TEXT NOT NULL, watcher TEXT NOT NULL, subject TEXT NOT NULL, ts INTEGER NOT NULL, result TEXT NOT NULL,
+              text TEXT NOT NULL, snapshot TEXT);
             "#,
         )?;
         let has_pending: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='pending_parent_native'")?.exists([])?;

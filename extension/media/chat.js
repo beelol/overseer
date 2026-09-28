@@ -227,7 +227,7 @@
       if (this.labels.has(ev.seq)) return;
       this.labels.set(ev.seq, label || '');
       this.all.push(ev); if (this.all.length > 20000) this.all.splice(0, this.all.length - 20000);
-      this.conversation.add(ev);
+      try { this.conversation.add(ev); } catch (error) { console.error('overseer: event not shown', ev && ev.kind, error); }
       if (this.logBuilt) this.logLine(ev);
       if (this.restored) this.scheduleBottom();
     }
@@ -242,6 +242,12 @@
       else this.toBottom();
       // An unsent message comes back after a reload or restart (AC-49), unless one was typed since.
       if (restore && restore.draft && !this.prompt.value) { this.prompt.value = restore.draft; this.drafts.set(this.runId, restore.draft); this.grow(); }
+    }
+
+    /** A proposal's answer could not be given (already answered elsewhere, or refused): say so on its card. */
+    proposalStatus(id, text) {
+      const card = this.conversation.proposals && this.conversation.proposals.get(id);
+      if (card) this.conversation.settleProposal(card, text);
     }
     events(items) { for (const x of items) this.add(x.event, x.label); }
     notice(text) { this.noticeEl.textContent = text || ''; this.noticeEl.classList.toggle('error', !!text); }

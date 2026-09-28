@@ -18,7 +18,9 @@ if (process.argv.includes('auth') && process.argv.includes('status')) { console.
 if (!process.argv.includes('-p')) { console.log('claude-fixture 0.0.0 (synthetic)'); process.exit(0); }
 // CLAUDE_FIXTURE_MODE_FILE lets one test session give each task its own mode (read at start).
 const modeFile = process.env.CLAUDE_FIXTURE_MODE_FILE;
-const mode = (modeFile && fs.existsSync(modeFile) && fs.readFileSync(modeFile, 'utf8').trim()) || process.env.CLAUDE_FIXTURE_MODE || process.env.FIXTURE_MODE || 'nested';
+// Overseer's own run is the one whose prompt carries the agents' state: it is always Overseer,
+// whatever mode the agents' processes run in (the mode is settled once the first prompt is read).
+let mode = (modeFile && fs.existsSync(modeFile) && fs.readFileSync(modeFile, 'utf8').trim()) || process.env.CLAUDE_FIXTURE_MODE || process.env.FIXTURE_MODE || 'nested';
 const sid = 'fixture-session-1';
 const out = o => process.stdout.write(JSON.stringify(o) + '\n');
 const assistant = (content, parent = null) => out({ type: 'assistant', session_id: sid, parent_tool_use_id: parent, message: { role: 'assistant', content } });
@@ -34,8 +36,34 @@ rl.on('line', l => { if (stdinLog) { try { fs.appendFileSync(stdinLog, l + '\n')
 const next = pred => new Promise(resolve => { const check = () => { const i = lines.findIndex(pred); if (i >= 0) { const [m] = lines.splice(i, 1); waiting = undefined; resolve(m); } }; waiting = check; check(); });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+/** The MCP server named in --mcp-config (Gate S), spoken to over stdio like the live harness does; null without one. */
+async function mcpClient() {
+  const at = process.argv.indexOf('--mcp-config');
+  if (at < 0) return null;
+  const config = JSON.parse(fs.readFileSync(process.argv[at + 1], 'utf8'));
+  const [name, server] = Object.entries(config.mcpServers || {})[0] || [];
+  if (!server) return null;
+  const cp = require('child_process');
+  const child = cp.spawn(server.command, server.args || [], { env: { ...process.env, ...(server.env || {}) }, stdio: ['pipe', 'pipe', 'ignore'] });
+  const pending = new Map();
+  let id = 0;
+  require('readline').createInterface({ input: child.stdout }).on('line', l => { let m; try { m = JSON.parse(l); } catch { return; } const p = pending.get(m.id); if (p) { pending.delete(m.id); p(m); } });
+  const request = (method, params) => new Promise((resolve, reject) => { const rid = ++id; pending.set(rid, m => m.error ? reject(new Error(m.error.message)) : resolve(m.result)); child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: rid, method, params }) + '\n'); });
+  await request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'claude-fixture', version: '0' } });
+  child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
+  const tools = (await request('tools/list', {})).tools.map(t => t.name);
+  out({ type: 'system', subtype: 'mcp_ready', mcp_servers: [{ name, status: 'connected' }], tools: tools.map(t => `mcp__${name}__${t}`) });
+  return { tools, call: (tool, args) => request('tools/call', { name: tool, arguments: args }), close: () => child.kill() };
+}
+
 (async () => {
   const first = await next(m => m.type === 'user');
+  const firstText = Array.isArray(first.message.content) ? first.message.content.filter(c => c.type === 'text').map(c => c.text).join('\n') : String(first.message.content);
+  if (firstText.includes('<overseer-state>')) {
+    // CLAUDE_FIXTURE_OVERSEER_MODE_FILE forces Overseer's own turns into another mode (a failing harness).
+    const forced = process.env.CLAUDE_FIXTURE_OVERSEER_MODE_FILE;
+    mode = (forced && fs.existsSync(forced) && fs.readFileSync(forced, 'utf8').trim()) || 'overseer';
+  }
   out({ type: 'system', subtype: 'init', session_id: sid, model: 'fixture', cwd: process.cwd(), tools: ['Agent', 'Write'] });
   if (mode === 'nested') {
     // Grandchild traffic arrives before the child's Agent tool_use is reported (delayed parent).
@@ -232,21 +260,235 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     assistant([{ type: 'text', text: 'Trying the migration…' }]);
     result(true, 'Migration failed: relation users_v2 does not exist');
   } else if (mode === 'overseer') {
+    // Talk to Overseer. With an MCP server configured (Gate S: --mcp-config), the fixture speaks
+    // MCP like the live harness: it calls the daemon's roster tool and proposes through the
+    // propose tool, reporting each call as a tool_use. Without one, it answers from the state
+    // sent with the message and proposes in a fenced overseer-actions block (AC-107's fallback).
     const content = first.message.content;
     const text = Array.isArray(content) ? content.filter(c => c.type === 'text').map(c => c.text).join('\n') : String(content);
     const state = /Agents \(JSON\):\n([\s\S]*?)\n<\/overseer-state>/.exec(text);
-    const agents = state ? JSON.parse(state[1]) : [];
+    let agents = state ? JSON.parse(state[1]) : [];
     const said = text.replace(/^<overseer-state>[\s\S]*?<\/overseer-state>\s*/, '').trim();
+    const mcp = process.env.CLAUDE_FIXTURE_NO_MCP ? null : await mcpClient();
+    let n = 0;
+    const call = async (name, args) => {
+      const id = `toolu_mcp_${++n}`;
+      assistant([{ type: 'tool_use', id, name: `mcp__overseer__${name}`, input: args }]);
+      out({ type: 'control_request', request_id: `req-mcp-${n}`, request: { subtype: 'can_use_tool', tool_name: `mcp__overseer__${name}`, input: args } });
+      const reply = await next(m => m.type === 'control_response' && m.response?.request_id === `req-mcp-${n}`);
+      if (reply.response.response.behavior !== 'allow') throw new Error('tool refused');
+      const r = await mcp.call(name, args);
+      user([{ type: 'tool_result', tool_use_id: id, content: r.content, is_error: !!r.isError }]);
+      return r.content.map(c => c.text || '').join('');
+    };
     let reply;
     const tell = /tell (.+?) to (.+)/i.exec(said);
+    // A check-in composed by the daemon: one check_in call per agent, from the JSON it sent; an
+    // agent whose files left its area (or whose task names a part it left out) is drifting or
+    // done-with-something-left-out; for drifting, propose what the prompt says the level allows.
+    const checkIn = /Check-in \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
+    const questions = /Questions \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
+    const reports = /Reports \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
+    const findings = /Findings \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
+    // A watcher's finding: Overseer acts on the subject at its level. A stop is a hold (at Ask
+    // first a proposal) and then a redirect (a proposal at Steer, done at Auto); a concern is a
+    // message to the subject. Each goes in its own proposal so a quiet one is not held back.
+    const actOnFindings = async (list, level) => {
+      const lines = [];
+      for (const f of list) {
+        if (/approve|owner/i.test(f.text)) {
+          // Words in a finding that ask for more than the level allows: the daemon, not the fixture, says no.
+          try { lines.push(await call('propose', { actions: [{ action: 'archive', agent: f.subject }] })); } catch (e) { lines.push('refused: ' + e.message); }
+        }
+        if (f.result === 'stop') {
+          lines.push(await call('propose', { actions: [{ action: 'hold', agent: f.subject, reason: 'stop finding from ' + f.watcher_title + ': ' + f.text }] }));
+          if (level !== 'ask_first') lines.push(await call('propose', { actions: [{ action: 'redirect', agent: f.subject, text: 'Stop: put the tests back and make them pass instead of deleting them.' }] }));
+        } else {
+          lines.push(await call('propose', { actions: [{ action: 'message', agent: f.subject, text: 'A watcher raised a concern: ' + f.text }] }));
+        }
+      }
+      return lines;
+    };
+    const rallyAsk = /rally my agents(?: in (\S+))?/i.exec(said);
+    // The rally's map: ask only the agents whose digests cannot answer (one report each, the cost
+    // said first); once every digest answers, propose the areas in one proposal.
+    const rally = async repo => {
+      const map = JSON.parse(await call('rally', repo ? { repo } : {}));
+      if (map.ask.length) {
+        await call('propose', { actions: map.ask.map(id => ({ action: 'report', agent: id })) });
+        return `Rally: ${map.agents.length} agents in ${path.basename(map.repository)}; ${map.ask.length} of them have no area and no report, so I asked them for a report (${map.cost}).`;
+      }
+      const areas = map.agents.filter(a => !a.area.length && a.suggested_area.length).map(a => ({ action: 'area', agent: a.id, paths: a.suggested_area }));
+      if (areas.length) await call('propose', { actions: areas });
+      const owns = map.agents.map(a => `${a.title} owns ${(a.area.length ? a.area : a.suggested_area).join(', ') || 'nothing yet'}${a.needs ? ` (needs ${a.needs})` : ''}`).join('; ');
+      const overlap = map.overlaps.length ? ' Overlaps: ' + map.overlaps.map(o => o.path).join(', ') + '.' : ' No overlaps.';
+      return `Map: ${owns}.${overlap}${areas.length ? ` I proposed ${areas.length} areas.` : ''}`;
+    };
+    if (rallyAsk && mcp) {
+      const reply = await rally(rallyAsk[1]);
+      assistant([{ type: 'text', text: reply }]);
+      result(false, reply);
+      mcp.close();
+      await sleep(100);
+      process.exit(0);
+    }
+    if (mcp && (questions || reports || findings) && !checkIn) {
+      const lines = [];
+      const level = (/The level is (\w+)\./.exec(text) || [])[1] || 'ask_first';
+      if (findings) lines.push(...await actOnFindings(JSON.parse(findings[1]), level));
+      for (const q of questions ? JSON.parse(questions[1]) : []) lines.push(await call('answer', { ask: q.id, text: 'From the roster: ' + q.question.replace(/\?$/, '') + ' — see the other agents\' digests.' }));
+      if (reports) { const list = JSON.parse(reports[1]); lines.push(await rally(list[0]?.repository)); }
+      reply = lines.join(' ');
+      assistant([{ type: 'text', text: reply }]);
+      result(false, reply);
+      mcp.close();
+      await sleep(100);
+      process.exit(0);
+    }
+    if (checkIn && mcp) {
+      const level = (/The level is (\w+)\./.exec(text) || [])[1] || 'ask_first';
+      const items = JSON.parse(checkIn[1]);
+      const lines = [];
+      if (findings) lines.push(...await actOnFindings(JSON.parse(findings[1]), level));
+      for (const q of questions ? JSON.parse(questions[1]) : []) lines.push(await call('answer', { ask: q.id, text: 'From the roster: ' + q.question.replace(/\?$/, '') + ' — see the other agents\' digests.' }));
+      for (const it of items) {
+        const outside = it.area && it.area.length ? it.changed.filter(p => !it.area.some(a => p === a || p.startsWith(a.replace(/\/$/, '') + '/'))) : [];
+        const leftOut = (it.asked.join(' ').match(/\[leave out: ([^\]]+)\]/) || [])[1];
+        const tripped = it.reasons.some(r => /guardrail|outside|circles|collides/.test(r));
+        let result, reason;
+        // Drifting first: an agent that left its area is drifting even when it has stopped.
+        if (outside.length || tripped) { result = 'drifting'; reason = outside.length ? `wrote outside its area: ${outside.join(', ')}` : it.reasons.join('; '); }
+        else if (it.status === 'completed' || it.status === 'failed') { result = 'done'; reason = `finished with ${it.changed.length} files changed`; }
+        else { result = 'on_task'; reason = 'its changes stay within its task'; }
+        await call('check_in', { agent: it.id, result, reason, left_out: result === 'done' && leftOut ? leftOut : '' });
+        lines.push(`${it.title}: ${result}`);
+        if (result === 'drifting') {
+          const action = level === 'auto' ? { action: 'redirect', agent: it.id, text: 'Back to your task; leave the other files alone.' }
+            : level === 'steer' ? { action: 'hold', agent: it.id, reason: 'drifting: ' + reason }
+            : { action: 'redirect', agent: it.id, text: 'Back to your task; leave the other files alone.' };
+          await call('propose', { actions: [action] });
+        }
+      }
+      reply = 'Check-in: ' + lines.join('; ');
+      assistant([{ type: 'text', text: reply }]);
+      result(false, reply);
+      mcp.close();
+      await sleep(100);
+      process.exit(0);
+    }
+    if (mcp) {
+      const roster = await call('roster', {});
+      // One line per agent: "<id> · <title> · <status> · …".
+      agents = roster.split('\n').map(l => l.split(' · ')).filter(p => p.length >= 3).map(p => ({ id: p[0], title: p[1], status: p[2] }));
+    }
+    const changed = /what did (.+?) change in (\S+)/i.exec(said);
     if (/what is everyone doing/i.test(said)) reply = agents.length ? 'Here is what everyone is doing:\n\n' + agents.map(a => `- **${a.title}**: ${a.status}`).join('\n') : 'No agents are running.';
-    else if (tell) {
+    else if (changed && mcp) {
+      // "What did <agent> change in <file>?": the diff, read through the daemon's tool, quoted.
+      const who = agents.find(a => a.title.toLowerCase().includes(changed[1].toLowerCase()));
+      const diff = who ? await call('diff', { id: who.id, path: changed[2].replace(/[?.!]+$/, '') }) : '';
+      reply = who ? `Here is what ${who.title} changed in ${changed[2]}:\n\n\`\`\`diff\n${diff}\n\`\`\`` : `I could not find an agent called ${changed[1]}.`;
+    } else if (tell) {
       const who = agents.find(a => a.title.toLowerCase().includes(tell[1].toLowerCase()));
       const task = tell[2].replace(/[.!?]+$/, '');
-      reply = who ? `I will send ${who.title} this follow-up: "Please ${task}."\n\n\`\`\`overseer-actions\n${JSON.stringify([{ action: 'follow_up', agent: who.id, title: who.title, text: `Please ${task}.` }])}\n\`\`\`` : `I could not find an agent called ${tell[1]}.`;
+      if (!who) reply = `I could not find an agent called ${tell[1]}.`;
+      else if (mcp) { const outcome = await call('propose', { actions: [{ action: 'message', agent: who.id, text: `Please ${task}.` }] }); reply = `I proposed sending ${who.title} this message: "Please ${task}." ${outcome}`; }
+      else reply = `I will send ${who.title} this follow-up: "Please ${task}."\n\n\`\`\`overseer-actions\n${JSON.stringify([{ action: 'message', agent: who.id, title: who.title, text: `Please ${task}.` }])}\n\`\`\``;
     } else reply = 'I can tell you what your agents are doing, or pass a message to one of them.';
     assistant([{ type: 'text', text: reply }]);
     result(false, reply);
+    if (mcp) mcp.close();
+  } else if (mode === 'channel') {
+    // An agent with Overseer's channel (AC-190): it writes the files its prompt names (write:),
+    // claims, reports and asks as the prompt says (claim:, report:, ask:; "report x3:" repeats),
+    // answers a request for a report from Overseer with what git sees, and refers to a share.
+    // Without --mcp-config (a lone agent) it has no channel and says so.
+    const text = firstText;
+    const mcp = await mcpClient();
+    let n = 0;
+    const call = async (name, args) => {
+      const id = `toolu_mcp_${++n}`;
+      assistant([{ type: 'tool_use', id, name: `mcp__overseer__${name}`, input: args }]);
+      out({ type: 'control_request', request_id: `req-mcp-${n}`, request: { subtype: 'can_use_tool', tool_name: `mcp__overseer__${name}`, input: args } });
+      const reply = await next(m => m.type === 'control_response' && m.response?.request_id === `req-mcp-${n}`);
+      if (reply.response.response.behavior !== 'allow') throw new Error('tool refused');
+      const r = await mcp.call(name, args);
+      user([{ type: 'tool_result', tool_use_id: id, content: r.content, is_error: !!r.isError }]);
+      return r.content.map(c => c.text || '').join('');
+    };
+    const writes = [...text.matchAll(/write: (\S+)/g)].map(m => m[1]);
+    for (const rel of writes) {
+      const file = path.join(process.cwd(), rel);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      const content = '// written by the fixture\n';
+      const id = `toolu_w_${++n}`;
+      assistant([{ type: 'tool_use', id, name: 'Write', input: { file_path: file, content } }]);
+      fs.writeFileSync(file, content);
+      user([{ type: 'tool_result', tool_use_id: id, content: 'File created successfully at: ' + file }]);
+    }
+    const lines = [];
+    const claim = /claim: ([^;\n]+)/.exec(text);
+    if (claim && mcp) lines.push(await call('claim', { paths: claim[1].split(',').map(s => s.trim()) }));
+    const rep = /report(?: x(\d+))?: ([^;\n]+)/.exec(text);
+    if (rep && mcp) { for (let i = 0; i < Number(rep[1] || 1); i++) lines.push(await call('report', { doing: rep[2].trim(), changed: writes, needs: '', blocked: '' })); }
+    const ask = /ask: ([^;\n]+)/.exec(text);
+    if (ask && mcp) lines.push(await call('ask', { question: ask[1].trim() }));
+    if (/Report, with your report tool/.test(text) && mcp) {
+      const changed = require('child_process').execSync('git status --porcelain', { encoding: 'utf8' }).split('\n').filter(Boolean).map(l => l.slice(3).trim());
+      lines.push(await call('report', { doing: 'working in ' + path.basename(process.cwd()), changed, needs: '', blocked: '' }));
+    }
+    let reply;
+    const shared = /Shared by Overseer from (.+?) \(/.exec(text);
+    if (shared) reply = 'Read the share from ' + shared[1] + '; using it.';
+    else if (/Withdrawn: what Overseer shared/.test(text)) reply = 'Dropped the withdrawn share.';
+    else if (/Answer to your question/.test(text)) reply = 'Got the answer from Overseer.';
+    else if (/Briefing from Overseer/.test(text) && !claim && !rep && !ask) reply = 'Noted the briefing.';
+    else reply = mcp ? 'channel: ' + lines.join(' | ') : 'no channel';
+    assistant([{ type: 'text', text: reply }]);
+    result(false, reply);
+    if (mcp) mcp.close();
+  } else if (mode === 'watcher') {
+    // A watcher (AC-193, AC-194): woken by the daemon with what changed in its subject, it files
+    // one finding through the finding tool. Deleting tests is a stop; a hesitation is a concern;
+    // a watch that checks runs the copy's test.sh and reports a failing one; else fine.
+    const text = firstText;
+    const mcp = await mcpClient();
+    let n = 0;
+    const call = async (name, args) => {
+      const id = `toolu_mcp_${++n}`;
+      assistant([{ type: 'tool_use', id, name: `mcp__overseer__${name}`, input: args }]);
+      out({ type: 'control_request', request_id: `req-mcp-${n}`, request: { subtype: 'can_use_tool', tool_name: `mcp__overseer__${name}`, input: args } });
+      const reply = await next(m => m.type === 'control_response' && m.response?.request_id === `req-mcp-${n}`);
+      if (reply.response.response.behavior !== 'allow') throw new Error('tool refused');
+      const r = await mcp.call(name, args);
+      user([{ type: 'tool_result', tool_use_id: id, content: r.content, is_error: !!r.isError }]);
+      return r.content.map(c => c.text || '').join('');
+    };
+    const changed = (/What changed since your last wake[^\n]*:\n([\s\S]*?)\n\nFile one finding/.exec(text) || [])[1] || '';
+    let finding = { result: 'fine', text: 'nothing to report' };
+    if (/delete/i.test(changed) && /tests?/i.test(changed)) finding = { result: 'stop', text: 'it is deleting tests so that the suite passes: ' + changed.split('\n').find(l => /delete/i.test(l)) };
+    else if (/hmm|not sure/i.test(changed)) finding = { result: 'concern', text: 'it sounds unsure: ' + changed.split('\n').find(l => /hmm|not sure/i.test(l)) };
+    if (/Your copy of the subject's worktree/.test(text) && fs.existsSync(path.join(process.cwd(), 'test.sh'))) {
+      const id = `toolu_sh_${++n}`;
+      assistant([{ type: 'tool_use', id, name: 'Bash', input: { command: 'sh test.sh' } }]);
+      let output = '', failed = false;
+      try { output = require('child_process').execSync('sh test.sh', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); } catch (e) { failed = true; output = String(e.stdout || '') + String(e.stderr || ''); }
+      user([{ type: 'tool_result', tool_use_id: id, content: output, is_error: failed }]);
+      if (failed) finding = { result: 'concern', text: 'the tests do not pass in its worktree: ' + (output.split('\n').find(l => /FAIL/.test(l)) || output.trim()) };
+    }
+    const outcome = mcp ? await call('finding', finding) : 'no channel';
+    const reply = `finding: ${finding.result} (${outcome})`;
+    assistant([{ type: 'text', text: reply }]);
+    result(false, reply);
+    if (mcp) mcp.close();
+  } else if (mode === 'circles') {
+    // The same command failing three times in a row (a free check of AC-189).
+    for (let i = 1; i <= 3; i++) {
+      assistant([{ type: 'tool_use', id: `toolu_fail_${i}`, name: 'Bash', input: { command: 'npm test' } }]);
+      user([{ type: 'tool_result', tool_use_id: `toolu_fail_${i}`, content: 'Error: 1 failing', is_error: true }]);
+    }
+    assistant([{ type: 'text', text: 'the tests keep failing' }]);
+    result(false, 'the tests keep failing');
   } else if (mode === 'prose') {
     assistant([{ type: 'text', text: 'I delegated this to a sub-agent and it finished.' }]);
     result(false, 'I delegated this to a sub-agent and it finished.');

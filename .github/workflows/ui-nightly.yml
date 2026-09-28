@@ -1,0 +1,32 @@
+# The packaged-UI fixture suite, nightly and on demand (AC-148): builds the VSIX, installs VS Code,
+# and runs every fixture scenario through scripts/test-all (LIVE scenarios and perf are not run here).
+name: ui-nightly
+on:
+  schedule:
+    - cron: '17 9 * * *'
+  workflow_dispatch:
+jobs:
+  ui:
+    runs-on: macos-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: VS Code
+        run: brew install --cask visual-studio-code
+      - name: Tooling for the VSIX
+        run: |
+          npm ci --prefix extension/branch-diff/tooling/review --ignore-scripts
+          npm ci --prefix extension/tooling/vsce --ignore-scripts
+      - name: Every test
+        run: scripts/test-all
+      - name: Evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-evidence
+          path: docs/verification/evidence/ui

@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overseer Voice Mark</title>
+<!--
+  The reference for AC-177: the Star animation the owner picked on 2026-09-27, in every state,
+  drawn on the layers in ../brand/layers/. Open this file in a browser. The voice is simulated.
+
+  Voice Mode ports MOTION, step() and pose() as they are, and draws with the same layers. The
+  numbers in MOTION are the ones in the per-state table of docs/rfcs/voice-mode.md; change both
+  together, and only by a recorded decision.
+-->
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #FBFAFD; --raised: #FFFFFF; --raised2: #EFEEF5; --border: #E4E2EC; --border-strong: #D2CFDE;
+    --text: #1C1A26; --muted: #5C576F; --faint: #9A96AC; --accent: #6B47E0; --on-accent: #FFFFFF; --focus: #7A5AF0;
+    --stage-in: #ECE8FB; --stage-out: #F2F1F7; --glow: 107, 71, 224;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17161D; --raised: #211F2A; --raised2: #282633; --border: #2A2835; --border-strong: #38354A;
+      --text: #E8E6F0; --muted: #A7A3B9; --faint: #6C687F; --accent: #A48BFF; --on-accent: #17161D; --focus: #8D72F5;
+      --stage-in: #211F2A; --stage-out: #121118; --glow: 164, 139, 255;
+    }
+  }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 48px; display: flex; flex-direction: column; gap: 20px; }
+  h1 { font-size: 20px; font-weight: 600; line-height: 1.3; margin: 0; }
+  p { margin: 0; color: var(--muted); max-width: 68ch; }
+  .stage { border: 1px solid var(--border); border-radius: 12px; background: radial-gradient(circle at 50% 44%, var(--stage-in), var(--stage-out) 72%);
+    display: flex; flex-direction: column; align-items: center; gap: 4px; padding-block: 12px 20px; padding-inline: 16px; }
+  .mark { position: relative; width: min(440px, 100%); aspect-ratio: 1; }
+  .mark canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .mark.is-still canvas { filter: grayscale(1); opacity: .45; }
+  .sign { position: absolute; right: 18%; bottom: 18%; width: 44px; height: 44px; border-radius: 999px; background: var(--raised);
+    border: 1px solid var(--border-strong); color: var(--text); display: grid; place-items: center; }
+  .state { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
+  .meter { width: min(240px, 70%); height: 6px; border-radius: 999px; background: var(--raised2); overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--accent); }
+  fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+  legend { float: left; width: 72px; padding: 0; font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+  .pick { position: relative; }
+  .pick input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .pick span { display: inline-block; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--raised); font-size: 13px; }
+  .pick input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+  .pick input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
+  label.check { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>The Overseer mark in Voice Mode</h1>
+  <p>The Star animation, the owner's pick of 2026-09-27, in every state. The voice here is simulated; in Overseer the level comes from the Rust listener. The swooshes never move.</p>
+
+  <div class="stage">
+    <div class="mark" id="mark">
+      <canvas id="canvas" role="img" aria-label="The Overseer mark, animated"></canvas>
+      <div class="sign" id="sign" hidden aria-hidden="true"></div>
+    </div>
+    <div class="state" id="label">Listening</div>
+    <div class="meter" id="meter" hidden><i id="meter-fill"></i></div>
+  </div>
+
+  <fieldset>
+    <legend>State</legend>
+    <label class="pick"><input type="radio" name="state" value="auto" checked><span>A whole request</span></label>
+    <label class="pick"><input type="radio" name="state" value="listening"><span>Listening</span></label>
+    <label class="pick"><input type="radio" name="state" value="hearing"><span>Hearing you</span></label>
+    <label class="pick"><input type="radio" name="state" value="thinking"><span>Thinking</span></label>
+    <label class="pick"><input type="radio" name="state" value="speaking"><span>Speaking</span></label>
+    <label class="pick"><input type="radio" name="state" value="muted"><span>Muted</span></label>
+    <label class="pick"><input type="radio" name="state" value="paused"><span>Paused for a call</span></label>
+  </fieldset>
+  <label class="check"><input type="checkbox" id="reduced"> Reduced motion</label>
+</main>
+
+<script>
+// ---------------------------------------------------------------- the reference, to be ported
+
+// Where the parts sit on the layers' 1254 px canvas (docs/design/brand/layers/split.py prints them).
+const GEOMETRY = { size: 1254, core: [632.8, 642.8], star: [637.4, 640.6], coreRadius: 283, fit: 0.74 };
+
+// Every number of the animation. Times in seconds; glow strength 0..1; scales are multiples of the star's size.
+const MOTION = {
+  level: { rise: 0.030, fall: 0.160 },              // how fast the drawn level follows the voice
+  glow: { rest: 0.18, breath: 0.05, breathPeriod: 4, hearing: 0.80, speaking: 0.35, reach: 0.40, reachHearing: 0.10 },
+  star: { hearing: 0.85, speaking: 0.30, thinking: 0.12, light: 0.70, turn: 1.3, settle: 0.40 },
+  rings: { threshold: 0.42, gap: 0.20, life: 0.95, reach: 1.05, width: 0.07, power: [0.35, 0.65], alpha: 0.90, max: 6 },
+  still: { opacity: 0.45 },
+  blend: 0.12,                                       // how fast listening and thinking fade in and out
+};
+
+const STATES = ['listening', 'hearing', 'thinking', 'speaking', 'muted', 'paused'];
+
+function createMotion() {
+  return { clock: 0, hearing: 0, speaking: 0, listening: 1, thinking: 0, turn: 0, rings: [], lastRing: -Infinity, loud: false };
+}
+
+// Advances the motion by dt seconds. `level` is the voice's loudness (0..1): the owner's while
+// hearing, Overseer's while speaking; it is ignored in every other state.
+function step(m, state, level, dt) {
+  const toward = (v, target, tau) => v + (target - v) * (1 - Math.exp(-dt / tau));
+  const follow = (v, target) => toward(v, target, target > v ? MOTION.level.rise : MOTION.level.fall);
+  m.clock += dt;
+  m.hearing = follow(m.hearing, state === 'hearing' ? level : 0);
+  m.speaking = follow(m.speaking, state === 'speaking' ? level : 0);
+  m.listening = toward(m.listening, state === 'listening' ? 1 : 0, MOTION.blend);
+  m.thinking = toward(m.thinking, state === 'thinking' ? 1 : 0, MOTION.blend);
+  if (state === 'thinking') m.turn += MOTION.star.turn * dt;
+  else {
+    const quarter = Math.PI / 2;                    // the star has four points: a quarter turn looks like none
+    m.turn = toward(m.turn, Math.round(m.turn / quarter) * quarter, MOTION.star.settle / 3);
+  }
+  const loud = state === 'speaking' && m.speaking > MOTION.rings.threshold;
+  if (loud && !m.loud && m.clock - m.lastRing >= MOTION.rings.gap) {
+    m.rings.push({ age: 0, power: MOTION.rings.power[0] + MOTION.rings.power[1] * m.speaking });
+    m.lastRing = m.clock;
+    if (m.rings.length > MOTION.rings.max) m.rings.shift();
+  }
+  m.loud = loud;
+  for (const r of m.rings) r.age += dt / MOTION.rings.life;
+  m.rings = m.rings.filter(r => r.age < 1);
+  if (state === 'muted' || state === 'paused') m.rings = [];
+}
+
+// What to draw now. Pure: the same motion and state give the same pose.
+function pose(m, state, reduced) {
+  const still = reduced || state === 'muted' || state === 'paused';
+  const breath = MOTION.glow.breath * m.listening * Math.sin(2 * Math.PI * m.clock / MOTION.glow.breathPeriod);
+  return {
+    still,
+    sign: state === 'muted' ? 'mute' : state === 'paused' ? 'pause' : null,
+    meter: reduced && !(state === 'muted' || state === 'paused') ? Math.max(m.hearing, m.speaking) : null,
+    glow: { strength: MOTION.glow.rest + breath + MOTION.glow.hearing * m.hearing + MOTION.glow.speaking * m.speaking,
+            reach: MOTION.glow.reach + MOTION.glow.reachHearing * m.hearing },
+    star: { scale: 1 + MOTION.star.hearing * m.hearing + MOTION.star.speaking * m.speaking + MOTION.star.thinking * m.thinking,
+            turn: m.turn, light: MOTION.star.light * Math.max(m.hearing, m.speaking) },
+    rings: m.rings.map(r => ({ radius: r.age * MOTION.rings.reach, alpha: (1 - r.age) * r.power })),
+  };
+}
+
+// Draws a pose. `layers` holds the images core, swooshes, star and flat (the whole logo); `glow`
+// is the accent colour as "r, g, b". Back to front: glow, core, rings on the core, swooshes, star.
+function draw(ctx, spare, layers, p, glow) {
+  const W = ctx.canvas.width, M = W * GEOMETRY.fit, S = GEOMETRY.size;
+  const [cx, cy] = GEOMETRY.core.map(v => v / S), [sx, sy] = GEOMETRY.star.map(v => v / S);
+  const place = (c, img, scale = 1, turn = 0, around = 'core') => {
+    const fx = around === 'star' ? sx : cx, fy = around === 'star' ? sy : cy;
+    c.save();
+    c.translate(W / 2 + (fx - cx) * M, W / 2 + (fy - cy) * M);
+    c.rotate(turn); c.scale(scale, scale);
+    c.drawImage(img, -fx * M, -fy * M, M, M);
+    c.restore();
+  };
+  ctx.clearRect(0, 0, W, W);
+  if (p.still) { place(ctx, layers.flat); return; }
+
+  const g = ctx.createRadialGradient(W / 2, W / 2, W * 0.12, W / 2, W / 2, W * p.glow.reach);
+  g.addColorStop(0, `rgba(${glow}, ${0.55 * Math.max(0, p.glow.strength)})`);
+  g.addColorStop(1, `rgba(${glow}, 0)`);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, W);
+
+  place(ctx, layers.core);
+  if (p.rings.length) {
+    const s = spare.getContext('2d'), rim = GEOMETRY.coreRadius / S * M, band = W * MOTION.rings.width;
+    s.globalCompositeOperation = 'source-over'; s.clearRect(0, 0, W, W);
+    for (const r of p.rings) {
+      const at = r.radius * rim, lg = s.createRadialGradient(W / 2, W / 2, Math.max(0, at - band), W / 2, W / 2, at + band);
+      lg.addColorStop(0, 'rgba(255, 255, 255, 0)'); lg.addColorStop(0.5, `rgba(255, 255, 255, ${r.alpha})`); lg.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      s.fillStyle = lg; s.fillRect(0, 0, W, W);
+    }
+    s.globalCompositeOperation = 'destination-in'; place(s, layers.core); s.globalCompositeOperation = 'source-over';
+    ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = MOTION.rings.alpha; ctx.drawImage(spare, 0, 0); ctx.restore();
+  }
+  place(ctx, layers.swooshes);
+  place(ctx, layers.star, p.star.scale, p.star.turn, 'star');
+  if (p.star.light > 0.005) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.min(1, p.star.light);
+    place(ctx, layers.star, p.star.scale, p.star.turn, 'star'); ctx.restore();
+  }
+}
+
+// ---------------------------------------------------------------- this page only: a simulated voice
+
+(() => {
+  const $ = id => document.getElementById(id);
+  const canvas = $('canvas'), ctx = canvas.getContext('2d'), spare = document.createElement('canvas');
+  const LABEL = { listening: 'Listening', hearing: 'Hearing you', thinking: 'Thinking', speaking: 'Speaking', muted: 'Muted', paused: 'Paused for a call' };
+  const SCRIPT = [['listening', 2.4], ['hearing', 6.4], ['thinking', 1.2], ['speaking', 4.4], ['listening', 1.4]];
+  const SIGN = {
+    mute: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M4 4l16 16"/></svg>',
+    pause: '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="5" width="3.5" height="14" rx="1"/><rect x="13.5" y="5" width="3.5" height="14" rx="1"/></svg>'
+  };
+  const hash = n => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+  const voice = (t, seed) => {                   // syllables about four a second, short gaps between words
+    const i = Math.floor(t * 4.6), f = t * 4.6 - i;
+    return hash(i * 7 + 3 + seed) < 0.15 ? 0 : (0.45 + 0.55 * hash(i + seed)) * Math.pow(Math.sin(Math.PI * f), 1.4);
+  };
+  const layers = {};
+  const motion = createMotion();
+  let chosen = 'auto', step_ = 0, inStep = 0, last = 0, glow = '';
+  let reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  $('reduced').checked = reduced;
+
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000 || 0); last = now;
+    const css = $('mark').clientWidth || 440, px = Math.round(css * Math.min(2, window.devicePixelRatio || 1));
+    if (canvas.width !== px) canvas.width = canvas.height = spare.width = spare.height = px;
+    inStep += dt;
+    let state = chosen, span = 6.4;
+    if (chosen === 'auto') {
+      if (inStep > SCRIPT[step_][1]) { step_ = (step_ + 1) % SCRIPT.length; inStep = 0; }
+      [state, span] = SCRIPT[step_];
+    }
+    const t = chosen === 'auto' ? inStep : inStep % (span + 0.8);
+    const talking = (state === 'hearing' || state === 'speaking') && t < span * 0.94;
+    step(motion, state, talking ? voice(t, state === 'speaking' ? 40 : 0) : 0, dt);
+    const p = pose(motion, state, reduced);
+    if (!glow || Math.random() < 0.02) glow = getComputedStyle(document.documentElement).getPropertyValue('--glow').trim();
+    draw(ctx, spare, layers, p, glow);
+    $('label').textContent = LABEL[state];
+    $('mark').classList.toggle('is-still', !!p.sign);
+    $('sign').hidden = !p.sign; if (p.sign && $('sign').dataset.sign !== p.sign) { $('sign').innerHTML = SIGN[p.sign]; $('sign').dataset.sign = p.sign; }
+    $('meter').hidden = p.meter === null; if (p.meter !== null) $('meter-fill').style.width = Math.round(p.meter * 100) + '%';
+    requestAnimationFrame(frame);
+  }
+
+  for (const input of document.querySelectorAll('input[name="state"]')) input.addEventListener('change', () => { chosen = input.value; step_ = 0; inStep = 0; });
+  $('reduced').addEventListener('change', e => { reduced = e.target.checked; });
+  const load = (key, src) => new Promise((ok, fail) => { const i = new Image(); i.onload = () => { layers[key] = i; ok(); }; i.onerror = fail; i.src = src; });
+  Promise.all([
+    load('core', '../brand/layers/overseer-logo-core.png'), load('swooshes', '../brand/layers/overseer-logo-swooshes.png'),
+    load('star', '../brand/layers/overseer-logo-star.png'), load('flat', '../brand/overseer-logo.png'),
+  ]).then(() => requestAnimationFrame(t => { last = t; frame(t); }))
+    .catch(() => { $('label').textContent = 'Open this page from its place in the repository: it loads the layers from ../brand/.'; });
+})();
+</script>
+</body>
+</html>

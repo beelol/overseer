@@ -125,7 +125,8 @@ impl Daemon {
                 return run;
             }
             if Instant::now() > deadline {
-                panic!("run {id} stuck in {}", run["status"]);
+                let errors: Vec<String> = self.events(id).iter().filter(|e| e["kind"] == "error" || e["kind"] == "daemon_error" || (e["kind"] == "output" && e["payload"]["role"] == "stderr")).map(|e| e["payload"].to_string().chars().take(300).collect()).collect();
+                panic!("run {id} stuck in {} (exit reason {}; errors {errors:?})", run["status"], run["exit_reason"]);
             }
             std::thread::sleep(Duration::from_millis(100));
         }

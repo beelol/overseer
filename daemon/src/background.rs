@@ -201,6 +201,17 @@ fn notifier_app() -> Option<std::path::PathBuf> {
     app.join("Contents/MacOS/notifier").is_file().then_some(app)
 }
 
+/// Registers the bundled notifier with LaunchServices once per daemon, so an updated helper's
+/// icon replaces the one macOS cached from an older build (AC-179). Best effort.
+fn register_notifier(app: &std::path::Path) {
+    static DONE: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    DONE.get_or_init(|| {
+        let lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
+        let _ = std::process::Command::new(lsregister).arg("-f").arg(app)
+            .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status();
+    });
+}
+
 /// Runs the notifier and returns its outcome code (0 posted, 3 denied, 5 no answer, other: failed).
 /// macOS only lets an app use notifications when LaunchServices launched it, so it is started
 /// with `open -n -W` and reports through a result file. Tests with fake helpers set
@@ -210,6 +221,7 @@ fn run_notifier(app: &std::path::Path, title: &str, body: &str) -> Result<i32, S
     if std::env::var_os("OVERSEER_TEST_NOTIFIER_DIRECT").is_some() {
         return std::process::Command::new(app.join("Contents/MacOS/notifier")).args(args).output().map(|o| o.status.code().unwrap_or(-1)).map_err(|e| e.to_string());
     }
+    register_notifier(app);
     let result = crate::paths::runtime_dir().join(format!("notify-{}.result", std::process::id()));
     let _ = std::fs::remove_file(&result);
     let status = std::process::Command::new("/usr/bin/open").arg("-n").arg("-W").arg(app).arg("--args").args(args).arg("--result").arg(&result).status().map_err(|e| e.to_string())?;

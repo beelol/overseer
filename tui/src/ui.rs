@@ -123,8 +123,79 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Mode::Pairing => pairing(f, app, Rect { y: head.y, height: head.height + body.height, ..area }),
         Mode::Audio => audio_mode(f, app, area),
         Mode::AudioImport => audio_import(f, app, area),
+        Mode::Overseer => overseer_view(f, app, area),
         _ => {}
     }
+}
+
+/// The conversation with Overseer (AC-199): the owner's words, Overseer's replies, the daemon's
+/// cards, the proposals that wait (answered with ctrl+y / ctrl+n), and what is being typed.
+fn overseer_view(f: &mut Frame, app: &App, area: Rect) {
+    let w = 110.min(area.width.saturating_sub(4));
+    let h = area.height.saturating_sub(2).max(8);
+    let r = Rect { x: area.x + (area.width.saturating_sub(w)) / 2, y: area.y + (area.height.saturating_sub(h)) / 2, width: w, height: h };
+    let inner_w = (w as usize).saturating_sub(4);
+    let s = &app.overseer;
+    let level = match s["level"].as_str().unwrap_or("ask_first") { "steer" => "Steer", "auto" => "Auto", _ => "Ask first" };
+    let mut lines: Vec<Line> = Vec::new();
+    let wrap = |text: &str, prefix: &str, style: Style, out: &mut Vec<Line>| {
+        let mut first = true;
+        for para in text.split('\n') {
+            let mut line = String::new();
+            for word in para.split(' ') {
+                if !line.is_empty() && line.width() + word.width() + 1 > inner_w.saturating_sub(prefix.width()) {
+                    out.push(Line::from(vec![Span::styled(if first { prefix.to_string() } else { " ".repeat(prefix.width()) }, Style::new().fg(MUTED)), Span::styled(std::mem::take(&mut line), style)]));
+                    first = false;
+                }
+                if !line.is_empty() {
+                    line.push(' ');
+                }
+                line.push_str(word);
+            }
+            out.push(Line::from(vec![Span::styled(if first { prefix.to_string() } else { " ".repeat(prefix.width()) }, Style::new().fg(MUTED)), Span::styled(line, style)]));
+            first = false;
+        }
+    };
+    for m in s["messages"].as_array().cloned().unwrap_or_default() {
+        let source = m["source"].as_str().unwrap_or("system");
+        let text = m["text"].as_str().unwrap_or("");
+        match source {
+            "owner" => wrap(text, " you › ", Style::new().add_modifier(Modifier::BOLD), &mut lines),
+            "overseer" => wrap(text, " ◆ ", Style::new(), &mut lines),
+            _ => {
+                let kind = m["card"]["kind"].as_str().unwrap_or(source);
+                let mark = match kind { "finding" | "cannot_answer" => " ⚠ ", "done" => " ✓ ", "started" => " ▶ ", _ => " · " };
+                wrap(&format!("{kind}: {text}"), mark, Style::new().fg(MUTED), &mut lines);
+            }
+        }
+    }
+    for p in s["proposals"].as_array().cloned().unwrap_or_default() {
+        if p["state"] != "open" {
+            continue;
+        }
+        lines.push(Line::from(Span::styled(" Overseer will:", Style::new().fg(waiting()).add_modifier(Modifier::BOLD))));
+        for l in p["lines"].as_array().cloned().unwrap_or_default() {
+            wrap(l.as_str().unwrap_or(""), "   • ", Style::new().fg(waiting()), &mut lines);
+        }
+        lines.push(Line::from(Span::styled("   ctrl+y yes · ctrl+n no", Style::new().fg(MUTED))));
+    }
+    if lines.is_empty() {
+        lines.push(Line::from(Span::styled(" Nothing yet. Type to Overseer: what your agents are doing, or what one of them should do next.", Style::new().fg(MUTED))));
+    }
+    let draft_h = (app.overseer_draft.lines().count().max(1) as u16).min(4) + 1;
+    let body_h = (h as usize).saturating_sub(2 + draft_h as usize);
+    let end = lines.len().saturating_sub(app.overseer_scroll.min(lines.len()));
+    let start = end.saturating_sub(body_h);
+    let shown: Vec<Line> = lines[start..end].to_vec();
+    let mut all = shown;
+    all.push(Line::from(Span::styled(" ".repeat(inner_w.min(120)).replace(' ', "─"), Style::new().fg(MUTED))));
+    let draft = if app.overseer_draft.is_empty() { " › type a message for Overseer".to_string() } else { format!(" › {}", app.overseer_draft) };
+    all.push(Line::from(Span::styled(draft, if app.overseer_draft.is_empty() { Style::new().fg(MUTED) } else { Style::new().fg(accent()) })));
+    let block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(accent()))
+        .title(Span::styled(format!(" ◆ Overseer · {level} "), Style::new().add_modifier(Modifier::BOLD)))
+        .title_bottom(Line::from(Span::styled(" enter sends · ctrl+y / ctrl+n answer a proposal · esc closes ", Style::new().fg(MUTED))).right_aligned());
+    f.render_widget(Clear, r);
+    f.render_widget(Paragraph::new(all).block(block).wrap(Wrap { trim: false }), r);
 }
 
 fn header(f: &mut Frame, app: &App, area: Rect) {
@@ -196,9 +267,10 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         Mode::Pairing => &[("p", "new code"), ("esc", "close")],
         Mode::Audio => &[("space", "on/off"), ("1/2/3", "track"), ("tab", "cue"), ("p", "preview"), ("v", "voice"), ("i", "import"), ("esc", "close")],
         Mode::AudioImport => &[("type", "private folder path"), ("enter", "import"), ("esc", "back")],
+        Mode::Overseer => &[("type", "to Overseer"), ("enter", "send"), ("ctrl+y/n", "yes/no to a proposal"), ("j/k", "scroll"), ("esc", "close")],
         Mode::Search => &[("type", "to search title, repo, harness, model, prompt"), ("enter", "keep"), ("esc", "clear")],
         Mode::Changes => &[("j/k", "file"), ("J/K", "scroll diff"), ("c", "comparison"), ("r", "refresh"), ("v/esc", "back")],
-        _ if area.width < 110 => &[("i", "message"), ("z", "zoom"), ("a/d", "answer"), ("n", "new"), ("?", "keys"), ("q", "quit")],
+        _ if area.width < 110 => &[("i", "message"), ("z", "zoom"), ("a/d", "answer"), ("n", "new"), ("o", "Overseer"), ("?", "keys"), ("q", "quit")],
         _ => &[("←↑↓→", "move"), ("i", "message"), ("z", "zoom"), ("v", "changes"), ("a/d", "allow/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
     };
     let mut spans = vec![Span::raw(" ")];
@@ -271,6 +343,8 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     if let Some(m) = run.model.as_deref().filter(|m| !m.is_empty()) {
         meta.push(m.to_string());
     }
+    // Oversight (AC-199): held, watched, watching, in conflict, from the daemon's state.
+    meta.extend(app.state.marks(&run.id));
     let age = elapsed(run.ended_ms.unwrap_or_else(now_ms) - run.created_ms);
     let right = format!(" {} · {} ", meta.join(" · "), age);
     let room = (area.width as usize).saturating_sub(right.width() + 8);

@@ -48,7 +48,7 @@
   function decorate(pre, post) {
     const code = pre.querySelector('code');
     const lang = code && /language-([\w+-]+)/.exec(code.className || '')?.[1];
-    if (lang === 'overseer-actions') { proposal(pre, code.textContent, post); return; }
+    if (lang === 'overseer-actions') { pre.remove(); return; } // the daemon turns it into a proposal card (Gate S)
     if (code && window.hljs) {
       try {
         if (lang && window.hljs.getLanguage(lang)) code.innerHTML = window.hljs.highlight(code.textContent, { language: lang, ignoreIllegals: true }).value;

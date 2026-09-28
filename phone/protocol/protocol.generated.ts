@@ -116,6 +116,8 @@ export interface State {
   workspaces: Array<Workspace>;
   profiles: Array<Profile>;
   turns: Record<string, Array<Turn>>;
+  oversight: Record<string, unknown>;
+  overseer: unknown;
   daemon: {
     pid: number;
     started_ms: number;
@@ -882,6 +884,94 @@ export interface Methods {
   "ollama.stop": { class: 'mac_only'; params: unknown; result: unknown };
   /** Age a wait (tests only). The Mac only: A test hook. */
   "continuity.test_age": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Every agent, as Overseer sees them. */
+  "agents.roster": { class: 'mac_only'; params: unknown; result: unknown };
+  /** A digest of what an agent did. */
+  "agent.digest": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Set or read the area an agent works in. */
+  "agent.area": { class: 'mac_only'; params: unknown; result: unknown };
+  /** The briefings an agent was given. */
+  "agent.briefings": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Set how often an agent checks in. */
+  "agent.cadence": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Turn briefings and the channel on or off. */
+  "agent.channel": { class: 'mac_only'; params: unknown; result: unknown };
+  /** An agent's check-ins. */
+  "agent.check_ins": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Add a guardrail to an agent. */
+  "agent.guardrail": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Remove a guardrail. */
+  "agent.guardrail_remove": { class: 'mac_only'; params: unknown; result: unknown };
+  /** An agent's guardrails. */
+  "agent.guardrails": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Hold an agent. */
+  "agent.hold": { class: 'mac_only'; params: unknown; result: unknown };
+  /** The agents on hold. */
+  "agent.holds": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Release a held agent. */
+  "agent.release": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Redirect an agent. */
+  "agent.redirect": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Refuse shares to an agent. */
+  "agent.share_deny": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Redirect an agent. */
+  "run.redirect": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Queue a message for an agent. */
+  "run.queue": { class: 'mac_only'; params: unknown; result: unknown };
+  /** An agent's queued messages. */
+  "run.queued": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Remove a queued message. */
+  "run.unqueue": { class: 'mac_only'; params: unknown; result: unknown };
+  /** The agents' channel. */
+  "channel.messages": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Conflicts between agents. */
+  "conflicts.list": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Dismiss a conflict between agents. */
+  "conflict.dismiss": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Resolve a conflict between agents. */
+  "conflict.resolve": { class: 'mac_only'; params: unknown; result: unknown };
+  /** What agents shared. */
+  "share.list": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Withdraw a share. */
+  "share.withdraw": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Start a watch on an agent. */
+  "watch.start": { class: 'mac_only'; params: unknown; result: unknown };
+  /** End a watch. */
+  "watch.end": { class: 'mac_only'; params: unknown; result: unknown };
+  /** The watches. */
+  "watch.list": { class: 'mac_only'; params: unknown; result: unknown };
+  /** What a watch found. */
+  "watch.findings": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Overseer's session. */
+  "overseer.session": { class: 'mac_only'; params: unknown; result: unknown };
+  /** The conversation with Overseer. */
+  "overseer.messages": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Say something to Overseer. */
+  "overseer.send": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Propose actions for the owner to approve. */
+  "overseer.propose": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Answer one of Overseer's proposals. */
+  "overseer.answer": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Cancel one of Overseer's proposals. */
+  "overseer.cancel": { class: 'mac_only'; params: unknown; result: unknown };
+  /** One of Overseer's cards. */
+  "overseer.card": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Set how much Overseer does on its own. */
+  "overseer.level": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Set Overseer's spending cap. */
+  "overseer.cap": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Start a fresh Overseer conversation. */
+  "overseer.fresh": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Rally the agents. */
+  "overseer.rally": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Scan an agent for conflicts. */
+  "overseer.scan": { class: 'mac_only'; params: unknown; result: unknown };
+  /** A token for an agent's Overseer tools. The Mac only: It is for the agents' own Overseer tools, never a phone. */
+  "overseer.token": { class: 'mac_only'; params: unknown; result: unknown };
+  /** The Overseer tools an agent may use. The Mac only: It is for the agents' own Overseer tools, never a phone. */
+  "overseer.tools": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Run one of Overseer's tools for an agent. The Mac only: It is for the agents' own Overseer tools, never a phone. */
+  "overseer.tool": { class: 'mac_only'; params: unknown; result: unknown };
 }
 
 export type MethodName = keyof Methods;
@@ -994,6 +1084,50 @@ export const METHOD_CLASS = {
   "ollama.start": 'mac_only',
   "ollama.stop": 'mac_only',
   "continuity.test_age": 'mac_only',
+  "agents.roster": 'mac_only',
+  "agent.digest": 'mac_only',
+  "agent.area": 'mac_only',
+  "agent.briefings": 'mac_only',
+  "agent.cadence": 'mac_only',
+  "agent.channel": 'mac_only',
+  "agent.check_ins": 'mac_only',
+  "agent.guardrail": 'mac_only',
+  "agent.guardrail_remove": 'mac_only',
+  "agent.guardrails": 'mac_only',
+  "agent.hold": 'mac_only',
+  "agent.holds": 'mac_only',
+  "agent.release": 'mac_only',
+  "agent.redirect": 'mac_only',
+  "agent.share_deny": 'mac_only',
+  "run.redirect": 'mac_only',
+  "run.queue": 'mac_only',
+  "run.queued": 'mac_only',
+  "run.unqueue": 'mac_only',
+  "channel.messages": 'mac_only',
+  "conflicts.list": 'mac_only',
+  "conflict.dismiss": 'mac_only',
+  "conflict.resolve": 'mac_only',
+  "share.list": 'mac_only',
+  "share.withdraw": 'mac_only',
+  "watch.start": 'mac_only',
+  "watch.end": 'mac_only',
+  "watch.list": 'mac_only',
+  "watch.findings": 'mac_only',
+  "overseer.session": 'mac_only',
+  "overseer.messages": 'mac_only',
+  "overseer.send": 'mac_only',
+  "overseer.propose": 'mac_only',
+  "overseer.answer": 'mac_only',
+  "overseer.cancel": 'mac_only',
+  "overseer.card": 'mac_only',
+  "overseer.level": 'mac_only',
+  "overseer.cap": 'mac_only',
+  "overseer.fresh": 'mac_only',
+  "overseer.rally": 'mac_only',
+  "overseer.scan": 'mac_only',
+  "overseer.token": 'mac_only',
+  "overseer.tools": 'mac_only',
+  "overseer.tool": 'mac_only',
 } as const satisfies Record<MethodName, MethodClass>;
 
 export type PhoneMethod = { [K in MethodName]: Methods[K]['class'] extends 'mac_only' ? never : K }[MethodName];

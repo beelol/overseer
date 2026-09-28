@@ -686,6 +686,25 @@ Built in its own worktree and pull request, like the other gates. The goal text 
 | 9. Bounds, safety, coverage | AC-198, AC-200, AC-201 | |
 | 10. The owner's session | AC-202 | |
 
+## Decisions made while building
+
+Settled by the implementing session (pull request #14) where the text above left room, each with
+its test.
+
+| Question | Decision |
+| --- | --- |
+| When briefings and the channel start | Only once the owner has spoken to Overseer (its run exists), and then when another agent works in the repository; a generic program gets neither. Before that, an agent's task is exactly as typed, so nothing changes for an owner who never opens the conversation (Continuity's fixtures showed why). The owner sets it per agent or as the default (`agent.channel`). |
+| When an agent is finished | When it has stayed idle for the grace period after completing a turn (30 s, `overseer.grace_ms`); a new turn inside it means the work goes on. Check-ins and watches use the same notion. |
+| A watcher's first wake | A new watcher is created on the subject's first wake, not when the watch is set, so an unchanged subject costs nothing. A named idle agent is woken instead. |
+| Hold on stop when the subject is idle | The hold is recorded either way: a running subject is stopped now, an idle one has its next turn wait. |
+| A briefing that changed | When a companion claims an area, the briefing is made again; one still waiting in the queue is replaced. |
+| An agent started by hand | Appears in the conversation as a *started* card (the seed of home's *Ask Overseer instead*). A start from Overseer has its proposal's card instead. |
+| Naming agents at home | `@` opens a list under the text that never takes the keyboard (typing narrows it, arrows move, Enter or Tab inserts, Escape closes); a named agent reaches Overseer as `@Title (run id)`. |
+| The words of a proposal | The daemon writes them (`lines`) for every surface, with the proposal's cause, so the terminal and the phone show the same card as VS Code. |
+| A denied permission | Remembered for a day with its command or path; words that would have another agent repeat it are refused at the proposal. |
+| Channel messages | Redacted at the door, so no credential enters a report, a question or an answer, whatever surface reads them later. |
+| Test settings | `OVERSEER_CHANNEL_DEFAULT` (auto, on, off) and `OVERSEER_CHECK_INS` (off, done, every:N) at the daemon's start, so the suites run with the new behaviour off and on (AC-201). |
+
 ## Acceptance
 
 AC-180 to AC-202 in the main RFC are the acceptance criteria. Each has its Verify clause there.
