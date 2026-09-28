@@ -18,9 +18,9 @@ Classes: **(a)** fixtures and targeted tests can finish it; **(b)** it needs a l
 | AUTO-AC-14 Unknown and cold start | Needs a routing-classifier response that cannot turn an unknown balance into a fact. Depends on AUTO-AC-34. | (a) after 34 |
 | AUTO-AC-15 Reproducible decision trace | Replay that includes an inference output, plus a secrets and privacy sweep of the traces. Depends on AUTO-AC-34. | (a) after 34 |
 | AUTO-AC-16 No suitable route | Verified in this slice. | (a), done |
-| AUTO-AC-17 Concurrent admission | Joined ordinary, Auto, Swarm and Gate S admission for the last window. Also: changed or unknown identity, local endpoint aliases, and a daemon race between a calibrated Auto unit and a Swarm worker. | (a) |
+| AUTO-AC-17 Concurrent admission | Done in this slice: the last-window race (calibrated Auto against Swarm) and the Gate S last-slot check. Left: a competing manual run on a profile whose account identity was never read. Counting it as possibly the same account would block Auto and known-window bookings whenever the owner runs an unidentified manual task; reading the identity would change the manual path, which AUTO-AC-01 keeps unchanged. Also left: local endpoint aliases and a live watcher-wake race. | (a); (c) unknown-identity policy |
 | AUTO-AC-19 Pre-effect fallback | A model-turn failure on the same upstream, a direct launch rejection after discovery, and a wider no-effect classification. | (a) |
-| AUTO-AC-20 Bounded retries and stable dispatch | Recovery across accounts on one failed endpoint, and token and parent-budget enforcement. | (a) |
+| AUTO-AC-20 Bounded retries and stable dispatch | Verified in this slice: one shared recovery check per endpoint across accounts. | (a), done |
 | AUTO-AC-21 Safe handoff | "Controlled real harness processes" fail after an edit and continue in a linked run. Also automatic handoff selection. | (a) selection; (b) real harness (Codex, or OpenCode with local Qwen if the handoff accepts it) |
 | AUTO-AC-23 User intent survives | Verified in this slice. It reopens if automatic continuation is added. | (a), done; (d) for the waiting UI |
 | AUTO-AC-24 Durable recovery | A crash mid-handoff, Auto launches on the booking across a crash, two real UI clients reconnecting (phone if Gate N lands). | (a); (d) |
@@ -29,7 +29,7 @@ Classes: **(a)** fixtures and targeted tests can finish it; **(b)** it needs a l
 | AUTO-AC-31 Repeated delegation while healthy | An actual parent delegating a real browser run-through. | (b) |
 | AUTO-AC-32 Consumption attribution | Gate S turns on the same metering path (a). A comparable live allowance delta (b). | (a); (b) |
 | AUTO-AC-33 Outcome-aware selection evaluation | Real browser, routine-edit and diagnosis work scored against the frozen v1 rubric. | (b); (c) budget |
-| AUTO-AC-34 Bounded routing inference | Not started: a classifier call path with timeout, invalid-output, budget and escalation bounds, tested with a fixture classifier. | (a); (c) which model a live classifier may use |
+| AUTO-AC-34 Bounded routing inference | Not started. Needs a classifier call path with timeout, invalid-output, budget and escalation bounds, tested with a fixture classifier. Every call is a paid turn, so the owner must decide whether a classifier ships and on which model (the budget rules allow only luna-low or haiku). Until then no inference runs and traces record `not_used`. | (a) for the fixture bounds; (c) whether and which model |
 | AUTO-AC-35 Delegation lifecycle | A real managed child returning a browser artifact exactly once. | (b) |
 | AUTO-AC-36 Adaptation without configuration upkeep | Selection now reads the qualified draw. Left: churn and switching-overhead checks, and invalidation on a harness or model change, through dispatch. | (a) |
 | AUTO-AC-38 Minimal local measurement schema | Secret-sentinel fixtures (a). A real authorized Claude task record (b). | (a); (b) |
