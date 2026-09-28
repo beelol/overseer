@@ -615,7 +615,9 @@ impl Daemon {
         let (at_once, settle) = if confirm {
             (false, false)
         } else if voice {
-            (checked.iter().all(|a| a["action"] == "stop"), !checked.iter().all(|a| a["action"] == "stop"))
+            // Stop and the Look tier (pin) happen at once; the rest of Steer settles (AC-171).
+            let now_ok = checked.iter().all(|a| a["action"] == "stop" || super::control::action_class(a["action"].as_str().unwrap_or("")) == Some(super::control::LOOK));
+            (now_ok, !now_ok)
         } else if level == "ask_first" {
             (false, false)
         } else if owner_asked {

@@ -239,6 +239,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "voice.requests" => crate::voice::request::list(d, p)?,
         "voice.cancel" => crate::voice::request::cancel(d, p)?,
         "voice.read_back" => crate::voice::request::read_back(d, p)?,
+        "voice.answer" => crate::voice::request::answer(d, p)?,
         "harness.list" => {
             let list: Vec<Value> = ["codex", "codex-app", "claude", "opencode", "opencode-serve", "generic"]
                 .iter()

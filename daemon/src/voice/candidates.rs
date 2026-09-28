@@ -69,7 +69,7 @@ pub fn candidates(text: &str, ctx: &Context) -> Vec<Candidate> {
     let said = words(text);
     let set: BTreeSet<&str> = said.iter().map(String::as_str).collect();
     let mut out: Vec<Candidate> = Vec::new();
-    let mut add = |id: &str, reason: &'static str, out: &mut Vec<Candidate>| {
+    let add = |id: &str, reason: &'static str, out: &mut Vec<Candidate>| {
         if !out.iter().any(|c| c.id == id) {
             out.push(Candidate {
                 id: id.to_string(),

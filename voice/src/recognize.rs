@@ -146,6 +146,10 @@ impl Recognizer for Scripted {
             };
             out.extend(words.into_iter().take(said));
         }
+        // A test hook: a scripted line can make the recognizer fail (AC-175).
+        if out.iter().any(|w| *w == "<recognizer-fails>") {
+            anyhow::bail!("the recognizer failed (a scripted failure)");
+        }
         Ok(out.join(" "))
     }
 

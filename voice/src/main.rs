@@ -69,6 +69,21 @@ fn run() -> Result<()> {
             "--rate" => opts.rate = Some(value()?.parse()?),
             "--echo" => opts.echo = value()?.parse()?,
             "--no-control" => opts.control = false,
+            "--lock" => {
+                // One listener per daemon (AC-163): a second one with the same lock is refused.
+                let path = PathBuf::from(value()?);
+                let f = std::fs::OpenOptions::new()
+                    .create(true)
+                    .truncate(false)
+                    .write(true)
+                    .open(&path)?;
+                use std::os::fd::AsRawFd;
+                if unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
+                    anyhow::bail!("another listener is running (lock {})", path.display());
+                }
+                // Held until the process ends.
+                std::mem::forget(f);
+            }
             "--commands" => {
                 let text = std::fs::read_to_string(value()?)?;
                 for line in text.lines().filter(|l| !l.trim().is_empty()) {

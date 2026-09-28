@@ -135,6 +135,8 @@ pub struct Live {
     pub pid: Option<i32>,
     pub started_at: Option<Instant>,
     pub download: Option<Value>,
+    /// The listener's or the recognizer's last error, shown in the strip (AC-175).
+    pub last_error: Option<(String, i64)>,
 }
 
 pub struct Voice {
@@ -278,6 +280,13 @@ impl Voice {
         if s.rate > 0 {
             args.extend(["--rate".into(), s.rate.to_string()]);
         }
+        args.extend([
+            "--lock".into(),
+            crate::paths::data_dir()
+                .join("voice-listener.lock")
+                .display()
+                .to_string(),
+        ]);
         let (listener, stdout) = proc::Listener::spawn(&path, &args, &[])?;
         let listener = Arc::new(listener);
         let pid = listener.pid;
@@ -423,6 +432,7 @@ impl Voice {
             "error" => {
                 let message = e["message"].as_str().unwrap_or("").to_string();
                 crate::log(&format!("voice: listener: {message}"));
+                self.st.lock().unwrap().last_error = Some((message.clone(), crate::daemon::now()));
                 self.emit(json!({"kind": "listener", "event": "error", "message": message}));
             }
             _ => {}
@@ -442,6 +452,8 @@ impl Voice {
             st.next_line
         };
         self.send(json!({"cmd": "speak", "line": line, "text": text}));
+        // What Overseer says is also shown (a caption in the view, and the tests' record).
+        self.emit(json!({"kind": "say", "line": line, "text": text}));
         Some(line)
     }
 }
@@ -523,7 +535,8 @@ pub fn get(d: &Arc<Daemon>) -> Result<Value> {
             "keep_days": s.keep_days, "model": s.model,
         },
         "model": {"name": s.model, "downloaded": model_path.exists() || simulated(), "bytes": model::size(&s.model), "download": st.download},
-        "listener": {"running": st.pid.is_some(), "pid": st.pid, "restarts": st.restarts.len()},
+        "listener": {"running": st.pid.is_some(), "pid": st.pid, "restarts": st.restarts.len(),
+            "last_error": st.last_error.as_ref().map(|(m, at)| json!({"message": m, "at": at}))},
     }))
 }
 

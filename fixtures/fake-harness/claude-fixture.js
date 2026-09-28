@@ -257,6 +257,8 @@ async function mcpClient() {
     assistant([{ type: 'text', text: 'Trying the migration…' }]);
     result(true, 'Migration failed: relation users_v2 does not exist');
   } else if (mode === 'overseer') {
+    // A slow orchestrator (Voice Mode's holding line, AC-165): nothing at all for a while.
+    if (process.env.FIXTURE_OVERSEER_DELAY_MS) await sleep(Number(process.env.FIXTURE_OVERSEER_DELAY_MS));
     // Talk to Overseer. With an MCP server configured (Gate S: --mcp-config), the fixture speaks
     // MCP like the live harness: it calls the daemon's roster tool and proposes through the
     // propose tool, reporting each call as a tool_use. Without one, it answers from the state
@@ -377,6 +379,38 @@ async function mcpClient() {
       const roster = await call('roster', {});
       // One line per agent: "<id> · <title> · <status> · …".
       agents = roster.split('\n').map(l => l.split(' · ')).filter(p => p.length >= 3).map(p => ({ id: p[0], title: p[1], status: p[2] }));
+    }
+    // A spoken request (Voice Mode, Gate R): choose among the daemon's candidates, as the prompt
+    // asks; with none, ask one short question and propose nothing. A correction's words give the
+    // new task ("I meant wait for the review"); its names were already applied by the daemon.
+    const voiceReq = /Request (V-\d+): (.*)$/m.exec(said);
+    const candidates = /\(Candidates from the daemon: (.*?)\. Choose among them/.exec(said);
+    if (voiceReq && mcp && !/what is everyone doing|what did .+ change in/i.test(voiceReq[2])) {
+      const words = voiceReq[2].trim();
+      const list = candidates ? candidates[1].split('; ').map(c => /^(.*) \(([^()]+)\): (.+)$/.exec(c)).filter(Boolean).map(m => ({ title: m[1], id: m[2], why: m[3] })) : [];
+      const taskOf = s => { const m = /\b(?:to|should(?: both| also| all)?) (.+?)[.!?]*$/i.exec(s); return m ? m[1] : null; };
+      const fix = /.*\(correction[^:]*: (.*)\)$/.exec(words);
+      let task = taskOf(words.replace(/\s*\(correction[^)]*\)/g, ''));
+      if (fix) {
+        const c = fix[1].replace(/^(i meant|i mean|actually|instead|no)[, ]+/i, '').trim();
+        if (!/^(not |tell |the |that )/i.test(c)) task = c.replace(/[.!?]+$/, '');
+        else task = taskOf(c) || task;
+      }
+      if (!task && /^(yes|go ahead|ok|okay)\b/i.test(words)) task = 'go ahead';
+      if (!list.length) reply = 'Who should I tell?';
+      else if (/^archive\b/i.test(words)) {
+        await call('propose', { actions: list.map(c => ({ action: 'archive', agent: c.id, confidence: 'high', why: c.why })) });
+        reply = `Archiving ${list.map(c => c.title).join(' and ')}.`;
+      } else if (!task) reply = `What should I tell ${list.map(c => c.title).join(' and ')}?`;
+      else {
+        await call('propose', { actions: list.map(c => ({ action: 'message', agent: c.id, text: `Please ${task}.`, confidence: 'high', why: c.why })) });
+        reply = `Telling ${list.map(c => c.title).join(' and ')} to ${task}.`;
+      }
+      assistant([{ type: 'text', text: reply }]);
+      result(false, reply);
+      mcp.close();
+      await sleep(100);
+      process.exit(0);
     }
     const changed = /what did (.+?) change in (\S+)/i.exec(said);
     if (/what is everyone doing/i.test(said)) reply = agents.length ? 'Here is what everyone is doing:\n\n' + agents.map(a => `- **${a.title}**: ${a.status}`).join('\n') : 'No agents are running.';

@@ -37,6 +37,12 @@ pub struct Open {
     pub settle_until: Option<Instant>,
     /// The daemon's candidates for it, with their reasons (AC-166).
     pub candidates: Vec<(String, &'static str)>,
+    /// A Confirm-tier plan read back and waiting for a yes by voice since then (AC-171).
+    pub confirm_at: Option<Instant>,
+    /// "Still working on it." was said (once at most, AC-165).
+    pub holding_said: bool,
+    /// The sent request this one corrects (a correction after the send, AC-170).
+    pub replaces_sent: Option<String>,
 }
 
 /// A permission read back and waiting for the owner's yes or no.
@@ -70,6 +76,8 @@ struct Requests {
     unreachable_said: Option<Instant>,
     /// The agents the last spoken request reached ("tell them also").
     last_targets: Vec<String>,
+    /// The last request that went out, for a correction after the send (AC-170): id, words, when.
+    last_sent: Option<(String, String, Instant)>,
 }
 
 static REQ: OnceLock<Mutex<Requests>> = OnceLock::new();
@@ -120,6 +128,87 @@ const NO: &[&str] = &[
     "reject",
     "reject it",
 ];
+
+/// Answering every permission at once is refused: one at a time (AC-171).
+const ALL_AT_ONCE: &[&str] = &[
+    "allow everything",
+    "allow all",
+    "allow them all",
+    "allow all of them",
+    "approve everything",
+    "approve all",
+    "approve them all",
+    "yes to everything",
+    "yes to all",
+    "accept all",
+    "accept everything",
+    "allow everything from now on",
+];
+
+/// How long a read-back or a Confirm plan waits for a yes by voice: 20 s
+/// (`OVERSEER_VOICE_CONFIRM_S` in tests).
+fn confirm_limit() -> Duration {
+    Duration::from_secs(
+        std::env::var("OVERSEER_VOICE_CONFIRM_S")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(20),
+    )
+}
+
+/// When "Still working on it." is said if Overseer has not answered: 8 s after the request
+/// (`OVERSEER_VOICE_HOLDING_MS` in tests). "On it." is said at once by the daemon, so the holding
+/// line comes later than the side RFC's 2.5 s (the spike's revision, AC-162).
+fn holding_after() -> Duration {
+    Duration::from_millis(
+        std::env::var("OVERSEER_VOICE_HOLDING_MS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(8000),
+    )
+}
+
+/// Things that are not done by voice (AC-171): the place in the UI that does them.
+fn not_by_voice(p: &str) -> Option<(&'static str, &'static str)> {
+    let has = |w: &str| p.split(' ').any(|x| x == w);
+    let phrase = |w: &str| format!(" {p} ").contains(&format!(" {w} "));
+    if phrase("sign in")
+        || phrase("sign me in")
+        || phrase("sign out")
+        || phrase("log in")
+        || phrase("log out")
+        || phrase("log me in")
+        || (has("account") || has("accounts"))
+            && (has("add") || has("remove") || has("switch") || has("change") || has("new"))
+    {
+        return Some(("accounts", "Accounts"));
+    }
+    if has("phone") && (has("pair") || has("unpair") || phrase("phone access") || has("pairing")) {
+        return Some(("phone", "Phone access"));
+    }
+    if has("continuity")
+        && (has("download") || has("install") || has("model") || has("models"))
+        && !has("tell")
+    {
+        return Some(("continuity", "Continuity's settings"));
+    }
+    if (phrase("clean up") || has("cleanup"))
+        && (has("workspace") || has("workspaces") || has("worktrees") || has("worktree"))
+    {
+        return Some(("cleanup", "Workspace cleanup"));
+    }
+    if (has("stop") || has("quit") || has("restart") || has("kill"))
+        && (has("daemon") || phrase("overseer itself"))
+    {
+        return Some(("daemon", "the daemon's controls"));
+    }
+    if (has("change") || has("turn") || has("edit") || has("disable") || has("loosen"))
+        && (has("rules") || has("tiers") || phrase("voice settings") || phrase("what voice may do"))
+    {
+        return Some(("rules", "Voice Mode's settings"));
+    }
+    None
+}
 
 fn plain(text: &str) -> String {
     text.to_lowercase()
@@ -272,20 +361,42 @@ fn announce(v: &Voice, id: &str) {
     }
 }
 
+/// Lines waiting for a free floor (the speech queue, AC-173).
+static WAITING_LINES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// How long a line waits for a free floor before it goes to the card alone: 20 s
+/// (`OVERSEER_VOICE_HOLD_S` in tests).
+fn hold_limit() -> Duration {
+    Duration::from_secs(
+        std::env::var("OVERSEER_VOICE_HOLD_S")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(20),
+    )
+}
+
 /// Speaks a line when the floor is free: never while the owner speaks; after 20 s it goes to the
-/// card alone (AC-164).
+/// card alone (AC-164); with three lines already waiting, a fourth goes to the card at once.
 fn speak_when_free(v: &Arc<Voice>, text: &str) {
+    use std::sync::atomic::Ordering;
+    if WAITING_LINES.fetch_add(1, Ordering::SeqCst) >= 3 {
+        WAITING_LINES.fetch_sub(1, Ordering::SeqCst);
+        v.emit(json!({"kind": "spoke", "event": "card_only", "text": text, "why": "three lines are waiting"}));
+        return;
+    }
     let v = v.clone();
     let text = text.to_string();
     std::thread::spawn(move || {
         let start = Instant::now();
         while v.st.lock().unwrap().gate {
-            if start.elapsed() > Duration::from_secs(20) {
-                v.emit(json!({"kind": "spoke", "event": "card_only", "text": text}));
+            if start.elapsed() > hold_limit() {
+                WAITING_LINES.fetch_sub(1, Ordering::SeqCst);
+                v.emit(json!({"kind": "spoke", "event": "card_only", "text": text, "why": "the owner kept talking"}));
                 return;
             }
             std::thread::sleep(Duration::from_millis(50));
         }
+        WAITING_LINES.fetch_sub(1, Ordering::SeqCst);
         v.say_line(&text);
     });
 }
@@ -349,11 +460,59 @@ impl Voice {
         {
             return self.cancel_answer("voice");
         }
-        // 2. A read-back waiting for yes or no.
+        // Every permission at once is refused: one at a time, each read back (AC-171).
+        if ALL_AT_ONCE
+            .iter()
+            .any(|a| p == *a || p.starts_with(&format!("{a} ")) || p.ends_with(&format!(" {a}")))
+        {
+            heard_signal(self);
+            speak_when_free(
+                self,
+                "Not all at once. Ask me what's waiting, and I'll read each one back.",
+            );
+            return json!({"taken": false, "why": "all at once is refused"});
+        }
+        let short_unclear = p.split(' ').count() <= 4 && !CANCEL.contains(&p.as_str());
+        // 2. A read-back waiting for yes or no; anything unclear is no answer.
         let read_back = req().lock().unwrap().read_back.clone();
         if let Some(rb) = read_back {
             if YES.contains(&p.as_str()) || NO.contains(&p.as_str()) {
                 return self.answer_permission(&rb, YES.contains(&p.as_str()));
+            }
+            if short_unclear {
+                speak_when_free(self, "I need a clear yes or no.");
+                return json!({"taken": false, "why": "unclear: no answer"});
+            }
+        }
+        // 2b. A Confirm-tier plan read back and waiting for a yes by voice.
+        let confirming = req()
+            .lock()
+            .unwrap()
+            .open
+            .iter()
+            .find(|o| o.confirm_at.is_some_and(|t| t.elapsed() < confirm_limit()))
+            .cloned();
+        if let (Some(o), Some(p_id)) = (
+            confirming.as_ref(),
+            confirming.as_ref().and_then(|o| o.proposal.clone()),
+        ) {
+            let yes = YES.contains(&p.as_str());
+            if yes || NO.contains(&p.as_str()) || CANCEL.contains(&p.as_str()) {
+                if let Some(x) = req().lock().unwrap().open.iter_mut().find(|x| x.id == o.id) {
+                    x.confirm_at = None;
+                }
+                self.st.lock().unwrap().awaiting_answer = false;
+                heard_signal(self);
+                return match self.d.overseer_answer(&p_id, yes, "voice", "owner (voice)") {
+                    Ok(r) => {
+                        json!({"taken": true, "request": o.id, "answered": yes, "result": r["result"]})
+                    }
+                    Err(e) => json!({"taken": false, "why": e.to_string()}),
+                };
+            }
+            if short_unclear {
+                speak_when_free(self, "I need a clear yes or no.");
+                return json!({"taken": false, "why": "unclear: no answer"});
             }
         }
         // 3. A spoken request inside its settle window: cancel, correct or add.
@@ -382,6 +541,30 @@ impl Voice {
                 return self.request(&words, via, Some(&o.id));
             }
         }
+        // 3b. A correction after the send: a follow-up to the same agents, naming the request it
+        // replaces, which then reads superseded (AC-170).
+        let is_correction = ["i meant", "i mean", "actually", "instead", "not "]
+            .iter()
+            .any(|c| p.starts_with(c));
+        let last = req().lock().unwrap().last_sent.clone();
+        if let Some((old, words, at)) =
+            last.filter(|(_, _, at)| is_correction && at.elapsed() < Duration::from_secs(120))
+        {
+            let _ = at;
+            let r = self.request(
+                &format!("{words} (correction after it was sent: {text})"),
+                via,
+                Some(&old),
+            );
+            if let Some(new) = r["request"].as_str() {
+                if let Some(o) = req().lock().unwrap().open.iter_mut().find(|o| o.id == new) {
+                    o.replaces_sent = Some(old.clone());
+                }
+            }
+            update(&self.d, &old, "state", "superseded");
+            announce(self, &old);
+            return r;
+        }
         // 4. Asking about a permission request reads it back (then a yes or no answers it).
         let asks_permission = p.contains("permission")
             || (p.starts_with("what does ") && p.ends_with(" want"))
@@ -396,6 +579,30 @@ impl Voice {
         if asks_permission {
             heard_signal(self);
             return self.read_back();
+        }
+        // 4b. Not by voice: the place in the UI is opened, and Overseer says so (AC-171).
+        if let Some((place, name)) = not_by_voice(&p) {
+            let id = next_id(&self.d);
+            let _ = record(
+                &self.d,
+                &id,
+                &text,
+                via,
+                "overseer",
+                "not_sent",
+                "not_by_voice",
+            );
+            update(
+                &self.d,
+                &id,
+                "done",
+                &format!("Not done by voice: {name} opened."),
+            );
+            heard_signal(self);
+            self.emit(json!({"kind": "open", "place": place, "request": id}));
+            speak_when_free(self, &format!("That isn't done by voice. I opened {name}."));
+            announce(self, &id);
+            return json!({"taken": true, "request": id, "not_by_voice": place});
         }
         // 5. Built-in phrases that need no model (AC-175).
         if let Some(r) = self.built_in(&p, &text, via) {
@@ -481,17 +688,12 @@ impl Voice {
         let focus_now = self.st.lock().unwrap().focus.clone();
         let previous = req().lock().unwrap().last_targets.clone();
         let agents = agents_for(&d);
-        let found: Vec<(String, &'static str)> = super::candidates::candidates(
-            words,
-            &super::candidates::Context {
-                agents: &agents,
-                focus: focus_now.as_deref(),
-                previous: &previous,
-            },
-        )
-        .into_iter()
-        .map(|c| (c.id, c.reason))
-        .collect();
+        let ctx = super::candidates::Context {
+            agents: &agents,
+            focus: focus_now.as_deref(),
+            previous: &previous,
+        };
+        let found = candidates_for(words, &ctx);
         req().lock().unwrap().open.push(Open {
             id: id.clone(),
             words: words.to_string(),
@@ -499,6 +701,9 @@ impl Voice {
             proposal: None,
             settle_until: None,
             candidates: found.clone(),
+            confirm_at: None,
+            holding_said: false,
+            replaces_sent: None,
         });
         self.st.lock().unwrap().thinking += 1;
         self.refresh();
@@ -876,6 +1081,42 @@ fn answer_limit() -> Duration {
 /// Every 100 ms: permission answers whose window has passed go to the agent; read-backs that
 /// waited 20 s lapse; a request Overseer has not answered in time is not sent (AC-175).
 fn tick(v: &Arc<Voice>) {
+    // The holding line: once per request, when Overseer has neither planned nor answered.
+    let holding: Vec<String> = {
+        let mut r = req().lock().unwrap();
+        r.open
+            .iter_mut()
+            .filter(|o| {
+                o.proposal.is_none() && !o.holding_said && o.at.elapsed() >= holding_after()
+            })
+            .map(|o| {
+                o.holding_said = true;
+                o.id.clone()
+            })
+            .collect()
+    };
+    for id in holding {
+        if row(&v.d, &id).is_some_and(|r| r["answer"].is_null()) {
+            speak_when_free(v, "Still working on it.");
+            v.emit(json!({"kind": "holding", "request": id}));
+        }
+    }
+    // A Confirm plan left without a yes by voice: no answer; it stays in the card for a click.
+    let lapsed = {
+        let mut r = req().lock().unwrap();
+        let mut any = false;
+        for o in r.open.iter_mut() {
+            if o.confirm_at.is_some_and(|t| t.elapsed() >= confirm_limit()) {
+                o.confirm_at = None;
+                any = true;
+            }
+        }
+        any
+    };
+    if lapsed {
+        v.st.lock().unwrap().awaiting_answer = false;
+        v.emit(json!({"kind": "confirm", "lapsed": true}));
+    }
     let late: Vec<Open> = req()
         .lock()
         .unwrap()
@@ -913,7 +1154,7 @@ fn tick(v: &Arc<Voice>) {
         let mut r = req().lock().unwrap();
         if r.read_back
             .as_ref()
-            .is_some_and(|rb| rb.at.elapsed() > Duration::from_secs(20))
+            .is_some_and(|rb| rb.at.elapsed() > confirm_limit())
         {
             r.read_back = None;
             drop(r);
@@ -952,7 +1193,28 @@ fn tick(v: &Arc<Voice>) {
         update(&v.d, &a.id, "done", &text);
         v.emit(json!({"kind": "toast", "request": a.id, "text": text, "cancel": false}));
         announce(v, &a.id);
+        // One at a time: when another permission is waiting, it is read back next.
+        let v2 = v.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(500));
+            if req().lock().unwrap().read_back.is_none()
+                && another_permission_waiting(&v2.d, &a.run)
+            {
+                v2.read_back();
+            }
+        });
     }
+}
+
+fn another_permission_waiting(d: &Arc<Daemon>, answered: &str) -> bool {
+    d.roster().unwrap_or_default().into_iter().any(|l| {
+        l.id != answered
+            && l.status == "waiting_for_user"
+            && d.run(&l.id)
+                .ok()
+                .and_then(|r| r.attention)
+                .is_some_and(|a| a["kind"] == "permission")
+    })
 }
 
 /// Overseer's session moved: link proposals to spoken requests, speak the plan and the outcome,
@@ -971,6 +1233,9 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
                         Instant::now()
                             + Duration::from_millis((t - crate::daemon::now()).max(0) as u64)
                     });
+                    if p["state"] == "open" && p["confirm"] == true {
+                        o.confirm_at = Some(Instant::now());
+                    }
                     o.clone()
                 })
             };
@@ -1009,6 +1274,8 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
                 let state = p["state"].as_str().unwrap_or("");
                 let result = p["result"].as_str().unwrap_or("");
                 if state == "yes" {
+                    req().lock().unwrap().last_sent =
+                        Some((o.id.clone(), o.words.clone(), Instant::now()));
                     if let Ok(card) = v.d.card(id) {
                         let targets: Vec<String> = card["rows"]
                             .as_array()
@@ -1051,7 +1318,8 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
             let o = req().lock().unwrap().open.first().cloned();
             let Some(o) = o else { return };
             update(&v.d, &o.id, "answer", &text);
-            if text.contains("NOT_FOR_OVERSEER") {
+            // Only the exact reply counts: a reply that quotes the instruction is still an answer.
+            if text.trim_matches(|c: char| !c.is_alphanumeric() && c != '_') == "NOT_FOR_OVERSEER" {
                 v.close(&o.id, "not_for_overseer", None);
                 return;
             }
@@ -1093,13 +1361,31 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
                 let answered =
                     row(&v.d, &o.id).and_then(|r| r["answer"].as_str().map(String::from));
                 let failed = kind == "turn_failed" || (kind == "status" && p["status"] == "failed");
-                if failed && answered.is_none() {
+                if failed {
+                    // Rate-limited, signed out, offline: not sent, never sent later by itself, and
+                    // said once (AC-175).
+                    let why = answered
+                        .map(|a| first_sentences(&a, 1))
+                        .filter(|a| !a.is_empty())
+                        .unwrap_or_else(|| "Overseer's turn failed".into());
                     v.close(
                         &o.id,
                         "not_sent",
-                        Some("Overseer's turn failed; nothing was sent."),
+                        Some(&format!("Not sent: {why}. Nothing will be sent later.")),
                     );
-                    speak_when_free(v, "Overseer could not work on that; nothing was sent.");
+                    let say = {
+                        let mut r = req().lock().unwrap();
+                        let say = r
+                            .unreachable_said
+                            .is_none_or(|t| t.elapsed() > Duration::from_secs(600));
+                        if say {
+                            r.unreachable_said = Some(Instant::now());
+                        }
+                        say
+                    };
+                    if say {
+                        speak_when_free(v, "Overseer can't work on requests right now, so nothing was sent. Stop, mute and what's running still work.");
+                    }
                 } else {
                     v.close(&o.id, "answered", None);
                 }
@@ -1248,6 +1534,10 @@ pub fn decorate(d: &Daemon, actions: &mut [Value]) -> Result<bool> {
         Some(o) => (o.id.clone(), o.words.clone()),
         None => (String::new(), String::new()),
     };
+    let head = match open.as_ref().and_then(|o| o.replaces_sent.clone()) {
+        Some(old) => format!("(voice, request {id}, replaces {old}, which was already sent)"),
+        None => format!("(voice, request {id})"),
+    };
     let starts = actions.iter().filter(|a| a["action"] == "start").count() as u64;
     if starts > 8 {
         bail!("at most eight new agents from one request");
@@ -1320,9 +1610,9 @@ pub fn decorate(d: &Daemon, actions: &mut [Value]) -> Result<bool> {
                 .collect();
             let own = a[text_key].as_str().unwrap_or("").to_string();
             let mut full = if own.trim() == words.trim() {
-                format!("(voice, request {id}) The owner said: “{words}”")
+                format!("{head} The owner said: “{words}”")
             } else {
-                format!("(voice, request {id}) The owner said: “{words}”\nFor you: {own}")
+                format!("{head} The owner said: “{words}”\nFor you: {own}")
             };
             if !others.is_empty() {
                 full.push_str(&format!("\nAlso told: {}.", others.join(", ")));
@@ -1396,8 +1686,72 @@ pub fn cancel(_d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     }
 }
 
+/// `voice.answer`: yes or no from the keyboard to what was read back — a permission request or a
+/// Confirm plan — the same as saying it (AC-171, AC-174).
+pub fn answer(_d: &Arc<Daemon>, p: &Value) -> Result<Value> {
+    let v = super::voice().ok_or_else(|| anyhow!("the voice session is not running"))?;
+    let yes = p["yes"].as_bool().unwrap_or(false);
+    let rb = req().lock().unwrap().read_back.clone();
+    if let Some(rb) = rb {
+        return Ok(v.answer_permission(&rb, yes));
+    }
+    let o = req()
+        .lock()
+        .unwrap()
+        .open
+        .iter()
+        .find(|o| o.confirm_at.is_some() && o.proposal.is_some())
+        .cloned();
+    let Some(o) = o else {
+        bail!("nothing is waiting for a yes");
+    };
+    if let Some(x) = req().lock().unwrap().open.iter_mut().find(|x| x.id == o.id) {
+        x.confirm_at = None;
+    }
+    v.st.lock().unwrap().awaiting_answer = false;
+    let r = v.d.overseer_answer(
+        o.proposal.as_deref().unwrap_or(""),
+        yes,
+        "vscode",
+        "owner (keyboard)",
+    )?;
+    Ok(json!({"request": o.id, "answered": yes, "result": r["result"]}))
+}
+
 /// `voice.read_back`: reads the oldest waiting permission request back (also asked by voice).
 pub fn read_back(_d: &Arc<Daemon>, _p: &Value) -> Result<Value> {
     let v = super::voice().ok_or_else(|| anyhow!("the voice session is not running"))?;
     Ok(v.read_back())
+}
+
+/// The candidates for a request's words. A correction names the new targets ("I meant the phone
+/// agent") or leaves one out ("not Continuity"); with neither, the first words' candidates hold.
+fn candidates_for(words: &str, ctx: &super::candidates::Context) -> Vec<(String, &'static str)> {
+    let of = |t: &str| -> Vec<(String, &'static str)> {
+        super::candidates::candidates(t, ctx)
+            .into_iter()
+            .map(|c| (c.id, c.reason))
+            .collect()
+    };
+    let Some(at) = words.rfind(" (correction") else {
+        return of(words);
+    };
+    let first = &words[..at];
+    let fix = words[at..]
+        .split_once(": ")
+        .map(|(_, f)| f.trim_end_matches(')'))
+        .unwrap_or("");
+    let before = candidates_for(first, ctx);
+    if plain(fix).starts_with("not ") {
+        let gone: Vec<String> = of(fix).into_iter().map(|(id, _)| id).collect();
+        return before
+            .into_iter()
+            .filter(|(id, _)| !gone.contains(id))
+            .collect();
+    }
+    let named = of(fix);
+    if named.iter().any(|(_, why)| *why != "selected") {
+        return named;
+    }
+    before
 }

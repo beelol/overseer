@@ -58,6 +58,26 @@ pub fn addressed(text: &str, agent_names: &[String], awaiting_answer: bool) -> b
     if words.len() > 1 && words[0] == "hold" && words[1] == "on" {
         return true;
     }
+    // A job for someone new: "someone should write the migration note", "we need someone to…"
+    // (AC-168). Overseer can still answer that it was not meant for it.
+    if words.len() > 2
+        && matches!(words[0].as_str(), "someone" | "somebody")
+        && matches!(
+            words[1].as_str(),
+            "should" | "needs" | "has" | "must" | "could" | "can"
+        )
+    {
+        return true;
+    }
+    if words.len() > 3
+        && words[0] == "we"
+        && words[1] == "need"
+        && words[2..]
+            .iter()
+            .any(|w| matches!(w.as_str(), "someone" | "somebody" | "agent" | "agents"))
+    {
+        return true;
+    }
     // A question about the agents or their work.
     const QUESTION: &[&str] = &[
         "what", "whats", "who", "whos", "how", "hows", "is", "are", "did", "has", "have", "any",
@@ -203,5 +223,13 @@ mod tests {
             "an answer to Overseer's question"
         );
         assert!(!addressed("", &names, true));
+        assert!(addressed(
+            "someone should write the migration note",
+            &names,
+            false
+        ));
+        assert!(addressed("we need someone to fix the build", &names, false));
+        assert!(!addressed("someone left the door open", &names, false));
+        assert!(!addressed("we need milk", &names, false));
     }
 }
