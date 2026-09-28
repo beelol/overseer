@@ -111,7 +111,12 @@ fn assert_s0_outcome(w: &World, run: &str) {
     assert_eq!(count(d, "SELECT COUNT(*) FROM swarm_decisions WHERE run_id=?1", run), 3);
     assert_eq!(count(d, "SELECT COUNT(*) FROM swarm_completions WHERE run_id=?1", run), 1);
     assert_eq!(count(d, "SELECT COUNT(*) FROM swarm_director_owners WHERE run_id=?1", run), 1);
-    let offered = trace(&w.trace).into_iter().find(|t| t["step"] == "offered").unwrap();
+    let offers: Vec<Value> = trace(&w.trace).into_iter().filter(|t| t["step"] == "offered").collect();
+    assert_eq!((offers[0]["target"].as_str(), offers[0]["status"].as_str(), offers[0]["reason"].as_str()),
+        (Some("unapproved-local"), Some("blocked"), Some("not_allowed")),
+        "a manual swarm stays within its approved pool: {offers:?}");
+    let offered = &offers[1];
+    assert_eq!(offered["target"], "system-claude");
     assert_eq!((offered["status"].as_str(), offered["reason"].as_str()),
         (Some("blocked"), Some("audit_source_boundary_unqualified")),
         "an audit run refuses a native worker before any booking: {offered}");

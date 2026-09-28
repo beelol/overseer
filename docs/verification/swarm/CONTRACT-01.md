@@ -137,3 +137,7 @@ Still open, so this stays unchecked:
   director launch. Gate S's Overseer-started agents and watchers use `task.create`
   and so the same count, but no Gate S-specific race was run.
 - Short and long live windows, and live providers.
+
+## Normal start (S0) — 2026-09-27
+
+At `ccbedbf0` the normal start (`swarm.start`) launches the category's director through `launch_director`: the director's durable app-slot hold in the one app-slot count, its owner identity, and its run bound to the category, so its linked run takes the category's one slot (four slots for the director and three workers in `s0_normal_start_reads_back_once_and_runs_end_to_end`, and still four after a SIGKILL restart in `s0_restart_mid_run_reattaches_one_director_and_its_workers`). The scripted director runs the generic harness and books no account; a native director would book class `swarm/director`, which has no qualified draw. In S0 (an audit) a Claude account worker is refused `audit_source_boundary_unqualified` before booking, so the booked-worker evidence remains `swarm_worker_admission_books_the_shared_account_and_binds_its_run` and `qualified_draw_admits_a_swarm_worker_after_five_isolated_runs`. CONTRACT-01 stays in progress.

@@ -7,9 +7,15 @@
   },
   "criteria": {
     "SWARM-01": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "Normal Auto/Manual \u00d7 Swarm launch paths and an opt-in UI are not wired; fixture planning cannot verify off-mode or one-agent fallback."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_start.rs",
+        "fixtures/swarm/s0-start-v1/director.py",
+        "test/unit/swarm-start.js",
+        "docs/verification/swarm/SWARM-01.md",
+        "docs/verification/swarm/S0.md"
+      ],
+      "blocker": "Manual x Swarm on has a normal start (swarm.start and Start Swarm) exercised on fixtures: the approved pool is inherited, a target outside it is refused not_allowed, and an unknown reading reads back serial. The director and workers are scripted fixtures; Swarm off, Auto x Swarm and the four-combination matrix are not exercised."
     },
     "SWARM-02": {
       "status": "partial",
@@ -466,9 +472,12 @@
         "docs/verification/swarm/milestone-16.md",
         "daemon/tests/swarm_state.rs",
         "daemon/src/swarm/limits.rs",
-        "docs/verification/swarm/SWARM-39.md"
+        "docs/verification/swarm/SWARM-39.md",
+        "daemon/tests/swarm_start.rs",
+        "test/unit/swarm-start.js",
+        "docs/verification/swarm/S0.md"
       ],
-      "blocker": "Built-in defaults, saved precedence, approved-target inheritance, immutable run snapshots, percentage override arithmetic, the 100-job ready window and configured nonterminal backlog cap pass in fixtures. Durable replay-safe run-limit revisions can lower the worker ceiling and raise the backlog cap without rewriting the initial allowance; lowering backlog below existing nonterminal jobs is rejected. Actual S0 launch, normal UI controls, one-time account selection, immediate revocation and full Auto Mode scheduler enforcement remain unimplemented."
+      "blocker": "Built-in defaults, saved precedence, approved-target inheritance, immutable run snapshots, percentage override arithmetic, the 100-job ready window and configured nonterminal backlog cap pass in fixtures. Durable replay-safe run-limit revisions can lower the worker ceiling and raise the backlog cap without rewriting the initial allowance; lowering backlog below existing nonterminal jobs is rejected. A normal start (swarm.start and Start Swarm) now inherits the pool and defaults, asks only for a one-time account selection and commits after one read-back, on fixtures with a scripted director. Immediate revocation and preset edits during a run through the normal start, a qualified director, a real VS Code window and full Auto Mode scheduler enforcement remain open."
     },
     "SWARM-40": {
       "status": "partial",
@@ -743,9 +752,10 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md",
         "test/ui/scenario-swarm-allowance.js",
-        "docs/verification/evidence/ui/swarm-allowance/result.json"
+        "docs/verification/evidence/ui/swarm-allowance/result.json",
+        "daemon/tests/swarm_start.rs"
       ],
-      "blocker": "Fixture observations persist eligibility blocks and suppress unchanged-state wakes, including S4 after all qualified selected accounts disappear. An owner-confirmed fixture target change invalidates the prior assessment, waits for a fresh observation, wakes once, and preserves prior attempts and artifacts; an account newly selected after first admission cannot gain a new pool allocation. A joined Atlas replay blocks J4 after an injected external allowance reduction while preserving J2 backend evidence; a separate cross-category regression fences an older generous admission snapshot. The daemon preserves selected-window numeric allowance changes and an isolated packaged UI fixture displays a 100-to-0.5-point drop, then unknown without inventing zero. An injected explicit account revocation cancels admitted jobs on every selected route with the same account ID, records one durable revoke operation across replay, preserves an independent account's eligibility, and leaves usage uncertain. Director-wide availability messages remain readable with null job and attempt IDs. The Atlas replay now asserts native-unit before/after/change through status APIs; the packaged UI fixture remains separate. Live Auto Mode updates, verified account identity feeds, a normal owner target control and live director behavior remain unverified."
+      "blocker": "Fixture observations persist eligibility blocks and suppress unchanged-state wakes, including S4 after all qualified selected accounts disappear. An owner-confirmed fixture target change invalidates the prior assessment, waits for a fresh observation, wakes once, and preserves prior attempts and artifacts; an account newly selected after first admission cannot gain a new pool allocation. A joined Atlas replay blocks J4 after an injected external allowance reduction while preserving J2 backend evidence; a separate cross-category regression fences an older generous admission snapshot. The daemon preserves selected-window numeric allowance changes and an isolated packaged UI fixture displays a 100-to-0.5-point drop, then unknown without inventing zero. An injected explicit account revocation cancels admitted jobs on every selected route with the same account ID, records one durable revoke operation across replay, preserves an independent account's eligibility, and leaves usage uncertain. Director-wide availability messages remain readable with null job and attempt IDs. The Atlas replay now asserts native-unit before/after/change through status APIs; the packaged UI fixture remains separate. Live Auto Mode updates, verified account identity feeds, a normal owner target control and live director behavior remain unverified. The normal start refuses to commit with no approved account, no qualified director or no free slot, and reads back serial for an account without a usable reading."
     },
     "SWARM-60": {
       "status": "partial",
@@ -831,9 +841,16 @@
   },
   "scenarios": {
     "S0": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "No normal category + objective launch control or live director selection exists; policy defaults only have daemon fixture coverage."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_start.rs",
+        "fixtures/swarm/s0-start-v1/director.py",
+        "fixtures/swarm/s0-start-v1/worker.py",
+        "extension/src/swarm-controls.js",
+        "test/unit/swarm-start.js",
+        "docs/verification/swarm/S0.md"
+      ],
+      "blocker": "swarm.start gives one read-back (pool, readings and allocation, ceiling, deadline, director) and commits on one yes; a scripted director launched through the one launch path plans, dispatches three supervised fixture workers through Swarm admission, routes a discovery, accepts evidence and completes, also across a SIGKILL restart. No model harness is a qualified director (outside fixtures the start is blocked no_qualified_director), an audit run refuses native workers before booking and native workers have no report transport, so no account is booked in S0; the VS Code command has not run in a real window and nothing ran live."
     },
     "S1": {
       "status": "partial",

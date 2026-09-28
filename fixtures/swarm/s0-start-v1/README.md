@@ -9,8 +9,9 @@ director through the one launch path.
 
 `director.py` is the qualified director only under the fixture API
 (`OVERSEER_SWARM_FIXTURE_API=1` and `OVERSEER_SWARM_FIXTURE_DIRECTOR`). It plans
-three audit jobs, offers `members` to the approved Claude account (an audit run
-refuses a native worker before any booking), dispatches three supervised
+three audit jobs, offers `projects` to a target outside the approved pool
+(refused `not_allowed`) and `members` to the approved Claude account (an audit
+run refuses a native worker before any booking), dispatches three supervised
 `worker.py` processes through Swarm admission on the fixture target, waits for
 the test's gate file, routes discovery D1 to `members`, accepts each
 evidence-backed result and completes the run. It writes each step to a trace

@@ -82,3 +82,5 @@ and admits a 100-point job. A new account/pool introduced after the first
 admission is held as `allocation_not_frozen`. The action is fixture-gated;
 there is still no normal owner control, live Auto update, or qualified provider
 interruption. Keep SWARM-59 partial.
+
+S0 start follow-up at `ccbedbf0`: the normal start reports why it cannot start instead of committing a run: no approved account (`needs_account_selection`), no qualified director (`blocked` / `no_qualified_director`, and nothing weaker runs) and no free app slot for the director (`blocked` / `global_agent_limit`); an approved account without a usable reading gives a `serial` read-back. Tests: `s0_variants_ask_once_fall_back_or_block_without_committing` and `product_start_without_fixture_api_is_blocked_for_the_director` (`daemon/tests/swarm_start.rs`). This covers the start only; losing every target mid-run and finishing-capacity exhaustion are as recorded above. SWARM-59 stays partial.

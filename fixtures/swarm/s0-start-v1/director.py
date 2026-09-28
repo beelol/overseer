@@ -1,9 +1,10 @@
 """Scripted S0 director, launched by the daemon's normal Swarm start.
 
 It plans three audit jobs, commits a synthetic benefit estimate, and admits
-each job through Swarm admission. It first offers `members` to the approved
-Claude account target; an audit run refuses a native worker before any
-booking, so the job goes to the fixture target. It launches three supervised
+each job through Swarm admission. It offers `projects` to a target outside
+the approved pool (refused) and `members` to the approved Claude account
+target (an audit run refuses a native worker before any booking), so both go
+to the fixture target. It launches three supervised
 workers, records `dispatched`, and waits for the test's gate (a local file)
 before coordinating: it routes D1 to `members`, accepts each result on its
 evidence, and completes the run once every worker has exited. It writes each
@@ -60,6 +61,8 @@ snapshot = {"version": 1, "observed_ms": now - 1000, "expires_ms": now + 120000,
     "targets": [
         {"id": "fixture-local", "harness": "generic", "account_id": "fixture-account",
          "pool_ids": ["fixture-pool"], "capabilities": ["audit"], "health": "up", "auth": "ok"},
+        {"id": "unapproved-local", "harness": "generic", "account_id": "other-account",
+         "pool_ids": ["fixture-pool"], "capabilities": ["audit"], "health": "up", "auth": "ok"},
         {"id": "system-claude", "harness": "claude", "profile_id": "system-claude",
          "model": "sonnet", "effort": "medium", "account_id": "claude-account",
          "pool_ids": ["claude-pool"], "capabilities": ["audit"], "health": "up", "auth": "ok"}],
@@ -76,6 +79,13 @@ def admit(job, target):
 
 attempts = {}
 for job in JOBS:
+    if job == "projects":
+        # A target the owner never approved stays outside the run's pool.
+        outside = admit(job, "unapproved-local")
+        trace("offered", job=job, target="unapproved-local", status=outside["status"],
+              reason=outside.get("reason"))
+        if outside["status"] == "admitted":
+            raise RuntimeError("a target outside the approved pool was admitted")
     if job == "members":
         offered = admit(job, "system-claude")
         trace("offered", job=job, target="system-claude", status=offered["status"],

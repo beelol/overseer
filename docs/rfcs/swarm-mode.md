@@ -708,3 +708,13 @@ Repository context inspected at `19edf57` (2026-09-25):
   existing integration seams; this draft changes neither file nor their interfaces.
 
 No external service capability was newly verified and no live harness test was run for this RFC.
+
+### S0 normal start: decisions for the owner (2026-09-27)
+
+Build step 5 added the normal start (`swarm.start` and **Start Swarm…**): one read-back of the approved pool with each account's reading and the run's share, the worker ceiling, the deadline and the director, and one yes (the read-back's digest) that commits the run and launches its director through the one launch path. It runs end to end on fixtures, including a restart mid-run ([S0 record](../verification/swarm/S0.md)). Three decisions stand between it and a real Swarm; until they are made, a start outside the fixture API is blocked `no_qualified_director` and the director and worker protocol stays fixture-gated.
+
+1. **What qualifies a director.** Proposal: a Claude Code director with the daemon's Swarm tools supplied per run over MCP (the Gate S transport already proven for Overseer's tools), native `Agent`/`Task` denied as for Swarm workers, a Stop that interrupts it, and its own qualified draw (class `swarm/director`) before it books its account. Alternatively keep the director scripted until a model director passes a qualified live S0.
+2. **How a native worker reports.** Native workers have no report credential, so they cannot submit a discovery or a result; only fixture processes can. Proposal: the same per-run MCP transport with the worker's attempt token held by the daemon (never in the prompt), and the director still the only one to accept.
+3. **Native workers in an audit run.** An audit (`source_change_permission: none`) refuses every native worker before booking (`audit_source_boundary_unqualified`), because no native harness has proven it cannot write source. S0 is an audit, so its account workers need either a qualified read-only boundary (for example a read-only sandbox that a test shows holding) or the owner's acceptance that isolated worktrees are enough for audits.
+
+A Claude account also cannot calibrate its draw from product readings today (Auto RFC, "Claude quota readings for calibration"), so even with these decisions a Claude account reads back `serial` until that is decided too.
