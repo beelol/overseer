@@ -141,7 +141,7 @@ async function production(o) {
   const socket = bin ? run(bin, ['socket-path']) : null;
   let hello = null;
   if (socket) { try { hello = await call(socket, 'hello', {}, 3000); } catch {} }
-  if (hello?.instance) die(`the daemon at ${socket} reports dev instance ${hello.instance}; deploy only ever touches production`);
+  if (hello?.instance) die(`the daemon at ${socket} reports dev daemon ${hello.instance}; deploy only ever touches production`);
   return { bin, socket, hello, current: hist[hist.length - 1] || null, installed: bin ? run(bin, ['version']) : null };
 }
 
