@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: 24
       - name: Rust (daemon and TUI)
-        run: cargo test --workspace
+        run: cargo test --workspace --no-fail-fast
       - name: Extension unit tests
         run: node test/unit/run.js
       - name: Extension source check
