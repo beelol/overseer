@@ -1,5 +1,12 @@
 # AC-146: merges
 
+## Pull request #10 (phone remote, Gate N), 2026-09-28
+
+- **Finished:** marked ready by the phone agent (head `1488b4be`), with main merged in at `295f97f2` (Voice Mode and the production guard: conflicts in `server.rs`, `daemon-client.js`, `extension.js` and `Cargo.lock` kept both sides; Voice Mode's methods are Mac-only for phones). Its own records on main (`420853a4`): 15 verified, 7 partial, AC-128 and AC-133 not started.
+- **Throwaway copy:** current main merged in without conflicts (`efbddb96`; main had gained only docs).
+- **Tests:** `scripts/test-all --jobs=3` at load 8 to 10. The first run: Rust 392 passed and `protocol`'s ac45 failed (a 600 ms notice; it passes alone, 4 of 4), and the VSIX step failed from the copy's setup (no `target/`). The second: Rust 444 passed, 0 failed; unit 8 of 8; check; links; VSIX; 49 of 50 UI scenarios. `audit` fails on review's text budget (175 → 178) exactly as on main; it is not this branch's (recorded as its own row).
+- **Merged:** squash, `b95aedfa`. The TestFlight workflow started on the merge (run 36442588449).
+
 ## Pull request #19 (production guard, Gate T stage 1), 2026-09-28
 
 - **Finished:** marked ready by the dev daemons agent; AC-212 verified on main (`5b994d28`).
