@@ -676,7 +676,7 @@
       "blocker": null
     },
     "SWARM-54": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
         "daemon/tests/swarm_dispatch.rs",
@@ -684,9 +684,11 @@
         "daemon/src/swarm/completion.rs",
         "docs/verification/swarm/milestone-2.md",
         "docs/verification/swarm/milestone-12.md",
-        "docs/verification/swarm/SWARM-54.md"
+        "docs/verification/swarm/SWARM-54.md",
+        "daemon/tests/swarm_checkpoint.rs",
+        "daemon/tests/swarm_atlas.rs"
       ],
-      "blocker": "Acceptance and fixture final completion revalidate stored evidence provenance and integrity, including tampering after review. Dependent context now excludes unreviewed artifacts and becomes unavailable after a late source result. Live filesystem provenance and permission-scoped replacement retrieval remain unimplemented."
+      "blocker": null
     },
     "SWARM-55": {
       "status": "verified",

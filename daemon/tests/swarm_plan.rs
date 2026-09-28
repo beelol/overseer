@@ -461,3 +461,119 @@ fn invalid_plan_shapes_are_rejected_and_conflicting_writers_cannot_dispatch_toge
         [&id], |r| r.get(0)).unwrap();
     assert_eq!(attempts, 0);
 }
+
+/// SWARM-54: from the final finding back to its sources. A run pinned to a
+/// repository commit accepts J2's reproduction only after J2's evidence,
+/// removed after submission, is restored; J2's result contradicts J5, and an
+/// independent J7 reproduction resolves it. The completed run's readouts then
+/// give the chain without any transcript: the completion check names J2's
+/// artifact; the coverage row names its job, attempt and assignment revision;
+/// the conflict names J7's reproduction; the run names the pinned source
+/// commit; and a later worker on another destination, once granted the
+/// artifact, retrieves it with its job, source revision and hash (and cannot
+/// before the grant).
+#[test]
+fn a_final_finding_keeps_its_provenance_chain_and_another_worker_can_read_it() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("atlas-source"));
+    let head = git(&checkout, &["rev-parse", "HEAD"]);
+    let run = d.call("swarm.create", json!({"category":"Provenance","objective":"Audit tasks",
+        "allowed_targets":["account-a","account-b"],"repositories":[checkout]}));
+    let id = run["id"].as_str().unwrap().to_string();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"j2","title":"Task mutation","acceptance":"foreign task reproduction","deps":[]},
+        {"id":"j5","title":"Second look","acceptance":"task response","deps":[]},
+        {"id":"j7","title":"Independent reproduction","acceptance":"repeat J2","deps":[]},
+        {"id":"j9","title":"Follow-up on J2","acceptance":"fix direction","deps":["j2"]}]}));
+    let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
+    let snapshot = json!({"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+        "targets":[{"id":"account-a","account_id":"a","pool_ids":["pa"],"capabilities":["audit"],"health":"up","auth":"ok"},
+            {"id":"account-b","account_id":"b","pool_ids":["pb"],"capabilities":["audit"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pa","windows":[{"id":"w","unit":"points","remaining_milli":100000,"protected_milli":0,"reserved_milli":0,"confidence":"exact","expires_ms":at+60000}]},
+            {"id":"pb","windows":[{"id":"w","unit":"points","remaining_milli":100000,"protected_milli":0,"reserved_milli":0,"confidence":"exact","expires_ms":at+60000}]}]});
+    let cost = json!({"elapsed_ms":10,"usage_milli":{"points":1}});
+    let workers: Vec<serde_json::Value> = ["j2","j5","j7"].iter().map(|job| json!({"id":job,
+        "elapsed_ms":100,"usage_milli":{"points":10}})).collect();
+    let serial = json!({"planning":cost,"context":cost,"integration":cost,"review":cost,"retries":cost,"workers":workers});
+    let mut parallel = serial.clone();
+    parallel["context"]["elapsed_ms"] = json!(20);
+    assert_eq!(d.call("swarm.benefit.commit", json!({"run_id":id,"generation":1,"revision":1,"estimate":{
+        "independent":true,"max_workers":3,"allocation_milli":{"points":10000},
+        "finishing_reserve_milli":{"points":2000},"serial":serial,"parallel":parallel}}))["decision"], "parallel");
+    let submit = |job: &str, kind: &str, outcome: &str, content: &str| -> serde_json::Value {
+        let admitted = d.call("swarm.admit", json!({"run_id":id,"generation":1,"revision":1,"job_id":job,
+            "target_id":"account-a","request_id":format!("{job}-a"),"now_ms":at,"snapshot":snapshot,
+            "required_capabilities":["audit"],"estimate_milli":{"points":100},"purpose":"worker"}));
+        assert_eq!(admitted["status"], "admitted", "{job}: {admitted}");
+        let attempt = json!({"id":admitted["attempt_id"],"token":admitted["token"]});
+        let artifact = format!("{job}-evidence");
+        d.call("swarm.artifact.put", json!({"run_id":id,"job_id":job,"attempt_id":attempt["id"],
+            "token":attempt["token"],"artifact_id":artifact,"source_revision":1,"kind":kind,"content":content}));
+        d.call("swarm.report", json!({"run_id":id,"job_id":job,"attempt_id":attempt["id"],"token":attempt["token"],
+            "message_id":format!("{job}-result"),"type":"result","revision":1,
+            "payload":{"artifact_ids":[artifact],"audit_outcome":outcome}}));
+        attempt
+    };
+    let j2 = submit("j2", "reproduction", "confirmed_defect", "PATCH /tasks/task-b-7 as alice-test: 200, Bob's row changed");
+    let j5 = submit("j5", "finding", "negative", "PATCH /tasks/task-b-7: 403");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let saved: (String, String, i64, String, String) = db.query_row("SELECT job_id,attempt_id,source_revision,kind,content
+        FROM swarm_artifacts WHERE run_id=?1 AND id='j2-evidence'", [&id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))).unwrap();
+    // The evidence disappears after submission: nothing can be accepted until it is restored.
+    db.execute("DELETE FROM swarm_artifacts WHERE run_id=?1 AND id='j2-evidence'", [&id]).unwrap();
+    let accept_j2 = json!({"run_id":id,"generation":1,"revision":1,"job_id":"j2","decision":"accept","evidence":["j2-evidence"]});
+    assert!(d.try_call("swarm.decide", accept_j2.clone()).unwrap_err().contains("missing artifact"));
+    d.call("swarm.artifact.put", json!({"run_id":id,"job_id":"j2","attempt_id":j2["id"],"token":j2["token"],
+        "artifact_id":"j2-evidence","source_revision":saved.2,"kind":saved.3,"content":saved.4}));
+    d.call("swarm.conflict.open", json!({"run_id":id,"generation":1,"revision":1,"conflict_id":"task-response",
+        "left_job_id":"j2","left_artifact_id":"j2-evidence","right_job_id":"j5","right_artifact_id":"j5-evidence",
+        "reason":"200 versus 403"}));
+    let j7 = submit("j7", "reproduction", "confirmed_defect", "fresh schema: PATCH /tasks/task-b-7 returned 200");
+    d.call("swarm.decide", json!({"run_id":id,"generation":1,"revision":1,"job_id":"j7","decision":"accept","evidence":["j7-evidence"]}));
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":id,"generation":1,"revision":1,"job_id":"j7","attempt_id":j7["id"]}));
+    d.call("swarm.conflict.resolve", json!({"run_id":id,"generation":1,"revision":1,"conflict_id":"task-response",
+        "outcome":"supports_left","reproduction_job_id":"j7","reproduction_artifact_id":"j7-evidence"}));
+    assert_eq!(d.call("swarm.decide", accept_j2)["status"], "accepted");
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":id,"generation":1,"revision":1,"job_id":"j2","attempt_id":j2["id"]}));
+    // J5 is revised to a reproduction of the other side before its evidence could be used.
+    d.call("swarm.decide", json!({"run_id":id,"generation":1,"revision":1,"job_id":"j5","decision":"reject","evidence":["j5-evidence"]}));
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":id,"generation":1,"revision":1,"job_id":"j5","attempt_id":j5["id"]}));
+
+    // A worker on another destination, for the dependent job, reads J2's
+    // evidence once it is granted, with no transcript.
+    let workers = json!([{"id":"j9","elapsed_ms":100,"usage_milli":{"points":10}}]);
+    let serial = json!({"planning":cost,"context":cost,"integration":cost,"review":cost,"retries":cost,"workers":workers});
+    d.call("swarm.benefit.commit", json!({"run_id":id,"generation":1,"revision":1,"estimate":{
+        "independent":true,"max_workers":1,"allocation_milli":{"points":10000},
+        "finishing_reserve_milli":{"points":2000},"serial":serial,"parallel":serial}}));
+    let follow = d.call("swarm.admit", json!({"run_id":id,"generation":1,"revision":1,"job_id":"j9",
+        "target_id":"account-b","request_id":"j9-b","now_ms":at,"snapshot":snapshot,
+        "required_capabilities":["audit"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(follow["status"], "admitted", "{follow}");
+    let read = json!({"run_id":id,"job_id":"j9","attempt_id":follow["attempt_id"],"token":follow["token"],
+        "artifact_id":"j2-evidence"});
+    let before_grant = d.try_call("swarm.context.get", read.clone());
+    d.call("swarm.context.grant", json!({"run_id":id,"generation":1,"revision":1,"artifact_id":"j2-evidence",
+        "target_id":"account-b"}));
+    assert!(before_grant.is_err(), "{before_grant:?}");
+    let got = d.call("swarm.context.get", read);
+    assert_eq!((got["job_id"].as_str(), got["source_revision"].as_i64(), got["kind"].as_str()),
+        (Some("j2"), Some(1), Some("reproduction")), "{got} (before grant: {before_grant:?})");
+    assert!(got["content"].as_str().unwrap().contains("PATCH /tasks/task-b-7"));
+    let sha: String = db.query_row("SELECT sha256 FROM swarm_artifacts WHERE run_id=?1 AND id='j2-evidence'",
+        [&id], |r| r.get(0)).unwrap();
+    assert_eq!(got["sha256"], sha.as_str());
+
+    // The chain from the final finding, through readouts.
+    let coverage = d.call("swarm.coverage", json!({"run_id":id}));
+    let row = coverage["rows"].as_array().unwrap().iter().find(|r| r["job_id"] == "j2").unwrap().clone();
+    assert_eq!((row["attempt_id"].as_str(), row["plan_revision"].as_i64(), row["coverage_state"].as_str()),
+        (j2["id"].as_str(), Some(1), Some("confirmed_application_defect")), "{row}");
+    assert_eq!(row["artifact_ids"], json!(["j2-evidence"]));
+    let conflict = &d.call("swarm.conflicts", json!({"run_id":id}))["conflicts"][0];
+    assert_eq!((conflict["left_artifact_id"].as_str(), conflict["reproduction_job_id"].as_str(),
+        conflict["reproduction_artifact_id"].as_str()), (Some("j2-evidence"), Some("j7"), Some("j7-evidence")));
+    let state = d.call("swarm.get", json!({"id":id}));
+    assert_eq!(state["repositories"][0]["source_commit"], head.as_str(), "{state}");
+}
