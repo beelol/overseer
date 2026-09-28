@@ -466,4 +466,40 @@ mod tests {
         work.context_needed = 1;
         assert!(select(&work, &routes).selected.is_none(), "unknown context limit must not satisfy a positive requirement");
     }
+
+    /// AUTO-AC-11: a model is offered only at the effort its prior names and
+    /// only when the catalog reports that effort. Astra without `high` and
+    /// Sol without `medium` yield no route, so frontier work pauses rather
+    /// than running at an effort the model does not support.
+    #[test]
+    fn unsupported_effort_creates_no_route() {
+        use crate::auto_select::{select, CapabilityTier, Sandbox, WorkUnit};
+        let catalog = parse_codex_catalog(&json!({"data":[
+            {"model":"gpt-6-astra","hidden":false,"isDefault":true,"defaultReasoningEffort":"medium",
+             "supportedReasoningEfforts":[{"reasoningEffort":"low"},{"reasoningEffort":"medium"}]},
+            {"model":"gpt-6-sol","hidden":false,"isDefault":false,"defaultReasoningEffort":"low",
+             "supportedReasoningEfforts":[{"reasoningEffort":"low"}]}
+        ],"nextCursor":null}), 1_000).unwrap();
+        let tools = parse_codex_tools(&json!({"data":[],"nextCursor":null}), 1_000).unwrap();
+        assert!(codex_auto_routes(&catalog, &tools, None, "system-codex", 1_000).is_empty());
+        let full = parse_codex_catalog(&json!({"data":[
+            {"model":"gpt-6-astra","hidden":false,"isDefault":true,"defaultReasoningEffort":"medium",
+             "supportedReasoningEfforts":[{"reasoningEffort":"medium"},{"reasoningEffort":"high"}]},
+            {"model":"gpt-6-sol","hidden":false,"isDefault":false,"defaultReasoningEffort":"low",
+             "supportedReasoningEfforts":[{"reasoningEffort":"low"}]}
+        ],"nextCursor":null}), 1_000).unwrap();
+        let routes = codex_auto_routes(&full, &tools, None, "system-codex", 1_000);
+        assert_eq!(routes.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
+            vec!["system-codex/gpt-6-astra/high"]);
+        let work = WorkUnit { id:"unit".into(), min_tier:CapabilityTier::General,
+            required_tools:BTreeSet::new(), context_needed:0, requires_approvals:false,
+            min_sandbox:Sandbox::WorkspaceWrite, max_sandbox:Sandbox::WorkspaceWrite,
+            allowed_profiles:BTreeSet::from(["system-codex".into()]), pinned_route:None,
+            preferred_harness:None, task_class:None, execution_budget_ms:None };
+        assert_eq!(select(&work, &routes).selected.as_deref(), Some("system-codex/gpt-6-astra/high"),
+            "without a supported Sol effort the general unit goes to the capable Astra route");
+        assert!(select(&work, &codex_auto_routes(&catalog, &tools, None, "system-codex", 1_000))
+            .selected.is_none());
+    }
+
 }
