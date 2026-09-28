@@ -1,6 +1,6 @@
 # SWARM-19 — integration and combined verification
 
-Status: partial. Revisions: `14faa93`, `fca22c0`, `089df35`. Fixture version: local Git repositories with scripted Swarm review and exit APIs; no provider account or live service.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`, after `866b0a58`); see the last section. Earlier revisions: `14faa93`, `fca22c0`, `089df35`. Fixture version: local Git repositories with scripted Swarm review and exit APIs; no provider account or live service.
 
 Input: submit an accepted `patch` artifact from a worker, confirm its exit, and request integration against the pinned source commit. A second fixture gives two accepted workers conflicting edits to the same file. A third requests final completion before the accepted patch is integrated.
 
@@ -70,3 +70,17 @@ broker, conflict, control, owner, integration, runtime and state suites and
 the full offline Rust workspace suite passed. This is fixture-only; normal
 launch, live verifier sandboxing and recovery of a stopped integration
 intent are still open. SWARM-19 remains partial.
+
+## Verified at fixture scope (2026-09-28)
+
+The Verify clause has three parts. Each is covered by a non-ignored test in `daemon/tests/swarm_integration.rs`, rerun serially on `claude/auto-swarm` after `866b0a58` (`cargo test --offline -p overseerd --test swarm_integration -- --test-threads=1`: 25 passed, 0 failed):
+
+| Clause | Test | What it shows |
+| --- | --- | --- |
+| Workers pass individually but their combined output fails a check | `individually_accepted_patches_cannot_complete_after_combined_check_fails` | Each patch passes the fixture checker alone in the source checkout; both are accepted and integrated; the check passes on the first commit and fails on the combined commit; the source checkout's fingerprint is unchanged. |
+| The task stays incomplete until integration and required verification pass | the same test; `completion_rejects_an_accepted_but_unintegrated_patch`; `completion_requires_a_current_passed_combined_check` | `swarm.complete` refuses a run whose combined check failed (`combined verification`), a run with an accepted but unintegrated patch, and a run with no current passed check; it accepts only after a pass on the current commit. |
+| Stopping or exhaustion preserves partial artifacts without reporting success | `stop_remains_responsive_during_slow_integration_and_cannot_ack_its_patch`, `stop_remains_responsive_while_combined_checker_is_running`, `stopped_run_recovers_after_orphaned_checker_exits`, `exhausted_integrated_patch_stays_incomplete_after_late_conflict` | Stop during integration or checking leaves the patch unacknowledged and the intent kept; a stopped run keeps its artifacts and reads incomplete; a job out of attempts keeps its private commit and reads `incomplete` / `attempts_exhausted`, never complete. |
+
+The joined Catalog S3 replay (`swarm_scenarios`, opt-in, Node.js 24) exercises the same rule on a 24-module backend; it was not rerun in this session and is not needed for the clause.
+
+What this does not cover, and where it is tracked: unsaved editor buffers and service-side writes (SWARM-18); a live verifier sandbox and live adapter permissions (SWARM-25); an operator path to reconcile a stopped integration intent or end a hung orphaned checker (future work, not in this clause). The integration and verification methods stay behind the fixture API.

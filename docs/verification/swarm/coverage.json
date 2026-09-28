@@ -39,7 +39,7 @@
         "docs/verification/swarm/S5.md",
         "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "Supervised fixture processes now execute five jobs concurrently across two growth waves while holding a conflicting database writer without an attempt. A separate supervised root\u2192child\u2192leaf replay holds each dependent before accepted evidence and after acceptance until the parent process exits, then admits it. Real worktree writer enforcement, undeclared-resource discovery and a qualified live route remain incomplete."
+      "blocker": "Supervised fixture processes now execute five jobs concurrently across two growth waves while holding a conflicting database writer without an attempt. A separate supervised root→child→leaf replay holds each dependent before accepted evidence and after acceptance until the parent process exits, then admits it. Real worktree writer enforcement, undeclared-resource discovery and a qualified live route remain incomplete."
     },
     "SWARM-04": {
       "status": "partial",
@@ -214,7 +214,7 @@
       "blocker": "A versioned S3 fixture integrates 26 contract/module commits in an isolated worktree and preserves its source checkout. Unsaved buffers, service-side writes, live worker isolation and normal launch-path enforcement remain unverified."
     },
     "SWARM-19": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
         "docs/verification/swarm/milestone-2.md",
@@ -227,7 +227,7 @@
         "daemon/src/swarm/completion.rs",
         "daemon/src/swarm/schema.rs"
       ],
-      "blocker": "The versioned S3 fixture integrates both a full 24-module branch and a scoped 12-module branch. In the scoped run, completion refuses an accepted retained patch before integration, the combined check fails at 11 routes and passes at 12, and excluded routes keep working. A local daemon-crash replay holds an orphaned checker until exit and requires a fresh check. Stop remains responsive during a delayed integration and prevents acknowledgement, leaving an unresolved durable intent. A director can now close an unresolved or two-attempt-exhausted fixture run with a durable incomplete report in the Stop transaction; restart preserves it and the exhausted private patch without changing the source checkout. A completed run still reads complete only through its evidence-gated completion record. Live sandboxed verification, operator reconciliation of stopped integrations, termination of a permanently hung orphan, director conflict resolution and normal adapter integration remain unqualified."
+      "blocker": null
     },
     "SWARM-20": {
       "status": "partial",
@@ -536,7 +536,7 @@
         "docs/verification/swarm/SWARM-43.md",
         "fixtures/swarm/atlas-v1/swarm-j4-long-worker.mjs"
       ],
-      "blocker": "The joined S1 replay records delivered/applied advisories and J4 overlap redirect. Local acceptance and final completion hold unapplied director redirects, advisories and retractions; new directives to finished attempts are rejected while exact receipts replay. Daemon fixtures enforce the 30-second applied-ack timeout, and a joined Atlas S5 replay sends a revision-2 plan redirect while J4\u2019s PostgreSQL attachment probe is held: receipt remains delivered, dependent review stays held, a checkpoint is queued and the linked worker is interrupted without accepting a result. The complete six-job S1 revision-2 and stale-output trace, qualified live provider delivery/application, and exclusion of unsupported harness paths remain unverified."
+      "blocker": "The joined S1 replay records delivered/applied advisories and J4 overlap redirect. Local acceptance and final completion hold unapplied director redirects, advisories and retractions; new directives to finished attempts are rejected while exact receipts replay. Daemon fixtures enforce the 30-second applied-ack timeout, and a joined Atlas S5 replay sends a revision-2 plan redirect while J4’s PostgreSQL attachment probe is held: receipt remains delivered, dependent review stays held, a checkpoint is queued and the linked worker is interrupted without accepting a result. The complete six-job S1 revision-2 and stale-output trace, qualified live provider delivery/application, and exclusion of unsupported harness paths remain unverified."
     },
     "SWARM-44": {
       "status": "partial",
