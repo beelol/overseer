@@ -15,6 +15,8 @@ which is out of scope for now. The full list is under [Acceptance criteria](#acc
 
 Only the owner can do these (AC-160). Each is one step; the criterion it unblocks is in brackets. The everything goal (`docs/goals/everything.md`) keeps this list current.
 
+- **Before the 11:00 phone test: fix the TestFlight signing password.** The first Actions build (run 36442588449) stopped at signing because `IOS_DIST_CERT_PASSWORD` does not open `IOS_DIST_CERT_P12`. In Keychain Access (login, My Certificates), export *Apple Distribution: STATION 42 INTERACTIVE L.L.C.* as `dist.p12` with a simple letters-and-digits password. Then run `gh secret set IOS_DIST_CERT_P12 --repo beelol/overseer < <(base64 -i ~/Downloads/dist.p12)` and `gh secret set IOS_DIST_CERT_PASSWORD --repo beelol/overseer --body '<that password>'`, and tell the TestFlight agent "re-set" (it reruns and watches the upload) [the phone's first TestFlight build from main, for the pairing test of AC-141].
+- **For the phone test: say yes to installing the current Overseer in your VS Code.** Your installed extension is from 26 September, before the phone feature. It is installed through the dev daemons feature's deploy (or its manual path from a clean clone), and your data and logins are kept [AC-214, Gate N].
 - Try the Gate K build in your own VS Code [AC-114].
 - Say whether the Gate J design review still needs marks or the Gate K review replaces it [AC-66].
 - Work an hour using only Overseer [AC-64].
