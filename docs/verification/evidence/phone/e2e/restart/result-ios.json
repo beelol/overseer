@@ -1,0 +1,27 @@
+{
+  "at": "2026-09-27T22:02:10.156Z",
+  "seededSlow": 0,
+  "ok": true,
+  "platforms": {
+    "ios": [
+      {
+        "name": "pair",
+        "criteria": [
+          "AC-117",
+          "AC-118",
+          "AC-141"
+        ],
+        "ok": true,
+        "seconds": 70.9
+      },
+      {
+        "name": "restart",
+        "criteria": [
+          "AC-141"
+        ],
+        "ok": true,
+        "seconds": 169.3
+      }
+    ]
+  }
+}

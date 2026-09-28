@@ -1,0 +1,351 @@
+$ git clone --branch claude/phone-remote-vscode-control-b48a34 --single-branch <origin> clean-clone   (2026-09-28 05:07:55)
+commit cc4a556; untracked files: 0
+$ cd phone && npm ci
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+$ npm run prebuild
+✔ Finished prebuild
+- Installing CocoaPods...
+✔ Installed CocoaPods
+$ OVERSEER_AWAY_MINUTES=5 npm run e2e   (2026-09-28 05:08:31, load { 4.60 3.94 4.40 })
+
+> overseer-phone@0.1.0 e2e
+> node e2e/run.mjs
+
+12:08:31 $ cargo build -p overseerd
+12:08:42 $ node /private/tmp/claude-501/-Users-bilal-projects-overseer--claude-worktrees-phone-remote-vscode-control-b48a34/ae4a24d6-748d-49fa-a70f-dacf90a6c148/scratchpad/clean-clone/phone/scripts/run-ios.mjs --release
+12:11:06 $ node /private/tmp/claude-501/-Users-bilal-projects-overseer--claude-worktrees-phone-remote-vscode-control-b48a34/ae4a24d6-748d-49fa-a70f-dacf90a6c148/scratchpad/clean-clone/phone/scripts/run-android.mjs --release
+12:11:49 The phone's scenarios on ios. Commit cc4a556.
+12:11:53 scenario pair (AC-117, AC-118, AC-141): a code typed on the phone, confirmed on the Mac, and the agents list
+12:11:53 flow pair
+12:12:20 ok   pair
+12:12:20 scenario agents (AC-124): every agent, those that need the owner first; every agent of the Mac has its row on the phone
+12:12:20 flow agents
+12:12:49 flow agents-every-row
+12:13:05   9 agents of the Mac (nested children among them: 2), each found on the phone
+12:13:05 ok   agents
+12:13:05 scenario delay (AC-124): a line an agent prints reaches the phone's screen: the delay from the Mac's event to the frame that shows it
+12:13:06 flow watch-stream
+12:13:54   from the Mac's event to the frame that shows it: 320 lines, p50 27 ms, p95 34 ms, longest 49 ms (AC-58 holds a VS Code tile to 250 ms); the device's clock 0 ms from the Mac's; load average 7.4
+12:13:54 ok   delay
+12:13:54 scenario conversation (AC-124): an agent's conversation opens with its composer
+12:13:54 flow conversation
+12:14:28 ok   conversation
+12:14:28 scenario permission (AC-125): a permission request allowed from the phone unblocks the agent
+12:14:28 flow permission
+12:14:48 ok   permission
+12:14:48 scenario send (AC-122, AC-125): a message typed on the phone reaches the agent exactly once
+12:14:48 flow send
+12:15:25 ok   send
+12:15:25 scenario image (AC-125): an image chosen in the system's photo picker reaches the Claude fixture as an image block
+12:15:25 flow send-image
+12:15:56   the fixture read an image block: image/jpeg, 172411 bytes, with the message's text
+12:15:56 ok   image
+12:15:56 scenario review (AC-126): an agent's changed files, a file's hunks, and a hunk marked reviewed
+12:15:56 flow review
+12:16:23 ok   review
+12:16:23 scenario diff (AC-126): a file's diff on the phone is git diff for the comparison, line for line; a mark made on the Mac shows on the phone
+12:16:23 flow diff-lines
+12:16:48   4 lines in 1 hunks equal git diff and are on the screen; the Mac's mark shows on the phone
+12:16:48 ok   diff
+12:16:48 scenario reject (AC-126, AC-130): a hunk rejected from the phone is asked about once and then gone from the worktree
+12:16:48 flow reject
+12:17:14 ok   reject
+12:17:14 scenario big-repo (AC-126, AC-135): an agent in a repository of 10,000 files changes 500: the phone lists them, and the list scrolls without dropped frames
+12:17:21 flow big-repo
+12:18:12   10,000 files, 500 changed: 9 scrolls of the list, 1362 frames, 0 dropped (0%), longest 16.7 ms; load average 4.6
+12:18:12 ok   big-repo
+12:18:12 scenario cleanup (AC-130, AC-127): clean up a worktree with uncommitted files: the phone names them and asks once; the worktree is gone
+12:18:12 flow cleanup
+12:18:35 ok   cleanup
+12:18:35 scenario merge (AC-130, AC-127): merge back from the phone: aborted after a conflict, and completed, each asked once
+12:18:36 flow merge-abort
+12:19:01 flow merge-complete
+12:19:26 ok   merge
+12:19:26 scenario safety (AC-130): both safety settings turned on from the phone, each with the device's own unlock: the app is locked when opened, and Stop all asks for the unlock
+12:19:26 flow safety-toggle
+12:19:59 flow safety-is-on
+12:20:06 flow safety-toggle
+12:20:39 flow safety-is-on
+12:20:45 flow locked-open
+12:21:08 flow unlocked
+12:21:17 flow stop-all-unlock
+12:22:02 ok   safety
+12:22:02 scenario backup (AC-130): an attempt to read the phone's key from everything the app keeps on disk (more than a backup carries) fails
+12:22:08   27 files of the app searched: no private key of this phone; a planted key was found; keychain items [{"group":"FQ6YGD7554.com.beelol.overseer.phone","accessible":"cku"}]
+12:22:08 ok   backup
+12:22:08 scenario new (AC-125): a new agent started from the phone
+12:22:08 flow new
+12:22:25 ok   new
+12:22:25 scenario accounts (AC-127): the accounts of the Mac
+12:22:25 flow accounts
+12:22:38 ok   accounts
+12:22:38 scenario notifications (AC-129): notifications switched off on the phone are off on the Mac, and on again
+12:22:38 flow notifications-off
+12:22:56 flow notifications-on
+12:23:12 ok   notifications
+12:23:12 skip banner: iOS shows the system's own notification (the scenario push)
+12:23:12 scenario push (AC-129): the daemon's own notification on the simulator: a tap opens the agent, Allow unblocks it
+12:23:12 flow home
+12:23:19 flow notification-open
+12:23:39 flow home
+12:23:47 flow notification-allow
+12:24:08 ok   push
+12:24:08 scenario stop-all (AC-125, AC-130): Stop all agents names how many will stop, asks once, and stops them
+12:24:09 flow stop-all
+12:24:45 ok   stop-all
+12:24:45 scenario update (AC-141): a new build installed over the old one keeps the pairing: the app opens on the agents list
+12:24:46 flow opened
+12:24:55 ok   update
+12:24:55 scenario reopen (AC-141, AC-130): opened five times, the app never asks to pair, sign in or unlock
+12:24:55 flow opened
+12:25:06 flow opened
+12:25:17 flow opened
+12:25:28 flow opened
+12:25:38 flow opened
+12:25:49 ok   reopen
+12:25:49 scenario restart (AC-141): the phone restarted: the app opens on the agents list with no prompt and connects by itself
+12:25:56 flow opened
+12:26:21 ok   restart
+12:26:21 scenario off-and-on (AC-116, AC-121): phone access turned off on the Mac and on again: the app says so and comes back by itself
+12:26:21 flow off
+12:26:33 flow on
+12:26:44 ok   off-and-on
+12:26:44 scenario queued (AC-122, AC-121): a message typed while phone access is off is kept, shown, and sent once when it is on again
+12:26:45 flow send-offline
+12:27:23 ok   queued
+12:27:23 scenario unreachable (AC-123, AC-116, AC-121): the Mac gone without a word: the app says unreachable with the last contact, and comes back by itself
+12:27:23 flow unreachable
+12:27:35 flow reachable
+12:27:44 ok   unreachable
+12:27:44 scenario manual-address (AC-120): the Mac answers somewhere else: an address typed by the owner connects, with no pairing again
+12:27:45 flow manual-address
+12:28:07 ok   manual-address
+12:28:07 scenario away (AC-121): five minutes in the background while an agent writes numbered lines, the daemon restarted in the middle: every event once, in order
+12:28:08 flow away-start
+12:28:38   the app is in the background for 5 minutes; the daemon restarts half way
+12:33:41 flow away-return
+12:33:58   the Mac's newest event is 3664; the phone received 2517 events up to 3664, gaps 0, duplicates 0, reloads 0
+12:33:58 ok   away
+12:33:58 scenario tour (AC-131): every screen in both themes, at the smallest and the largest text size; the theme changed with the app open
+12:34:00 flow tour
+12:34:48 flow tour
+12:35:34 flow tour
+12:36:22 flow tour
+12:37:07 flow opened
+12:37:24 ok   tour
+12:37:24 scenario busy (AC-135, AC-137): an animation drops no frame while the logic is held for 500 ms
+12:37:24 flow busy
+12:37:45   frames 53, dropped 0 (0%), longest 16.7 ms, frame time 16.7 ms
+12:37:45 ok   busy
+12:37:45 scenario watch-only (AC-119): made watch only on the Mac, the phone shows everything and no control that changes something
+12:37:45 flow watch
+12:38:06 flow full
+12:38:15 ok   watch-only
+12:41:34 ok   budgets
+12:41:34 scenario revoke (AC-119): removed on the Mac, the phone is back on pairing and holds nothing of the Mac
+12:41:34 flow revoked
+12:41:44 storage after the revoke: overseer.counter, perf.busy, perf.delay, perf.last, perf.launches, perf.scroll, perf.stream, settings.appLock, settings.unlockBeforeChanges, test.door
+12:41:44 ok   revoke
+12:41:45 The phone's scenarios on android. Commit cc4a556.
+12:41:48 scenario pair (AC-117, AC-118, AC-141): a code typed on the phone, confirmed on the Mac, and the agents list
+12:41:48 flow pair
+12:42:30 ok   pair
+12:42:30 scenario agents (AC-124): every agent, those that need the owner first; every agent of the Mac has its row on the phone
+12:42:30 flow agents
+12:42:44 flow agents-every-row
+12:42:53   9 agents of the Mac (nested children among them: 2), each found on the phone
+12:42:53 ok   agents
+12:42:53 scenario delay (AC-124): a line an agent prints reaches the phone's screen: the delay from the Mac's event to the frame that shows it
+12:42:54 flow watch-stream
+12:43:40   from the Mac's event to the frame that shows it: 346 lines, p50 0 ms, p95 0 ms, longest 400 ms (AC-58 holds a VS Code tile to 250 ms); the device's clock -292 ms from the Mac's; load average 2.3
+12:43:40 ok   delay
+12:43:40 scenario conversation (AC-124): an agent's conversation opens with its composer
+12:43:40 flow conversation
+12:44:03 ok   conversation
+12:44:03 scenario permission (AC-125): a permission request allowed from the phone unblocks the agent
+12:44:03 flow permission
+12:44:16 ok   permission
+12:44:16 scenario send (AC-122, AC-125): a message typed on the phone reaches the agent exactly once
+12:44:16 flow send
+12:44:49 ok   send
+12:44:49 scenario image (AC-125): an image chosen in the system's photo picker reaches the Claude fixture as an image block
+12:44:50 flow send-image
+12:45:24   the fixture read an image block: image/jpeg, 79999 bytes, with the message's text
+12:45:24 ok   image
+12:45:24 scenario review (AC-126): an agent's changed files, a file's hunks, and a hunk marked reviewed
+12:45:24 flow review
+12:45:56 ok   review
+12:45:56 scenario diff (AC-126): a file's diff on the phone is git diff for the comparison, line for line; a mark made on the Mac shows on the phone
+12:45:56 flow diff-lines
+12:46:23   4 lines in 1 hunks equal git diff and are on the screen; the Mac's mark shows on the phone
+12:46:23 ok   diff
+12:46:23 scenario reject (AC-126, AC-130): a hunk rejected from the phone is asked about once and then gone from the worktree
+12:46:24 flow reject
+12:46:55 ok   reject
+12:46:55 scenario big-repo (AC-126, AC-135): an agent in a repository of 10,000 files changes 500: the phone lists them, and the list scrolls without dropped frames
+12:47:01 flow big-repo
+12:47:43   10,000 files, 500 changed: 9 scrolls of the list, 575 frames, 0 dropped (0%), longest 16.7 ms; load average 3.3
+12:47:43   the emulator's own figure, recorded as its baseline: 0% dropped
+12:47:43 ok   big-repo
+12:47:43 scenario cleanup (AC-130, AC-127): clean up a worktree with uncommitted files: the phone names them and asks once; the worktree is gone
+12:47:44 flow cleanup
+12:48:09 ok   cleanup
+12:48:09 scenario merge (AC-130, AC-127): merge back from the phone: aborted after a conflict, and completed, each asked once
+12:48:10 flow merge-abort
+12:48:39 flow merge-complete
+12:49:09 ok   merge
+12:49:09 scenario safety (AC-130): both safety settings turned on from the phone, each with the device's own unlock: the app is locked when opened, and Stop all asks for the unlock
+12:49:09 flow safety-toggle
+12:49:35 flow safety-is-on
+12:49:40 flow safety-toggle
+12:50:05 flow safety-is-on
+12:50:09 flow locked-open
+12:50:25 flow unlocked
+12:50:31 flow stop-all-unlock
+12:50:55 ok   safety
+12:50:55 scenario backup (AC-130): an attempt to read the phone's key from everything the app keeps on disk (more than a backup carries) fails
+12:50:58   27 files of the app searched: no private key of this phone; a planted key was found; keychain items []
+12:50:58 ok   backup
+12:50:58 scenario new (AC-125): a new agent started from the phone
+12:50:58 flow new
+12:51:16 ok   new
+12:51:16 scenario accounts (AC-127): the accounts of the Mac
+12:51:16 flow accounts
+12:51:28 ok   accounts
+12:51:28 scenario notifications (AC-129): notifications switched off on the phone are off on the Mac, and on again
+12:51:28 flow notifications-off
+12:51:43 flow notifications-on
+12:51:56 ok   notifications
+12:51:56 scenario banner (AC-129): with the app open, an agent that needs the owner shows as a banner; a tap opens the agent
+12:51:56 flow opened
+12:52:04 flow banner
+12:52:22 ok   banner
+12:52:22 skip push: Android shows its notifications itself while the app is open, in this gate
+12:52:22 scenario stop-all (AC-125, AC-130): Stop all agents names how many will stop, asks once, and stops them
+12:52:23 flow stop-all
+12:52:46 ok   stop-all
+12:52:46 scenario update (AC-141): a new build installed over the old one keeps the pairing: the app opens on the agents list
+12:52:47 flow opened
+12:52:55 ok   update
+12:52:55 scenario reopen (AC-141, AC-130): opened five times, the app never asks to pair, sign in or unlock
+12:52:55 flow opened
+12:53:03 flow opened
+12:53:11 flow opened
+12:53:19 flow opened
+12:53:27 flow opened
+12:53:35 ok   reopen
+12:53:35 scenario restart (AC-141): the phone restarted: the app opens on the agents list with no prompt and connects by itself
+12:53:52 flow opened
+12:54:02 ok   restart
+12:54:02 scenario off-and-on (AC-116, AC-121): phone access turned off on the Mac and on again: the app says so and comes back by itself
+12:54:02 flow off
+12:54:09 flow on
+12:54:16 ok   off-and-on
+12:54:16 scenario queued (AC-122, AC-121): a message typed while phone access is off is kept, shown, and sent once when it is on again
+12:54:16 flow send-offline
+12:54:52 ok   queued
+12:54:52 scenario unreachable (AC-123, AC-116, AC-121): the Mac gone without a word: the app says unreachable with the last contact, and comes back by itself
+12:54:52 flow unreachable
+12:55:00 flow reachable
+12:55:06 ok   unreachable
+12:55:06 scenario manual-address (AC-120): the Mac answers somewhere else: an address typed by the owner connects, with no pairing again
+12:55:07 flow manual-address
+12:55:29 ok   manual-address
+12:55:29 scenario away (AC-121): five minutes in the background while an agent writes numbered lines, the daemon restarted in the middle: every event once, in order
+12:55:29 flow away-start
+12:55:57   the app is in the background for 5 minutes; the daemon restarts half way
+13:01:00 flow away-return
+13:01:16   the Mac's newest event is 3557; the phone received 2499 events up to 3557, gaps 0, duplicates 0, reloads 0
+13:01:16 ok   away
+13:01:16 scenario tour (AC-131): every screen in both themes, at the smallest and the largest text size; the theme changed with the app open
+13:01:18 flow tour
+13:02:23 flow tour
+13:03:36 flow tour
+13:04:43 flow tour
+13:05:56 flow opened
+13:06:09 ok   tour
+13:06:09 scenario busy (AC-135, AC-137): an animation drops no frame while the logic is held for 500 ms
+13:06:09 flow busy
+13:06:36   frames 53, dropped 0 (0%), longest 16.7 ms, frame time 16.7 ms
+13:06:36 ok   busy
+13:06:36 scenario watch-only (AC-119): made watch only on the Mac, the phone shows everything and no control that changes something
+13:06:36 flow watch
+13:06:59 flow full
+13:07:06 ok   watch-only
+13:10:05 FAIL budgets
+13:10:05 scenario revoke (AC-119): removed on the Mac, the phone is back on pairing and holds nothing of the Mac
+13:10:05 flow revoked
+13:10:12 storage after the revoke: overseer.counter, perf.busy, perf.delay, perf.last, perf.launches, perf.scroll, perf.stream, settings.appLock, settings.unlockBeforeChanges, test.door
+13:10:12 ok   revoke
+
+ios      ok   pair
+ios      ok   agents
+ios      ok   delay
+ios      ok   conversation
+ios      ok   permission
+ios      ok   send
+ios      ok   image
+ios      ok   review
+ios      ok   diff
+ios      ok   reject
+ios      ok   big-repo
+ios      ok   cleanup
+ios      ok   merge
+ios      ok   safety
+ios      ok   backup
+ios      ok   new
+ios      ok   accounts
+ios      ok   notifications
+ios      skip banner: iOS shows the system's own notification (the scenario push)
+ios      ok   push
+ios      ok   stop-all
+ios      ok   update
+ios      ok   reopen
+ios      ok   restart
+ios      ok   off-and-on
+ios      ok   queued
+ios      ok   unreachable
+ios      ok   manual-address
+ios      ok   away
+ios      ok   tour
+ios      ok   busy
+ios      ok   watch-only
+ios      ok   budgets
+ios      ok   revoke
+android  ok   pair
+android  ok   agents
+android  ok   delay
+android  ok   conversation
+android  ok   permission
+android  ok   send
+android  ok   image
+android  ok   review
+android  ok   diff
+android  ok   reject
+android  ok   big-repo
+android  ok   cleanup
+android  ok   merge
+android  ok   safety
+android  ok   backup
+android  ok   new
+android  ok   accounts
+android  ok   notifications
+android  ok   banner
+android  skip push: Android shows its notifications itself while the app is open, in this gate
+android  ok   stop-all
+android  ok   update
+android  ok   reopen
+android  ok   restart
+android  ok   off-and-on
+android  ok   queued
+android  ok   unreachable
+android  ok   manual-address
+android  ok   away
+android  ok   tour
+android  ok   busy
+android  ok   watch-only
+android  FAIL budgets: a budget was missed (see the measurements above)
+android  ok   revoke
+
+The run failed.
