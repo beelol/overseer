@@ -1,6 +1,6 @@
 # SWARM-53 — mutable resource isolation
 
-Status: partial. Revisions: `fa376e9` (admission claims), `0d2074c` (durable planned claims), `83cc330` (late active conflict), `1d4ae16` (historical observations), `dc8a787` (completed-run verdict invalidation), `0673cea` (unconfirmed planned owner).
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. Revisions: `fa376e9` (admission claims), `0d2074c` (durable planned claims), `83cc330` (late active conflict), `1d4ae16` (historical observations), `dc8a787` (completed-run verdict invalidation), `0673cea` (unconfirmed planned owner).
 
 Input: two fixture categories request attempts against the same database namespace. Their admission requests declare `db:shared-test` as an exclusive write claim; the second also tries a read claim while the first writer remains active.
 
@@ -23,3 +23,17 @@ Atlas follow-up at `d985ff5`: `fixtures/swarm/atlas-v1/probe-shared.mjs` uses tw
 Current evidence: `daemon/tests/swarm_admission.rs`, `daemon/tests/swarm_runtime.rs`, `daemon/tests/swarm_atlas.rs`, `fixtures/swarm/atlas-v1/probe-shared.mjs`, `daemon/src/swarm/director.rs`.
 
 Remaining: The late observation API is fixture-only and relies on an explicit resource name supplied by the caller. Live tool/resource discovery, canonical aliases and external service mutation detection are not implemented. An unconfirmed planned owner remains blocked until a director revises its plan or otherwise resolves the claim; there is no automatic proof that it never used the resource. The Atlas fault uses two scripted clients in one process, not independent live harnesses. The evidence is quarantined as unsafe, not reported as proven overlap. SWARM-53 stays unchecked.
+
+## Verified at fixture scope (2026-09-28)
+
+| Clause | Test |
+| --- | --- |
+| Two tests on one mutable database namespace: the conflicting exclusive claim is detected before dispatch | `mutable_resource_conflict_is_rejected_before_reserving_an_attempt`, `planned_write_claim_cannot_be_omitted_at_admission` (`resource_conflict`, no attempt or reservation; the planned write cannot be downgraded at admission) |
+| Contamination discovered later invalidates the affected evidence | `late_shared_database_use_quarantines_evidence_and_bounds_retries`, `late_write_after_declared_read_quarantines_both_attempts`, `historical_shared_database_use_revokes_accepted_evidence_after_exit`, `unconfirmed_planned_owner_preserves_late_use_and_holds_both_jobs`; joined: `atlas_s5_shared_database_contamination_quarantines_and_retries` (two real Express/PostgreSQL clients on one schema) |
+| …and reruns only within remaining attempts and budget | the same late-use test: each rerun is an ordinary budget-checked admission on a fresh namespace; a second collision fails both jobs and no third attempt is admitted |
+| A shared read-only snapshot is allowed | `late_shared_read_only_snapshot_remains_parallel` |
+| No global single-UI constraint on command/code workers | `independent_jobs_execute_together_while_conflicting_writer_waits` and `explicit_ceiling_runs_thirty_two_supervised_workers`: command workers run concurrently; the only serialization is a declared resource claim |
+
+Rerun serially on 2026-09-28: `swarm_admission` 39 passed; `swarm_runtime late_resource_conflict_interrupts_only_affected_supervised_workers` passed; the Atlas contamination replay passed against disposable PostgreSQL 16.
+
+Boundary: resources are the names a plan or worker declares. Discovering undeclared resources, canonical aliases, and external mutation detection in a live harness are not part of this clause and are not claimed.

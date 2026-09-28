@@ -656,7 +656,7 @@
       "blocker": "The fixture integration API defaults runs to no source-change permission, retains it over restart, and requires an explicit isolated-write grant. Native targets without a qualified audit source-write boundary are now held before quota reservation and rechecked at process launch, including an old pending admission. Generic fixture workers still have writable worktrees; no qualified audit-only native harness sandbox, live-service mutation boundary, joined S1/S2/S4 audit replay or normal-launch permission path exists."
     },
     "SWARM-53": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
         "daemon/tests/swarm_admission.rs",
@@ -669,7 +669,7 @@
         "daemon/src/swarm/director.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "Planned write claims constrain admission; a joined Atlas replay now proves two scripted Express/PostgreSQL clients sharing one mutable schema contaminate each other, quarantine both submitted artifacts, and recover through one isolated retry per job. Quarantined result notifications no longer requeue indefinitely in the director inbox, with a non-ignored regression. Other fixtures preserve observations through exit/restart, invalidate a prior completed verdict, interrupt affected supervised workers, enforce retry bounds, and permit shared read-only access. Live resource discovery, alias canonicalization, external mutation detection, and independent live harness qualification remain unavailable."
+      "blocker": null
     },
     "SWARM-54": {
       "status": "partial",
