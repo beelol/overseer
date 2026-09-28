@@ -484,3 +484,183 @@ fn s0_native_director_survives_a_daemon_restart_mid_run() {
         [], |r| r.get(0)).unwrap();
     assert_eq!(directors, 1, "one director process for the run");
 }
+
+/// One cell of the four-way matrix: how the work was launched, what it
+/// booked and how many app slots it held while running.
+#[derive(Debug, PartialEq)]
+struct Cell {
+    path: String,
+    bookings: Vec<String>,
+    slots: i64,
+    swarm_runs: i64,
+    swarm_workers: i64,
+}
+
+fn swarm_totals(d: &Daemon) -> (i64, i64) {
+    let db = db(d);
+    let runs: i64 = db.query_row("SELECT COUNT(*) FROM swarm_runs", [], |r| r.get(0)).unwrap();
+    let workers: i64 = db.query_row("SELECT COUNT(*) FROM swarm_worker_launches", [], |r| r.get(0)).unwrap();
+    (runs, workers)
+}
+
+fn bound_bookings(d: &Daemon, run: &str) -> Vec<String> {
+    let db = db(d);
+    let mut stmt = db.prepare("SELECT caller||':'||CASE WHEN slot_held THEN 'slot' ELSE 'no_slot' END
+        FROM shared_booking_intents WHERE run_id=?1").unwrap();
+    let rows = stmt.query_map([run], |r| r.get(0)).unwrap().map(Result::unwrap).collect();
+    rows
+}
+
+/// What launched a run, from the daemon's own records.
+fn launch_path(d: &Daemon, run: &str) -> String {
+    let db = db(d);
+    let has = |sql: &str| -> bool { db.query_row(sql, [run], |r| r.get::<_, i64>(0)).unwrap() > 0 };
+    if has("SELECT COUNT(*) FROM swarm_director_owners WHERE overseer_run_id=?1") { "swarm_director".into() }
+    else if has("SELECT COUNT(*) FROM swarm_worker_launches WHERE overseer_run_id=?1") { "swarm_worker".into() }
+    else if has("SELECT COUNT(*) FROM auto_root_intents WHERE run_id=?1") { "auto_root".into() }
+    else { "ordinary".into() }
+}
+
+fn end_run(d: &Daemon, run: &str) {
+    let _ = d.try_call("run.interrupt", json!({"run_id":run}));
+    d.wait_done(run, 30);
+    let deadline = Instant::now() + Duration::from_secs(15);
+    while active(d) != 0 {
+        assert!(Instant::now() < deadline, "slots still held after {run} ended");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+/// SWARM-01's four combinations on one daemon, with the Swarm fixture API
+/// off (the product path) and the native director on: Manual and Auto (Auto
+/// Mode's root) with Swarm off, and a normal Swarm start with Auto Mode off
+/// and on. Each cell records its launch path, what it booked and the app
+/// slots it held; Swarm off creates no Swarm run or worker, a Swarm keeps to
+/// its approved pool, and Auto Mode does not change how a Swarm launches
+/// (no Swarm route is chosen by Auto's selector).
+#[test]
+fn four_way_launch_matrix_auto_manual_by_swarm_on_off() {
+    let draws = tmp();
+    let draw_file = draws.path().join("draws.json");
+    let codex = repo_root().join("fixtures/fake-harness/codex-app-fixture.js").display().to_string();
+    let w = world(&[("OVERSEER_SWARM_FIXTURE_API", "0"), ("OVERSEER_SHARED_BOOKING_FIXTURE_API", "1"),
+        ("OVERSEER_SWARM_FIXTURE_DRAW", draw_file.to_str().unwrap()),
+        ("OVERSEER_CODEX_PATH", codex.as_str()), ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "8000"),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH",
+            "CLAUDE_FIXTURE_MODE,CLAUDE_FIXTURE_VERSION,CLAUDE_FIXTURE_HELP,CLAUDE_FIXTURE_SWARM_SCRIPT,CLAUDE_FIXTURE_SWARM_WORKERS,FIXTURE_MODE,FIXTURE_TURN_DELAY_MS")]);
+    let d = &w.d;
+    let workers_profile = d.call("profile.create", json!({"name":"workers","harness":"claude"}))["id"]
+        .as_str().unwrap().to_string();
+    let booking = fixture_account_booking(d, &workers_profile, "worker-account", 0.0, 3_000);
+    std::fs::write(&draw_file, json!({workers_profile.clone(): booking}).to_string()).unwrap();
+    d.call("agents.limit.set", json!({"max_active":5}));
+    d.call("swarm.native_director.set", json!({"enabled":true}));
+
+    // Manual × Swarm off: an ordinary start. Its automatic booking attempt
+    // finds no qualified draw for the account, so it runs unbooked.
+    d.call("auto.mode.set", json!({"enabled":false}));
+    let manual = run_id(&d.call("task.create", json!({"repo":w.checkout,"harness":"codex-app","model":"gpt-6-sol",
+        "effort":"medium","prompt":"hold","title":"manual"})));
+    d.wait_status(&manual, |s| s == "running", 20);
+    let (runs, workers) = swarm_totals(d);
+    let manual_off = Cell { path: launch_path(d, &manual), bookings: bound_bookings(d, &manual), slots: active(d),
+        swarm_runs: runs, swarm_workers: workers };
+    end_run(d, &manual);
+
+    // Auto × Swarm off: an Auto root. Its route is Auto's choice and its
+    // account is held by Auto's unknown-draw claim on the whole pool.
+    d.call("auto.mode.set", json!({"enabled":true}));
+    let root = d.call("auto.start", json!({"work_unit_id":"matrix-root","repo":w.checkout,"workspace_mode":"worktree",
+        "prompt":"hold parent","title":"auto","allowed_profiles":["system-codex"],"min_tier":"general",
+        "required_tools":[],"sandbox":"read_only"}));
+    let root_run = run_id(&root);
+    d.wait_status(&root_run, |s| s == "running", 20);
+    let claim: String = db(d).query_row("SELECT state FROM auto_pool_claims WHERE work_unit_id='matrix-root'",
+        [], |r| r.get(0)).unwrap();
+    let mut bookings = bound_bookings(d, &root_run);
+    bookings.push(format!("auto_pool_claim:{claim}"));
+    let (runs, workers) = swarm_totals(d);
+    let auto_off = Cell { path: launch_path(d, &root_run), bookings, slots: active(d), swarm_runs: runs, swarm_workers: workers };
+    assert_eq!(root["decision"]["selected"], "system-codex/gpt-6-sol/medium", "{root}");
+    end_run(d, &root_run);
+
+    // Swarm on, with Auto Mode off and then on: the normal start; the Claude
+    // director on the approved Claude account and two native workers booked
+    // through Swarm admission on the approved worker account.
+    d.call("swarm.policy.set", json!({"scope":"application","allowed_targets":["system-claude", workers_profile]}));
+    let swarm_cell = |auto: bool, category: &str| -> (Cell, Vec<String>) {
+        d.call("auto.mode.set", json!({"enabled":auto}));
+        let cell_trace = w.dir.path().join(format!("{category}-trace.jsonl"));
+        let gate = w.dir.path().join(format!("{category}-gate"));
+        std::fs::write(&w.script, json!({
+            "trace":cell_trace,"gate":gate,
+            "jobs":[{"id":"a","title":"First","acceptance":"evidence","deps":[]},
+                {"id":"b","title":"Second","acceptance":"evidence","deps":[]}],
+            "estimate":benefit(&["a","b"]),
+            "dispatch":[{"job":"a","target":workers_profile,"model":"sonnet"},{"job":"b","target":workers_profile,"model":"sonnet"}],
+            "complete":{"summary":"matrix cell","verification":"evidence accepted"}}).to_string()).unwrap();
+        std::fs::write(&w.workers, json!({"trace":cell_trace,"gate":gate,"jobs":{
+            "a":{"evidence":[{"id":"a-proof","kind":"finding","content":"a"}]},
+            "b":{"evidence":[{"id":"b-proof","kind":"finding","content":"b"}]}}}).to_string()).unwrap();
+        let params = json!({"category":category,"objective":"Matrix cell","repositories":[w.checkout],
+            "source_change_permission":"isolated"});
+        let back = d.call("swarm.start", params.clone());
+        let mut confirm = params.clone();
+        confirm["request_id"] = json!(category);
+        confirm["confirm_readback_sha256"] = back["readback_sha256"].clone();
+        let started = d.call("swarm.start", confirm);
+        assert_eq!(started["director"]["status"], "launched", "{started}");
+        let run = started["run"]["id"].as_str().unwrap().to_string();
+        let director = started["director"]["overseer_run_id"].as_str().unwrap().to_string();
+        let deadline = Instant::now() + Duration::from_secs(60);
+        let launched = loop {
+            let steps = trace(&cell_trace);
+            if steps.iter().any(|t| t["step"] == "dispatched") {
+                break steps.into_iter().filter(|t| t["step"] == "launched").collect::<Vec<_>>();
+            }
+            assert!(Instant::now() < deadline, "{category}: {steps:?}");
+            std::thread::sleep(Duration::from_millis(50));
+        };
+        let mut bookings = vec![format!("director:{}", bound_bookings(d, &director).join("+"))];
+        let mut paths = vec![launch_path(d, &director)];
+        for worker in &launched {
+            paths.push(launch_path(d, worker["worker"].as_str().unwrap()));
+            assert_eq!(worker["target"], workers_profile.as_str(), "a Swarm keeps to its approved pool");
+            bookings.push(format!("worker:{}", bound_bookings(d, worker["worker"].as_str().unwrap()).join("+")));
+        }
+        let (runs, workers) = swarm_totals(d);
+        let slots = active(d);
+        let routed_by_auto: i64 = db(d).query_row("SELECT COUNT(*) FROM auto_root_intents i JOIN swarm_worker_launches l
+            ON l.overseer_run_id=i.run_id", [], |r| r.get(0)).unwrap();
+        assert_eq!(routed_by_auto, 0, "no Swarm worker is an Auto root");
+        std::fs::write(&gate, "open").unwrap();
+        let finished = d.wait_done(&director, 60);
+        assert_eq!(finished["status"], "completed", "{finished}");
+        assert_eq!(d.call("swarm.get", json!({"id":run}))["status"], "completed");
+        let deadline = Instant::now() + Duration::from_secs(15);
+        while active(d) != 0 {
+            assert!(Instant::now() < deadline, "slots still held after {category}");
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        let (harness, profile): (String, String) = db(d).query_row("SELECT harness,profile_id FROM runs WHERE id=?1",
+            [&director], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+        (Cell { path: paths.join("+"), bookings, slots, swarm_runs: runs, swarm_workers: workers },
+            vec![harness, profile])
+    };
+    let (manual_on, manual_director) = swarm_cell(false, "Matrix manual");
+    let (auto_on, auto_director) = swarm_cell(true, "Matrix auto");
+
+    eprintln!("Manual x Swarm off: {manual_off:?}\nAuto x Swarm off: {auto_off:?}\nManual x Swarm on: {manual_on:?}\nAuto x Swarm on: {auto_on:?}");
+    assert_eq!(manual_off, Cell { path: "ordinary".into(), bookings: vec![], slots: 1, swarm_runs: 0, swarm_workers: 0 },
+        "an ordinary start: one slot, unbooked while its draw is unknown, no Swarm");
+    assert_eq!(auto_off, Cell { path: "auto_root".into(), bookings: vec!["auto_pool_claim:active".into()], slots: 1,
+        swarm_runs: 0, swarm_workers: 0 }, "an Auto root: one slot, Auto's unknown-draw claim, no Swarm");
+    let swarm_expected = |runs: i64, workers: i64| Cell { path: "swarm_director+swarm_worker+swarm_worker".into(),
+        bookings: vec!["director:".into(), "worker:swarm:slot".into(), "worker:swarm:slot".into()],
+        slots: 3, swarm_runs: runs, swarm_workers: workers };
+    assert_eq!(manual_on, swarm_expected(1, 2),
+        "the director (unbooked, its swarm/director draw unknown) and two workers each booked with its slot: three slots");
+    assert_eq!(auto_on, swarm_expected(2, 4), "Auto Mode does not change how a Swarm launches");
+    assert_eq!(manual_director, vec!["claude".to_string(), "system-claude".to_string()]);
+    assert_eq!(auto_director, manual_director);
+}
