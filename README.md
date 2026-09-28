@@ -388,7 +388,10 @@ agent and the daemon, `?` lists every key, `q` quits.
 
 - State lives in `~/Library/Application Support/Overseer` (`overseer.sqlite`, per-run
   output under `runs/`, worktrees under `worktrees/`, profiles under `profiles/`). Linux
-  uses `$XDG_DATA_HOME/overseer`. `OVERSEER_HOME` overrides it.
+  uses `$XDG_DATA_HOME/overseer`. `OVERSEER_HOME` overrides it for tests and dev instances
+  only: the installed extension and TUI ignore `OVERSEER_HOME`, `OVERSEER_SOCKET` and
+  `OVERSEER_INSTANCE` in their environment and refuse any daemon marked dev
+  ([AC-212](docs/verification/AC-212.md), [dev instances](docs/rfcs/dev-instance.md)).
 - The daemon binary is `target/release/overseerd` in a build, or
   `~/.vscode/extensions/beelol.overseer-0.1.0/bin/overseerd-darwin-arm64` once installed.
   `overseerd serve` runs it in the foreground without VS Code (the extension normally starts

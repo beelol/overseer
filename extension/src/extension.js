@@ -3,7 +3,7 @@
 const vscode = require('vscode');
 const path = require('path');
 const { execFile } = require('child_process');
-const { DaemonClient, resolveBinary } = require('./daemon-client');
+const { DaemonClient, resolveBinary, isProductionInstall } = require('./daemon-client');
 const { Model, AgentsProvider, AccountsProvider, ACTIVE, accountName } = require('./views');
 const { SearchView } = require('./search-view');
 const { OutputPanels } = require('./output-panel');
@@ -47,7 +47,10 @@ async function activate(context) {
   context.subscriptions.push(log);
   const say = msg => log.info(msg);
   const binary = resolveBinary(context, vscode.workspace.getConfiguration('overseer').get('daemonPath'));
-  client = new DaemonClient(binary, say);
+  // Production (the owner's installed extension) only ever uses the standard daemon (AC-212).
+  const production = isProductionInstall(context.extensionPath);
+  say(`${production ? 'installed in the standard extensions folder: production' : 'loaded from an isolated extensions folder'}; daemon ${binary}`);
+  client = new DaemonClient(binary, say, { production });
   const model = new Model(client);
   // The side bar's agents list (Gate K): Needs you, then agents by repository.
   const agents = new AgentsProvider(model, context.workspaceState, context.extensionUri, { attention: () => attention(), pinned: () => pinned() });
@@ -225,6 +228,7 @@ async function activate(context) {
     status.text = client.connected ? `$(overseer-mark) Overseer ${active} active${needs ? `  $(bell-dot) ${needs}` : ''}` : client.stopped ? '$(circle-slash) Overseer stopped' : '$(debug-disconnect) Overseer disconnected';
     status.tooltip = client.connected ? `${active} agent${active === 1 ? '' : 's'} running${needs ? ` · ${needs} need${needs === 1 ? 's' : ''} you` : ''}\nAgents keep running when VS Code closes.\nClick to open the dashboard.` : client.stopped ? 'Agents and daemon were stopped. Click to start the daemon again.' : 'Reconnecting to overseerd…';
     status.command = client.stopped && !client.connected ? 'overseer.startDaemon' : 'overseer.openCenter';
+    if (client.refusal) { status.text = '$(error) Overseer refused a dev daemon'; status.tooltip = client.refusal; status.command = 'overseer.showLog'; }
     status.show();
     vscode.commands.executeCommand('setContext', 'overseer.connected', client.connected);
   };
@@ -234,6 +238,7 @@ async function activate(context) {
   model.onDidChange(() => { autoArchive().catch(() => {}); });
   client.on('connected', () => { model.refresh(); updateStatus(); });
   client.on('disconnected', () => { model.error = 'daemon connection lost; reconnecting'; model.emitter.fire(); updateStatus(); });
+  client.on('refused', message => { model.error = message; model.emitter.fire(); updateStatus(); });
   client.on('stopped', () => { model.error = 'agents and daemon stopped (Overseer: Start Daemon to restart)'; model.emitter.fire(); updateStatus(); });
   // Accounts created, removed or signed out elsewhere (overseerd ctl, another window) show up here too.
   let accountsTimer;

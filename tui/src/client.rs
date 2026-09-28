@@ -21,6 +21,8 @@ pub enum Msg {
     Connected,
     /// Connection lost; the client is reconnecting.
     Disconnected(String),
+    /// The daemon is a dev instance and this TUI is the installed one (AC-212): never used, no retry.
+    Refused(String),
     /// A daemon event (never delivered twice).
     Event(Value),
     /// The replay of retained events after the subscription cursor finished.
@@ -61,12 +63,22 @@ struct Inner {
     generation: AtomicU64,
     /// Stopped on purpose: keep trying to connect (another UI may start it) but never spawn.
     stopped: AtomicBool,
+    /// The installed TUI: refuses a daemon whose hello reports a dev instance (AC-212).
+    production: bool,
+    /// The id of this connection's hello; its answer says which daemon this is.
+    hello: AtomicU64,
+    refused: AtomicBool,
 }
 
 impl Client {
     /// Connects in the background (starting the daemon when needed) and keeps reconnecting.
     /// `after` is the event cursor to resume from (0 = only new events after the first state).
     pub fn start(daemon: Option<Daemon>, socket: std::path::PathBuf, tx: Sender<Msg>) -> Client {
+        Self::start_as(daemon, socket, tx, crate::locate::production())
+    }
+
+    /// `production`: refuse a daemon that reports a dev instance (the installed TUI does).
+    pub fn start_as(daemon: Option<Daemon>, socket: std::path::PathBuf, tx: Sender<Msg>, production: bool) -> Client {
         let inner = Arc::new(Inner {
             daemon,
             socket,
@@ -79,6 +91,9 @@ impl Client {
             internal: Mutex::new(HashSet::new()),
             generation: AtomicU64::new(0),
             stopped: AtomicBool::new(false),
+            production,
+            hello: AtomicU64::new(0),
+            refused: AtomicBool::new(false),
         });
         let bg = inner.clone();
         std::thread::spawn(move || bg.connect_loop());
@@ -149,7 +164,7 @@ impl Inner {
 
     fn connect_loop(self: Arc<Self>) {
         let mut spawned = false;
-        while !self.closed.load(Ordering::SeqCst) {
+        while !self.closed.load(Ordering::SeqCst) && !self.refused.load(Ordering::SeqCst) {
             match UnixStream::connect(&self.socket) {
                 Ok(stream) => {
                     spawned = false;
@@ -176,11 +191,10 @@ impl Inner {
         let Ok(read) = stream.try_clone() else { return };
         *self.writer.lock().unwrap() = Some(stream);
         self.generation.fetch_add(1, Ordering::SeqCst);
-        self.connected.store(true, Ordering::SeqCst);
-        // Identify as a watching UI (the daemon counts it like a VS Code window).
+        // Identify as a watching UI (the daemon counts it like a VS Code window). Connected is
+        // announced when its answer says the daemon may be used.
         let hello = self.send("hello", json!({ "client": "tui" }));
-        self.internal.lock().unwrap().insert(hello);
-        let _ = self.tx.send(Msg::Connected);
+        self.hello.store(hello, Ordering::SeqCst);
         let mut reader = BufReader::new(read);
         let mut line = String::new();
         let reason = loop {
@@ -195,7 +209,7 @@ impl Inner {
         };
         *self.writer.lock().unwrap() = None;
         self.connected.store(false, Ordering::SeqCst);
-        if !self.closed.load(Ordering::SeqCst) {
+        if !self.closed.load(Ordering::SeqCst) && !self.refused.load(Ordering::SeqCst) {
             let _ = self.tx.send(Msg::Disconnected(reason));
         }
     }
@@ -222,6 +236,20 @@ impl Inner {
             }
             _ => {
                 let Some(id) = msg["id"].as_u64() else { return };
+                if id == self.hello.load(Ordering::SeqCst) {
+                    let instance = msg["result"]["instance"].as_str().filter(|_| self.production);
+                    if let Some(instance) = instance {
+                        self.refused.store(true, Ordering::SeqCst);
+                        let _ = self.tx.send(Msg::Refused(format!("This overseer-tui is the installed one and refuses dev instance {instance} ({}). Dev instances have their own TUI: scripts/dev tui.", self.socket.display())));
+                        if let Some(s) = self.writer.lock().unwrap().as_ref() {
+                            let _ = s.shutdown(std::net::Shutdown::Both);
+                        }
+                    } else {
+                        self.connected.store(true, Ordering::SeqCst);
+                        let _ = self.tx.send(Msg::Connected);
+                    }
+                    return;
+                }
                 if self.internal.lock().unwrap().remove(&id) {
                     return;
                 }
@@ -232,6 +260,63 @@ impl Inner {
                 };
                 let _ = self.tx.send(Msg::Reply { id, result });
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::net::UnixListener;
+
+    /// A fake daemon answering hello with `instance`; returns how many connections it took.
+    fn fake(path: &std::path::Path, instance: Option<&'static str>) -> Arc<AtomicU64> {
+        let listener = UnixListener::bind(path).unwrap();
+        let count = Arc::new(AtomicU64::new(0));
+        let seen = count.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                seen.fetch_add(1, Ordering::SeqCst);
+                std::thread::spawn(move || {
+                    let mut w = stream.try_clone().unwrap();
+                    for line in BufReader::new(stream).lines().map_while(Result::ok) {
+                        let msg: Value = serde_json::from_str(&line).unwrap();
+                        let result = if msg["method"] == "hello" { json!({ "instance": instance }) } else { json!({}) };
+                        let _ = w.write_all(format!("{}\n", json!({ "id": msg["id"], "result": result })).as_bytes());
+                    }
+                });
+            }
+        });
+        count
+    }
+
+    #[test]
+    fn ac212_the_installed_tui_refuses_a_dev_daemon_and_does_not_retry() {
+        let tmp = tempfile::tempdir().unwrap();
+        let sock = tmp.path().join("d.sock");
+        let seen = fake(&sock, Some("dev-a"));
+        let (tx, rx) = std::sync::mpsc::channel();
+        let c = Client::start_as(None, sock, tx, true);
+        match rx.recv_timeout(Duration::from_secs(5)).unwrap() {
+            Msg::Refused(why) => assert!(why.contains("refuses dev instance dev-a"), "{why}"),
+            other => panic!("expected a refusal, got {other:?}"),
+        }
+        std::thread::sleep(Duration::from_millis(1200));
+        assert!(!c.connected());
+        assert_eq!(seen.load(Ordering::SeqCst), 1, "no retry into the dev daemon");
+        assert!(rx.try_iter().all(|m| !matches!(m, Msg::Connected)), "never announced as connected");
+    }
+
+    #[test]
+    fn ac212_a_dev_tui_and_a_standard_daemon_connect() {
+        let tmp = tempfile::tempdir().unwrap();
+        for (name, instance, production) in [("std.sock", None, true), ("dev.sock", Some("dev-b"), false)] {
+            let sock = tmp.path().join(name);
+            fake(&sock, instance);
+            let (tx, rx) = std::sync::mpsc::channel();
+            let c = Client::start_as(None, sock, tx, production);
+            assert!(matches!(rx.recv_timeout(Duration::from_secs(5)).unwrap(), Msg::Connected), "{name}");
+            assert!(c.connected());
         }
     }
 }
