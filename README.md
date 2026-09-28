@@ -384,6 +384,22 @@ step), `P` opens a GitHub pull request with your `gh`, `C` removes a finished wo
 Commander folder, preview; the daemon plays, and the terminal bell rings only when it does not), `X` stops every
 agent and the daemon, `?` lists every key, `q` quits.
 
+## Developing Overseer: dev instances
+
+A dev instance is Overseer built from a checkout and run beside the installed one, with its own
+data folder, socket, gateway port and VS Code profile ([design](docs/rfcs/dev-instance.md)).
+Agents use it to build and try Overseer without touching yours:
+
+```bash
+scripts/dev up --name a            # build this checkout, start dev-a, print where everything is
+scripts/dev code --name a          # an isolated VS Code pinned to dev-a ("Overseer dev-a")
+scripts/dev clean --name a         # stop everything of dev-a and remove it
+```
+
+`scripts/dev --help` has every command. The installed Overseer never sees dev instances, and
+never uses one even when their variables leak into its environment
+([AC-212](docs/verification/AC-212.md)).
+
 ## Recovery
 
 - State lives in `~/Library/Application Support/Overseer` (`overseer.sqlite`, per-run
