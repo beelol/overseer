@@ -76,9 +76,21 @@ pub enum Event {
         message: String,
         t_ms: u64,
     },
+    /// Another app is recording (a call): the listener stopped listening and speaking (AC-173).
+    Paused {
+        apps: Vec<String>,
+        t_ms: u64,
+    },
+    /// The other app is done: listening again.
+    Resumed {
+        t_ms: u64,
+    },
     /// The input ended (a file or a closed feed).
     End {
         t_ms: u64,
+        /// The most audio the listener held at once, in ms (AC-173: 30 s at most).
+        #[serde(default)]
+        held_max_ms: u64,
     },
 }
 

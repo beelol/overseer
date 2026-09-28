@@ -1482,7 +1482,7 @@ fn ac171_permissions_one_at_a_time_with_silence_maybe_and_the_toast_s_cancel() {
             && v["request"] == yes_id
             && v["text"].as_str().unwrap_or("").starts_with("Sent")
     });
-    assert_eq!(cue_count(&env, "agent_unblocked"), 2);
+    wait_cues(&env, "agent_unblocked", 2);
     env.d.wait_status(&first, |s| s != "waiting_for_user", 20);
     // The second one is read back by itself, and answered on its own.
     let second = if first == a { b.clone() } else { a.clone() };
@@ -1498,9 +1498,30 @@ fn ac171_permissions_one_at_a_time_with_silence_maybe_and_the_toast_s_cancel() {
             && v["request"] == no_id
             && v["text"].as_str().unwrap_or("").starts_with("Sent")
     });
-    assert_eq!(cue_count(&env, "agent_stopped"), 1, "{:?}", env.cue_log());
+    wait_cues(&env, "agent_stopped", 1);
     assert_eq!(cue_count(&env, "agent_unblocked"), 2);
     env.d.wait_status(&second, |s| s != "waiting_for_user", 20);
+}
+
+/// A cue waits for the end of Overseer's phrase (the arbiter), so it can come a moment after the
+/// answer: waits for `n`, then checks no more came.
+fn wait_cues(env: &Env, key: &str, n: usize) {
+    let deadline = Instant::now() + Duration::from_secs(15);
+    while cue_count(env, key) < n {
+        assert!(
+            Instant::now() < deadline,
+            "{n} × {key}: {:?}",
+            env.cue_log()
+        );
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    std::thread::sleep(Duration::from_secs(1));
+    assert_eq!(
+        cue_count(env, key),
+        n,
+        "exactly {n} × {key}: {:?}",
+        env.cue_log()
+    );
 }
 
 /// AC-171: what an agent writes is never the owner's words: an instruction to Overseer in an
@@ -1854,4 +1875,424 @@ fn ac164_lines_wait_for_the_owner_and_side_talk_makes_no_request() {
         .unwrap()
         .len();
     assert_eq!(before, after);
+}
+
+/// AC-173: another app recording (a fixture call) pauses Voice Mode within 2 s, shown in the
+/// strip; speech is not heard while paused; it resumes when the app is done.
+#[test]
+fn ac173_a_call_pauses_voice_mode_and_it_resumes() {
+    let calls = tmp();
+    let file = calls.path().join("recording");
+    let file_s = file.display().to_string();
+    let env = voice_daemon(&[("OVERSEER_LISTENER_TEST_MIC_USERS", &file_s)]);
+    let live = listening(&env);
+    let t0 = Instant::now();
+    std::fs::write(&file, "us.zoom.xos\n").unwrap();
+    let paused = live.wait("paused", 5, |v| {
+        v["kind"] == "state" && v["state"] == "paused"
+    });
+    assert!(
+        when(&live, &paused).duration_since(t0) < Duration::from_secs(2),
+        "within 2 s"
+    );
+    assert_eq!(paused["reason"], "Paused while Zoom uses the microphone");
+    let got = env.d.call("voice.get", json!({}));
+    assert_eq!(got["state"], "paused");
+    // Nothing is heard while paused.
+    live.clear();
+    env.d.call(
+        "voice.simulate",
+        json!({"speechlike": 1.5, "words": "tell phone to stop"}),
+    );
+    std::thread::sleep(Duration::from_secs(3));
+    assert!(live.kind("level").is_empty(), "no levels while paused");
+    assert!(!live.all().iter().any(|v| v["kind"] == "heard"));
+    // The call ends: listening again within 2 s, and speech is heard again.
+    let t1 = Instant::now();
+    std::fs::write(&file, "").unwrap();
+    let back = live.wait("resumed", 5, |v| {
+        v["kind"] == "state" && v["state"] == "listening"
+    });
+    assert!(when(&live, &back).duration_since(t1) < Duration::from_secs(2));
+    env.d.call("voice.simulate", json!({"speechlike": 1.5}));
+    live.wait("hearing", 5, |v| {
+        v["kind"] == "state" && v["state"] == "hearing"
+    });
+}
+
+/// AC-173: each bound of the side RFC is held: open requests (a fifth waits), requests per hour,
+/// the size of one message, the request records, the speech model's memory budget and the rate
+/// of levels. (Audio held, one utterance and the speech queue are in the listener's tests and
+/// in ac164_lines_wait_for_the_owner_and_side_talk_makes_no_request; listener restarts in
+/// ac175_a_dying_listener_never_touches_an_agent_and_four_deaths_turn_voice_off.)
+#[test]
+fn ac173_each_bound_holds() {
+    let env = voice_daemon(&[
+        ("FIXTURE_OVERSEER_DELAY_MS", "2500"),
+        (
+            "OVERSEER_HARNESS_ENV_PASSTHROUGH",
+            "CLAUDE_FIXTURE_MODE_FILE,FIXTURE_OVERSEER_DELAY_MS",
+        ),
+    ]);
+    env.d.call("voice.set", json!({"settle_seconds": 1}));
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let phone = agent(&env.d, &repo, "Phone");
+    let live = listening(&env);
+    let sql = |statement: &str| {
+        let out = std::process::Command::new("sqlite3")
+            .arg(env.d.home.path().join("overseer.sqlite"))
+            .arg(statement)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    };
+    // Open requests: four at once; a fifth waits, then goes when one closes.
+    let ids: Vec<String> = (0..5)
+        .map(|i| {
+            let r = env.d.call(
+                "voice.say",
+                json!({"text": format!("Tell Phone to do step {i}.")}),
+            );
+            if i == 4 {
+                assert_eq!(r["waits_behind"], 4, "{r}");
+            }
+            r["request"].as_str().unwrap().to_string()
+        })
+        .collect();
+    assert_eq!(request(&env.d, &ids[4])["state"], "waiting_turn");
+    for id in &ids {
+        wait_state(&live, id, "sent");
+    }
+    // One message: 4,000 characters at most; the owner's words are cut, the card keeps them.
+    let long = format!(
+        "{}and so, Phone, rebase onto main please. Tell Phone to rebase.",
+        "I keep the whole long list of steps in mind ".repeat(110)
+    );
+    let id = say(&env, &long);
+    let sent = wait_state(&live, &id, "sent");
+    let card = env
+        .d
+        .call("overseer.card", json!({"id": sent["request"]["proposal"]}));
+    let message = card["rows"][0]["message"].as_str().unwrap().to_string();
+    assert!(
+        message.chars().count() <= 4000,
+        "{}",
+        message.chars().count()
+    );
+    assert!(
+        message.contains(&format!("the whole request is {id}")),
+        "{message}"
+    );
+    assert_eq!(
+        request(&env.d, &id)["words"].as_str().unwrap().len(),
+        long.len()
+    );
+    assert_eq!(received(&env, &phone).len(), 6);
+    // Requests per hour: at the owner's limit, a request is refused and it is said once.
+    env.d.call("voice.set", json!({"requests_per_hour": 10}));
+    sql("UPDATE voice_requests SET ts = ts");
+    let taken = env.d.call("voice.requests", json!({}))["requests"]
+        .as_array()
+        .unwrap()
+        .len();
+    assert!(taken >= 6);
+    for i in taken..10 {
+        sql(&format!("INSERT INTO voice_requests(id, ts, words, via, target, state, kind) VALUES('X-{i}', {}, 'filler', 'test', 'overseer', 'sent', 'request')", now_ms()));
+    }
+    live.clear();
+    let over = env
+        .d
+        .call("voice.say", json!({"text": "Tell Phone to stop pushing."}));
+    assert_eq!(over["why"], "the hour's limit", "{over}");
+    let again = env
+        .d
+        .call("voice.say", json!({"text": "Tell Phone to rebase."}));
+    assert_eq!(again["why"], "the hour's limit");
+    std::thread::sleep(Duration::from_secs(1));
+    let said = live
+        .all()
+        .iter()
+        .filter(|v| {
+            v["kind"] == "say"
+                && v["text"]
+                    .as_str()
+                    .unwrap_or("")
+                    .contains("this hour's limit")
+        })
+        .count();
+    assert_eq!(said, 1, "said once");
+    let stop = env.d.call("voice.say", json!({"text": "stop Phone"}));
+    assert_eq!(
+        stop["built_in"], "stop",
+        "built-in phrases still work: {stop}"
+    );
+    // Records: 5,000 at most, and none older than the kept days.
+    env.d.call(
+        "voice.set",
+        json!({"requests_per_hour": 600, "keep_days": 30}),
+    );
+    let old = now_ms() - 31 * 86_400_000;
+    let mut rows = String::from("BEGIN;");
+    rows.push_str(&format!("INSERT INTO voice_requests(id, ts, words, via, target, state, kind) VALUES('OLD', {old}, 'old', 'test', 'overseer', 'sent', 'request');"));
+    for i in 0..5_010 {
+        rows.push_str(&format!("INSERT INTO voice_requests(id, ts, words, via, target, state, kind) VALUES('F-{i}', {}, 'filler', 'test', 'overseer', 'sent', 'filler');", now_ms() - 7_200_000 - i));
+    }
+    rows.push_str("COMMIT;");
+    sql(&rows);
+    agent(&env.d, &repo, "Continuity");
+    say(&env, "Tell Continuity to add tests.");
+    let count = std::process::Command::new("sqlite3")
+        .arg(env.d.home.path().join("overseer.sqlite"))
+        .arg("SELECT COUNT(*), SUM(id='OLD') FROM voice_requests")
+        .output()
+        .unwrap();
+    let out = String::from_utf8_lossy(&count.stdout).trim().to_string();
+    assert_eq!(out, "5000|0", "5,000 kept, the old one gone");
+    // Levels: 30 a second at most for each voice.
+    live.clear();
+    env.d.call("voice.simulate", json!({"speechlike": 3.0}));
+    std::thread::sleep(Duration::from_millis(3500));
+    let owner = live
+        .kind("level")
+        .iter()
+        .filter(|v| v["source"] == "owner")
+        .count();
+    assert!(
+        owner > 20 && owner as f64 / 3.0 <= 30.0 + 1.0,
+        "{owner} levels in 3 s"
+    );
+}
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64
+}
+
+/// AC-173: a speech model is loaded only inside Gate L's memory budget: on a machine short of
+/// memory, turning Voice Mode on is refused with the reason, and no listener starts.
+#[test]
+fn ac173_a_model_above_the_memory_budget_is_refused() {
+    let m = tmp();
+    let fixture = m.path().join("memory.json");
+    std::fs::write(
+        &fixture,
+        json!({"total": 8_000_000_000u64, "available": 4_300_000_000u64, "pressure": "normal"})
+            .to_string(),
+    )
+    .unwrap();
+    let f = fixture.display().to_string();
+    let env = voice_daemon(&[
+        ("OVERSEER_TEST_MEMORY", &f),
+        ("OVERSEER_VOICE_TEST_BUDGET", "1"),
+    ]);
+    env.d.call("voice.set", json!({"model": "small.en"}));
+    let on = env.d.try_call("voice.set", json!({"enabled": true}));
+    std::thread::sleep(Duration::from_secs(1));
+    let got = env.d.call("voice.get", json!({}));
+    let why = format!("{on:?} {got}");
+    assert!(why.contains("memory budget"), "{why}");
+    assert_eq!(got["listener"]["running"], false, "no listener: {got}");
+    // With memory to spare it starts.
+    std::fs::write(
+        &fixture,
+        json!({"total": 64_000_000_000u64, "available": 40_000_000_000u64, "pressure": "normal"})
+            .to_string(),
+    )
+    .unwrap();
+    env.d.call("voice.set", json!({"enabled": false}));
+    env.d.call("voice.set", json!({"enabled": true}));
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while env.d.call("voice.get", json!({}))["state"] != "listening" {
+        assert!(
+            Instant::now() < deadline,
+            "{}",
+            env.d.call("voice.get", json!({}))
+        );
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+/// AC-172: an attention cue due while the owner speaks plays after the thought (5 s at most);
+/// across 100 mixed events — Overseer's lines, the owner's speech, agents starting and finishing,
+/// agents asking for attention — a cue never plays over Overseer's voice or over the owner.
+#[test]
+fn ac172_an_attention_cue_waits_for_the_thought_and_nothing_overlaps() {
+    let env = voice_daemon(&[]);
+    env.d.call("audio.set", json!({"enabled": true}));
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let live = listening(&env);
+    // The owner speaks for 2.5 s; an agent asks for attention meanwhile.
+    env.d.call("voice.simulate", json!({"speechlike": 2.5}));
+    live.wait("hearing", 5, |v| {
+        v["kind"] == "state" && v["state"] == "hearing"
+    });
+    std::fs::write(env.mode_file(), "permission").unwrap();
+    env.d.call(
+        "task.create",
+        json!({"repo": repo, "harness": "claude", "prompt": "write a file", "title": "Asks"}),
+    );
+    let cue = live.wait("the attention cue", 15, |v| {
+        v["kind"] == "cue" && v["key"] == "agent_needs_attention" && v["result"] == "played"
+    });
+    let ended = live.wait("the thought ended", 1, |v| {
+        v["kind"] == "state" && v["state"] != "hearing"
+    });
+    assert!(
+        when(&live, &ended) <= when(&live, &cue),
+        "after the thought"
+    );
+    assert!(cue["waited_ms"].as_u64().unwrap() <= 5_300, "{cue}");
+    // A hundred mixed events.
+    live.clear();
+    let lines = [
+        "First phrase here, second phrase here.",
+        "One more line, with two phrases.",
+        "Short one.",
+    ];
+    for i in 0..100 {
+        match i % 10 {
+            0 | 5 => {
+                env.d.call("voice.speak", json!({"text": lines[i % 3]}));
+            }
+            1 | 4 | 7 => {
+                env.d.generic(&repo, "worktree", "/bin/echo", &["hi"]);
+            }
+            2 | 8 => {
+                env.d.call("voice.simulate", json!({"speechlike": 0.8}));
+            }
+            3 => {
+                std::fs::write(env.mode_file(), "permission").unwrap();
+                env.d.call(
+                    "task.create",
+                    json!({"repo": repo, "harness": "claude", "prompt": "write a file", "title": format!("Asks {i}")}),
+                );
+            }
+            _ => {}
+        }
+        std::thread::sleep(Duration::from_millis(300));
+    }
+    std::thread::sleep(Duration::from_secs(8));
+    let all: Vec<(Instant, Value)> = live.msgs.lock().unwrap().clone();
+    let played: Vec<Instant> = all
+        .iter()
+        .filter(|(_, v)| v["kind"] == "cue" && v["result"] == "played")
+        .map(|(t, _)| *t)
+        .collect();
+    let dropped = all
+        .iter()
+        .filter(|(_, v)| v["kind"] == "cue" && v["result"] == "dropped")
+        .count();
+    assert!(played.len() >= 20, "{} played", played.len());
+    for t in &played {
+        // Not over the owner: the last state before the cue is not hearing (routine cues are
+        // dropped, attention cues wait; these utterances are short of the 5 s cap).
+        let last_state = all
+            .iter()
+            .filter(|(at, v)| at <= t && v["kind"] == "state")
+            .last()
+            .map(|(_, v)| v["state"].clone());
+        assert_ne!(last_state, Some(json!("hearing")), "a cue over the owner");
+        // Not over Overseer: no level of its voice while the cue plays (600 ms, with 100 ms of
+        // slack at each end for the channel's latency).
+        let over = all.iter().any(|(at, v)| {
+            v["kind"] == "level"
+                && v["source"] == "overseer"
+                && v["value"].as_f64().unwrap_or(0.0) > 0.02
+                && *at > *t + Duration::from_millis(100)
+                && *at < *t + Duration::from_millis(500)
+        });
+        assert!(!over, "Overseer's voice over a cue");
+    }
+    eprintln!(
+        "100 mixed events: {} cues played, {dropped} dropped",
+        played.len()
+    );
+}
+
+/// AC-173: the daemon's listener under a file and network trace: a macOS sandbox kills it at its
+/// first connection or at any file write but its own lock, so 20 requests through it with no
+/// restart show it wrote no audio and opened no connection; the database holds the words of the
+/// requests and nothing else from the listener.
+#[test]
+fn ac173_twenty_requests_with_the_listener_writing_nothing_and_connecting_nowhere() {
+    let w = tmp();
+    let wrapper = w.path().join("sandboxed-listener");
+    std::fs::write(
+        &wrapper,
+        format!(
+            r#"#!/bin/sh
+LOCK="$(cd "$OVERSEER_HOME" && pwd -P)/voice-listener.lock"
+P="(version 1)(allow default)(deny network* (with send-signal SIGKILL))(deny file-write* (with send-signal SIGKILL))(allow file-write* (subpath \"/dev\") (literal \"$LOCK\"))"
+exec /usr/bin/sandbox-exec -p "$P" "{}" "$@"
+"#,
+            listener_bin().display()
+        ),
+    )
+    .unwrap();
+    std::process::Command::new("chmod")
+        .arg("+x")
+        .arg(&wrapper)
+        .status()
+        .unwrap();
+    let wrapper_s = wrapper.display().to_string();
+    let env = voice_daemon(&[("OVERSEER_LISTENER", &wrapper_s)]);
+    env.d.call("voice.set", json!({"settle_seconds": 1}));
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let phone = agent(&env.d, &repo, "Phone");
+    let live = listening(&env);
+    let pid = env.d.call("voice.get", json!({}))["listener"]["pid"].clone();
+    let mut ids = Vec::new();
+    for i in 0..20 {
+        live.clear();
+        env.d.call(
+            "voice.simulate",
+            json!({"speechlike": 1.0, "words": format!("Tell Phone to do task {i}.")}),
+        );
+        let taken = live.wait("taken", 90, |v| {
+            v["kind"] == "request"
+                && v["request"]["words"] == json!(format!("Tell Phone to do task {i}."))
+        });
+        ids.push(taken["request"]["id"].as_str().unwrap().to_string());
+    }
+    let deadline = Instant::now() + Duration::from_secs(180);
+    while ids.iter().any(|id| request(&env.d, id)["state"] != "sent") {
+        assert!(
+            Instant::now() < deadline,
+            "all 20 sent: {:?}",
+            ids.iter()
+                .map(|id| format!(
+                    "{id} {} {}",
+                    request(&env.d, id)["state"],
+                    request(&env.d, id)["done"]
+                ))
+                .take(3)
+                .collect::<Vec<_>>()
+        );
+        std::thread::sleep(Duration::from_millis(250));
+    }
+    let got = env.d.call("voice.get", json!({}));
+    assert_eq!(got["listener"]["restarts"], 0, "never killed: {got}");
+    assert_eq!(got["listener"]["pid"], pid, "the same listener throughout");
+    assert!(got["listener"]["last_error"].is_null(), "{got}");
+    assert_eq!(received(&env, &phone).len(), 20);
+    // What the database holds of Voice Mode: the words of the 20 requests.
+    let out = std::process::Command::new("sqlite3")
+        .arg(env.d.home.path().join("overseer.sqlite"))
+        .arg("SELECT words FROM voice_requests ORDER BY ts")
+        .output()
+        .unwrap();
+    let words = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(words.lines().count(), 20);
+    assert!(words
+        .lines()
+        .all(|l| l.starts_with("Tell Phone to do task ")));
 }

@@ -74,6 +74,8 @@ pub enum EndAction {
         end_ms: u64,
         complete: bool,
         audio: Vec<f32>,
+        /// Where `audio` starts: after the parts already handed off (a long utterance).
+        audio_start_ms: u64,
     },
 }
 
@@ -85,6 +87,8 @@ struct Utterance {
     silence: u64,
     asked: bool,
     words: Option<String>,
+    /// Samples at the front already handed off for words (AC-173: 30 s held at most).
+    taken: u64,
 }
 
 pub struct Endpointer {
@@ -118,6 +122,17 @@ impl Endpointer {
             .as_ref()
             .map(|u| u.audio.as_slice())
             .unwrap_or(&[])
+    }
+
+    /// Hands off the first `n` samples of a long utterance, which the endpointer then forgets:
+    /// the utterance's id, where they start, and the samples.
+    pub fn take_front(&mut self, n: usize) -> Option<(u64, u64, Vec<f32>)> {
+        let u = self.current.as_mut()?;
+        let n = n.min(u.audio.len());
+        let start = ms(u.start + u.taken);
+        let front: Vec<f32> = u.audio.drain(..n).collect();
+        u.taken += n as u64;
+        Some((u.id, start, front))
     }
 
     /// The words recognized for the current utterance, for deciding whether they read complete.
@@ -157,6 +172,7 @@ impl Endpointer {
                     silence: 0,
                     asked: false,
                     words: None,
+                    taken: 0,
                 });
                 out.push(EndAction::Started {
                     id,
@@ -173,7 +189,7 @@ impl Endpointer {
                     u.silence += frame.len() as u64;
                 }
                 let silence = ms(u.silence);
-                let length = ms(u.audio.len() as u64);
+                let length = ms(u.audio.len() as u64 + u.taken);
                 if silence >= self.cfg.check_ms && !u.asked {
                     u.asked = true;
                     out.push(EndAction::NeedWords { id: u.id });
@@ -188,13 +204,14 @@ impl Endpointer {
                     // Keep 300 ms of the silence at the end, no more.
                     let extra = u.silence.saturating_sub(RATE as u64 * 3 / 10);
                     let mut audio = u.audio;
-                    audio.truncate(audio.len() - extra as usize);
+                    audio.truncate(audio.len().saturating_sub(extra as usize));
                     out.push(EndAction::Ended {
                         id: u.id,
                         start_ms: ms(u.start),
                         end_ms: ms(now - extra),
                         complete: complete.unwrap_or(true),
                         audio,
+                        audio_start_ms: ms(u.start + u.taken),
                     });
                     if open && length >= self.cfg.longest_ms {
                         // Still speaking at 90 s: go on in a new utterance.
@@ -207,6 +224,7 @@ impl Endpointer {
                             silence: 0,
                             asked: false,
                             words: None,
+                            taken: 0,
                         });
                         out.push(EndAction::Started {
                             id,

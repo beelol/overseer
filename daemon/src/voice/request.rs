@@ -78,7 +78,17 @@ struct Requests {
     last_targets: Vec<String>,
     /// The last request that went out, for a correction after the send (AC-170): id, words, when.
     last_sent: Option<(String, String, Instant)>,
+    /// Requests taken while four were open: they begin as others close (AC-173).
+    waiting: VecDeque<(String, String, String)>,
+    /// A follow-up's id and the sent request it replaces, until it begins.
+    replaces_pending: std::collections::HashMap<String, String>,
 }
+
+/// At most four open requests at once (AC-173).
+const MAX_OPEN: usize = 4;
+
+/// One message to an agent, in characters (AC-173).
+const MAX_MESSAGE: usize = 4000;
 
 static REQ: OnceLock<Mutex<Requests>> = OnceLock::new();
 
@@ -210,6 +220,17 @@ fn not_by_voice(p: &str) -> Option<(&'static str, &'static str)> {
     None
 }
 
+/// The rolling context holds 10 minutes or 30 exchanges, whichever is less, in memory only (AC-173).
+fn trim_context(ctx: &mut VecDeque<Heard>) {
+    while ctx.len() > 30
+        || ctx
+            .front()
+            .is_some_and(|h| h.at.elapsed() > Duration::from_secs(600))
+    {
+        ctx.pop_front();
+    }
+}
+
 fn plain(text: &str) -> String {
     text.to_lowercase()
         .replace(['-', '’', '\''], " ")
@@ -289,6 +310,7 @@ pub fn start(v: &Arc<Voice>) {
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_millis(100));
         if let Some(v) = v2.or_else(voice_or_none) {
+            let _in_runtime = v.rt.as_ref().map(|h| h.enter());
             tick(v);
         }
     });
@@ -551,16 +573,18 @@ impl Voice {
             last.filter(|(_, _, at)| is_correction && at.elapsed() < Duration::from_secs(120))
         {
             let _ = at;
+            // The follow-up (the next id) names the request it replaces.
+            let next = next_id(&self.d);
+            req()
+                .lock()
+                .unwrap()
+                .replaces_pending
+                .insert(next, old.clone());
             let r = self.request(
                 &format!("{words} (correction after it was sent: {text})"),
                 via,
                 Some(&old),
             );
-            if let Some(new) = r["request"].as_str() {
-                if let Some(o) = req().lock().unwrap().open.iter_mut().find(|o| o.id == new) {
-                    o.replaces_sent = Some(old.clone());
-                }
-            }
             update(&self.d, &old, "state", "superseded");
             announce(self, &old);
             return r;
@@ -624,13 +648,7 @@ impl Voice {
                 at: Instant::now(),
                 text: text.clone(),
             });
-            while r.context.len() > 30
-                || r.context
-                    .front()
-                    .is_some_and(|h| h.at.elapsed() > Duration::from_secs(600))
-            {
-                r.context.pop_front();
-            }
+            trim_context(&mut r.context);
             self.emit(json!({"kind": "not_meant", "text": text}));
             return json!({"taken": false, "why": "not meant for Overseer"});
         }
@@ -684,6 +702,35 @@ impl Voice {
         heard_signal(self);
         // The quick answer: at once, with no model (AC-165).
         self.say_line("On it.");
+        // At most four open requests; a fifth waits for one to close (AC-173).
+        let waiting_behind = {
+            let mut r = req().lock().unwrap();
+            if r.open.len() >= MAX_OPEN {
+                r.waiting
+                    .push_back((id.clone(), words.to_string(), via.to_string()));
+                Some(r.open.len())
+            } else {
+                None
+            }
+        };
+        if let Some(n) = waiting_behind {
+            update(&d, &id, "state", "waiting_turn");
+            update(&d, &id, "done", &format!("Waiting: {n} requests are open."));
+            announce(self, &id);
+            return json!({"taken": true, "request": id, "waits_behind": n});
+        }
+        self.begin(&id, words, via)
+    }
+
+    /// A taken request goes to Overseer (or to the agent spoken to).
+    fn begin(self: &Arc<Self>, id: &str, words: &str, via: &str) -> Value {
+        let d = self.d.clone();
+        let id = id.to_string();
+        let s = match settings(&d) {
+            Ok(s) => s,
+            Err(e) => return json!({"taken": false, "why": e.to_string()}),
+        };
+        let target = s.target.clone();
         // Who it may be for, with the reasons, from the daemon's own records (AC-166).
         let focus_now = self.st.lock().unwrap().focus.clone();
         let previous = req().lock().unwrap().last_targets.clone();
@@ -694,6 +741,7 @@ impl Voice {
             previous: &previous,
         };
         let found = candidates_for(words, &ctx);
+        let replaces_sent = req().lock().unwrap().replaces_pending.remove(&id);
         req().lock().unwrap().open.push(Open {
             id: id.clone(),
             words: words.to_string(),
@@ -703,18 +751,16 @@ impl Voice {
             candidates: found.clone(),
             confirm_at: None,
             holding_said: false,
-            replaces_sent: None,
+            replaces_sent,
         });
         self.st.lock().unwrap().thinking += 1;
         self.refresh();
         // Words heard before that were not requests go along as context, once.
-        let context: Vec<String> = req()
-            .lock()
-            .unwrap()
-            .context
-            .drain(..)
-            .map(|h| h.text)
-            .collect();
+        let context: Vec<String> = {
+            let mut r = req().lock().unwrap();
+            trim_context(&mut r.context);
+            r.context.drain(..).map(|h| h.text).collect()
+        };
         // Talking to one agent: the words go to it as they are, with no model turn (AC-166).
         if target != "overseer" && !plain(words).split(' ').any(|w| w == "overseer") {
             let action = json!([{"action": "message", "agent": target, "text": words, "why": "the owner is talking to it", "confidence": "high"}]);
@@ -802,6 +848,25 @@ impl Voice {
         }
         announce(self, id);
         self.refresh();
+        self.next_waiting();
+    }
+
+    /// A request that waited for a free place begins.
+    fn next_waiting(self: &Arc<Self>) {
+        let next = {
+            let mut r = req().lock().unwrap();
+            if r.open.len() < MAX_OPEN {
+                r.waiting.pop_front()
+            } else {
+                None
+            }
+        };
+        if let Some((id, words, via)) = next {
+            let v = self.clone();
+            self.run_blocking(move || {
+                v.begin(&id, &words, &via);
+            });
+        }
     }
 
     fn cancel_request(self: &Arc<Self>, o: &Open, how: &str) -> Value {
@@ -1224,9 +1289,16 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
         "proposal" if p["cause"] == "voice" || p["via"] == "voice" => {
             let id = p["id"].as_str().unwrap_or("").to_string();
             let settle_until = p["settle_until"].as_i64();
+            let about = turn_requests(&v.d, false);
             let open = {
                 let mut r = req().lock().unwrap();
-                let o = r.open.iter_mut().find(|o| o.proposal.is_none());
+                // The request Overseer's turn is about; with several in flight, not just the first.
+                let at = r
+                    .open
+                    .iter()
+                    .position(|o| o.proposal.is_none() && about.contains(&o.id))
+                    .or_else(|| r.open.iter().position(|o| o.proposal.is_none()));
+                let o = at.map(|i| &mut r.open[i]);
                 o.map(|o| {
                     o.proposal = Some(id.clone());
                     o.settle_until = settle_until.map(|t| {
@@ -1315,7 +1387,15 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
                 return;
             }
             let text = m["text"].as_str().unwrap_or("").trim().to_string();
-            let o = req().lock().unwrap().open.first().cloned();
+            let about = turn_requests(&v.d, false);
+            let o = {
+                let r = req().lock().unwrap();
+                r.open
+                    .iter()
+                    .find(|o| about.contains(&o.id))
+                    .or_else(|| r.open.first())
+                    .cloned()
+            };
             let Some(o) = o else { return };
             update(&v.d, &o.id, "answer", &text);
             // Only the exact reply counts: a reply that quotes the instruction is still an answer.
@@ -1349,12 +1429,14 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
             {
                 return;
             }
+            // Only the requests the ended turn was about: others wait for their own turn.
+            let about = turn_requests(&v.d, true);
             let done: Vec<Open> = req()
                 .lock()
                 .unwrap()
                 .open
                 .iter()
-                .filter(|o| o.proposal.is_none() && o.at.elapsed() > Duration::from_millis(200))
+                .filter(|o| o.proposal.is_none() && about.contains(&o.id))
                 .cloned()
                 .collect();
             for o in done {
@@ -1523,13 +1605,15 @@ fn first_sentences(text: &str, n: usize) -> String {
 /// over the model's choice of add or redirect (AC-167, AC-168).
 pub fn decorate(d: &Daemon, actions: &mut [Value]) -> Result<bool> {
     let s = settings(d)?;
-    let open = req()
-        .lock()
-        .unwrap()
-        .open
-        .iter()
-        .find(|o| o.proposal.is_none())
-        .cloned();
+    let about = turn_requests(d, false);
+    let open = {
+        let r = req().lock().unwrap();
+        r.open
+            .iter()
+            .find(|o| o.proposal.is_none() && about.contains(&o.id))
+            .or_else(|| r.open.iter().find(|o| o.proposal.is_none()))
+            .cloned()
+    };
     let (id, words) = match &open {
         Some(o) => (o.id.clone(), o.words.clone()),
         None => (String::new(), String::new()),
@@ -1616,6 +1700,25 @@ pub fn decorate(d: &Daemon, actions: &mut [Value]) -> Result<bool> {
             };
             if !others.is_empty() {
                 full.push_str(&format!("\nAlso told: {}.", others.join(", ")));
+            }
+            // One message is 4,000 characters at most (AC-173): the owner's quote is cut first
+            // (the card keeps the whole request); a part Overseer wrote that is too long alone is
+            // not sent.
+            let len = full.chars().count();
+            if len > MAX_MESSAGE {
+                let quote = words.chars().count();
+                let room = quote.saturating_sub(len - MAX_MESSAGE + 90);
+                if room < 200 {
+                    bail!("a message to an agent is 4,000 characters at most; this one is {len}");
+                }
+                let cut: String = words.chars().take(room).collect();
+                full = full.replacen(
+                    &format!("“{words}”"),
+                    &format!(
+                        "“{cut}…” (cut here: the whole request is {id} in Overseer's conversation)"
+                    ),
+                    1,
+                );
             }
             a[text_key] = json!(full);
         }
@@ -1754,4 +1857,68 @@ fn candidates_for(words: &str, ctx: &super::candidates::Context) -> Vec<(String,
         return named;
     }
     before
+}
+
+/// The spoken requests an Overseer turn is about, from its prompt ("Request V-0042: …"): the turn
+/// now running, or with `ended` the last one that ended.
+fn turn_requests(d: &Daemon, ended: bool) -> Vec<String> {
+    let Ok(session) = d.overseer_session() else {
+        return Vec::new();
+    };
+    let Some(run) = session["run_id"].as_str() else {
+        return Vec::new();
+    };
+    let turns = d.store.lock().unwrap().turns(run).unwrap_or_default();
+    let turn = if ended {
+        turns.iter().rev().find(|t| t.ended_ms.is_some())
+    } else {
+        turns.last()
+    };
+    let Some(prompt) = turn.map(|t| t.prompt.as_str()) else {
+        return Vec::new();
+    };
+    prompt
+        .match_indices("Request V-")
+        .map(|(i, _)| {
+            prompt[i + "Request ".len()..]
+                .chars()
+                .take_while(|c| c.is_ascii_alphanumeric() || *c == '-')
+                .collect()
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// AC-173: the rolling context keeps 10 minutes or 30 exchanges.
+    #[test]
+    fn the_rolling_context_keeps_ten_minutes_or_thirty() {
+        let mut ctx: VecDeque<Heard> = VecDeque::new();
+        let now = Instant::now();
+        let ago = |s: u64| now.checked_sub(Duration::from_secs(s)).unwrap_or(now);
+        ctx.push_back(Heard {
+            at: ago(660),
+            text: "eleven minutes ago".into(),
+        });
+        ctx.push_back(Heard {
+            at: ago(540),
+            text: "nine minutes ago".into(),
+        });
+        trim_context(&mut ctx);
+        assert_eq!(
+            ctx.iter().map(|h| h.text.as_str()).collect::<Vec<_>>(),
+            vec!["nine minutes ago"]
+        );
+        for i in 0..40 {
+            ctx.push_back(Heard {
+                at: now,
+                text: format!("line {i}"),
+            });
+        }
+        trim_context(&mut ctx);
+        assert_eq!(ctx.len(), 30);
+        assert_eq!(ctx.front().unwrap().text, "line 10");
+    }
 }

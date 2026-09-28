@@ -383,29 +383,35 @@ async function mcpClient() {
     // A spoken request (Voice Mode, Gate R): choose among the daemon's candidates, as the prompt
     // asks; with none, ask one short question and propose nothing. A correction's words give the
     // new task ("I meant wait for the review"); its names were already applied by the daemon.
-    const voiceReq = /Request (V-\d+): (.*)$/m.exec(said);
-    const candidates = /\(Candidates from the daemon: (.*?)\. Choose among them/.exec(said);
-    if (voiceReq && mcp && !/what is everyone doing|what did .+ change in/i.test(voiceReq[2])) {
-      const words = voiceReq[2].trim();
-      const list = candidates ? candidates[1].split('; ').map(c => /^(.*) \(([^()]+)\): (.+)$/.exec(c)).filter(Boolean).map(m => ({ title: m[1], id: m[2], why: m[3] })) : [];
-      const taskOf = s => { const m = /\b(?:to|should(?: both| also| all)?) (.+?)[.!?]*$/i.exec(s); return m ? m[1] : null; };
-      const fix = /.*\(correction[^:]*: (.*)\)$/.exec(words);
-      let task = taskOf(words.replace(/\s*\(correction[^)]*\)/g, ''));
-      if (fix) {
-        const c = fix[1].replace(/^(i meant|i mean|actually|instead|no)[, ]+/i, '').trim();
-        if (!/^(not |tell |the |that )/i.test(c)) task = c.replace(/[.!?]+$/, '');
-        else task = taskOf(c) || task;
+    // Messages queued while Overseer was busy arrive together: each request is answered on its own.
+    const voiceReqs = [...said.matchAll(/Request (V-\d+): (.*)$/gm)].filter(m => !/what is everyone doing|what did .+ change in/i.test(m[2]));
+    if (voiceReqs.length && mcp) {
+      const replies = [];
+      for (const voiceReq of voiceReqs) {
+        const words = voiceReq[2].trim();
+        const marks = [...said.slice(0, voiceReq.index).matchAll(/\(Candidates from the daemon: (?:(none named)|(.*?)\. Choose among them)/g)];
+        const mark = marks[marks.length - 1];
+        const list = mark && mark[2] ? mark[2].split('; ').map(c => /^(.*) \(([^()]+)\): (.+)$/.exec(c)).filter(Boolean).map(m => ({ title: m[1], id: m[2], why: m[3] })) : [];
+        const taskOf = s => { const m = /\b(?:to|should(?: both| also| all)?) (.+?)[.!?]*$/i.exec(s); return m ? m[1] : null; };
+        const fix = /.*\(correction[^:]*: (.*)\)$/.exec(words);
+        let task = taskOf(words.replace(/\s*\(correction[^)]*\)/g, ''));
+        if (fix) {
+          const c = fix[1].replace(/^(i meant|i mean|actually|instead|no)[, ]+/i, '').trim();
+          if (!/^(not |tell |the |that )/i.test(c)) task = c.replace(/[.!?]+$/, '');
+          else task = taskOf(c) || task;
+        }
+        if (!task && /^(yes|go ahead|ok|okay)\b/i.test(words)) task = 'go ahead';
+        if (!list.length) replies.push('Who should I tell?');
+        else if (/^archive\b/i.test(words)) {
+          await call('propose', { actions: list.map(c => ({ action: 'archive', agent: c.id, confidence: 'high', why: c.why })) });
+          replies.push(`Archiving ${list.map(c => c.title).join(' and ')}.`);
+        } else if (!task) replies.push(`What should I tell ${list.map(c => c.title).join(' and ')}?`);
+        else {
+          await call('propose', { actions: list.map(c => ({ action: 'message', agent: c.id, text: `Please ${task}.`, confidence: 'high', why: c.why })) });
+          replies.push(`Telling ${list.map(c => c.title).join(' and ')} to ${task}.`);
+        }
       }
-      if (!task && /^(yes|go ahead|ok|okay)\b/i.test(words)) task = 'go ahead';
-      if (!list.length) reply = 'Who should I tell?';
-      else if (/^archive\b/i.test(words)) {
-        await call('propose', { actions: list.map(c => ({ action: 'archive', agent: c.id, confidence: 'high', why: c.why })) });
-        reply = `Archiving ${list.map(c => c.title).join(' and ')}.`;
-      } else if (!task) reply = `What should I tell ${list.map(c => c.title).join(' and ')}?`;
-      else {
-        await call('propose', { actions: list.map(c => ({ action: 'message', agent: c.id, text: `Please ${task}.`, confidence: 'high', why: c.why })) });
-        reply = `Telling ${list.map(c => c.title).join(' and ')} to ${task}.`;
-      }
+      reply = replies.join(' ');
       assistant([{ type: 'text', text: reply }]);
       result(false, reply);
       mcp.close();

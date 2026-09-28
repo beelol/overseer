@@ -11,16 +11,21 @@ use std::process::Command;
 /// Overseer's voice while the owner speaks over it: about 10 dB lower.
 pub const LOWERED: f32 = 0.3;
 
-/// Speaks `text` into samples, in memory: `say` writes a WAV file in a private temporary folder,
-/// which is read and removed at once. This is Overseer's own voice, never the owner's.
+/// Speaks `text` into samples, in memory, with the system's voices: no file is written at any
+/// point (AC-173). This is Overseer's own voice, never the owner's.
 ///
-/// `say` takes 100 to 300 ms for a short line on an idle Mac and seconds on a busy one, so the
-/// lines Overseer says most are made when the listener starts (`COMMON`) and play at once.
+/// A short line takes 100 to 300 ms on an idle Mac and seconds on a busy one, so the lines
+/// Overseer says most are made when the listener starts (`COMMON`) and play at once. The speech
+/// service sometimes never finishes; the line is then tried once more.
 pub fn synthesize(text: &str, voice: Option<&str>, rate: Option<u32>) -> Result<Vec<f32>> {
-    say(text, voice, rate)
+    match crate::memspeech::speak(text, voice, rate) {
+        Ok(a) => Ok(a),
+        Err(_) => crate::memspeech::speak(text, voice, rate),
+    }
 }
 
-/// Runs `say` into a temporary WAV file and returns its samples. macOS's speech service sometimes
+/// Runs `say` into a temporary WAV file and returns its samples: for tests and the spike, which
+/// make speech at test time in a temporary folder (AC-164). macOS's speech service sometimes
 /// never answers, so `say` gets a time limit that grows with the text (20 s and 100 ms a
 /// character: generous, because a busy Mac makes it slow without making it stuck), is killed when
 /// it passes it, and is tried once more.

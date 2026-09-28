@@ -135,6 +135,8 @@ pub struct Live {
     pub pid: Option<i32>,
     pub started_at: Option<Instant>,
     pub download: Option<Value>,
+    /// Another app is recording (a call): Voice Mode is paused until it is done (AC-173).
+    pub paused_for: Option<Vec<String>>,
     /// The listener's or the recognizer's last error, shown in the strip (AC-175).
     pub last_error: Option<(String, i64)>,
 }
@@ -144,9 +146,24 @@ pub struct Voice {
     pub live: broadcast::Sender<Value>,
     pub st: Mutex<Live>,
     listener: Mutex<Option<Arc<proc::Listener>>>,
+    /// The daemon's async runtime: work started from the listener's threads runs inside it, as
+    /// it would from a request (starting Overseer's harness needs it).
+    pub rt: Option<tokio::runtime::Handle>,
 }
 
 impl Voice {
+    /// Runs `f` on the runtime's blocking pool (or a thread, with no runtime).
+    pub fn run_blocking(&self, f: impl FnOnce() + Send + 'static) {
+        match &self.rt {
+            Some(h) => {
+                h.spawn_blocking(f);
+            }
+            None => {
+                std::thread::spawn(f);
+            }
+        }
+    }
+
     /// Sends one message on the live channel (never stored).
     pub fn emit(&self, v: Value) {
         let _ = self.live.send(v);
@@ -194,6 +211,15 @@ impl Voice {
         }
         if !st.ready {
             return ("starting", None);
+        }
+        if let Some(apps) = &st.paused_for {
+            return (
+                "paused",
+                Some(format!(
+                    "Paused while {} uses the microphone",
+                    apps.join(" and ")
+                )),
+            );
         }
         if st.gate {
             ("hearing", None)
@@ -255,6 +281,11 @@ impl Voice {
         let path = listener_path().ok_or_else(|| {
             anyhow!("the listener (overseer-listener) is not installed next to the daemon")
         })?;
+        // The speech model loads only inside Gate L's memory budget (AC-173); the simulated voice
+        // loads none, unless a test asks for the check.
+        if !simulated() || std::env::var("OVERSEER_VOICE_TEST_BUDGET").is_ok_and(|v| v == "1") {
+            model::check_budget(&s.model)?;
+        }
         let mut args: Vec<String> = Vec::new();
         if simulated() {
             args.extend(["--input", "sim", "--script-live"].map(String::from));
@@ -300,6 +331,7 @@ impl Voice {
         let v = self.clone();
         std::thread::spawn(move || {
             use std::io::BufRead;
+            let _in_runtime = v.rt.as_ref().map(|h| h.enter());
             for line in std::io::BufReader::new(stdout).lines() {
                 let Ok(line) = line else { break };
                 if let Ok(event) = serde_json::from_str::<Value>(&line) {
@@ -364,6 +396,27 @@ impl Voice {
     /// One event from the listener.
     fn on_event(self: &Arc<Self>, e: Value) {
         match e["type"].as_str().unwrap_or("") {
+            "paused" => {
+                // Said in the strip only: the owner is on a call.
+                let apps: Vec<String> = e["apps"]
+                    .as_array()
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|x| x.as_str().map(|n| app_name(n)))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                {
+                    let mut st = self.st.lock().unwrap();
+                    st.paused_for = Some(apps.clone());
+                    st.gate = false;
+                }
+                self.emit(json!({"kind": "listener", "event": "paused", "apps": apps}));
+            }
+            "resumed" => {
+                self.st.lock().unwrap().paused_for = None;
+                self.emit(json!({"kind": "listener", "event": "resumed"}));
+            }
             "ready" => {
                 self.st.lock().unwrap().ready = true;
                 self.emit(json!({"kind": "listener", "event": "ready", "input": e["input"], "model": e["model"]}));
@@ -400,7 +453,9 @@ impl Voice {
                 self.emit(json!({"kind": "heard", "id": e["id"], "text": text, "final": true}));
                 let v = self.clone();
                 let complete = e["complete"].as_bool().unwrap_or(true);
-                std::thread::spawn(move || v.on_utterance(&text, complete, "voice"));
+                self.run_blocking(move || {
+                    v.on_utterance(&text, complete, "voice");
+                });
             }
             "dropped" => {
                 self.emit(json!({"kind": "dropped", "id": e["id"], "reason": e["reason"]}));
@@ -482,6 +537,7 @@ pub fn start(d: Arc<Daemon>) {
         live,
         st: Mutex::new(Live::default()),
         listener: Mutex::new(None),
+        rt: tokio::runtime::Handle::try_current().ok(),
     });
     if VOICE.set(v.clone()).is_err() {
         return;
@@ -813,4 +869,31 @@ pub fn before_cue(key: &str, cue_ms: u64) -> bool {
         Some(v) => v.before_cue(key, cue_ms),
         None => true,
     }
+}
+
+/// A readable name for an app that is recording: "us.zoom.xos" reads as "zoom".
+fn app_name(id: &str) -> String {
+    const KNOWN: &[(&str, &str)] = &[
+        ("us.zoom.xos", "Zoom"),
+        ("com.apple.FaceTime", "FaceTime"),
+        ("com.microsoft.teams", "Teams"),
+        ("com.microsoft.teams2", "Teams"),
+        ("com.tinyspeck.slackmacgap", "Slack"),
+        ("com.google.Chrome", "Chrome"),
+        ("com.apple.Safari", "Safari"),
+        ("com.hnc.Discord", "Discord"),
+        ("com.apple.QuickTimePlayerX", "QuickTime"),
+        ("com.apple.VoiceMemos", "Voice Memos"),
+    ];
+    KNOWN
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case(id))
+        .map(|(_, n)| n.to_string())
+        .unwrap_or_else(|| {
+            if id.contains('.') && !id.contains(' ') {
+                id.rsplit('.').next().unwrap_or(id).to_string()
+            } else {
+                id.to_string()
+            }
+        })
 }

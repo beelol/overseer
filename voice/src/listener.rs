@@ -14,10 +14,10 @@ use crate::recognize::{Recognizer, VOCABULARY};
 use crate::speak::{self, SpeakEvent, Speaker};
 use crate::words;
 use anyhow::Result;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc, Mutex};
 
 #[derive(Clone, Debug)]
 pub enum Input {
@@ -100,6 +100,38 @@ enum Msg {
         audio: Vec<f32>,
     },
     Fail(String),
+    /// The apps other than the listener that are recording now (AC-173).
+    Calls(Vec<String>),
+}
+
+/// Lines waiting to be made into Overseer's voice. A line to speak goes ahead of the common lines
+/// made in advance (line 0), so it never waits behind them on a busy Mac.
+#[derive(Clone, Default)]
+struct SynthQueue(Arc<(Mutex<VecDeque<(u64, usize, String)>>, std::sync::Condvar)>);
+
+impl SynthQueue {
+    fn send(&self, job: (u64, usize, String)) {
+        let (q, ready) = &*self.0;
+        let mut q = q.lock().unwrap();
+        if job.0 == 0 {
+            q.push_back(job);
+        } else {
+            let at = q.iter().position(|j| j.0 == 0).unwrap_or(q.len());
+            q.insert(at, job);
+        }
+        ready.notify_one();
+    }
+
+    fn recv(&self) -> Option<(u64, usize, String)> {
+        let (q, ready) = &*self.0;
+        let mut q = q.lock().unwrap();
+        loop {
+            if let Some(job) = q.pop_front() {
+                return Some(job);
+            }
+            q = ready.wait(q).unwrap();
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -110,12 +142,17 @@ enum Job {
     Check { id: u64 },
     /// All the words, at the end of the thought.
     Final { id: u64, start_ms: u64, end_ms: u64 },
+    /// The first part of a long utterance, handed off so no more than 30 s is held (AC-173).
+    Segment { id: u64 },
 }
 
 impl Job {
     fn id(&self) -> u64 {
         match self {
-            Job::Partial { id } | Job::Check { id } | Job::Final { id, .. } => *id,
+            Job::Partial { id }
+            | Job::Check { id }
+            | Job::Segment { id }
+            | Job::Final { id, .. } => *id,
         }
     }
 }
@@ -147,6 +184,10 @@ struct State<W: Write> {
     t: u64,
     frames: u64,
     suppress_until: u64,
+    /// Words of the parts of long utterances already handed off, by utterance.
+    segments: HashMap<u64, String>,
+    /// The most utterance audio held at once, in samples.
+    held_max: usize,
     echo: f32,
     echo_line: VecDeque<f32>,
     /// While a recognition runs on the worker, no new partial is asked for.
@@ -161,7 +202,7 @@ struct State<W: Write> {
     pending_timed: VecDeque<(u64, Command)>,
     recognizer: Option<Box<dyn Recognizer>>,
     work: Option<mpsc::Sender<(Job, Vec<f32>, u64, String)>>,
-    synth_work: Option<mpsc::Sender<(u64, usize, String)>>,
+    synth_work: Option<SynthQueue>,
     synth: Box<dyn FnMut(&str) -> Result<Vec<f32>> + Send>,
     starts: std::collections::HashMap<u64, u64>,
     output: Option<std::sync::Arc<std::sync::Mutex<VecDeque<f32>>>>,
@@ -223,6 +264,15 @@ impl<W: Write> State<W> {
         let t_ms = self.now_ms();
         let echo = words::is_echo(&text, &self.speaker.recent_words());
         match job {
+            Job::Segment { id } => {
+                let words = self.segments.entry(id).or_default();
+                if !text.is_empty() {
+                    if !words.is_empty() {
+                        words.push(' ');
+                    }
+                    words.push_str(&text);
+                }
+            }
             Job::Partial { id } | Job::Check { id } => {
                 self.end.set_words(id, &text);
                 if text.is_empty() || echo {
@@ -240,6 +290,17 @@ impl<W: Write> State<W> {
                 start_ms,
                 end_ms,
             } => {
+                // The words of the parts handed off earlier come first.
+                let before = self.segments.remove(&id).unwrap_or_default();
+                let had = !before.is_empty();
+                let text = if had && !text.is_empty() {
+                    format!("{before} {text}")
+                } else if had {
+                    before
+                } else {
+                    text
+                };
+                let echo = echo && !had;
                 if self.barged == Some(id) {
                     // The utterance that lowered the voice has ended and nothing decided otherwise.
                     self.barged = None;
@@ -340,7 +401,7 @@ impl<W: Write> State<W> {
                     if let Some(a) = self.made.get(&phrase) {
                         self.speaker.synthesized(l, p, a.clone());
                     } else if let Some(w) = &self.synth_work {
-                        let _ = w.send((l, p, phrase));
+                        w.send((l, p, phrase));
                     } else {
                         match (self.synth)(&phrase) {
                             Ok(a) => self.speaker.synthesized(l, p, a),
@@ -474,8 +535,13 @@ impl<W: Write> State<W> {
             let (_, c) = self.pending_timed.pop_front().unwrap();
             self.command(c, tx);
         }
-        // Overseer's voice for the same 20 ms.
-        let (voice, events, level) = self.speaker.next(FRAME);
+        // Overseer's voice for the same 20 ms; it holds while an Audio Mode cue plays, so the two
+        // never overlap (AC-172).
+        let (voice, events, level) = if self.t < self.suppress_until {
+            (vec![0.0; FRAME], Vec::new(), None)
+        } else {
+            self.speaker.next(FRAME)
+        };
         for e in events {
             self.spoke(e);
         }
@@ -560,6 +626,7 @@ impl<W: Write> State<W> {
                     start_ms,
                     end_ms,
                     audio,
+                    audio_start_ms,
                     ..
                 } => {
                     self.starts.remove(&id);
@@ -570,10 +637,20 @@ impl<W: Write> State<W> {
                             end_ms,
                         },
                         audio,
-                        start_ms,
+                        audio_start_ms,
                         tx,
                     );
                 }
+            }
+        }
+        // Audio held in memory is 30 s at most (AC-173): past that, the first 25 s of a long
+        // utterance is turned into words and let go.
+        self.held_max = self.held_max.max(self.end.audio().len());
+        if self.end.audio().len() >= RATE as usize * 30 {
+            if let Some((id, start, front)) = self.end.take_front(RATE as usize * 25) {
+                self.starts.insert(id, start + 25_000);
+                self.next_partial = self.next_partial.saturating_sub(RATE as usize * 25);
+                self.ask(Job::Segment { id }, front, start, tx);
             }
         }
         // Partial words: every second of speech; every 0.3 s while Overseer speaks, also in the
@@ -628,6 +705,8 @@ pub fn run<W: Write + Send + 'static>(
         t: 0,
         frames: 0,
         suppress_until: 0,
+        segments: HashMap::new(),
+        held_max: 0,
         echo: opts.echo,
         echo_line: std::iter::repeat_n(0.0, RATE as usize * 40 / 1000).collect(),
         busy: false,
@@ -676,11 +755,12 @@ pub fn run<W: Write + Send + 'static>(
         }
     }
     if !inline {
-        let (stx, srx) = mpsc::channel::<(u64, usize, String)>();
+        let stx = SynthQueue::default();
+        let srx = stx.clone();
         let back = tx.clone();
         let voice = opts.voice.clone();
         std::thread::spawn(move || {
-            while let Ok((line, phrase, text)) = srx.recv() {
+            while let Some((line, phrase, text)) = srx.recv() {
                 let audio = match synth_fn {
                     Some(f) => Ok(f(&text)),
                     None => speak::synthesize(&text, voice.as_deref(), rate),
@@ -702,7 +782,7 @@ pub fn run<W: Write + Send + 'static>(
         });
         // The common lines, made ahead (line 0 means "keep, do not play").
         for (i, text) in speak::COMMON.iter().enumerate() {
-            let _ = stx.send((0, i, text.to_string()));
+            stx.send((0, i, text.to_string()));
         }
         st.synth_work = Some(stx);
     }
@@ -734,6 +814,7 @@ pub fn run<W: Write + Send + 'static>(
         });
     }
     // The input.
+    let mut mic_device: Option<crate::mic::Device> = None;
     let input_name = match &opts.input {
         Input::Mic { voice_processing } => {
             let back = tx.clone();
@@ -741,7 +822,7 @@ pub fn run<W: Write + Send + 'static>(
                 let _ = back.send(Msg::Frame(s));
             })?;
             st.output = Some(output);
-            std::mem::forget(device); // the device lives as long as the process
+            mic_device = Some(device); // lives as long as the loop
             if *voice_processing {
                 "mic (voice processing)"
             } else {
@@ -797,6 +878,24 @@ pub fn run<W: Write + Send + 'static>(
             "sim".to_string()
         }
     };
+    // Another app recording pauses the listener (AC-173): checked twice a second.
+    {
+        let back = tx.clone();
+        let simulated = !matches!(opts.input, Input::Mic { .. });
+        std::thread::spawn(move || {
+            let mut last: Vec<String> = Vec::new();
+            loop {
+                let now = crate::calls::others_recording(simulated);
+                if now != last {
+                    last = now.clone();
+                    if back.send(Msg::Calls(now)).is_err() {
+                        return;
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            }
+        });
+    }
     st.out.send(&Event::Ready {
         input: input_name,
         model,
@@ -804,8 +903,27 @@ pub fn run<W: Write + Send + 'static>(
     });
     let mut carry: Vec<f32> = Vec::new();
     let mut ended = false;
+    let mut paused = false;
     while let Ok(msg) = rx.recv() {
         match msg {
+            Msg::Frame(_) if paused => {}
+            Msg::Calls(apps) => {
+                let t_ms = st.now_ms();
+                if !apps.is_empty() && !paused {
+                    paused = true;
+                    carry.clear();
+                    if let Some(d) = &mic_device {
+                        d.pause();
+                    }
+                    st.out.send(&Event::Paused { apps, t_ms });
+                } else if apps.is_empty() && paused {
+                    paused = false;
+                    if let Some(d) = &mic_device {
+                        d.resume();
+                    }
+                    st.out.send(&Event::Resumed { t_ms });
+                }
+            }
             Msg::Frame(samples) => {
                 carry.extend(samples);
                 while carry.len() >= FRAME {
@@ -838,7 +956,10 @@ pub fn run<W: Write + Send + 'static>(
                     }
                 }
                 let t_ms = st.now_ms();
-                st.out.send(&Event::End { t_ms });
+                st.out.send(&Event::End {
+                    t_ms,
+                    held_max_ms: (st.held_max as u64) * 1000 / RATE as u64,
+                });
                 if !opts.control || matches!(opts.input, Input::File(_) | Input::Stdin) {
                     break;
                 }

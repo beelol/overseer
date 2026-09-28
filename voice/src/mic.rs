@@ -20,6 +20,19 @@ unsafe impl Send for Device {}
 
 pub type Output = Arc<Mutex<VecDeque<f32>>>;
 
+impl Device {
+    /// Closes the microphone (and the speakers) while another app records; `resume` opens it
+    /// again (AC-173).
+    pub fn pause(&self) {
+        #[cfg(target_os = "macos")]
+        mac::stop(self.inner);
+    }
+    pub fn resume(&self) {
+        #[cfg(target_os = "macos")]
+        mac::start(self.inner);
+    }
+}
+
 #[cfg(not(target_os = "macos"))]
 pub fn open<F: FnMut(Vec<f32>) + Send + 'static>(
     _voice_processing: bool,
@@ -112,6 +125,7 @@ mod mac {
         ) -> OSStatus;
         fn AudioUnitInitialize(inUnit: AudioUnit) -> OSStatus;
         fn AudioOutputUnitStart(ci: AudioUnit) -> OSStatus;
+        fn AudioOutputUnitStop(ci: AudioUnit) -> OSStatus;
         fn AudioUnitRender(
             inUnit: AudioUnit,
             ioActionFlags: *mut u32,
@@ -197,6 +211,14 @@ mod mac {
             *s = q.pop_front().unwrap_or(0.0);
         }
         0
+    }
+
+    pub fn stop(unit: *mut c_void) {
+        unsafe { AudioOutputUnitStop(unit) };
+    }
+
+    pub fn start(unit: *mut c_void) {
+        unsafe { AudioOutputUnitStart(unit) };
     }
 
     fn check(status: OSStatus, what: &str) -> Result<()> {

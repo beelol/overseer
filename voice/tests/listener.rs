@@ -464,3 +464,34 @@ fn the_output_carries_no_audio() {
         out.stdout.len()
     );
 }
+
+/// AC-173: a long thought (70 s, with short pauses) is one utterance with all its words, and the
+/// listener never holds more than 30 s of audio: the front of a long utterance is turned into words
+/// and let go.
+#[test]
+fn a_long_utterance_keeps_every_word_and_holds_thirty_seconds_at_most() {
+    let parts: Vec<(f32, f32)> = (0..14).map(|i| (1.0 + i as f32 * 5.0, 4.6)).collect();
+    let audio = voice_at(74.0, &parts);
+    let script = vec![
+        line(1000, 5000, "first tell the phone app"),
+        line(26000, 30000, "then in the middle of it"),
+        line(51000, 55000, "and after that again"),
+        line(66000, 70000, "the very last words"),
+    ];
+    let run = listen(&audio, script, vec![], 0.0);
+    let u = run.utterances();
+    assert_eq!(u.len(), 1, "{u:?}");
+    assert_eq!(
+        u[0].0,
+        "first tell the phone app then in the middle of it and after that again the very last words"
+    );
+    let held = run
+        .events
+        .iter()
+        .find_map(|e| match e {
+            Event::End { held_max_ms, .. } => Some(*held_max_ms),
+            _ => None,
+        })
+        .unwrap();
+    assert!(held > 20_000 && held <= 30_000, "held {held} ms at most");
+}

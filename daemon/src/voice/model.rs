@@ -43,6 +43,31 @@ pub fn size(name: &str) -> u64 {
         .unwrap_or(0)
 }
 
+/// Memory a model takes once loaded: whisper.cpp's own figures (base 388 MB, small 852 MB).
+pub fn memory_needed(name: &str) -> u64 {
+    match name {
+        "base.en" => 388_000_000,
+        "small.en" => 852_000_000,
+        other => size(other).max(500_000_000) * 2,
+    }
+}
+
+/// A speech model is loaded only inside Gate L's memory budget (AC-140, AC-173), checked before
+/// the listener starts. `OVERSEER_TEST_MEMORY` sets the machine's memory in tests.
+pub fn check_budget(name: &str) -> Result<()> {
+    let mem = crate::sys::memory()?;
+    let budget = crate::local::budget(&mem, &crate::continuity::settings().pick_options(false), 0);
+    let need = memory_needed(name);
+    if need > budget.budget {
+        bail!(
+            "the speech model {name} needs {} MB and the memory budget is {} MB now; Voice Mode waits for memory",
+            need / 1_000_000,
+            budget.budget / 1_000_000
+        );
+    }
+    Ok(())
+}
+
 /// Starts the download in the background; progress goes on the live channel.
 pub fn download(v: &Arc<Voice>, name: &str) -> Result<Value> {
     let (_, bytes, sha) = *MODELS
