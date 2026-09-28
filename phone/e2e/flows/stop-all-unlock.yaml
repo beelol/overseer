@@ -1,14 +1,26 @@
 # Stop all agents with the unlock before changes on: asked once, then the device's unlock.
 appId: ${APP}
 ---
-- tapOn:
-    id: "agents.menu"
-    retryTapIfNoChange: true
-# Offered once the phone knows an agent is going: the news may still be on its way.
+# The menu, opened again if a tap is lost while the list changes (a new agent's row arriving).
+# Stop all is offered once the phone knows an agent is going: the news may still be on its way.
+- repeat:
+    times: 3
+    while:
+      notVisible:
+        id: "agents.menu.stop"
+    commands:
+      - tapOn:
+          id: "agents.menu"
+          optional: true
+      - extendedWaitUntil:
+          visible:
+            id: "agents.menu.stop"
+          timeout: 7000
+          optional: true
 - extendedWaitUntil:
     visible:
       id: "agents.menu.stop"
-    timeout: 20000
+    timeout: 10000
 - tapOn:
     id: "agents.menu.stop"
 - extendedWaitUntil:
