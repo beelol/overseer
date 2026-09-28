@@ -63,7 +63,11 @@ echo "▸ work dir:     $work"
 cd "$phone"
 echo "▸ installing deps…";        npm install --no-audit --no-fund >/dev/null
 echo "▸ generating brand assets…"; node scripts/gen-assets.mjs >/dev/null
-echo "▸ expo prebuild (ios)…";     npx expo prebuild -p ios --clean >/dev/null
+echo "▸ expo prebuild (ios)…";     OVERSEER_BUILD_NUMBER="$BUILD_NUMBER" npx expo prebuild -p ios --clean >/dev/null
+# phone/app.config.ts takes the build number from OVERSEER_BUILD_NUMBER; prebuild writes it into
+# Info.plist, where CURRENT_PROJECT_VERSION alone would not reach.
+stamped=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" ios/Overseer/Info.plist)
+[ "$stamped" = "$BUILD_NUMBER" ] || { echo "✗ Info.plist has build $stamped, not $BUILD_NUMBER" >&2; exit 1; }
 
 # API key must be findable by altool too.
 mkdir -p "$HOME/.appstoreconnect/private_keys"

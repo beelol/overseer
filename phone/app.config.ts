@@ -5,7 +5,9 @@ import { palettes } from '../extension/design/tokens.js';
 
 const IDENTIFIER = 'com.beelol.overseer.phone';
 /** The build number a release script sets (OVERSEER_BUILD_NUMBER): whole and positive, or unset. */
-const BUILD_NUMBER = /^[1-9][0-9]*$/.test(process.env.OVERSEER_BUILD_NUMBER ?? '') ? process.env.OVERSEER_BUILD_NUMBER : undefined;
+const BUILD_NUMBER = /^[1-9][0-9]*$/.test(process.env.OVERSEER_BUILD_NUMBER ?? '')
+  ? process.env.OVERSEER_BUILD_NUMBER
+  : undefined;
 
 /**
  * The whole native configuration. `ios/` and `android/` are generated from this file by
@@ -36,7 +38,10 @@ const config: ExpoConfig = {
   },
   android: {
     package: IDENTIFIER,
-    ...(BUILD_NUMBER ? { versionCode: Number(BUILD_NUMBER) } : {}),
+    // Google Play caps versionCode at 2,100,000,000; a timestamp build number (iOS) is left out.
+    ...(BUILD_NUMBER && Number(BUILD_NUMBER) <= 2_100_000_000
+      ? { versionCode: Number(BUILD_NUMBER) }
+      : {}),
     // The template asks for these; the app has no use for them.
     blockedPermissions: [
       'android.permission.READ_EXTERNAL_STORAGE',
