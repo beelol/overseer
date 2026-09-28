@@ -1,11 +1,5 @@
 name: iOS TestFlight
 
-# ┌─ ACTIVATION ─────────────────────────────────────────────────────────────────────────────────┐
-# │ This file is parked at ci/ because pushing under .github/workflows/ needs the `workflow` OAuth │
-# │ scope, which isn't granted yet (AC-148). To activate: the owner runs `gh auth refresh -s       │
-# │ workflow`, then move this file to .github/workflows/ios-testflight.yml and push.               │
-# └────────────────────────────────────────────────────────────────────────────────────────────┘
-#
 # Builds the Overseer phone app and uploads it to TestFlight.
 # Runs on a push to main that touches the phone app, and on manual dispatch.
 #

@@ -27,7 +27,7 @@ Only the owner can do these (AC-160). Each is one step; the criterion it unblock
 
 ## Releasing the phone app (TestFlight)
 
-The iOS app ships through TestFlight — App Store Connect app **Overseer Remote**, bundle `com.beelol.overseer.phone`. Full setup and IDs: [testflight-goal.md](docs/goals/testflight-goal.md). Build, sign and upload with `scripts/testflight-release.sh`. CI workflow is parked at `ci/ios-testflight.yml` until the `workflow` scope is granted (see owner actions), then it moves to `.github/workflows/`.
+The iOS app ships through TestFlight — App Store Connect app **Overseer Remote**, bundle `com.beelol.overseer.phone`. Full setup and IDs: [testflight-goal.md](docs/goals/testflight-goal.md). Build, sign and upload with `scripts/testflight-release.sh`, or let `.github/workflows/ios-testflight.yml` do it from `main` (on changes to `phone/**` or manual dispatch). The workflow needs the repository secrets in the owner-actions list.
 
 **⚠️ Build-number rule:** every TestFlight upload must have a **higher build number** (`CFBundleVersion`) than the previous one, or App Store Connect rejects it. The release script stamps a unique timestamp build number so this never bites — never reuse a number or ship the default `1` twice.
 
