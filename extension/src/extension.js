@@ -645,6 +645,33 @@ async function activate(context) {
       const picked = await vscode.window.showQuickPick(choices, { title: 'Show Swarm jobs' });
       if (picked) agents.setSwarmStatusFilter(picked.value);
     })),
+    vscode.commands.registerCommand('overseer.startSwarm', guard(async () => {
+      requireTrust();
+      const folders = vscode.workspace.workspaceFolders || [];
+      const roots = [...new Set((await Promise.all(folders.map(f => gitRoot(f.uri.fsPath)))).filter(Boolean))];
+      if (!roots.length) throw new Error('Open a Git repository to start a swarm.');
+      const repo = roots.length === 1 ? roots[0] : (await vscode.window.showQuickPick(
+        roots.map(r => ({ label: path.basename(r), description: r, root: r })), { title: 'Start swarm: repository' }))?.root;
+      if (!repo) return;
+      const category = await vscode.window.showInputBox({ title: 'Start swarm: category', placeHolder: 'Backend security' });
+      if (!category) return;
+      const objective = await vscode.window.showInputBox({ title: `Start swarm: ${category}`, placeHolder: 'What should this swarm achieve?' });
+      if (!objective) return;
+      const result = await swarmControls.start({ category, objective, repositories: [repo] }, {
+        pickAccounts: async () => {
+          const profiles = await client.request('profile.list');
+          const picked = await vscode.window.showQuickPick(profiles.map(p => ({ label: p.name, description: p.harness, id: p.id })),
+            { title: `Accounts ${category} may use (asked once)`, canPickMany: true });
+          return picked?.map(p => p.id);
+        },
+        confirm: async (readback, text) => (await vscode.window.showInformationMessage(readback.summary,
+          { modal: true, detail: text }, 'Start swarm')) === 'Start swarm'
+      });
+      if (result.status === 'started') vscode.window.showInformationMessage(`${category} swarm started: ${result.run.start?.summary || ''}`);
+      else if (result.status === 'blocked') vscode.window.showWarningMessage(`The ${category} swarm cannot start: ${result.reason}.`);
+      else if (result.status === 'needs_account_selection') vscode.window.showWarningMessage('Choose at least one account for this category.');
+      else if (result.status === 'readback_changed') vscode.window.showWarningMessage('The accounts or limits changed twice while confirming; nothing was started.');
+    })),
     vscode.commands.registerCommand('overseer.pauseSwarm', guard(async arg => {
       requireTrust(); const id = await swarmId(arg, ['planning', 'running']);
       if (id) await swarmControls.pause(id);
