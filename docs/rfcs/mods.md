@@ -1,3 +1,5 @@
+> **Name:** this feature is called **mods** (the owner's choice, 2026-09-27). The text below was drafted as "plugins"; read "mod" for "plugin".
+
 # Side RFC: Plugins — rules, skills, styles and limits you plug into your agents
 
 Status: owner request (2026-09-27). A product proposal for the owner to agree or change. Nothing is
@@ -632,4 +634,4 @@ Prior art for governance, and the idea taken from each:
 - **Global `~/.claude` and `~/.codex` rules:** ignored by default. They apply only if the owner opts in; a one-time "migrate them into Overseer" option may be offered.
 - **Repository team files:** later, not in the first version.
 - **Installing on its own:** by default, Overseer notices that a plugin would help (or that the owner asked for one) and asks first ("Install caveman? It will …"), like Codex asks; the owner says yes. A setting may later allow automatic installs.
-- **Name:** open. The owner wants something on brand, and a name that does not collide with VS Code's own extensions/plugins; "middleware" or "transformer" describe some of them but not all.
+- **Name: mods** (chosen 2026-09-27 over loadouts, rigs, traits, kits and lenses). The feature is "mods": install a mod, enable it for all agents, a repository, a group, one agent or Overseer's own session. Where this document says "plugin", read "mod"; the criteria use "mod".
