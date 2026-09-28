@@ -32,7 +32,7 @@ Classes: **(a)** fixtures and targeted tests can finish it; **(b)** it needs a l
 | AUTO-AC-34 Bounded routing inference | Not started. Needs a classifier call path with timeout, invalid-output, budget and escalation bounds, tested with a fixture classifier. Every call is a paid turn, so the owner must decide whether a classifier ships and on which model (the budget rules allow only luna-low or haiku). Until then no inference runs and traces record `not_used`. | (a) for the fixture bounds; (c) whether and which model |
 | AUTO-AC-35 Delegation lifecycle | A real managed child returning a browser artifact exactly once. | (b) |
 | AUTO-AC-36 Adaptation without configuration upkeep | Verified on 2026-09-28 (no churn, upgrade invalidation through dispatch). | (a), done |
-| AUTO-AC-38 Minimal local measurement schema | Secret-sentinel fixtures (a). A real authorized Claude task record (b). | (a); (b) |
+| AUTO-AC-38 Minimal local measurement schema | Secret-sentinel fixtures exist (a, done). A real authorized Claude task record (b). | (b) |
 | AUTO-AC-39 Retention, deletion and export | The whole-volume floor is done (2026-09-28). Left: a measured worst-case journal size and slow-disk latency. | (a) |
 
 **Owner decisions that touch these (defaults kept):** Claude calibration's plan source, allowance, bracketing and freshness (RFC, "Claude quota readings for calibration") decide whether a Claude route can ever get a qualified draw and so a known fit (AUTO-AC-13/17 in live use, not their fixture Verify clauses). The Swarm director and native workers decide the Swarm legs of AUTO-AC-17 in live use.
