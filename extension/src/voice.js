@@ -242,7 +242,7 @@ class Voice {
   async talkTo() {
     const { roster } = await this.client.request('agents.roster').catch(() => ({ roster: [] }));
     const active = (roster || []).filter(a => ['queued', 'starting', 'running', 'waiting_for_user'].includes(a.status));
-    const pick = await vscode.window.showQuickPick([{ label: '$(eye) Overseer', description: 'works out the agents from what you say', target: 'overseer' }, ...active.map(a => ({ label: a.title, description: a.status, target: a.id }))], { title: 'Voice Mode: talk to', placeHolder: 'Who hears what you say' });
+    const pick = await vscode.window.showQuickPick([{ label: '$(overseer-mark) Overseer', description: 'works out the agents from what you say', target: 'overseer' }, ...active.map(a => ({ label: a.title, description: a.status, target: a.id }))], { title: 'Voice Mode: talk to', placeHolder: 'Who hears what you say' });
     if (!pick) return;
     await this.client.request('voice.set', { target: pick.target });
     return this.refresh();
