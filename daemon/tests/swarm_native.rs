@@ -1059,3 +1059,49 @@ fn each_route_decision_replays_to_the_same_route_and_reason() {
     }
     assert_eq!(t.w.d.call("swarm.route.replay", json!({"event_seq":seqs[0]}))["matches"], false);
 }
+
+/// SWARM-02 on Auto's route selection: accounts the owner never selected are
+/// never candidates, for a first attempt or for fallback. (1) The approved
+/// pool is two accounts; a third, healthy account discovered on the machine is
+/// not in it. A worker that fails before any effect falls back to the other
+/// approved account, never to the discovered one. (2) With only the
+/// director's account approved and two healthy discovered accounts, a dispatch
+/// is blocked `no_eligible_route`: the discovered accounts are not even
+/// candidates, and nothing is admitted.
+#[test]
+fn unselected_accounts_are_never_candidates_for_work_or_fallback() {
+    let t = driven(&["alpha", "beta", "gamma"], &[("alpha", 0.0), ("beta", 0.0), ("gamma", 0.0)],
+        &["system-claude", "alpha", "beta"], &["x"], &[]);
+    let ids = t.ids.clone();
+    std::fs::write(&t.worker_gate, "open").unwrap();
+    let (run, director, _) = start(&t.w, "isolated", "unselected-fallback");
+    wait_trace(&t.w, step("dispatched", "director"), "plan", 60);
+    let status = |job: &str| -> String { db(&t.w.d).query_row("SELECT status FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+        [&run, &job.to_string()], |r| r.get(0)).unwrap() };
+    let one = dispatch_job(&t.w.d, &director, json!({"job_id":"x","brief":"Job x: x"}));
+    assert_eq!(one["status"], "launched", "{one}");
+    let until = std::time::Instant::now() + Duration::from_secs(60);
+    while status("x") != "ready" { assert!(std::time::Instant::now() < until); std::thread::sleep(Duration::from_millis(100)); }
+    let two = dispatch_job(&t.w.d, &director, json!({"job_id":"x","brief":"Job x: x"}));
+    assert_eq!(two["status"], "launched", "{two}");
+    let used: Vec<String> = admitted_routes(&t.w.d, &run, "x").into_iter().map(|r| r.0).collect();
+    assert!(used.iter().all(|p| p == &ids["alpha"] || p == &ids["beta"]), "{used:?}");
+    assert!(!used.contains(&ids["gamma"]), "the discovered account is never used");
+    for trace in route_decisions(&t.w.d, &run, "x") {
+        let candidates = trace["selection_input"]["routes"].as_array().unwrap();
+        assert!(candidates.iter().all(|r| r["profile_id"] != ids["gamma"].as_str()), "{trace}");
+    }
+
+    // Only the director's own (unidentified) account approved.
+    let only = driven(&["alpha", "beta"], &[("alpha", 0.0), ("beta", 0.0)], &["system-claude"], &["y"], &["y"]);
+    let (run2, director2, _) = start(&only.w, "isolated", "only-denied");
+    wait_trace(&only.w, step("dispatched", "director"), "plan", 60);
+    let blocked = dispatch_job(&only.w.d, &director2, json!({"job_id":"y","brief":"Job y: y"}));
+    assert_eq!((blocked["status"].as_str(), blocked["reason"].as_str()), (Some("blocked"), Some("no_eligible_route")), "{blocked}");
+    let trace = &route_decisions(&only.w.d, &run2, "y")[0];
+    let candidates: Vec<&str> = trace["selection_input"]["routes"].as_array().unwrap().iter()
+        .filter_map(|r| r["profile_id"].as_str()).collect();
+    assert!(candidates.iter().all(|p| *p == "system-claude"), "only approved accounts are candidates: {candidates:?}");
+    assert!(admitted_routes(&only.w.d, &run2, "y").is_empty());
+    std::fs::write(&only.worker_gate, "open").unwrap();
+}

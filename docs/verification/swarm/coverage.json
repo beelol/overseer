@@ -19,13 +19,15 @@
       "blocker": "four_way_launch_matrix_auto_manual_by_swarm_on_off runs all four combinations on one daemon on fixtures (product path, Swarm fixture API off) and records launch path, booking and slots: ordinary unbooked 1 slot; Auto root with Auto's unknown-draw claim 1 slot; Swarm with Auto Mode off and on identical (Claude director unbooked plus two booked native workers, 3 slots); Swarm off creates no Swarm run or worker. Swarm on outside fixtures needs swarm.native_director, which is off until the owner decides; no Swarm route is chosen by Auto's selector; the full suite was not run and nothing ran live."
     },
     "SWARM-02": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_checkpoint.rs",
         "daemon/tests/swarm_dispatch_incident.rs",
-        "docs/verification/swarm/SWARM-02.md"
+        "docs/verification/swarm/SWARM-02.md",
+        "daemon/tests/swarm_native.rs",
+        "daemon/tests/swarm_context.rs"
       ],
-      "blocker": "Fixture allowlists exclude a newly observed unselected account and require a destination-specific checkpoint grant before selected account B resumes. Live discovery/provider-context permissions, denied-only routing and ordinary fallback remain unverified."
+      "blocker": null
     },
     "SWARM-03": {
       "status": "verified",
