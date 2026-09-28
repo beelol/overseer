@@ -1455,9 +1455,14 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "swarm.pause" => crate::swarm::pause(&mut d.store.lock().unwrap(), p)?,
         "swarm.resume" => crate::swarm::resume(&mut d.store.lock().unwrap(), p)?,
         "swarm.off" => crate::swarm::off(&mut d.store.lock().unwrap(), p)?,
+        "claims.ledger" => crate::claims::ledger(&d.store.lock().unwrap().conn)?,
         "swarm.claim" => {
             fixture_only()?;
-            let claim = crate::swarm::claim(&mut d.store.lock().unwrap(), p)?;
+            let claim = crate::swarm::claim(&mut d.store.lock().unwrap(), p);
+            if let Err(error) = d.notify_claim_refusals() {
+                crate::log(&format!("claim refusal notice failed: {error}"));
+            }
+            let claim = claim?;
             if claim["status"] == "contaminated" {
                 if let Err(error) = crate::swarm::retry_targeted_interrupts(d) {
                     crate::log(&format!("swarm contamination interrupt failed: {error}"));

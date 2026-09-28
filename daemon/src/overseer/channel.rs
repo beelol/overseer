@@ -39,6 +39,22 @@ fn clean_path(p: &str) -> Result<String> {
     Ok(p)
 }
 
+/// The Swarm jobs holding any of `paths` exclusively, each refusal recorded in the one claim
+/// ledger (SWARM-44); empty when the agent may take them all.
+pub(crate) fn ledger_refusals(conn: &rusqlite::Connection, run_id: &str, paths: &[String]) -> Result<Vec<crate::claims::Holder>> {
+    let mut all = Vec::new();
+    for p in paths {
+        let me = crate::claims::Holder { kind: "agent", run: run_id.to_string(), job: None, resource: p.clone() };
+        for holder in crate::claims::swarm_write_holders(conn, run_id, p)? {
+            crate::claims::refuse(conn, &me, &holder)?;
+            if !all.contains(&holder) {
+                all.push(holder);
+            }
+        }
+    }
+    Ok(all)
+}
+
 /// The directory most of the paths share, for an agent that never claimed one.
 fn suggest_area(paths: &[String]) -> Vec<String> {
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
@@ -374,6 +390,14 @@ impl Daemon {
         self.picked_up(run_id)?;
         {
             let store = self.store.lock().unwrap();
+            // One ledger with Swarm's claims (SWARM-44): a path a Swarm job holds exclusively
+            // is refused, whole claim or nothing, and both sides are told.
+            let held = ledger_refusals(&store.conn, run_id, &paths)?;
+            if !held.is_empty() {
+                drop(store);
+                self.notify_claim_refusals()?;
+                bail!("{}", crate::claims::refusal_text(&held));
+            }
             for p in &paths {
                 store.conn.execute("INSERT OR IGNORE INTO areas(run_id, path, set_by, created_ms) VALUES(?1, ?2, 'agent', ?3)", rusqlite::params![run_id, p, crate::daemon::now()])?;
             }
@@ -457,6 +481,12 @@ impl Daemon {
         }
         {
             let store = self.store.lock().unwrap();
+            let held = ledger_refusals(&store.conn, run_id, &clean)?;
+            if !held.is_empty() {
+                drop(store);
+                self.notify_claim_refusals()?;
+                bail!("{}", crate::claims::refusal_text(&held));
+            }
             store.conn.execute("DELETE FROM areas WHERE run_id=?1", [run_id])?;
             for p in &clean {
                 store.conn.execute("INSERT OR IGNORE INTO areas(run_id, path, set_by, created_ms) VALUES(?1, ?2, ?3, ?4)", rusqlite::params![run_id, p, by, crate::daemon::now()])?;

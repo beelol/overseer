@@ -15,6 +15,7 @@ mod auto_mcp;
 mod audio;
 mod adapters;
 mod background;
+mod claims;
 mod continuity;
 mod daemon;
 mod downloads;

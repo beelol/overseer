@@ -565,13 +565,16 @@
       "blocker": null
     },
     "SWARM-44": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
         "daemon/tests/swarm_atlas.rs",
-        "docs/verification/swarm/milestone-2.md"
+        "docs/verification/swarm/milestone-2.md",
+        "daemon/tests/swarm_claim_ledger.rs",
+        "daemon/src/claims.rs",
+        "docs/verification/swarm/SWARM-44.md"
       ],
-      "blocker": "Cross-category read/write claims and duplicate hypothesis ownership pass; joined S1 records J4 overlap and scripted redirect while J1 separately checks project middleware. Director redirection is not connected to live workers."
+      "blocker": null
     },
     "SWARM-45": {
       "status": "partial",

@@ -399,6 +399,15 @@ fn admit_inner(
                 return Ok(blocked("resource_conflict"));
             }
         }
+        // The same ledger holds ordinary agents' areas (SWARM-44): a job whose exclusive
+        // claim falls inside one waits; its director decides what to do about it.
+        if mode == "write" {
+            let held = crate::claims::agent_holders(&tx, run, resource)?;
+            if !held.is_empty() {
+                return Ok(json!({"status":"blocked","reason":"resource_conflict",
+                    "holders":held.iter().map(crate::claims::Holder::json).collect::<Vec<_>>()}));
+            }
+        }
     }
     let queued_inbox: i64 = tx.query_row(
         "SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND recipient='director' AND phase='queued'",

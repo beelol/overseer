@@ -1025,6 +1025,19 @@ pub fn claim(store: &mut Store, p: &Value) -> Result<Value> {
     {
         bail!("job cannot claim a resource in this state");
     }
+    // One daemon ledger (SWARM-44): an exclusive claim inside a live ordinary agent's area
+    // is refused and recorded for both sides. Read-only analysis is not ownership.
+    if mode == "write" && !after_use {
+        let held = crate::claims::agent_holders(&store.conn, run, resource)?;
+        if !held.is_empty() {
+            let me = crate::claims::Holder { kind: "swarm", run: run.to_string(),
+                job: Some(job.to_string()), resource: resource.to_string() };
+            for holder in &held {
+                crate::claims::refuse(&store.conn, &me, holder)?;
+            }
+            bail!("{} (for {resource})", crate::claims::refusal_text(&held));
+        }
+    }
     let tx = store.conn.transaction()?;
     let mut stmt = tx.prepare(
         "SELECT run_id,job_id,mode FROM swarm_claims WHERE resource=?1 AND status='active'",

@@ -75,7 +75,7 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     // fixture launch bridges, the account booking inputs and every setting are not from the
     // conversation.
     ("swarm.get", "read"), ("swarm.list", "read"), ("swarm.jobs", "read"), ("swarm.coverage", "read"),
-    ("swarm.messages", "read"), ("swarm.conflicts", "read"), ("swarm.policy.preview", "read"),
+    ("swarm.messages", "read"), ("swarm.conflicts", "read"), ("swarm.policy.preview", "read"), ("claims.ledger", "read"),
     ("swarm.benefit.preview", "read"), ("swarm.storage.status", "read"), ("swarm.director.summary", "read"),
     ("swarm.worker.liveness", "read"), ("swarm.route.replay", "read"), ("swarm.native_director.get", "read"), ("agents.limit.get", "read"), ("auto.root.preview", "read"),
     ("auto.mode.get", "read"), ("auto.models.list", "read"), ("auto.quota.state", "read"), ("auto.quota.list", "read"),
@@ -465,6 +465,16 @@ impl Daemon {
             "assign" => {
                 // The keeper owns the paths; the other agent gets a guardrail and a word.
                 let dirs: Vec<String> = paths.clone();
+                // The keeper's area is in the one claim ledger (SWARM-44): a Swarm job holding
+                // one of the paths refuses the whole assignment before anything changes.
+                let held = {
+                    let store = self.store.lock().unwrap();
+                    super::channel::ledger_refusals(&store.conn, &keep, &dirs)?
+                };
+                if !held.is_empty() {
+                    self.notify_claim_refusals()?;
+                    bail!("{}", crate::claims::refusal_text(&held));
+                }
                 self.agent_guardrail(&other, &format!("{keep_title} owns {}; leave those files to it.", dirs.join(", ")), &[], &dirs, false, by)?;
                 {
                     let store = self.store.lock().unwrap();

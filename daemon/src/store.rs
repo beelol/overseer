@@ -461,6 +461,10 @@ impl Store {
             CREATE INDEX IF NOT EXISTS conflicts_key ON conflicts(key, state);
             CREATE TABLE IF NOT EXISTS areas(
               run_id TEXT NOT NULL, path TEXT NOT NULL, set_by TEXT NOT NULL, created_ms INTEGER NOT NULL, PRIMARY KEY(run_id, path));
+            CREATE TABLE IF NOT EXISTS claim_refusals(
+              id TEXT PRIMARY KEY, resource TEXT NOT NULL, claimant_kind TEXT NOT NULL, claimant_run TEXT NOT NULL, claimant_job TEXT,
+              holder_kind TEXT NOT NULL, holder_run TEXT NOT NULL, holder_job TEXT, holder_resource TEXT NOT NULL,
+              created_ms INTEGER NOT NULL, notified_ms INTEGER);
             CREATE TABLE IF NOT EXISTS run_roles(run_id TEXT PRIMARY KEY, role TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS turn_sources(turn_id TEXT PRIMARY KEY, source TEXT NOT NULL, detail TEXT);
             CREATE TABLE IF NOT EXISTS overseer_sessions(
