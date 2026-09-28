@@ -749,8 +749,9 @@ Still to measure with the owner (step 4): echo cancellation through real speaker
 What the simulated voice cannot show. About 20 minutes on the owner's Mac, plus the session (AC-176).
 Everything else in Gate R is tested with the simulated voice and fixtures.
 
-1. **Install**, when no agents are running: `node extension/scripts/package.js`, then install
-   `extension/overseer-0.1.0.vsix` and reload VS Code.
+1. **In a dev daemon (Gate T's guided test):** an isolated dev Overseer beside the installed one
+   ([dev-instance.md](dev-instance.md)); nothing is installed into the owner's own VS Code. The owner
+   says "let's start the voice mode test" and an agent opens it and walks through the steps below.
 2. **Turn it on (AC-163):** ⌘⌥⇧V (*Overseer: Voice Mode: Turn On or Off*). Accept the speech model
    download (small.en, 465 MiB, once). macOS asks for the microphone: the prompt must name
    **Overseer Listener**. Allow.

@@ -453,6 +453,7 @@
       if (!this.proposals) this.proposals = new Map();
       const card = el('div', 'proposal'); card.setAttribute('role', 'group'); card.setAttribute('aria-label', 'Overseer proposes'); card.dataset.id = p.id;
       const head = el('div', 'proposal-head'); head.append(ui.mark('sm'), el('span', null, 'Overseer will'));
+      if (p.cause === 'voice') { const mic = ui.icon('mic', 'xs'); mic.removeAttribute('aria-hidden'); mic.setAttribute('role', 'img'); mic.setAttribute('aria-label', 'From a spoken request'); mic.title = 'From a spoken request'; head.append(mic); card.classList.add('spoken'); }
       const list = el('ul', 'proposal-list');
       for (const line of p.lines || []) list.append(el('li', null, line));
       if (p.note) list.append(el('li', 'muted', p.note));

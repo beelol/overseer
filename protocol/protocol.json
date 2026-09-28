@@ -1777,6 +1777,94 @@
       "reason": "It is for the agents' own Overseer tools, never a phone",
       "params": "json",
       "result": "json"
+    },
+    "voice.get": {
+      "class": "mac_only",
+      "summary": "Voice Mode's settings",
+      "phone": "mac_only",
+      "reason": "Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose",
+      "params": "json",
+      "result": "json"
+    },
+    "voice.set": {
+      "class": "mac_only",
+      "summary": "Change Voice Mode's settings",
+      "phone": "mac_only",
+      "reason": "Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose",
+      "params": "json",
+      "result": "json"
+    },
+    "voice.focus": {
+      "class": "mac_only",
+      "summary": "Which agent Voice Mode speaks for",
+      "phone": "mac_only",
+      "reason": "Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose",
+      "params": "json",
+      "result": "json"
+    },
+    "voice.say": {
+      "class": "mac_only",
+      "summary": "Say something to Voice Mode",
+      "phone": "mac_only",
+      "reason": "Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose",
+      "params": "json",
+      "result": "json"
+    },
+    "voice.speak": {
+      "class": "mac_only",
+      "summary": "Speak a text aloud on the Mac",
+      "phone": "mac_only",
+      "reason": "Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose",
+      "params": "json",
+      "result": "json"
+    },
+    "voice.read_back": {
+      "class": "mac_only",
+      "summary": "Read an agent's answer aloud on the Mac",
+      "phone": "mac_only",
+      "reason": "Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose",
+      "params": "json",
+      "result": "json"
+    },
+    "voice.answer": {
+      "class": "mac_only",
+      "summary": "Answer by voice",
+      "phone": "mac_only",
+      "reason": "Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose",
+      "params": "json",
+      "result": "json"
+    },
+    "voice.cancel": {
+      "class": "mac_only",
+      "summary": "Stop what Voice Mode is doing",
+      "phone": "mac_only",
+      "reason": "Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose",
+      "params": "json",
+      "result": "json"
+    },
+    "voice.requests": {
+      "class": "mac_only",
+      "summary": "What Voice Mode is waiting to hear",
+      "phone": "mac_only",
+      "reason": "Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose",
+      "params": "json",
+      "result": "json"
+    },
+    "voice.download": {
+      "class": "mac_only",
+      "summary": "Download a voice",
+      "phone": "mac_only",
+      "reason": "Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose",
+      "params": "json",
+      "result": "json"
+    },
+    "voice.simulate": {
+      "class": "mac_only",
+      "summary": "Simulate speech for tests",
+      "phone": "mac_only",
+      "reason": "Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose",
+      "params": "json",
+      "result": "json"
     }
   }
 }

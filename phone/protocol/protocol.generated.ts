@@ -972,6 +972,28 @@ export interface Methods {
   "overseer.tools": { class: 'mac_only'; params: unknown; result: unknown };
   /** Run one of Overseer's tools for an agent. The Mac only: It is for the agents' own Overseer tools, never a phone. */
   "overseer.tool": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Voice Mode's settings. The Mac only: Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose. */
+  "voice.get": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Change Voice Mode's settings. The Mac only: Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose. */
+  "voice.set": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Which agent Voice Mode speaks for. The Mac only: Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose. */
+  "voice.focus": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Say something to Voice Mode. The Mac only: Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose. */
+  "voice.say": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Speak a text aloud on the Mac. The Mac only: Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose. */
+  "voice.speak": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Read an agent's answer aloud on the Mac. The Mac only: Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose. */
+  "voice.read_back": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Answer by voice. The Mac only: Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose. */
+  "voice.answer": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Stop what Voice Mode is doing. The Mac only: Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose. */
+  "voice.cancel": { class: 'mac_only'; params: unknown; result: unknown };
+  /** What Voice Mode is waiting to hear. The Mac only: Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose. */
+  "voice.requests": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Download a voice. The Mac only: Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose. */
+  "voice.download": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Simulate speech for tests. The Mac only: Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose. */
+  "voice.simulate": { class: 'mac_only'; params: unknown; result: unknown };
 }
 
 export type MethodName = keyof Methods;
@@ -1128,6 +1150,17 @@ export const METHOD_CLASS = {
   "overseer.token": 'mac_only',
   "overseer.tools": 'mac_only',
   "overseer.tool": 'mac_only',
+  "voice.get": 'mac_only',
+  "voice.set": 'mac_only',
+  "voice.focus": 'mac_only',
+  "voice.say": 'mac_only',
+  "voice.speak": 'mac_only',
+  "voice.read_back": 'mac_only',
+  "voice.answer": 'mac_only',
+  "voice.cancel": 'mac_only',
+  "voice.requests": 'mac_only',
+  "voice.download": 'mac_only',
+  "voice.simulate": 'mac_only',
 } as const satisfies Record<MethodName, MethodClass>;
 
 export type PhoneMethod = { [K in MethodName]: Methods[K]['class'] extends 'mac_only' ? never : K }[MethodName];

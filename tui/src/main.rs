@@ -22,7 +22,8 @@ USAGE:
 OPTIONS:
     --daemon PATH   overseerd binary (default: $OVERSEERD, next to this binary, $PATH, or the one
                     bundled with the Overseer VS Code extension)
-    --home DIR      Overseer data directory (sets OVERSEER_HOME; default: the same as VS Code)
+    --home DIR      Overseer data directory (default: the same as VS Code; the installed TUI
+                    ignores OVERSEER_HOME and OVERSEER_SOCKET in its environment)
     --no-mouse      Leave the mouse to the terminal (text selection) instead of clicking tiles
     --no-bell       No terminal bell when an agent starts waiting for you
     -h, --help      Show this help
@@ -53,6 +54,7 @@ enum Ev {
 
 fn main() -> Result<()> {
     let mut daemon_path: Option<PathBuf> = None;
+    let mut home: Option<PathBuf> = None;
     let mut mouse = true;
     let mut bell = true;
     let mut args = std::env::args().skip(1);
@@ -67,17 +69,15 @@ fn main() -> Result<()> {
                 return Ok(());
             }
             "--daemon" => daemon_path = args.next().map(PathBuf::from),
-            "--home" => {
-                if let Some(h) = args.next() {
-                    std::env::set_var("OVERSEER_HOME", h);
-                }
-            }
+            "--home" => home = args.next().map(PathBuf::from),
             "--no-mouse" => mouse = false,
             "--no-bell" => bell = false,
             other => anyhow::bail!("unknown option {other} (see --help)"),
         }
     }
-    let daemon = Daemon::find(daemon_path.as_deref())?;
+    let mut daemon = Daemon::find(daemon_path.as_deref())?;
+    // An explicit --home is deliberate; OVERSEER_HOME in the environment only counts for a dev TUI (AC-212).
+    daemon.home = home;
     let socket = daemon.socket_path()?;
     let (tx, rx) = mpsc::channel::<Ev>();
     let (dtx, drx) = mpsc::channel::<Msg>();

@@ -204,6 +204,10 @@ fn notifier_app() -> Option<std::path::PathBuf> {
 /// Registers the bundled notifier with LaunchServices once per daemon, so an updated helper's
 /// icon replaces the one macOS cached from an older build (AC-179). Best effort.
 fn register_notifier(app: &std::path::Path) {
+    // A dev instance never touches the installed notifier's registration (AC-212).
+    if crate::paths::instance().is_some() {
+        return;
+    }
     static DONE: std::sync::OnceLock<()> = std::sync::OnceLock::new();
     DONE.get_or_init(|| {
         let lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";

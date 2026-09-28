@@ -1,0 +1,51 @@
+     Running unittests src/lib.rs (target/debug/deps/overseer_tui-d71541eafe2eecf8)
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.21s
+     Running unittests src/main.rs (target/debug/deps/overseer_tui-09fb74e181d61ec1)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/audio.rs (target/debug/deps/audio-75d298f293471db8)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 53.79s
+     Running tests/control.rs (target/debug/deps/control-cfd480017111ccb2)
+test t19_a_new_waiting_agent_rings_and_shows_in_the_window_title ... FAILED
+thread 't19_a_new_waiting_agent_rings_and_shows_in_the_window_title' panicked at tui/tests/control.rs:323:5:
+test result: FAILED. 9 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.09s
+     Running tests/interact.rs (target/debug/deps/interact-bdfe22d49df94786)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 50.25s
+     Running tests/live.rs (target/debug/deps/live-f5e39ffa6efb0f26)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.59s
+     Running tests/live_harness.rs (target/debug/deps/live_harness-f7605cf1a378eb5e)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/look.rs (target/debug/deps/look-e7c65169c5d532e1)
+test t10_nine_busy_agents_stay_responsive ... FAILED
+thread 't10_nine_busy_agents_stay_responsive' panicked at tui/tests/look.rs:109:5:
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.71s
+     Running tests/overseer.rs (target/debug/deps/overseer-79d6f2b1b521cadd)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.81s
+     Running unittests src/main.rs (target/debug/deps/overseerd-88edd398d06528ba)
+test result: ok. 68 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+     Running tests/audio.rs (target/debug/deps/audio-e6a79879efa614e3)
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.15s
+     Running tests/continuity.rs (target/debug/deps/continuity-df37330207906efb)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.08s
+     Running tests/dev_instance.rs (target/debug/deps/dev_instance-0e81d32dbf5e8407)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.15s
+     Running tests/downloads.rs (target/debug/deps/downloads-4f305471b09998c2)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.71s
+     Running tests/handoff.rs (target/debug/deps/handoff-f94cf88502946c01)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.95s
+     Running tests/local_runs.rs (target/debug/deps/local_runs-66f2172453cae9de)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.44s
+     Running tests/netsim.rs (target/debug/deps/netsim-933e767e0eecb89d)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 71.28s
+     Running tests/ollama_install.rs (target/debug/deps/ollama_install-6bc41ba50645fae1)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.03s
+     Running tests/overseer.rs (target/debug/deps/overseer-c39f080486d8d071)
+test ac192_conflicts_between_agents_in_flight ... FAILED
+thread 'ac192_conflicts_between_agents_in_flight' panicked at daemon/tests/overseer.rs:275:9:
+test result: FAILED. 23 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 641.06s
+     Running tests/protocol.rs (target/debug/deps/protocol-e971086891266310)
+test ac45_one_notice_per_quit_a_brief_reconnect_does_not_repeat_it ... FAILED
+test ac51_worktree_tree_lists_one_directory_marks_changes_and_stays_inside ... FAILED
+thread 'ac45_one_notice_per_quit_a_brief_reconnect_does_not_repeat_it' panicked at daemon/tests/protocol.rs:972:5:
+thread 'ac51_worktree_tree_lists_one_directory_marks_changes_and_stays_inside' panicked at daemon/tests/protocol.rs:1356:5:
+test result: FAILED. 50 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.69s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
