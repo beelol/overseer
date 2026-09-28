@@ -1055,3 +1055,104 @@ fn ac167_ac168_delivery_setting_and_new_agent_limits() {
     );
     assert!(nine.unwrap_err().contains("at most eight"));
 }
+
+/// AC-167: additions to an agent in mid-turn wait for the end of its turn, never interrupt it, and
+/// arrive as one message in the order spoken; with delivery set to redirect, a spoken change stops
+/// the turn and the next turn starts with the direction.
+#[test]
+fn ac167_additions_wait_and_arrive_as_one_message_a_redirect_stops_the_turn() {
+    let env = voice_daemon(&[
+        ("FIXTURE_SLOW_MS", "120000"),
+        (
+            "OVERSEER_HARNESS_ENV_PASSTHROUGH",
+            "CLAUDE_FIXTURE_MODE_FILE,FIXTURE_SLOW_MS",
+        ),
+    ]);
+    env.d.call("voice.set", json!({"settle_seconds": 2}));
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    std::fs::write(env.mode_file(), "slow").unwrap();
+    let created = env.d.call(
+        "task.create",
+        json!({"repo": repo, "harness": "claude", "prompt": "write the release", "title": "Sessions"}),
+    );
+    let run = created["run"]["id"].as_str().unwrap().to_string();
+    env.d.wait_status(&run, |s| s == "running", 30);
+    let live = listening(&env);
+    let said = [
+        ("Tell Sessions to add a changelog.", "add a changelog"),
+        ("Tell Sessions to bump the version.", "bump the version"),
+        ("Tell Sessions to update the readme.", "update the readme"),
+    ];
+    for (text, _) in said {
+        let id = env.d.call("voice.say", json!({"text": text}))["request"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        live.wait("sent", 60, |v| {
+            v["kind"] == "request" && v["request"]["id"] == id && v["request"]["state"] == "sent"
+        });
+    }
+    // All three wait, in order; the turn goes on.
+    let queued = env.d.call("run.queued", json!({"run_id": run}))["queued"].clone();
+    let texts: Vec<&str> = queued
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|q| q["text"].as_str().unwrap_or(""))
+        .collect();
+    assert_eq!(texts.len(), 3, "{queued}");
+    for (i, (_, part)) in said.iter().enumerate() {
+        assert!(texts[i].contains(part), "in the order spoken: {texts:?}");
+    }
+    assert_eq!(
+        env.d
+            .call("run.turns", json!({"run_id": run}))
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert!(
+        !env.d
+            .events(&run)
+            .iter()
+            .any(|e| e["kind"] == "interrupt" || e["kind"] == "redirect"),
+        "an addition never interrupts"
+    );
+    env.d.wait_status(&run, |s| s == "running", 1);
+    // A change of course with delivery set to redirect: the turn stops, and the next turn starts
+    // with the three additions and the direction, as one message.
+    std::fs::write(env.mode_file(), "echo").unwrap();
+    env.d.call("voice.set", json!({"delivery": "redirect"}));
+    let id = env.d.call(
+        "voice.say",
+        json!({"text": "Tell Sessions to switch to the release notes."}),
+    )["request"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    live.wait("sent", 60, |v| {
+        v["kind"] == "request" && v["request"]["id"] == id && v["request"]["state"] == "sent"
+    });
+    let until = Instant::now() + Duration::from_secs(30);
+    let turns = loop {
+        let t = env.d.call("run.turns", json!({"run_id": run}));
+        if t.as_array().unwrap().len() >= 2 || Instant::now() > until {
+            break t;
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    };
+    let turns = turns.as_array().unwrap();
+    assert_eq!(turns.len(), 2, "one next turn: {turns:?}");
+    let next = turns[1]["prompt"].as_str().unwrap();
+    let at = |s: &str| next.find(s).unwrap_or_else(|| panic!("{s} in {next}"));
+    assert!(at("add a changelog") < at("bump the version"));
+    assert!(at("bump the version") < at("update the readme"));
+    assert!(at("update the readme") < at("switch to the release notes"));
+    assert!(env
+        .d
+        .events(&run)
+        .iter()
+        .any(|e| e["kind"] == "redirect" && e["payload"]["stopped"] == true));
+}

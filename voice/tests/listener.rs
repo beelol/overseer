@@ -379,3 +379,88 @@ fn real_speech_from_say_is_heard_as_one_utterance() {
         )]
     );
 }
+
+/// AC-173: the listener's output, as the daemon reads it, is words and loudness only. The real
+/// binary reads a recording with speech, a cough and typing; every line is a known event, no
+/// line carries samples, and the whole output is a small fraction of the audio it heard.
+#[test]
+fn the_output_carries_no_audio() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut audio = voice_at(11.0, &[(1.0, 2.5)]);
+    synth::mix(
+        &mut audio,
+        &synth::noise("cough", 3, 1.0).unwrap(),
+        synth::secs(5.0),
+    );
+    synth::mix(
+        &mut audio,
+        &synth::noise("typing", 4, 1.0).unwrap(),
+        synth::secs(6.5),
+    );
+    let wav = dir.path().join("in.wav");
+    std::fs::write(&wav, pcm::wav_bytes(&audio)).unwrap();
+    let script = dir.path().join("script.json");
+    std::fs::write(
+        &script,
+        serde_json::to_vec(&vec![line(
+            1000,
+            3500,
+            "tell the phone app to wait for the review",
+        )])
+        .unwrap(),
+    )
+    .unwrap();
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_overseer-listener"))
+        .args([
+            "--input",
+            &format!("file:{}", wav.display()),
+            "--fast",
+            "--no-control",
+        ])
+        .arg("--script")
+        .arg(&script)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let known = [
+        "ready",
+        "gate",
+        "level",
+        "words",
+        "utterance",
+        "dropped",
+        "barge",
+        "spoke",
+        "error",
+        "end",
+    ];
+    let mut kinds = std::collections::BTreeMap::<String, usize>::new();
+    fn no_samples(v: &serde_json::Value) -> bool {
+        match v {
+            serde_json::Value::Array(a) => a.len() <= 16 && a.iter().all(no_samples),
+            serde_json::Value::Object(o) => o.values().all(no_samples),
+            serde_json::Value::String(s) => s.len() <= 400,
+            _ => true,
+        }
+    }
+    for l in String::from_utf8(out.stdout.clone()).unwrap().lines() {
+        let v: serde_json::Value =
+            serde_json::from_str(l).unwrap_or_else(|_| panic!("not JSON: {l}"));
+        let t = v["type"].as_str().unwrap_or("").to_string();
+        assert!(known.contains(&t.as_str()), "unknown line {l}");
+        assert!(no_samples(&v), "a line that could carry audio: {l}");
+        *kinds.entry(t).or_default() += 1;
+    }
+    assert!(kinds.get("level").copied().unwrap_or(0) > 10, "{kinds:?}");
+    assert_eq!(kinds.get("utterance"), Some(&1), "{kinds:?}");
+    let audio_bytes = audio.len() * 2;
+    assert!(
+        out.stdout.len() * 20 < audio_bytes,
+        "{} bytes of output for {audio_bytes} bytes of audio: {kinds:?}",
+        out.stdout.len()
+    );
+}
