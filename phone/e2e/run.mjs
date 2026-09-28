@@ -247,7 +247,7 @@ async function main() {
   if (args.dev) args.build = false;
   else run(build, 'cargo', ['build', '-p', 'overseerd'], { cwd: root });
   if (args.build) {
-    for (const platform of args.platforms) run(build, 'node', [path.join(phone, 'scripts', `run-${platform}.mjs`), '--release'], { env: { ...process.env, LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8' } });
+    for (const platform of args.platforms) run(build, 'node', [path.join(phone, 'scripts', `run-${platform}.mjs`), '--release'], { env: { ...process.env, LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8', OVERSEER_EMULATOR_HEADLESS: '1' } });
   }
   const summary = {};
   let ok = true;

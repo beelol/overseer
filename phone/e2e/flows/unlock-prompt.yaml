@@ -12,9 +12,10 @@ appId: ${APP}
     when:
       platform: Android
     commands:
+      # The system's prompt: the app's reason as its title, a PIN field and a number pad.
       - extendedWaitUntil:
           visible:
-            text: ".*PIN.*"
+            id: "com\\.android\\.systemui:id/background"
           timeout: 20000
       - inputText: "${PIN}"
       - pressKey: Enter

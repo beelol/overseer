@@ -76,7 +76,9 @@ async function ensureEmulator() {
     console.log(`Starting the emulator ${avd}`);
     const emulator = spawn(
       path.join(sdk, 'emulator', 'emulator'),
-      ['-avd', avd, '-gpu', 'host', '-no-boot-anim'],
+      // Without a window when asked (the scenario run asks): a windowed emulator waits for the
+      // Mac's display, and hangs while it is asleep.
+      ['-avd', avd, '-gpu', 'host', '-no-boot-anim', ...(process.env.OVERSEER_EMULATOR_HEADLESS === '1' ? ['-no-window'] : [])],
       {
         detached: true,
         stdio: 'ignore',
