@@ -26,6 +26,11 @@ export interface LaunchConventions {
   readonly keyboard: 'padding' | 'height';
   /** How a screen enters: iOS slides in from the side, Android fades up from the bottom. */
   readonly screenEnter: 'slide_from_right' | 'fade_from_bottom';
+  /**
+   * Whether the WebSocket's ping is a ping: iOS sends a ping frame; React Native on Android sends
+   * an empty binary message instead, which the gateway would read as a frame, so no ping there.
+   */
+  readonly socketPing: boolean;
 }
 
 export interface LaunchInfo {

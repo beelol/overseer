@@ -102,5 +102,5 @@ export {
   type SessionHandlers,
   type SessionTiming,
 } from "./session.ts";
-export { type CloseInfo, type Socket, type SocketFactory, type SocketHandlers, type WebSocketConstructor, type WebSocketLike, webSocketFactory } from "./socket.ts";
+export { type CloseInfo, type Socket, type SocketFactory, type SocketHandlers, type WebSocketConstructor, type WebSocketLike, type WebSocketOptions, webSocketFactory } from "./socket.ts";
 export { isRequestId, uuidV4 } from "./uuid.ts";

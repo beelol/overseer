@@ -83,11 +83,21 @@ function exactBuffer(data: Uint8Array): ArrayBuffer {
   return copy.buffer;
 }
 
+/** How the app's platform wants its sockets. */
+export interface WebSocketOptions {
+  /**
+   * Whether the socket's own `ping` may be used (true unless said). React Native's WebSocket on
+   * Android sends its "ping" as an empty binary message, not a ping frame; the gateway would read
+   * it as a frame, so the app turns this off there and keeps to its encrypted keepalive.
+   */
+  readonly ping?: boolean;
+}
+
 /**
  * Makes a `SocketFactory` from a standard `WebSocket` constructor. Frames are binary
  * (`binaryType = "arraybuffer"`); a text frame is an error and closes the socket.
  */
-export function webSocketFactory(WebSocketClass: WebSocketConstructor): SocketFactory {
+export function webSocketFactory(WebSocketClass: WebSocketConstructor, options: WebSocketOptions = {}): SocketFactory {
   return (url, handlers) => {
     let done = false;
     let ws: StandardWebSocket | null = null;
@@ -168,7 +178,7 @@ export function webSocketFactory(WebSocketClass: WebSocketConstructor): SocketFa
         }
       },
     };
-    if (typeof socket.ping === "function") {
+    if (options.ping !== false && typeof socket.ping === "function") {
       out.ping = () => {
         try {
           (socket.ping as () => void)();

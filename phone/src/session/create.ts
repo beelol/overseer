@@ -50,7 +50,9 @@ export interface CreateSessionOptions {
 /** The app's session on a real device: the connection library wired to the platform layer. */
 export function createSession({ capabilities, app, log }: CreateSessionOptions): Session {
   const client = new PhoneClient({
-    socketFactory: webSocketFactory(WebSocket as never),
+    socketFactory: webSocketFactory(WebSocket as never, {
+      ping: capabilities.launch.info().conventions.socketPing,
+    }),
     store: asKeyValue(capabilities.keyValue.scope<Anything>('overseer')),
     secrets: asSecrets(capabilities.secretStore.scope<Anything>('overseer')),
     random: (n) => capabilities.random.bytes(n),
@@ -70,7 +72,8 @@ export function createSession({ capabilities, app, log }: CreateSessionOptions):
     learned: LEARNED_SCOPES.map((name) => capabilities.keyValue.scope<Anything>(name)),
     // The addresses the owner typed are the Mac's too.
     onForgotten: () => {
-      for (const address of capabilities.discovery.manual.get()) capabilities.discovery.removeManual(address);
+      for (const address of capabilities.discovery.manual.get())
+        capabilities.discovery.removeManual(address);
     },
     // Read by the scenario run, which compares it with the Mac's own log.
     onStream: (stream) => {

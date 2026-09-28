@@ -152,6 +152,13 @@ describe("the adapter", () => {
     withPing.socket.close();
   });
 
+  it("does not ping where the platform says its ping is no ping (React Native on Android)", async () => {
+    const quiet = open(webSocketFactory(WsWebSocket, { ping: false }));
+    await waitFor(() => quiet.opened === 1, "open");
+    expect(quiet.socket.ping).toBeUndefined();
+    quiet.socket.close();
+  });
+
   it("sets binaryType to arraybuffer", () => {
     const made: { binaryType: string }[] = [];
     class Fake {

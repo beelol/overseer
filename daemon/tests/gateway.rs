@@ -91,6 +91,22 @@ async fn ac116_phone_access_is_off_until_the_mac_turns_it_on() {
     assert_eq!(kinds, vec!["on", "off", "on", "on"], "every change is an event");
 }
 
+/// React Native's WebSocket on Android sends its "ping" as an empty binary message: in a session it
+/// keeps the session, where it used to close it as a frame that did not decrypt (every 20 s).
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn ac121_an_empty_frame_in_a_session_keeps_the_session() {
+    let d = daemon("echo", &[]);
+    phone::enable(&d);
+    let (mut phone, _paired) = pair(&d, "Android").await;
+    assert!(phone.call("hello", json!({"client": "phone"})).await["device"]["id"].is_string());
+    for _ in 0..3 {
+        phone.ws.send(Message::Binary(Vec::new().into())).await.unwrap();
+    }
+    assert!(phone.call("state", json!({})).await["cursor"].is_number(), "the session still answers");
+    assert_eq!(d.call("gateway.status", json!({}))["sessions"], 1);
+    assert!(!log(&d).contains("did not decrypt"), "{}", log(&d));
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn ac116_nothing_answers_before_a_session_is_authenticated() {
     let d = daemon("echo", &[]);

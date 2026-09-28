@@ -6,6 +6,6 @@ export function createLaunch(): LaunchCapability {
   return createLaunchFor({
     platform: 'android',
     simulatorHostAddress: '10.0.2.2',
-    conventions: { keyboard: 'height', screenEnter: 'fade_from_bottom' },
+    conventions: { keyboard: 'height', screenEnter: 'fade_from_bottom', socketPing: false },
   });
 }

@@ -63,6 +63,7 @@ hands on from `launch.info().conventions` without looking at it.
 | --- | --- | --- | --- |
 | Going back | A swipe from the left edge, or anywhere across the screen; the header's arrow | The system's back gesture or button; the header's arrow | The native stack of `react-native-screens`, with gestures on |
 | A screen entering | Slides in from the right | Fades up from the bottom | `conventions.screenEnter`, handed to the stack |
+| The socket's ping | A ping frame | None: React Native sends its "ping" as an empty binary message | `conventions.socketPing`, handed to the socket factory |
 | Making room for the keyboard | The screen pads its bottom | The window resizes | `conventions.keyboard`, handed to `Screen` |
 | Haptics | The system's feedback generators | The system's view haptics | `haptics.play(moment)`: one set of moments, each platform's own feel |
 | What needs the owner | The system's notifications, with Allow and Deny on them | The app's own banner while it is open (push on Android comes with the relay) | `push` where supported, else the banner of `src/notifications` |

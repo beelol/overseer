@@ -604,6 +604,10 @@ async fn session(d: Arc<Daemon>, device: Device, transport: snow::TransportState
             _ = closed.changed() => { why = "closed by the Mac"; break }
             next = tokio::time::timeout(idle(), stream.next()) => match next {
                 Err(_) => { why = "silent for a minute"; break }
+                // React Native's WebSocket on Android sends its "ping" as an empty binary message.
+                // A sealed frame is never empty (it carries at least its tag), so an empty one says
+                // only that the phone is there; closing on it cut every Android session each 20 s.
+                Ok(Some(Ok(Message::Binary(frame)))) if frame.is_empty() => {}
                 Ok(Some(Ok(Message::Binary(frame)))) => {
                     let joined = {
                         let mut t = transport.lock().unwrap();

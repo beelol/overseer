@@ -6,6 +6,6 @@ export function createLaunch(): LaunchCapability {
   return createLaunchFor({
     platform: 'ios',
     simulatorHostAddress: '127.0.0.1',
-    conventions: { keyboard: 'padding', screenEnter: 'slide_from_right' },
+    conventions: { keyboard: 'padding', screenEnter: 'slide_from_right', socketPing: true },
   });
 }
