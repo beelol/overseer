@@ -14,8 +14,10 @@ appId: ${APP}
     visible:
       id: "connection.off|connection.unreachable"
     timeout: 60000
-- tapOn:
-    id: "agents.row.${SHOWCASE}"
+- runFlow:
+    file: open-agent.yaml
+    env:
+      RUN: ${SHOWCASE}
 - extendedWaitUntil:
     visible:
       id: "agent.composer.text"

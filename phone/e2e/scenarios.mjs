@@ -341,7 +341,9 @@ export const scenarios = [
         ];
       });
       const marks = expectations.map(([key, words]) => `- scrollUntilVisible:\n    element:\n      id: "file\\\\.hunk\\\\.accept"\n      text: "${words}"\n      childOf:\n        id: ${JSON.stringify(exactly(`file.hunk.${key}`))}\n    direction: UP\n    timeout: 15000`);
-      const open = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), 'flows', 'open-file.yaml'), 'utf8');
+      const flows = path.join(path.dirname(new URL(import.meta.url).pathname), 'flows');
+      // Written beside Maestro's record, the flow names its subflows by their full path.
+      const open = fs.readFileSync(path.join(flows, 'open-file.yaml'), 'utf8').replace(/(runFlow:\s*(?:\n\s*file:\s*)?)([\w.-]+\.yaml)/g, (_, lead, file) => `${lead}${path.join(flows, file)}`);
       const file_ = path.join(path.dirname(c.out), 'maestro', c.platform, 'generated', 'diff-lines.yaml');
       fs.mkdirSync(path.dirname(file_), { recursive: true });
       fs.writeFileSync(file_, `${open.trimEnd()}\n${steps.join('\n')}\n${marks.join('\n')}\n- takeScreenshot: diff-lines\n`);
@@ -637,9 +639,11 @@ export const scenarios = [
       const one = c.lab.agent('showcase-permission', 'Count the stock', 'count');
       const two = c.lab.agent('showcase-permission', 'Price the returns', 'price');
       await c.until('two agents going', () => ACTIVE.includes(run(c, one).status) && ACTIVE.includes(run(c, two).status));
+      // Only this scenario's Stop all counts: another scenario (safety) sent one of its own.
+      const since = c.lab.call('state').cursor;
       await c.flow('stop-all');
       await c.until('every agent stopped', () => c.lab.call('state').runs.every((r) => !ACTIVE.includes(r.status)), 60_000);
-      const asked = c.lab.call('events.list', { after: 0, limit: 5000 }).events.filter((e) => e.kind === 'remote_command' && e.payload.method === 'runs.stop_all');
+      const asked = c.lab.call('events.list', { after: since, limit: 5000 }).events.filter((e) => e.kind === 'remote_command' && e.payload.method === 'runs.stop_all');
       expect(asked.length === 1 && asked[0].source === `phone:${c.name}`, 'the daemon did not record one Stop all from the phone');
     },
   },
@@ -688,10 +692,14 @@ export const scenarios = [
     async run(c) {
       const port = c.port;
       c.lab.call('gateway.disable');
-      await c.flow('off', { SHOWCASE: c.runs.showcase });
-      c.shot('phone-access-off');
-      expect(me(c).connected === false, 'the phone is still connected while phone access is off');
-      c.lab.call('gateway.enable', { port });
+      try {
+        await c.flow('off', { SHOWCASE: c.runs.showcase });
+        c.shot('phone-access-off');
+        expect(me(c).connected === false, 'the phone is still connected while phone access is off');
+      } finally {
+        // On again whatever the flow found: the scenarios after this one need it.
+        c.lab.call('gateway.enable', { port });
+      }
       await c.flow('on', { SHOWCASE: c.runs.showcase });
       await c.until('the phone connected again', () => me(c).connected);
     },
@@ -707,9 +715,12 @@ export const scenarios = [
       const message = `count the receipts ${Date.now() % 100000}`;
       const sent = () => c.lab.call('run.turns', { run_id: id }).filter((t) => t.prompt === message).length;
       c.lab.call('gateway.disable');
-      await c.flow('send-offline', { SHOWCASE: id, MESSAGE: message });
-      expect(sent() === 0, 'the message reached the agent while phone access was off');
-      c.lab.call('gateway.enable', { port: c.port });
+      try {
+        await c.flow('send-offline', { SHOWCASE: id, MESSAGE: message });
+        expect(sent() === 0, 'the message reached the agent while phone access was off');
+      } finally {
+        c.lab.call('gateway.enable', { port: c.port });
+      }
       await c.until('the message reaching the agent', () => sent() >= 1, 90_000);
       await c.sleep(4000);
       expect(sent() === 1, `the agent received the message ${sent()} times`);
@@ -721,8 +732,12 @@ export const scenarios = [
     says: 'the Mac gone without a word: the app says unreachable with the last contact, and comes back by itself',
     async run(c) {
       c.lab.down();
-      await c.flow('unreachable', { SHOWCASE: c.runs.showcase });
-      c.lab.up();
+      try {
+        await c.flow('unreachable', { SHOWCASE: c.runs.showcase });
+      } finally {
+        // The Mac comes back whatever the flow found: the scenarios after this one need it.
+        c.lab.up();
+      }
       await c.flow('reachable');
       await c.until('the phone connected again', () => me(c).connected, 60_000);
       expect(c.lab.call('gateway.status').enabled === true, 'phone access did not stay on across the restart of the daemon');

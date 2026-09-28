@@ -13,6 +13,16 @@ appId: ${APP}
       id: "connection.unreachable"
     timeout: 90000
 - assertVisible: ".*last contact.*"
-- assertVisible:
-    id: "agents.row.${SHOWCASE}"
+# What the phone knew is still there: the agent's row, found wherever the list has it.
+- scrollUntilVisible:
+    element:
+      id: "agents.row.${SHOWCASE}"
+    direction: DOWN
+    timeout: 20000
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "agents.row.${SHOWCASE}"
+    direction: UP
+    timeout: 20000
 - takeScreenshot: mac-unreachable

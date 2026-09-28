@@ -11,20 +11,10 @@ appId: ${APP}
     notVisible:
       id: "agents.new"
     timeout: 45000
-- scrollUntilVisible:
-    element:
-      id: "agents.row.${SHOWCASE}"
-    direction: DOWN
-    timeout: 20000
-    centerElement: true
-    optional: true
-- scrollUntilVisible:
-    element:
-      id: "agents.row.${SHOWCASE}"
-    direction: DOWN
-    timeout: 20000
-- tapOn:
-    id: "agents.row.${SHOWCASE}"
+- runFlow:
+    file: open-agent.yaml
+    env:
+      RUN: ${SHOWCASE}
 - extendedWaitUntil:
     visible:
       id: "agent.list"

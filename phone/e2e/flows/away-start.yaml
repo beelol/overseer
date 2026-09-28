@@ -7,20 +7,8 @@ appId: ${APP}
     visible:
       id: "agents.screen"
     timeout: 30000
-- scrollUntilVisible:
-    element:
-      id: "agents.row.${RUN}"
-    direction: DOWN
-    timeout: 20000
-    centerElement: true
-    optional: true
-- scrollUntilVisible:
-    element:
-      id: "agents.row.${RUN}"
-    direction: DOWN
-    timeout: 20000
-- tapOn:
-    id: "agents.row.${RUN}"
+- runFlow:
+    file: open-agent.yaml
 - extendedWaitUntil:
     visible:
       id: "agent.list"
