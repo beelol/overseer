@@ -64,7 +64,10 @@ fn main() {
         dev_guard();
     }
     match args.get(1).map(String::as_str) {
-        Some("version") | Some("--version") => println!("overseerd {} (protocol {})", env!("CARGO_PKG_VERSION"), server::PROTOCOL_VERSION),
+        Some("version") | Some("--version") => match server::BUILD {
+            Some(build) => println!("overseerd {} (protocol {}, build {build})", env!("CARGO_PKG_VERSION"), server::PROTOCOL_VERSION),
+            None => println!("overseerd {} (protocol {})", env!("CARGO_PKG_VERSION"), server::PROTOCOL_VERSION),
+        },
         Some("socket-path") => println!("{}", paths::socket_path().display()),
         Some("shim") => {
             let dir = args.get(2).unwrap_or_else(|| usage());

@@ -14,6 +14,8 @@ use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::mpsc;
 
 pub const PROTOCOL_VERSION: i64 = 1;
+/// The commit a packaged build was made from (`extension/scripts/package.js` sets it; AC-214).
+pub const BUILD: Option<&str> = option_env!("OVERSEER_BUILD_COMMIT");
 pub const MAX_REQUEST_BYTES: u64 = 1024 * 1024;
 
 pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
@@ -216,7 +218,7 @@ fn s<'a>(p: &'a Value, key: &str) -> Result<&'a str> {
 
 pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     Ok(match method {
-        "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path(), "instance": paths::instance()}),
+        "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path(), "instance": paths::instance(), "build": BUILD}),
         "state" => d.state_for(p["include_hidden"].as_bool().unwrap_or(false))?,
         "audio.get" => crate::audio::get(d)?,
         "audio.set" => crate::audio::set(d, p)?,
