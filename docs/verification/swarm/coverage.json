@@ -42,14 +42,16 @@
       "blocker": null
     },
     "SWARM-04": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_policy.rs",
         "daemon/tests/swarm_scheduler.rs",
         "docs/verification/swarm/milestone-4.md",
-        "docs/verification/swarm/SWARM-04.md"
+        "docs/verification/swarm/SWARM-04.md",
+        "daemon/tests/swarm_native.rs",
+        "daemon/src/swarm/route.rs"
       ],
-      "blocker": "A copied durable database replays the same Swarm job admission and blocked reason, and renaming only a provider label does not change eligibility for a fixture-supplied target. Auto Mode live target ranking and one shared ordinary/Auto/Swarm allowance transaction are not yet integrated, so whole-route replay remains unverified."
+      "blocker": null
     },
     "SWARM-05": {
       "status": "verified",
