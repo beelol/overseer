@@ -30,3 +30,15 @@ Evidence: `daemon/tests/shared_launch.rs` (`swarm_worker_admission_books_the_sha
 produces a qualified per-window upper draw, so the booking inputs are fixture-supplied behind
 `OVERSEER_SHARED_BOOKING_FIXTURE_API=1`; Auto's route producer is not yet consumed by Swarm
 (targets are still injected snapshots); Gate S's cap replay is not implemented.
+
+Qualified upper draw (`b08646f8`, 2026-09-27): without fixture inputs, Swarm admission of an
+account target now books with `BookingDraw::Qualified`: the booking cites the account's latest
+reading and current identity and computes the worker's per-window upper draw from at least five
+isolated runs of the same harness, model and effort (`daemon/src/upper_draw.rs`), recording its
+provenance on the booking intent. Fewer samples refuse `upper_draw_unknown` and report
+`draw.samples`/`draw.min_samples`. Evidence: `daemon/tests/shared_launch.rs`
+(`qualified_draw_admits_a_swarm_worker_after_five_isolated_runs`: refused at four samples,
+admitted at five with the five runs as provenance, the worker launched and bound to that booking).
+Still partial: the test's readings are fixture meters (Claude readings written directly, as
+Claude has no between-run metadata read), no live delta has been attributed, targets are still
+injected snapshots, and Gate S's cap replay is not implemented.

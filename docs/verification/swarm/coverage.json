@@ -85,9 +85,10 @@
         "docs/verification/swarm/SWARM-08.md",
         "daemon/tests/swarm_runtime.rs",
         "daemon/tests/shared_launch.rs",
-        "daemon/src/account_booking.rs"
+        "daemon/src/account_booking.rs",
+        "daemon/src/upper_draw.rs"
       ],
-      "blocker": "One app-slot count (account_booking::app_slots_in_use) is read in every admission transaction: ordinary starts and follow-ups (durable slot holds), Auto roots and children, booked starts and Swarm admission; a four-path race for the last slot admits exactly one and holds it across restart. Swarm account workers book the shared account windows with fixture upper draws only: no code produces a qualified per-window upper draw, Auto roots/children still hold unknown-draw claims, and linked profiles and live providers are unverified."
+      "blocker": "One app-slot count (account_booking::app_slots_in_use) is read in every admission transaction: ordinary starts and follow-ups (durable slot holds), Auto roots and children, booked starts and Swarm admission; a four-path race for the last slot admits exactly one and holds it across restart. Swarm account workers book the shared account windows; without fixture inputs they book on Auto's qualified upper draw (five isolated same-bucket runs, fixture meters only in tests, refused upper_draw_unknown before). Auto roots/children still hold unknown-draw claims, and linked profiles and live providers are unverified."
     },
     "SWARM-09": {
       "status": "partial",
@@ -304,9 +305,10 @@
         "daemon/tests/shared_launch.rs",
         "daemon/src/account_booking.rs",
         "docs/verification/swarm/CONTRACT-01.md",
-        "docs/verification/swarm/CONTRACT-05.md"
+        "docs/verification/swarm/CONTRACT-05.md",
+        "daemon/src/upper_draw.rs"
       ],
-      "blocker": "Swarm admission of an account target books Auto's shared booking inside its own admission transaction with its remaining category allocation per window (thousandths of a reported percentage point), and the worker launch claims effects and binds its run; swarm_reservations is no account authority for it. Still partial: the upper draw is fixture-supplied (no qualified producer exists), Swarm targets are injected snapshots rather than Auto's route producer, and Gate S's turn cap has not been replayed alongside an approved Swarm director."
+      "blocker": "Swarm admission of an account target books Auto's shared booking inside its own admission transaction with its remaining category allocation per window (thousandths of a reported percentage point), and the worker launch claims effects and binds its run; swarm_reservations is no account authority for it. Without fixture inputs the booking now uses Auto's qualified upper draw from isolated same-bucket runs and records its provenance (refused upper_draw_unknown below five samples). Still partial: the tests' readings are fixture meters and no live delta is attributed, Swarm targets are injected snapshots rather than Auto's route producer, and Gate S's turn cap has not been replayed alongside an approved Swarm director."
     },
     "SWARM-25": {
       "status": "unverified",

@@ -114,9 +114,13 @@ What now holds, and the test that shows it:
 
 Still open, so this stays unchecked:
 
-- No product code produces a qualified per-window upper draw. Every booking here
-  cites fixture inputs behind `OVERSEER_SHARED_BOOKING_FIXTURE_API=1`; without one
-  a Swarm account worker is refused `upper_draw_unknown`.
+- The qualified per-window upper draw (`b08646f8`, `daemon/src/upper_draw.rs`)
+  lets a Swarm account worker and a `draw: "qualified"` booked start book without
+  fixture inputs once five isolated runs of the same harness, model and effort
+  exist on the account (`qualified_draw_admits_a_swarm_worker_after_five_isolated_runs`,
+  `qualified_draw_prices_a_booked_start_after_five_isolated_runs`); before that
+  they are refused `upper_draw_unknown`. Its readings in those tests are fixture
+  meters, and no live window delta has been attributed.
 - Auto roots and children still hold unknown-draw account claims rather than
   per-window bookings, so the account-window race is shown for booked ordinary and
   Swarm callers, not for Auto (Auto competes for the app slot only).

@@ -38,3 +38,12 @@ restart (`daemon/tests/shared_launch.rs`,
 worker books the shared account windows (`swarm_worker_admission_books_the_shared_account_and_binds_its_run`).
 Still partial: bookings use fixture upper draws only (no qualified producer), Auto roots and
 children hold unknown-draw claims rather than per-window bookings, and live providers are untested.
+
+Qualified upper draw (`b08646f8`, 2026-09-27): a Swarm account worker without fixture inputs now
+books on the qualified upper draw that Auto learns from isolated runs of the same harness, model
+and effort on the same account (`daemon/src/upper_draw.rs`); with fewer than five attributable
+runs it is refused `upper_draw_unknown` with its sample count
+(`qualified_draw_admits_a_swarm_worker_after_five_isolated_runs`). The slot count is unchanged.
+Still partial: the samples in that test are Claude fixture runs with readings written as the
+fixture helper does (Claude has no between-run reading yet), Auto roots and children still hold
+unknown-draw claims, and live providers are untested.
