@@ -1,0 +1,30 @@
+# An agent's changed files at the comparison since its task started (the tap experiment goes on from it).
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- runFlow: open-agent.yaml
+- extendedWaitUntil:
+    visible:
+      id: "agent.changes"
+    timeout: 30000
+- tapOn:
+    id: "agent.changes"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "changes.comparison"
+    timeout: 30000
+- tapOn:
+    id: "changes.comparison"
+    retryTapIfNoChange: true
+- tapOn:
+    id: "changes.comparison.menu.task_start"
+- extendedWaitUntil:
+    visible:
+      id: "changes.row.${FILE}"
+    timeout: 30000

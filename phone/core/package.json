@@ -1,0 +1,36 @@
+{
+  "name": "@overseer/phone-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The platform-neutral core of Overseer's phone app: Noise sessions, pairing and the daemon protocol client.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
+    "test": "npm run typecheck && vitest run",
+    "bench": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/bench-handshake.mjs",
+    "check:hermes": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hermes.mjs"
+  },
+  "dependencies": {
+    "@noble/ciphers": "2.4.0",
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2",
+    "ws": "^8.22.0"
+  }
+}

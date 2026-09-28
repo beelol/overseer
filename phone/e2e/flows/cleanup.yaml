@@ -1,0 +1,16 @@
+# Clean up a worktree with uncommitted files: the phone names what will be lost and asks once.
+appId: ${APP}
+---
+- runFlow: open-agent-menu.yaml
+- tapOn:
+    id: "agent.more.cleanup"
+- extendedWaitUntil:
+    visible:
+      id: "agent.more.cleanup.confirm"
+    timeout: 15000
+- assertVisible:
+    text: ".*${LOST}.*"
+- takeScreenshot: cleanup-asks-once
+- tapOn:
+    id: "agent.more.cleanup.confirm"
+    retryTapIfNoChange: true

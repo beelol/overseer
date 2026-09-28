@@ -1,0 +1,19 @@
+22:15:52 The phone's scenarios on android. Commit a1448f69.
+22:15:52 scenario pair (AC-117, AC-118, AC-141): a code typed on the phone, confirmed on the Mac, and the agents list
+22:15:52 flow opened
+Running on Overseer_API_35
+ > Flow opened
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: pair.code is not visible... COMPLETED
+Assert that id: pair.submit is not visible... COMPLETED
+22:16:38 ok   pair
+22:16:38 scenario restart (AC-141): the phone restarted: the app opens on the agents list with no prompt and connects by itself
+22:17:09 flow opened
+Running on Overseer_API_35
+ > Flow opened
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: pair.code is not visible... COMPLETED
+Assert that id: pair.submit is not visible... COMPLETED
+22:18:14 ok   restart

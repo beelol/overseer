@@ -1,0 +1,23 @@
+# One agent's conversation, with its composer.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- runFlow:
+    file: open-agent.yaml
+    env:
+      RUN: ${SHOWCASE}
+- extendedWaitUntil:
+    visible:
+      id: "agent.list"
+    timeout: 30000
+- assertVisible:
+    id: "agent.composer.text"
+- assertVisible:
+    id: "agent.changes"
+- assertNotVisible:
+    id: "agent.error"

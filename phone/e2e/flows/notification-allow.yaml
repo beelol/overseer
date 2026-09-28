@@ -1,0 +1,17 @@
+# A notification's own Allow: the agent goes on without the app being opened.
+appId: ${APP}
+---
+- extendedWaitUntil:
+    visible: "Needs your permission"
+    timeout: 60000
+- takeScreenshot: notification-before-allow
+- longPressOn: "Needs your permission"
+# The system's menu of the notification's actions (Allow, Deny) is drawn outside every view
+# hierarchy Maestro can read, so it is found by where the system draws it: its first row,
+# under the notification at the top of the screen. The scenario then asks the daemon whether
+# the agent received the phone's Allow.
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: notification-actions
+- tapOn:
+    point: "40%,21%"

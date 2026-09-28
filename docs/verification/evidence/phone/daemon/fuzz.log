@@ -1,0 +1,18 @@
+fuzz of the gateway's handshake and frame parser (AC-130)
+seed 0x5eed20260926 for the static keys and the mutations; each handshake's own one-time keys are fresh, so counts differ a little between runs
+
+first frames: 200000 inputs (random bytes of 0 to 5000, and mutated good handshakes)
+  refused by the frame parser: 68308
+  parsed and given to the handshake: 131692
+  handshakes refused: 131491
+  handshakes accepted: 201 (each one byte for byte the untouched message)
+
+transport frames: 100000 rounds (random bytes of 0 to 70000, and mutated good frames)
+  changed frames refused: 99823
+  untouched frames opened afterwards: 100000
+
+other parsers: 50000 random texts through the range, base32, method class and name cleaning
+
+crashes: 0
+changed input accepted: 0
+time: 21.5 s

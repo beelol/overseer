@@ -1,0 +1,55 @@
+Measuring on ios (E6105FAE-0651-4D7B-801A-40FF49980468), 20 cold starts, 2026-09-28T12:38:15.687Z
+Load average (1, 5, 15 min) at the start: 5.6 5.0 5.9
+Cold starts with the door and without it (turned off by the test setting), in turn; the door opens in 1000 ms:
+  warm-up launch (not counted): first screen 203.1 ms, interactive 205.6 ms, door shown 203.1 ms, opening 1016.1 ms, dropped 0
+  launch 1 with the door: first screen 210 ms, interactive 212.7 ms, door shown 210.1 ms, opening 1026.2 ms, dropped 0
+  launch 1 without the door: first screen 205.4 ms, interactive 205.9 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 2 with the door: first screen 208.3 ms, interactive 210.9 ms, door shown 208.3 ms, opening 1030 ms, dropped 0
+  launch 2 without the door: first screen 205.5 ms, interactive 206.4 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 3 with the door: first screen 212.5 ms, interactive 215.2 ms, door shown 212.6 ms, opening 1027.7 ms, dropped 0
+  launch 3 without the door: first screen 205.4 ms, interactive 206 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 4 with the door: first screen 216.4 ms, interactive 218 ms, door shown 216.3 ms, opening 1008.2 ms, dropped 0
+  launch 4 without the door: first screen 229.7 ms, interactive 230.9 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 5 with the door: first screen 222 ms, interactive 223.6 ms, door shown 221.9 ms, opening 1009.9 ms, dropped 0
+  launch 5 without the door: first screen 208.4 ms, interactive 209.5 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 6 with the door: first screen 208.6 ms, interactive 211.3 ms, door shown 208.7 ms, opening 1027.7 ms, dropped 0
+  launch 6 without the door: first screen 206.7 ms, interactive 207.7 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 7 with the door: first screen 217.5 ms, interactive 219 ms, door shown 217.4 ms, opening 1006.9 ms, dropped 0
+  launch 7 without the door: first screen 204 ms, interactive 204.6 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 8 with the door: first screen 218.6 ms, interactive 220.1 ms, door shown 218.5 ms, opening 1008.6 ms, dropped 0
+  launch 8 without the door: first screen 206.3 ms, interactive 207.3 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 9 with the door: first screen 217.9 ms, interactive 219.4 ms, door shown 217.8 ms, opening 1012.4 ms, dropped 0
+  launch 9 without the door: first screen 207.7 ms, interactive 208.7 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 10 with the door: first screen 221 ms, interactive 222.7 ms, door shown 220.9 ms, opening 1003.5 ms, dropped 0
+  launch 10 without the door: first screen 206.8 ms, interactive 207.8 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 11 with the door: first screen 215.9 ms, interactive 217.5 ms, door shown 215.8 ms, opening 1003 ms, dropped 0
+  launch 11 without the door: first screen 203.8 ms, interactive 204.4 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 12 with the door: first screen 215.8 ms, interactive 217.4 ms, door shown 215.7 ms, opening 1005.6 ms, dropped 0
+  launch 12 without the door: first screen 202.6 ms, interactive 203.1 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 13 with the door: first screen 214.6 ms, interactive 216.1 ms, door shown 214.4 ms, opening 1008.9 ms, dropped 0
+  launch 13 without the door: first screen 204.5 ms, interactive 205.1 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 14 with the door: first screen 217 ms, interactive 218.5 ms, door shown 216.8 ms, opening 1009.1 ms, dropped 0
+  launch 14 without the door: first screen 206.3 ms, interactive 207.2 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 15 with the door: first screen 214.8 ms, interactive 216.3 ms, door shown 214.7 ms, opening 1002.3 ms, dropped 0
+  launch 15 without the door: first screen 202.5 ms, interactive 203 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 16 with the door: first screen 206.8 ms, interactive 209.4 ms, door shown 206.9 ms, opening 1024.6 ms, dropped 0
+  launch 16 without the door: first screen 202.6 ms, interactive 203.1 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 17 with the door: first screen 224.6 ms, interactive 226.1 ms, door shown 224.4 ms, opening 1002 ms, dropped 0
+  launch 17 without the door: first screen 203.2 ms, interactive 204.2 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 18 with the door: first screen 208.2 ms, interactive 210.7 ms, door shown 208.2 ms, opening 1027.8 ms, dropped 0
+  launch 18 without the door: first screen 204.3 ms, interactive 205.3 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 19 with the door: first screen 207.1 ms, interactive 209.8 ms, door shown 207.2 ms, opening 1027 ms, dropped 0
+  launch 19 without the door: first screen 202.6 ms, interactive 203.6 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 20 with the door: first screen 206.5 ms, interactive 208.9 ms, door shown 206.6 ms, opening 1021.7 ms, dropped 0
+  launch 20 without the door: first screen 202.5 ms, interactive 203.1 ms, door shown NaN ms, opening NaN ms, dropped n/a
+Load average (1, 5, 15 min) at the end: 2.0 3.7 5.2
+
+ok   every launch reaches the agents list: 20 (limit 20)
+ok   launches that showed pairing or any other question, of 40: 0 (limit 0)
+ok   agents list interactive, p95 (ms): 223.6 (limit 1000)
+ok   agents list interactive against the baseline, p95 (ms): 223.6 (limit 251.7) — baseline 228.8 ms + 10%
+ok   the door is on screen with the first screen or before it, worst launch (ms after the first screen): 0.1 (limit 17) — 20 of 20 launches marked both
+ok   the door opens in 1000 ms within 60 ms, shortest (ms): 1002 (limit 940)
+ok   the door opens in 1000 ms within 60 ms, longest (ms): 1030 (limit 1060)
+ok   frames dropped while the door opens, worst launch (%): 0 (limit 1) — 0 of 57 frames
+ok   the door makes the first screen no later, median (ms): 216.3 (limit 245.8) — without the door 205.3 ms

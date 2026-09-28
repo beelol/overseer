@@ -1,0 +1,19 @@
+# Phone access was turned off on the Mac: the app says so and keeps what it has.
+appId: ${APP}
+---
+- extendedWaitUntil:
+    visible:
+      id: "connection.off"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "agents.row.${SHOWCASE}"
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "agents.row.${SHOWCASE}"
+    direction: DOWN
+    timeout: 20000

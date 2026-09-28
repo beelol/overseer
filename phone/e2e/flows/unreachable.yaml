@@ -1,0 +1,28 @@
+# The Mac is gone without a word: the app says so, with the time of the last contact, and
+# keeps what it has.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "connection.unreachable"
+    timeout: 90000
+- assertVisible: ".*last contact.*"
+# What the phone knew is still there: the agent's row, found wherever the list has it.
+- scrollUntilVisible:
+    element:
+      id: "agents.row.${SHOWCASE}"
+    direction: DOWN
+    timeout: 20000
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "agents.row.${SHOWCASE}"
+    direction: UP
+    timeout: 20000
+- takeScreenshot: mac-unreachable

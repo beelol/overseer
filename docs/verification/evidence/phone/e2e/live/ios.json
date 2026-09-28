@@ -1,0 +1,96 @@
+{
+  "platform": "ios",
+  "at": "2026-09-28T01:33:50.421Z",
+  "task": "Reply with the single word ok and nothing else.",
+  "turns": [
+    {
+      "harness": "codex",
+      "model": "gpt-5.6-luna",
+      "effort": "low",
+      "signedIn": true,
+      "run": "r-63f7e2f49d01",
+      "status": "completed",
+      "model_used": "gpt-5.6-luna",
+      "answer": "ok",
+      "from_phone": "phone:Lab ios",
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 28160,
+        "input_tokens": 36011,
+        "output_tokens": 205,
+        "reasoning_output_tokens": 79
+      },
+      "errors": [],
+      "outcome": "answered"
+    }
+  ],
+  "earlier": {
+    "platform": "ios",
+    "at": "2026-09-28T01:31:05.658Z",
+    "task": "Reply with the single word ok and nothing else.",
+    "turns": [
+      {
+        "harness": "claude",
+        "model": "haiku",
+        "effort": "default",
+        "signedIn": true,
+        "run": "r-043409b6a3ed",
+        "status": "completed",
+        "model_used": "haiku",
+        "answer": "ok",
+        "from_phone": "phone:Lab ios",
+        "usage": {
+          "num_turns": 1,
+          "total_cost_usd": 0.0193353,
+          "usage": {
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 8381,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "cache_creation_input_tokens": 8381,
+            "cache_read_input_tokens": 13763,
+            "inference_geo": "not_available",
+            "input_tokens": 10,
+            "iterations": [
+              {
+                "cache_creation": {
+                  "ephemeral_1h_input_tokens": 8381,
+                  "ephemeral_5m_input_tokens": 0
+                },
+                "cache_creation_input_tokens": 8381,
+                "cache_read_input_tokens": 13763,
+                "input_tokens": 10,
+                "output_tokens": 48,
+                "type": "message"
+              }
+            ],
+            "output_tokens": 48,
+            "output_tokens_details": {
+              "thinking_tokens": 41
+            },
+            "server_tool_use": {
+              "web_fetch_requests": 0,
+              "web_search_requests": 0
+            },
+            "service_tier": "standard",
+            "speed": "standard"
+          }
+        },
+        "outcome": "answered"
+      },
+      {
+        "harness": "codex",
+        "model": "gpt-5.6-luna",
+        "effort": "low",
+        "signedIn": true,
+        "run": "r-73763017adb8",
+        "status": "failed",
+        "model_used": "haikugpt-5.6-luna",
+        "answer": "",
+        "from_phone": "phone:Lab ios",
+        "usage": null,
+        "outcome": "not answered as asked"
+      }
+    ]
+  }
+}

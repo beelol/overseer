@@ -15,6 +15,7 @@ const { PullRequests } = require('./pull-request');
 const { TaskLauncher } = require('./task-launcher');
 const { Steering } = require('./run-actions');
 const { Dashboard } = require('./dashboard-mode');
+const { PhoneAccess } = require('./phone-access');
 const { Immersive } = require('./immersive');
 const { OverseerChat } = require('./overseer-chat');
 const { Continuity } = require('./continuity');
@@ -837,6 +838,9 @@ async function activate(context) {
     vscode.workspace.onDidGrantWorkspaceTrust(() => model.emitter.fire()),
   );
 
+  // Phone access (Gate N): its own status bar item, the Devices view and pairing.
+  const phoneAccess = new PhoneAccess(context, client, { say, guard, requireTrust, looking: { model, center, outputs, selected: () => selectedRun } });
+
   updateStatus();
   try {
     await client.start();
@@ -861,7 +865,7 @@ async function activate(context) {
     say('daemon start failed: ' + error.message);
     vscode.window.showErrorMessage(`Overseer could not start its daemon: ${error.message}`);
   }
-  return { client, model, review, outputs, selectRun, agents, agentsView, center, dashboard, arrangement, attention, voice, selectedRun: () => selectedRun }; // exported for UI tests
+  return { client, model, review, outputs, selectRun, agents, agentsView, center, dashboard, arrangement, attention, phoneAccess, voice, selectedRun: () => selectedRun }; // exported for UI tests
 }
 
 function deactivate() { if (centerRef) centerRef.shuttingDown = true; client?.dispose(); }

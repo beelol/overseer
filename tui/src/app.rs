@@ -11,6 +11,9 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+mod phone;
+pub use phone::{ago, code_groups, fingerprint, platform_name, Device, PairRequest, Pairing, PairingState, Phone};
+
 pub const PAGE: usize = 9;
 /// Pages of history fetched per run (5,000 events each), newest kept by the feed cap.
 const HISTORY_PAGES: usize = 10;
@@ -68,6 +71,10 @@ pub enum Mode {
     Search,
     /// Accounts and their sign-in status (`A`).
     Accounts,
+    /// Paired phones (`D`): revoke, scope, pair a phone.
+    Devices,
+    /// The pairing code as text and as a QR code, and the time it still works.
+    Pairing,
     /// Daemon-owned Audio Mode settings and cue previews.
     Audio,
     /// Private Commander folder path entry.
@@ -111,6 +118,14 @@ pub enum Confirm {
     StopAll { text: String },
     /// Commit, push the agent's branch and open a GitHub pull request with `gh`.
     OpenPr { run: String, text: String },
+    /// Turn phone access off while phones are connected.
+    PhoneOff { text: String },
+    /// Pairing was asked for with phone access off: turn it on first.
+    PhoneOnAndPair,
+    /// Revoke a paired phone.
+    Revoke { id: String, name: String, text: String },
+    /// A phone asks to pair: the owner's decision.
+    Pair { request: String, text: String },
 }
 
 /// What a pending request was for.
@@ -143,6 +158,14 @@ enum Pending {
     PrPrepare { run: String, plan: Value },
     PrPublish { run: String },
     PrOpened,
+    PhoneStatus,
+    PhoneSwitch { on: bool, then_pair: bool },
+    PairStart,
+    PairCancel,
+    PairConfirm { accept: bool, name: String },
+    DeviceRevoke(String),
+    DeviceScope { name: String, scope: String },
+    PhoneNotifications(bool),
     AudioGet,
     AudioSet,
     AudioPreview,
@@ -345,6 +368,20 @@ pub struct App {
     next_job: u64,
     /// The last Open PR plan (kept between the confirmation and the prepare step).
     pr_plan: Option<Value>,
+    /// Phone access as the daemon reports it (`O`, `D`).
+    pub phone: Phone,
+    /// The pairing this terminal started, while its panel is open.
+    pub pairing: Option<Pairing>,
+    /// Where a phone question returns to (the Devices or pairing panel).
+    pub confirm_back: Option<Mode>,
+    phone_due: Option<Instant>,
+    /// Pairing requests already put to the owner here.
+    pair_asked: HashSet<String>,
+    /// `gateway.pair_start` calls whose `pairing_opened` event is still to come.
+    pair_starting: u32,
+    pairing_since: Option<Instant>,
+    /// The seconds left last drawn (the clock redraws once a second).
+    pairing_shown: u64,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -404,6 +441,14 @@ impl App {
             jobs: None,
             next_job: 1 << 60,
             pr_plan: None,
+            phone: Phone::default(),
+            pairing: None,
+            confirm_back: None,
+            phone_due: None,
+            pair_asked: HashSet::new(),
+            pair_starting: 0,
+            pairing_since: None,
+            pairing_shown: 0,
         }
     }
 
@@ -617,6 +662,7 @@ impl App {
                 self.connect_generation += 1;
                 self.state_inflight = false;
                 self.request_state();
+                self.phone_request();
                 // What the last connection said about audio may no longer hold.
                 self.audio.known = false;
                 self.audio_inflight = false;
@@ -632,6 +678,7 @@ impl App {
                 self.connected = false;
                 // Replies to requests on the old connection never come.
                 self.pending.clear();
+                self.pair_starting = 0;
                 self.state_inflight = false;
                 self.audio.known = false;
                 self.audio_inflight = false;
@@ -690,6 +737,7 @@ impl App {
                 changed = true;
             }
         }
+        changed |= self.phone_tick(now);
         changed
     }
 
@@ -717,6 +765,9 @@ impl App {
         }
         let run_id = ev["run_id"].as_str().unwrap_or_default().to_string();
         let kind = ev["kind"].as_str().unwrap_or_default().to_string();
+        if phone::is_phone_event(&kind) {
+            self.on_phone_event(&kind, &ev);
+        }
         if kind == "daemon_stopping" {
             // Stopped from here or from VS Code: do not start it again behind the user's back.
             self.stopped = true;
@@ -1097,6 +1148,7 @@ impl App {
                 self.form.busy = false;
                 self.form.error = Some(e);
             }
+            (why @ (Pending::PhoneStatus | Pending::PhoneSwitch { .. } | Pending::PairStart | Pending::PairCancel | Pending::PairConfirm { .. } | Pending::DeviceRevoke(_) | Pending::DeviceScope { .. } | Pending::PhoneNotifications(_)), result) => self.on_phone_reply(why, result),
             (_, Err(e)) => self.say(e, true),
         }
     }
@@ -1509,12 +1561,15 @@ impl App {
         }
         match self.mode.clone() {
             Mode::Help => self.mode = Mode::Grid,
+            Mode::Confirm(c @ (Confirm::PhoneOff { .. } | Confirm::PhoneOnAndPair | Confirm::Revoke { .. } | Confirm::Pair { .. })) => {
+                self.phone_confirm(&c, k);
+            }
             Mode::Confirm(c) => match k.code {
                 KeyCode::Char('y') | KeyCode::Char('Y') => {
                     self.mode = Mode::Grid;
                     match c {
                         Confirm::Interrupt(run) => self.request("run.interrupt", json!({ "run_id": run }), Pending::Interrupt),
-                        Confirm::Quit => self.quit = true,
+                        Confirm::Quit => self.leave(),
                         Confirm::MergePrepare { run, .. } => {
                             if let Some(ws) = self.state.run(&run).map(|r| r.workspace_id.clone()) {
                                 self.say("Preparing merge back…", false);
@@ -1542,6 +1597,8 @@ impl App {
                                 self.request("workspace.merge_complete", json!({ "workspace_id": ws }), Pending::MergeComplete);
                             }
                         }
+                        // The phone questions are answered in `phone_confirm`.
+                        Confirm::PhoneOff { .. } | Confirm::PhoneOnAndPair | Confirm::Revoke { .. } | Confirm::Pair { .. } => {}
                     }
                 }
                 _ => self.mode = Mode::Grid,
@@ -1551,6 +1608,8 @@ impl App {
             Mode::Changes => self.changes_key(k),
             Mode::Search => self.search_key(k),
             Mode::Accounts => self.accounts_key(k),
+            Mode::Devices => self.devices_key(k),
+            Mode::Pairing => self.pairing_key(k),
             Mode::Audio => self.audio_key(k),
             Mode::Overseer => self.overseer_key(k),
             Mode::AudioImport => self.audio_import_key(k),
@@ -1562,8 +1621,14 @@ impl App {
         if self.drafts.values().any(|d| !d.trim().is_empty()) && self.mode != Mode::Confirm(Confirm::Quit) {
             self.mode = Mode::Confirm(Confirm::Quit);
         } else {
-            self.quit = true;
+            self.leave();
         }
+    }
+
+    /// Quits. A pairing code this terminal is showing is taken back first.
+    fn leave(&mut self) {
+        self.take_back_pairing();
+        self.quit = true;
     }
 
     fn nav_key(&mut self, k: KeyEvent) {
@@ -1597,6 +1662,8 @@ impl App {
             KeyCode::Char('n') => self.open_new_agent(),
             KeyCode::Char('v') => self.open_changes(),
             KeyCode::Char('A') => self.open_accounts(),
+            KeyCode::Char('O') => self.toggle_phone_access(),
+            KeyCode::Char('D') => self.open_devices(),
             KeyCode::Char('S') => self.open_audio(),
             KeyCode::Char('o') => self.open_overseer(),
             KeyCode::Char('P') => {

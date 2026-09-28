@@ -1,0 +1,12 @@
+ios cold-start-dark: ios-cold-start-dark.mp4
+  marks: {"door.shown":243.15758323669434,"screen.agents.shown":243.32766616344452,"screen.agents.interactive":245.12516617774963,"door.opening":248.26054120063782,"door.opened":1271.757833123207}
+  door: {"opening":{"count":1,"p50":1022.3,"p95":1022.3,"max":1022.3377079963684},"frames":{"count":1,"p50":61,"p95":61,"max":61},"dropped":{"count":1,"p50":0,"p95":0,"max":0},"longestFrame":{"count":1,"p50":16.7,"p95":16.7,"max":16.7}}
+ios cold-start-light: ios-cold-start-light.mp4
+  marks: {"door.shown":261.5265828371048,"screen.agents.shown":261.7025828361511,"screen.agents.interactive":263.530415892601,"door.opening":266.8427908420563,"door.opened":1279.3114159107208}
+  door: {"opening":{"count":1,"p50":1011.3,"p95":1011.3,"max":1011.3159580230713},"frames":{"count":1,"p50":59,"p95":59,"max":59},"dropped":{"count":1,"p50":0,"p95":0,"max":0},"longestFrame":{"count":1,"p50":16.7,"p95":16.7,"max":16.7}}
+ios return-from-background: ios-return-from-background.mp4 (no new launch: the app was not started again)
+  marks: {}
+  door: {}
+ios cold-start-reduce-motion: ios-cold-start-reduce-motion.mp4
+  marks: {"door.shown":216.7419158220291,"screen.agents.shown":216.89941585063934,"screen.agents.interactive":218.52537488937378,"door.opening":221.64916586875916,"door.opened":431.2534158229828}
+  door: {"opening":{"count":1,"p50":209.1,"p95":209.1,"max":209.14079201221466},"frames":{"count":1,"p50":12,"p95":12,"max":12},"dropped":{"count":1,"p50":0,"p95":0,"max":0},"longestFrame":{"count":1,"p50":16.7,"p95":16.7,"max":16.7}}

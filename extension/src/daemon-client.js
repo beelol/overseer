@@ -52,6 +52,7 @@ class DaemonClient extends EventEmitter {
     this.disposed = false;
     this.buffer = '';
     this.seen = new Set();
+    this.live = false;
   }
 
   /** Production never starts or asks a daemon binary marked dev. */
@@ -97,6 +98,8 @@ class DaemonClient extends EventEmitter {
       socket.setEncoding('utf8');
       socket.on('connect', () => {
         opened = true; this.socket = socket; this.buffer = '';
+        // Until the replay of missed events ends, events are history, not news.
+        this.live = false;
         // Identify as a VS Code window: the daemon notifies when the last one closes while agents run.
         // Its answer says which daemon this is: production refuses a dev instance (AC-212).
         this.request('hello', { client: 'vscode' }).then(hello => {
@@ -172,12 +175,13 @@ class DaemonClient extends EventEmitter {
         this.log('event stream lagged; resubscribing from cursor ' + this.cursor);
         this.request('events.subscribe', { after: this.cursor }).catch(() => {});
       } else if (msg.method === 'replayed') {
+        this.live = true;
         this.emit('replayed', msg.params);
       } else if (msg.method === 'voice') {
         this.emit('voice', msg.params);
       } else if (msg.id !== undefined && this.pending.has(msg.id)) {
         const { resolve, reject } = this.pending.get(msg.id); this.pending.delete(msg.id);
-        if (msg.error) reject(new Error(msg.error.message || msg.error.code)); else resolve(msg.result);
+        if (msg.error) reject(Object.assign(new Error(msg.error.message || msg.error.code), { code: msg.error.code, data: msg.error.data })); else resolve(msg.result);
       }
     }
   }

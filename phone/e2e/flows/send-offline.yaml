@@ -1,0 +1,33 @@
+# A message typed while the Mac cannot be reached: it is kept on the phone, shown as queued,
+# and sent once when the Mac is back.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+# Opened while phone access is off, the app cannot tell off from unreachable: the Mac told it
+# nothing. Either way it is not connected, and what is sent waits.
+- extendedWaitUntil:
+    visible:
+      id: "connection.off|connection.unreachable"
+    timeout: 60000
+- runFlow:
+    file: open-agent.yaml
+    env:
+      RUN: ${SHOWCASE}
+- extendedWaitUntil:
+    visible:
+      id: "agent.composer.text"
+    timeout: 30000
+- tapOn:
+    id: "agent.composer.text"
+- inputText: ${MESSAGE}
+- tapOn:
+    id: "agent.composer.send"
+- extendedWaitUntil:
+    visible: ".*${MESSAGE}.*"
+    timeout: 5000
+- takeScreenshot: queued-while-away

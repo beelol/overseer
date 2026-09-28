@@ -1,0 +1,44 @@
+$ node e2e/run.mjs --platform android --skip-build --skip-measure --only tap-timing --out <scratch>   (2026-09-28 03:29:08, app from a673dee, experiment from b8587cc7, load { 2.29 2.78 3.62 })
+10:29:08 $ cargo build -p overseerd
+10:29:08 The phone's scenarios on android. Commit a673dee.
+10:29:12 scenario pair (AC-117, AC-118, AC-141): a code typed on the phone, confirmed on the Mac, and the agents list
+10:29:12 flow pair
+10:29:54 ok   pair
+10:29:54 scenario tap-timing (AC-126): experiment: a tap on a hunk's Accept, sent by adb the moment the file screen shows it, 1.2 s later and 3 s later: is any lost?
+10:29:54 flow open-file
+10:30:31   Accept is at 724, 442
+10:30:31 flow open-file
+10:31:03   a tap 0 ms after the hunks showed, try 1: LOST
+10:31:03 flow open-file
+10:31:29   a tap 0 ms after the hunks showed, try 2: marked
+10:31:29 flow open-file
+10:32:00   a tap 0 ms after the hunks showed, try 3: LOST
+10:32:00 flow open-file
+10:32:33   a tap 0 ms after the hunks showed, try 4: LOST
+10:32:33 flow open-file
+10:33:04   a tap 0 ms after the hunks showed, try 5: LOST
+10:33:04 flow open-file
+10:33:35   a tap 0 ms after the hunks showed, try 6: LOST
+10:33:35 flow open-file
+10:34:02   a tap 0 ms after the hunks showed, try 7: marked
+10:34:02 flow open-file
+10:34:28   a tap 0 ms after the hunks showed, try 8: marked
+10:34:28 flow open-file
+10:34:59   a tap 0 ms after the hunks showed, try 9: LOST
+10:34:59 flow open-file
+10:35:26   a tap 0 ms after the hunks showed, try 10: marked
+10:35:26 flow open-file
+10:35:55   a tap 0 ms after the hunks showed, try 11: marked
+10:35:55 flow open-file
+10:36:21   a tap 0 ms after the hunks showed, try 12: marked
+10:36:21 flow open-file
+10:36:54   a tap 1200 ms after the hunks showed, try 1: LOST
+10:36:54 flow open-file
+10:37:26   a tap 1200 ms after the hunks showed, try 2: LOST
+10:37:26 flow open-file
+10:37:58   a tap 1200 ms after the hunks showed, try 3: LOST
+10:37:59 flow open-file
+10:38:30   a tap 1200 ms after the hunks showed, try 4: LOST
+10:38:30 flow open-file
+10:39:02   a tap 1200 ms after the hunks showed, try 5: LOST
+10:39:02 flow open-file

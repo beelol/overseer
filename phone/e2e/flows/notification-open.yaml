@@ -1,0 +1,12 @@
+# A notification, tapped: the app opens on that agent.
+appId: ${APP}
+---
+- extendedWaitUntil:
+    visible: "Needs your permission"
+    timeout: 60000
+- takeScreenshot: notification
+- tapOn: "Needs your permission"
+- extendedWaitUntil:
+    visible:
+      id: "agent.permission.allow"
+    timeout: 30000

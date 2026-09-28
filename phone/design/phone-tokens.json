@@ -1,0 +1,88 @@
+{
+  "_comment": "What the phone adds to the VS Code design tokens: values a webview has no use for. Sizes in points, durations in milliseconds. scripts/gen-tokens.mjs writes them into src/theme/tokens.generated.ts as `phone`.",
+  "size": {
+    "touch": 44,
+    "header": 52,
+    "icon": {
+      "sm": 14,
+      "md": 16,
+      "lg": 20,
+      "xl": 24
+    },
+    "logo": {
+      "row": 28,
+      "header": 20,
+      "door": 160
+    },
+    "hairline": 1,
+    "composerMaxLines": 5,
+    "doorSeam": 2,
+    "doorLight": 120
+  },
+  "font": {
+    "title": 28,
+    "mono": 12,
+    "code": 22
+  },
+  "motion": {
+    "door": {
+      "open": 1000,
+      "fade": 200,
+      "lightLoop": 2400,
+      "angle": 24
+    },
+    "screen": {
+      "push": 320,
+      "fade": 160
+    },
+    "message": {
+      "arrive": 220
+    },
+    "status": {
+      "change": 200
+    },
+    "pulse": {
+      "loop": 1600,
+      "low": 0.35
+    },
+    "sheet": {
+      "open": 280
+    },
+    "press": {
+      "in": 80,
+      "out": 160,
+      "scale": 0.97
+    },
+    "connection": {
+      "show": 200
+    },
+    "spring": {
+      "gentle": {
+        "damping": 22,
+        "stiffness": 220,
+        "mass": 1
+      },
+      "snappy": {
+        "damping": 26,
+        "stiffness": 360,
+        "mass": 1
+      }
+    },
+    "distance": {
+      "arrive": 12,
+      "screen": 24
+    },
+    "test": {
+      "lead": 200,
+      "busy": 500,
+      "whole": 900
+    }
+  },
+  "opacity": {
+    "pressed": 0.7,
+    "disabled": 0.45,
+    "scrim": 0.4,
+    "diffTint": 0.5,
+    "doorStreak": 0.2
+  }
+}

@@ -1,0 +1,27 @@
+# A phone that may only watch sees everything and no control that changes something.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible:
+      id: "agents.new"
+    timeout: 45000
+- runFlow:
+    file: open-agent.yaml
+    env:
+      RUN: ${SHOWCASE}
+- extendedWaitUntil:
+    visible:
+      id: "agent.list"
+    timeout: 30000
+- assertVisible:
+    id: "watch.line"
+- assertNotVisible:
+    id: "agent.composer.text"
+- assertNotVisible:
+    id: "agent.composer.send"

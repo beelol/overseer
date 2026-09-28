@@ -1,0 +1,56 @@
+import { defineCapability, type Support } from '../capability';
+import type { LaunchCapability, LaunchInfo } from '../capabilities/launch';
+import { createFakeSupport, type FakeSupport } from './support';
+
+/** The fake's device unless a test says otherwise: an iOS simulator, as in development. */
+export const FAKE_IOS_SIMULATOR: LaunchInfo = Object.freeze({
+  device: Object.freeze({ platform: 'ios', systemVersion: '26.5', model: 'iPhone 17 Pro' }),
+  conventions: Object.freeze({
+    keyboard: 'padding',
+    screenEnter: 'slide_from_right',
+    socketPing: true,
+  }),
+  isSimulator: true,
+  hostAddresses: Object.freeze(['127.0.0.1']),
+  runtime: Object.freeze({ engine: 'hermes', newArchitecture: true }),
+});
+
+export const FAKE_ANDROID_EMULATOR: LaunchInfo = Object.freeze({
+  device: Object.freeze({ platform: 'android', systemVersion: '15', model: 'sdk_gphone64_arm64' }),
+  conventions: Object.freeze({
+    keyboard: 'height',
+    screenEnter: 'fade_from_bottom',
+    socketPing: false,
+  }),
+  isSimulator: true,
+  hostAddresses: Object.freeze(['10.0.2.2']),
+  runtime: Object.freeze({ engine: 'hermes', newArchitecture: true }),
+});
+
+export const FAKE_IPHONE: LaunchInfo = Object.freeze({
+  device: Object.freeze({ platform: 'ios', systemVersion: '26.5', model: 'iPhone 17 Pro' }),
+  conventions: Object.freeze({
+    keyboard: 'padding',
+    screenEnter: 'slide_from_right',
+    socketPing: true,
+  }),
+  isSimulator: false,
+  hostAddresses: Object.freeze([]),
+  runtime: Object.freeze({ engine: 'hermes', newArchitecture: true }),
+});
+
+export interface FakeLaunch {
+  readonly capability: LaunchCapability;
+  readonly support: FakeSupport;
+}
+
+export function createFakeLaunch(
+  info: LaunchInfo = FAKE_IOS_SIMULATOR,
+  initial?: Support,
+): FakeLaunch {
+  const support = createFakeSupport('launch', initial);
+  return {
+    capability: defineCapability<LaunchCapability>('launch', support.check, { info: () => info }),
+    support,
+  };
+}

@@ -1,0 +1,12 @@
+# Back in the app after time away: the conversation is there and goes on by itself.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: false
+- takeScreenshot: stream-on-return
+- extendedWaitUntil:
+    visible:
+      id: "agent.list|agents.screen"
+    timeout: 60000
+- assertNotVisible:
+    id: "pair.code"

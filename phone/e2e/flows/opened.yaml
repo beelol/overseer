@@ -1,0 +1,13 @@
+# The app, opened again: it is on the agents list and asks for nothing.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- assertNotVisible:
+    id: "pair.code"
+- assertNotVisible:
+    id: "pair.submit"
