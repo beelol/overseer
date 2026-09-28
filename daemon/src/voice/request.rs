@@ -35,6 +35,8 @@ pub struct Open {
     pub at: Instant,
     pub proposal: Option<String>,
     pub settle_until: Option<Instant>,
+    /// The daemon's candidates for it, with their reasons (AC-166).
+    pub candidates: Vec<(String, &'static str)>,
 }
 
 /// A permission read back and waiting for the owner's yes or no.
@@ -66,6 +68,8 @@ struct Requests {
     /// When "that's the hour's limit" and "Overseer isn't answering" were last said: once each.
     limit_said: Option<Instant>,
     unreachable_said: Option<Instant>,
+    /// The agents the last spoken request reached ("tell them also").
+    last_targets: Vec<String>,
 }
 
 static REQ: OnceLock<Mutex<Requests>> = OnceLock::new();
@@ -292,6 +296,31 @@ fn heard_signal(v: &Voice) {
     v.emit(json!({"kind": "heard_signal"}));
 }
 
+/// The agents as the candidates see them: active top-level agents, what they changed, and whether
+/// they are waiting on the owner.
+fn agents_for(d: &Arc<Daemon>) -> Vec<super::candidates::Agent> {
+    d.roster()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|l| l.role != "overseer" && l.role != "watcher")
+        .map(|l| {
+            let files = d
+                .digest(&l.id)
+                .map(|g| g.changed.into_iter().map(|c| c.path).collect())
+                .unwrap_or_default();
+            super::candidates::Agent {
+                active: crate::daemon::ACTIVE.contains(&l.status.as_str()),
+                just_asked: l.status == "waiting_for_user" || l.waiting.is_some(),
+                id: l.id,
+                title: l.title,
+                repository: l.repository,
+                branch: l.branch,
+                files,
+            }
+        })
+        .collect()
+}
+
 /// `target` for `voice.set`: "overseer" or an active top-level agent.
 pub fn check_target(d: &Arc<Daemon>, t: &str) -> Result<String> {
     if t == "overseer" {
@@ -343,7 +372,7 @@ impl Voice {
             let correction = ["i meant", "i mean", "not ", "no ", "actually", "instead"]
                 .iter()
                 .any(|c| p.starts_with(c));
-            if correction || floor::addressed(&text, &self.agent_names(), false) {
+            if correction || !is_backchannel(&text) {
                 self.cancel_request(&o, if correction { "corrected" } else { "joined" });
                 let words = if correction {
                     format!("{} (correction: {text})", o.words)
@@ -448,12 +477,28 @@ impl Voice {
         heard_signal(self);
         // The quick answer: at once, with no model (AC-165).
         self.say_line("On it.");
+        // Who it may be for, with the reasons, from the daemon's own records (AC-166).
+        let focus_now = self.st.lock().unwrap().focus.clone();
+        let previous = req().lock().unwrap().last_targets.clone();
+        let agents = agents_for(&d);
+        let found: Vec<(String, &'static str)> = super::candidates::candidates(
+            words,
+            &super::candidates::Context {
+                agents: &agents,
+                focus: focus_now.as_deref(),
+                previous: &previous,
+            },
+        )
+        .into_iter()
+        .map(|c| (c.id, c.reason))
+        .collect();
         req().lock().unwrap().open.push(Open {
             id: id.clone(),
             words: words.to_string(),
             at: Instant::now(),
             proposal: None,
             settle_until: None,
+            candidates: found.clone(),
         });
         self.st.lock().unwrap().thinking += 1;
         self.refresh();
@@ -500,6 +545,24 @@ impl Voice {
                 context.join("” “")
             ));
         }
+        if found.is_empty() {
+            message.push_str("(Candidates from the daemon: none named. Unless the request is about everyone or answers itself, ask the owner one short question: who?)\n");
+        } else {
+            let list: Vec<String> = found
+                .iter()
+                .map(|(run, why)| {
+                    format!(
+                        "{} ({run}): {why}",
+                        agents
+                            .iter()
+                            .find(|a| &a.id == run)
+                            .map(|a| a.title.as_str())
+                            .unwrap_or(run)
+                    )
+                })
+                .collect();
+            message.push_str(&format!("(Candidates from the daemon: {}. Choose among them; anyone else waits longer and is named aloud.)\n", list.join("; ")));
+        }
         message.push_str(&format!("{VOICE_NOTE}\nRequest {id}: {words}"));
         update(&d, &id, "state", "thinking");
         announce(self, &id);
@@ -537,10 +600,25 @@ impl Voice {
     }
 
     fn cancel_request(self: &Arc<Self>, o: &Open, how: &str) -> Value {
+        // Out of the open list first, so the proposal's own "cancelled" event, which may arrive
+        // on another thread, cannot close a correction or a join under the wrong name.
+        let taken = {
+            let mut r = req().lock().unwrap();
+            let before = r.open.len();
+            r.open.retain(|x| x.id != o.id);
+            before != r.open.len()
+        };
         if let Some(p) = &o.proposal {
             if let Err(e) = self.d.overseer_cancel(p, "owner (voice)") {
+                if taken {
+                    req().lock().unwrap().open.push(o.clone());
+                }
                 return json!({"cancelled": false, "why": e.to_string()});
             }
+        }
+        if taken {
+            let mut st = self.st.lock().unwrap();
+            st.thinking = st.thinking.saturating_sub(1);
         }
         self.close(&o.id, how, Some("Cancelled: nothing was sent."));
         if how == "cancelled" {
@@ -930,6 +1008,21 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
             if let Some(o) = o {
                 let state = p["state"].as_str().unwrap_or("");
                 let result = p["result"].as_str().unwrap_or("");
+                if state == "yes" {
+                    if let Ok(card) = v.d.card(id) {
+                        let targets: Vec<String> = card["rows"]
+                            .as_array()
+                            .map(|r| {
+                                r.iter()
+                                    .filter_map(|x| x["run_id"].as_str().map(String::from))
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+                        if !targets.is_empty() {
+                            req().lock().unwrap().last_targets = targets;
+                        }
+                    }
+                }
                 let (req_state, line) = match state {
                     "yes" if result.contains("failed") => (
                         "partly_sent",
@@ -1171,8 +1264,30 @@ pub fn decorate(d: &Daemon, actions: &mut [Value]) -> Result<bool> {
             Some((a["agent"].as_str().unwrap_or("").to_string(), who))
         })
         .collect();
+    let found = open
+        .as_ref()
+        .map(|o| o.candidates.clone())
+        .unwrap_or_default();
     for a in actions.iter_mut() {
         let kind = a["action"].as_str().unwrap_or("").to_string();
+        // Why this agent: the daemon's reason when it was a candidate; otherwise it is Overseer's
+        // own choice, which waits the longer window and is named aloud (AC-166).
+        if let Some(agent) = a["agent"].as_str().map(String::from) {
+            match found.iter().find(|(id, _)| *id == agent) {
+                Some((_, why)) => {
+                    if a["why"].as_str().unwrap_or("").is_empty() {
+                        a["why"] = json!(why);
+                    }
+                }
+                None if !found.is_empty() || a["confidence"] != "high" => {
+                    a["why"] = json!("chosen by Overseer");
+                    if a["confidence"] != "low" {
+                        a["confidence"] = json!("medium");
+                    }
+                }
+                None => {}
+            }
+        }
         // The owner's delivery setting.
         if kind == "redirect" && s.delivery == "add" {
             a["action"] = json!("message");

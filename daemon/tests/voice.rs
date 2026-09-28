@@ -541,11 +541,18 @@ fn ac165_a_spoken_request_is_taken_at_once_planned_and_sent_with_the_owner_s_wor
         "the heard signal under Audio Mode: {:?}",
         env.cue_log()
     );
-    let lines = live
-        .kind("spoke")
-        .iter()
-        .filter(|v| v["event"] == "start")
-        .count();
+    // "Sent." waits for the plan's line to end, so it may start a moment after the state changes.
+    let spoken = || {
+        live.kind("spoke")
+            .iter()
+            .filter(|v| v["event"] == "start")
+            .count()
+    };
+    let until = Instant::now() + Duration::from_secs(20);
+    while spoken() < 3 && Instant::now() < until {
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let lines = spoken();
     assert!(lines >= 3, "On it, the plan and Sent were spoken: {lines}");
     assert_eq!(request(&env.d, &id)["state"], "sent");
 }
@@ -774,4 +781,277 @@ fn ac175_built_in_phrases_work_with_no_model() {
     live.wait("not sent", 30, |v| {
         v["kind"] == "request" && v["request"]["id"] == id2 && v["request"]["state"] == "not_sent"
     });
+}
+
+// ---------------------------------------------------------------------- more of Gate R
+
+/// AC-164: speaking over Overseer to someone else lowers its voice and it goes on; words meant
+/// for Overseer stop it at the end of its phrase.
+#[test]
+fn ac164_side_talk_over_overseer_lets_it_finish_and_addressed_words_stop_it() {
+    let env = voice_daemon(&[]);
+    let live = listening(&env);
+    // Side talk: lowered, then Overseer finishes its line.
+    env.d.call("voice.speak", json!({"text": "One phrase here, two phrases here, three phrases here, four phrases here, five phrases here, and six."}));
+    live.wait("speaking", 5, |v| {
+        v["kind"] == "spoke" && v["event"] == "start"
+    });
+    std::thread::sleep(Duration::from_millis(300));
+    env.d.call(
+        "voice.simulate",
+        json!({"speechlike": 2.0, "words": "yeah I will call you back after lunch"}),
+    );
+    live.wait("lowered", 6, |v| {
+        v["kind"] == "floor" && v["event"] == "lowered"
+    });
+    live.wait("the line finishes", 20, |v| {
+        v["kind"] == "spoke" && v["event"] == "done"
+    });
+    assert!(
+        !live
+            .all()
+            .iter()
+            .any(|v| v["kind"] == "spoke" && v["event"] == "stopped"),
+        "side talk never stops Overseer"
+    );
+    assert!(!live
+        .all()
+        .iter()
+        .any(|v| v["kind"] == "floor" && v["event"] == "yield"));
+    // Addressed: Overseer yields at the end of its phrase.
+    live.clear();
+    env.d.call("voice.speak", json!({"text": "One phrase here, two phrases here, three phrases here, four phrases here, five phrases here, and six."}));
+    live.wait("speaking", 5, |v| {
+        v["kind"] == "spoke" && v["event"] == "start"
+    });
+    std::thread::sleep(Duration::from_millis(300));
+    env.d.call(
+        "voice.simulate",
+        json!({"speechlike": 2.5, "words": "Overseer tell the phone app to wait for the review"}),
+    );
+    live.wait("lowered", 6, |v| {
+        v["kind"] == "floor" && v["event"] == "lowered"
+    });
+    live.wait("yields", 6, |v| {
+        v["kind"] == "floor" && v["event"] == "yield"
+    });
+    live.wait("stopped at the end of the phrase", 6, |v| {
+        v["kind"] == "spoke" && v["event"] == "stopped"
+    });
+    assert!(!live
+        .all()
+        .iter()
+        .any(|v| v["kind"] == "spoke" && v["event"] == "done"));
+}
+
+/// AC-163 and AC-177: two windows get the same live channel from one listener.
+#[test]
+fn ac177_two_windows_see_the_same_levels_from_one_listener() {
+    let env = voice_daemon(&[]);
+    let a = listening(&env);
+    let b = Live::open(&env.d);
+    env.d.call(
+        "voice.simulate",
+        json!({"speechlike": 1.5, "words": "just a few words"}),
+    );
+    a.wait("listening again", 10, |v| {
+        v["kind"] == "heard" && v["final"] == true
+    });
+    std::thread::sleep(Duration::from_millis(300));
+    let levels = |l: &Live| {
+        l.kind("level")
+            .iter()
+            .map(|v| v["value"].as_f64().unwrap_or(-1.0))
+            .collect::<Vec<_>>()
+    };
+    let (la, lb) = (levels(&a), levels(&b));
+    assert!(la.len() >= 10, "{}", la.len());
+    assert_eq!(la, lb, "both windows get the same levels");
+    assert_eq!(
+        env.d.call("voice.get", json!({}))["listener"]["restarts"],
+        0,
+        "one listener"
+    );
+}
+
+/// AC-166, AC-169, AC-170: the daemon's candidates go to Overseer; the card says why each agent
+/// was chosen; the text in the card is the text the agent got, byte for byte; words added inside
+/// the window join the request; the request survives a restart and is found by a word.
+#[test]
+fn ac169_the_card_holds_the_exact_text_the_agent_got() {
+    // A Claude agent busy in a long turn (the fixture's slow mode): it is active when named, and
+    // each turn it starts records its prompt.
+    let mut env = voice_daemon(&[
+        ("FIXTURE_SLOW_MS", "90000"),
+        (
+            "OVERSEER_HARNESS_ENV_PASSTHROUGH",
+            "CLAUDE_FIXTURE_MODE_FILE,FIXTURE_SLOW_MS",
+        ),
+    ]);
+    env.d.call("voice.set", json!({"settle_seconds": 4}));
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    std::fs::write(env.mode_file(), "slow").unwrap();
+    let created = env.d.call(
+        "task.create",
+        json!({"repo": repo, "harness": "claude", "prompt": "say hi", "title": "Sessions"}),
+    );
+    let run = created["run"]["id"].as_str().unwrap().to_string();
+    env.d.wait_status(&run, |s| s == "running", 30);
+    let live = listening(&env);
+    let first = env.d.call(
+        "voice.say",
+        json!({"text": "Tell Sessions to add a changelog"}),
+    );
+    let id = first["request"].as_str().unwrap().to_string();
+    live.wait("settling", 60, |v| {
+        v["kind"] == "request" && v["request"]["id"] == id && v["request"]["state"] == "settling"
+    });
+    // Words added inside the window join the request.
+    let join = env
+        .d
+        .call("voice.say", json!({"text": "with the release date."}));
+    let joined = join["request"].as_str().unwrap().to_string();
+    assert_eq!(request(&env.d, &id)["state"], "joined");
+    assert_eq!(
+        request(&env.d, &joined)["words"],
+        "Tell Sessions to add a changelog with the release date."
+    );
+    let sent = live.wait("sent", 60, |v| {
+        v["kind"] == "request" && v["request"]["id"] == joined && v["request"]["state"] == "sent"
+    });
+    let proposal = sent["request"]["proposal"].as_str().unwrap().to_string();
+    // Overseer was told the candidates, with their reasons.
+    let session = env.d.call("overseer.session", json!({}));
+    let asked = session["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|m| m["source"] == "owner")
+        .map(|m| m["text"].as_str().unwrap_or("").to_string())
+        .last()
+        .unwrap();
+    assert!(
+        asked.contains(&format!(
+            "Candidates from the daemon: Sessions ({run}): named"
+        )),
+        "{asked}"
+    );
+    // The card: the reason, and the text the agent got.
+    let card = env.d.call("overseer.card", json!({"id": proposal}));
+    let row = &card["rows"][0];
+    assert_eq!(row["why"], "named");
+    let message = row["message"].as_str().unwrap().to_string();
+    // The agent is mid-turn, so the message waits in its run as a queued message event.
+    let events = env.d.events(&run);
+    let got: Vec<&str> = events
+        .iter()
+        .filter(|e| e["kind"] == "queued")
+        .filter_map(|e| e["payload"]["text"].as_str())
+        .collect();
+    assert_eq!(
+        got,
+        vec![message.as_str()],
+        "the card's text is the text sent, byte for byte"
+    );
+    let row_state = || {
+        env.d.call("overseer.card", json!({"id": proposal}))["rows"][0]["state"]
+            .as_str()
+            .unwrap_or("")
+            .to_string()
+    };
+    assert_eq!(row_state(), "held", "held while the agent's turn runs");
+    // The turn ends; the message starts the next turn (answered at once by the echo fixture),
+    // and the row advances on the daemon's own events.
+    std::fs::write(env.mode_file(), "echo").unwrap();
+    env.d.call("run.interrupt", json!({"run_id": run}));
+    let until = Instant::now() + Duration::from_secs(40);
+    while row_state() == "held" && Instant::now() < until {
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    let advanced = row_state();
+    assert!(
+        ["delivered", "picked_up", "picked up", "answered"].contains(&advanced.as_str()),
+        "the row advanced on the daemon's events: {advanced}"
+    );
+    // After a restart the card and the request are the same, and a word finds it.
+    env.d.kill9();
+    std::thread::sleep(Duration::from_millis(300));
+    env.d.spawn();
+    assert_eq!(
+        env.d.call("overseer.card", json!({"id": proposal}))["rows"][0]["message"],
+        json!(message)
+    );
+    assert_eq!(request(&env.d, &joined)["state"], "sent");
+    let found = env
+        .d
+        .call("voice.requests", json!({"query": "release date"}));
+    assert_eq!(found["requests"][0]["id"], json!(joined));
+}
+
+/// AC-167 and AC-168: the owner's delivery setting wins over the model's choice; more new
+/// agents than the owner's limit wait for a yes, and more than eight are refused.
+#[test]
+fn ac167_ac168_delivery_setting_and_new_agent_limits() {
+    let env = voice_daemon(&[]);
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let phone = agent(&env.d, &repo, "Phone");
+    listening(&env);
+    let sql = |statement: &str| {
+        let out = std::process::Command::new("sqlite3")
+            .arg(env.d.home.path().join("overseer.sqlite"))
+            .arg(statement)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    };
+    env.d.call("overseer.session", json!({}));
+    let voice_cause = || sql("UPDATE overseer_sessions SET last_cause='voice'");
+    // Always add: a redirect becomes a message that waits for the turn to end.
+    env.d.call("voice.set", json!({"delivery": "add"}));
+    voice_cause();
+    let p = env.d.call("overseer.propose", json!({"actions": [{"action": "redirect", "agent": phone, "text": "switch to the new format", "confidence": "high"}], "source": "test"}));
+    let card = env.d.call("overseer.card", json!({"id": p["proposal"]}));
+    assert_eq!(card["actions"][0]["action"], "message", "{card}");
+    // Always redirect: a message to a working agent becomes a redirect.
+    env.d.call("voice.set", json!({"delivery": "redirect"}));
+    voice_cause();
+    let p = env.d.call("overseer.propose", json!({"actions": [{"action": "message", "agent": phone, "text": "switch to the new format", "confidence": "high"}], "source": "test"}));
+    assert_eq!(
+        env.d.call("overseer.card", json!({"id": p["proposal"]}))["actions"][0]["action"],
+        "redirect"
+    );
+    // New agents: up to three settle; four wait for a yes; nine are refused.
+    env.d.call("voice.set", json!({"delivery": "auto"}));
+    let start = |n: usize| {
+        (0..n).map(|i| json!({"action": "start", "repo": repo, "title": format!("helper {i}"), "prompt": "write the note", "confidence": "high"})).collect::<Vec<_>>()
+    };
+    voice_cause();
+    assert_eq!(
+        env.d.call(
+            "overseer.propose",
+            json!({"actions": start(3), "source": "test"})
+        )["state"],
+        "settling"
+    );
+    voice_cause();
+    let four = env.d.call(
+        "overseer.propose",
+        json!({"actions": start(4), "source": "test"}),
+    );
+    assert_eq!(
+        four["state"], "open",
+        "more than three wait for a yes: {four}"
+    );
+    voice_cause();
+    let nine = env.d.try_call(
+        "overseer.propose",
+        json!({"actions": start(9), "source": "test"}),
+    );
+    assert!(nine.unwrap_err().contains("at most eight"));
 }

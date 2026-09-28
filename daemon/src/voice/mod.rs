@@ -7,6 +7,7 @@
 //! never stored (AC-173). Voice Mode is off until the owner turns it on, and muted means the
 //! listener has stopped, so the microphone is closed.
 
+mod candidates;
 mod floor;
 mod model;
 mod proc;
