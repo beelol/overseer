@@ -103,6 +103,9 @@ impl Daemon {
         let id = format!("m-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
         let now = crate::daemon::now();
         let text = crate::redact::redact(text);
+        // A card carries titles, prompts and findings from agents: redacted like the text (AC-200).
+        let card: Option<Value> = card.map(|c| serde_json::from_str(&crate::redact::redact(&c.to_string())).unwrap_or_else(|_| c.clone()));
+        let card = card.as_ref();
         let seq: i64 = {
             let store = self.store.lock().unwrap();
             store.conn.execute("INSERT INTO overseer_messages(id, session_id, ts, source, surface, text, card) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)", rusqlite::params![id, session, now, source, surface, text, card.map(|c| c.to_string())])?;
@@ -666,6 +669,9 @@ impl Daemon {
                 _ => (false, false),
             }
         };
+        // What an action carries (a message, a note to share) is redacted before it is stored,
+        // shown or sent: a credential never travels between agents through Overseer (AC-200).
+        let checked: Vec<Value> = checked.into_iter().map(|a| serde_json::from_str(&crate::redact::redact(&a.to_string())).unwrap_or(a)).collect();
         let id = format!("p-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
         let now = crate::daemon::now();
         let lines: Vec<String> = checked.iter().map(|a| self.describe(a)).collect();

@@ -449,7 +449,8 @@ impl Daemon {
         if !["fine", "concern", "stop"].contains(&result) {
             bail!("a finding is fine, concern or stop");
         }
-        let text = args["text"].as_str().unwrap_or("").trim().to_string();
+        // What a watcher writes is redacted before it is stored, shown or read by Overseer (AC-200).
+        let text = crate::redact::redact(args["text"].as_str().unwrap_or("").trim());
         if text.is_empty() && result != "fine" {
             bail!("a {result} finding says what you saw");
         }

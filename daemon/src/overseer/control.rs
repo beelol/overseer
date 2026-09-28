@@ -417,7 +417,8 @@ impl Daemon {
             .collect::<rusqlite::Result<_>>()?;
         let mut card = proposal;
         card["rows"] = json!(rows);
-        Ok(card)
+        // Titles come from agents (a generic run's title is its command line): redacted (AC-200).
+        Ok(serde_json::from_str(&crate::redact::redact(&card.to_string())).unwrap_or(card))
     }
 
     /// A conflict's card actions (AC-192): assign, sequence, dismiss; share follows with AC-191.

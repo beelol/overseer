@@ -654,7 +654,11 @@ impl Daemon {
             }
             other => bail!("share carries a diff, a report, messages, a note or a finding, not {other:?}"),
         };
+        let raw_len = content.len();
+        let raw_id = short_sha(&content);
         let content = crate::redact::redact(&content);
+        // Nothing was redacted: the piece may also travel as a commit (a commit carries the files as they are).
+        let clean = content.len() == raw_len && short_sha(&content) == raw_id;
         let source = match &from_title {
             Some(t) => format!("from {t} ({label})"),
             None => format!("(Overseer's {label})"),
@@ -678,7 +682,7 @@ impl Daemon {
         // The whole of a large diff of everything is also a commit the receiver can read with git.
         let branch = match (what, from, &file, a["path"].as_str().filter(|p| !p.is_empty())) {
             // A branch that cannot be made (a ref in the way) leaves the patch file, which is enough.
-            ("diff", Some(f), Some(_), None) => self.share_branch(f, to, &id, &source).unwrap_or_else(|e| {
+            ("diff", Some(f), Some(_), None) if clean => self.share_branch(f, to, &id, &source).unwrap_or_else(|e| {
                 crate::log(&format!("share {id}: no branch: {e:#}"));
                 None
             }),

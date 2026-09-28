@@ -2343,3 +2343,109 @@ fn ac191_a_large_diff_is_also_a_branch_and_commit() {
     d.call("share.withdraw", json!({"id": share["id"], "by": "owner"}));
     assert!(git(&repo, &["for-each-ref", "--format=%(refname)", &format!("refs/heads/{branch}")]).trim().is_empty(), "the withdrawn share's branch is removed");
 }
+
+/// AC-200: Overseer's traffic as a whole carries no credential. Credentials planted in an agent's
+/// output, title and files, in a report and a question over the channel, in a watcher's finding
+/// and in a note to share; then everything that leaves the daemon for Overseer, its watchers and
+/// the other agents is collected (every prompt of Overseer's run, every answer of every tool,
+/// the conversation with its cards, every digest and the roster, what other agents were sent,
+/// shares and their files, findings, cards) and none of it holds any of them.
+#[test]
+fn ac200_no_credential_in_overseer_s_traffic() {
+    let _one_at_a_time = heavy();
+    const KEYS: &[&str] = &["sk-ant-api03-plantedplantedplanted0123", "ghp_plantedPLANTEDplanted0123456789", "xoxb-planted-0123456789", "sk-proj-plantedplantedplanted456"];
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.channel", json!({"default": "on", "by": "owner"}));
+    d.call("agent.cadence", json!({"cadence": "every:1", "by": "owner"}));
+    d.call("overseer.level", json!({"level": "steer"}));
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    // An agent that prints a key, writes one into a file, and carries one in its title.
+    let script = format!("printf 'API_KEY={}\\n' > .env.local; echo using {}; echo token {}", KEYS[0], KEYS[0], KEYS[1]);
+    let leaky = run_id(&d.generic(&repo, "worktree", "/bin/sh", &["-c", &script]));
+    d.wait_done(&leaky, 20);
+    // A report and a question with keys, over the channel.
+    let talker = claude_task(&d, &repo, &mode_file, "channel", "Talker", &format!("report: deploying with {}; ask: is {} still valid?; write: docs/x.md", KEYS[2], KEYS[2]));
+    d.wait_done(&talker, 40);
+    // A watcher's finding with a key.
+    let watcher = claude_task(&d, &repo, &mode_file, "echo", "Watcher", "hello");
+    d.wait_done(&watcher, 30);
+    std::fs::write(&mode_file, "overseer").unwrap();
+    d.call("watch.start", json!({"subject": leaky, "watcher": watcher, "brief": "secrets", "by": "owner"}));
+    let wtoken = d.call("overseer.token", json!({"run_id": watcher, "role": "agent"}))["token"].as_str().unwrap().to_string();
+    let f = d.call("overseer.tool", json!({"token": wtoken, "name": "finding", "arguments": {"result": "concern", "text": format!("found {} in its output", KEYS[0])}}));
+    assert_eq!(f["is_error"], false, "{f}");
+    // Shares: the leaky agent's whole diff and a note with a key, to the talker.
+    std::fs::write(&mode_file, "channel").unwrap();
+    sql(&d, "UPDATE overseer_sessions SET last_cause='owner';");
+    d.call("overseer.propose", json!({"actions": [{"action": "share", "to": talker, "from": leaky, "what": "diff"}, {"action": "share", "to": talker, "what": "note", "text": format!("the staging key is {}", KEYS[3])}], "source": "ctl"}));
+    wait_turn_with(&d, &talker, "Shared by Overseer", 20);
+    d.wait_done(&talker, 40);
+    std::thread::sleep(Duration::from_secs(7));
+    wait_overseer_idle(&d, 60);
+    std::fs::write(&mode_file, "overseer").unwrap();
+    d.call("overseer.send", json!({"text": "What did Talker change in docs/x.md?", "surface": "ctl"}));
+    let s = wait_overseer_idle(&d, 60);
+
+    // Everything that left the daemon for a model or another agent.
+    let mut traffic: Vec<(String, String)> = Vec::new();
+    let overseer_run = s["run_id"].as_str().unwrap().to_string();
+    for t in turns(&d, &overseer_run) {
+        traffic.push(("Overseer's prompt".into(), t["prompt"].to_string()));
+    }
+    traffic.push(("the conversation".into(), d.call("overseer.messages", json!({"limit": 500})).to_string()));
+    let state = d.call("state", json!({"include_hidden": true}));
+    let runs: Vec<String> = state["runs"].as_array().unwrap().iter().map(|r| r["id"].as_str().unwrap().to_string()).collect();
+    let otoken = d.call("overseer.token", json!({"run_id": "traffic-check", "role": "overseer"}))["token"].as_str().unwrap().to_string();
+    let tool = |name: &str, args: Value| match d.try_call("overseer.tool", json!({"token": otoken, "name": name, "arguments": args})) {
+        Ok(v) => v.to_string(),
+        Err(e) => e,
+    };
+    traffic.push(("roster".into(), d.call("agents.roster", json!({})).to_string()));
+    traffic.push(("tool roster".into(), tool("roster", json!({}))));
+    traffic.push(("tool conflicts".into(), tool("conflicts", json!({}))));
+    traffic.push(("tool search".into(), tool("search", json!({"query": "API_KEY"}))));
+    for id in &runs {
+        traffic.push((format!("digest {id}"), d.call("agent.digest", json!({"run_id": id})).to_string()));
+        for (name, args) in [("agent", json!({"id": id})), ("conversation", json!({"id": id})), ("changes", json!({"id": id})), ("diff", json!({"id": id, "path": ".env.local"})), ("file", json!({"id": id, "path": ".env.local"})), ("usage", json!({"id": id}))] {
+            traffic.push((format!("tool {name} {id}"), tool(name, args)));
+        }
+        if *id != leaky && *id != overseer_run {
+            // What other agents were sent (shares, answers, briefings, watch wakes); the leaky
+            // agent's own task is the owner's.
+            for t in turns(&d, id).iter().skip(1) {
+                traffic.push((format!("sent to {id}"), t["prompt"].to_string()));
+            }
+        }
+        traffic.push((format!("briefings {id}"), d.call("agent.briefings", json!({"run_id": id})).to_string()));
+    }
+    let shares = d.call("share.list", json!({}));
+    for sh in shares["shares"].as_array().unwrap() {
+        if let Some(file) = sh["file"].as_str() {
+            traffic.push((format!("share file {file}"), std::fs::read_to_string(file).unwrap()));
+        }
+        if let Some(c) = sh["commit"].as_str() {
+            traffic.push((format!("share commit {c}"), git(&repo, &["show", c])));
+        }
+    }
+    traffic.push(("shares".into(), shares.to_string()));
+    traffic.push(("findings".into(), d.call("watch.findings", json!({})).to_string()));
+    traffic.push(("channel".into(), d.call("channel.messages", json!({})).to_string()));
+    for p in d.call("events.list", json!({"limit": 5000}))["events"].as_array().unwrap().iter().filter(|e| e["kind"] == "proposal") {
+        traffic.push(("card".into(), d.call("overseer.card", json!({"id": p["payload"]["id"]})).to_string()));
+    }
+    assert!(traffic.len() > 40, "the whole traffic was collected: {}", traffic.len());
+    assert!(traffic.iter().any(|(what, t)| what.starts_with("share file") || t.contains("Shared by Overseer")), "the shares were part of it");
+    for (what, text) in &traffic {
+        for key in KEYS {
+            assert!(!text.contains(key), "{key} in {what}: {}", &text[text.find(key).unwrap().saturating_sub(200)..(text.find(key).unwrap() + 80).min(text.len())]);
+        }
+    }
+    // The planted key was really there to find: the leaky agent's own worktree holds it.
+    let ws = PathBuf::from(d.call("agent.digest", json!({"run_id": leaky}))["digest"]["worktree"].as_str().unwrap());
+    assert!(std::fs::read_to_string(ws.join(".env.local")).unwrap().contains(KEYS[0]));
+}
