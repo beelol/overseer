@@ -1,6 +1,6 @@
 # SWARM-16 — checkpoint recovery after worker failure
 
-Status: partial. Reproduce with `cargo test --offline -p overseerd --test swarm_checkpoint -q` and `./fixtures/swarm/dispatch-v1/run-swarm.sh`. See `daemon/tests/swarm_checkpoint.rs` and [S4](S4.md).
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. Reproduce with `cargo test --offline -p overseerd --test swarm_checkpoint -q` and `./fixtures/swarm/dispatch-v1/run-swarm.sh`. See `daemon/tests/swarm_checkpoint.rs` and [S4](S4.md).
 
 A failed SQL worker stores a checkpoint artifact containing a sanitized trace, source reference and open question. Reconciliation confirms the worker failed and makes the same logical job ready. The artifact survives daemon restart. A replacement on a different selected account is blocked until the director grants that destination access; an unselected account and stale director generation cannot receive a grant. The replacement's worker brief lists the checkpoint and its context API returns the content. A second grant request is idempotent. Revocation during replacement stops delivery, interrupts the worker and blocks the job. The joined S4 Go/PostgreSQL replay uses this handoff on the second attempt while other scoped jobs continue.
 
@@ -36,3 +36,15 @@ no automatic checkpoint if it dies first, no native-session portability, no
 live account-outage handoff, and no joined proof that an accepted artifact and
 an uncertain external effect are both carried and reconciled on the new route.
 SWARM-16 remains partial.
+
+## Verified at fixture scope (2026-09-28)
+
+| Clause | Test |
+| --- | --- |
+| After a worker fails, its accepted artifacts are recovered through a checkpoint on another eligible target | `failed_worker_checkpoint_and_evidence_require_destination_grants_before_replacement` (`swarm_checkpoint.rs`): the first attempt on target A writes a checkpoint and evidence, then its process fails; across a daemon restart, attempt 2 on selected target B is held until the director grants those artifacts to B, then reads them; an unselected destination cannot; joined: `shipment_incident_survives_sql_account_loss_with_two_attempts` (Dispatch Go/PostgreSQL S4: L2 fails on account A, its checkpoint reaches the attempt-2 replacement on account B while L1/L3 continue; passed again against PostgreSQL 16) |
+| Without claiming native session portability | the replacement is a new launch carrying the checkpoint and granted artifacts in its brief; no session or transcript of the failed attempt is transferred or resumed (the brief holds references, see [SWARM-34](SWARM-34.md)) |
+| An uncertain external side effect blocks retry until reconciled | `failed_worker_with_unknown_effect_cannot_route_to_replacement` (`swarm_routing.rs`); `lost_side_effect_ack_blocks_retry_until_outcome_is_reconciled` (`swarm_effects.rs`); on the route-selection path `one_job_falls_back_once_then_stops_and_an_uncertain_effect_pauses` (`side_effect_unreconciled`, no route decision) |
+
+Rerun serially on 2026-09-28: `swarm_checkpoint` 1, `swarm_routing` 2, `swarm_effects` 4, `swarm_native` (fallback test), and the S4 replacement replay.
+
+Boundary: the checkpoint is written by the worker (or granted by the director); assembling one automatically from a worker that died without writing it is not claimed.

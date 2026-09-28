@@ -185,7 +185,7 @@
       "blocker": null
     },
     "SWARM-16": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_checkpoint.rs",
         "daemon/tests/swarm_dispatch_incident.rs",
@@ -193,9 +193,12 @@
         "docs/verification/swarm/S4.md",
         "daemon/tests/swarm_runtime.rs",
         "daemon/tests/swarm_director_process.rs",
-        "docs/verification/swarm/main-reconciliation-2026-09-27.md"
+        "docs/verification/swarm/main-reconciliation-2026-09-27.md",
+        "daemon/tests/swarm_routing.rs",
+        "daemon/tests/swarm_effects.rs",
+        "daemon/tests/swarm_native.rs"
       ],
-      "blocker": "A worker-authored checkpoint and separately granted durable trace now reach a selected same-job replacement; unselected destinations fail, and trace revocation interrupts after daemon restart. The trace is not accepted dependent evidence. Automatic checkpoint creation after abrupt failure, live account/harness handoff and joined accepted-artifact/uncertain-effect reconciliation remain unverified. Gate L generic successor recovery stays barred until same-job reservation continuity is proved."
+      "blocker": null
     },
     "SWARM-17": {
       "status": "partial",
