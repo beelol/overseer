@@ -7,8 +7,8 @@ const { spawnSync } = require('child_process');
 require('../../scripts/git-fallback').ensureGit('packager'); // AC-159
 const root = path.resolve(__dirname, '..');
 const repo = path.resolve(root, '..');
-const run = (cmd, args, cwd) => {
-  const r = spawnSync(cmd, args, { cwd, stdio: 'inherit', shell: false });
+const run = (cmd, args, cwd, env = process.env) => {
+  const r = spawnSync(cmd, args, { cwd, stdio: 'inherit', shell: false, env });
   if (r.error || r.status !== 0) { console.error(`${cmd} ${args.join(' ')} failed`); process.exit(r.status || 1); }
 };
 const toolRoot = path.join(root, 'tooling', 'vsce');
@@ -19,7 +19,10 @@ if (installed.version !== required) { console.error(`Expected vsce ${required}; 
 run(process.execPath, [path.join(root, 'branch-diff/scripts/build-review.js')], root);
 run(process.execPath, [path.join(root, 'notifier/build.js')], root);
 run(process.execPath, [path.join(root, 'listener/build.js')], root); // Voice Mode's listener (Gate R)
-run('cargo', ['build', '--release', '-p', 'overseerd'], repo);
+// The daemon says which commit it was built from (hello's `build`, `overseerd version`): deploys record it (AC-214).
+const head = spawnSync('git', ['rev-parse', '--short=12', 'HEAD'], { cwd: repo, encoding: 'utf8' }).stdout.trim();
+const dirty = spawnSync('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: repo, encoding: 'utf8' }).stdout.trim() ? '-dirty' : '';
+run('cargo', ['build', '--release', '-p', 'overseerd'], repo, { ...process.env, OVERSEER_BUILD_COMMIT: head ? head + dirty : 'unknown' });
 fs.mkdirSync(path.join(root, 'bin'), { recursive: true });
 const target = path.join(root, 'bin', `overseerd-${process.platform}-${process.arch}`);
 fs.copyFileSync(path.join(repo, 'target/release/overseerd'), target);

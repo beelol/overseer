@@ -7,7 +7,7 @@
         "label": "by title",
         "expect": "History task 123",
         "q": "History task 123",
-        "ms": 36,
+        "ms": 33,
         "labels": [
           "History task 123"
         ],
@@ -22,7 +22,7 @@
         "label": "by prompt",
         "expect": "History task 201",
         "q": "pw201",
-        "ms": 40,
+        "ms": 32,
         "labels": [
           "History task 201"
         ],
@@ -52,7 +52,7 @@
         "label": "by file the agent edited",
         "expect": "Refresh sessions once",
         "q": "coordinator",
-        "ms": 32,
+        "ms": 31,
         "labels": [
           "Refresh sessions once"
         ],
@@ -67,7 +67,7 @@
         "label": "by repository",
         "expect": "Broken migration",
         "q": "billing-service",
-        "ms": 36,
+        "ms": 33,
         "labels": [
           "Broken migration",
           "Refresh sessions once"
@@ -83,7 +83,7 @@
         "label": "by account",
         "expect": "Refresh sessions once",
         "q": "existing login",
-        "ms": 36,
+        "ms": 34,
         "labels": [
           "Refresh sessions once"
         ],
@@ -98,7 +98,7 @@
         "label": "by status",
         "expect": "Broken migration",
         "q": "failed",
-        "ms": 34,
+        "ms": 32,
         "labels": [
           "Broken migration"
         ],

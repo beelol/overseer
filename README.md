@@ -591,6 +591,21 @@ scripts/dev clean --name a         # stop everything of dev-a and remove it
 never uses one even when their variables leak into its environment
 ([AC-212](docs/verification/AC-212.md)).
 
+### Deploying: the one path to your installed Overseer
+
+A change reaches your installed Overseer only through a deploy, after its pull request is merged
+to main ([AC-214](docs/verification/AC-214.md)):
+
+```bash
+scripts/deploy              # build origin/main in its own clone, install it, restart the daemon when no runs are active
+scripts/deploy --status     # what is deployed and running
+scripts/deploy --rollback   # back to the previous deploy
+```
+
+It asks before changing anything, waits while runs are active (`--no-wait` stops instead), keeps
+your data and logins, and records each deploy in the data folder's `deploys/`. Agents run it only
+when you ask them to.
+
 ## Recovery
 
 - State lives in `~/Library/Application Support/Overseer` (`overseer.sqlite`, per-run

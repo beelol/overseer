@@ -33,6 +33,7 @@ Codex, Kilo and Claude all read this file (Claude through `CLAUDE.md`). The owne
 - When the owner asks for an owner check a gate lists ("let's start the voice mode test"), run it with `scripts/dev test <check>` (`scripts/dev test --list` names them; the checks are `docs/owner-checks/*.json`): `--start` builds the check's branch into a dev daemon and a dev VS Code and prints step 1; tell the owner each step and `--record` what they say or see (or `--skip` with the reason); `--finish` writes the evidence and cleans up. Commit the evidence with the criteria's records on main.
 - Always clean up: `scripts/dev clean --name <name>` (or `--all`) stops its agents, daemon, VS Code and TUI and removes its folder.
 - Never touch the production daemon (the owner's installed Overseer): never stop, restart, reinstall or point anything at it, and never deploy to it unless the owner asked you to in this conversation.
+- Deploying (`scripts/deploy`, see `scripts/deploy --help`) is the only way a change reaches the owner's installed Overseer: after the pull request is merged to main, and only when the owner asked for it.
 
 ## Where the designs are
 - Orchestrator UI (Gates J, K, M): `docs/rfcs/orchestrator-ui.md`
