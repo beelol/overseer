@@ -1,6 +1,6 @@
 # SWARM-15 — bounded routing failure retries
 
-Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. First revision: `ca52007` (fixture-only scripted workers and injected target snapshots).
 
 Input: a one-job backend category permits two fixture targets backed by different accounts. The first target admits an attempt whose supervised worker fails to start its missing executable. The daemon observes its terminal state. The same logical job is admitted on the second target, where the same launch failure occurs. Each terminal receipt is replayed. A plan revision then changes the job title. A separate replay records an unknown external effect before its worker fails.
 
