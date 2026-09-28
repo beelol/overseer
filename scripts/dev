@@ -370,7 +370,7 @@ async function down(o, i = instance(o['--name'])) {
   const meta = readMeta(i);
   if (!meta) die(`no dev instance ${i.name} under ${DEV_ROOT}`);
   const stopped = await stopDaemon(i, 'daemon.stop_all');
-  const left = pidsWith(i.dir + path.sep).filter(p => { const c = commandOf(p); return !(o['--keep-clients'] && (c.includes(i.profile) || c.includes(i.tui))); });
+  const left = pidsWith(i.dir + path.sep).filter(p => { const c = commandOf(p); return !(o['--keep-clients'] && (c.includes(path.join(i.dir, 'vscode')) || c.includes(i.tui))); });
   await killAll(left);
   if (!o['--keep-clients']) fs.rmSync(path.join(i.profile, 'DevToolsActivePort'), { force: true });
   if (!o['--quiet']) console.log(`Dev instance ${i.id}: ${stopped ? 'stopped' : 'was not running'}${left.length ? `; ${left.length} process${left.length === 1 ? '' : 'es'} from its folder ended` : ''}${o['--keep-clients'] ? '; its VS Code and TUI stay open, waiting for the next up' : ''}.`);
