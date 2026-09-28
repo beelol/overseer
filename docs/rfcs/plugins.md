@@ -623,3 +623,13 @@ Prior art for governance, and the idea taken from each:
   ([registry](https://github.com/modelcontextprotocol/registry)). Taken: provenance is recorded.
   Signing waits until sources offer it.
 - Ruler and rulesync write one set of rules into each agent's own files. That is option B below.
+
+## The owner's answers (2026-09-27)
+
+- **Examples:** caveman and RTK are the kind of thing meant. The name "unicorn" (or "pony") is not important; drop the search.
+- **Scopes:** agents have their own "everywhere" (all agents), and Overseer's own session is a separate place to enable things. Enabling for all agents does not include Overseer's session.
+- **What installing means:** a plugin installs everything it needs, isolated from the owner's own tools ("virtualized"), and deleting it removes everything it installed. Replace the proposal "Overseer shows the command" with that.
+- **Global `~/.claude` and `~/.codex` rules:** ignored by default. They apply only if the owner opts in; a one-time "migrate them into Overseer" option may be offered.
+- **Repository team files:** later, not in the first version.
+- **Installing on its own:** by default, Overseer notices that a plugin would help (or that the owner asked for one) and asks first ("Install caveman? It will …"), like Codex asks; the owner says yes. A setting may later allow automatic installs.
+- **Name:** open. The owner wants something on brand, and a name that does not collide with VS Code's own extensions/plugins; "middleware" or "transformer" describe some of them but not all.
