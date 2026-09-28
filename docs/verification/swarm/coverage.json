@@ -61,12 +61,15 @@
       "blocker": "Fixture benefit decisions account for two worker waves when three jobs share two app slots, choose serial when the extra wave removes the gain, and refill completed slots. Current occupancy from other tasks, actual native usage and phase costs, undeclared-resource independence, live calibrated estimates and shared Auto Mode quota input remain absent."
     },
     "SWARM-06": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_policy.rs",
-        "docs/verification/swarm/milestone-4.md"
+        "docs/verification/swarm/milestone-4.md",
+        "docs/verification/swarm/SWARM-06.md",
+        "daemon/tests/swarm_native.rs",
+        "daemon/src/swarm/route.rs"
       ],
-      "blocker": "Capability requirements reject a cheaper unqualified target in fixtures; real quality routing and launch gating are not implemented."
+      "blocker": null
     },
     "SWARM-07": {
       "status": "partial",

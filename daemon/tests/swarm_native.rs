@@ -971,3 +971,34 @@ fn a_native_director_applies_the_owners_requirement_change_by_revising() {
     assert_ne!(a["reason"], "requirements_pending", "{a}");
     std::fs::write(&t.worker_gate, "open").unwrap();
 }
+
+/// SWARM-06 through Auto's route selection: the cheaper general-tier route is
+/// refused for a job needing the frontier tier (`insufficient_capability`) and
+/// the costlier qualified route is chosen; a job needing a tool no approved
+/// route has is blocked visibly (`no_eligible_route`, each route's reason
+/// recorded) and nothing weaker is admitted in its place.
+#[test]
+fn an_unqualified_cheap_route_is_refused_and_no_qualified_route_blocks_visibly() {
+    let t = driven(&["alpha"], &[("alpha", 0.0)], &["system-claude", "alpha"], &["frontier", "tooling"], &["frontier"]);
+    let (w, ids) = (&t.w, &t.ids);
+    let (run, director, _) = start(w, "isolated", "capability-floor");
+    wait_trace(w, step("dispatched", "director"), "plan", 60);
+    let frontier = dispatch_job(&w.d, &director, json!({"job_id":"frontier","brief":"Job frontier",
+        "requirements":{"min_tier":"frontier"}}));
+    assert_eq!(frontier["status"], "launched", "{frontier}");
+    assert_eq!(admitted_routes(&w.d, &run, "frontier"), vec![(ids["alpha"].clone(), "opus".to_string(), "high".to_string())]);
+    let chosen = &route_decisions(&w.d, &run, "frontier")[0];
+    assert_eq!(exclusion_reasons(chosen)[&format!("{}/sonnet/medium", ids["alpha"])], "insufficient_capability", "{chosen}");
+    let blocked = dispatch_job(&w.d, &director, json!({"job_id":"tooling","brief":"Job tooling",
+        "requirements":{"required_tools":["browser/navigate"]}}));
+    assert_eq!((blocked["status"].as_str(), blocked["reason"].as_str()), (Some("blocked"), Some("no_eligible_route")), "{blocked}");
+    let decision = &route_decisions(&w.d, &run, "tooling")[0];
+    let reasons = exclusion_reasons(decision);
+    for model in ["sonnet/medium", "opus/high"] {
+        assert!(reasons.contains_key(&format!("{}/{model}", ids["alpha"])), "every route has its reason: {decision}");
+    }
+    assert!(admitted_routes(&w.d, &run, "tooling").is_empty(), "nothing weaker was admitted");
+    let job: String = db(&w.d).query_row("SELECT status FROM swarm_jobs WHERE run_id=?1 AND id='tooling'", [&run], |r| r.get(0)).unwrap();
+    assert_eq!(job, "ready");
+    std::fs::write(&t.worker_gate, "open").unwrap();
+}
