@@ -1,6 +1,6 @@
 # SWARM-20 — control actions and descendant exit
 
-Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`) for every surface available today; the phone clause is not yet in force (Gate N's gateway is not on `main` or this branch) and re-opens this criterion when it lands. See the last section. Previous status: partial. Latest evidence revision: `ce46780`.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`) for every surface available today; the phone clause is not yet in force (Gate N's gateway is not on `main` or this branch) and re-opens this criterion when it lands. See the last section. Earlier evidence revision: `ce46780`.
 
 Input: a fixture run has an admitted, running `/bin/sleep` worker. A test-only fault simulates an unreachable control socket on Stop's first interrupt attempt, then kills and restarts the daemon. The fixture is `stop_retries_an_initially_unreachable_worker_after_daemon_restart` in `daemon/tests/swarm_runtime.rs`.
 
