@@ -1,6 +1,6 @@
 # SWARM-43 — redirect receipt and application
 
-Status: partial. Code revisions: `216f4a1` (daemon deadline), `8efd953` (joined Atlas replay), `c168d78` (revision-2 redirect). Policy: approved Swarm RFC's 30-second applied-ack deadline. Fixtures: `daemon/tests/swarm_broker.rs`, `daemon/tests/swarm_runtime.rs`, and `daemon/tests/swarm_atlas.rs`. No live account or harness path was used.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. Code revisions: `216f4a1` (daemon deadline), `8efd953` (joined Atlas replay), `c168d78` (revision-2 redirect). Policy: approved Swarm RFC's 30-second applied-ack deadline. Fixtures: `daemon/tests/swarm_broker.rs`, `daemon/tests/swarm_runtime.rs`, and `daemon/tests/swarm_atlas.rs`. No live account or harness path was used.
 
 Inputs: a planned Atlas-shaped J4 attachment audit, with one registered worker attempt and a dependent review job. A director sends `redirect` with stable message ID `j4-redirect`. The worker reports `delivered` while a simulated long-running command remains active. A second fixture links the attempt to a supervised `/bin/sleep 30` process, kills the daemon, ages the delivered receipt past 30 seconds, and restarts it.
 
@@ -46,3 +46,16 @@ Validation: `cargo test -p overseerd --test swarm_broker --test swarm_plan
 application receipts. They do not prove the recipient actually followed a
 directive through a qualified provider transport, autonomous correction, or
 the complete S1 trace; SWARM-43 remains partial.
+
+## Verified at fixture scope (2026-09-28)
+
+| Clause | Test |
+| --- | --- |
+| J4's revision-2 redirect delivered while its tool call is active; delivered and applied shown separately | `atlas_s5_redirect_during_long_probe_interrupts_and_holds_review` (J4's real attachment probe is held mid-call; the revision-2 redirect is `delivered`, never `applied`); `directive_delivery_and_application_are_distinct`; `delivered_redirect_interrupts_a_long_running_worker_after_restart` |
+| Old-revision output cannot satisfy the new assignment | `atlas_s1_faults_quarantine_stale_and_missing_evidence` (J4's revision-1 evidence is refused as stale after the revision); `superseded_result_is_applied_after_delivery_without_accepting_old_evidence`; `acceptance_waits_for_directive_application_before_unlocking_dependents` |
+| After 30 s without an applied acknowledgement: hold dependent work, request interrupt and checkpoint | the Atlas held-redirect replay (dependent review held, one checkpoint request, the worker interrupted, no result accepted); `unapplied_redirect_times_out_and_holds_dependent_work` |
+| A harness with no qualified delivery/acknowledgement path is excluded before launch | `a_harness_without_a_swarm_delivery_path_is_excluded_before_launch` (`daemon/tests/swarm_native.rs`, new; passed on first run once the director's account was set apart): an approved Codex profile is excluded in the route decision as `swarm_worker_launch_unsupported` and the job launches on a Claude account with the daemon's Swarm tools; `uncontrolled_native_delegation_blocks_admission_before_reserving_or_launching` (the fixture path refuses a Codex target before any attempt or reservation) |
+
+The new test runs the proposed native path (`swarm.native_director` switched on inside the test only; the default stays off). Rerun on 2026-09-28: `swarm_native` 8 passed serially (one earlier full-file run had `four_way_launch_matrix_auto_manual_by_swarm_on_off` fail once under machine load; it passed alone and in the next full-file run), the Atlas redirect and stale-evidence replays against PostgreSQL 16, and `swarm_runtime delivered_redirect`.
+
+Boundary: whether a real Claude worker applies a redirect in the middle of a live tool call is SWARM-25 material.

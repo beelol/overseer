@@ -524,7 +524,7 @@
       "blocker": null
     },
     "SWARM-43": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
@@ -535,9 +535,10 @@
         "daemon/tests/swarm_atlas.rs",
         "daemon/tests/swarm_runtime.rs",
         "docs/verification/swarm/SWARM-43.md",
-        "fixtures/swarm/atlas-v1/swarm-j4-long-worker.mjs"
+        "fixtures/swarm/atlas-v1/swarm-j4-long-worker.mjs",
+        "daemon/tests/swarm_native.rs"
       ],
-      "blocker": "The joined S1 replay records delivered/applied advisories and J4 overlap redirect. Local acceptance and final completion hold unapplied director redirects, advisories and retractions; new directives to finished attempts are rejected while exact receipts replay. Daemon fixtures enforce the 30-second applied-ack timeout, and a joined Atlas S5 replay sends a revision-2 plan redirect while J4’s PostgreSQL attachment probe is held: receipt remains delivered, dependent review stays held, a checkpoint is queued and the linked worker is interrupted without accepting a result. The complete six-job S1 revision-2 and stale-output trace, qualified live provider delivery/application, and exclusion of unsupported harness paths remain unverified."
+      "blocker": null
     },
     "SWARM-44": {
       "status": "partial",

@@ -696,6 +696,7 @@ fn driven(names: &[&str], accounts: &[(&str, f64)], pool: &[&str], jobs: &[&str]
         ("OVERSEER_SWARM_FIXTURE_DRAW", draw_file.to_str().unwrap())]);
     let mut ids = std::collections::BTreeMap::new();
     ids.insert("system-claude".to_string(), "system-claude".to_string());
+    ids.insert("system-codex".to_string(), "system-codex".to_string());
     for name in names {
         let id = w.d.call("profile.create", json!({"name":name,"harness":"claude"}))["id"].as_str().unwrap().to_string();
         ids.insert(name.to_string(), id);
@@ -918,4 +919,30 @@ fn one_job_falls_back_once_then_stops_and_an_uncertain_effect_pauses() {
         [&run, &job.to_string()], |r| r.get(0)).unwrap() };
     assert_eq!((attempts("x"), attempts("y")), (2, 1));
     assert_eq!(count(&t.w.d, "SELECT COUNT(*) FROM swarm_worker_launches WHERE run_id=?1", &run), 3);
+}
+
+/// SWARM-43: a harness with no qualified Swarm delivery and acknowledgement
+/// path is excluded before launch, with the limitation shown. The approved
+/// pool holds a Codex profile (no Swarm broker transport for Codex workers)
+/// and Claude accounts (the daemon's Swarm tools). The route decision
+/// records Codex as `swarm_worker_launch_unsupported`, the job is admitted
+/// and launched on the Claude account, and nothing is admitted on Codex.
+#[test]
+fn a_harness_without_a_swarm_delivery_path_is_excluded_before_launch() {
+    // The director runs on the first approved Claude account (system-claude).
+    let t = driven(&["alpha"], &[("alpha", 0.0)], &["system-claude", "system-codex", "alpha"], &["a"], &["a"]);
+    let (w, ids) = (&t.w, &t.ids);
+    let (run, director, _) = start(w, "isolated", "delivery-path");
+    wait_trace(w, step("dispatched", "director"), "plan", 60);
+    let a = dispatch_job(&w.d, &director, json!({"job_id":"a","brief":"Job a: a"}));
+    assert_eq!(a["status"], "launched", "{a}");
+    assert_eq!(admitted_routes(&w.d, &run, "a"), vec![(ids["alpha"].clone(), "sonnet".to_string(), "medium".to_string())]);
+    let decisions = route_decisions(&w.d, &run, "a");
+    assert_eq!(decisions.len(), 1);
+    assert_eq!(exclusion_reasons(&decisions[0]).get("system-codex").map(String::as_str),
+        Some("swarm_worker_launch_unsupported"), "{}", decisions[0]);
+    let codex: i64 = db(&w.d).query_row("SELECT COUNT(*) FROM swarm_admissions WHERE run_id=?1
+        AND target_profile_id='system-codex'", [&run], |r| r.get(0)).unwrap();
+    assert_eq!(codex, 0);
+    std::fs::write(&t.worker_gate, "open").unwrap();
 }
