@@ -1120,18 +1120,12 @@ fn unselected_accounts_are_never_candidates_for_work_or_fallback() {
     std::fs::write(&only.worker_gate, "open").unwrap();
 }
 
-/// The director's own qualified draw (class `swarm/director`) with the
-/// Claude calibration of 2026-09-28, on the product path with the switch at
-/// its default (on). The identity read records the plan; seven serial Claude
-/// runs on the account (sonnet, medium: the director's route) leave five
-/// neighbour-bracketed samples; they are recorded as director runs of
-/// earlier Swarm runs (the class is the only seeded fact; readings, runs and
-/// bracketing are real). The confirmed start's director then books its
-/// account on that draw instead of running unbooked, and a booked start on
-/// the same account is no longer refused `account_pool_busy` while it runs.
-#[test]
-fn a_calibrated_director_books_its_account_with_its_own_draw() {
-    let dir = tmp();
+/// A world whose Claude account has a qualified `swarm/director` draw: the
+/// identity read records the plan; seven serial Claude runs on the account
+/// (sonnet, medium: the director's route) leave five neighbour-bracketed
+/// samples; they are recorded as director runs of earlier Swarm runs (the
+/// class is the only seeded fact; readings, runs and bracketing are real).
+fn calibrated_director_world(dir: tempfile::TempDir, extra: &[(&str, &str)]) -> World {
     let meter = dir.path().join("meter.json");
     let plan = dir.path().join("plan.txt");
     std::fs::write(&plan, "max").unwrap();
@@ -1141,9 +1135,11 @@ fn a_calibrated_director_books_its_account_with_its_own_draw() {
     let passthrough = "CLAUDE_FIXTURE_MODE,CLAUDE_FIXTURE_VERSION,CLAUDE_FIXTURE_HELP,CLAUDE_FIXTURE_SWARM_SCRIPT,\
         CLAUDE_FIXTURE_SWARM_WORKERS,CLAUDE_FIXTURE_METER_FILE,CLAUDE_FIXTURE_PLAN_FILE";
     let (meter_path, plan_path) = (meter.display().to_string(), plan.display().to_string());
-    let w = world_in(dir, &[("OVERSEER_SWARM_FIXTURE_API", "0"), ("OVERSEER_SHARED_BOOKING_FIXTURE_API", "1"),
+    let mut env = vec![("OVERSEER_SWARM_FIXTURE_API", "0"), ("OVERSEER_SHARED_BOOKING_FIXTURE_API", "1"),
         ("OVERSEER_HARNESS_ENV_PASSTHROUGH", passthrough), ("CLAUDE_FIXTURE_METER_FILE", meter_path.as_str()),
-        ("CLAUDE_FIXTURE_PLAN_FILE", plan_path.as_str()), ("OVERSEER_TEST_DRAW_SETTLE_MS", "300")]);
+        ("CLAUDE_FIXTURE_PLAN_FILE", plan_path.as_str()), ("OVERSEER_TEST_DRAW_SETTLE_MS", "300")];
+    env.extend_from_slice(extra);
+    let w = world_in(dir, &env);
     let identity = w.d.call("auto.quota.refresh", json!({"profile_id":"system-claude"}));
     assert_eq!(identity["plan"], "max", "{identity}");
     let mut earlier = Vec::new();
@@ -1168,6 +1164,21 @@ fn a_calibrated_director_books_its_account_with_its_own_draw() {
                 rusqlite::params![format!("earlier-swarm-{n}"), format!("{n:064}"), run]).unwrap();
         }
     }
+    w
+}
+
+/// The director's own qualified draw (class `swarm/director`) with the
+/// Claude calibration of 2026-09-28, on the product path with the switch at
+/// its default (on). The identity read records the plan; seven serial Claude
+/// runs on the account (sonnet, medium: the director's route) leave five
+/// neighbour-bracketed samples; they are recorded as director runs of
+/// earlier Swarm runs (the class is the only seeded fact; readings, runs and
+/// bracketing are real). The confirmed start's director then books its
+/// account on that draw instead of running unbooked, and a booked start on
+/// the same account is no longer refused `account_pool_busy` while it runs.
+#[test]
+fn a_calibrated_director_books_its_account_with_its_own_draw() {
+    let w = calibrated_director_world(tmp(), &[]);
     w.d.call("agents.limit.set", json!({"max_active":5}));
     w.d.call("swarm.policy.set", json!({"scope":"application","allowed_targets":["system-claude"]}));
     std::fs::write(&w.script, json!({"trace":w.trace,"gate":w.gate,
@@ -1341,6 +1352,96 @@ fn native_claude_workers_audit_read_only_and_a_source_change_fails_the_attempt()
     let deadline = Instant::now() + Duration::from_secs(20);
     while active(&w.d) != 0 {
         assert!(Instant::now() < deadline, "slots still held after the audit run stopped");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+/// SWARM-40 (planning shares the allocation) and SWARM-24 (an approved
+/// director keeps working at Overseer's daily cap, metered to its
+/// allocation). The calibrated director's booking is made against the run's
+/// category allocation: it freezes the run's cap in each window and its draw
+/// counts in the run's outstanding use, so a worker whose draw would fit the
+/// allocation alone is refused once the director's draw is counted. Overseer
+/// is at its cap of self-started turns throughout; the director plans and
+/// dispatches anyway, and Overseer's count does not move.
+#[test]
+fn the_directors_booking_draws_on_the_runs_allocation_and_works_at_overseers_cap() {
+    let dir = tmp();
+    let draw_file = dir.path().join("draws.json");
+    let offers_gate = dir.path().join("offers-gate");
+    let draw_path = draw_file.display().to_string();
+    let w = calibrated_director_world(dir, &[("OVERSEER_SWARM_FIXTURE_DRAW", draw_path.as_str())]);
+    // Overseer at its cap: one self-started turn today against a cap of one.
+    w.d.call("overseer.cap", json!({"cap":1}));
+    db(&w.d).execute("INSERT INTO overseer_turns(ts,session_id,cause,turn_id) VALUES(?1,'earlier','check_in',NULL)",
+        [std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64]).unwrap();
+    let overseer_turns = || -> i64 { db(&w.d).query_row("SELECT COUNT(*) FROM overseer_turns WHERE cause!='owner'",
+        [], |r| r.get(0)).unwrap() };
+    w.d.call("agents.limit.set", json!({"max_active":5}));
+    w.d.call("swarm.policy.set", json!({"scope":"application","allowed_targets":["system-claude"]}));
+    std::fs::write(&w.script, json!({"trace":w.trace,"gate":w.gate,"wait_before_offers":offers_gate,
+        "jobs":[{"id":"a","title":"Tenant lookup","acceptance":"evidence","deps":[]}],
+        "estimate":benefit(&["a"]),"offers":[{"job":"a"}],"dispatch":[]}).to_string()).unwrap();
+    std::fs::write(&w.workers, json!({"trace":w.trace,"jobs":{"a":{"evidence":[{"id":"a-proof","kind":"finding",
+        "content":"x"}]}}}).to_string()).unwrap();
+    let (run, director, _) = start(&w, "isolated", "director-allocation");
+    wait_trace(&w, step("planned", "director"), "the director's plan", 30);
+    let db = db(&w.d);
+    let (booking, created): (String, i64) = db.query_row(
+        "SELECT work_unit_id,created_ms FROM shared_booking_intents WHERE run_id=?1", [&director],
+        |r| Ok((r.get(0)?, r.get(1)?))).expect("the director booked its account");
+    assert!(booking.starts_with(&format!("swarm-director/{run}/")), "the booking belongs to the run: {booking}");
+    let director_draw: Vec<(String, i64)> = {
+        let mut st = db.prepare("SELECT window_key,amount_milli FROM shared_booking_windows WHERE work_unit_id=?1
+            ORDER BY window_key").unwrap();
+        st.query_map([&booking], |r| Ok((r.get(0)?, r.get(1)?))).unwrap().map(Result::unwrap).collect()
+    };
+    assert_eq!(director_draw.len(), 2);
+    // The run's cap is frozen at the director's booking, and its draw is the
+    // run's outstanding use.
+    let capacity = w.d.call("swarm.get", json!({"id":run}))["capacity"]["windows"].clone();
+    let windows = capacity.as_array().unwrap();
+    assert_eq!(windows.len(), 2, "{capacity}");
+    let frozen: i64 = db.query_row("SELECT COUNT(*) FROM swarm_pool_caps WHERE run_id=?1 AND created_ms<=?2",
+        rusqlite::params![run, created + 1000], |r| r.get(0)).unwrap();
+    assert_eq!(frozen, 2, "frozen with the director's booking");
+    for (key, amount) in &director_draw {
+        let window = windows.iter().find(|w| w["window_id"] == key.as_str()).unwrap();
+        assert_eq!(window["outstanding_estimate_milli"].as_i64(), Some(*amount), "{capacity}");
+    }
+    // A worker whose draw fits the run's allocation less its reserve, but
+    // not once the director's draw is counted, is refused.
+    let five = windows.iter().find(|w| w["window_id"] == director_draw[0].0.as_str()).unwrap();
+    let room = five["allocation_milli"].as_i64().unwrap() - five["finishing_reserve_milli"].as_i64().unwrap();
+    let other = windows.iter().find(|w| w["window_id"] == director_draw[1].0.as_str()).unwrap();
+    let other_room = other["allocation_milli"].as_i64().unwrap() - other["finishing_reserve_milli"].as_i64().unwrap()
+        - director_draw[1].1;
+    assert!(room > director_draw[0].1 && other_room > 1, "{capacity}");
+    let (seq, generation): (i64, i64) = db.query_row(
+        "SELECT o.event_seq,a.generation FROM auto_quota_observations o JOIN auto_account_identity a
+         ON a.profile_id=o.pool_id WHERE o.pool_id='system-claude' ORDER BY o.observed_ms DESC,o.event_seq DESC LIMIT 1",
+        [], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+    let keys: Vec<String> = { let mut st = db.prepare("SELECT window_key FROM shared_booking_windows WHERE work_unit_id=?1
+        ORDER BY rowid").unwrap(); st.query_map([&booking], |r| r.get(0)).unwrap().map(Result::unwrap).collect() };
+    let worker_draw: Vec<i64> = keys.iter().map(|k| if *k == director_draw[0].0 { room - director_draw[0].1 + 500 } else { 1 })
+        .collect();
+    std::fs::write(&draw_file, json!({"system-claude":{"account_generation":generation,"quota_event_seq":seq,
+        "upper_draw_milli":worker_draw}}).to_string()).unwrap();
+    std::fs::write(&offers_gate, "open").unwrap();
+    let offered = wait_trace(&w, |t| t["step"] == "offered" && t["job"] == "a", "the offer", 30);
+    assert_eq!((offered["status"].as_str(), offered["reason"].as_str()), (Some("blocked"), Some("no_eligible_route")),
+        "{offered}");
+    let reasons = exclusion_reasons(&json!({"decision":offered["decision"]}));
+    assert_eq!(reasons.get("system-claude/sonnet/medium").map(String::as_str), Some("category_allocation_exceeded"),
+        "{offered}");
+    // The director kept working at Overseer's cap; Overseer's count did not move.
+    wait_trace(&w, step("dispatched", "director"), "the director's dispatch step", 30);
+    assert_eq!(overseer_turns(), 1, "director turns are not Overseer's");
+    let revision = w.d.call("swarm.get", json!({"id":run}))["revision"].clone();
+    w.d.call("swarm.stop", json!({"run_id":run,"generation":1,"revision":revision}));
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while active(&w.d) != 0 {
+        assert!(Instant::now() < deadline, "slots still held after the run stopped");
         std::thread::sleep(Duration::from_millis(50));
     }
 }

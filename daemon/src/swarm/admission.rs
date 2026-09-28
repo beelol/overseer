@@ -890,13 +890,16 @@ pub(super) fn category_allocation(
                 prior.map_or(fresh, |prior| prior.min(fresh))
             }
         };
+        // The run's own bookings: its workers' attempts and its director's
+        // (planning, review and synthesis share the one allocation).
         let own: i64 = conn.query_row(
             "SELECT COALESCE(SUM(w.amount_milli),0) FROM shared_booking_windows w
              JOIN auto_pool_claims c ON c.work_unit_id=w.work_unit_id
-             JOIN swarm_attempts a ON 'swarm/'||a.id=w.work_unit_id
-             WHERE a.run_id=?1 AND w.pool_id=?2 AND c.state IN ('active','uncertain')
+             WHERE w.pool_id=?2 AND c.state IN ('active','uncertain')
+               AND (w.work_unit_id IN (SELECT 'swarm/'||a.id FROM swarm_attempts a WHERE a.run_id=?1)
+                    OR substr(w.work_unit_id,1,length(?5))=?5)
                AND (w.window_key=?3 OR w.window_key NOT IN (SELECT value FROM json_each(?4)))",
-            params![run, pool, key, keys_json], |row| row.get(0))?;
+            params![run, pool, key, keys_json, director_booking_prefix(run)], |row| row.get(0))?;
         let reserve = if finishing { 0 } else { cap.saturating_mul(reserve_percent) / 100 };
         result.push(BookedWindow {
             pool: pool.clone(), key: key.clone(), cap, reserve,
@@ -904,4 +907,56 @@ pub(super) fn category_allocation(
         });
     }
     Ok(result)
+}
+
+/// The prefix of a run's director bookings (`swarm-director/<run>/…`).
+pub fn director_booking_prefix(run: &str) -> String {
+    format!("swarm-director/{run}/")
+}
+
+/// Book a native director's launch against its run's category allocation
+/// (SWARM-40: planning shares the one allocation). In one IMMEDIATE
+/// transaction: the category's remaining allocation in each window of the
+/// cited reading is passed to the shared booking, and a booked director
+/// freezes the run's cap in those windows, as a worker's first booking does.
+pub fn book_director_launch(
+    store: &Store,
+    run: &str,
+    account: &crate::account_booking::AccountBookingRequest<'_>,
+    workspace_path: Option<&str>,
+    consume_agent_slot: bool,
+    launch_hash: &str,
+) -> Result<crate::account_booking::LaunchBookingDecision> {
+    if !account.id.starts_with(&director_booking_prefix(run)) {
+        bail!("a director booking belongs to its run");
+    }
+    let tx = rusqlite::Transaction::new_unchecked(&store.conn, rusqlite::TransactionBehavior::Immediate)?;
+    let current = get(store, run)?;
+    let effective = &current["policy"]["effective"];
+    let cited = crate::account_booking::cited_windows_in_tx(&tx, account.quota_profile_id, account.quota_event_seq)?;
+    let allocation = match &cited {
+        Some(windows) => Some(category_allocation(&tx, run, windows, effective, false)?),
+        None => None,
+    };
+    let remaining: Option<Vec<i64>> = allocation.as_ref().map(|w| w.iter().map(|w| w.remaining).collect());
+    let request = crate::account_booking::AccountBookingRequest {
+        id: account.id, request_hash: account.request_hash, caller: account.caller,
+        route_id: account.route_id, profile_id: account.profile_id,
+        quota_profile_id: account.quota_profile_id, account_generation: account.account_generation,
+        quota_event_seq: account.quota_event_seq, now_ms: account.now_ms, draw: account.draw,
+        allocation_remaining_milli: remaining.as_deref(),
+    };
+    let decision = crate::account_booking::book_shared_launch_in_tx(&tx,
+        &crate::account_booking::LaunchBookingRequest { account: &request, workspace_path,
+            consume_agent_slot, launch_hash })?;
+    if matches!(decision, crate::account_booking::LaunchBookingDecision::Booked(_)) {
+        for window in allocation.iter().flatten() {
+            tx.execute("INSERT OR IGNORE INTO swarm_pool_caps(run_id,pool_id,window_id,unit,allocation_milli,created_ms)
+                VALUES(?1,?2,?3,'percent_milli',?4,?5)",params![run,window.pool,window.key,window.cap,account.now_ms])?;
+            tx.execute("INSERT OR IGNORE INTO swarm_allocations(run_id,pool_id,window_id,unit,allocation_milli,reserve_milli,created_ms)
+                VALUES(?1,?2,?3,'percent_milli',?4,?5,?6)",params![run,window.pool,window.key,window.cap,window.reserve,account.now_ms])?;
+        }
+    }
+    tx.commit()?;
+    Ok(decision)
 }

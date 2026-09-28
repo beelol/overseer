@@ -673,6 +673,7 @@ async function mcpClient() {
       const planned = await call('swarm_plan', { jobs: script.jobs, estimate: script.estimate });
       if (planned.error) throw new Error('plan: ' + planned.error);
       trace('planned', { revision: planned.revision, benefit: planned.benefit });
+      if (script.wait_before_offers) await waitFile(script.wait_before_offers, 60000);
       for (const offer of script.offers || []) {
         const offered = { job_id: offer.job, brief: offer.brief || `Job ${offer.job}: ${offer.job}` };
         if (offer.target) offered.target = offer.target;

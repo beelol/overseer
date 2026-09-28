@@ -209,6 +209,9 @@ struct SharedStart {
     launch_hash: String,
     /// Booked by the daemon for an ordinary start that asked for none.
     automatic: bool,
+    /// A native director's booking: its Swarm run, whose category
+    /// allocation the booking draws on.
+    director_run: Option<String>,
 }
 
 impl SharedStart {
@@ -260,6 +263,7 @@ impl SharedStart {
             launch_hash: format!("{:x}", sha2::Sha256::digest(p.to_string().as_bytes())),
             id,
             automatic: false,
+            director_run: None,
         })
     }
 
@@ -267,9 +271,15 @@ impl SharedStart {
     /// qualified draw when one exists (handover step 4). Its app slot stays
     /// the start's own durable hold, so the booking takes none; any refusal
     /// falls back to the unbooked start, which keeps today's behavior.
-    fn automatic(store: &Store, p: &Value, harness: &str, profile_id: &str, task_class: &str) -> Result<Self> {
+    fn automatic(store: &Store, p: &Value, harness: &str, profile_id: &str, task_class: &str,
+        director: Option<&SwarmDirectorIdentity>) -> Result<Self> {
         use sha2::Digest;
-        let id = format!("ordinary/{}", uuid::Uuid::new_v4().simple());
+        let id = match director {
+            // A director's booking is its run's (the category allocation counts it).
+            Some(identity) => format!("{}g{}/{}", crate::swarm::director_booking_prefix(&identity.run_id),
+                identity.generation, uuid::Uuid::new_v4().simple()),
+            None => format!("ordinary/{}", uuid::Uuid::new_v4().simple()),
+        };
         Ok(Self {
             request_hash: id.clone(),
             route_id: format!("{harness}/{}", p["model"].as_str().unwrap_or("default")),
@@ -286,6 +296,7 @@ impl SharedStart {
             launch_hash: format!("{:x}", sha2::Sha256::digest(p.to_string().as_bytes())),
             id,
             automatic: true,
+            director_run: director.map(|identity| identity.run_id.clone()),
         })
     }
 }
@@ -914,7 +925,11 @@ impl Daemon {
             if can_book {
                 let store = self.store.lock().unwrap();
                 let class = if native_director { "swarm/director" } else { crate::upper_draw::AGENT_CLASS };
-                shared_start = Some(SharedStart::automatic(&store, p, harness, profile_id, class)?);
+                let director = match swarm_identity.as_ref() {
+                    Some(SwarmLaunchIdentity::Director(identity)) if native_director => Some(*identity),
+                    _ => None,
+                };
+                shared_start = Some(SharedStart::automatic(&store, p, harness, profile_id, class, director)?);
             }
         }
         let target_ref = p["target_ref"].as_str().filter(|s| !s.is_empty()).map(str::to_string);
@@ -928,7 +943,8 @@ impl Daemon {
         if let Some(start) = &shared_start {
             let workspace_path = (mode == "current").then(|| repo.display().to_string());
             let account = crate::account_booking::AccountBookingRequest {
-                id: &start.id, request_hash: &start.request_hash, caller: "ordinary",
+                id: &start.id, request_hash: &start.request_hash,
+                caller: if start.director_run.is_some() { "swarm_director" } else { "ordinary" },
                 route_id: &start.route_id, profile_id: &start.profile_id,
                 quota_profile_id: &start.quota_profile_id,
                 account_generation: start.account_generation,
@@ -939,11 +955,15 @@ impl Daemon {
                 },
                 allocation_remaining_milli: None,
             };
-            let decision = self.store.lock().unwrap().book_shared_launch(
-                &crate::account_booking::LaunchBookingRequest {
-                    account: &account, workspace_path: workspace_path.as_deref(),
-                    consume_agent_slot: start.consume_agent_slot, launch_hash: &start.launch_hash,
-                });
+            let decision = match &start.director_run {
+                Some(run) => crate::swarm::book_director_launch(&self.store.lock().unwrap(), run, &account,
+                    workspace_path.as_deref(), start.consume_agent_slot, &start.launch_hash),
+                None => self.store.lock().unwrap().book_shared_launch(
+                    &crate::account_booking::LaunchBookingRequest {
+                        account: &account, workspace_path: workspace_path.as_deref(),
+                        consume_agent_slot: start.consume_agent_slot, launch_hash: &start.launch_hash,
+                    }),
+            };
             let booked = match decision {
                 // Unknown draw, busy or short account, stale reading: the
                 // ordinary start proceeds unbooked, exactly as before.
