@@ -1,6 +1,6 @@
 # SWARM-03 — dependency and resource-aware concurrency
 
-Status: partial. Revision: `2c9b1c5`. Support level: daemon fixture paths only.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. First revision: `2c9b1c5`.
 
 Input: a version-1 Swarm plan contains two ready audit jobs that both declare an exclusive `db:shared` write claim. The director supplies paired serial/parallel estimates and marks them independent. A second fixture creates two categories whose ready jobs each declare an exclusive `db:tenant-fixture` write claim, but submits admission requests without any claim. Both use the built-in Swarm policy and synthetic exact quota snapshots. The benefit fixture restarts the daemon after planning.
 
@@ -66,3 +66,15 @@ replays cover declared dependency and resource coordination without touching
 the owner's editor or a live provider. Real worktree writer enforcement,
 undeclared resource discovery and a qualified live route leave SWARM-03
 partial.
+
+## Verified at fixture scope (2026-09-28)
+
+| Clause | Test |
+| --- | --- |
+| Replay a serial dependency chain, three independent jobs and overlapping write ownership | `dependency_chain_explains_serial_work_while_independent_jobs_admit` (one plan with root→child→leaf, three independent jobs and two writers of `db:shared`; a second run walks the chain in order) |
+| Only ready independent jobs run concurrently | the same test (the root, the three independent jobs and one writer are admitted in one wave; five attempts, none for the held jobs); supervised: `independent_jobs_execute_together_while_conflicting_writer_waits` (five real processes run together across two growth waves while the conflicting writer is held without an attempt), `supervised_dependency_chain_waits_for_accepted_result_and_exit` |
+| Serial execution has an explicit reason | `dependency_pending` with `waiting_on` naming the blocking job; `resource_conflict` for the second writer; a benefit decision of `serial` with `resource_conflict` when overlapping writers are proposed as a batch (`planned_exclusive_claim_overrides_director_parallel_estimate`); `growth_wave_full` for a wave already at its size |
+
+Rerun serially on 2026-09-28: `swarm_admission` 39, `swarm_runtime` 25, `swarm_benefit` 9.
+
+Boundary: resource ownership is what the plan declares; discovering undeclared resources and tool-level writer enforcement inside a live harness are not claimed.

@@ -28,7 +28,7 @@
       "blocker": "Fixture allowlists exclude a newly observed unselected account and require a destination-specific checkpoint grant before selected account B resumes. Live discovery/provider-context permissions, denied-only routing and ordinary fallback remain unverified."
     },
     "SWARM-03": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
         "daemon/tests/swarm_benefit.rs",
@@ -39,7 +39,7 @@
         "docs/verification/swarm/S5.md",
         "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "Supervised fixture processes now execute five jobs concurrently across two growth waves while holding a conflicting database writer without an attempt. A separate supervised root→child→leaf replay holds each dependent before accepted evidence and after acceptance until the parent process exits, then admits it. Real worktree writer enforcement, undeclared-resource discovery and a qualified live route remain incomplete."
+      "blocker": null
     },
     "SWARM-04": {
       "status": "partial",

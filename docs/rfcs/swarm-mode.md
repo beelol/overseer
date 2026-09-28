@@ -610,7 +610,7 @@ fixture proves policy behavior, not live provider compatibility.
 | --- | --- |
 | SWARM-01 | [ ] Exercise all four Auto/Manual × Swarm on/off combinations. Swarm off creates no Overseer worker; manual swarm stays within its selected pool; enabled swarm may choose one agent. Existing manual/native behavior remains intact. |
 | SWARM-02 | [ ] A newly discovered account remains excluded until selected. A denied provider/context destination is never used for workers, fallback, or checkpoint transfer; test routing with only denied candidates. |
-| SWARM-03 | [ ] Replay a serial dependency chain, three independent jobs, and overlapping write ownership. Only ready independent jobs run concurrently; serial execution has an explicit reason. |
+| SWARM-03 | [x] Replay a serial dependency chain, three independent jobs, and overlapping write ownership. Only ready independent jobs run concurrently; serial execution has an explicit reason. |
 | SWARM-04 | [ ] Given identical plan, policy, telemetry, and reservation state, scheduler decisions and reason codes match on replay. Changing a provider name without changing capabilities/health does not change policy eligibility. |
 | SWARM-05 | [ ] In paired serial/parallel fixtures, include planning/context/integration/review costs. Reject parallelism when benefit is absent or finishing becomes unaffordable; admit an affordable beneficial batch. Retain estimates and actuals. |
 | SWARM-06 | [ ] Give a cheap target insufficient capabilities and a qualified target higher cost. Reject the cheap target; if no qualified target exists, block visibly instead of degrading the quality requirement. |
