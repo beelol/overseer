@@ -52,6 +52,12 @@ impl Daemon {
         };
         let messages = Self::messages_of(&store, &id, 0, 50)?;
         let mut proposals = Self::proposals_of(&store, &id, true)?;
+        // The latest answered proposals, drawn as cards with a row per agent (AC-185).
+        let answered: Vec<String> = {
+            let mut stmt = store.conn.prepare("SELECT id FROM overseer_proposals WHERE session_id=?1 AND state NOT IN ('open', 'settling', 'answering') ORDER BY COALESCE(answered_ms, ts) DESC LIMIT 10")?;
+            let rows = stmt.query_map([&id], |r| r.get::<_, String>(0))?.collect::<rusqlite::Result<Vec<_>>>()?;
+            rows
+        };
         let run_status = run_id.as_deref().and_then(|r| store.run(r).ok().flatten()).map(|r| r.status);
         let queued: i64 = store.conn.query_row("SELECT COUNT(*) FROM overseer_pending WHERE session_id=?1", [&id], |r| r.get(0)).unwrap_or(0);
         let cursor = store.max_seq()?;
@@ -60,13 +66,23 @@ impl Daemon {
             let lines: Vec<String> = p["actions"].as_array().map(|a| a.iter().map(|x| self.describe(x)).collect()).unwrap_or_default();
             p["lines"] = json!(lines);
         }
+        let cards: Vec<Value> = answered
+            .iter()
+            .rev()
+            .filter_map(|p| self.card(p).ok())
+            .map(|mut c| {
+                let lines: Vec<String> = c["actions"].as_array().map(|a| a.iter().map(|x| crate::redact::redact(&self.describe(x))).collect()).unwrap_or_default();
+                c["lines"] = json!(lines);
+                c
+            })
+            .collect();
         // What Overseer and the watchers have used: the harnesses' own numbers, or not reported.
         let usage = json!({
             "overseer": run_id.as_deref().and_then(|r| self.digest(r).ok()).map(|d| d.usage).unwrap_or(json!("not reported")),
             "turns_today": self.self_started_today(),
             "watchers": self.watches_list(None, false).ok().and_then(|w| w["watches"].as_array().cloned()).unwrap_or_default().iter().filter_map(|w| w["watcher"].as_str().map(str::to_string)).collect::<std::collections::BTreeSet<_>>().into_iter().map(|w| json!({"run_id": w, "usage": self.digest(&w).ok().map(|d| d.usage).unwrap_or(json!("not reported"))})).collect::<Vec<_>>(),
         });
-        Ok(json!({"id": id, "started_ms": started_ms, "harness": harness, "model": model, "run_id": run_id, "task_id": task_id, "run_status": run_status, "level": level, "levels": LEVELS, "messages": messages, "proposals": proposals, "pending": queued, "last_seq": last_seq, "cursor": cursor, "usage": usage}))
+        Ok(json!({"id": id, "started_ms": started_ms, "harness": harness, "model": model, "run_id": run_id, "task_id": task_id, "run_status": run_status, "level": level, "levels": LEVELS, "messages": messages, "proposals": proposals, "cards": cards, "pending": queued, "last_seq": last_seq, "cursor": cursor, "usage": usage}))
     }
 
     fn messages_of(store: &crate::store::Store, session: &str, after: i64, limit: i64) -> Result<Vec<Value>> {
