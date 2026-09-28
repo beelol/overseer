@@ -113,6 +113,104 @@ impl TurnOpts {
     }
 }
 
+/// A caller-qualified shared launch booking for an ordinary start. Only a
+/// fixture caller may supply one until upper draws can be qualified; the
+/// in-process Swarm caller will use the same booking functions directly.
+struct SharedStart {
+    id: String,
+    request_hash: String,
+    route_id: String,
+    profile_id: String,
+    quota_profile_id: String,
+    account_generation: i64,
+    quota_event_seq: i64,
+    upper_draw_milli: Vec<i64>,
+    consume_agent_slot: bool,
+    launch_hash: String,
+}
+
+impl SharedStart {
+    fn from_params(booking: &Value, p: &Value, harness: &str, profile_id: &str) -> Result<Self> {
+        if std::env::var("OVERSEER_SHARED_BOOKING_FIXTURE_API").as_deref() != Ok("1") {
+            bail!("shared launch booking is not available to this caller");
+        }
+        let text = |key: &str| booking[key].as_str().filter(|value| !value.is_empty()).map(str::to_string);
+        let id = text("work_unit_id").ok_or_else(|| anyhow!("shared booking needs a work_unit_id"))?;
+        let upper_draw_milli = booking["upper_draw_milli"].as_array()
+            .filter(|draws| !draws.is_empty() && draws.len() <= 32)
+            .and_then(|draws| draws.iter().map(Value::as_i64).collect::<Option<Vec<_>>>())
+            .ok_or_else(|| anyhow!("shared booking needs an upper draw for every window"))?;
+        use sha2::Digest;
+        Ok(Self {
+            request_hash: text("request_hash").unwrap_or_else(|| id.clone()),
+            route_id: text("route_id").unwrap_or_else(||
+                format!("{harness}/{}", p["model"].as_str().unwrap_or("default"))),
+            profile_id: profile_id.to_string(),
+            quota_profile_id: text("quota_profile_id").unwrap_or_else(|| profile_id.to_string()),
+            account_generation: booking["account_generation"].as_i64()
+                .ok_or_else(|| anyhow!("shared booking needs the account generation"))?,
+            quota_event_seq: booking["quota_event_seq"].as_i64()
+                .ok_or_else(|| anyhow!("shared booking needs the cited quota observation"))?,
+            upper_draw_milli,
+            consume_agent_slot: booking["consume_agent_slot"].as_bool().unwrap_or(true),
+            // Every launch input is bound to the intent: a replay with any
+            // changed field is refused rather than treated as the same start.
+            launch_hash: format!("{:x}", sha2::Sha256::digest(p.to_string().as_bytes())),
+            id,
+        })
+    }
+}
+
+#[derive(PartialEq)]
+enum SharedLaunchStage { Booked, Claimed, Bound }
+
+/// Held by the request that booked a shared launch until its run is bound.
+/// Stopping while only booked is a confirmed pre-effect failure and releases
+/// everything. Stopping after the effects claim, before any run is bound,
+/// means no model process can have started: the slot and the account
+/// commitment are released, the writer stays held for reconciliation.
+struct UnboundSharedLaunch {
+    daemon: Arc<Daemon>,
+    id: String,
+    stage: SharedLaunchStage,
+}
+
+impl UnboundSharedLaunch {
+    /// Called immediately before the first external (Git) effect.
+    fn claim_effects(&mut self) -> Result<()> {
+        if !self.daemon.store.lock().unwrap().claim_shared_launch_effects(&self.id)? {
+            self.stage = SharedLaunchStage::Bound;
+            bail!("shared launch {} was claimed by another request", self.id);
+        }
+        self.stage = SharedLaunchStage::Claimed;
+        shared_launch_test_crash("after_claim");
+        Ok(())
+    }
+}
+
+impl Drop for UnboundSharedLaunch {
+    fn drop(&mut self) {
+        let store = self.daemon.store.lock().unwrap();
+        let released = match self.stage {
+            SharedLaunchStage::Booked => store.release_shared_booking_pre_effect(&self.id),
+            SharedLaunchStage::Claimed => store.release_unbound_shared_launch(&self.id),
+            SharedLaunchStage::Bound => return,
+        };
+        if let Err(error) = released {
+            crate::log(&format!("shared launch {} kept its holds: {error}", self.id));
+        }
+    }
+}
+
+/// Test-only crash points between booking, claiming and binding.
+fn shared_launch_test_crash(point: &str) {
+    if std::env::var("OVERSEER_TEST_SHARED_LAUNCH_CRASH").as_deref() == Ok(point) {
+        unsafe { libc::kill(libc::getpid(), libc::SIGKILL); }
+        // Delivery to this process is asynchronous: make no further progress.
+        loop { std::thread::park(); }
+    }
+}
+
 pub struct Daemon {
     pub store: Mutex<Store>,
     profile_gates: Mutex<BTreeMap<String, Arc<Mutex<()>>>>,
@@ -533,7 +631,18 @@ impl Daemon {
             }
             0
         };
-        if let Some(profile) = &profile {
+        let shared_start = match p.get("shared_booking") {
+            None | Some(Value::Null) => None,
+            Some(booking) => {
+                if auto_routing {
+                    bail!("an Auto parent cannot also carry a shared launch booking");
+                }
+                let profile = profile.as_ref()
+                    .ok_or_else(|| anyhow!("a shared launch booking needs an account profile"))?;
+                Some(SharedStart::from_params(booking, p, harness, &profile.id)?)
+            }
+        };
+        if let (Some(profile), None) = (&profile, &shared_start) {
             if self.store.lock().unwrap().auto_claim_conflicts_with_run(&profile.id, "")? {
                 bail!("{MANUAL_POOL_CONFLICT}");
             }
@@ -544,6 +653,33 @@ impl Daemon {
                 bail!("target ref {t} does not exist");
             }
         }
+        let mut unbound_launch = None;
+        if let Some(start) = &shared_start {
+            let workspace_path = (mode == "current").then(|| repo.display().to_string());
+            let account = crate::account_booking::AccountBookingRequest {
+                id: &start.id, request_hash: &start.request_hash, caller: "ordinary",
+                route_id: &start.route_id, profile_id: &start.profile_id,
+                quota_profile_id: &start.quota_profile_id,
+                account_generation: start.account_generation,
+                quota_event_seq: start.quota_event_seq, now_ms: now(),
+                upper_draw_milli: &start.upper_draw_milli, allocation_remaining_milli: None,
+            };
+            let decision = self.store.lock().unwrap().book_shared_launch(
+                &crate::account_booking::LaunchBookingRequest {
+                    account: &account, workspace_path: workspace_path.as_deref(),
+                    consume_agent_slot: start.consume_agent_slot, launch_hash: &start.launch_hash,
+                })?;
+            match decision {
+                crate::account_booking::LaunchBookingDecision::Blocked(reason) =>
+                    bail!("shared launch booking blocked: {reason}"),
+                crate::account_booking::LaunchBookingDecision::Replayed(_) =>
+                    return self.shared_start_replay(&start.id),
+                crate::account_booking::LaunchBookingDecision::Booked(_) => {}
+            }
+            unbound_launch = Some(UnboundSharedLaunch { daemon: self.clone(), id: start.id.clone(),
+                stage: SharedLaunchStage::Booked });
+            shared_launch_test_crash("after_book");
+        }
         let (ws, fork_commit, fork_prov) = match mode {
             "worktree" => {
                 let start = target_ref.clone().unwrap_or_else(|| "HEAD".into());
@@ -551,6 +687,9 @@ impl Daemon {
                 let repo_name = repo.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "repo".into());
                 let hash = &fingerprint(&common.display().to_string())[..8];
                 let parent = paths::worktrees_dir().join(format!("{repo_name}-{hash}"));
+                if let Some(launch) = unbound_launch.as_mut() {
+                    launch.claim_effects()?;
+                }
                 let (path, branch) = git::worktree_add(&repo, &parent, &title, &start_sha)?;
                 let ws = Workspace {
                     id: format!("w-{}", short_id()),
@@ -570,6 +709,13 @@ impl Daemon {
                 let path = repo.display().to_string();
                 if let Some(run) = self.active_writer(&path)? {
                     bail!("the current checkout already has an active writer (run {} '{}'); refusing a second independent writer", run.id, run.title);
+                }
+                let own = shared_start.as_ref().map(|start| start.id.as_str());
+                if let Some(hold) = self.store.lock().unwrap().shared_writer_hold(&path, own, None)? {
+                    bail!("the current checkout is held by shared launch {hold}; refusing a second independent writer");
+                }
+                if let Some(launch) = unbound_launch.as_mut() {
+                    launch.claim_effects()?;
                 }
                 let status = git::status(&repo)?;
                 let head = git::head(&repo);
@@ -672,10 +818,20 @@ impl Daemon {
         }
         {
             // Task and run appear together: a state snapshot never shows a task without its run.
+            // A booked start binds its run in the same commit, so the held slot and
+            // writer become this run's occupancy without ever counting it twice.
             let store = self.store.lock().unwrap();
+            let tx = store.conn.unchecked_transaction()?;
             store.insert_task(&task)?;
             store.insert_run(&run)?;
             store.set_workspace_owner(&ws.id, Some(&run.id))?;
+            if let Some(start) = &shared_start {
+                crate::account_booking::bind_shared_launch_run_in_tx(&tx, &start.id, &run.id, now())?;
+            }
+            tx.commit()?;
+        }
+        if let Some(launch) = unbound_launch.as_mut() {
+            launch.stage = SharedLaunchStage::Bound;
         }
         let opts = TurnOpts { model: None, ..TurnOpts::from_params(p)? };
         {
@@ -684,12 +840,64 @@ impl Daemon {
         }
         self.emit(Some(&task.id), Some(&run.id), "task_created", "daemon", "exact", json!({"task": task, "workspace": ws, "run": run}))?;
         let started = self.start_turn(&run.id, &prompt, false, &opts);
-        let run = self.run(&run.id)?;
+        let mut run = self.run(&run.id)?;
+        if let (Err(e), Some(_)) = (&started, &shared_start) {
+            // No supervisor identity was recorded, so no model process ran:
+            // settle the booked run so its holds do not wait for a restart.
+            if ACTIVE.contains(&run.status.as_str())
+                && self.store.lock().unwrap().run_process(&run.id)?.is_none() {
+                self.mark_ended(&run, "failed", &format!("not launched: {e}"))?;
+                run = self.run(&run.id)?;
+            }
+        }
         let task = self.task(&task.id)?;
         if let Err(e) = started {
             return Ok(json!({"task": task, "run": run, "workspace": ws, "launch_error": e.to_string()}));
         }
         Ok(json!({"task": task, "run": run, "workspace": ws}))
+    }
+
+    /// A repeated or concurrent booked start returns the run its first
+    /// request bound, and never claims or attempts the launch again.
+    fn shared_start_replay(self: &Arc<Self>, id: &str) -> Result<Value> {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        loop {
+            let intent = self.store.lock().unwrap().shared_launch_intent(id)?
+                .ok_or_else(|| anyhow!("shared launch {id} is not recorded"))?;
+            if let Some(run_id) = &intent.run_id {
+                let run = self.run(run_id)?;
+                let task = self.task(&run.task_id)?;
+                let ws = self.workspace(&run.workspace_id)?;
+                return Ok(json!({"task": task, "run": run, "workspace": ws, "replayed": true,
+                    "shared_launch": intent}));
+            }
+            match intent.outcome.as_deref() {
+                Some("released_unclaimed") =>
+                    bail!("shared launch {id} was released before any effect; book a new attempt"),
+                Some("effects_uncertain") =>
+                    bail!("shared launch {id} stopped with uncertain effects; it is held for reconciliation and not retried"),
+                _ if intent.phase == "released" => bail!("shared launch {id} was released"),
+                _ => {}
+            }
+            if std::time::Instant::now() >= deadline {
+                bail!("shared launch {id} is still pending");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    }
+
+    /// Both the supervisor and the harness are confirmed gone, or no
+    /// supervisor was ever recorded. A missing or unreadable shim record
+    /// is not confirmation.
+    fn run_processes_gone(&self, run_id: &str) -> bool {
+        let process = self.store.lock().unwrap().run_process(run_id);
+        match process {
+            Ok(None) => true,
+            Ok(Some((dir, _, _))) => std::fs::read(Path::new(&dir).join("shim.json")).ok()
+                .and_then(|bytes| serde_json::from_slice::<ShimInfo>(&bytes).ok())
+                .is_some_and(|info| !pid_alive(info.shim_pid) && !pid_alive(info.child_pid)),
+            Err(_) => false,
+        }
     }
 
     /// Execute a bounded work unit in a separately supervised workspace made
@@ -1273,6 +1481,9 @@ impl Daemon {
                         bail!("workspace has another active writer ({})", other.id);
                     }
                 }
+                if let Some(hold) = self.store.lock().unwrap().shared_writer_hold(&ws.path, None, Some(&run.id))? {
+                    bail!("workspace is held by shared launch {hold}");
+                }
             }
         }
         if run.harness == "claude" && run.relation_source.as_deref() == Some("managed-delegation") {
@@ -1552,7 +1763,8 @@ impl Daemon {
         recorded_meta["args"] = json!(launch.args.iter().map(|a| redact(a)).collect::<Vec<_>>());
         recorded_meta["env_keys"] = json!(launch.env.keys().collect::<Vec<_>>());
         let record_before_spawn = recorded_meta["generic"]["auto_selected"] == true
-            || recorded_meta["generic"]["auto_routing"] == true;
+            || recorded_meta["generic"]["auto_routing"] == true
+            || self.store.lock().unwrap().shared_launch_bound_unsettled(&run.id)?;
         if record_before_spawn {
             // A crash or write failure after cmd.spawn must not leave a live
             // Auto supervisor with no durable identity to reconcile.
@@ -2476,6 +2688,9 @@ impl Daemon {
 
     pub(crate) fn mark_ended(&self, run: &Run, status: &str, reason: &str) -> Result<()> {
         let mut emitted = Vec::new();
+        // Every other end status comes after an exit record or before any
+        // supervisor; a lost supervisor may leave its harness running.
+        let process_gone = status != "disconnected" || self.run_processes_gone(&run.id);
         {
             let store = self.store.lock().unwrap();
             store.conn.execute_batch("SAVEPOINT settle_run")?;
@@ -2486,6 +2701,7 @@ impl Daemon {
                 let turn_status = if status == "completed" { "completed" } else { status };
                 store.finish_open_turns(&run.id, turn_status, ended)?;
                 store.release_settled_auto_pool_claim(&run.id)?;
+                store.settle_shared_launch_run(&run.id, process_gone)?;
                 emitted.push(store.insert_event(ended, Some(&run.task_id), Some(&run.id), "status", "daemon", "exact", &json!({"status": status, "reason": reason}))?);
                 if status == "completed" && run.relation_source.as_deref() == Some("managed-delegation") {
                     if let Some(notice) = store.publish_managed_result_notice(run, ended)? {
@@ -2544,8 +2760,8 @@ impl Daemon {
     /// ones, and report lost sessions. Never relaunches work.
     pub fn reconcile(self: &Arc<Self>) -> Result<Value> {
         self.store.lock().unwrap().release_stale_unstarted_auto_pool_claims()?;
+        let mut report = self.store.lock().unwrap().reconcile_shared_launches_on_start()?;
         let runs = self.store.lock().unwrap().runs()?;
-        let mut report = Vec::new();
         for run in runs.iter().filter(|r| (r.parent_run_id.is_none() || matches!(r.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation"))) && (ACTIVE.contains(&r.status.as_str()) || r.status == "disconnected")) {
             let process = self.store.lock().unwrap().run_process(&run.id)?;
             let Some((dir, _, _)) = process else {
@@ -2570,7 +2786,14 @@ impl Daemon {
                     self.watch_codex_account_handshake(run.id.clone(), run.process_generation, dir.clone());
                 }
                 report.push(json!({"run": run.id, "result": "reattached"}));
-            } else if run.status != "disconnected" {
+            } else if run.status == "disconnected" {
+                // Lost by an earlier daemon: its bound holds are released only
+                // once both of its processes are confirmed gone.
+                if self.run_processes_gone(&run.id)
+                    && self.store.lock().unwrap().settle_lost_shared_launch(&run.id)? {
+                    report.push(json!({"run": run.id, "result": "lost shared launch settled"}));
+                }
+            } else {
                 let child_alive = std::fs::read(dir.join("shim.json")).ok().and_then(|b| serde_json::from_slice::<ShimInfo>(&b).ok()).map(|i| pid_alive(i.child_pid)).unwrap_or(false);
                 let reason = if child_alive { "supervisor lost; harness process still exists but its output is no longer observable" } else { "supervisor and harness are gone without an exit record (lost session)" };
                 self.mark_ended(run, "disconnected", reason)?;
