@@ -102,8 +102,8 @@ pub(crate) fn tool_list(role: &str) -> Vec<Value> {
         }));
         tools.push(json!({
             "name": "propose",
-            "description": "Ask the daemon for actions on agents: message (agent, text), stop (agent), pin (agent), start (repo, title, prompt), hold (agent, reason), release (agent), guardrail (agent, words, allow, deny), redirect (agent, text), cadence (agent, cadence), report (agent: ask it for a report), area (agent, paths), share (to, from, what: diff|report|messages|note|finding, path, text), withdraw (share), archive (agent). The daemon checks each one and, at the owner's level, either records a proposal that waits for the owner's yes or carries it out. Returns what happened.",
-            "inputSchema": {"type": "object", "properties": {"actions": {"type": "array", "items": {"type": "object", "properties": {"action": {"type": "string", "enum": ["message", "stop", "pin", "start", "hold", "release", "guardrail", "redirect", "cadence", "report", "area", "share", "withdraw", "archive", "answer"]}, "agent": {"type": "string"}, "text": {"type": "string"}, "repo": {"type": "string"}, "title": {"type": "string"}, "prompt": {"type": "string"}, "reason": {"type": "string"}, "paths": {"type": "array", "items": {"type": "string"}}, "to": {"type": "string"}, "from": {"type": "string"}, "what": {"type": "string"}, "path": {"type": "string"}, "share": {"type": "string"}, "ask": {"type": "string"}, "cadence": {"type": "string"}, "words": {"type": "string"}, "allow": {"type": "array", "items": {"type": "string"}}, "deny": {"type": "array", "items": {"type": "string"}}, "confidence": {"type": "string", "enum": ["high", "medium", "low"]}, "why": {"type": "string"}}, "required": ["action"]}}}, "required": ["actions"], "additionalProperties": false}
+            "description": "Ask the daemon for actions on agents: message (agent, text), stop (agent), pin (agent), start (repo, title, prompt), hold (agent, reason), release (agent), guardrail (agent, words, allow, deny), redirect (agent, text), cadence (agent, cadence), report (agent: ask it for a report), area (agent, paths), share (to, from, what: diff|report|messages|note|finding, path, text), withdraw (share), archive (agent), permission (agent, allow_request true or false: answer its waiting request), merge_back (agent), pull_request (agent). Archive, permission, merge_back and pull_request happen only when the owner asked, after their yes. The daemon checks each one and, at the owner's level, either records a proposal that waits for the owner's yes or carries it out. Returns what happened.",
+            "inputSchema": {"type": "object", "properties": {"actions": {"type": "array", "items": {"type": "object", "properties": {"action": {"type": "string", "enum": ["message", "stop", "pin", "start", "hold", "release", "guardrail", "redirect", "cadence", "report", "area", "share", "withdraw", "archive", "answer", "permission", "merge_back", "pull_request"]}, "agent": {"type": "string"}, "text": {"type": "string"}, "repo": {"type": "string"}, "title": {"type": "string"}, "prompt": {"type": "string"}, "reason": {"type": "string"}, "paths": {"type": "array", "items": {"type": "string"}}, "to": {"type": "string"}, "from": {"type": "string"}, "what": {"type": "string"}, "path": {"type": "string"}, "share": {"type": "string"}, "ask": {"type": "string"}, "cadence": {"type": "string"}, "words": {"type": "string"}, "allow": {"type": "array", "items": {"type": "string"}}, "deny": {"type": "array", "items": {"type": "string"}}, "allow_request": {"type": "boolean"}, "request": {"type": "string"}, "confidence": {"type": "string", "enum": ["high", "medium", "low"]}, "why": {"type": "string"}}, "required": ["action"]}}}, "required": ["actions"], "additionalProperties": false}
         }));
     }
     tools
@@ -249,11 +249,13 @@ pub(crate) fn bound(s: &str, max: usize) -> String {
     if s.len() <= max {
         return s.to_string();
     }
-    let mut end = max;
+    // The note that says so counts toward the bound: the whole answer is at most `max` bytes.
+    let note = format!("\n[cut at {max} bytes; ask for a smaller range]");
+    let mut end = max.saturating_sub(note.len());
     while !s.is_char_boundary(end) {
         end -= 1;
     }
-    format!("{}\n[cut at {max} bytes; ask for a smaller range]", &s[..end])
+    format!("{}{note}", &s[..end])
 }
 
 impl Daemon {

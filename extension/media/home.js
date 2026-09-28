@@ -94,6 +94,36 @@
       return card;
     }
 
+    // An answered proposal (AC-185): what Overseer did, with one row per agent: why it was chosen,
+    // the delivery, the state and when it got there; the whole text sent is the row's tooltip.
+    const STATE = { yes: 'Done', done: 'Done', no: 'Declined', cancelled: 'Cancelled', stale: 'Not done', not_done: 'Not done', failed: 'Failed', refused: 'Refused' };
+    const ROW = { held: 'held', sent: 'sent', delivered: 'delivered', picked_up: 'picked up', answered: 'answered', failed: 'failed', cancelled: 'cancelled', not_sent: 'not sent' };
+    const clock = ms => ms ? new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+    function answered(c) {
+      const card = el('div', 'proposal answered done-card'); card.setAttribute('role', 'group'); card.setAttribute('aria-label', 'What Overseer did'); card.dataset.id = c.id; card.dataset.state = c.state;
+      const head = el('div', 'proposal-head'); head.append(ui.mark('sm'), el('span', null, STATE[c.state] || c.state));
+      const by = [c.answered_by, c.surface && c.surface !== 'settle' ? c.surface : ''].filter(Boolean).join(' · ');
+      if (by) head.append(el('span', 'card-by', by));
+      const list = el('ul', 'proposal-list');
+      for (const line of c.lines || []) list.append(el('li', null, line));
+      card.append(head, list);
+      if ((c.rows || []).length) {
+        const rows = el('div', 'card-rows'); rows.setAttribute('role', 'list');
+        for (const r of c.rows) {
+          const row = el('div', 'card-row'); row.setAttribute('role', 'listitem'); row.dataset.state = r.state; row.dataset.run = r.run_id;
+          const at = r.answered_ms || r.picked_ms || r.delivered_ms || r.sent_ms || r.held_ms;
+          const times = [['held', r.held_ms], ['sent', r.sent_ms], ['delivered', r.delivered_ms], ['picked up', r.picked_ms], ['answered', r.answered_ms]].filter(x => x[1]).map(([k, v]) => `${k} ${clock(v)}`).join(' · ');
+          row.append(el('span', 'card-row-agent', r.title || r.run_id), el('span', 'card-row-meta', [r.why, r.delivery].filter(Boolean).join(' · ')), el('span', `card-row-state state-${r.state}`, ROW[r.state] || r.state), el('span', 'card-row-time', clock(at)));
+          row.title = `${r.message || ''}\n\nWhy: ${r.why || '—'} · delivery: ${r.delivery || '—'}\n${times}`;
+          rows.append(row);
+        }
+        card.append(rows);
+      }
+      if (c.result) card.append(el('div', 'proposal-status', ui.firstLine(c.result, 140)));
+      card.dataset.sig = JSON.stringify([c.state, (c.rows || []).map(r => r.state)]);
+      return card;
+    }
+
     return {
       /** The daemon's session: redrawn from its messages and open proposals (cheap: ids are stable). */
       session(s) {
@@ -113,9 +143,19 @@
           const id = 'p:' + p.id; keep.add(id);
           if (!shown.has(id)) { const e = proposal(p); shown.set(id, e); list.append(e); }
         }
+        // Answered: the open card becomes the card of what was done, in place.
+        for (const c of (s && s.cards) || []) {
+          const id = 'c:' + c.id; keep.add(id);
+          const e = shown.get(id), was = shown.get('p:' + c.id);
+          const sig = JSON.stringify([c.state, (c.rows || []).map(r => r.state)]);
+          if (e && e.dataset.sig === sig) continue;
+          const n = answered(c);
+          if (e) e.replaceWith(n); else if (was) { was.replaceWith(n); shown.delete('p:' + c.id); } else list.append(n);
+          shown.set(id, n);
+        }
         for (const [id, e] of shown) if (!keep.has(id)) { e.remove(); shown.delete(id); }
         // Until the owner has spoken to Overseer (its run exists), home is the composer alone.
-        wrap.hidden = !(s && s.run_id) || (messages.length === 0 && open.length === 0);
+        wrap.hidden = !(s && s.run_id) || (messages.length === 0 && open.length === 0 && !((s && s.cards) || []).length);
         list.scrollTop = list.scrollHeight;
       },
       /** A message came back for a proposal card (an error, a state). */

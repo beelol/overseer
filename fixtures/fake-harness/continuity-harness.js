@@ -34,7 +34,8 @@ const OUTAGE = { codex: 'unexpected status 503 Service Unavailable', claude: 'AP
 
 function act(prompt) {
   // The script is the pending message of a handoff prompt, else its task, else the prompt itself.
-  const handed = /^You are continuing a task/.test(prompt);
+  // A handoff prompt may follow the guardrails the successor took over, so it is found on any line.
+  const handed = /^You are continuing a task/m.test(prompt);
   const script = !handed ? prompt : ((/^The user's last message, not yet answered: (.*)$/m.exec(prompt) || /^Task: (.*)$/m.exec(prompt) || [])[1] || '');
   const done = [];
   for (const step of script.split(';').map(s => s.trim())) {

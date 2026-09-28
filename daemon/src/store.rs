@@ -230,6 +230,11 @@ impl Store {
         if !has_pending {
             self.conn.execute_batch("ALTER TABLE runs ADD COLUMN pending_parent_native TEXT;")?;
         }
+        // A large diff shared within one repository is also a branch and a commit (AC-191).
+        let has_share_branch: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('shares') WHERE name='branch'")?.exists([])?;
+        if !has_share_branch {
+            self.conn.execute_batch("ALTER TABLE shares ADD COLUMN branch TEXT; ALTER TABLE shares ADD COLUMN commit_sha TEXT;")?;
+        }
         let has_archived: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('tasks') WHERE name='archived_ms'")?.exists([])?;
         if !has_archived {
             self.conn.execute_batch("ALTER TABLE tasks ADD COLUMN archived_ms INTEGER;")?;

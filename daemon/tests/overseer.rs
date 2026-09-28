@@ -214,6 +214,69 @@ fn ac183_roster_equals_state_and_digests_stay_bounded_and_clean() {
     assert!(reply["digest"]["last_messages"].as_array().unwrap().len() <= 3);
 }
 
+/// AC-183: the fields later steps fill, each equal to what the daemon recorded: the last report
+/// (from the agent's channel), the last check-in, holds, guardrails, area and watches; and the
+/// watcher's own role and digest.
+#[test]
+fn ac183_digest_carries_reports_check_ins_holds_guardrails_and_watches() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call("agent.channel", json!({"default": "on", "by": "owner"}));
+    let a = claude_task(&d, &repo, &mode_file, "channel", "Reporter", "report: tidying the docs; write: docs/a.md");
+    d.wait_done(&a, 40);
+    let digest = |id: &str| d.call("agent.digest", json!({"run_id": id}));
+    let dg = digest(&a)["digest"].clone();
+    assert_eq!(dg["last_report"]["doing"], "tidying the docs", "{}", dg["last_report"]);
+    assert_eq!(dg["last_report"]["changed"], json!(["docs/a.md"]));
+    assert!(dg["holds"].as_array().unwrap().is_empty() && dg["guardrails"].as_array().unwrap().is_empty() && dg["watches"].as_array().unwrap().is_empty() && dg["last_check_in"].is_null());
+    // A watch: a new watcher, created on the subject's next turn end, whose role is watcher.
+    std::fs::write(&mode_file, "slow").unwrap();
+    d.call("run.follow_up", json!({"run_id": a, "prompt": "go on"}));
+    d.wait_status(&a, |st| st == "running", 20);
+    let watch = d.call("watch.start", json!({"subject": a, "brief": "edits outside docs", "harness": "claude", "by": "owner"}));
+    std::fs::write(&mode_file, "watcher").unwrap();
+    d.wait_done(&a, 30);
+    wait_count(&d, &a, "watch_wake", 1, 20);
+    let watcher = d.call("watch.list", json!({}))["watches"][0]["watcher"].as_str().unwrap().to_string();
+    assert!(!watcher.is_empty());
+    d.wait_done(&watcher, 30);
+    let dw = digest(&watcher);
+    assert_eq!(dw["digest"]["role"], "watcher");
+    assert_eq!(dw["digest"]["watches"][0]["id"], watch["id"]);
+    assert_eq!(dw["digest"]["watches"][0]["subject"], a.as_str());
+    assert!(dw["text"].as_str().unwrap().contains("role: watcher") && dw["text"].as_str().unwrap().contains("watching Reporter: edits outside docs"), "{}", dw["text"]);
+    // A check-in, a hold, a guardrail and an area.
+    let token = d.call("overseer.token", json!({"run_id": "overseer-under-test", "role": "overseer"}))["token"].as_str().unwrap().to_string();
+    let recorded = d.call("overseer.tool", json!({"token": token, "name": "check_in", "arguments": {"agent": a, "result": "on_task", "reason": "docs as asked"}}));
+    assert_eq!(recorded["is_error"], false, "{recorded}");
+    d.call("agent.hold", json!({"run_id": a, "reason": "review first", "by": "owner"}));
+    d.call("agent.guardrail", json!({"run_id": a, "words": "Docs only.", "deny": ["src"], "by": "owner"}));
+    d.call("agent.area", json!({"run_id": a, "paths": ["docs"], "by": "owner"}));
+    let started = std::time::Instant::now();
+    let reply = digest(&a);
+    assert!(started.elapsed() < Duration::from_secs(2));
+    let dg = &reply["digest"];
+    assert_eq!((dg["last_check_in"]["result"].as_str(), dg["last_check_in"]["reason"].as_str()), (Some("on_task"), Some("docs as asked")));
+    assert_eq!(dg["last_check_in"], d.call("agent.check_ins", json!({"run_id": a}))["check_ins"].as_array().unwrap().last().map(|c| json!({"result": c["result"], "reason": c["reason"], "left_out": c["left_out"], "title": "Reporter"})).unwrap());
+    let hold = d.call("agent.holds", json!({}))["holds"][0].clone();
+    assert_eq!(dg["holds"], json!([{"by": hold["by"], "reason": hold["reason"], "set_ms": hold["set_ms"], "release_on": hold["release_on"]}]));
+    let g = d.call("agent.guardrails", json!({"run_id": a}))["guardrails"][0].clone();
+    assert_eq!(dg["guardrails"], json!([{"id": g["id"], "words": "Docs only.", "allow": [], "deny": ["src"], "hold_on_cross": false, "enforcement": "enforced", "by": "owner"}]));
+    assert_eq!(dg["area"], json!(["docs"]));
+    assert_eq!(dg["watches"][0]["id"], watch["id"]);
+    assert_eq!(dg["watches"][0]["watcher"], watcher.as_str());
+    let text = reply["text"].as_str().unwrap();
+    for line in ["report: tidying the docs", "held by owner: review first", "guardrail (enforced): Docs only. · do not change src", "area: docs", "watched by Watching Reporter (watch): edits outside docs"] {
+        assert!(text.contains(line), "{line:?} in {text}");
+    }
+    assert!(text.len() <= 4096);
+}
+
 fn write_lines(path: &Path, lines: &[&str]) {
     std::fs::write(path, lines.join("\n") + "\n").unwrap();
 }
@@ -2159,4 +2222,311 @@ fn ac198_quiet_and_bounded() {
     assert!(usage["overseer"].is_object() || usage["overseer"] == "not reported", "{usage}");
     assert!(usage["watchers"].as_array().unwrap().iter().any(|w| w["run_id"] == watcher), "{usage}");
     assert_eq!(usage["turns_today"], so_far);
+}
+
+/// Overseer's run and its turns' prompts, oldest first.
+fn overseer_prompts(d: &Daemon) -> Vec<String> {
+    let run = session(d)["run_id"].as_str().unwrap().to_string();
+    d.call("run.turns", json!({"run_id": run})).as_array().unwrap().iter().map(|t| t["prompt"].as_str().unwrap().to_string()).collect()
+}
+
+/// AC-198: one turn Overseer starts by itself reads at most twenty items and at most 32 KiB:
+/// twenty-five findings filed together are two turns (twenty, then five, oldest first), and
+/// twenty long ones are one turn whose prompt is cut to the bound.
+#[test]
+fn ac198_one_turn_is_at_most_twenty_items_and_32_kib() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    let subject = claude_task(&d, &repo, &mode_file, "echo", "Subject", "hello");
+    d.wait_done(&subject, 30);
+    let watcher = claude_task(&d, &repo, &mode_file, "echo", "Watcher", "hello");
+    d.wait_done(&watcher, 30);
+    std::fs::write(&mode_file, "overseer").unwrap();
+    d.call("watch.start", json!({"subject": subject, "watcher": watcher, "brief": "look", "by": "owner"}));
+    let token = d.call("overseer.token", json!({"run_id": watcher, "role": "agent"}))["token"].as_str().unwrap().to_string();
+    let file = |text: String| {
+        let r = d.call("overseer.tool", json!({"token": token, "name": "finding", "arguments": {"result": "concern", "text": text}}));
+        assert_eq!(r["is_error"], false, "{r}");
+    };
+    // Twenty-five at once: twenty in the first turn, the other five in the next.
+    let before = overseer_prompts(&d).len();
+    for i in 0..25 {
+        file(format!("item-{i:02} looks off"));
+    }
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    while overseer_prompts(&d).len() < before + 2 {
+        assert!(std::time::Instant::now() < deadline, "two turns: {:?}", overseer_turn_causes(&d));
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    wait_overseer_idle(&d, 60);
+    let prompts = overseer_prompts(&d);
+    let items = |p: &str| (0..25).filter(|i| p.contains(&format!("item-{i:02} looks off"))).collect::<Vec<_>>();
+    assert_eq!(items(&prompts[before]), (0..20).collect::<Vec<_>>(), "the first turn reads the oldest twenty");
+    assert_eq!(items(&prompts[before + 1]), (20..25).collect::<Vec<_>>(), "the next turn the other five");
+    assert_eq!(prompts.len(), before + 2);
+    // Twenty long findings: one turn, its prompt within 32 KiB and saying where it was cut.
+    let before = prompts.len();
+    for i in 0..20 {
+        file(format!("long-{i:02} {}", "x".repeat(3000)));
+    }
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    while overseer_prompts(&d).len() < before + 1 {
+        assert!(std::time::Instant::now() < deadline, "one turn: {:?}", overseer_turn_causes(&d));
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    wait_overseer_idle(&d, 60);
+    std::thread::sleep(Duration::from_secs(1));
+    let prompts = overseer_prompts(&d);
+    assert_eq!(prompts.len(), before + 1, "twenty items are one turn");
+    let long = &prompts[before];
+    assert!(long.len() <= 32 * 1024, "{} bytes", long.len());
+    assert!(long.ends_with("[cut at 32768 bytes; ask for a smaller range]") && long.contains("long-00 "), "{}", &long[long.len().saturating_sub(200)..]);
+}
+
+/// AC-191: a large diff shared within one repository arrives as a patch file and as a branch and
+/// commit the receiver can read with git, made from the source's worktree on its task's base with
+/// neither worktree touched; withdrawing the share removes the branch.
+#[test]
+fn ac191_a_large_diff_is_also_a_branch_and_commit() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call("overseer.level", json!({"level": "steer"}));
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    let beta = claude_task(&d, &repo, &mode_file, "channel", "Beta", "hello");
+    d.wait_done(&beta, 40);
+    let created = d.generic(&repo, "worktree", "/bin/sh", &["-c", "yes 'a line of text for the patch' | head -c 102400 > big.txt; echo tweak >> README.md"]);
+    let big = run_id(&created);
+    d.wait_done(&big, 30);
+    let big_ws = ws_path(&d, &created);
+    let beta_ws = PathBuf::from(d.call("agent.digest", json!({"run_id": beta}))["digest"]["worktree"].as_str().unwrap());
+    let (before_big, before_beta) = (fingerprint(&big_ws), fingerprint(&beta_ws));
+    let refs_before = git(&repo, &["for-each-ref", "--format=%(refname)"]);
+    d.call("overseer.propose", json!({"actions": [{"action": "share", "to": beta, "from": big, "what": "diff"}], "source": "ctl"}));
+    let t = wait_turn_with(&d, &beta, "on branch overseer/share/", 15);
+    let text = t["prompt"].as_str().unwrap().to_string();
+    let share = d.call("share.list", json!({"run_id": beta}))["shares"].as_array().unwrap().iter().find(|s| s["from"] == big).cloned().unwrap();
+    let (branch, commit) = (share["branch"].as_str().unwrap().to_string(), share["commit"].as_str().unwrap().to_string());
+    assert_eq!(branch, format!("overseer/share/{}", share["id"].as_str().unwrap()));
+    assert!(text.contains(&format!("as commit {commit} on branch {branch} (git show {commit})")) && share["file"].is_string(), "{text}");
+    assert!(text.len() <= 8 * 1024 + 512);
+    // The receiver reads it with git from its own worktree: the whole change, on the task's base.
+    assert_eq!(git(&beta_ws, &["rev-parse", &branch]).trim(), commit);
+    let files = git(&beta_ws, &["show", "--name-only", "--format=", &commit]);
+    assert_eq!(files.lines().collect::<Vec<_>>(), ["README.md", "big.txt"], "{files}");
+    let base = option(&d, &big, "task_start", None)["base"].as_str().unwrap().to_string();
+    assert_eq!(git(&beta_ws, &["rev-parse", &format!("{commit}^")]).trim(), base, "on the task's base");
+    assert_eq!(git(&beta_ws, &["diff", "--stat", &base, &commit]).lines().count(), 3, "the same change the review shows");
+    assert_eq!(git(&beta_ws, &["show", &format!("{commit}:big.txt")]).len(), 102400);
+    // Neither worktree changed; the only new ref is the share's branch.
+    assert_eq!((fingerprint(&big_ws), fingerprint(&beta_ws)), (before_big, before_beta));
+    let refs_after = git(&repo, &["for-each-ref", "--format=%(refname)"]);
+    // (The daemon's own snapshot refs of Beta's new turn aside.)
+    let new: Vec<&str> = refs_after.lines().filter(|l| !refs_before.lines().any(|b| b == *l) && !l.starts_with("refs/overseer/snapshots/")).collect();
+    assert_eq!(new, [format!("refs/heads/{branch}").as_str()]);
+    // A small diff, or a diff of one file, stays inline or a patch file: no branch.
+    assert!(d.call("share.list", json!({}))["shares"].as_array().unwrap().iter().filter(|s| s["id"] != share["id"]).all(|s| s["branch"].is_null()));
+    // Withdrawn: the branch goes.
+    d.wait_done(&beta, 30);
+    d.call("share.withdraw", json!({"id": share["id"], "by": "owner"}));
+    assert!(git(&repo, &["for-each-ref", "--format=%(refname)", &format!("refs/heads/{branch}")]).trim().is_empty(), "the withdrawn share's branch is removed");
+}
+
+/// AC-200: Overseer's traffic as a whole carries no credential. Credentials planted in an agent's
+/// output, title and files, in a report and a question over the channel, in a watcher's finding
+/// and in a note to share; then everything that leaves the daemon for Overseer, its watchers and
+/// the other agents is collected (every prompt of Overseer's run, every answer of every tool,
+/// the conversation with its cards, every digest and the roster, what other agents were sent,
+/// shares and their files, findings, cards) and none of it holds any of them.
+#[test]
+fn ac200_no_credential_in_overseer_s_traffic() {
+    let _one_at_a_time = heavy();
+    const KEYS: &[&str] = &["sk-ant-api03-plantedplantedplanted0123", "ghp_plantedPLANTEDplanted0123456789", "xoxb-planted-0123456789", "sk-proj-plantedplantedplanted456"];
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.channel", json!({"default": "on", "by": "owner"}));
+    d.call("agent.cadence", json!({"cadence": "every:1", "by": "owner"}));
+    d.call("overseer.level", json!({"level": "steer"}));
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    // An agent that prints a key, writes one into a file, and carries one in its title.
+    let script = format!("printf 'API_KEY={}\\n' > .env.local; echo using {}; echo token {}", KEYS[0], KEYS[0], KEYS[1]);
+    let leaky = run_id(&d.generic(&repo, "worktree", "/bin/sh", &["-c", &script]));
+    d.wait_done(&leaky, 20);
+    // A report and a question with keys, over the channel.
+    let talker = claude_task(&d, &repo, &mode_file, "channel", "Talker", &format!("report: deploying with {}; ask: is {} still valid?; write: docs/x.md", KEYS[2], KEYS[2]));
+    d.wait_done(&talker, 40);
+    // A watcher's finding with a key.
+    let watcher = claude_task(&d, &repo, &mode_file, "echo", "Watcher", "hello");
+    d.wait_done(&watcher, 30);
+    std::fs::write(&mode_file, "overseer").unwrap();
+    d.call("watch.start", json!({"subject": leaky, "watcher": watcher, "brief": "secrets", "by": "owner"}));
+    let wtoken = d.call("overseer.token", json!({"run_id": watcher, "role": "agent"}))["token"].as_str().unwrap().to_string();
+    let f = d.call("overseer.tool", json!({"token": wtoken, "name": "finding", "arguments": {"result": "concern", "text": format!("found {} in its output", KEYS[0])}}));
+    assert_eq!(f["is_error"], false, "{f}");
+    // Shares: the leaky agent's whole diff and a note with a key, to the talker.
+    std::fs::write(&mode_file, "channel").unwrap();
+    sql(&d, "UPDATE overseer_sessions SET last_cause='owner';");
+    d.call("overseer.propose", json!({"actions": [{"action": "share", "to": talker, "from": leaky, "what": "diff"}, {"action": "share", "to": talker, "what": "note", "text": format!("the staging key is {}", KEYS[3])}], "source": "ctl"}));
+    wait_turn_with(&d, &talker, "Shared by Overseer", 20);
+    d.wait_done(&talker, 40);
+    std::thread::sleep(Duration::from_secs(7));
+    wait_overseer_idle(&d, 60);
+    std::fs::write(&mode_file, "overseer").unwrap();
+    d.call("overseer.send", json!({"text": "What did Talker change in docs/x.md?", "surface": "ctl"}));
+    let s = wait_overseer_idle(&d, 60);
+
+    // Everything that left the daemon for a model or another agent.
+    let mut traffic: Vec<(String, String)> = Vec::new();
+    let overseer_run = s["run_id"].as_str().unwrap().to_string();
+    for t in turns(&d, &overseer_run) {
+        traffic.push(("Overseer's prompt".into(), t["prompt"].to_string()));
+    }
+    traffic.push(("the conversation".into(), d.call("overseer.messages", json!({"limit": 500})).to_string()));
+    let state = d.call("state", json!({"include_hidden": true}));
+    let runs: Vec<String> = state["runs"].as_array().unwrap().iter().map(|r| r["id"].as_str().unwrap().to_string()).collect();
+    let otoken = d.call("overseer.token", json!({"run_id": "traffic-check", "role": "overseer"}))["token"].as_str().unwrap().to_string();
+    let tool = |name: &str, args: Value| match d.try_call("overseer.tool", json!({"token": otoken, "name": name, "arguments": args})) {
+        Ok(v) => v.to_string(),
+        Err(e) => e,
+    };
+    traffic.push(("roster".into(), d.call("agents.roster", json!({})).to_string()));
+    traffic.push(("tool roster".into(), tool("roster", json!({}))));
+    traffic.push(("tool conflicts".into(), tool("conflicts", json!({}))));
+    traffic.push(("tool search".into(), tool("search", json!({"query": "API_KEY"}))));
+    for id in &runs {
+        traffic.push((format!("digest {id}"), d.call("agent.digest", json!({"run_id": id})).to_string()));
+        for (name, args) in [("agent", json!({"id": id})), ("conversation", json!({"id": id})), ("changes", json!({"id": id})), ("diff", json!({"id": id, "path": ".env.local"})), ("file", json!({"id": id, "path": ".env.local"})), ("usage", json!({"id": id}))] {
+            traffic.push((format!("tool {name} {id}"), tool(name, args)));
+        }
+        if *id != leaky && *id != overseer_run {
+            // What other agents were sent (shares, answers, briefings, watch wakes); the leaky
+            // agent's own task is the owner's.
+            for t in turns(&d, id).iter().skip(1) {
+                traffic.push((format!("sent to {id}"), t["prompt"].to_string()));
+            }
+        }
+        traffic.push((format!("briefings {id}"), d.call("agent.briefings", json!({"run_id": id})).to_string()));
+    }
+    let shares = d.call("share.list", json!({}));
+    for sh in shares["shares"].as_array().unwrap() {
+        if let Some(file) = sh["file"].as_str() {
+            traffic.push((format!("share file {file}"), std::fs::read_to_string(file).unwrap()));
+        }
+        if let Some(c) = sh["commit"].as_str() {
+            traffic.push((format!("share commit {c}"), git(&repo, &["show", c])));
+        }
+    }
+    traffic.push(("shares".into(), shares.to_string()));
+    traffic.push(("findings".into(), d.call("watch.findings", json!({})).to_string()));
+    traffic.push(("channel".into(), d.call("channel.messages", json!({})).to_string()));
+    for p in d.call("events.list", json!({"limit": 5000}))["events"].as_array().unwrap().iter().filter(|e| e["kind"] == "proposal") {
+        traffic.push(("card".into(), d.call("overseer.card", json!({"id": p["payload"]["id"]})).to_string()));
+    }
+    assert!(traffic.len() > 40, "the whole traffic was collected: {}", traffic.len());
+    assert!(traffic.iter().any(|(what, t)| what.starts_with("share file") || t.contains("Shared by Overseer")), "the shares were part of it");
+    for (what, text) in &traffic {
+        for key in KEYS {
+            assert!(!text.contains(key), "{key} in {what}: {}", &text[text.find(key).unwrap().saturating_sub(200)..(text.find(key).unwrap() + 80).min(text.len())]);
+        }
+    }
+    // The planted key was really there to find: the leaky agent's own worktree holds it.
+    let ws = PathBuf::from(d.call("agent.digest", json!({"run_id": leaky}))["digest"]["worktree"].as_str().unwrap());
+    assert!(std::fs::read_to_string(ws.join(".env.local")).unwrap().contains(KEYS[0]));
+}
+
+/// AC-185: the Confirm actions answering a permission, merge back and a pull request happen only
+/// when the owner asked, wait for a yes even at Auto, and then are carried out with a row on
+/// their card: the waiting request is answered, the branch lands in the target, and VS Code is
+/// asked to open the pull request (the daemon holds no token).
+#[test]
+fn ac185_confirm_actions_permission_merge_back_and_pull_request() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    git(&repo, &["remote", "add", "origin", "https://github.com/example/demo.git"]);
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call("overseer.level", json!({"level": "auto"}));
+    let asker = claude_task(&d, &repo, &mode_file, "permission", "Asker", "write perm.txt");
+    d.wait_status(&asker, |s| s == "waiting_for_user", 20);
+    let writer = d.generic(&repo, "worktree", "/bin/sh", &["-c", "echo landed > landed.txt"]);
+    let writer_id = run_id(&writer);
+    d.wait_done(&writer_id, 20);
+    let proposer = run_id(&d.generic(&repo, "worktree", "/bin/sh", &["-c", "echo proposed > proposed.txt"]));
+    d.wait_done(&proposer, 20);
+    let actions = json!([{"action": "permission", "agent": asker, "allow_request": true}, {"action": "merge_back", "agent": writer_id}, {"action": "pull_request", "agent": proposer}]);
+    // Not asked for by the owner: refused, each of them.
+    sql(&d, "UPDATE overseer_sessions SET last_cause='check_in';");
+    for a in actions.as_array().unwrap() {
+        let e = d.try_call("overseer.propose", json!({"actions": [a], "source": "test"})).unwrap_err();
+        assert!(e.contains("only when the owner asks"), "{e}");
+    }
+    // Asked for: read back, and at Auto still waiting for the yes.
+    sql(&d, "UPDATE overseer_sessions SET last_cause='owner';");
+    let p = d.call("overseer.propose", json!({"actions": actions, "source": "ctl"}));
+    assert_eq!(p["state"], "open", "{p}");
+    std::thread::sleep(Duration::from_secs(3));
+    let lines = session(&d)["proposals"].as_array().unwrap().iter().find(|x| x["id"] == p["proposal"]).cloned().unwrap()["lines"].clone();
+    assert_eq!(lines, json!(["Allow Asker's request", format!("Merge {} back into its target branch", d.run(&writer_id)["title"].as_str().unwrap()), format!("Open a pull request for {} (VS Code pushes with your GitHub sign-in)", d.run(&proposer)["title"].as_str().unwrap())]));
+    assert_eq!(d.run(&asker)["status"], "waiting_for_user", "nothing before the yes");
+    assert!(git(&repo, &["ls-tree", "--name-only", "HEAD"]).lines().all(|l| l != "landed.txt"));
+    let answered = d.call("overseer.answer", json!({"id": p["proposal"], "yes": true, "surface": "ctl", "by": "owner"}));
+    let result = answered["result"].as_str().unwrap_or("").to_string();
+    assert!(result.contains("allowed Asker's request") && result.contains("merged") && result.contains("asked VS Code to open a pull request"), "{answered}");
+    d.wait_done(&asker, 20);
+    assert!(d.events(&asker).iter().any(|e| e["kind"] == "permission_answered" && e["payload"]["allow"] == true));
+    assert!(git(&repo, &["ls-tree", "--name-only", "HEAD"]).lines().any(|l| l == "landed.txt"), "the branch landed in the target");
+    assert!(d.events(&proposer).iter().any(|e| e["kind"] == "overseer_action" && e["payload"]["action"] == "pull_request"), "VS Code is asked to open it");
+    let card = d.call("overseer.card", json!({"id": p["proposal"]}));
+    let actions_done: Vec<&str> = card["rows"].as_array().unwrap().iter().map(|r| r["action"].as_str().unwrap()).collect();
+    assert_eq!(actions_done, ["permission", "merge_back", "pull_request"], "{card}");
+}
+
+/// AC-187: a held agent starts no turn from a watch either: an idle agent the owner named as a
+/// watcher, held, gets its wake queued behind the hold, and the wake is its next turn after the
+/// release.
+#[test]
+fn ac187_a_held_agent_starts_no_turn_from_a_watch() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    let watcher = claude_task(&d, &repo, &mode_file, "echo", "Reviewer", "hello");
+    d.wait_done(&watcher, 30);
+    std::fs::write(&mode_file, "slow").unwrap();
+    let subject = claude_task(&d, &repo, &mode_file, "slow", "Subject", "tidy the docs");
+    d.wait_status(&subject, |s| s == "running", 20);
+    d.call("watch.start", json!({"subject": subject, "watcher": watcher, "brief": "anything odd", "by": "owner"}));
+    d.call("agent.hold", json!({"run_id": watcher, "reason": "not now", "by": "owner"}));
+    std::fs::write(&mode_file, "echo").unwrap();
+    d.wait_done(&subject, 30);
+    wait_count(&d, &subject, "watch_wake", 1, 20);
+    std::thread::sleep(Duration::from_secs(2));
+    assert_eq!(turns(&d, &watcher).len(), 1, "a held watcher starts no turn from its wake");
+    let queued = d.call("run.queued", json!({"run_id": watcher}))["queued"].as_array().unwrap().clone();
+    assert!(queued.len() == 1 && queued[0]["source"] == "watch" && queued[0]["text"].as_str().unwrap().starts_with("[Watch "), "{queued:?}");
+    d.call("agent.release", json!({"run_id": watcher, "by": "owner"}));
+    let t = wait_turn_with(&d, &watcher, "[Watch ", 20);
+    assert_eq!(turns(&d, &watcher).len(), 2, "{t}");
 }
