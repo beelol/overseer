@@ -1,6 +1,6 @@
 # SWARM-47 — contradictory evidence after review
 
-Status: partial. Implementation revision: `70cffa9`. Support: fixture-only director actions, scripted Atlas workers, disposable PostgreSQL 16 backend. The RFC box remains unchecked.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. Implementation revision: `70cffa9`. Support: fixture-only director actions, scripted Atlas workers, disposable PostgreSQL 16 backend.
 
 Input: J2 reports a foreign task mutation (HTTP 200 and Bob's row changed), while J7 reports HTTP 403 and an unchanged row under the guarded fixture option. The director registers both submitted artifact chains as one conflict. A third job, J8, independently probes the unguarded and guarded variants in fresh, separate PostgreSQL namespaces. An alternate local fixture declares the disagreement explicitly unresolved.
 
@@ -315,3 +315,15 @@ semantic choice and wording remain fixture supplied. Only those two reasons
 are supported by this new closeout method; unavailable targets, unknown
 effects and other incomplete causes still need joined closure flows. No live
 director or supported UI path was qualified. SWARM-47 remains partial.
+
+## Verified at fixture scope (2026-09-28)
+
+| Clause | Test |
+| --- | --- |
+| Conflicting J2/J7 evidence: both chains retained | `contradictory_results_require_independent_accepted_reproduction_before_review`; joined `atlas_s5_contradictory_j7_requires_bounded_j8_reproduction` (real unguarded and guarded task routes in separate PostgreSQL schemas); `atlas_s1_faults_quarantine_stale_and_missing_evidence` |
+| Bounded reproduction, or an explicit unresolved outcome | the J8 replay (one bounded independent reproduction resolves it); `explicitly_unresolved_conflict_remains_visible_and_blocks_acceptance`; `director_can_close_an_unresolved_run_with_a_durable_partial_report` |
+| A confident claim, majority agreement or an empty worker exit cannot become a confirmed finding | `majority_confidence_or_an_empty_exit_cannot_confirm_a_contested_finding` (new, passed on first run): a `certain` defect claim cannot be accepted while contested; two accepted agreeing findings (3:1) cannot resolve the conflict because they are not reproductions; the parties cannot resolve it with their own evidence; a worker that exits with no result has nothing to resolve or accept; after an explicit `unresolved` outcome J2 is still not accepted or confirmed in coverage. `reported_defect_needs_reproducer_evidence_before_confirmation` (a defect needs a reproduction) |
+
+Rerun on 2026-09-28: `swarm_conflict` 11 passed (serial); the two Atlas replays passed against disposable PostgreSQL 16.
+
+Boundary: the director's choice to open, reproduce or leave unresolved is scripted; the daemon rule that only accepted independent reproduction resolves a disagreement is what is verified.

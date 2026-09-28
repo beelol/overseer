@@ -639,3 +639,82 @@ fn late_conflict_invalidates_accepted_dependents_until_explicit_re_review() {
         "evidence":["consumer-evidence"]})).unwrap_err();
     assert!(stale.contains("stale artifact source revision"),"{stale}");
 }
+
+/// SWARM-47: agreement, confidence and silence are not evidence. J2 claims a
+/// defect with high confidence, J7 contradicts it; two more workers agree
+/// with J2 (a 3:1 majority) with findings, not reproductions, and a fifth
+/// worker exits with no result at all. None of these can confirm the finding:
+/// J2 cannot be accepted while the conflict is open, the conflict cannot be
+/// resolved with an agreeing finding, the conflicting parties or the silent
+/// worker, and the silent worker has nothing to accept. Both chains stay
+/// intact until an explicit unresolved outcome, which still blocks J2.
+#[test]
+fn majority_confidence_or_an_empty_exit_cannot_confirm_a_contested_finding() {
+    let d = Daemon::start(&[]);
+    let created = d.call("swarm.create", json!({"category":"Votes are not evidence",
+        "objective":"Audit tenant isolation","allowed_targets":["fixture"]}));
+    let run = created["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"j2","title":"Task mutation","acceptance":"foreign task response","deps":[]},
+        {"id":"j7","title":"Independent task response","acceptance":"repeat task response","deps":[]},
+        {"id":"agree-1","title":"Second opinion","acceptance":"opinion","deps":[]},
+        {"id":"agree-2","title":"Third opinion","acceptance":"opinion","deps":[]},
+        {"id":"silent","title":"Silent worker","acceptance":"evidence","deps":[]}
+    ]}));
+    let j2 = d.call("swarm.attempt.register", json!({"run_id":run,"generation":1,"revision":1,"job_id":"j2"}));
+    d.call("swarm.artifact.put", json!({"run_id":run,"job_id":"j2","attempt_id":j2["id"],
+        "token":j2["token"],"artifact_id":"j2-evidence","source_revision":1,"kind":"reproduction",
+        "content":"PATCH /tasks/task-b-7 returned 200"}));
+    d.call("swarm.report", json!({"run_id":run,"job_id":"j2","attempt_id":j2["id"],"token":j2["token"],
+        "message_id":"j2-result","type":"result","revision":1,"payload":{"artifact_ids":["j2-evidence"],
+        "audit_outcome":"confirmed_defect","confidence":"certain"}}));
+    submit(&d, run, "j7", "finding", "PATCH /tasks/task-b-7 returned 403");
+    d.call("swarm.conflict.open", json!({"run_id":run,"generation":1,"revision":1,
+        "conflict_id":"task-response","left_job_id":"j2","left_artifact_id":"j2-evidence",
+        "right_job_id":"j7","right_artifact_id":"j7-evidence","reason":"200 versus 403"}));
+    let mut agreeing = Vec::new();
+    for job in ["agree-1", "agree-2"] {
+        let attempt = submit(&d, run, job, "finding", "I agree with J2: the route is vulnerable");
+        assert_eq!(d.call("swarm.decide", json!({"run_id":run,"generation":1,"revision":1,"job_id":job,
+            "decision":"accept","evidence":[format!("{job}-evidence")]}))["status"], "accepted");
+        d.call("swarm.attempt.confirm_exit", json!({"run_id":run,"generation":1,"revision":1,
+            "job_id":job,"attempt_id":attempt["id"]}));
+        agreeing.push(job);
+    }
+    let silent = d.call("swarm.attempt.register", json!({"run_id":run,"generation":1,"revision":1,"job_id":"silent"}));
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"silent","attempt_id":silent["id"]}));
+
+    let accept_j2 = d.try_call("swarm.decide", json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"j2","decision":"accept","evidence":["j2-evidence"]})).unwrap_err();
+    assert!(accept_j2.contains("conflict"), "a confident claim is not confirmed: {accept_j2}");
+    for job in &agreeing {
+        let vote = d.try_call("swarm.conflict.resolve", json!({"run_id":run,"generation":1,"revision":1,
+            "conflict_id":"task-response","outcome":"supports_left","reproduction_job_id":job,
+            "reproduction_artifact_id":format!("{job}-evidence")})).unwrap_err();
+        assert!(vote.contains("reproduction must be accepted evidence"), "agreement is not reproduction: {vote}");
+    }
+    let own = d.try_call("swarm.conflict.resolve", json!({"run_id":run,"generation":1,"revision":1,
+        "conflict_id":"task-response","outcome":"supports_left","reproduction_job_id":"j2",
+        "reproduction_artifact_id":"j2-evidence"})).unwrap_err();
+    assert!(own.contains("independent"), "{own}");
+    let empty = d.try_call("swarm.conflict.resolve", json!({"run_id":run,"generation":1,"revision":1,
+        "conflict_id":"task-response","outcome":"supports_left","reproduction_job_id":"silent",
+        "reproduction_artifact_id":"silent-evidence"}));
+    assert!(empty.is_err(), "an empty exit is not evidence: {empty:?}");
+    let nothing = d.try_call("swarm.decide", json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"silent","decision":"accept","evidence":[]}));
+    assert!(nothing.is_err(), "an empty exit has nothing to accept: {nothing:?}");
+    let conflicts = d.call("swarm.conflicts", json!({"run_id":run}));
+    let open = &conflicts["conflicts"][0];
+    assert_eq!((open["status"].as_str(), open["left_artifact_id"].as_str(), open["right_artifact_id"].as_str()),
+        (Some("open"), Some("j2-evidence"), Some("j7-evidence")), "both chains kept: {conflicts}");
+    // The director may instead record the disagreement as unresolved; J2 is still not confirmed.
+    assert_eq!(d.call("swarm.conflict.resolve", json!({"run_id":run,"generation":1,"revision":1,
+        "conflict_id":"task-response","outcome":"unresolved"}))["status"], "unresolved");
+    assert!(d.try_call("swarm.decide", json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"j2","decision":"accept","evidence":["j2-evidence"]})).is_err());
+    let coverage = d.call("swarm.coverage", json!({"run_id":run}));
+    let j2_row = coverage["rows"].as_array().unwrap().iter().find(|r| r["job_id"] == "j2").unwrap().clone();
+    assert_ne!(j2_row["coverage_state"], "confirmed_application_defect", "{j2_row}");
+}
