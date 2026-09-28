@@ -340,6 +340,8 @@ fn ac192_sixteen_agents_in_a_large_repository() {
     git(&repo, &["add", "."]);
     git(&repo, &["commit", "-q", "-m", "ten thousand files"]);
     let d = Daemon::start(&[]);
+    // The app-wide agent limit (claude/auto-swarm, default 9) is raised for sixteen agents.
+    d.call("agents.limit.set", json!({"max_active": 16}));
     let mut agents = Vec::new();
     for i in 0..16 {
         let (id, ws) = sleeper(&d, &repo, &format!("Agent {i}"));
