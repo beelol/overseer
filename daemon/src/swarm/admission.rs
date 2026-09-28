@@ -377,6 +377,10 @@ fn admit_inner(
     if attempts >= effective["max_attempts"].as_i64().unwrap_or(2).min(2) {
         return Ok(blocked("attempt_limit"));
     }
+    // An independent reproducer has its own budget inside the run's allocation (SWARM-45).
+    if let Some(reason) = super::findings::over_budget(&tx, run, job, p)? {
+        return Ok(blocked(reason));
+    }
     for (resource, mode) in &resource_claims {
         let mut stmt = tx.prepare(
             "SELECT run_id,job_id,mode FROM swarm_claims WHERE resource=?1 AND status='active'",
@@ -739,6 +743,7 @@ fn admit_inner(
     tx.execute("INSERT INTO swarm_attempts(id,run_id,job_id,revision,token_sha256,status,executor,executor_run_id,created_ms) VALUES(?1,?2,?3,?4,?5,'registered',?6,?7,?8)",
         params![attempt_id,run,job,job_revision,hash(&token),
             if director_self { "director" } else { "worker" },director_process_id,now])?;
+    super::findings::charge(&tx, &attempt_id, run, job, p)?;
     if let Some((wave, estimate_elapsed_ms, estimate_usage_milli)) = benefit_assignment {
         tx.execute("INSERT INTO swarm_benefit_attempt_outcomes(attempt_id,run_id,revision,wave,job_id,estimate_elapsed_ms,estimate_usage_milli)
             VALUES(?1,?2,?3,?4,?5,?6,?7)",

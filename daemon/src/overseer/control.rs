@@ -75,7 +75,7 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     // fixture launch bridges, the account booking inputs and every setting are not from the
     // conversation.
     ("swarm.get", "read"), ("swarm.list", "read"), ("swarm.jobs", "read"), ("swarm.coverage", "read"),
-    ("swarm.messages", "read"), ("swarm.conflicts", "read"), ("swarm.policy.preview", "read"), ("claims.ledger", "read"), ("broker.envelopes", "read"),
+    ("swarm.messages", "read"), ("swarm.conflicts", "read"), ("swarm.policy.preview", "read"), ("claims.ledger", "read"), ("swarm.findings", "read"), ("broker.envelopes", "read"),
     ("swarm.benefit.preview", "read"), ("swarm.storage.status", "read"), ("swarm.director.summary", "read"),
     ("swarm.worker.liveness", "read"), ("swarm.route.replay", "read"), ("swarm.native_director.get", "read"), ("agents.limit.get", "read"), ("auto.root.preview", "read"),
     ("auto.mode.get", "read"), ("auto.models.list", "read"), ("auto.quota.state", "read"), ("auto.quota.list", "read"),
@@ -89,7 +89,7 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     ("swarm.storage.limit_pages", NEVER), ("swarm.plan", NEVER), ("swarm.attempt.register", NEVER), ("swarm.report", NEVER),
     ("swarm.direct", NEVER), ("swarm.ack", NEVER), ("swarm.partial", NEVER), ("swarm.claim", NEVER), ("swarm.artifact.put", NEVER),
     ("swarm.integrate", NEVER), ("swarm.verify", NEVER), ("swarm.decide", NEVER), ("swarm.conflict.open", NEVER),
-    ("swarm.conflict.resolve", NEVER), ("swarm.complete", NEVER), ("swarm.attempt.confirm_exit", NEVER), ("swarm.revise", NEVER),
+    ("swarm.conflict.resolve", NEVER), ("swarm.finding.record", NEVER), ("swarm.finding.merge", NEVER), ("swarm.reproduce", NEVER), ("swarm.complete", NEVER), ("swarm.attempt.confirm_exit", NEVER), ("swarm.revise", NEVER),
     ("swarm.benefit.commit", NEVER), ("swarm.availability.observe", NEVER), ("swarm.policy.set", NEVER),
     ("swarm.estimate.revoke", NEVER), ("swarm.admit", NEVER), ("swarm.schedule.next", NEVER), ("swarm.dispatch.next", NEVER),
     ("swarm.worker.launch", NEVER), ("swarm.effect.begin", NEVER), ("swarm.effect.reconcile", NEVER), ("swarm.worker.brief", NEVER),

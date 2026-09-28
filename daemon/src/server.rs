@@ -1509,6 +1509,19 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             crate::swarm::resolve_conflict(&mut d.store.lock().unwrap(), p)?
         }
         "swarm.conflicts" => crate::swarm::list_conflicts(&d.store.lock().unwrap(), p)?,
+        "swarm.finding.record" => {
+            fixture_only()?;
+            crate::swarm::record_finding(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.finding.merge" => {
+            fixture_only()?;
+            crate::swarm::merge_findings(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.reproduce" => {
+            fixture_only()?;
+            crate::swarm::reproduce(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.findings" => crate::swarm::findings(&d.store.lock().unwrap(), p)?,
         "swarm.complete" => {
             fixture_only()?;
             crate::swarm::complete(&mut d.store.lock().unwrap(), p)?

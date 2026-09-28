@@ -577,13 +577,16 @@
       "blocker": null
     },
     "SWARM-45": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
         "daemon/tests/swarm_atlas.rs",
-        "docs/verification/swarm/milestone-2.md"
+        "docs/verification/swarm/milestone-2.md",
+        "daemon/tests/swarm_reproduction.rs",
+        "daemon/src/swarm/findings.rs",
+        "docs/verification/swarm/SWARM-45.md"
       ],
-      "blocker": "Joined S1 adds J7 after J2's task result and independently reproduces it from a fresh PostgreSQL schema within the worker ceiling. Director-selected budgeted creation, contradiction handling and finding merge remain unimplemented."
+      "blocker": null
     },
     "SWARM-46": {
       "status": "verified",

@@ -553,6 +553,53 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS swarm_effects_job ON swarm_effects(run_id,job_id,outcome);
         CREATE UNIQUE INDEX IF NOT EXISTS swarm_effects_operation
           ON swarm_effects(run_id,operation_sha256);
+        CREATE TABLE IF NOT EXISTS swarm_findings(
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          finding_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          root_cause TEXT,
+          merged_into TEXT,
+          created_revision INTEGER NOT NULL,
+          created_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,finding_id)
+        );
+        CREATE TABLE IF NOT EXISTS swarm_finding_evidence(
+          run_id TEXT NOT NULL,
+          finding_id TEXT NOT NULL,
+          job_id TEXT NOT NULL,
+          artifact_id TEXT NOT NULL,
+          endpoint TEXT NOT NULL,
+          created_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,finding_id,job_id,artifact_id,endpoint),
+          FOREIGN KEY(run_id,finding_id) REFERENCES swarm_findings(run_id,finding_id)
+        );
+        CREATE TABLE IF NOT EXISTS swarm_reproductions(
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          finding_id TEXT NOT NULL,
+          job_id TEXT NOT NULL,
+          budget_unit TEXT NOT NULL,
+          budget_milli INTEGER NOT NULL CHECK(budget_milli > 0),
+          created_revision INTEGER NOT NULL,
+          created_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,finding_id),
+          UNIQUE(run_id,job_id),
+          FOREIGN KEY(run_id,job_id) REFERENCES swarm_jobs(run_id,id)
+        );
+        CREATE TABLE IF NOT EXISTS swarm_reproduction_sources(
+          run_id TEXT NOT NULL,
+          message_id TEXT NOT NULL,
+          finding_id TEXT NOT NULL,
+          created_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,message_id)
+        );
+        CREATE TABLE IF NOT EXISTS swarm_reproduction_charges(
+          attempt_id TEXT PRIMARY KEY REFERENCES swarm_attempts(id),
+          run_id TEXT NOT NULL,
+          job_id TEXT NOT NULL,
+          unit TEXT NOT NULL,
+          amount_milli INTEGER NOT NULL,
+          created_ms INTEGER NOT NULL
+        );
         "#,
     )?;
     // The partial index is rebuilt on every open (its status list changed
