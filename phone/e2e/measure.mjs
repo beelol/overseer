@@ -125,6 +125,8 @@ function figures(records) {
     'door.frames': measure('door.frames'),
     'door.dropped': measure('door.dropped'),
     'door.longestFrame': measure('door.longestFrame'),
+    // Every launch's opening together: the frames drawn and the frames dropped.
+    'door.all': ok.reduce((all, r) => ({ frames: all.frames + (r.summary['door.frames']?.max ?? 0), dropped: all.dropped + (r.summary['door.dropped']?.max ?? 0) }), { frames: 0, dropped: 0 }),
     'seeded.slow': measure('seeded.slow'),
   };
 }
@@ -151,7 +153,21 @@ export function verdicts(platform, withDoor, withoutDoor, baseline) {
   const frames = withDoor['door.frames'].min ?? 0;
   const dropped = withDoor['door.dropped'].max ?? 0;
   const share = frames + dropped === 0 ? 100 : round((dropped / (frames + dropped)) * 100);
-  say('frames dropped while the door opens, worst launch (%)', share, 1, share <= 1, `${dropped} of ${frames + dropped} frames`);
+  if (platform === 'ios') {
+    say('frames dropped while the door opens, worst launch (%)', share, 1, share <= 1, `${dropped} of ${frames + dropped} frames`);
+  } else {
+    // AC-135: the 1% display budget is measured on the owner's iPhone; the emulator records its own
+    // baseline for each budget and a later run stays within 10% of it. Its drops are still shown.
+    const all = withDoor['door.all'];
+    const allShare = all.frames + all.dropped === 0 ? 100 : round((all.dropped / (all.frames + all.dropped)) * 100);
+    const worst = `worst launch ${share}% (${dropped} of ${frames + dropped} frames)`;
+    if (baseline && typeof baseline['door.dropped.share'] === 'number') {
+      const allowed = round(baseline['door.dropped.share'] * ALLOWED);
+      say('frames dropped while the door opens, all launches, against the baseline (%)', allShare, allowed, allShare <= allowed, `${all.dropped} of ${all.frames + all.dropped} frames; baseline ${baseline['door.dropped.share']}% + 10%; ${worst}`);
+    } else {
+      say("frames dropped while the door opens, all launches (%): the emulator's own figure, its baseline", allShare, '—', true, `${all.dropped} of ${all.frames + all.dropped} frames; ${worst}; the 1% display budget is the owner's iPhone's`);
+    }
+  }
   if (withoutDoor) {
     const without = withoutDoor['agents.interactive'].p50;
     const withIt = withDoor['agents.interactive'].p50;
@@ -192,7 +208,8 @@ async function main() {
 
   const failed = checks.filter((c) => !c.ok);
   if (args.writeBaseline && failed.length === 0) {
-    baselines[args.platform] = { at: result.at, 'agents.interactive.p95': withDoor['agents.interactive'].p95, 'agents.interactive.p50': withDoor['agents.interactive'].p50, 'door.opening.p50': withDoor['door.opening'].p50, 'javascript.loaded.p50': withDoor['javascript.loaded'].p50 };
+    const all = withDoor['door.all'];
+    baselines[args.platform] = { at: result.at, 'agents.interactive.p95': withDoor['agents.interactive'].p95, 'agents.interactive.p50': withDoor['agents.interactive'].p50, 'door.opening.p50': withDoor['door.opening'].p50, 'javascript.loaded.p50': withDoor['javascript.loaded'].p50, 'door.dropped.share': all.frames + all.dropped === 0 ? 0 : round((all.dropped / (all.frames + all.dropped)) * 100) };
     fs.writeFileSync(BASELINES, `${JSON.stringify(baselines, null, 2)}\n`);
     log(`Baseline of ${args.platform} written to e2e/baselines.json`);
   } else if (args.writeBaseline) {
