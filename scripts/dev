@@ -1,0 +1,515 @@
+#!/usr/bin/env node
+// scripts/dev: dev instances of Overseer beside the installed one (Gate T, docs/rfcs/dev-instance.md).
+// Run `scripts/dev --help` for everything; the help text below is the whole manual.
+'use strict';
+const fs = require('fs');
+const net = require('net');
+const os = require('os');
+const path = require('path');
+const cp = require('child_process');
+
+const SELF_REPO = path.resolve(__dirname, '..');
+const HOME = os.homedir();
+const DEV_ROOT = path.resolve(process.env.OVERSEER_DEV_ROOT || path.join(HOME, '.overseer-dev'));
+const MARKER = 'overseer-dev-instance'; // next to dev binaries: marks them dev (AC-212)
+const CODE = process.env.OVERSEER_CODE || '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code';
+const FIRST_PORT = 47900; // production's gateway uses 47810
+
+const COMMANDS = {
+  up: 'build from a checkout and start a dev instance (or say it is already running)',
+  down: 'stop its agents and daemon, then its VS Code windows and TUI',
+  status: 'what runs, where, from which commit',
+  list: 'every instance under the dev root',
+  logs: "print the daemon's log (-f follows it)",
+  ctl: "send one request to the instance's daemon and print the answer",
+  env: 'print shell lines that point dev tools at the instance',
+  code: 'open an isolated VS Code pinned to the instance',
+  tui: "run the instance's own TUI against it",
+  phone: 'the phone simulators pinned to the instance (after pull request #10)',
+  clean: 'down, then remove the instance folder (--all: every instance)',
+  help: 'this text',
+};
+const FLAGS = {
+  '--name': 'value', '--repo': 'value', '--release': 'bool', '--no-build': 'bool', '--restart': 'bool',
+  '--owner-logins': 'bool', '--mdns': 'bool', '--json': 'bool', '--keep-clients': 'bool', '--follow': 'bool',
+  '-f': 'bool', '--vsix': 'value', '--inspect': 'bool', '--dry-run': 'bool', '--platform': 'value', '--all': 'bool',
+  '--help': 'bool', '-h': 'bool',
+};
+
+const HELP = `scripts/dev: dev instances of Overseer, beside the installed one (Gate T).
+
+A dev instance is a daemon (overseerd) built from a checkout, with its own data folder, socket,
+gateway port, VS Code profile and extensions folder. Several run side by side, each with a name.
+The installed Overseer (production) is never touched and never sees them: production ignores
+OVERSEER_HOME/OVERSEER_SOCKET/OVERSEER_INSTANCE and refuses anything marked dev (AC-212).
+
+USAGE
+  scripts/dev up     --name NAME [--repo PATH] [--release] [--no-build] [--restart]
+                     [--owner-logins] [--mdns] [--json]
+      Builds overseerd and overseer-tui in the checkout (cargo build; --release for an
+      optimised build; --no-build uses what target/ already has), copies them into the
+      instance folder with the dev marker, starts the daemon as dev-NAME and prints where
+      everything is and the next commands. The checkout is the one this script is in, or
+      --repo (any Overseer checkout or worktree; remembered for later ups). On a running
+      instance it changes nothing; --restart rebuilds and restarts it (its agents keep
+      running and are reattached; pinned VS Code windows reconnect).
+  scripts/dev down   --name NAME [--keep-clients]
+      Stops the instance's agents and daemon, then its VS Code windows and TUI
+      (--keep-clients leaves them open, waiting for the next up), then anything still
+      running from its folder.
+  scripts/dev status --name NAME [--json]     running or stopped, pid, socket, repo, commit, port
+  scripts/dev list   [--json]                 every instance under the dev root
+  scripts/dev logs   --name NAME [-f|--follow]
+  scripts/dev ctl    --name NAME METHOD [JSON]  for example: ctl --name a state
+                     ctl --name a task.create '{"repo":"/path","harness":"claude","prompt":"hi"}'
+  scripts/dev env    --name NAME              eval "$(scripts/dev env --name a)" for dev tools
+  scripts/dev code   --name NAME [FOLDER] [--vsix FILE] [--no-build] [--inspect]
+      Builds the VSIX in the instance's checkout (node extension/scripts/package.js; --vsix
+      uses a built one; --no-build the newest one in extension/), installs it into the
+      instance's own VS Code profile and extensions folder (never yours), pins it to the
+      instance (overseer.daemonPath, overseer.daemonSocket, overseer.devInstance) and opens
+      VS Code. The status bar reads "Overseer dev-NAME" and the title starts with [dev-NAME].
+      A pinned window never starts a daemon or connects anywhere else. --inspect adds
+      --remote-debugging-port=0 (for UI scenarios).
+  scripts/dev tui    --name NAME [--dry-run]  the instance's TUI; refuses a stopped instance
+  scripts/dev phone  --name NAME --platform ios|android
+      After pull request #10 (the phone app and its gateway): the simulator app pinned to
+      the instance. Until then it prints the address to type in the app.
+  scripts/dev clean  --name NAME | --all      down, then delete the instance folder(s)
+  scripts/dev help | --help | -h
+
+WHERE THINGS ARE
+  Dev root: ${DEV_ROOT}
+      (~/.overseer-dev, or OVERSEER_DEV_ROOT; never inside the installed Overseer's folder)
+  Instance NAME: <dev root>/NAME/
+      instance.json  what up recorded      home/  its data folder (OVERSEER_HOME)
+      overseerd.sock its socket             bin/   its overseerd and overseer-tui (marked dev)
+      daemon.out     the daemon's output    vscode/profile, vscode/extensions
+      notifications.log  what it would have notified (it never uses the Overseer notifier)
+  NAME: lower-case letters, digits and hyphens (up to 32); the daemon runs as dev-NAME.
+  Gateway: each instance gets its own port from ${FIRST_PORT} up (production uses 47810); mDNS
+      is off unless --mdns, and then only as _overseer-dev._tcp, never _overseer._tcp.
+
+LOGINS AND PAID TURNS
+  By default an instance has no logins: Claude is the repository's fixture harness, Codex and
+  OpenCode are off, the desktop logins point at an empty folder, Ollama at a closed port, and
+  Continuity's network probes are off. --owner-logins (per instance, shown by status) uses the
+  real harnesses with the owner's logins: paid turns then follow AGENTS.md (ChatGPT:
+  gpt-5.6-luna at low effort; Claude: haiku, light use). Nothing here signs in or out.
+
+RULES
+  Never touch the installed (production) daemon, its data, the owner's VS Code, logins or
+  keychain; this script never does. Clean up: scripts/dev clean --name NAME (or --all) when
+  done leaves no process, socket or folder. Production changes only through a deploy, run
+  by the owner or by an agent the owner asked.
+`;
+
+// ------------------------------------------------------------------ small helpers
+
+class Usage extends Error {}
+const die = (msg, code = 1) => { const e = new Error(msg); e.exitCode = code; throw e; };
+const exists = p => { try { fs.accessSync(p); return true; } catch { return false; } };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const shq = s => `'${String(s).replace(/'/g, `'\\''`)}'`;
+
+/** A path as the file system sees it, for paths that may not exist yet. */
+function real(p) {
+  p = path.resolve(p);
+  try { return fs.realpathSync(p); } catch { const parent = path.dirname(p); return parent === p ? p : path.join(real(parent), path.basename(p)); }
+}
+const inside = (child, parent) => { const rel = path.relative(parent, child); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
+
+function standardDataDir() {
+  if (process.platform === 'darwin') return path.join(HOME, 'Library/Application Support/Overseer');
+  return path.join(process.env.XDG_DATA_HOME || path.join(HOME, '.local/share'), 'overseer');
+}
+function standardSocket() {
+  const run = process.platform === 'linux' && process.env.XDG_RUNTIME_DIR ? path.join(process.env.XDG_RUNTIME_DIR, 'overseer') : path.join(standardDataDir(), 'run');
+  return path.join(run, 'overseerd.sock');
+}
+const fallbackSocketDir = () => `/tmp/overseer-${process.getuid()}`;
+
+function parse(argv) {
+  const opts = { _: [] };
+  for (let k = 0; k < argv.length; k++) {
+    const a = argv[k];
+    if (a.startsWith('-') && !/^-?\d/.test(a.slice(1))) {
+      const [key, inline] = a.includes('=') ? [a.slice(0, a.indexOf('=')), a.slice(a.indexOf('=') + 1)] : [a, undefined];
+      if (!(key in FLAGS)) throw new Usage(`unknown option ${key} (see scripts/dev --help)`);
+      if (FLAGS[key] === 'value') {
+        const v = inline !== undefined ? inline : argv[++k];
+        if (v === undefined) throw new Usage(`${key} needs a value`);
+        opts[key] = v;
+      } else opts[key] = true;
+    } else opts._.push(a);
+  }
+  return opts;
+}
+
+function instance(name) {
+  if (!name) throw new Usage('--name NAME is required (see scripts/dev --help)');
+  if (!/^[a-z0-9][a-z0-9-]{0,31}$/.test(name)) die(`invalid name ${JSON.stringify(name)}: lower-case letters, digits and hyphens, up to 32, starting with a letter or digit`);
+  const dir = path.join(DEV_ROOT, name);
+  const bin = path.join(dir, 'bin');
+  return {
+    name, id: `dev-${name}`, dir, bin, home: path.join(dir, 'home'), socket: path.join(dir, 'overseerd.sock'),
+    meta: path.join(dir, 'instance.json'), out: path.join(dir, 'daemon.out'), system: path.join(dir, 'system'),
+    profile: path.join(dir, 'vscode/profile'), extensions: path.join(dir, 'vscode/extensions'),
+    daemon: path.join(bin, 'overseerd'), tui: path.join(bin, 'overseer-tui'), notifications: path.join(dir, 'notifications.log'),
+  };
+}
+
+/** The script's own refusals: nothing it makes may be production's. */
+function guard(i) {
+  const std = real(standardDataDir());
+  if (inside(real(DEV_ROOT), std)) die(`the dev root ${DEV_ROOT} is inside the installed Overseer's folder ${std}; choose another OVERSEER_DEV_ROOT`);
+  if (inside(std, real(DEV_ROOT))) die(`the dev root ${DEV_ROOT} contains the installed Overseer's folder ${std}; choose another OVERSEER_DEV_ROOT`);
+  const sock = real(i.socket);
+  if (sock === real(standardSocket())) die(`refusing the installed Overseer's socket ${standardSocket()}`);
+  if (inside(sock, real(fallbackSocketDir()))) die(`refusing a socket in the installed Overseer's socket folder ${fallbackSocketDir()}`);
+  if (Buffer.byteLength(i.socket) > 100) die(`the socket path ${i.socket} is over 100 bytes (a Unix socket limit); set a shorter OVERSEER_DEV_ROOT`);
+}
+
+function readMeta(i) { try { return JSON.parse(fs.readFileSync(i.meta, 'utf8')); } catch { return null; } }
+function writeMeta(i, meta) { fs.writeFileSync(i.meta, JSON.stringify(meta, null, 2) + '\n'); }
+
+function call(socket, method, params = {}, ms = 30000) {
+  return new Promise((resolve, reject) => {
+    const s = net.createConnection(socket);
+    let buf = '';
+    const timer = setTimeout(() => { s.destroy(); reject(new Error(`${method}: no answer in ${ms} ms`)); }, ms);
+    s.setEncoding('utf8');
+    s.on('connect', () => s.write(JSON.stringify({ id: 1, method, params }) + '\n'));
+    s.on('data', d => {
+      buf += d; const k = buf.indexOf('\n'); if (k < 0) return;
+      clearTimeout(timer); s.destroy();
+      const msg = JSON.parse(buf.slice(0, k));
+      if (msg.error) reject(new Error(msg.error.message || msg.error.code)); else resolve(msg.result);
+    });
+    s.on('error', e => { clearTimeout(timer); reject(e); });
+  });
+}
+
+const alive = pid => { if (!pid) return false; try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+const commandOf = pid => cp.spawnSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8' }).stdout.trim();
+/** Processes whose command line contains `text` (never this one). */
+function pidsWith(text) {
+  const out = cp.spawnSync('pgrep', ['-f', text], { encoding: 'utf8' }).stdout;
+  return out.split('\n').map(Number).filter(p => p && p !== process.pid && p !== process.ppid);
+}
+async function killAll(pids) {
+  for (const p of pids) { try { process.kill(p, 'SIGTERM'); } catch {} }
+  for (let k = 0; k < 50 && pids.some(alive); k++) await sleep(100);
+  for (const p of pids.filter(alive)) { try { process.kill(p, 'SIGKILL'); } catch {} }
+}
+
+async function state(i) {
+  const meta = readMeta(i);
+  if (!meta) return null;
+  let hello = null;
+  if (exists(i.socket)) { try { hello = await call(i.socket, 'hello', {}, 3000); } catch {} }
+  const running = !!hello && hello.instance === i.id;
+  return { ...meta, running, pid: running ? hello.pid : null, version: hello?.version ?? null };
+}
+
+function git(repo, ...args) { const r = cp.spawnSync('git', ['-C', repo, ...args], { encoding: 'utf8' }); return r.status === 0 ? r.stdout.trim() : ''; }
+
+function checkRepo(repo) {
+  if (!exists(path.join(repo, 'daemon/Cargo.toml')) || !exists(path.join(repo, 'tui/Cargo.toml')) || !exists(path.join(repo, 'extension/package.json'))) die(`${repo} is not an Overseer checkout (no daemon/, tui/ and extension/)`);
+}
+
+function build(repo, release) {
+  const args = ['build', '-p', 'overseerd', '-p', 'overseer-tui', ...(release ? ['--release'] : [])];
+  process.stderr.write(`building in ${repo}: cargo ${args.join(' ')}\n`);
+  const r = cp.spawnSync('cargo', args, { cwd: repo, stdio: ['ignore', process.stderr, process.stderr] });
+  if (r.status !== 0) die(`cargo build failed in ${repo}`);
+}
+const targetDir = (repo, release) => path.join(process.env.CARGO_TARGET_DIR ? path.resolve(repo, process.env.CARGO_TARGET_DIR) : path.join(repo, 'target'), release ? 'release' : 'debug');
+
+/** Copies by rename, so a running daemon or supervisor keeps its own file. */
+function install(src, dest, mode = 0o755) {
+  const tmp = `${dest}.tmp-${process.pid}`;
+  fs.copyFileSync(src, tmp); fs.chmodSync(tmp, mode); fs.renameSync(tmp, dest);
+}
+
+function portFree(port) {
+  return new Promise(resolve => { const s = net.createServer(); s.once('error', () => resolve(false)); s.listen(port, '0.0.0.0', () => s.close(() => resolve(true))); });
+}
+async function pickPort(i) {
+  const taken = new Set();
+  for (const name of names()) { if (name !== i.name) { const m = readMeta(instance(name)); if (m?.port) taken.add(m.port); } }
+  for (let p = FIRST_PORT; p < FIRST_PORT + 500; p++) if (!taken.has(p) && await portFree(p)) return p;
+  die('no free gateway port from ' + FIRST_PORT);
+}
+
+function names() {
+  try { return fs.readdirSync(DEV_ROOT).filter(n => exists(path.join(DEV_ROOT, n, 'instance.json'))).sort(); } catch { return []; }
+}
+
+/** The instance daemon's environment: nothing inherited that points at another Overseer. */
+function daemonEnv(i, meta) {
+  const env = {};
+  for (const [k, v] of Object.entries(process.env)) if (!k.startsWith('OVERSEER_') && k !== 'OVERSEERD') env[k] = v;
+  Object.assign(env, {
+    OVERSEER_INSTANCE: i.id, OVERSEER_HOME: i.home, OVERSEER_SOCKET: i.socket,
+    OVERSEER_GATEWAY_PORT: String(meta.port), OVERSEER_NOTIFY_COMMAND: path.join(i.bin, 'notify'),
+  });
+  if (!meta.mdns) env.OVERSEER_GATEWAY_MDNS = 'off';
+  if (meta.logins !== 'owner') {
+    Object.assign(env, {
+      OVERSEER_CLAUDE_PATH: path.join(i.bin, 'claude-fixture.js'),
+      OVERSEER_CODEX_PATH: '/nonexistent/dev-instance-without-owner-logins',
+      OVERSEER_OPENCODE_PATH: '/nonexistent/dev-instance-without-owner-logins',
+      OVERSEER_TEST_SYSTEM_HOME: i.system,
+      OVERSEER_OLLAMA_URL: 'http://127.0.0.1:9',
+      OVERSEER_CONTINUITY_PROBES: 'off',
+      OVERSEER_HARNESS_ENV_PASSTHROUGH: 'CLAUDE_FIXTURE_MODE_FILE,FIXTURE_SLOW_MS',
+      CLAUDE_FIXTURE_MODE_FILE: path.join(i.dir, 'fixture-mode'),
+      FIXTURE_SLOW_MS: '200',
+    });
+  }
+  return env;
+}
+
+/** What dev tools (the dev TUI, scripts) need to reach the instance. */
+function clientEnv(i) {
+  const env = {};
+  for (const [k, v] of Object.entries(process.env)) if (!k.startsWith('OVERSEER_') && k !== 'OVERSEERD') env[k] = v;
+  return Object.assign(env, { OVERSEER_INSTANCE: i.id, OVERSEER_HOME: i.home, OVERSEER_SOCKET: i.socket, OVERSEERD: i.daemon });
+}
+
+async function startDaemon(i, meta) {
+  fs.rmSync(i.socket, { force: true });
+  const out = fs.openSync(i.out, 'a');
+  const child = cp.spawn(i.daemon, ['serve'], { env: daemonEnv(i, meta), cwd: i.dir, detached: true, stdio: ['ignore', out, out] });
+  let exited = null;
+  child.on('exit', code => { exited = code; });
+  child.unref();
+  fs.closeSync(out);
+  for (let k = 0; k < 150; k++) {
+    if (exited !== null) break;
+    try { const h = await call(i.socket, 'hello', {}, 1000); if (h.instance === i.id) return h; } catch {}
+    await sleep(100);
+  }
+  const tail = (() => { try { return fs.readFileSync(i.out, 'utf8').trim().split('\n').slice(-8).join('\n'); } catch { return ''; } })();
+  die(`dev instance ${i.id} did not start${exited !== null ? ` (exit ${exited})` : ''}. Its output:\n${tail}`);
+}
+
+async function stopDaemon(i, method) {
+  const st = await state(i);
+  if (!st?.running) return false;
+  const pid = st.pid;
+  try { await call(i.socket, method, {}, 60000); } catch {}
+  for (let k = 0; k < 150 && alive(pid); k++) await sleep(100);
+  if (alive(pid) && commandOf(pid).includes(i.dir)) await killAll([pid]);
+  fs.rmSync(i.socket, { force: true });
+  return true;
+}
+
+function print(obj, json, text) { console.log(json ? JSON.stringify(obj, null, 2) : text); }
+
+function describe(st, i) {
+  const lines = [
+    `Dev instance ${i.id} is ${st.running ? 'running' : 'stopped'}.`,
+    `  repo      ${st.repo} (commit ${st.commit || 'unknown'}${st.dirty ? ', with uncommitted changes' : ''}${st.release ? ', release build' : ''})`,
+    `  daemon    ${st.running ? `pid ${st.pid}, ` : ''}socket ${st.socket}`,
+    `  data      ${st.home}`,
+    `  gateway   port ${st.port} (mDNS ${st.mdns ? 'on, as _overseer-dev._tcp' : 'off'})`,
+    `  logins    ${st.logins === 'owner' ? "the owner's (--owner-logins): paid turns follow AGENTS.md" : 'none: Claude fixture harness; Codex and OpenCode off'}`,
+  ];
+  if (st.code?.profile) lines.push(`  VS Code   profile ${st.code.profile}`);
+  lines.push('Next:',
+    `  scripts/dev ctl --name ${i.name} state`,
+    `  scripts/dev code --name ${i.name} [FOLDER]`,
+    `  scripts/dev tui --name ${i.name}`,
+    `  scripts/dev logs --name ${i.name}`,
+    `  scripts/dev clean --name ${i.name}    (when done: stops everything, removes the folder)`);
+  return lines.join('\n');
+}
+
+// ------------------------------------------------------------------ commands
+
+async function up(o) {
+  const i = instance(o['--name']);
+  guard(i);
+  const old = readMeta(i);
+  const repo = real(o['--repo'] || old?.repo || SELF_REPO);
+  checkRepo(repo);
+  const release = !!o['--release'];
+  const before = await state(i);
+  if (before?.running && !o['--restart']) {
+    print({ ...before, already_running: true }, o['--json'], `Already running (scripts/dev up --name ${i.name} --restart rebuilds and restarts it).\n` + describe(before, i));
+    return;
+  }
+  if (!o['--no-build']) build(repo, release);
+  const from = targetDir(repo, release);
+  for (const b of ['overseerd', 'overseer-tui']) if (!exists(path.join(from, b))) die(`${path.join(from, b)} is missing: build it (drop --no-build)`);
+  if (before?.running) await stopDaemon(i, 'daemon.shutdown'); // --restart: agents keep running, reattached next
+  for (const d of [i.dir, i.bin, i.system]) fs.mkdirSync(d, { recursive: true });
+  fs.mkdirSync(i.home, { recursive: true, mode: 0o700 });
+  install(path.join(from, 'overseerd'), i.daemon);
+  install(path.join(from, 'overseer-tui'), i.tui);
+  install(path.join(repo, 'fixtures/fake-harness/claude-fixture.js'), path.join(i.bin, 'claude-fixture.js'));
+  fs.writeFileSync(path.join(i.bin, MARKER), i.id + '\n');
+  fs.writeFileSync(path.join(i.bin, 'notify'), `#!/bin/sh\nprintf '%s\\t%s\\t%s\\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$1" "$2" >> ${shq(i.notifications)}\n`);
+  fs.chmodSync(path.join(i.bin, 'notify'), 0o755);
+  const meta = {
+    name: i.name, instance: i.id, repo, commit: git(repo, 'rev-parse', '--short', 'HEAD'), branch: git(repo, 'rev-parse', '--abbrev-ref', 'HEAD'),
+    dirty: git(repo, 'status', '--porcelain').length > 0, release, built: new Date().toISOString(),
+    socket: i.socket, home: i.home, bin: i.bin, port: old?.port || await pickPort(i),
+    mdns: !!o['--mdns'],
+    logins: o['--owner-logins'] ? 'owner' : 'fixture', code: old?.code,
+  };
+  writeMeta(i, meta);
+  const hello = await startDaemon(i, meta);
+  const st = { ...meta, running: true, pid: hello.pid, version: hello.version };
+  print(st, o['--json'], describe(st, i));
+}
+
+async function down(o, i = instance(o['--name'])) {
+  const meta = readMeta(i);
+  if (!meta) die(`no dev instance ${i.name} under ${DEV_ROOT}`);
+  const stopped = await stopDaemon(i, 'daemon.stop_all');
+  const left = pidsWith(i.dir + path.sep).filter(p => { const c = commandOf(p); return !(o['--keep-clients'] && (c.includes(i.profile) || c.includes(i.tui))); });
+  await killAll(left);
+  if (!o['--keep-clients']) fs.rmSync(path.join(i.profile, 'DevToolsActivePort'), { force: true });
+  if (!o['--quiet']) console.log(`Dev instance ${i.id}: ${stopped ? 'stopped' : 'was not running'}${left.length ? `; ${left.length} process${left.length === 1 ? '' : 'es'} from its folder ended` : ''}${o['--keep-clients'] ? '; its VS Code and TUI stay open, waiting for the next up' : ''}.`);
+}
+
+async function status(o) {
+  const i = instance(o['--name']);
+  const st = await state(i);
+  if (!st) die(`no dev instance ${i.name} under ${DEV_ROOT} (scripts/dev up --name ${i.name})`);
+  print(st, o['--json'], describe(st, i));
+}
+
+async function list(o) {
+  const all = [];
+  for (const name of names()) all.push(await state(instance(name)));
+  print(all, o['--json'], all.length ? all.map(s => `${s.running ? 'running' : 'stopped'}  ${s.instance.padEnd(20)} pid ${String(s.pid || '-').padEnd(7)} port ${s.port}  ${s.repo} @ ${s.commit}`).join('\n') : `no dev instances under ${DEV_ROOT}`);
+}
+
+function logs(o) {
+  const i = instance(o['--name']);
+  const files = [path.join(i.home, 'overseerd.log'), i.out].filter(exists);
+  if (!files.length) die(`no logs yet for ${i.id}`);
+  if (o['-f'] || o['--follow']) { cp.spawnSync('tail', ['-n', '40', '-F', ...files], { stdio: 'inherit' }); return; }
+  for (const f of files) { console.log(`==> ${f} <==`); console.log(fs.readFileSync(f, 'utf8').split('\n').slice(-60).join('\n')); }
+}
+
+async function ctl(o) {
+  const i = instance(o['--name']);
+  const [method, params] = o._.slice(1);
+  if (!method) throw new Usage('ctl needs a METHOD, for example: scripts/dev ctl --name a state');
+  let p = {};
+  if (params) { try { p = JSON.parse(params); } catch { die(`the parameters must be JSON: ${params}`); } }
+  const st = await state(i);
+  if (!st?.running) die(`dev instance ${i.id} is not running (scripts/dev up --name ${i.name})`);
+  console.log(JSON.stringify(await call(i.socket, method, p), null, 2));
+}
+
+function env(o) {
+  const i = instance(o['--name']);
+  if (!readMeta(i)) die(`no dev instance ${i.name} under ${DEV_ROOT}`);
+  console.log(`# dev instance ${i.id}: for dev tools only (the installed extension and TUI ignore these, AC-212)`);
+  for (const [k, v] of Object.entries({ OVERSEER_INSTANCE: i.id, OVERSEER_HOME: i.home, OVERSEER_SOCKET: i.socket, OVERSEERD: i.daemon })) console.log(`export ${k}=${shq(v)}`);
+}
+
+async function code(o) {
+  const i = instance(o['--name']);
+  const st = await state(i);
+  if (!st?.running) die(`dev instance ${i.id} is not running (scripts/dev up --name ${i.name})`);
+  if (!exists(CODE)) die(`VS Code's command line tool is not at ${CODE} (set OVERSEER_CODE)`);
+  let vsix = o['--vsix'] && real(o['--vsix']);
+  if (!vsix) {
+    if (!o['--no-build']) {
+      process.stderr.write(`packaging the extension in ${st.repo}\n`);
+      const r = cp.spawnSync(process.execPath, [path.join(st.repo, 'extension/scripts/package.js')], { cwd: st.repo, stdio: ['ignore', process.stderr, process.stderr] });
+      if (r.status !== 0) die('packaging failed (first time in a checkout: npm ci --prefix extension/tooling/vsce --ignore-scripts and npm ci --prefix extension/branch-diff/tooling/review --ignore-scripts)');
+    }
+    const dir = path.join(st.repo, 'extension');
+    const found = fs.readdirSync(dir).filter(f => f.endsWith('.vsix')).map(f => path.join(dir, f)).sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
+    if (!found) die(`no VSIX in ${dir}`);
+    vsix = found;
+  }
+  fs.mkdirSync(path.join(i.profile, 'User'), { recursive: true });
+  fs.mkdirSync(i.extensions, { recursive: true });
+  const inst = cp.spawnSync(CODE, ['--user-data-dir', i.profile, '--extensions-dir', i.extensions, '--install-extension', vsix, '--force'], { encoding: 'utf8', env: clientEnv(i) });
+  if (inst.status !== 0) die(`installing ${vsix} into ${i.extensions} failed:\n${inst.stdout}${inst.stderr}`);
+  const file = path.join(i.profile, 'User/settings.json');
+  let settings = {};
+  try { settings = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
+  Object.assign(settings, {
+    'telemetry.telemetryLevel': 'off', 'extensions.autoUpdate': false, 'extensions.autoCheckUpdates': false, 'update.mode': 'none',
+    'workbench.startupEditor': 'none', 'workbench.tips.enabled': false, 'security.workspace.trust.enabled': false, 'window.restoreWindows': 'none',
+    'window.title': `[${i.id}] \${rootName}\${separator}\${activeEditorShort}`,
+    'overseer.daemonPath': i.daemon, 'overseer.daemonSocket': i.socket, 'overseer.devInstance': i.id,
+  });
+  fs.writeFileSync(file, JSON.stringify(settings, null, 2) + '\n');
+  fs.rmSync(path.join(i.profile, 'DevToolsActivePort'), { force: true });
+  const folder = o._[1] ? real(o._[1]) : null;
+  const log = fs.openSync(path.join(i.dir, 'vscode/code.log'), 'a');
+  const child = cp.spawn(CODE, ['--new-window', '--user-data-dir', i.profile, '--extensions-dir', i.extensions, '--skip-welcome', '--skip-release-notes', ...(o['--inspect'] ? ['--remote-debugging-port=0'] : []), ...(folder ? [folder] : [])],
+    { env: clientEnv(i), detached: true, stdio: ['ignore', log, log] });
+  child.unref();
+  fs.closeSync(log);
+  const meta = readMeta(i);
+  meta.code = { profile: i.profile, extensions: i.extensions, vsix, opened: new Date().toISOString(), folder };
+  writeMeta(i, meta);
+  print(meta.code, o['--json'], `VS Code opened for ${i.id} (profile ${i.profile}; extension ${path.basename(vsix)}). Its status bar reads "Overseer ${i.id}". Close it with scripts/dev down --name ${i.name}.`);
+}
+
+async function tui(o) {
+  const i = instance(o['--name']);
+  const st = await state(i);
+  if (!st?.running) die(`dev instance ${i.id} is not running (scripts/dev up --name ${i.name}); the TUI would start a daemon of its own`);
+  const command = [i.tui, '--daemon', i.daemon];
+  if (o['--dry-run']) { console.log(JSON.stringify({ command, env: { OVERSEER_INSTANCE: i.id, OVERSEER_HOME: i.home, OVERSEER_SOCKET: i.socket } }, null, 2)); return; }
+  const r = cp.spawnSync(command[0], command.slice(1), { stdio: 'inherit', env: clientEnv(i) });
+  process.exitCode = r.status ?? 1;
+}
+
+async function phone(o) {
+  const i = instance(o['--name']);
+  const st = await state(i);
+  if (!st) die(`no dev instance ${i.name} under ${DEV_ROOT}`);
+  const platform = o['--platform'] || 'ios';
+  if (!['ios', 'android'].includes(platform)) throw new Usage('--platform is ios or android');
+  const address = `${platform === 'ios' ? '127.0.0.1' : '10.0.2.2'}:${st.port}`;
+  console.log(`The phone app and its gateway arrive with pull request #10; pinning the simulator to ${i.id} is AC-210, after it merges.
+Until then: this instance's gateway port is ${st.port}; in the ${platform === 'ios' ? 'iOS simulator' : 'Android emulator'} its address is ${address}
+(the app's Settings → Mac address). The installed app never pairs with a dev instance (AC-213).`);
+  process.exitCode = 2;
+}
+
+async function clean(o) {
+  const all = o['--all'];
+  if (!all && !o['--name']) throw new Usage('clean needs --name NAME or --all');
+  const targets = all ? names().map(instance) : [instance(o['--name'])];
+  for (const i of targets) {
+    if (readMeta(i)) await down({ ...o, '--keep-clients': false, '--quiet': true }, i);
+    fs.rmSync(i.dir, { recursive: true, force: true });
+    console.log(`Dev instance ${i.id}: stopped and removed (${i.dir}).`);
+  }
+  if (all) { try { fs.rmdirSync(DEV_ROOT); } catch {} }
+  if (all && !targets.length) console.log(`no dev instances under ${DEV_ROOT}`);
+}
+
+async function main(argv) {
+  const o = parse(argv);
+  const cmd = o._[0];
+  if (!cmd || cmd === 'help' || o['--help'] || o['-h']) { process.stdout.write(HELP); return; }
+  const run = { up, down, status, list, logs, ctl, env, code, tui, phone, clean }[cmd];
+  if (!run) throw new Usage(`unknown command ${cmd} (see scripts/dev --help)`);
+  await run(o);
+}
+
+if (require.main === module) {
+  main(process.argv.slice(2)).catch(e => {
+    if (e instanceof Usage) { console.error(`scripts/dev: ${e.message}`); process.exit(2); }
+    console.error(`scripts/dev: ${e.message}`);
+    process.exit(e.exitCode || 1);
+  });
+}
+
+module.exports = { COMMANDS, FLAGS, HELP, parse };
