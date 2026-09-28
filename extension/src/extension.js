@@ -50,7 +50,7 @@ async function activate(context) {
   const binary = resolveBinary(context, settings.get('daemonPath'));
   // Production (the owner's installed extension) only ever uses the standard daemon (AC-212).
   const production = isProductionInstall(context.extensionPath);
-  // A dev profile (scripts/dev code) pins this window to one dev instance (AC-209); production ignores it.
+  // A dev profile (scripts/dev code) pins this window to one dev daemon (AC-209); production ignores it.
   const pinSocket = settings.get('daemonSocket'), pinInstance = settings.get('devInstance');
   const pin = !production && pinSocket ? { socket: pinSocket, instance: pinInstance } : null;
   if (production && (pinSocket || pinInstance)) say('ignoring overseer.daemonSocket and overseer.devInstance: this is the installed extension');

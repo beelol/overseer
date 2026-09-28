@@ -239,13 +239,13 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-204** Finished slices merge; the rest becomes criteria — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-204.md)
 - [ ] **AC-205** Offline on a real Wi-Fi toggle (owner step) — not started — [evidence](docs/verification/AC-205.md)
 - [ ] **AC-206** One command gives a dev Overseer (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-206.md)
-- [ ] **AC-207** A dev instance never interferes with the running Overseer (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-207.md)
-- [ ] **AC-208** Production knows nothing of dev instances (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-208.md)
+- [ ] **AC-207** A dev daemon never interferes with the running Overseer (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-207.md)
+- [ ] **AC-208** Production knows nothing of dev daemons (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-208.md)
 - [ ] **AC-209** VS Code and the TUI pointed at one instance (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-209.md)
-- [ ] **AC-210** The phone simulators pinned to a dev instance (after pull request #10) — not started: after PR #10 (the phone app and the gateway) — [evidence](docs/verification/AC-210.md)
+- [ ] **AC-210** The phone simulators pinned to a dev daemon (after pull request #10) — not started: after PR #10 (the phone app and the gateway) — [evidence](docs/verification/AC-210.md)
 - [ ] **AC-211** Agents learn it from the repository, and leave nothing running (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-211.md)
 - [ ] **AC-212** Production can never point at a dev version (stage 1) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-212.md)
-- [ ] **AC-213** The production phone app never pairs with a dev instance (after pull request #10) — not started: after PR #10 (the phone app and the gateway) — [evidence](docs/verification/AC-213.md)
+- [ ] **AC-213** The production phone app never pairs with a dev daemon (after pull request #10) — not started: after PR #10 (the phone app and the gateway) — [evidence](docs/verification/AC-213.md)
 - [ ] **AC-214** Deploy: the one path from dev to production (stage 3) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-214.md)
 <!-- ac-list:end -->
 
@@ -384,9 +384,9 @@ step), `P` opens a GitHub pull request with your `gh`, `C` removes a finished wo
 Commander folder, preview; the daemon plays, and the terminal bell rings only when it does not), `X` stops every
 agent and the daemon, `?` lists every key, `q` quits.
 
-## Developing Overseer: dev instances
+## Developing Overseer: dev daemons
 
-A dev instance is Overseer built from a checkout and run beside the installed one, with its own
+A dev daemon is Overseer built from a checkout and run beside the installed one, with its own
 data folder, socket, gateway port and VS Code profile ([design](docs/rfcs/dev-instance.md)).
 Agents use it to build and try Overseer without touching yours:
 
@@ -396,7 +396,7 @@ scripts/dev code --name a          # an isolated VS Code pinned to dev-a ("Overs
 scripts/dev clean --name a         # stop everything of dev-a and remove it
 ```
 
-`scripts/dev --help` has every command. The installed Overseer never sees dev instances, and
+`scripts/dev --help` has every command. The installed Overseer never sees dev daemons, and
 never uses one even when their variables leak into its environment
 ([AC-212](docs/verification/AC-212.md)).
 
@@ -404,10 +404,10 @@ never uses one even when their variables leak into its environment
 
 - State lives in `~/Library/Application Support/Overseer` (`overseer.sqlite`, per-run
   output under `runs/`, worktrees under `worktrees/`, profiles under `profiles/`). Linux
-  uses `$XDG_DATA_HOME/overseer`. `OVERSEER_HOME` overrides it for tests and dev instances
+  uses `$XDG_DATA_HOME/overseer`. `OVERSEER_HOME` overrides it for tests and dev daemons
   only: the installed extension and TUI ignore `OVERSEER_HOME`, `OVERSEER_SOCKET` and
   `OVERSEER_INSTANCE` in their environment and refuse any daemon marked dev
-  ([AC-212](docs/verification/AC-212.md), [dev instances](docs/rfcs/dev-instance.md)).
+  ([AC-212](docs/verification/AC-212.md), [dev daemons](docs/rfcs/dev-instance.md)).
 - The daemon binary is `target/release/overseerd` in a build, or
   `~/.vscode/extensions/beelol.overseer-0.1.0/bin/overseerd-darwin-arm64` once installed.
   `overseerd serve` runs it in the foreground without VS Code (the extension normally starts
@@ -493,13 +493,13 @@ the owner action or decision each one needs.
 - [ ] [AC-204](docs/verification/AC-204.md) (Finished slices merge; the rest becomes criteria): Not started (Gate Q, added by the owner on 2026-09-27).
 - [ ] [AC-205](docs/verification/AC-205.md) (Offline on a real Wi-Fi toggle (owner step)): Owner, when no agents are in flight: run `node test/local/wifi-live.js`, switch Wi-Fi off when it asks and on again when it says Overseer is offline (about a minute). It writes `evidence/ac-205/`; then this record is updated.
 - [ ] [AC-206](docs/verification/AC-206.md) (One command gives a dev Overseer (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
-- [ ] [AC-207](docs/verification/AC-207.md) (A dev instance never interferes with the running Overseer (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
-- [ ] [AC-208](docs/verification/AC-208.md) (Production knows nothing of dev instances (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
+- [ ] [AC-207](docs/verification/AC-207.md) (A dev daemon never interferes with the running Overseer (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
+- [ ] [AC-208](docs/verification/AC-208.md) (Production knows nothing of dev daemons (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
 - [ ] [AC-209](docs/verification/AC-209.md) (VS Code and the TUI pointed at one instance (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
-- [ ] [AC-210](docs/verification/AC-210.md) (The phone simulators pinned to a dev instance (after pull request #10)): After PR #10: the phone app and the gateway must be on main first.
+- [ ] [AC-210](docs/verification/AC-210.md) (The phone simulators pinned to a dev daemon (after pull request #10)): After PR #10: the phone app and the gateway must be on main first.
 - [ ] [AC-211](docs/verification/AC-211.md) (Agents learn it from the repository, and leave nothing running (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
 - [ ] [AC-212](docs/verification/AC-212.md) (Production can never point at a dev version (stage 1)): Not started (Gate T, added by the owner on 2026-09-27).
-- [ ] [AC-213](docs/verification/AC-213.md) (The production phone app never pairs with a dev instance (after pull request #10)): After PR #10: the phone app and the gateway must be on main first.
+- [ ] [AC-213](docs/verification/AC-213.md) (The production phone app never pairs with a dev daemon (after pull request #10)): After PR #10: the phone app and the gateway must be on main first.
 - [ ] [AC-214](docs/verification/AC-214.md) (Deploy: the one path from dev to production (stage 3)): Not started (Gate T, added by the owner on 2026-09-27).
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.

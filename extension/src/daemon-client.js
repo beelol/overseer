@@ -12,7 +12,7 @@ const { EventEmitter } = require('events');
 // with OVERSEER_INSTANCE=dev-<name> and reports it in `hello`, and dev binaries carry this file.
 const DEV_MARKER = 'overseer-dev-instance';
 // Variables that point a daemon at another instance: production ignores them (a terminal where a
-// dev instance was set up, or a launcher, can leak them into VS Code's environment).
+// dev daemon was set up, or a launcher, can leak them into VS Code's environment).
 const LEAKY = ['OVERSEER_HOME', 'OVERSEER_SOCKET', 'OVERSEER_INSTANCE'];
 
 const real = p => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
@@ -24,7 +24,7 @@ function isProductionInstall(extensionPath, home = os.homedir()) {
   return ['.vscode', '.vscode-insiders'].some(d => real(path.join(home, d, 'extensions')) === parent);
 }
 
-/** The dev instance a binary is marked with (the file next to it), or null. */
+/** The dev daemon a binary is marked with (the file next to it), or null. */
 function devMarker(binary) {
   try { return fs.readFileSync(path.join(path.dirname(binary), DEV_MARKER), 'utf8').trim() || 'dev'; } catch { return null; }
 }
@@ -60,13 +60,13 @@ class DaemonClient extends EventEmitter {
   checkBinary() {
     if (!this.production) return;
     const marker = devMarker(this.binary);
-    if (marker) throw new Error(`Refusing ${this.binary}: it is a dev build (${marker}). The installed Overseer only runs its own daemon; clear overseer.daemonPath, and use scripts/dev code for dev instances.`);
+    if (marker) throw new Error(`Refusing ${this.binary}: it is a dev build (${marker}). The installed Overseer only runs its own daemon; clear overseer.daemonPath, and use scripts/dev code for dev daemons.`);
   }
 
-  /** Said when a pinned dev instance is not running: it is never started or replaced from here. */
+  /** Said when a pinned dev daemon is not running: it is never started or replaced from here. */
   notRunning() {
     const name = (this.pin.instance || '').replace(/^dev-/, '') || '<name>';
-    return `Dev instance ${this.pin.instance || '(unnamed)'} is not running (socket ${this.pin.socket}). Start it with scripts/dev up --name ${name}.`;
+    return `Dev daemon ${this.pin.instance || '(unnamed)'} is not running (socket ${this.pin.socket}). Start it with scripts/dev up --name ${name}.`;
   }
 
   socketPath() {
@@ -117,7 +117,7 @@ class DaemonClient extends EventEmitter {
       socket.on('connect', () => {
         opened = true; this.socket = socket; this.buffer = '';
         // Identify as a VS Code window: the daemon notifies when the last one closes while agents run.
-        // Its answer says which daemon this is: production refuses a dev instance (AC-212).
+        // Its answer says which daemon this is: production refuses a dev daemon (AC-212).
         this.request('hello', { client: 'vscode' }).then(hello => {
           const refusal = this.refuse(hello || {});
           if (refusal) {
@@ -157,8 +157,8 @@ class DaemonClient extends EventEmitter {
 
   /** Why this daemon must not be used, or null. */
   refuse(hello) {
-    if (this.pin && hello.instance !== this.pin.instance) return `Pinned to dev instance ${this.pin.instance}, but the daemon at ${this.pin.socket} is ${hello.instance ? 'dev instance ' + hello.instance : 'not a dev instance'}; refusing it.`;
-    if (this.production && hello.instance) return `The installed Overseer refuses to use dev instance ${hello.instance} (socket ${this.socketPath()}). Dev instances are for dev VS Code profiles (scripts/dev code); production uses only the standard daemon.`;
+    if (this.pin && hello.instance !== this.pin.instance) return `Pinned to dev daemon ${this.pin.instance}, but the daemon at ${this.pin.socket} is ${hello.instance ? 'dev daemon ' + hello.instance : 'not a dev daemon'}; refusing it.`;
+    if (this.production && hello.instance) return `The installed Overseer refuses to use dev daemon ${hello.instance} (socket ${this.socketPath()}). Dev daemons are for dev VS Code profiles (scripts/dev code); production uses only the standard daemon.`;
     return null;
   }
 

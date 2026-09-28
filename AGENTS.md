@@ -27,9 +27,9 @@ Codex, Kilo and Claude all read this file (Claude through `CLAUDE.md`). The owne
 - Leave no test windows, daemons, shims or runs going.
 
 ## Running a dev Overseer
-- To build and try Overseer itself (a daemon, VS Code or the TUI from your checkout), use a dev instance, never the installed Overseer: `scripts/dev up --name <short-name> --repo <your worktree>`. It builds from that checkout, starts a daemon with its own data folder, socket, gateway port and VS Code profile, and prints where everything is. You need no one's permission to start one.
+- The dev daemons feature runs developer versions of Overseer beside the owner's installed one without colliding with it or with each other. To build and try Overseer itself (a daemon, VS Code or the TUI from your checkout), use a dev daemon, never the installed Overseer: `scripts/dev up --name <short-name> --repo <your worktree>`. It builds from that checkout, starts a daemon with its own data folder, socket, gateway port and VS Code profile, and prints where everything is. You need no one's permission to start one.
 - Then `scripts/dev ctl --name <name> state` (any daemon method), `scripts/dev code --name <name> [folder]` (an isolated VS Code pinned to it), `scripts/dev tui --name <name>`, `scripts/dev logs --name <name>`, `scripts/dev up --name <name> --restart` after a rebuild. `scripts/dev --help` has everything.
-- Instances have no logins: the Claude harness is the fixture, Codex and OpenCode are off. `--owner-logins` uses the owner's logins, and then the paid-turn rules below apply.
+- Dev daemons have no logins: the Claude harness is the fixture, Codex and OpenCode are off. `--owner-logins` uses the owner's logins, and then the paid-turn rules below apply.
 - Always clean up: `scripts/dev clean --name <name>` (or `--all`) stops its agents, daemon, VS Code and TUI and removes its folder.
 - Never touch the production daemon (the owner's installed Overseer): never stop, restart, reinstall or point anything at it, and never deploy to it unless the owner asked you to in this conversation.
 
@@ -40,6 +40,6 @@ Codex, Kilo and Claude all read this file (Claude through `CLAUDE.md`). The owne
 - Audio Mode (Gate O) and the TUI (`docs/rfcs/tui.md`): their RFCs under `docs/rfcs/`
 - Auto and Swarm: `docs/rfcs/auto-mode.md` and `docs/rfcs/swarm-mode.md`, built together by the everything goal on `claude/auto-swarm` since 2026-09-27. Auto owns the one shared account booking (`daemon/src/account_booking.rs`); nothing else keeps an account ledger
 - Voice Mode (Gate R): `docs/rfcs/voice-mode.md`, its goal `docs/rfcs/voice-mode-goal.md` and the mark's animation `docs/design/voice-mark/index.html`; audio is collected on the Rust side
-- Overseer develops Overseer (Gate T: dev instances, the production guard, deploy): `docs/rfcs/dev-instance.md` and its goal `docs/rfcs/dev-instance-goal.md`
+- Overseer develops Overseer (Gate T: dev daemons, the production guard, deploy): `docs/rfcs/dev-instance.md` and its goal `docs/rfcs/dev-instance-goal.md`
 - Overseer itself (Gate S): `docs/rfcs/orchestrator.md`, its goal `docs/rfcs/orchestrator-goal.md`; one Overseer session in the daemon, shared with Voice Mode and Talk to Overseer (AC-107)
 - Follow-through and agent oversight (Gates P and Q): `docs/overseer-rfc.md`; the goal is `docs/goals/everything.md` and what it tracks is `docs/verification/tracker.md`

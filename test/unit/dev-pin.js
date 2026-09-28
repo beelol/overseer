@@ -1,4 +1,4 @@
-// AC-209, AC-208: a dev profile's window is pinned to one dev instance. It connects only to that
+// AC-209, AC-208: a dev profile's window is pinned to one dev daemon. It connects only to that
 // socket and only to a daemon reporting that instance; when the instance is down it says so, never
 // starts a daemon and never falls back to another socket; it picks the instance up again when it
 // restarts. Production ignores the pin, and the pin settings are machine-scoped.
@@ -53,7 +53,7 @@ const runs = bin => { try { return fs.readFileSync(path.join(path.dirname(bin), 
     const said = [];
     const c = new DaemonClient(bin, () => {}, { production: false, pin: { socket: aSock, instance: 'dev-a' } });
     c.on('unreachable', m => said.push(m));
-    await assert.rejects(c.start(), /Dev instance dev-a is not running \(socket .*a\.sock\)\. Start it with scripts\/dev up --name a\./);
+    await assert.rejects(c.start(), /Dev daemon dev-a is not running \(socket .*a\.sock\)\. Start it with scripts\/dev up --name a\./);
     assert.strictEqual(standard.connections, 0, 'the standard daemon saw no connection');
     assert.deepStrictEqual(runs(bin), [], 'the daemon binary was never run');
     c.reconnectLater();
@@ -79,9 +79,9 @@ const runs = bin => { try { return fs.readFileSync(path.join(path.dirname(bin), 
   await check('a pinned window refuses a daemon reporting another instance, or none', async () => {
     const b = await fakeDaemon(path.join(tmp, 'b.sock'), 'dev-b');
     const c = new DaemonClient(bin, () => {}, { production: false, pin: { socket: b.file, instance: 'dev-a' } });
-    await assert.rejects(c.start(), /Pinned to dev instance dev-a, but the daemon at .*b\.sock is dev instance dev-b/);
+    await assert.rejects(c.start(), /Pinned to dev daemon dev-a, but the daemon at .*b\.sock is dev daemon dev-b/);
     const d = new DaemonClient(bin, () => {}, { production: false, pin: { socket: standard.file, instance: 'dev-a' } });
-    await assert.rejects(d.start(), /is not a dev instance; refusing it/);
+    await assert.rejects(d.start(), /is not a dev daemon; refusing it/);
     await delay(1200);
     assert.strictEqual(b.connections, 1, 'no retry');
     c.dispose(); d.dispose();

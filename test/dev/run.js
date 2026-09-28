@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Gate T (AC-206, AC-207, AC-208, AC-209's TUI part, AC-211): dev instances through scripts/dev,
+// Gate T (AC-206, AC-207, AC-208, AC-209's TUI part, AC-211): dev daemons through scripts/dev,
 // with a temporary HOME (a temporary "production") and a temporary dev root. The owner's own
 // daemon, data, VS Code and logins are never involved.
 //   Phase A: two instances side by side; everything scripts/dev does; the default data folder is
 //            never created; clean --all leaves nothing.
-//   Phase B: a standard daemon runs under the temporary HOME; dev instances beside it, busy, then
+//   Phase B: a standard daemon runs under the temporary HOME; dev daemons beside it, busy, then
 //            cleaned; the standard daemon keeps its pid, socket, state, clients and data, and
 //            nothing of it mentions them.
 // Run: node test/dev/run.js   (scripts/test-all runs it)
@@ -16,7 +16,7 @@ const path = require('path');
 const cp = require('child_process');
 
 const repo = path.resolve(__dirname, '../..');
-require('../../scripts/git-fallback').ensureGit('dev instances'); // AC-159
+require('../../scripts/git-fallback').ensureGit('dev daemons'); // AC-159
 const DEV = path.join(repo, 'scripts/dev');
 const realHome = os.homedir();
 const tmp = fs.realpathSync(fs.mkdtempSync('/tmp/ovs-dvt-'));
@@ -174,7 +174,7 @@ async function snapshot(socket) {
     before = await snapshot(stdSocket); filesBefore = listing(stdData);
   });
 
-  await check('AC-207, AC-208: dev instances beside it, busy, then cleaned, leave the standard daemon as it was', async () => {
+  await check('AC-207, AC-208: dev daemons beside it, busy, then cleaned, leave the standard daemon as it was', async () => {
     const c = dev(homeB, rootB, ['up', '--name', 'c', '--no-build'], { json: true });
     const d = dev(homeB, rootB, ['up', '--name', 'd', '--no-build'], { json: true });
     for (const [x, name] of [[c, 'c'], [d, 'd']]) {
@@ -183,7 +183,7 @@ async function snapshot(socket) {
       await call(x.socket, 'task.create', { repo: r, harness: 'generic', program: '/bin/sh', args: ['-c', 'echo busy; sleep 20'], prompt: '', title: `busy ${name}` });
     }
     await delay(800);
-    assert.strictEqual(await snapshot(stdSocket), before, 'while dev instances run');
+    assert.strictEqual(await snapshot(stdSocket), before, 'while dev daemons run');
     dev(homeB, rootB, ['down', '--name', 'd']);
     dev(homeB, rootB, ['clean', '--all']);
     assert.strictEqual(await snapshot(stdSocket), before, 'after they are cleaned');

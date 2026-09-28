@@ -1,4 +1,4 @@
-// Packaged-UI scenario for AC-209 (no paid tokens): two dev instances, A and B, each with its own
+// Packaged-UI scenario for AC-209 (no paid tokens): two dev daemons, A and B, each with its own
 // agent; `scripts/dev code --name a` opens an isolated VS Code pinned to A. It shows A's agent and
 // not B's, reads "Overseer dev-a" in the status bar and "[dev-a]" in the title; A counts it as a
 // client and B does not. When A stops (down --keep-clients) the window says A is not running and
@@ -72,7 +72,7 @@ function call(socket, method, params = {}) {
     await s.screenshot('a-not-running');
     const aUp = cp.spawnSync('pgrep', ['-f', `${path.join(root, 'a/bin/overseerd')} serve`], { encoding: 'utf8' }).stdout.trim();
     check('when A stops the window says so and names scripts/dev up, and no daemon is started for it',
-      /Dev instance dev-a is not running/.test(toast) && /scripts\/dev up --name a/.test(toast) && !aUp && !fs.existsSync(a.socket), { toast, status: await statusText(), started: aUp });
+      /Dev daemon dev-a is not running/.test(toast) && /scripts\/dev up --name a/.test(toast) && !aUp && !fs.existsSync(a.socket), { toast, status: await statusText(), started: aUp });
     check('nothing connects to B meanwhile', (await call(b.socket, 'daemon.clients')).ui === 0);
 
     // A comes back (the dev loop: rebuild, up): the open window reconnects by itself.

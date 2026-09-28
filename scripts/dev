@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// scripts/dev: dev instances of Overseer beside the installed one (Gate T, docs/rfcs/dev-instance.md).
+// scripts/dev: dev daemons of Overseer beside the installed one (Gate T, docs/rfcs/dev-instance.md).
 // Run `scripts/dev --help` for everything; the help text below is the whole manual.
 'use strict';
 const fs = require('fs');
@@ -16,7 +16,7 @@ const CODE = process.env.OVERSEER_CODE || '/Applications/Visual Studio Code.app/
 const FIRST_PORT = 47900; // production's gateway uses 47810
 
 const COMMANDS = {
-  up: 'build from a checkout and start a dev instance (or say it is already running)',
+  up: 'build from a checkout and start a dev daemon (or say it is already running)',
   down: 'stop its agents and daemon, then its VS Code windows and TUI',
   status: 'what runs, where, from which commit',
   list: 'every instance under the dev root',
@@ -36,9 +36,9 @@ const FLAGS = {
   '--help': 'bool', '-h': 'bool',
 };
 
-const HELP = `scripts/dev: dev instances of Overseer, beside the installed one (Gate T).
+const HELP = `scripts/dev: the dev daemons feature: developer versions of Overseer beside the installed one (Gate T).
 
-A dev instance is a daemon (overseerd) built from a checkout, with its own data folder, socket,
+A dev daemon (one instance) is an overseerd built from a checkout, with its own data folder, socket,
 gateway port, VS Code profile and extensions folder. Several run side by side, each with a name.
 The installed Overseer (production) is never touched and never sees them: production ignores
 OVERSEER_HOME/OVERSEER_SOCKET/OVERSEER_INSTANCE and refuses anything marked dev (AC-212).
@@ -292,7 +292,7 @@ async function startDaemon(i, meta) {
     await sleep(100);
   }
   const tail = (() => { try { return fs.readFileSync(i.out, 'utf8').trim().split('\n').slice(-8).join('\n'); } catch { return ''; } })();
-  die(`dev instance ${i.id} did not start${exited !== null ? ` (exit ${exited})` : ''}. Its output:\n${tail}`);
+  die(`dev daemon ${i.id} did not start${exited !== null ? ` (exit ${exited})` : ''}. Its output:\n${tail}`);
 }
 
 async function stopDaemon(i, method) {
@@ -310,7 +310,7 @@ function print(obj, json, text) { console.log(json ? JSON.stringify(obj, null, 2
 
 function describe(st, i) {
   const lines = [
-    `Dev instance ${i.id} is ${st.running ? 'running' : 'stopped'}.`,
+    `Dev daemon ${i.id} is ${st.running ? 'running' : 'stopped'}.`,
     `  repo      ${st.repo} (commit ${st.commit || 'unknown'}${st.dirty ? ', with uncommitted changes' : ''}${st.release ? ', release build' : ''})`,
     `  daemon    ${st.running ? `pid ${st.pid}, ` : ''}socket ${st.socket}`,
     `  data      ${st.home}`,
@@ -368,25 +368,25 @@ async function up(o) {
 
 async function down(o, i = instance(o['--name'])) {
   const meta = readMeta(i);
-  if (!meta) die(`no dev instance ${i.name} under ${DEV_ROOT}`);
+  if (!meta) die(`no dev daemon ${i.name} under ${DEV_ROOT}`);
   const stopped = await stopDaemon(i, 'daemon.stop_all');
   const left = pidsWith(i.dir + path.sep).filter(p => { const c = commandOf(p); return !(o['--keep-clients'] && (c.includes(path.join(i.dir, 'vscode')) || c.includes(i.tui))); });
   await killAll(left);
   if (!o['--keep-clients']) fs.rmSync(path.join(i.profile, 'DevToolsActivePort'), { force: true });
-  if (!o['--quiet']) console.log(`Dev instance ${i.id}: ${stopped ? 'stopped' : 'was not running'}${left.length ? `; ${left.length} process${left.length === 1 ? '' : 'es'} from its folder ended` : ''}${o['--keep-clients'] ? '; its VS Code and TUI stay open, waiting for the next up' : ''}.`);
+  if (!o['--quiet']) console.log(`Dev daemon ${i.id}: ${stopped ? 'stopped' : 'was not running'}${left.length ? `; ${left.length} process${left.length === 1 ? '' : 'es'} from its folder ended` : ''}${o['--keep-clients'] ? '; its VS Code and TUI stay open, waiting for the next up' : ''}.`);
 }
 
 async function status(o) {
   const i = instance(o['--name']);
   const st = await state(i);
-  if (!st) die(`no dev instance ${i.name} under ${DEV_ROOT} (scripts/dev up --name ${i.name})`);
+  if (!st) die(`no dev daemon ${i.name} under ${DEV_ROOT} (scripts/dev up --name ${i.name})`);
   print(st, o['--json'], describe(st, i));
 }
 
 async function list(o) {
   const all = [];
   for (const name of names()) all.push(await state(instance(name)));
-  print(all, o['--json'], all.length ? all.map(s => `${s.running ? 'running' : 'stopped'}  ${s.instance.padEnd(20)} pid ${String(s.pid || '-').padEnd(7)} port ${s.port}  ${s.repo} @ ${s.commit}`).join('\n') : `no dev instances under ${DEV_ROOT}`);
+  print(all, o['--json'], all.length ? all.map(s => `${s.running ? 'running' : 'stopped'}  ${s.instance.padEnd(20)} pid ${String(s.pid || '-').padEnd(7)} port ${s.port}  ${s.repo} @ ${s.commit}`).join('\n') : `no dev daemons under ${DEV_ROOT}`);
 }
 
 function logs(o) {
@@ -404,21 +404,21 @@ async function ctl(o) {
   let p = {};
   if (params) { try { p = JSON.parse(params); } catch { die(`the parameters must be JSON: ${params}`); } }
   const st = await state(i);
-  if (!st?.running) die(`dev instance ${i.id} is not running (scripts/dev up --name ${i.name})`);
+  if (!st?.running) die(`dev daemon ${i.id} is not running (scripts/dev up --name ${i.name})`);
   console.log(JSON.stringify(await call(i.socket, method, p), null, 2));
 }
 
 function env(o) {
   const i = instance(o['--name']);
-  if (!readMeta(i)) die(`no dev instance ${i.name} under ${DEV_ROOT}`);
-  console.log(`# dev instance ${i.id}: for dev tools only (the installed extension and TUI ignore these, AC-212)`);
+  if (!readMeta(i)) die(`no dev daemon ${i.name} under ${DEV_ROOT}`);
+  console.log(`# dev daemon ${i.id}: for dev tools only (the installed extension and TUI ignore these, AC-212)`);
   for (const [k, v] of Object.entries({ OVERSEER_INSTANCE: i.id, OVERSEER_HOME: i.home, OVERSEER_SOCKET: i.socket, OVERSEERD: i.daemon })) console.log(`export ${k}=${shq(v)}`);
 }
 
 async function code(o) {
   const i = instance(o['--name']);
   const st = await state(i);
-  if (!st?.running) die(`dev instance ${i.id} is not running (scripts/dev up --name ${i.name})`);
+  if (!st?.running) die(`dev daemon ${i.id} is not running (scripts/dev up --name ${i.name})`);
   if (!exists(CODE)) die(`VS Code's command line tool is not at ${CODE} (set OVERSEER_CODE)`);
   let vsix = o['--vsix'] && real(o['--vsix']);
   if (!vsix) {
@@ -462,7 +462,7 @@ async function code(o) {
 async function tui(o) {
   const i = instance(o['--name']);
   const st = await state(i);
-  if (!st?.running) die(`dev instance ${i.id} is not running (scripts/dev up --name ${i.name}); the TUI would start a daemon of its own`);
+  if (!st?.running) die(`dev daemon ${i.id} is not running (scripts/dev up --name ${i.name}); the TUI would start a daemon of its own`);
   const command = [i.tui, '--daemon', i.daemon];
   if (o['--dry-run']) { console.log(JSON.stringify({ command, env: { OVERSEER_INSTANCE: i.id, OVERSEER_HOME: i.home, OVERSEER_SOCKET: i.socket } }, null, 2)); return; }
   const r = cp.spawnSync(command[0], command.slice(1), { stdio: 'inherit', env: clientEnv(i) });
@@ -472,13 +472,13 @@ async function tui(o) {
 async function phone(o) {
   const i = instance(o['--name']);
   const st = await state(i);
-  if (!st) die(`no dev instance ${i.name} under ${DEV_ROOT}`);
+  if (!st) die(`no dev daemon ${i.name} under ${DEV_ROOT}`);
   const platform = o['--platform'] || 'ios';
   if (!['ios', 'android'].includes(platform)) throw new Usage('--platform is ios or android');
   const address = `${platform === 'ios' ? '127.0.0.1' : '10.0.2.2'}:${st.port}`;
   console.log(`The phone app and its gateway arrive with pull request #10; pinning the simulator to ${i.id} is AC-210, after it merges.
 Until then: this instance's gateway port is ${st.port}; in the ${platform === 'ios' ? 'iOS simulator' : 'Android emulator'} its address is ${address}
-(the app's Settings → Mac address). The installed app never pairs with a dev instance (AC-213).`);
+(the app's Settings → Mac address). The installed app never pairs with a dev daemon (AC-213).`);
   process.exitCode = 2;
 }
 
@@ -489,10 +489,10 @@ async function clean(o) {
   for (const i of targets) {
     if (readMeta(i)) await down({ ...o, '--keep-clients': false, '--quiet': true }, i);
     fs.rmSync(i.dir, { recursive: true, force: true });
-    console.log(`Dev instance ${i.id}: stopped and removed (${i.dir}).`);
+    console.log(`Dev daemon ${i.id}: stopped and removed (${i.dir}).`);
   }
   if (all) { try { fs.rmdirSync(DEV_ROOT); } catch {} }
-  if (all && !targets.length) console.log(`no dev instances under ${DEV_ROOT}`);
+  if (all && !targets.length) console.log(`no dev daemons under ${DEV_ROOT}`);
 }
 
 async function main(argv) {
