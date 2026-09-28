@@ -1011,3 +1011,51 @@ fn an_unqualified_cheap_route_is_refused_and_no_qualified_route_blocks_visibly()
     assert_eq!(job, "ready");
     std::fs::write(&t.worker_gate, "open").unwrap();
 }
+
+/// SWARM-04 through Auto's route selection: each recorded route decision
+/// replays to the same route and reason from its recorded input alone (plan
+/// requirements, account readings and draws, bookings and exclusions as
+/// recorded), also after a daemon restart. The daemon's own reasons (category
+/// allocation, the account's own allowance, unresolved identity) and Auto's
+/// eligibility reasons are both part of the recorded decision.
+#[test]
+fn each_route_decision_replays_to_the_same_route_and_reason() {
+    let mut t = driven(&["alpha", "beta", "full", "unread"], &[("alpha", 0.0), ("beta", 0.0), ("full", 97.0)],
+        &["system-claude", "alpha", "beta", "full", "unread"], &["a", "b", "c"], &["a", "b", "c"]);
+    let (run, director, _) = start(&t.w, "isolated", "replay");
+    wait_trace(&t.w, step("dispatched", "director"), "plan", 60);
+    for (job, needs) in [("a", json!({})), ("b", json!({"min_tier":"frontier"})), ("c", json!({}))] {
+        let r = dispatch_job(&t.w.d, &director, json!({"job_id":job,"brief":format!("Job {job}: {job}"),"requirements":needs}));
+        assert_eq!(r["status"], "launched", "{r}");
+    }
+    let seqs: Vec<i64> = {
+        let db = db(&t.w.d);
+        let mut stmt = db.prepare("SELECT seq FROM events WHERE kind='swarm_route_decision'
+            AND json_extract(payload,'$.swarm_run_id')=?1 ORDER BY seq").unwrap();
+        let rows = stmt.query_map([&run], |r| r.get(0)).unwrap().map(Result::unwrap).collect();
+        rows
+    };
+    assert_eq!(seqs.len(), 3);
+    let replay_all = |d: &Daemon| -> Vec<Value> { seqs.iter().map(|seq| d.call("swarm.route.replay", json!({"event_seq":seq}))).collect() };
+    let first = replay_all(&t.w.d);
+    for replay in &first {
+        assert_eq!(replay["matches"], true, "{replay}");
+        assert_eq!(replay["selected"], replay["recorded_selected"]);
+        assert_eq!(replay["auto_exclusions_recorded"], true);
+    }
+    std::fs::write(&t.worker_gate, "open").unwrap();
+    t.w.d.kill9();
+    t.w.d.spawn();
+    assert_eq!(replay_all(&t.w.d), first, "the same answers after a restart");
+    // A decision that does not follow from its input is caught: record job a
+    // as having chosen the frontier route instead of the default.
+    {
+        let db = db(&t.w.d);
+        let payload: String = db.query_row("SELECT payload FROM events WHERE seq=?1", [seqs[0]], |r| r.get(0)).unwrap();
+        let mut payload: Value = serde_json::from_str(&payload).unwrap();
+        let selected = payload["trace"]["decision"]["selected"].as_str().unwrap().replace("sonnet/medium", "opus/high");
+        payload["trace"]["decision"]["selected"] = json!(selected);
+        db.execute("UPDATE events SET payload=?2 WHERE seq=?1", rusqlite::params![seqs[0], payload.to_string()]).unwrap();
+    }
+    assert_eq!(t.w.d.call("swarm.route.replay", json!({"event_seq":seqs[0]}))["matches"], false);
+}

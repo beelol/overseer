@@ -1443,6 +1443,15 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             require_swarm_storage(d)?;
             crate::swarm::change_requirements(&mut d.store.lock().unwrap(), p)?
         }
+        "swarm.route.replay" => {
+            let seq = p["event_seq"].as_i64().filter(|seq| *seq > 0)
+                .ok_or_else(|| anyhow!("event_seq must be a positive event identity"))?;
+            let payload: String = d.store.lock().unwrap().conn.query_row(
+                "SELECT payload FROM events WHERE seq=?1 AND kind='swarm_route_decision'",
+                [seq], |row| row.get(0))?;
+            let payload: Value = serde_json::from_str(&payload)?;
+            crate::swarm::replay_route(&payload["trace"])?
+        }
         "swarm.pause" => crate::swarm::pause(&mut d.store.lock().unwrap(), p)?,
         "swarm.resume" => crate::swarm::resume(&mut d.store.lock().unwrap(), p)?,
         "swarm.off" => crate::swarm::off(&mut d.store.lock().unwrap(), p)?,

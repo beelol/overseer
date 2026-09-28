@@ -297,3 +297,34 @@ pub fn route_scoped_refusal(reason: &str) -> bool {
         | "upper_draw_unknown" | "account_pool_busy" | "allocation_exhausted" | "shared_pool_headroom"
         | "duplicate_window")
 }
+
+/// Replay one recorded route decision (SWARM-04): Auto's selector runs again on
+/// the recorded selection input. Every route Auto's eligibility excludes must
+/// have been recorded as excluded, and choosing among the routes the decision
+/// did not exclude must give the same route for the same reason. No reading,
+/// booking or clock is consulted: the recorded input is the whole state.
+pub fn replay(trace: &Value) -> Result<Value> {
+    if trace["selector_version"] != SELECTOR_VERSION {
+        bail!("unsupported swarm route selector version");
+    }
+    if trace["inference"]["state"] != "not_used" {
+        bail!("a route decision that used inference cannot be replayed");
+    }
+    let input = &trace["selection_input"];
+    let work: WorkUnit = serde_json::from_value(input["work"].clone())?;
+    let routes: Vec<Route> = serde_json::from_value(input["routes"].clone())?;
+    if routes.len() > 128 {
+        bail!("swarm route replay exceeded its candidate bound");
+    }
+    let recorded: Decision = serde_json::from_value(trace["decision"].clone())?;
+    let recorded_reasons: BTreeMap<String, String> = recorded.exclusions.iter()
+        .map(|e| (e.route_id.clone(), e.reason.clone())).collect();
+    let auto = auto_select::select(&work, &routes);
+    let auto_consistent = auto.exclusions.iter().all(|e| recorded_reasons.contains_key(&e.route_id));
+    let candidates: Vec<Route> = routes.iter().filter(|r| !recorded_reasons.contains_key(&r.id)).cloned().collect();
+    let chosen = auto_select::select(&work, &candidates);
+    let matches = auto_consistent && chosen.selected == recorded.selected && chosen.reason == recorded.reason;
+    Ok(json!({"matches":matches,"selected":chosen.selected,"reason":chosen.reason,
+        "recorded_selected":recorded.selected,"recorded_reason":recorded.reason,
+        "auto_exclusions_recorded":auto_consistent,"candidates":candidates.len()}))
+}

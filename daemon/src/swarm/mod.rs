@@ -33,6 +33,7 @@ pub use benefit::preview as preview_benefit;
 pub use benefit::commit as commit_benefit;
 pub use broker::{ack, direct, messages, overseer_advisory, register, report};
 pub use requirements::change as change_requirements;
+pub use route::replay as replay_route;
 pub use completion::complete;
 pub use conflicts::{list as list_conflicts, open as open_conflict, resolve as resolve_conflict};
 pub use coverage::report as coverage_report;

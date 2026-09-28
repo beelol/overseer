@@ -77,7 +77,7 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     ("swarm.get", "read"), ("swarm.list", "read"), ("swarm.jobs", "read"), ("swarm.coverage", "read"),
     ("swarm.messages", "read"), ("swarm.conflicts", "read"), ("swarm.policy.preview", "read"),
     ("swarm.benefit.preview", "read"), ("swarm.storage.status", "read"), ("swarm.director.summary", "read"),
-    ("swarm.worker.liveness", "read"), ("swarm.native_director.get", "read"), ("agents.limit.get", "read"), ("auto.root.preview", "read"),
+    ("swarm.worker.liveness", "read"), ("swarm.route.replay", "read"), ("swarm.native_director.get", "read"), ("agents.limit.get", "read"), ("auto.root.preview", "read"),
     ("auto.mode.get", "read"), ("auto.models.list", "read"), ("auto.quota.state", "read"), ("auto.quota.list", "read"),
     ("auto.usage.list", "read"), ("auto.usage.work.list", "read"), ("auto.usage.thread.list", "read"),
     ("auto.usage.summary", "read"), ("auto.decision.replay", "read"), ("run.result", "read"),
