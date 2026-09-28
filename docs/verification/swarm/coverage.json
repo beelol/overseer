@@ -361,7 +361,7 @@
       "blocker": "Fixture admission binds harness, profile, model and optional effort to worker launch and enforces persisted per-job capabilities. A two-account fixture routes code and browser jobs to qualified allowed targets. Explicit approved repositories and source commits now bind director/worker process launches, including after restart; normal launch still needs to supply that scope. Live Auto account-generation/provider/model-version revalidation, a manual single-target pool, ordinary launch integration and shared account admission remain unverified."
     },
     "SWARM-29": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
@@ -371,7 +371,7 @@
         "docs/verification/swarm/milestone-7.md",
         "docs/verification/swarm/SWARM-29.md"
       ],
-      "blocker": "A deterministic 100-job fixture admits 32 attempts at a time and accepts all 100 exactly once with intact synthetic evidence; a 130-job fixture now bounds the ready window to 100 and refills its durable backlog. A separate fixture runs 32 supervised local processes alongside a scripted active director turn, and quota headroom reduces effective concurrency with a reason. A working model director, executed checks and combined 100-job supervised/provider path remain unverified."
+      "blocker": null
     },
     "SWARM-30": {
       "status": "verified",

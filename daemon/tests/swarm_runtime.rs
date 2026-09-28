@@ -1772,3 +1772,168 @@ fn default_sixty_minute_deadline_stops_active_and_blocked_runs_but_nothing_else(
     d.call("run.interrupt", json!({"run_id":ordinary}));
     d.wait_done(&ordinary, 10);
 }
+
+/// SWARM-29 as a supervised run: 100 independent jobs, a total agent limit
+/// of 33 and a worker limit of 32. Each job is a real local process in its
+/// own worktree that executes its check (reads its module file from the
+/// pinned checkout and counts the expected line) and reports the check's
+/// exit status and output as evidence through the broker. The test acts as
+/// the scripted director: it admits in waves of four up to 32 workers, reviews
+/// each result's evidence and accepts it only when the executed check passed.
+/// At the peak 32 workers run together while the category's director slot is
+/// held, so an ordinary start is refused; no job gets a second attempt and all
+/// 100 are accepted exactly once.
+#[test]
+fn hundred_supervised_jobs_run_their_checks_through_thirty_two_workers() {
+    let d = Daemon::start(&[]);
+    d.call("agents.limit.set", json!({"max_active":33}));
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("hundred-source"));
+    std::fs::create_dir_all(checkout.join("modules")).unwrap();
+    for n in 0..100 {
+        std::fs::write(checkout.join(format!("modules/m{n:03}.txt")), format!("module {n}\nstatus ok\n")).unwrap();
+    }
+    git(&checkout, &["add", "modules"]);
+    git(&checkout, &["commit", "-q", "-m", "hundred modules"]);
+    let run = d.call("swarm.create", json!({"category":"Hundred supervised checks",
+        "objective":"Check one hundred modules","allowed_targets":["fixture-local"],
+        "repositories":[checkout],"policy":{"max_workers":32,"deadline_ms":900000}}));
+    let id = run["id"].as_str().unwrap().to_string();
+    let names: Vec<String> = (0..100).map(|n| format!("m{n:03}")).collect();
+    let jobs: Vec<serde_json::Value> = names.iter().map(|j| json!({"id":j,"title":format!("Check {j}"),
+        "acceptance":"the module's check passes","deps":[]})).collect();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":jobs}));
+    let script = temp.path().join("check-worker.py");
+    let gate = temp.path().join("gate");
+    std::fs::write(&script, r#"
+import json, os, subprocess, sys, time
+env = os.environ
+job = env["OVERSEER_SWARM_JOB_ID"]
+ids = {"run_id": env["OVERSEER_SWARM_RUN_ID"], "job_id": job,
+       "attempt_id": env["OVERSEER_SWARM_ATTEMPT_ID"], "token": env["OVERSEER_SWARM_TOKEN"]}
+revision = int(env["OVERSEER_SWARM_REVISION"])
+def call(method, params):
+    for _ in range(100):
+        done = subprocess.run([env["OVERSEER_BIN"], "ctl", method, json.dumps(params)], text=True, capture_output=True)
+        if done.returncode == 0 and done.stdout.strip():
+            reply = json.loads(done.stdout)
+            if "error" in reply:
+                raise SystemExit(f"{method}: {reply['error']['message']}")
+            return reply["result"]
+        time.sleep(0.1)
+    raise SystemExit(f"{method}: unreachable")
+# The first 32 wait until all of them are running together (the test opens the gate).
+while not os.path.exists(sys.argv[1]):
+    time.sleep(0.05)
+check = subprocess.run(["grep", "-c", "status ok", f"modules/{job}.txt"], text=True, capture_output=True)
+content = f"check=grep -c 'status ok' modules/{job}.txt exit={check.returncode} count={check.stdout.strip()}"
+call("swarm.artifact.put", {**ids, "artifact_id": f"{job}-check", "source_revision": revision,
+     "kind": "check", "content": content})
+call("swarm.report", {**ids, "revision": revision, "message_id": f"{job}-result", "type": "result",
+     "payload": {"artifact_ids": [f"{job}-check"], "audit_outcome": "negative"}})
+time.sleep(0.5)
+"#).unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.busy_timeout(std::time::Duration::from_secs(10)).unwrap();
+    let at = now();
+    let mut clock = at;
+    let mut wave = 0;
+    let mut next = 0usize;
+    let mut accepted = std::collections::BTreeSet::new();
+    let mut peak = 0i64;
+    let mut ordinary_refused = false;
+    let mut committed = -1i64;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(420);
+    while accepted.len() < 100 {
+        assert!(std::time::Instant::now() < deadline, "only {} of 100 accepted", accepted.len());
+        // Admit in growth waves of four while there is room (the test's own clock).
+        let active: i64 = db.query_row("SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND status='registered'",
+            [&id], |r| r.get(0)).unwrap();
+        if next < 100 && active < 32 {
+            clock += 5_000;
+            wave = 0;
+            while next < 100 && wave < 4 {
+                // The director's benefit estimate covers the next batch of up to 32 jobs.
+                if next % 32 == 0 && committed != next as i64 {
+                    commit_beneficial_batch(&d, &id, &names[next..(next + 32).min(100)].to_vec());
+                    committed = next as i64;
+                }
+                let job = &names[next];
+                let admitted = d.call("swarm.admit", json!({"run_id":id,"generation":1,"revision":1,
+                    "job_id":job,"target_id":"fixture-local","request_id":format!("hundred-{job}"),"now_ms":clock,
+                    "snapshot":{"version":1,"observed_ms":clock-1000,"expires_ms":clock+900000,
+                        "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["fixture-pool"],
+                            "capabilities":["code"],"health":"up","auth":"ok"}],
+                        "pools":[{"id":"fixture-pool","windows":[{"id":"run","unit":"points",
+                            "remaining_milli":100_000_000,"protected_milli":0,"reserved_milli":0,
+                            "confidence":"exact","expires_ms":clock+900000}]}]},
+                    "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+                if admitted["status"] != "admitted" {
+                    assert!(matches!(admitted["reason"].as_str(), Some("worker_limit" | "global_agent_limit" | "growth_wave_full")),
+                        "{job}: {admitted}");
+                    break;
+                }
+                let launched = d.call("swarm.worker.launch", json!({"run_id":id,"job_id":job,
+                    "attempt_id":admitted["attempt_id"],"token":admitted["token"],"repo":checkout,
+                    "program":"/usr/bin/python3","args":[script, gate],"prompt":format!("Check {job}"),
+                    "title":format!("Check {job}")}));
+                assert_eq!(launched["status"], "launched", "{job}: {launched}");
+                next += 1;
+                wave += 1;
+            }
+        }
+        let active: i64 = db.query_row("SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND status='registered'",
+            [&id], |r| r.get(0)).unwrap();
+        peak = peak.max(active);
+        assert!(active <= 32, "oversubscribed: {active} workers");
+        if active == 32 && !ordinary_refused {
+            let ordinary = d.try_call("task.create", json!({"repo":checkout,"harness":"generic",
+                "workspace_mode":"worktree","program":"/bin/sleep","args":["5"],"prompt":"","title":"ordinary"}));
+            assert!(ordinary.as_ref().is_err_and(|e| e.contains("agent limit")),
+                "the director's slot and 32 workers leave no room: {ordinary:?}");
+            ordinary_refused = true;
+            // All 32 run together; let them execute their checks.
+            let running = |d: &Daemon| -> usize { let rows: Vec<String> = {
+                let mut stmt = db.prepare("SELECT l.overseer_run_id FROM swarm_worker_launches l
+                    JOIN swarm_attempts a ON a.id=l.attempt_id WHERE l.run_id=?1 AND a.status='registered'").unwrap();
+                let r = stmt.query_map([&id], |r| r.get(0)).unwrap().map(Result::unwrap).collect(); r };
+                rows.iter().filter(|w| d.run(w)["status"] == "running").count() };
+            let until = std::time::Instant::now() + std::time::Duration::from_secs(60);
+            while running(&d) < 32 {
+                assert!(std::time::Instant::now() < until, "only {} of 32 workers running", running(&d));
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+            std::fs::write(&gate, "open").unwrap();
+        }
+        // Review: accept each submitted result whose executed check passed.
+        let submitted: Vec<(String, String)> = {
+            let mut stmt = db.prepare("SELECT j.id,a.content FROM swarm_jobs j JOIN swarm_artifacts a
+                ON a.run_id=j.run_id AND a.job_id=j.id WHERE j.run_id=?1 AND j.status='submitted'").unwrap();
+            let rows = stmt.query_map([&id], |r| Ok((r.get(0)?, r.get(1)?))).unwrap().map(Result::unwrap).collect();
+            rows
+        };
+        for (job, content) in submitted {
+            assert_eq!(content, format!("check=grep -c 'status ok' modules/{job}.txt exit=0 count=1"), "{job}");
+            let decided = d.call("swarm.decide", json!({"run_id":id,"generation":1,"revision":1,
+                "job_id":job,"decision":"accept","evidence":[format!("{job}-check")]}));
+            assert_eq!(decided["status"], "accepted", "{job}: {decided}");
+            assert!(accepted.insert(job.clone()), "{job} accepted twice");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    assert_eq!(peak, 32, "the full worker pool ran together");
+    assert!(ordinary_refused);
+    let (jobs_accepted, attempts, decisions, distinct): (i64, i64, i64, i64) = db.query_row("SELECT
+        (SELECT COUNT(*) FROM swarm_jobs WHERE run_id=?1 AND status='accepted' AND attempt_count=1),
+        (SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1),
+        (SELECT COUNT(*) FROM swarm_decisions WHERE run_id=?1 AND decision='accept'),
+        (SELECT COUNT(DISTINCT overseer_run_id) FROM swarm_worker_launches WHERE run_id=?1)",
+        [&id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))).unwrap();
+    assert_eq!((jobs_accepted, attempts, decisions, distinct), (100, 100, 100, 100));
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    while d.call("agents.limit.get", json!({}))["active"].as_i64().unwrap_or(0) > 1 {
+        assert!(std::time::Instant::now() < until, "workers did not all exit");
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+    d.call("swarm.stop", json!({"run_id":id,"generation":1,"revision":1}));
+}
