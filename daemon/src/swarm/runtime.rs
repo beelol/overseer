@@ -296,6 +296,7 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
     let digest = format!("{:x}", Sha256::digest(p.to_string().as_bytes()));
     let assigned_prompt;
     let assigned_route;
+    let reused: Option<(String, String)>;
     let source_commit;
     let attempt_revision;
     {
@@ -367,6 +368,11 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
         if !eligible {
             bail!("attempt has no current admitted job");
         }
+        reused = match p.get("reuse_session_of") {
+            None | Some(Value::Null) => None,
+            Some(from) => Some(reusable_session(&store, run, job, attempt,
+                from.as_str().ok_or_else(|| anyhow!("reuse_session_of must be an attempt id"))?)?),
+        };
         let brief = super::worker_brief(&store, p)?;
         assigned_prompt = format!("{prompt}\n\nSwarm assignment and evidence references:\n{brief}");
         if assigned_prompt.len() > 32 * 1024 {
@@ -377,6 +383,13 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
                 "INSERT INTO swarm_worker_launches(attempt_id,run_id,job_id,request_sha256,created_ms,launch_phase)
                  VALUES(?1,?2,?3,?4,?5,'reserved')",
                 params![attempt,run,job,digest,crate::daemon::now()],
+            )?;
+        }
+        if let Some((from, native)) = &reused {
+            store.conn.execute(
+                "INSERT OR IGNORE INTO swarm_session_reuse(attempt_id,run_id,from_attempt,native_id,created_ms)
+                 VALUES(?1,?2,?3,?4,?5)",
+                params![attempt,run,from,native,crate::daemon::now()],
             )?;
         }
         // The admitted route is the source of profile and model choices; the
@@ -390,6 +403,7 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
             "target_ref":source_commit,
             "profile_id":assigned_route.0,"model":assigned_route.1,"effort":assigned_route.2,
             "program":program_override,"args":args,"prompt":assigned_prompt,"title":title,
+            "resume_native_id":reused.as_ref().map(|(_, native)| native.clone()),
         }),
         &SwarmWorkerIdentity {
             run_id: run.to_string(),
@@ -410,7 +424,83 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
             "error":task["launch_error"],"duplicate":false}),
         );
     }
-    Ok(json!({"status":"launched","overseer_run_id":overseer_run_id,"duplicate":false}))
+    let mut launched = json!({"status":"launched","overseer_run_id":overseer_run_id,"duplicate":false});
+    if let Some((from, _)) = &reused {
+        launched["reused_session"] = json!({"from_attempt":from});
+    }
+    Ok(launched)
+}
+
+/// Whether an attempt may continue an earlier worker's native session (SWARM-35), and that
+/// session's id. Only a valid related session: of this swarm run (another run's or category's
+/// session carries unrelated context), exited, of the same logical job or of a job this one
+/// depends on, not rejected, not from before its job changed (for a dependent), not
+/// contaminated or disputed, on the same admitted route (a session stays on its account), with
+/// a session to continue, and continued in one place only.
+fn reusable_session(store: &crate::store::Store, run: &str, job: &str, attempt: &str, from: &str)
+    -> Result<(String, String)> {
+    let prior: Option<(String, String, i64, String, i64, Option<String>)> = store.conn.query_row(
+        "SELECT a.run_id,a.job_id,a.revision,a.status,j.plan_revision,r.native_id
+         FROM swarm_attempts a JOIN swarm_jobs j ON j.run_id=a.run_id AND j.id=a.job_id
+         LEFT JOIN swarm_worker_launches l ON l.attempt_id=a.id LEFT JOIN runs r ON r.id=l.overseer_run_id
+         WHERE a.id=?1", params![from], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
+    ).optional()?;
+    let Some((prior_run, prior_job, prior_revision, status, job_revision, native)) = prior else {
+        bail!("no worker session {from} to reuse");
+    };
+    if prior_run != run {
+        bail!("session {from} belongs to another swarm; its context is unrelated to this category, so start a fresh session");
+    }
+    if status == "registered" {
+        bail!("session {from} has not exited; a session continues in one place at a time");
+    }
+    let deps: Vec<String> = serde_json::from_str(&store.conn.query_row(
+        "SELECT deps FROM swarm_jobs WHERE run_id=?1 AND id=?2", params![run, job], |r| r.get::<_, String>(0))?)?;
+    let same_job = prior_job == job;
+    if !same_job && !deps.contains(&prior_job) {
+        bail!("session {from} is not related to job {job} (neither an earlier attempt of it nor a dependency)");
+    }
+    if !same_job {
+        let decisions: Vec<String> = {
+            let mut stmt = store.conn.prepare("SELECT decision FROM swarm_decisions WHERE run_id=?1 AND attempt_id=?2")?;
+            let rows = stmt.query_map(params![run, from], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
+            rows
+        };
+        if decisions.iter().any(|d| d == "reject") {
+            bail!("session {from}'s result was rejected; a dependent job does not build on it");
+        }
+        if !decisions.iter().any(|d| d == "accept") {
+            bail!("session {from}'s result was never accepted; a dependent job does not build on it");
+        }
+        if prior_revision < job_revision {
+            bail!("session {from} is stale: job {prior_job} changed after it (revision {prior_revision} of {job_revision})");
+        }
+    }
+    let contaminated: bool = store.conn.prepare(
+        "SELECT 1 FROM swarm_resource_contamination WHERE run_id=?1 AND attempt_id=?2")?.exists(params![run, from])?;
+    let disputed: bool = store.conn.prepare(
+        "SELECT 1 FROM swarm_conflicts WHERE run_id=?1 AND status='open' AND (left_job_id=?2 OR right_job_id=?2)")?
+        .exists(params![run, prior_job])?;
+    if contaminated || disputed {
+        bail!("session {from} is contaminated or its evidence is disputed");
+    }
+    let route = |id: &str| -> Result<Option<(Option<String>, Option<String>)>> {
+        Ok(store.conn.query_row("SELECT target_harness,target_profile_id FROM swarm_admissions WHERE attempt_id=?1",
+            [id], |r| Ok((r.get(0)?, r.get(1)?))).optional()?)
+    };
+    let (mine, theirs) = (route(attempt)?, route(from)?);
+    if mine.is_none() || mine != theirs {
+        bail!("session {from} ran on another route; a session stays on its account and harness");
+    }
+    let native = native.filter(|n| !n.is_empty())
+        .ok_or_else(|| anyhow!("session {from} reported no native session to continue"))?;
+    let continued: Option<String> = store.conn.query_row(
+        "SELECT attempt_id FROM swarm_session_reuse WHERE from_attempt=?1 AND attempt_id!=?2",
+        params![from, attempt], |r| r.get(0)).optional()?;
+    if let Some(other) = continued {
+        bail!("session {from} was already continued by attempt {other}; continue that one instead");
+    }
+    Ok((from.to_string(), native))
 }
 
 pub fn interrupt_workers(d: &Arc<Daemon>, run: &str) -> Result<Value> {

@@ -1068,7 +1068,12 @@ impl Daemon {
             model: p["model"].as_str().filter(|s| !s.is_empty()).map(str::to_string),
             effort,
             workspace_id: ws.id.clone(),
-            native_id: None,
+            // A Swarm worker continuing an earlier worker's session (SWARM-35); the launch
+            // path has checked that the session is valid and related.
+            native_id: match swarm_identity.as_ref() {
+                Some(SwarmLaunchIdentity::Worker(_)) => p["resume_native_id"].as_str().filter(|s| !s.is_empty()).map(str::to_string),
+                _ => None,
+            },
             status: "queued".into(),
             exit_reason: None,
             created_ms: now(),
@@ -1083,7 +1088,9 @@ impl Daemon {
         let mut generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "sandbox":sandbox, "extra_args": p["extra_args"].clone(),
             "auto_routing":auto_routing,"auto_allowed_profiles":auto_allowed_profiles,
             "auto_parent_budget_ms":auto_parent_budget_ms,
-            "swarm_worker": matches!(swarm_identity.as_ref(), Some(SwarmLaunchIdentity::Worker(_)))});
+            "swarm_worker": matches!(swarm_identity.as_ref(), Some(SwarmLaunchIdentity::Worker(_))),
+            "resume_first_turn": matches!(swarm_identity.as_ref(), Some(SwarmLaunchIdentity::Worker(_)))
+                && p["resume_native_id"].as_str().is_some_and(|s| !s.is_empty())});
         // Capture this parent's own route metadata before its app-server turn
         // owns the profile. A second metadata session during that turn is not
         // safe; the child still verifies its own account and tools at launch.
@@ -1998,7 +2005,7 @@ impl Daemon {
         if swarm_tools_config.is_none() {
             extra_args.extend(self.channel_launch_args(run_id, &run.harness)?);
         }
-        let resume = if follow_up { run.native_id.clone() } else { None };
+        let resume = if follow_up || generic_meta["resume_first_turn"] == true { run.native_id.clone() } else { None };
         if follow_up && resume.is_none() && run.harness != "generic" {
             bail!("no native session id was reported for this run, so it cannot be resumed");
         }

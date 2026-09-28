@@ -446,7 +446,7 @@
       "blocker": null
     },
     "SWARM-35": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
         "docs/verification/swarm/milestone-2.md",
@@ -455,9 +455,11 @@
         "docs/verification/swarm/SWARM-35.md",
         "daemon/tests/swarm_scenarios.rs",
         "docs/verification/swarm/S3.md",
-        "daemon/tests/swarm_broker.rs"
+        "daemon/tests/swarm_broker.rs",
+        "daemon/tests/swarm_session_reuse.rs",
+        "daemon/src/swarm/runtime.rs"
       ],
-      "blocker": "Dependency readiness waits for accepted patch integration across review and plan revision paths. Local acceptance and completion now require applied director redirect/advisory/retraction receipts for the accepted attempt, with queued/delivered holds surviving restart. S3 contract repair uses attempt 2 of the same logical job, redirects one stale module result and integrates 24 module patches. Qualified live application, director conflict repair, session reuse and the complete S3 workflow remain unverified."
+      "blocker": null
     },
     "SWARM-36": {
       "status": "verified",

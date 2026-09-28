@@ -592,6 +592,14 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           created_ms INTEGER NOT NULL,
           PRIMARY KEY(run_id,message_id)
         );
+        CREATE TABLE IF NOT EXISTS swarm_session_reuse(
+          attempt_id TEXT PRIMARY KEY REFERENCES swarm_attempts(id),
+          run_id TEXT NOT NULL,
+          from_attempt TEXT NOT NULL REFERENCES swarm_attempts(id),
+          native_id TEXT NOT NULL,
+          created_ms INTEGER NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS swarm_session_reuse_once ON swarm_session_reuse(from_attempt);
         CREATE TABLE IF NOT EXISTS swarm_reproduction_charges(
           attempt_id TEXT PRIMARY KEY REFERENCES swarm_attempts(id),
           run_id TEXT NOT NULL,
