@@ -783,7 +783,7 @@ fn qualified_draw_prices_a_booked_start_after_five_isolated_runs() {
         ("FIXTURE_MODE", "managed-models"),
         ("FIXTURE_ACCOUNT_IDS_DIR", accounts.to_str().unwrap()),
         ("FIXTURE_QUOTA_MODES_DIR", meters.to_str().unwrap()),
-        ("FIXTURE_TURN_DELAY_MS", "50"),
+        ("FIXTURE_TURN_DELAY_MS", "3000"),
         ("OVERSEER_TEST_DRAW_SETTLE_MS", "300"),
     ]);
     let profile = d.call("profile.create", json!({"name":"solo","harness":"codex"}))["id"]
@@ -842,6 +842,39 @@ fn qualified_draw_prices_a_booked_start_after_five_isolated_runs() {
         .all(|s| s["before_seq"].as_i64() < s["after_seq"].as_i64()));
     d.wait_status(&run, |status| !HOLDING.contains(&status), 30);
     assert_eq!(intent(&d, "priced-start").4.as_deref(), Some("settled"));
+
+    // Step 4: an ordinary start that asks for no booking books the qualified
+    // draw by itself when one exists, and otherwise starts unbooked as before.
+    refresh(&d, &profile);
+    let bound = |d: &Daemon, run: &str| -> Option<(String, String, String)> {
+        use rusqlite::OptionalExtension;
+        db(d).query_row("SELECT work_unit_id,caller,draw_source FROM shared_booking_intents WHERE run_id=?1",
+            [run], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))).optional().unwrap()
+    };
+    let plain = |d: &Daemon, effort: &str, prompt: &str| d.call("task.create", json!({"repo":checkout,
+        "harness":"codex-app","profile_id":profile,"model":"gpt-6-sol","effort":effort,
+        "prompt":prompt,"title":prompt}))["run"]["id"].as_str().unwrap().to_string();
+    // No samples for high effort: unknown draw, unbooked.
+    let holding = plain(&d, "high", "hold parent");
+    assert_eq!(bound(&d, &holding), None, "no qualified draw: no booking");
+    // A medium start while that unbooked run holds the account: the booking
+    // is refused (account busy) and the start proceeds unbooked.
+    let beside = plain(&d, "medium", "beside");
+    assert_eq!(bound(&d, &beside), None, "a refused automatic booking falls back");
+    d.wait_status(&holding, |status| !HOLDING.contains(&status), 30);
+    d.wait_status(&beside, |status| !HOLDING.contains(&status), 30);
+    refresh(&d, &profile);
+    let automatic = plain(&d, "medium", "hold parent");
+    let (work_unit, caller, source) = bound(&d, &automatic).expect("booked on the qualified draw");
+    assert!(work_unit.starts_with("ordinary/"), "{work_unit}");
+    assert_eq!((caller.as_str(), source.as_str()), ("ordinary", "qualified"));
+    let (_, provenance, amounts) = booking_draw(&d, &work_unit);
+    assert_eq!(amounts, vec![3_000]);
+    assert_eq!(provenance["bucket"]["task_class"], "agent");
+    assert_eq!(active_slots(&d), 1, "its slot is the start's own, not a second one");
+    d.wait_status(&automatic, |status| !HOLDING.contains(&status), 30);
+    assert_eq!(intent(&d, &work_unit).4.as_deref(), Some("settled"));
+    assert_eq!(active_slots(&d), 0);
 }
 
 /// (draw_source, provenance, per-window amounts) of a booking.

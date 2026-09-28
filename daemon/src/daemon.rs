@@ -179,6 +179,8 @@ struct SharedStart {
     bucket: crate::upper_draw::DrawBucket,
     consume_agent_slot: bool,
     launch_hash: String,
+    /// Booked by the daemon for an ordinary start that asked for none.
+    automatic: bool,
 }
 
 impl SharedStart {
@@ -229,6 +231,30 @@ impl SharedStart {
             // changed field is refused rather than treated as the same start.
             launch_hash: format!("{:x}", sha2::Sha256::digest(p.to_string().as_bytes())),
             id,
+            automatic: false,
+        })
+    }
+
+    /// An ordinary start that asked for no booking books its account on the
+    /// qualified draw when one exists (handover step 4). Its app slot stays
+    /// the start's own durable hold, so the booking takes none; any refusal
+    /// falls back to the unbooked start, which keeps today's behavior.
+    fn automatic(store: &Store, p: &Value, harness: &str, profile_id: &str) -> Result<Self> {
+        use sha2::Digest;
+        let id = format!("ordinary/{}", uuid::Uuid::new_v4().simple());
+        Ok(Self {
+            request_hash: id.clone(),
+            route_id: format!("{harness}/{}", p["model"].as_str().unwrap_or("default")),
+            profile_id: profile_id.to_string(),
+            quota_profile_id: profile_id.to_string(),
+            account_generation: store.auto_account_generation(profile_id)?.unwrap_or(0).max(1),
+            quota_event_seq: store.latest_auto_quota(profile_id)?.map_or(1, |q| q.event_seq),
+            upper_draw_milli: None,
+            bucket: crate::upper_draw::DrawBucket::agent(harness, p["model"].as_str(), p["effort"].as_str()),
+            consume_agent_slot: false,
+            launch_hash: format!("{:x}", sha2::Sha256::digest(p.to_string().as_bytes())),
+            id,
+            automatic: true,
         })
     }
 }
@@ -804,7 +830,7 @@ impl Daemon {
             }
             0
         };
-        let shared_start = match p.get("shared_booking") {
+        let mut shared_start = match p.get("shared_booking") {
             None | Some(Value::Null) => None,
             Some(booking) => {
                 if auto_routing {
@@ -831,9 +857,20 @@ impl Daemon {
             }
             _ => None,
         };
-        if let (Some(profile), None, None) = (&profile, &shared_start, &swarm_booking) {
-            if self.store.lock().unwrap().auto_claim_conflicts_with_run(&profile.id, "")? {
+        let unbooked_profile = match (&profile, &shared_start, &swarm_booking) {
+            (Some(profile), None, None) => Some(profile.id.clone()),
+            _ => None,
+        };
+        if let Some(profile_id) = unbooked_profile {
+            if self.store.lock().unwrap().auto_claim_conflicts_with_run(&profile_id, "")? {
                 bail!("{MANUAL_POOL_CONFLICT}");
+            }
+            // An ordinary agent start (not Swarm, not an Auto parent, not the
+            // daemon's own Overseer or watcher run) tries the one booking.
+            if swarm_identity.is_none() && !auto_routing && harness != "generic"
+                && p.get("role").is_none_or(Value::is_null) {
+                let store = self.store.lock().unwrap();
+                shared_start = Some(SharedStart::automatic(&store, p, harness, &profile_id)?);
             }
         }
         let target_ref = p["target_ref"].as_str().filter(|s| !s.is_empty()).map(str::to_string);
@@ -862,17 +899,27 @@ impl Daemon {
                 &crate::account_booking::LaunchBookingRequest {
                     account: &account, workspace_path: workspace_path.as_deref(),
                     consume_agent_slot: start.consume_agent_slot, launch_hash: &start.launch_hash,
-                })?;
-            match decision {
-                crate::account_booking::LaunchBookingDecision::Blocked(reason) =>
+                });
+            let booked = match decision {
+                // Unknown draw, busy or short account, stale reading: the
+                // ordinary start proceeds unbooked, exactly as before.
+                Ok(crate::account_booking::LaunchBookingDecision::Blocked(_)) | Err(_)
+                    if start.automatic => false,
+                Err(error) => return Err(error),
+                Ok(crate::account_booking::LaunchBookingDecision::Blocked(reason)) =>
                     bail!("shared launch booking blocked: {reason}"),
-                crate::account_booking::LaunchBookingDecision::Replayed(_) =>
+                Ok(crate::account_booking::LaunchBookingDecision::Replayed(_)) =>
                     return self.shared_start_replay(&start.id),
-                crate::account_booking::LaunchBookingDecision::Booked(_) => {}
+                Ok(crate::account_booking::LaunchBookingDecision::Booked(_)) => true,
+            };
+            if booked {
+                unbound_launch = Some(UnboundSharedLaunch { daemon: self.clone(), id: start.id.clone(),
+                    stage: SharedLaunchStage::Booked, keep_booked: false });
+                shared_launch_test_crash("after_book");
             }
-            unbound_launch = Some(UnboundSharedLaunch { daemon: self.clone(), id: start.id.clone(),
-                stage: SharedLaunchStage::Booked, keep_booked: false });
-            shared_launch_test_crash("after_book");
+        }
+        if shared_start.as_ref().is_some_and(|start| start.automatic) && unbound_launch.is_none() {
+            shared_start = None;
         }
         let (ws, fork_commit, fork_prov) = match mode {
             "worktree" => {
