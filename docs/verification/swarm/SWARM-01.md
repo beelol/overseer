@@ -1,6 +1,6 @@
 # SWARM-01 — Auto/Manual × Swarm on/off
 
-Status: partial (all four combinations run on one daemon on fixtures, with Swarm on only through the proposed native director, whose switch is off until the owner decides). Revisions: `ccbedbf0` (daemon `swarm.start`), `a822cb1d` (VS Code **Start Swarm…**), `cfa0eba8` (native director behind `swarm.native_director`), `7fc8dc96` (the matrix test), on `claude/auto-swarm`.
+Status: partial (all four combinations run on one daemon on fixtures; the native director that makes Swarm on possible outside fixtures is on by default since the owner's decision of 2026-09-28, `e7e9e18c`, but has run only as the synthetic Claude fixture). Revisions: `ccbedbf0` (daemon `swarm.start`), `a822cb1d` (VS Code **Start Swarm…**), `cfa0eba8` (native director behind `swarm.native_director`), `7fc8dc96` (the matrix test), on `claude/auto-swarm`.
 
 Verify clause: exercise all four Auto/Manual × Swarm on/off combinations. Swarm off creates no Overseer worker; a manual swarm stays within its selected pool; an enabled swarm may choose one agent; existing manual and native behaviour is intact.
 
@@ -23,7 +23,7 @@ The normal start ([S0](S0.md)) inherits the approved pool (application or catego
 
 ## Why it stays partial
 
-- **Swarm on needs an undecided switch outside fixtures.** Off (the default), a normal start outside the fixture API is blocked `no_qualified_director`, so on the product path Swarm on exists only with `swarm.native_director` on, and only the synthetic Claude fixture has directed it.
+- **Swarm on is decided but not live.** `swarm.native_director` is on by default since `e7e9e18c` (off, a normal start outside the fixture API is blocked `no_qualified_director`); only the synthetic Claude fixture has directed a Swarm.
 - **Auto × Swarm on is Swarm with Auto Mode on, not Auto-routed Swarm.** No normal start chooses Swarm routes through Auto's selector.
 - **"May choose one agent"** rests on the serial read-back and `swarm_director_loop.rs` (director executes a job itself); the matrix does not re-run it.
 - **Native behaviour intact:** targeted regressions only (`swarm_start` 4/4 with the switch off, Gate S `ac180`/`ac185`/`ac190`, the booked Claude worker in `shared_launch.rs`); the full suite was not run this session.
