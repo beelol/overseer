@@ -1,5 +1,12 @@
 # AC-146: merges
 
+## Pull request #25 (UI scenarios never take focus), 2026-09-28
+
+- **Why:** the owner could not work while scenario windows kept coming to the front; UI runs were paused on every branch until this merged.
+- **Finished:** marked ready by its agent (head `96944787`). On macOS the harness starts VS Code paused under its inspector, shows windows without activating the app, keeps them transparent and click-through, and quits through `app.quit()`. `OVERSEER_UI_FOREGROUND=1` gives the old launch. Also touches `scripts/dev code --inspect` (Gate T).
+- **Tests:** the agent's two full `scripts/test-all --jobs=3` runs: 54 of 56 (both misses pass alone), then 48 of 56 at load 39 to 49 (each timing miss passes alone or misses the same way on main's foreground launch). Across 15,218 frontmost-app samples at 50 ms in the second run, no scenario window was in front. On the merge with main (`pm-wt`): unit 9 of 9, check, links, VSIX, and UI keyboard passed.
+- **Merged:** squash, `72e79ac0`.
+
 ## Pull requests #22 and #23 (guided owner tests and deploy, Gate T stages 3 and 4), 2026-09-28
 
 - **Finished:** both marked ready by the dev daemons agent; AC-215 and AC-214 verified on main (`dea2bff9`). #23 was stacked on #22.
