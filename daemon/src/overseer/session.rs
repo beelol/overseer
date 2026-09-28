@@ -514,6 +514,23 @@ impl Daemon {
         Ok(())
     }
 
+    /// Overseer's run waits for a connection (Continuity parked it): the conversation says why,
+    /// that the owner's words are kept, and what keeps working meanwhile.
+    fn overseer_waiting(&self, run_id: &str, reason: &str) -> Result<()> {
+        let session = self.overseer_session()?;
+        if session["run_id"].as_str() != Some(run_id) {
+            return Ok(());
+        }
+        let sid = session["id"].as_str().unwrap().to_string();
+        let reason: String = reason.chars().take(300).collect();
+        let text = format!("Overseer cannot answer right now: {reason}. Your words are kept and answered when a model can run again. What needs no model keeps working: digests, the free checks, conflicts and their cards, holds, guardrails, and stopping one agent or all.");
+        let said: i64 = self.store.lock().unwrap().conn.query_row("SELECT COUNT(*) FROM overseer_messages WHERE session_id=?1 AND source='system' AND text=?2", rusqlite::params![sid, text], |r| r.get(0))?;
+        if said == 0 {
+            self.append_session_message(&sid, "system", None, &text, Some(&json!({"kind": "cannot_answer", "reason": reason, "waiting": true})))?;
+        }
+        Ok(())
+    }
+
     /// Overseer asks the daemon for actions. Checked here, whatever the model claims; then a
     /// proposal, or done, by the level.
     pub fn overseer_propose(self: &Arc<Self>, actions: &Value, source: &str) -> Result<Value> {
@@ -1064,6 +1081,8 @@ pub fn start(daemon: Arc<Daemon>) {
                             d.overseer_cannot_answer(&run)?;
                             d.overseer_turn_ended(&run)?;
                         }
+                        // Overseer's own run follows Continuity: while it waits, the conversation says why.
+                        ("status", "overseer") if payload["status"] == crate::handoff::WAITING_FOR_CONNECTION || payload["status"] == crate::handoff::WAITING_FOR_MEMORY => d.overseer_waiting(&run, payload["reason"].as_str().unwrap_or("its connection failed"))?,
                         ("turn_done", "overseer") | ("status", "overseer") => d.overseer_turn_ended(&run)?,
                         ("turn_started", _) => {
                             d.dispatch_advance(&run, "delivered", payload["turn"]["id"].as_str())?;
@@ -1074,6 +1093,10 @@ pub fn start(daemon: Arc<Daemon>) {
                         ("task_created", "agent") => {
                             d.brief_companions(&run)?;
                             d.started_card(&run, &payload)?;
+                        }
+                        // A turn Continuity kept is sent again as the same turn: delivered now.
+                        ("retry", _) if payload["sending"] == true => {
+                            d.dispatch_advance(&run, "delivered", payload["turn"].as_str())?;
                         }
                         ("turn_done", _) => {
                             d.dispatch_advance(&run, "answered", None)?;
@@ -1103,8 +1126,6 @@ pub fn start(daemon: Arc<Daemon>) {
                         ("guardrail_crossed", _) => d.free_check_tripped(&run, "wrote across a guardrail")?,
                         ("conflict", _) if payload["needs_decision"] == true && payload["changed"] != true => d.free_check_tripped(&run, "collides with another agent")?,
                         ("conflict_closed", _) => d.release_due_holds("conflict_closed", Some(&run), &payload)?,
-                        // Continuity: the successor of a handed-off agent is the same agent to Overseer.
-                        ("handoff", _) if payload["successor"].as_str() == Some(run.as_str()) => d.adopt_successor(payload["predecessor"].as_str().unwrap_or(""), &run)?,
                         _ => {}
                     }
                     Ok(())

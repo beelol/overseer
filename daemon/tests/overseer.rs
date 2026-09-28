@@ -214,6 +214,69 @@ fn ac183_roster_equals_state_and_digests_stay_bounded_and_clean() {
     assert!(reply["digest"]["last_messages"].as_array().unwrap().len() <= 3);
 }
 
+/// AC-183: the fields later steps fill, each equal to what the daemon recorded: the last report
+/// (from the agent's channel), the last check-in, holds, guardrails, area and watches; and the
+/// watcher's own role and digest.
+#[test]
+fn ac183_digest_carries_reports_check_ins_holds_guardrails_and_watches() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call("agent.channel", json!({"default": "on", "by": "owner"}));
+    let a = claude_task(&d, &repo, &mode_file, "channel", "Reporter", "report: tidying the docs; write: docs/a.md");
+    d.wait_done(&a, 40);
+    let digest = |id: &str| d.call("agent.digest", json!({"run_id": id}));
+    let dg = digest(&a)["digest"].clone();
+    assert_eq!(dg["last_report"]["doing"], "tidying the docs", "{}", dg["last_report"]);
+    assert_eq!(dg["last_report"]["changed"], json!(["docs/a.md"]));
+    assert!(dg["holds"].as_array().unwrap().is_empty() && dg["guardrails"].as_array().unwrap().is_empty() && dg["watches"].as_array().unwrap().is_empty() && dg["last_check_in"].is_null());
+    // A watch: a new watcher, created on the subject's next turn end, whose role is watcher.
+    std::fs::write(&mode_file, "slow").unwrap();
+    d.call("run.follow_up", json!({"run_id": a, "prompt": "go on"}));
+    d.wait_status(&a, |st| st == "running", 20);
+    let watch = d.call("watch.start", json!({"subject": a, "brief": "edits outside docs", "harness": "claude", "by": "owner"}));
+    std::fs::write(&mode_file, "watcher").unwrap();
+    d.wait_done(&a, 30);
+    wait_count(&d, &a, "watch_wake", 1, 20);
+    let watcher = d.call("watch.list", json!({}))["watches"][0]["watcher"].as_str().unwrap().to_string();
+    assert!(!watcher.is_empty());
+    d.wait_done(&watcher, 30);
+    let dw = digest(&watcher);
+    assert_eq!(dw["digest"]["role"], "watcher");
+    assert_eq!(dw["digest"]["watches"][0]["id"], watch["id"]);
+    assert_eq!(dw["digest"]["watches"][0]["subject"], a.as_str());
+    assert!(dw["text"].as_str().unwrap().contains("role: watcher") && dw["text"].as_str().unwrap().contains("watching Reporter: edits outside docs"), "{}", dw["text"]);
+    // A check-in, a hold, a guardrail and an area.
+    let token = d.call("overseer.token", json!({"run_id": "overseer-under-test", "role": "overseer"}))["token"].as_str().unwrap().to_string();
+    let recorded = d.call("overseer.tool", json!({"token": token, "name": "check_in", "arguments": {"agent": a, "result": "on_task", "reason": "docs as asked"}}));
+    assert_eq!(recorded["is_error"], false, "{recorded}");
+    d.call("agent.hold", json!({"run_id": a, "reason": "review first", "by": "owner"}));
+    d.call("agent.guardrail", json!({"run_id": a, "words": "Docs only.", "deny": ["src"], "by": "owner"}));
+    d.call("agent.area", json!({"run_id": a, "paths": ["docs"], "by": "owner"}));
+    let started = std::time::Instant::now();
+    let reply = digest(&a);
+    assert!(started.elapsed() < Duration::from_secs(2));
+    let dg = &reply["digest"];
+    assert_eq!((dg["last_check_in"]["result"].as_str(), dg["last_check_in"]["reason"].as_str()), (Some("on_task"), Some("docs as asked")));
+    assert_eq!(dg["last_check_in"], d.call("agent.check_ins", json!({"run_id": a}))["check_ins"].as_array().unwrap().last().map(|c| json!({"result": c["result"], "reason": c["reason"], "left_out": c["left_out"], "title": "Reporter"})).unwrap());
+    let hold = d.call("agent.holds", json!({}))["holds"][0].clone();
+    assert_eq!(dg["holds"], json!([{"by": hold["by"], "reason": hold["reason"], "set_ms": hold["set_ms"], "release_on": hold["release_on"]}]));
+    let g = d.call("agent.guardrails", json!({"run_id": a}))["guardrails"][0].clone();
+    assert_eq!(dg["guardrails"], json!([{"id": g["id"], "words": "Docs only.", "allow": [], "deny": ["src"], "hold_on_cross": false, "enforcement": "enforced", "by": "owner"}]));
+    assert_eq!(dg["area"], json!(["docs"]));
+    assert_eq!(dg["watches"][0]["id"], watch["id"]);
+    assert_eq!(dg["watches"][0]["watcher"], watcher.as_str());
+    let text = reply["text"].as_str().unwrap();
+    for line in ["report: tidying the docs", "held by owner: review first", "guardrail (enforced): Docs only. · do not change src", "area: docs", "watched by Watching Reporter (watch): edits outside docs"] {
+        assert!(text.contains(line), "{line:?} in {text}");
+    }
+    assert!(text.len() <= 4096);
+}
+
 fn write_lines(path: &Path, lines: &[&str]) {
     std::fs::write(path, lines.join("\n") + "\n").unwrap();
 }
@@ -2159,4 +2222,70 @@ fn ac198_quiet_and_bounded() {
     assert!(usage["overseer"].is_object() || usage["overseer"] == "not reported", "{usage}");
     assert!(usage["watchers"].as_array().unwrap().iter().any(|w| w["run_id"] == watcher), "{usage}");
     assert_eq!(usage["turns_today"], so_far);
+}
+
+/// Overseer's run and its turns' prompts, oldest first.
+fn overseer_prompts(d: &Daemon) -> Vec<String> {
+    let run = session(d)["run_id"].as_str().unwrap().to_string();
+    d.call("run.turns", json!({"run_id": run})).as_array().unwrap().iter().map(|t| t["prompt"].as_str().unwrap().to_string()).collect()
+}
+
+/// AC-198: one turn Overseer starts by itself reads at most twenty items and at most 32 KiB:
+/// twenty-five findings filed together are two turns (twenty, then five, oldest first), and
+/// twenty long ones are one turn whose prompt is cut to the bound.
+#[test]
+fn ac198_one_turn_is_at_most_twenty_items_and_32_kib() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    let subject = claude_task(&d, &repo, &mode_file, "echo", "Subject", "hello");
+    d.wait_done(&subject, 30);
+    let watcher = claude_task(&d, &repo, &mode_file, "echo", "Watcher", "hello");
+    d.wait_done(&watcher, 30);
+    std::fs::write(&mode_file, "overseer").unwrap();
+    d.call("watch.start", json!({"subject": subject, "watcher": watcher, "brief": "look", "by": "owner"}));
+    let token = d.call("overseer.token", json!({"run_id": watcher, "role": "agent"}))["token"].as_str().unwrap().to_string();
+    let file = |text: String| {
+        let r = d.call("overseer.tool", json!({"token": token, "name": "finding", "arguments": {"result": "concern", "text": text}}));
+        assert_eq!(r["is_error"], false, "{r}");
+    };
+    // Twenty-five at once: twenty in the first turn, the other five in the next.
+    let before = overseer_prompts(&d).len();
+    for i in 0..25 {
+        file(format!("item-{i:02} looks off"));
+    }
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    while overseer_prompts(&d).len() < before + 2 {
+        assert!(std::time::Instant::now() < deadline, "two turns: {:?}", overseer_turn_causes(&d));
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    wait_overseer_idle(&d, 60);
+    let prompts = overseer_prompts(&d);
+    let items = |p: &str| (0..25).filter(|i| p.contains(&format!("item-{i:02} looks off"))).collect::<Vec<_>>();
+    assert_eq!(items(&prompts[before]), (0..20).collect::<Vec<_>>(), "the first turn reads the oldest twenty");
+    assert_eq!(items(&prompts[before + 1]), (20..25).collect::<Vec<_>>(), "the next turn the other five");
+    assert_eq!(prompts.len(), before + 2);
+    // Twenty long findings: one turn, its prompt within 32 KiB and saying where it was cut.
+    let before = prompts.len();
+    for i in 0..20 {
+        file(format!("long-{i:02} {}", "x".repeat(3000)));
+    }
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    while overseer_prompts(&d).len() < before + 1 {
+        assert!(std::time::Instant::now() < deadline, "one turn: {:?}", overseer_turn_causes(&d));
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    wait_overseer_idle(&d, 60);
+    std::thread::sleep(Duration::from_secs(1));
+    let prompts = overseer_prompts(&d);
+    assert_eq!(prompts.len(), before + 1, "twenty items are one turn");
+    let long = &prompts[before];
+    assert!(long.len() <= 32 * 1024, "{} bytes", long.len());
+    assert!(long.ends_with("[cut at 32768 bytes; ask for a smaller range]") && long.contains("long-00 "), "{}", &long[long.len().saturating_sub(200)..]);
 }

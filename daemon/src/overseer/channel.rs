@@ -708,6 +708,54 @@ impl Daemon {
 }
 
 impl Daemon {
+    /// For a run of the daemon's own (Overseer's run, a watcher): whether it runs read-only. A
+    /// watcher with a copy to check in runs under its own permission mode; the others read only.
+    pub fn own_read_only(&self, run_id: &str) -> Option<bool> {
+        match self.run_role(run_id).as_str() {
+            "overseer" => Some(true),
+            "watcher" => Some(self.watch_of_watcher(run_id).map(|w| w.copy_workspace.is_none()).unwrap_or(true)),
+            _ => None,
+        }
+    }
+
+    /// Continuity is about to start `successor` in place of `predecessor`. A run of the daemon's
+    /// own keeps its role (Overseer's run stays hidden and stays the conversation's; a watcher stays
+    /// the watch's), gets a token of its own and the launch that gives its role's tools on the new
+    /// harness, read-only as before (AC-197). Returns the permission mode that launch needs, or
+    /// None for an agent, whose mode Continuity carries itself.
+    pub fn carry_role(&self, predecessor: &str, successor: &crate::store::Run, harness: &str) -> Result<Option<Option<String>>> {
+        let role = self.run_role(predecessor);
+        let Some(read_only) = self.own_read_only(predecessor) else { return Ok(None) };
+        let dir = std::path::PathBuf::from(self.workspace(&successor.workspace_id)?.path);
+        let token = self.overseer_token(&successor.id, &role)?["token"].as_str().unwrap_or_default().to_string();
+        let (extra_args, mut mode) = self.tools_launch(harness, &dir, &token, &role, read_only)?;
+        // OpenCode's local server has no tools of the daemon's; its plan agent reads and never edits.
+        if read_only && !["claude", "codex", "opencode"].contains(&harness) {
+            mode = Some("plan");
+        }
+        let mode = mode.map(str::to_string);
+        {
+            let store = self.store.lock().unwrap();
+            store.conn.execute("INSERT OR REPLACE INTO run_roles(run_id, role) VALUES(?1, ?2)", rusqlite::params![successor.id, role])?;
+            store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1", rusqlite::params![successor.id, json!({"extra_args": extra_args, "opts": {"mode": mode}}).to_string()])?;
+            // The predecessor's token speaks for nobody now.
+            store.conn.execute("DELETE FROM overseer_tokens WHERE run_id=?1", [predecessor])?;
+            if role == "overseer" {
+                store.conn.execute("UPDATE overseer_sessions SET run_id=?2 WHERE run_id=?1", rusqlite::params![predecessor, successor.id])?;
+            }
+        }
+        self.emit(Some(&successor.task_id), Some(&successor.id), "role_moved", "daemon", "exact", json!({"from": predecessor, "role": role, "read_only": read_only, "harness": harness, "mode": mode}))?;
+        Ok(read_only.then_some(mode))
+    }
+
+    /// A handoff that could not start: the conversation goes back to the run that holds the work.
+    pub fn uncarry_role(&self, successor: &str, predecessor: &str) -> Result<()> {
+        if self.run_role(successor) == "overseer" {
+            self.store.lock().unwrap().conn.execute("UPDATE overseer_sessions SET run_id=?2 WHERE run_id=?1", rusqlite::params![successor, predecessor])?;
+        }
+        Ok(())
+    }
+
     /// Continuity handed an agent off: its holds, guardrails, area, watches, conflicts, cadence,
     /// channel setting and queued messages move to the successor, so it stays one agent to
     /// Overseer (AC-197).
@@ -728,6 +776,11 @@ impl Daemon {
             return Ok(());
         }
         let run = self.run(successor)?;
+        // A guardrail reads enforced only where the new harness itself refuses the write (AC-187).
+        self.store.lock().unwrap().conn.execute(
+            "UPDATE guardrails SET enforcement=CASE WHEN ?2='claude' AND deny<>'[]' THEN 'enforced' ELSE 'watched' END WHERE run_id=?1 AND removed_ms IS NULL",
+            rusqlite::params![successor, run.harness],
+        )?;
         self.emit(Some(&run.task_id), Some(successor), "oversight_moved", "daemon", "exact", json!({"from": predecessor, "moved": moved.iter().map(|(t, n)| json!({"table": t, "rows": n})).collect::<Vec<_>>()}))?;
         self.conflicts_touch(successor);
         Ok(())

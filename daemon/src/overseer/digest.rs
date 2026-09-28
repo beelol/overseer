@@ -49,6 +49,10 @@ pub struct Digest {
     pub guardrails: Vec<Value>,
     pub watches: Vec<Value>,
     pub conflicts: Vec<Value>,
+    /// Continuity: the runs this agent's work came from (oldest first), and the run that carries
+    /// it on when this one was handed off. One agent to Overseer (AC-197).
+    pub continued_from: Vec<String>,
+    pub handed_off_to: Option<String>,
     pub updated_ms: i64,
 }
 
@@ -126,17 +130,51 @@ impl Daemon {
             (turns, events, launch, account)
         };
         let opts = launch.get("generic").map(|g| g["opts"].clone()).unwrap_or_else(|| launch["opts"].clone());
+        // A handed-off agent is one agent: its predecessors' requests and messages come first.
+        let mut continued_from: Vec<String> = Vec::new();
+        let mut at = run_id.to_string();
+        while let Some(p) = crate::handoff::predecessor_of(self, &at) {
+            if continued_from.contains(&p) || p == run_id {
+                break;
+            }
+            continued_from.insert(0, p.clone());
+            at = p;
+        }
+        let handed_off_to = if run.status == crate::handoff::HANDED_OFF { crate::handoff::successor_of(self, run_id) } else { None };
+        let mut earlier_turns = Vec::new();
+        let mut earlier_events = Vec::new();
+        for p in &continued_from {
+            let store = self.store.lock().unwrap();
+            earlier_turns.extend(store.turns(p)?);
+            earlier_events.extend(store.events_after(0, Some(p), crate::store::EVENTS_PER_RUN)?.into_iter().filter(|e| e.kind == "output"));
+        }
         // What was asked: the task and every later turn, each with the source that sent it.
         let mut asked: Vec<Asked> = Vec::new();
-        if turns.is_empty() || run.parent_run_id.is_some() {
+        if (turns.is_empty() && earlier_turns.is_empty()) || run.parent_run_id.is_some() {
             asked.push(Asked { source: "task".into(), text: head(&task.prompt, MESSAGE_CHARS) });
         }
-        for (i, t) in turns.iter().enumerate() {
+        for (i, t) in earlier_turns.iter().enumerate() {
             let source = self.turn_source(&t.id).unwrap_or_else(|| if i == 0 { "task".into() } else { "owner".into() });
+            asked.push(Asked { source, text: head(&t.prompt, MESSAGE_CHARS) });
+        }
+        for (i, t) in turns.iter().enumerate() {
+            let first_of_successor = i == 0 && !continued_from.is_empty();
+            let source = self.turn_source(&t.id).unwrap_or_else(|| if first_of_successor { "handoff".into() } else if i == 0 { "task".into() } else { "owner".into() });
             asked.push(Asked { source, text: head(&t.prompt, MESSAGE_CHARS) });
         }
         // From the events: the agent's last messages, the files it touched, what it used.
         let mut messages: Vec<String> = Vec::new();
+        for e in &earlier_events {
+            if e.payload["role"] == "assistant" {
+                let text = e.payload["text"].as_str().unwrap_or_default().trim();
+                if !text.is_empty() {
+                    messages.push(head(text, MESSAGE_CHARS));
+                    if messages.len() > LAST_MESSAGES {
+                        messages.remove(0);
+                    }
+                }
+            }
+        }
         let mut changed: BTreeMap<String, String> = BTreeMap::new();
         let mut usage = Value::Null;
         let mut last_check_in = None;
@@ -208,10 +246,12 @@ impl Daemon {
             asks,
             last_check_in,
             area: self.area_of(run_id),
-            holds: Vec::new(),
-            guardrails: Vec::new(),
+            holds: self.hold_of(run_id).into_iter().map(|h| json!({"by": h["by"], "reason": redact(h["reason"].as_str().unwrap_or("")), "set_ms": h["set_ms"], "release_on": h["release_on"]})).collect(),
+            guardrails: self.guardrails_of(run_id).unwrap_or_default().into_iter().map(|g| json!({"id": g["id"], "words": redact(g["words"].as_str().unwrap_or("")), "allow": g["allow"], "deny": g["deny"], "hold_on_cross": g["hold_on_cross"], "enforcement": g["enforcement"], "by": g["by"]})).collect(),
             watches: self.watches_of(run_id),
             conflicts: self.open_conflicts_of(run_id).unwrap_or_default(),
+            continued_from,
+            handed_off_to,
             updated_ms,
         })
     }
@@ -249,8 +289,22 @@ impl Daemon {
             lines.push(format!("children: {}", d.children.iter().map(|c| format!("{} ({})", c.title, c.status)).collect::<Vec<_>>().join(", ")));
         }
         lines.push(format!("usage: {}", if d.usage.is_string() { d.usage.as_str().unwrap_or_default().to_string() } else { d.usage.to_string() }));
+        if !d.continued_from.is_empty() {
+            lines.push(format!("continued from: {} (handed off by Continuity; one agent)", d.continued_from.join(" → ")));
+        }
+        if let Some(s) = &d.handed_off_to {
+            lines.push(format!("handed off to: {s} (the agent carries on there)"));
+        }
         if !d.area.is_empty() {
             lines.push(format!("area: {}", d.area.join(", ")));
+        }
+        for h in &d.holds {
+            lines.push(format!("held by {}: {}", h["by"].as_str().unwrap_or("?"), h["reason"].as_str().unwrap_or("")));
+        }
+        for g in &d.guardrails {
+            let list = |k: &str| g[k].as_array().map(|a| a.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(", ")).unwrap_or_default();
+            let (allow, deny) = (list("allow"), list("deny"));
+            lines.push(format!("guardrail ({}): {}{}{}", g["enforcement"].as_str().unwrap_or("watched"), g["words"].as_str().unwrap_or(""), if allow.is_empty() { String::new() } else { format!(" · stay inside {allow}") }, if deny.is_empty() { String::new() } else { format!(" · do not change {deny}") }));
         }
         if let Some(r) = &d.last_report {
             lines.push(format!("report: {}{}{}", r["doing"].as_str().unwrap_or(""), r["needs"].as_str().filter(|s| !s.is_empty()).map(|n| format!(" · needs {n}")).unwrap_or_default(), r["blocked"].as_str().filter(|s| !s.is_empty()).map(|b| format!(" · blocked by {b}")).unwrap_or_default()));
@@ -274,7 +328,8 @@ impl Daemon {
             (store.runs()?, store.tasks()?, store.workspaces()?)
         };
         let mut out = Vec::new();
-        for r in runs.iter().filter(|r| r.parent_run_id.is_none() && self.run_role(&r.id) != "overseer") {
+        // A run that handed its work off is the same agent as its successor: one line, the successor's.
+        for r in runs.iter().filter(|r| r.parent_run_id.is_none() && self.run_role(&r.id) != "overseer" && !(r.status == crate::handoff::HANDED_OFF && crate::handoff::successor_of(self, &r.id).is_some())) {
             let task = tasks.iter().find(|t| t.id == r.task_id);
             let ws = workspaces.iter().find(|w| w.id == r.workspace_id);
             let changed_total = self.changed_total(&r.id);

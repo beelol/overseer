@@ -14,6 +14,8 @@ pub const MAX_EVERY: i64 = 20;
 /// Due check-ins within this window are one turn.
 pub const BATCH_MS: i64 = 5000;
 pub const BATCH_MAX: usize = 20;
+/// What one turn Overseer starts by itself reads, at most.
+pub const TURN_BYTES: usize = 32 * 1024;
 /// Turns Overseer starts by itself in a day, check-ins included (AC-198).
 pub const DEFAULT_CAP: i64 = 100;
 /// An agent is finished when it has stayed idle this long after completing: a follow-up inside
@@ -238,6 +240,8 @@ impl Daemon {
         if due.is_empty() {
             return Ok(());
         }
+        // One turn takes at most twenty items, oldest first; the rest are the next turn's.
+        let due: Vec<(i64, String, String, i64)> = due.into_iter().take(BATCH_MAX).collect();
         // The window runs from when the oldest entry became due.
         let oldest = due.iter().map(|d| d.3).min().unwrap_or(now);
         let became_due: i64 = self.store.lock().unwrap().conn.query_row("SELECT MIN(MAX(ts, not_before)) FROM check_in_queue WHERE not_before <= ?1", [now], |r| r.get::<_, Option<i64>>(0)).ok().flatten().unwrap_or(oldest);
@@ -366,7 +370,7 @@ impl Daemon {
         }
         out.push_str(&format!("Digests:\n{}\n{}\n", texts.join("\n\n"), super::session::CLOSE));
         out.push_str(if items.is_empty() { "\nAnswer the agents." } else { "\nCheck in on these agents." });
-        Ok(super::bound(&out, 32 * 1024))
+        Ok(super::bound(&out, TURN_BYTES))
     }
 
     /// The check_in tool: Overseer's result for one agent, recorded on that agent.

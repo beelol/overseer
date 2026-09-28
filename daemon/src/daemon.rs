@@ -570,6 +570,8 @@ impl Daemon {
                 // Guardrails are repeated on later turns; the briefing about the agents beside this
                 // one goes with its task (AC-190).
                 let preface = if follow_up { self.guardrail_preface(run_id) } else { self.briefing_preface(run_id) };
+                // A successor's first turn carries the guardrails it took over (AC-187, AC-197).
+                let preface = if opts.handoff && !follow_up { [self.guardrail_preface(run_id), preface].into_iter().filter(|p| !p.is_empty()).collect::<Vec<_>>().join("\n\n") } else { preface };
                 let prompt_owned = if preface.is_empty() { prompt.to_string() } else { format!("{preface}\n\n{prompt}") };
                 let turn = Turn { id: format!("u-{}", short_id()), run_id: run_id.into(), n, prompt: prompt_owned, snapshot_id: Some(snap.id.clone()), started_ms: now(), ended_ms: None, status: "running".into() };
                 self.store.lock().unwrap().insert_turn(&turn)?;
@@ -609,7 +611,7 @@ impl Daemon {
         }
         let args: Option<Vec<String>> = generic_meta["args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect());
         let mut extra_args: Vec<String> = generic_meta["extra_args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
-        if follow_up {
+        if follow_up || opts.handoff {
             extra_args.extend(self.guardrail_launch_args(run_id, &run.harness));
         }
         // The channel back to Overseer, on every turn of an agent that has one (AC-190).

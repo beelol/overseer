@@ -249,11 +249,13 @@ pub(crate) fn bound(s: &str, max: usize) -> String {
     if s.len() <= max {
         return s.to_string();
     }
-    let mut end = max;
+    // The note that says so counts toward the bound: the whole answer is at most `max` bytes.
+    let note = format!("\n[cut at {max} bytes; ask for a smaller range]");
+    let mut end = max.saturating_sub(note.len());
     while !s.is_char_boundary(end) {
         end -= 1;
     }
-    format!("{}\n[cut at {max} bytes; ask for a smaller range]", &s[..end])
+    format!("{}{note}", &s[..end])
 }
 
 impl Daemon {

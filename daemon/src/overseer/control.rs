@@ -325,7 +325,17 @@ impl Daemon {
         detail["redirect"] = json!(true);
         detail["snapshot"] = json!(snap.id);
         let prompt = if source == "overseer" { format!("{}{text}", super::session::FROM_OVERSEER) } else { text.to_string() };
-        self.emit(Some(&run.task_id), Some(run_id), "redirect", source, "exact", json!({"text": text, "snapshot": snap.id, "stopped": active, "detail": detail}))?;
+        let waits = run.status == crate::handoff::WAITING_FOR_CONNECTION || run.status == crate::handoff::WAITING_FOR_MEMORY;
+        self.emit(Some(&run.task_id), Some(run_id), "redirect", source, "exact", json!({"text": text, "snapshot": snap.id, "stopped": active && !waits, "waiting": waits, "detail": detail}))?;
+        if waits {
+            // Nothing runs to be stopped: the direction takes the place of the message the run
+            // kept and goes once, when the wait ends or to the agent Continuity moves the work to.
+            let preface = self.guardrail_preface(run_id);
+            let prompt = if preface.is_empty() { prompt } else { format!("{preface}\n\n{prompt}") };
+            let turn = crate::handoff::replace_waiting_turn(self, &run, &prompt)?;
+            self.store.lock().unwrap().conn.execute("INSERT OR REPLACE INTO turn_sources(turn_id, source, detail) VALUES(?1, ?2, ?3)", rusqlite::params![turn.id, source, detail.to_string()])?;
+            return Ok(json!({"run_id": run_id, "snapshot": snap.id, "delivery": "when the agent can run again", "turn": turn.id}));
+        }
         if active {
             // Queued first, so the turn that starts when the stop lands carries the direction.
             self.store.lock().unwrap().conn.execute("INSERT INTO queued_messages(run_id, ts, source, text, detail) VALUES(?1, ?2, ?3, ?4, ?5)", rusqlite::params![run_id, crate::daemon::now(), source, prompt, detail.to_string()])?;
