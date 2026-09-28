@@ -1,6 +1,6 @@
 # SWARM-20 — control actions and descendant exit
 
-Status: partial. Latest evidence revision: `ce46780`.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`) for every surface available today; the phone clause is not yet in force (Gate N's gateway is not on `main` or this branch) and re-opens this criterion when it lands. See the last section. Previous status: partial. Latest evidence revision: `ce46780`.
 
 Input: a fixture run has an admitted, running `/bin/sleep` worker. A test-only fault simulates an unreachable control socket on Stop's first interrupt attempt, then kills and restarts the daemon. The fixture is `stop_retries_an_initially_unreachable_worker_after_daemon_restart` in `daemon/tests/swarm_runtime.rs`.
 
@@ -63,3 +63,21 @@ returned, then passed. The full serialized offline Rust suite passed. This cover
 scripted local director, not live checkpoint or native-descendant control, so
 SWARM-20 remains partial.
 Replay: `cargo test --offline -q -p overseerd --test swarm_director_loop -- --test-threads=1`.
+
+## Verified at fixture scope (2026-09-28)
+
+Before this session Overseer had no way to act on a swarm, so "through an authorized Overseer action" could not be shown. `57618bc3` adds Overseer's `swarm` action over the same daemon methods as the owner's controls (Steer: pause, stop, off, a lowered limit; Confirm at every level: resume, a raised limit, changed requirements; starting a swarm is not an Overseer action).
+
+| Clause | Test |
+| --- | --- |
+| Pause, Resume, Stop and Swarm off with active and queued jobs, invoked by the owner | `pause_resume_and_off_keep_active_evidence_but_stop_new_delegation` (Pause blocks new attempts and asks the active one to checkpoint; Resume; Off drains without new delegation, queued work not started); `deadline_on_admission_stops_queued_work_without_claiming_completion`; `stop_blocks_new_attempts_without_discarding_late_evidence`; the packaged 100-job scenario recorded earlier (`test/ui/scenario-swarm-scale.js`) |
+| …or through an authorized Overseer action | `overseer_controls_a_swarm_only_through_its_controls_and_confirms_what_commits_more` (`daemon/tests/swarm_gate_s.rs`, new): at Auto, Overseer's own pause happens at once; resume, a raised limit and changed requirements are refused unless the owner asked and then wait for the owner's yes (a no changes nothing); a lowered limit and Stop are Steer; each carried-out action is recorded with its proposal |
+| A changed objective arrives as a plan revision without replacing the director generation | `catalog_s3_owner_requirement_change_becomes_a_recorded_plan_revision` (see [SWARM-21](SWARM-21.md)); the Overseer test sends a requirement change after the owner's yes and the generation stays 1 |
+| Stop reaches descendants | `stop_reaches_a_workers_descendant_processes` (`daemon/tests/swarm_runtime.rs`, new; passed on first run: the worker's own child process exits with it, the queued job is cancelled with no attempt); `parent_exit_waits_for_native_descendant_receipts_before_finishing_attempt` and `director_replacement_waits_for_native_descendant_receipts` for recorded native child rows |
+| Unconfirmed exits remain visible and retain reservations | `default_sixty_minute_deadline_stops_active_and_blocked_runs_but_nothing_else` (a worker ignoring the interrupt shows as an unconfirmed exit until it is killed); `stop_retries_an_initially_unreachable_worker_after_daemon_restart` (reservation `active`, then `uncertain` only after confirmed exit); `daemon_stop_all_preserves_unconfirmed_swarm_worker_after_control_loss` |
+| Swarm off prevents new delegation while draining active jobs | `pause_resume_and_off_keep_active_evidence_but_stop_new_delegation` |
+| Phone (when Gate N is available) | not in force; the daemon side (scoped start/stop request ids, stale queued Stop refused) is recorded in [SWARM-61](SWARM-61.md) |
+
+Rerun serially on 2026-09-28: `swarm_gate_s` 2, `swarm_control` 6, `swarm_runtime` stop tests, `overseer` 24, `auto_gate_s` 2.
+
+Boundary: native descendants of a live harness (subagents inside Claude) are controlled only as far as the harness allows; that is SWARM-17 (live).

@@ -230,7 +230,7 @@
       "blocker": null
     },
     "SWARM-20": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_broker.rs",
         "docs/verification/swarm/milestone-1.md",
@@ -244,9 +244,11 @@
         "test/ui/scenario-swarm-scale.js",
         "docs/verification/evidence/ui/swarm-scale/result.json",
         "daemon/tests/swarm_director_process.rs",
-        "daemon/tests/swarm_director_loop.rs"
+        "daemon/tests/swarm_director_loop.rs",
+        "daemon/tests/swarm_gate_s.rs",
+        "daemon/src/overseer/session.rs"
       ],
-      "blocker": "Local fixtures cover durable Stop/Off state, slow-signal lock release, retained reservations and restart reconciliation. Stop now interrupts a linked director, retries a missed signal after daemon restart, reports its unconfirmed exit, and cancels an unreviewed one-slot self-attempt only after confirmed exit. A job-deadline fixture also persists a linked director interruption, restarts the daemon before signaling, and confirms retry and terminalization. A packaged 100-job/32-live-worker scenario confirms Pause/Resume, active Swarm-off drain without interrupting workers, blocked new admission, owner-confirmed Stop, unconfirmed-exit display and process teardown. Live harness checkpoints, native-descendant control, changed-objective delivery and joined Overseer/phone paths remain unverified."
+      "blocker": "Phone clause not in force: Gate N's gateway is not on main or this branch; re-open for the joined phone tests when it lands."
     },
     "SWARM-21": {
       "status": "verified",
