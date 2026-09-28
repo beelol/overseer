@@ -1,5 +1,12 @@
 # AC-146: merges
 
+## Pull request #24 (the Android door's dropped frames), 2026-09-28
+
+- **Finished:** marked ready by its agent (head `3d4d91ef`, main merged in). The cause, from atrace cold starts: the Mac's state drawn mid-opening (about 190 prop updates, a 44 ms frame), and the opening starting over the first screen's mount. The fix holds the Mac's state until the door has opened, and starts the opening on the UI thread after three on-time frames or 200 ms at most. The door looks the same and opens in 1 s, but may start up to 0.2 s later on a cold start. Touches Gate N's session layer (`hold.ts`), as the PR says.
+- **Numbers (20 runs each):** at load 8 to 10, before 18 of 1,214 frames dropped (longest opening 1,165.8 ms), after 2 of 1,200 (1,015 to 1,025 ms). Above load 14 both builds drop frames while the app is idle (the emulator's compositor waits on the host). AC-135 and AC-136 stay partial: a quiet-machine 20-run check is owed.
+- **Tests:** the agent's `scripts/test-all --no-ui` (every group passed) and pairing on the emulator. On the merge with current main: the phone's `npm run check` 471 of 471, unit 9 of 9, links.
+- **Merged:** squash, `88cd2779`.
+
 ## Pull request #20 (Gate S gaps), 2026-09-28
 
 - **Finished:** marked ready by its agent (head `90c7ea44`). AC-182, 187, 191, 193, 194, 197 and 198 verified; the rest of Gate S stays partial with gaps that need Swarm on main or PR #10's phone parts (now merged). Touched Continuity (`handoff.rs`), `redact.rs`, `daemon.rs`, `store.rs` and the extension's views, chat and home, as its PR says.
