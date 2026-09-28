@@ -336,7 +336,7 @@ impl Drop for UnboundSharedLaunch {
 }
 
 /// Test-only crash points between booking, claiming and binding.
-fn shared_launch_test_crash(point: &str) {
+pub(crate) fn shared_launch_test_crash(point: &str) {
     if std::env::var("OVERSEER_TEST_SHARED_LAUNCH_CRASH").as_deref() == Ok(point) {
         unsafe { libc::kill(libc::getpid(), libc::SIGKILL); }
         // Delivery to this process is asynchronous: make no further progress.

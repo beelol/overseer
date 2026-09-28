@@ -410,3 +410,65 @@ fn auto_adapts_from_measured_draw_without_churn_and_forgets_it_on_upgrade() {
     assert_ne!(draw_source("upgrade-2").as_deref(), Some("qualified"), "no booking on the old samples");
     assert_eq!(d.wait_done(&run_id(&after), 20)["status"], "completed");
 }
+
+/// AUTO-AC-24 on the booking: a calibrated unit's decision, intent and
+/// known-window booking commit together; the daemon is killed right after
+/// that commit, before any Git effect or child. On restart the booking no
+/// longer holds the account's room, the unit replays paused without a
+/// child, and a new unit books the same room.
+#[test]
+fn auto_booked_unit_crashed_before_its_child_releases_its_room_and_replays_paused() {
+    let r = tmp();
+    let checkout = repo(&r.path().join("repo"));
+    let (mut d, accounts, meters) = codex_world(r.path());
+    let a = d.call("profile.create", json!({"name":"alpha","harness":"codex"}))["id"].as_str().unwrap().to_string();
+    std::fs::write(accounts.join(&a), "account-alpha").unwrap();
+    let meter = |id: &str, used: f64| std::fs::write(meters.join(id), format!("{used}")).unwrap();
+    let parent = run_id(&d.call("task.create", json!({"repo":checkout,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let a_sol = format!("{a}/gpt-6-sol/medium");
+    let request = |unit: &str| json!({"work_unit_id":unit,"parent_run_id":parent,"min_tier":"general",
+        "required_tools":[],"allowed_profiles":[a],"task_class":"browser_check",
+        "prompt":"check the page","title":"browser check"});
+    let mut used = 30.0;
+    meter(&a, used);
+    refresh(&d, &a);
+    for n in 0..5 {
+        let child = d.call("auto.dispatch", request(&format!("calibrate-{n}")));
+        assert_eq!(child["decision"]["selected"], a_sol, "{child}");
+        assert_eq!(d.wait_done(&run_id(&child), 20)["status"], "completed");
+        used += 1.0;
+        meter(&a, used);
+        std::thread::sleep(Duration::from_millis(400));
+        refresh(&d, &a);
+    }
+    let runs_before = d.runs().len();
+    let booking = |d: &Daemon, unit: &str| -> (String, String, i64) { db(d).query_row(
+        "SELECT i.draw_source,c.state,(SELECT COALESCE(SUM(w.amount_milli),0) FROM shared_booking_windows w
+            WHERE w.work_unit_id=i.work_unit_id) FROM shared_booking_intents i
+         JOIN auto_pool_claims c ON c.work_unit_id=i.work_unit_id WHERE i.work_unit_id=?1",
+        [unit], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))).unwrap() };
+
+    d.kill9();
+    d.env.push(("OVERSEER_TEST_SHARED_LAUNCH_CRASH".into(), "auto_after_book".into()));
+    d.spawn();
+    assert!(d.try_call("auto.dispatch", request("crashed-1")).is_err(), "the daemon died mid-dispatch");
+    let (source, state, amount) = booking(&d, "crashed-1");
+    assert_eq!((source.as_str(), state.as_str()), ("qualified", "active"), "booked before the crash");
+    assert!(amount > 0);
+    d.kill9();
+    d.env.retain(|(key, _)| key != "OVERSEER_TEST_SHARED_LAUNCH_CRASH");
+    d.spawn();
+
+    let (_, state, _) = booking(&d, "crashed-1");
+    assert_ne!(state, "active", "no child ran: the room is not held after restart");
+    let replay = d.call("auto.dispatch", request("crashed-1"));
+    assert_eq!(replay["state"], "paused", "{replay}");
+    assert_eq!(d.runs().len(), runs_before, "no child for the crashed unit, before or after replay");
+    let next = d.call("auto.dispatch", request("after-crash-2"));
+    assert_eq!(next["state"], "dispatched", "{next}");
+    assert_eq!(next["decision"]["selected"], a_sol);
+    assert_eq!(booking(&d, "after-crash-2").0, "qualified");
+    assert_eq!(d.wait_done(&run_id(&next), 20)["status"], "completed");
+}

@@ -2354,6 +2354,9 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                         }
                         other => other?,
                     };
+                    if admitted.is_some() {
+                        crate::daemon::shared_launch_test_crash("auto_after_book");
+                    }
                     if admitted.is_none() {
                         // The pool was claimed after selection. This is an
                         // admission race, not evidence of provider failure or
