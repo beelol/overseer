@@ -262,3 +262,72 @@ fn auto_no_suitable_route_pauses_with_reasons_and_actions_and_starts_nothing() {
     pause_twice("unavailable-4", json!({"allowed_profiles":[fresh],"pinned_route":sol(&fresh)}),
         &sol(&fresh), "route_unavailable");
 }
+
+/// AUTO-AC-20's shared recovery check across accounts: a structured 503
+/// with a short Retry-After on one account marks the Codex endpoint (the
+/// cooldown itself is covered in `protocol.rs`). Once the cooldown passes, two concurrent units on two different
+/// accounts (so no account claim serializes them) do not both probe the
+/// endpoint: one is admitted as the recovery check and the other pauses as
+/// `endpoint_recovery_in_progress`. The check's success clears the endpoint,
+/// and the next unit on the other account runs.
+#[test]
+fn auto_one_shared_recovery_check_per_endpoint_across_accounts() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+    use std::sync::{Arc, Barrier};
+    let r = tmp();
+    let checkout = repo(&r.path().join("repo"));
+    let accounts = r.path().join("account-ids");
+    std::fs::create_dir_all(&accounts).unwrap();
+    let codex = fixture("fake-harness/codex-app-fixture.js");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", codex.as_str()),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_ACCOUNT_IDS_DIR,FIXTURE_TURN_DELAY_MS"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_ACCOUNT_IDS_DIR", accounts.to_str().unwrap()),
+        ("FIXTURE_TURN_DELAY_MS", "3000")]);
+    d.call("auto.mode.set", json!({"enabled":true}));
+    let profile = |name: &str| -> String {
+        let id = d.call("profile.create", json!({"name":name,"harness":"codex"}))["id"]
+            .as_str().unwrap().to_string();
+        std::fs::write(accounts.join(&id), format!("account-{name}")).unwrap();
+        id
+    };
+    let (a, b) = (profile("alpha"), profile("beta"));
+    let parent = run_id(&d.call("task.create", json!({"repo":checkout,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 20)["status"], "completed");
+    let failed = run_id(&d.call("task.create", json!({"repo":checkout,"harness":"codex-app",
+        "profile_id":a,"model":"gpt-6-sol","effort":"medium",
+        "prompt":"simulate direct 503 with short Retry-After","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&failed, 20)["status"], "failed");
+    std::thread::sleep(Duration::from_millis(400));
+
+    let socket = d.socket();
+    let barrier = Arc::new(Barrier::new(2));
+    let results: Vec<Value> = [&a, &b].into_iter().enumerate().map(|(n, profile)| {
+        let (socket, barrier) = (socket.clone(), barrier.clone());
+        let params = json!({"work_unit_id":format!("recover-{n}"),"parent_run_id":parent,
+            "min_tier":"general","required_tools":[],"allowed_profiles":[profile],
+            "prompt":"browser check","title":"check"});
+        std::thread::spawn(move || {
+            barrier.wait();
+            let mut conn = UnixStream::connect(socket).unwrap();
+            conn.set_read_timeout(Some(Duration::from_secs(20))).unwrap();
+            conn.write_all(format!("{}\n", json!({"id":1,"method":"auto.dispatch","params":params})).as_bytes()).unwrap();
+            let mut line = String::new();
+            BufReader::new(conn).read_line(&mut line).unwrap();
+            let reply: Value = serde_json::from_str(&line).unwrap();
+            assert!(reply.get("error").is_none(), "{reply}");
+            reply["result"].clone()
+        })
+    }).collect::<Vec<_>>().into_iter().map(|h| h.join().unwrap()).collect();
+    let admitted: Vec<&Value> = results.iter().filter(|r| r["state"] != "paused").collect();
+    assert_eq!(admitted.len(), 1, "one recovery check, not a stampede: {results:?}");
+    let waiting = results.iter().find(|r| r["state"] == "paused").unwrap();
+    assert!(waiting["decision"]["exclusions"].as_array().unwrap().iter()
+        .any(|e| e["reason"] == "endpoint_recovery_in_progress"), "{waiting}");
+    assert_eq!(d.wait_done(&run_id(admitted[0]), 20)["status"], "completed");
+    let next = d.call("auto.dispatch", json!({"work_unit_id":"after-2","parent_run_id":parent,
+        "min_tier":"general","required_tools":[],"allowed_profiles":[a, b],"prompt":"x","title":"x"}));
+    assert_eq!(next["state"], "dispatched", "the check's success clears the endpoint: {next}");
+    assert_eq!(d.wait_done(&run_id(&next), 20)["status"], "completed");
+}

@@ -54,6 +54,19 @@ impl std::fmt::Display for AutoDrawExceedsAllowance {
 
 impl std::error::Error for AutoDrawExceedsAllowance {}
 
+/// The selected route's endpoint is past a failure's cooldown and another
+/// unit is already its one shared recovery check.
+#[derive(Debug)]
+pub struct AutoEndpointRecoveryInFlight;
+
+impl std::fmt::Display for AutoEndpointRecoveryInFlight {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "another unit is already checking this endpoint's recovery")
+    }
+}
+
+impl std::error::Error for AutoEndpointRecoveryInFlight {}
+
 /// A durable app-slot hold (`app_slot_holds`) for a start whose run row does
 /// not exist yet. The hold is one occupant in the one app-slot count
 /// (`account_booking::app_slots_in_use`); it is deleted in the commit that

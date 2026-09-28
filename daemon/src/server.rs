@@ -949,6 +949,27 @@ fn require_swarm_storage(d: &Daemon) -> Result<()> {
 /// Select an initial route from repository-scoped evidence without creating a
 /// workspace. The eventual auto.start admission must revalidate this result;
 /// preview by itself never owns a process, Git resource, or allowance claim.
+/// Past a failure's cooldown, the first unit on an endpoint is its one
+/// shared recovery check; other routes on that endpoint wait for it.
+fn mark_endpoint_recovery(d: &Arc<Daemon>, routes: &mut [crate::auto_select::Route],
+    requesting_parent: Option<&str>) -> Result<Vec<crate::auto_health::RecoveringEndpoint>> {
+    let store = d.store.lock().unwrap();
+    let recovering = crate::auto_health::recovering_endpoints(&store, crate::daemon::now())?;
+    for route in routes.iter_mut() {
+        if let Some(check) = recovering.iter().find(|r| r.provider == route.provider && r.endpoint == route.endpoint) {
+            route.endpoint_recovery_in_flight = crate::auto_health::endpoint_recovery_in_flight(
+                &store.conn, check, requesting_parent)?;
+        }
+    }
+    Ok(recovering)
+}
+
+fn recovery_check_for(recovering: &[crate::auto_health::RecoveringEndpoint],
+    route: &crate::auto_select::Route) -> Option<Value> {
+    recovering.iter().find(|r| r.provider == route.provider && r.endpoint == route.endpoint)
+        .map(|r| json!({"provider":r.provider,"endpoint":r.endpoint,"failed_ms":r.failed_ms}))
+}
+
 fn auto_root_preview(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     use crate::auto_select::{CapabilityTier, Sandbox, WorkUnit};
     use std::collections::{BTreeMap, BTreeSet};
@@ -1112,6 +1133,7 @@ fn auto_root_preview(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
                 && !store.auto_pool_open_to_known_windows(route, work.task_class.as_deref(), now_ms)?;
         }
     }
+    let recovering = mark_endpoint_recovery(d, &mut routes, None)?;
     let fit_now_ms = crate::daemon::now();
     let (fit_inputs, fit_evidence) = if d.learning_is_paused() {
         (routes.iter().map(|_| crate::auto_fit::FitEvidenceInput::Unavailable {
@@ -1126,7 +1148,7 @@ fn auto_root_preview(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let decision = crate::auto_fit::select_with_estimates(&work, &routes, &fit_inputs, fit_now_ms);
     let selected_route = decision.selected.as_deref().and_then(|id|
         routes.iter().find(|route| route.id == id));
-    let trace = json!({"selector_version":"multi-harness-preflight-v8","decision":decision,
+    let mut trace = json!({"selector_version":"multi-harness-preflight-v8","decision":decision,
         "selected_route":selected_route.map(|route| json!({
             "harness":route.harness,"provider":route.provider,"profile_id":route.profile_id,
             "model":route.model,"effort":route.effort,"quota":route.quota,
@@ -1139,6 +1161,9 @@ fn auto_root_preview(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         "selection_input":{"work":work,"routes":routes,
             "attempt_limit_reached":false,"deadline_exhausted":false},
         "evidence":evidence,"discovery_failures":discovery_failures});
+    if let Some(check) = selected_route.and_then(|route| recovery_check_for(&recovering, route)) {
+        trace["recovery_check"] = check;
+    }
     Ok(json!({"repo":repo,"decision":decision,"selected_route":selected_route,
         "evidence":evidence,"discovery_failures":discovery_failures,"trace":trace}))
 }
@@ -1778,15 +1803,18 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let admitted = match d.store.lock().unwrap().insert_auto_root_selected(work_unit_id,
                 &request_hash, &route.id, &route.pool_id, generation,
                 &workspace, &task, &run, &launch, &preview["trace"]) {
-                Err(error) if error.downcast_ref::<crate::daemon::AutoDrawExceedsAllowance>().is_some() => {
+                Err(error) if error.downcast_ref::<crate::daemon::AutoDrawExceedsAllowance>().is_some()
+                    || error.downcast_ref::<crate::daemon::AutoEndpointRecoveryInFlight>().is_some() => {
+                    let reason = if error.downcast_ref::<crate::daemon::AutoDrawExceedsAllowance>().is_some() {
+                        "estimated_draw_exceeds_allowance" } else { "endpoint_recovery_in_progress" };
                     let mut paused: crate::auto_select::Decision = serde_json::from_value(decision.clone())?;
                     paused.selected = None;
-                    paused.reason = "estimated_draw_exceeds_allowance".into();
+                    paused.reason = reason.into();
                     paused.exclusions.push(crate::auto_select::Exclusion {
-                        route_id: route.id.clone(), reason: "estimated_draw_exceeds_allowance".into(),
+                        route_id: route.id.clone(), reason: reason.into(),
                     });
                     return Ok(json!({"state":"paused","work_unit_id":work_unit_id,
-                        "decision":paused,"pause_reason":"estimated_draw_exceeds_allowance",
+                        "decision":paused,"pause_reason":reason,
                         "actions":["refresh","choose_manual_route"]}));
                 }
                 other => other?,
@@ -2153,6 +2181,7 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                             && !store.auto_pool_open_to_known_windows(route, task_class.as_deref(), now_ms)?;
                     }
                 }
+                let recovering = mark_endpoint_recovery(d, &mut routes, Some(&parent.id))?;
                 let work = WorkUnit { id:work_unit_id.into(), min_tier, required_tools:required_tools.clone(),
                     context_needed, requires_approvals, min_sandbox:sandbox,
                     max_sandbox:sandbox,
@@ -2246,7 +2275,7 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                         "profile_id":route.profile_id,"model":route.model,"effort":route.effort,
                         "quota":route.quota,"fit":route.fit,"health":route.health,
                     }));
-                let trace = json!({"selector_version":"multi-harness-preflight-v8","decision":decision,
+                let mut trace = json!({"selector_version":"multi-harness-preflight-v8","decision":decision,
                     "selected_route":selected_route,
                     "estimator":{"state":"scoped_fit","version":"v3","now_ms":fit_now_ms,
                         "inputs":fit_inputs,"routes":fit_evidence},
@@ -2264,6 +2293,10 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     "pre_effect_failures":pre_effect_failures,
                     "candidates":routes.iter().map(|route| json!({"id":route.id,"quota":route.quota,
                         "fit":route.fit,"health":route.health})).collect::<Vec<_>>()});
+                if let Some(check) = decision.selected.as_deref().and_then(|id| routes.iter().find(|r| r.id == id))
+                    .and_then(|route| recovery_check_for(&recovering, route)) {
+                    trace["recovery_check"] = check;
+                }
                 if let Some(selected) = decision.selected.as_deref() {
                     let route = routes.iter().find(|route| route.id == selected)
                         .ok_or_else(|| anyhow!("selected route disappeared"))?;
@@ -2275,20 +2308,25 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     let admitted = match d.record_auto_selected_decision(work_unit_id, &parent,
                         &requirements_hash, selected, &route.pool_id, generation.copied(),
                         execution_budget_ms, trace.clone()) {
-                        Err(error) if error.downcast_ref::<crate::daemon::AutoDrawExceedsAllowance>().is_some() => {
+                        Err(error) if error.downcast_ref::<crate::daemon::AutoDrawExceedsAllowance>().is_some()
+                            || error.downcast_ref::<crate::daemon::AutoEndpointRecoveryInFlight>().is_some() => {
                             // Selection's preview fitted, but the booking
                             // no longer does (another unit booked the room
-                            // first). A known draw that cannot fit pauses.
+                            // first), or another unit became the endpoint's
+                            // one recovery check. Either way, pause.
+                            let (reason, field) = if error.downcast_ref::<crate::daemon::AutoDrawExceedsAllowance>().is_some() {
+                                ("estimated_draw_exceeds_allowance", "admission_draw_exceeds_allowance")
+                            } else { ("endpoint_recovery_in_progress", "admission_endpoint_recovery_in_flight") };
                             let mut paused = decision.clone();
                             paused.selected = None;
-                            paused.reason = "estimated_draw_exceeds_allowance".into();
+                            paused.reason = reason.into();
                             paused.exclusions.push(crate::auto_select::Exclusion {
-                                route_id: selected.into(), reason: "estimated_draw_exceeds_allowance".into(),
+                                route_id: selected.into(), reason: reason.into(),
                             });
                             let mut pause_trace = trace;
                             pause_trace["decision"] = json!(paused);
                             pause_trace["selected_route"] = Value::Null;
-                            pause_trace["selection_input"]["admission_draw_exceeds_allowance"] = json!(selected);
+                            pause_trace["selection_input"][field] = json!(selected);
                             d.emit(Some(&parent.task_id), Some(&parent.id), "auto_decision",
                                 "daemon", "exact", pause_trace)?;
                             return Ok(json!({"state":"paused","work_unit_id":work_unit_id,
@@ -2481,6 +2519,13 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                             decision.reason = "pool_in_flight_unknown_draw".into();
                             decision.exclusions.push(crate::auto_select::Exclusion {
                                 route_id: route_id.into(), reason: "pool_in_flight_unknown_draw".into(),
+                            });
+                        }
+                        if let Some(route_id) = input["admission_endpoint_recovery_in_flight"].as_str() {
+                            decision.selected = None;
+                            decision.reason = "endpoint_recovery_in_progress".into();
+                            decision.exclusions.push(crate::auto_select::Exclusion {
+                                route_id: route_id.into(), reason: "endpoint_recovery_in_progress".into(),
                             });
                         }
                         if let Some(route_id) = input["admission_draw_exceeds_allowance"].as_str() {

@@ -428,7 +428,7 @@ mod tests {
             supported_sandboxes:None,
             recommended_default:true, quota:Allowance::ObservedNonExhausted,
             quota_blocks:Vec::new(), fit:Fit::Unknown, health:Health::Healthy,
-            unresolved_quota_pool_identity:false, in_flight_pool_claim:false };
+            unresolved_quota_pool_identity:false, in_flight_pool_claim:false, endpoint_recovery_in_flight:false };
         assert_eq!(assess_fit(&reading(96.0, at + 30_000), &work, &route,
             Some(&estimate), &[], at + 30_000), Fit::Unknown);
         assert_eq!(assess_fit(&reading(98.0, at + 30_000), &work, &route,

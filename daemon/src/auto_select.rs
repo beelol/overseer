@@ -241,6 +241,10 @@ pub struct Route {
     /// This is local admission evidence, not provider exhaustion.
     #[serde(default)]
     pub in_flight_pool_claim: bool,
+    /// Its endpoint is past a failure's cooldown and another unit is
+    /// already the one shared recovery check. Local admission evidence.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub endpoint_recovery_in_flight: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -397,6 +401,9 @@ fn excluded(work: &WorkUnit, route: &Route, blocks: &PoolBlocks<'_>) -> Option<&
     }
     if route.health == Health::Unavailable {
         return Some("route_unavailable");
+    }
+    if route.endpoint_recovery_in_flight {
+        return Some("endpoint_recovery_in_progress");
     }
     if route.unresolved_quota_pool_identity {
         return Some("unresolved_quota_pool_identity");
@@ -555,7 +562,7 @@ mod tests {
             fit: Fit::Unknown,
             health: Health::Healthy,
             unresolved_quota_pool_identity: false,
-            in_flight_pool_claim: false,
+            in_flight_pool_claim: false, endpoint_recovery_in_flight:false,
         }
     }
 

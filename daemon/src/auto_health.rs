@@ -291,6 +291,89 @@ pub fn recent_local_observations(
     Ok(observations)
 }
 
+/// An endpoint whose newest structured failure has passed its cooldown with
+/// no completed run on that endpoint since. The RFC allows one shared
+/// recovery check there, not a stampede: the next unit on it is that check.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RecoveringEndpoint {
+    pub provider: String,
+    pub endpoint: String,
+    pub failed_ms: i64,
+}
+
+pub fn recovering_endpoints(store: &crate::store::Store, now_ms: i64) -> Result<Vec<RecoveringEndpoint>> {
+    const MAX_RETRY_AFTER_MS: i64 = 24 * 60 * 60 * 1000;
+    let since = now_ms.saturating_sub(MAX_RETRY_AFTER_MS);
+    let mut failures = store.conn.prepare(
+        "SELECT e.ts,e.payload,r.harness,r.model,r.launch FROM events e JOIN runs r ON r.id=e.run_id
+         WHERE e.kind='error' AND e.source='harness' AND e.ts>=?1 AND e.ts<=?2
+           AND json_valid(e.payload)
+           AND json_extract(e.payload,'$.class') IN ('service_unavailable','network')
+         ORDER BY e.ts DESC,e.seq DESC LIMIT 500")?;
+    let mut newest: std::collections::BTreeMap<(String, String), i64> = Default::default();
+    let rows = failures.query_map(params![since, now_ms], |row| Ok((row.get::<_, i64>(0)?,
+        row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, Option<String>>(3)?,
+        row.get::<_, Option<String>>(4)?)))?;
+    for item in rows {
+        let (at, payload, harness, model, launch) = item?;
+        let Some(key) = observed_route_endpoint(&harness, model.as_deref(), launch.as_deref()) else { continue };
+        let Ok(value) = serde_json::from_str::<Value>(&payload) else { continue };
+        let cooldown = value.get("retry_after_ms").and_then(Value::as_i64)
+            .filter(|ms| (1..=MAX_RETRY_AFTER_MS).contains(ms)).unwrap_or(60_000);
+        // Only the newest failure per endpoint decides; one still cooling
+        // down keeps the route unavailable through `evaluate` instead.
+        if newest.contains_key(&key) { continue; }
+        newest.insert(key, if at.saturating_add(cooldown) <= now_ms { at } else { i64::MIN });
+    }
+    let mut recovering = Vec::new();
+    for ((provider, endpoint), failed_ms) in newest {
+        if failed_ms == i64::MIN { continue; }
+        let mut completed = store.conn.prepare(
+            "SELECT harness,model,launch FROM runs WHERE status='completed' AND ended_ms>?1
+             ORDER BY ended_ms DESC LIMIT 500")?;
+        let recovered = completed.query_map(params![failed_ms], |row| Ok((row.get::<_, String>(0)?,
+            row.get::<_, Option<String>>(1)?, row.get::<_, Option<String>>(2)?)))?
+            .filter_map(Result::ok)
+            .any(|(harness, model, launch)| observed_route_endpoint(&harness, model.as_deref(),
+                launch.as_deref()) == Some((provider.clone(), endpoint.clone())));
+        if !recovered {
+            recovering.push(RecoveringEndpoint { provider, endpoint, failed_ms });
+        }
+    }
+    Ok(recovering)
+}
+
+/// Is a recovery check already under way on this endpoint: a run on it
+/// created since the failure that may still be working, or an Auto launch
+/// admitted since then that has no run yet? The requesting parent itself is
+/// not a competing check.
+pub fn endpoint_recovery_in_flight(conn: &rusqlite::Connection, recovering: &RecoveringEndpoint,
+    except_run: Option<&str>) -> Result<bool> {
+    let key = Some((recovering.provider.clone(), recovering.endpoint.clone()));
+    let mut runs = conn.prepare(
+        "SELECT r.id,r.harness,r.model,r.launch FROM runs r WHERE r.created_ms>=?1
+           AND (r.status IN ('queued','starting','running','waiting_for_user')
+             OR EXISTS(SELECT 1 FROM turns t WHERE t.run_id=r.id AND t.status='running' AND t.ended_ms IS NULL))
+         LIMIT 500")?;
+    let busy = runs.query_map(params![recovering.failed_ms], |row| Ok((row.get::<_, String>(0)?,
+        row.get::<_, String>(1)?, row.get::<_, Option<String>>(2)?, row.get::<_, Option<String>>(3)?)))?
+        .filter_map(Result::ok)
+        .any(|(id, harness, model, launch)| Some(id.as_str()) != except_run
+            && observed_route_endpoint(&harness, model.as_deref(), launch.as_deref()) == key);
+    if busy { return Ok(true); }
+    let mut intents = conn.prepare(
+        "SELECT p.harness FROM auto_launch_intents i JOIN profiles p
+            ON p.id=substr(i.route_id,1,instr(i.route_id,'/')-1)
+         WHERE i.created_ms>=?1 AND i.phase='preparing'
+           AND NOT EXISTS(SELECT 1 FROM managed_work_units m WHERE m.work_unit_id=i.work_unit_id)
+         LIMIT 500")?;
+    let pending = intents.query_map(params![recovering.failed_ms], |row| row.get::<_, String>(0))?
+        .filter_map(Result::ok)
+        .any(|harness| fixed_harness_endpoint(match harness.as_str() { "codex" => "codex-app", other => other })
+            .map(|(p, e)| (p.to_string(), e.to_string())) == key);
+    Ok(pending)
+}
+
 fn fixed_harness_endpoint(harness: &str) -> Option<(&'static str, &'static str)> {
     match harness {
         "codex" | "codex-app" => Some(("openai", "codex")),
@@ -588,7 +671,7 @@ mod tests {
             fit: Fit::Unknown,
             health: Health::Unknown,
             unresolved_quota_pool_identity: false,
-            in_flight_pool_claim: false,
+            in_flight_pool_claim: false, endpoint_recovery_in_flight:false,
         }
     }
 

@@ -73,7 +73,7 @@ pub fn codex_auto_routes(
             quota: auto_select::observed_allowance(quota, &model.model, now_ms),
             quota_blocks: quota.map(|value| value.blocking_scopes(&model.model, now_ms)).unwrap_or_default(),
             fit: Fit::Unknown, health: Health::Unknown,
-            unresolved_quota_pool_identity:false, in_flight_pool_claim:false,
+            unresolved_quota_pool_identity:false, in_flight_pool_claim:false, endpoint_recovery_in_flight:false,
         });
     }
     routes
@@ -104,7 +104,7 @@ pub fn claude_auto_routes(
             quota:auto_select::observed_allowance(quota, model, now_ms),
             quota_blocks:quota.map(|value| value.blocking_scopes(model, now_ms)).unwrap_or_default(),
             fit:Fit::Unknown, health:Health::Unknown,
-            unresolved_quota_pool_identity:false, in_flight_pool_claim:false,
+            unresolved_quota_pool_identity:false, in_flight_pool_claim:false, endpoint_recovery_in_flight:false,
         }).collect()
 }
 
@@ -136,7 +136,7 @@ pub fn opencode_local_routes(catalog: &crate::auto_opencode::LocalCatalog,
             recommended_default:model.is_default, quota:Allowance::Unknown,
             quota_blocks:Vec::new(),
             fit:Fit::Unknown, health:Health::Unknown,
-            unresolved_quota_pool_identity:false, in_flight_pool_claim:false,
+            unresolved_quota_pool_identity:false, in_flight_pool_claim:false, endpoint_recovery_in_flight:false,
         })
     }).collect()
 }

@@ -412,7 +412,7 @@ mod tests {
             fit: Fit::Unknown,
             health: Health::Healthy,
             unresolved_quota_pool_identity: false,
-            in_flight_pool_claim: false,
+            in_flight_pool_claim: false, endpoint_recovery_in_flight:false,
         }
     }
 

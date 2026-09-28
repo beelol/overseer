@@ -1158,6 +1158,7 @@ impl Store {
         // The account: known windows when the qualified draw exists (the
         // booking counts every other claim, booking and run on the account),
         // otherwise the whole-account unknown-draw claim.
+        self.require_endpoint_recovery_free(decision, None)?;
         let windowed = self.book_auto_account_in_tx(work_unit_id, route_id, pool_id,
             account_generation, decision)?;
         if !windowed && self.auto_pool_claimed(pool_id)? { return Ok(None); }
@@ -1248,6 +1249,7 @@ impl Store {
                 return Err(anyhow!("parent Auto budget is exhausted"));
             }
         }
+        self.require_endpoint_recovery_free(payload, Some(&parent.id))?;
         let windowed = self.book_auto_account_in_tx(work_unit_id, route_id, pool_id,
             account_generation, payload)?;
         if !windowed && self.auto_pool_claimed_for_child(pool_id, &parent.id, account_generation)? {
@@ -1280,6 +1282,21 @@ impl Store {
     /// the whole account with an unknown-draw claim. False (nothing written
     /// that the caller keeps) when there is no qualified draw or the booking
     /// refuses; the caller then takes its existing unknown-draw path.
+    /// Inside the admission transaction: when selection recorded that its
+    /// endpoint is recovering, refuse if another unit has meanwhile become
+    /// that endpoint's one recovery check.
+    fn require_endpoint_recovery_free(&self, trace: &Value, except_run: Option<&str>) -> Result<()> {
+        let check = &trace["recovery_check"];
+        let (Some(provider), Some(endpoint), Some(failed_ms)) = (check["provider"].as_str(),
+            check["endpoint"].as_str(), check["failed_ms"].as_i64()) else { return Ok(()) };
+        let recovering = crate::auto_health::RecoveringEndpoint { provider: provider.into(),
+            endpoint: endpoint.into(), failed_ms };
+        if crate::auto_health::endpoint_recovery_in_flight(&self.conn, &recovering, except_run)? {
+            return Err(crate::daemon::AutoEndpointRecoveryInFlight.into());
+        }
+        Ok(())
+    }
+
     fn book_auto_account_in_tx(&self, work_unit_id: &str, route_id: &str, pool_id: &str,
         account_generation: Option<i64>, trace: &Value) -> Result<bool> {
         match self.book_auto_account_decision_in_tx(work_unit_id, route_id, pool_id,

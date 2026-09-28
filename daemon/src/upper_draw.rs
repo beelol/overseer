@@ -1098,7 +1098,7 @@ mod tests {
                 supported_sandboxes:None, recommended_default:true,
                 quota:Allowance::ObservedNonExhausted, quota_blocks:Vec::new(), fit:Fit::Unknown,
                 health:Health::Healthy, unresolved_quota_pool_identity:false,
-                in_flight_pool_claim:false }
+                in_flight_pool_claim:false, endpoint_recovery_in_flight:false }
         };
         let open = |class: &str| f.store
             .auto_pool_open_to_known_windows(&route, Some(class), crate::daemon::now()).unwrap();
@@ -1219,7 +1219,7 @@ mod tests {
             sandbox:Sandbox::WorkspaceWrite, supported_sandboxes:None,
             recommended_default:tier == CapabilityTier::General,
             quota:Allowance::ObservedNonExhausted, quota_blocks:Vec::new(), fit:Fit::Unknown,
-            health:Health::Healthy, unresolved_quota_pool_identity:false, in_flight_pool_claim:false };
+            health:Health::Healthy, unresolved_quota_pool_identity:false, in_flight_pool_claim:false, endpoint_recovery_in_flight:false };
         let candidates = || vec![
             route("a/sol", PROFILE, &pool_a, "gpt-6-sol", "medium", CapabilityTier::General),
             route("a/astra", PROFILE, &pool_a, "gpt-6-astra", "high", CapabilityTier::Frontier),
