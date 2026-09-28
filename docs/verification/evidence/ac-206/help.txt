@@ -1,0 +1,66 @@
+scripts/dev: the dev daemons feature: developer versions of Overseer beside the installed one (Gate T).
+
+A dev daemon (one instance) is an overseerd built from a checkout, with its own data folder, socket,
+gateway port, VS Code profile and extensions folder. Several run side by side, each with a name.
+The installed Overseer (production) is never touched and never sees them: production ignores
+OVERSEER_HOME/OVERSEER_SOCKET/OVERSEER_INSTANCE and refuses anything marked dev (AC-212).
+
+USAGE
+  scripts/dev up     --name NAME [--repo PATH] [--release] [--no-build] [--restart]
+                     [--owner-logins] [--mdns] [--json]
+      Builds overseerd and overseer-tui in the checkout (cargo build; --release for an
+      optimised build; --no-build uses what target/ already has), copies them into the
+      instance folder with the dev marker, starts the daemon as dev-NAME and prints where
+      everything is and the next commands. The checkout is the one this script is in, or
+      --repo (any Overseer checkout or worktree; remembered for later ups). On a running
+      instance it changes nothing; --restart rebuilds and restarts it (its agents keep
+      running and are reattached; pinned VS Code windows reconnect).
+  scripts/dev down   --name NAME [--keep-clients]
+      Stops the instance's agents and daemon, then its VS Code windows and TUI
+      (--keep-clients leaves them open, waiting for the next up), then anything still
+      running from its folder.
+  scripts/dev status --name NAME [--json]     running or stopped, pid, socket, repo, commit, port
+  scripts/dev list   [--json]                 every instance under the dev root
+  scripts/dev logs   --name NAME [-f|--follow]
+  scripts/dev ctl    --name NAME METHOD [JSON]  for example: ctl --name a state
+                     ctl --name a task.create '{"repo":"/path","harness":"claude","prompt":"hi"}'
+  scripts/dev env    --name NAME              eval "$(scripts/dev env --name a)" for dev tools
+  scripts/dev code   --name NAME [FOLDER] [--vsix FILE] [--no-build] [--inspect]
+      Builds the VSIX in the instance's checkout (node extension/scripts/package.js; --vsix
+      uses a built one; --no-build the newest one in extension/), installs it into the
+      instance's own VS Code profile and extensions folder (never yours), pins it to the
+      instance (overseer.daemonPath, overseer.daemonSocket, overseer.devInstance) and opens
+      VS Code. The status bar reads "Overseer dev-NAME" and the title starts with [dev-NAME].
+      A pinned window never starts a daemon or connects anywhere else. --inspect adds
+      --remote-debugging-port=0 (for UI scenarios).
+  scripts/dev tui    --name NAME [--dry-run]  the instance's TUI; refuses a stopped instance
+  scripts/dev phone  --name NAME --platform ios|android
+      After pull request #10 (the phone app and its gateway): the simulator app pinned to
+      the instance. Until then it prints the address to type in the app.
+  scripts/dev clean  --name NAME | --all      down, then delete the instance folder(s)
+  scripts/dev help | --help | -h
+
+WHERE THINGS ARE
+  Dev root: /Users/bilal/.overseer-dev
+      (~/.overseer-dev, or OVERSEER_DEV_ROOT; never inside the installed Overseer's folder)
+  Instance NAME: <dev root>/NAME/
+      instance.json  what up recorded      home/  its data folder (OVERSEER_HOME)
+      overseerd.sock its socket             bin/   its overseerd and overseer-tui (marked dev)
+      daemon.out     the daemon's output    vscode/profile, vscode/extensions
+      notifications.log  what it would have notified (it never uses the Overseer notifier)
+  NAME: lower-case letters, digits and hyphens (up to 32); the daemon runs as dev-NAME.
+  Gateway: each instance gets its own port from 47900 up (production uses 47810); mDNS
+      is off unless --mdns, and then only as _overseer-dev._tcp, never _overseer._tcp.
+
+LOGINS AND PAID TURNS
+  By default an instance has no logins: Claude is the repository's fixture harness, Codex and
+  OpenCode are off, the desktop logins point at an empty folder, Ollama at a closed port, and
+  Continuity's network probes are off. --owner-logins (per instance, shown by status) uses the
+  real harnesses with the owner's logins: paid turns then follow AGENTS.md (ChatGPT:
+  gpt-5.6-luna at low effort; Claude: haiku, light use). Nothing here signs in or out.
+
+RULES
+  Never touch the installed (production) daemon, its data, the owner's VS Code, logins or
+  keychain; this script never does. Clean up: scripts/dev clean --name NAME (or --all) when
+  done leaves no process, socket or folder. Production changes only through a deploy, run
+  by the owner or by an agent the owner asked.
