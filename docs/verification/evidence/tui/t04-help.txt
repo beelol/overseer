@@ -1,4 +1,4 @@
- ◆ Overseer  page 1/2 · 12 agents                                                                                                                                       ● connected
+ ◆ Overseer  page 1/2 · 12 agents                                                                                                                                       ● connected 
 ┏ 1 ✓ agent 12 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 0s ┓╭ 2 ✓ agent 11 ────────────────────────────── generic · 0s ╮╭ 3 ✓ agent 10 ────────────────────────────── generic · 0s ╮
 ┃ hi                                                       ┃│ hi                                                       ││ hi                                                       │
 ┃                                                          ┃│                                                          ││                                                          │
@@ -51,4 +51,4 @@
 │                                                          ││                                                          ││                                                          │
 │                                                          ││                                                          ││                                                          │
 ╰ completed ───────────────────────────────────────────────╯╰ completed ───────────────────────────────────────────────╯╰ completed ───────────────────────────────────────────────╯
- ←↑↓→ move   i message   z zoom   v changes   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit
+ ←↑↓→ move   i message   z zoom   v changes   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                                                       

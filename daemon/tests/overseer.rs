@@ -2499,3 +2499,34 @@ fn ac185_confirm_actions_permission_merge_back_and_pull_request() {
     let actions_done: Vec<&str> = card["rows"].as_array().unwrap().iter().map(|r| r["action"].as_str().unwrap()).collect();
     assert_eq!(actions_done, ["permission", "merge_back", "pull_request"], "{card}");
 }
+
+/// AC-187: a held agent starts no turn from a watch either: an idle agent the owner named as a
+/// watcher, held, gets its wake queued behind the hold, and the wake is its next turn after the
+/// release.
+#[test]
+fn ac187_a_held_agent_starts_no_turn_from_a_watch() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    let watcher = claude_task(&d, &repo, &mode_file, "echo", "Reviewer", "hello");
+    d.wait_done(&watcher, 30);
+    std::fs::write(&mode_file, "slow").unwrap();
+    let subject = claude_task(&d, &repo, &mode_file, "slow", "Subject", "tidy the docs");
+    d.wait_status(&subject, |s| s == "running", 20);
+    d.call("watch.start", json!({"subject": subject, "watcher": watcher, "brief": "anything odd", "by": "owner"}));
+    d.call("agent.hold", json!({"run_id": watcher, "reason": "not now", "by": "owner"}));
+    std::fs::write(&mode_file, "echo").unwrap();
+    d.wait_done(&subject, 30);
+    wait_count(&d, &subject, "watch_wake", 1, 20);
+    std::thread::sleep(Duration::from_secs(2));
+    assert_eq!(turns(&d, &watcher).len(), 1, "a held watcher starts no turn from its wake");
+    let queued = d.call("run.queued", json!({"run_id": watcher}))["queued"].as_array().unwrap().clone();
+    assert!(queued.len() == 1 && queued[0]["source"] == "watch" && queued[0]["text"].as_str().unwrap().starts_with("[Watch "), "{queued:?}");
+    d.call("agent.release", json!({"run_id": watcher, "by": "owner"}));
+    let t = wait_turn_with(&d, &watcher, "[Watch ", 20);
+    assert_eq!(turns(&d, &watcher).len(), 2, "{t}");
+}
