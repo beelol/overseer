@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **163 / 215** · **37** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-128, AC-129, AC-133, AC-135, AC-136, AC-137, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-182, AC-183, AC-185, AC-186, AC-187, AC-188, AC-189, AC-190, AC-191, AC-192, AC-193, AC-194, AC-195, AC-196, AC-197, AC-198, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-210, AC-213, AC-214. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+criteria: **164 / 215** · **37** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-128, AC-129, AC-133, AC-135, AC-136, AC-137, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-182, AC-183, AC-185, AC-186, AC-187, AC-188, AC-189, AC-190, AC-191, AC-192, AC-193, AC-194, AC-195, AC-196, AC-197, AC-198, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-210, AC-213. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), Voice Mode (Gate R, AC-162 to AC-177, added by the owner on 2026-09-27: a voice to talk to constantly that redirects every agent from context, answers quickly and shows every word it sent, with audio collected on the Rust side and the animated mark in the middle moving with the voice; [design](docs/rfcs/voice-mode.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -21,8 +21,7 @@ Only the owner can do these (AC-160). Each is one step; the criterion it unblock
 - Say whether the Gate J design review still needs marks or the Gate K review replaces it [AC-66].
 - Work an hour using only Overseer [AC-64].
 - Mark the phone's door and motion on the [review page](https://claude.ai/artifact/FzD5ido4NdwX3annWoY9Uq): *Right* or *Needs work* for each [AC-136, AC-137].
-- When the live tests are ready (an agent will ask): approve the sign-ins of your personal Claude and your personal ChatGPT Plus into Overseer, in your non-work browser. The work Claude Max and work ChatGPT Pro are never used [AC-53, Auto and Swarm accounts].
-- Decide seven Auto and Swarm questions (defaults are proposed; nothing live runs until you answer). For Claude calibration: whether `subscriptionType` stands for the plan, whether an `allowed` reading counts as an explicit allowance, strict run isolation or neighbouring readings, how fresh a reading must be. For a real Swarm: what qualifies a director (proposed: Claude with the daemon's Swarm tools, native Agent denied), how native workers report (proposed: the same tools), whether native workers may run in audit runs. In the Auto and Swarm RFCs on `claude/auto-swarm` [AUTO-AC-17, SWARM-01, S0].
+- When the live tests are ready (an agent will ask, now approved to run): approve the sign-ins of your personal Claude and your personal ChatGPT Plus into Overseer, in your non-work browser. The work Claude Max and work ChatGPT Pro are never used [AC-53, Auto and Swarm accounts].
 - Later, once the dev daemons feature is merged (Gate T): tell any agent "let's start the voice mode test". It opens a dev Overseer beside yours (your installed one is never touched), pulls up what the test needs and walks you through the checks in [Voice Mode's RFC](docs/rfcs/voice-mode.md) one at a time: the microphone prompt, the star with your voice, ten minutes of an ordinary room, echo on your speakers, a request with VS Code closed, then your session [AC-162, AC-163, AC-164, AC-176, AC-177].
 - Later, when no agent is running: turn Wi-Fi off and on while `node test/local/wifi-live.js` runs; it tells you when [AC-205].
 - Run *Overseer: Test Notification* in VS Code, allow notifications when macOS asks, and screenshot the banner and the helper (Overseer Notifier) in Finder [AC-179].
@@ -255,7 +254,7 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-211** Agents learn it from the repository, and leave nothing running (stage 2) — [evidence](docs/verification/AC-211.md)
 - [x] **AC-212** Production can never point at a dev version (stage 1) — [evidence](docs/verification/AC-212.md)
 - [ ] **AC-213** The production phone app never pairs with a dev daemon (after pull request #10) — not started: after PR #10 (the phone app and the gateway) — [evidence](docs/verification/AC-213.md)
-- [ ] **AC-214** Deploy: the one path from dev to production (stage 4) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-214.md)
+- [x] **AC-214** Deploy: the one path from dev to production (stage 4) — [evidence](docs/verification/AC-214.md)
 - [x] **AC-215** Guided owner tests in a dev daemon (stage 3) — [evidence](docs/verification/AC-215.md)
 <!-- ac-list:end -->
 
@@ -592,6 +591,21 @@ scripts/dev clean --name a         # stop everything of dev-a and remove it
 never uses one even when their variables leak into its environment
 ([AC-212](docs/verification/AC-212.md)).
 
+### Deploying: the one path to your installed Overseer
+
+A change reaches your installed Overseer only through a deploy, after its pull request is merged
+to main ([AC-214](docs/verification/AC-214.md)):
+
+```bash
+scripts/deploy              # build origin/main in its own clone, install it, restart the daemon when no runs are active
+scripts/deploy --status     # what is deployed and running
+scripts/deploy --rollback   # back to the previous deploy
+```
+
+It asks before changing anything, waits while runs are active (`--no-wait` stops instead), keeps
+your data and logins, and records each deploy in the data folder's `deploys/`. Agents run it only
+when you ask them to.
+
 ## Recovery
 
 - State lives in `~/Library/Application Support/Overseer` (`overseer.sqlite`, per-run
@@ -666,7 +680,6 @@ the owner action or decision each one needs.
 - [ ] [AC-205](docs/verification/AC-205.md) (Offline on a real Wi-Fi toggle (owner step)): Owner, when no agents are in flight: run `node test/local/wifi-live.js`, switch Wi-Fi off when it asks and on again when it says Overseer is offline (about a minute). It writes `evidence/ac-205/`; then this record is updated.
 - [ ] [AC-210](docs/verification/AC-210.md) (The phone simulators pinned to a dev daemon (after pull request #10)): After PR #10: the phone app and the gateway must be on main first.
 - [ ] [AC-213](docs/verification/AC-213.md) (The production phone app never pairs with a dev daemon (after pull request #10)): After PR #10: the phone app and the gateway must be on main first.
-- [ ] [AC-214](docs/verification/AC-214.md) (Deploy: the one path from dev to production (stage 4)): Not started (Gate T, added by the owner on 2026-09-27).
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.

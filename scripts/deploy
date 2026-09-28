@@ -1,0 +1,300 @@
+#!/usr/bin/env node
+// scripts/deploy: the one path from dev to production (Gate T, AC-214; docs/rfcs/dev-instance.md).
+// Run `scripts/deploy --help` for everything; the help text below is the whole manual.
+'use strict';
+const fs = require('fs');
+const net = require('net');
+const os = require('os');
+const path = require('path');
+const cp = require('child_process');
+
+const SELF_REPO = path.resolve(__dirname, '..');
+const HOME = os.homedir();
+const CODE = process.env.OVERSEER_CODE || '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code';
+const FLAGS = {
+  '--yes': 'bool', '--ref': 'value', '--repo': 'value', '--no-fetch': 'bool', '--vsix': 'value', '--wait': 'value', '--no-wait': 'bool',
+  '--poll': 'value', '--status': 'bool', '--rollback': 'bool', '--json': 'bool', '--user-data-dir': 'value', '--extensions-dir': 'value',
+  '--skip-notifier-registration': 'bool', '--help': 'bool', '-h': 'bool',
+};
+
+const HELP = `scripts/deploy: install a build of main as the owner's Overseer (production). Gate T, AC-214.
+
+Deploy is the only path from dev to production: a pull request is merged to main, then this
+builds main and installs it. It is run by the owner, or by an agent only when the owner asked
+for it in that conversation. It asks before changing anything (--yes answers for you).
+
+USAGE
+  scripts/deploy [--yes] [--ref REF] [--no-fetch] [--repo PATH] [--vsix FILE]
+                 [--wait MINUTES | --no-wait] [--poll SECONDS]
+  scripts/deploy --rollback [--yes] [--wait MINUTES | --no-wait]
+  scripts/deploy --status [--json]
+  scripts/deploy --help
+
+WHAT IT DOES
+  1. Build: fetches origin/main in the checkout (--repo, default the one this script is in;
+     --no-fetch skips it; --ref picks another ref or commit) and builds it in its own clone
+     under ${path.join('~', path.relative(HOME, cacheDir()))} (never in your checkout): the VSIX with the
+     release daemon, stamped with the commit, and the notifier. --vsix FILE deploys a VSIX
+     that is already built instead.
+  2. Waits for quiet: the production daemon is restarted only when no runs are active. With
+     runs active it checks every --poll seconds (30) for up to --wait minutes (60), or with
+     --no-wait stops at once, changes nothing and says how many runs are active.
+  3. Installs: the extension into your VS Code (code --install-extension --force), the
+     notifier registered with macOS, then the daemon stopped (daemon.shutdown) and the new one
+     started once. Open VS Code windows reconnect; reload them to use the new extension.
+  4. Records: each deploy (commit, time, the VSIX kept) in the data folder's deploys/:
+     ${path.join('~', path.relative(HOME, dataDir()), 'deploys/history.json')}
+  Your data (agents, history, settings) and logins are never touched.
+
+  --rollback   deploys the previous recorded version the same way (it waits for quiet too).
+  --status     what is deployed, what is installed, and what the running daemon reports.
+
+FOR TESTS ONLY (a temporary production)
+  --user-data-dir DIR --extensions-dir DIR   install into that VS Code profile, not yours
+  --skip-notifier-registration               do not register the notifier with macOS
+  HOME decides the production data folder and socket.
+`;
+
+// ------------------------------------------------------------------ helpers
+
+class Usage extends Error {}
+const die = (msg, code = 1) => { const e = new Error(msg); e.exitCode = code; throw e; };
+const exists = p => { try { fs.accessSync(p); return true; } catch { return false; } };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function dataDir() { return process.platform === 'darwin' ? path.join(HOME, 'Library/Application Support/Overseer') : path.join(process.env.XDG_DATA_HOME || path.join(HOME, '.local/share'), 'overseer'); }
+function cacheDir() { return process.env.OVERSEER_DEPLOY_CACHE ? path.resolve(process.env.OVERSEER_DEPLOY_CACHE) : process.platform === 'darwin' ? path.join(HOME, 'Library/Caches/overseer-deploy') : path.join(process.env.XDG_CACHE_HOME || path.join(HOME, '.cache'), 'overseer-deploy'); }
+const deploysDir = () => path.join(dataDir(), 'deploys');
+const historyFile = () => path.join(deploysDir(), 'history.json');
+
+/** Production's environment: nothing that points at another Overseer (AC-212). */
+function cleanEnv(extra = {}) {
+  const env = {};
+  // CARGO_TARGET_DIR would send the build's binary outside the clone, where the packaging step never looks.
+  for (const [k, v] of Object.entries(process.env)) if (!k.startsWith('OVERSEER_') && k !== 'OVERSEERD' && k !== 'CARGO_TARGET_DIR') env[k] = v;
+  return Object.assign(env, extra);
+}
+
+function parse(argv) {
+  const o = { _: [] };
+  for (let k = 0; k < argv.length; k++) {
+    const a = argv[k];
+    if (a.startsWith('-')) {
+      if (!(a in FLAGS)) throw new Usage(`unknown option ${a} (see scripts/deploy --help)`);
+      if (FLAGS[a] === 'value') { const v = argv[++k]; if (v === undefined) throw new Usage(`${a} needs a value`); o[a] = v; } else o[a] = true;
+    } else o._.push(a);
+  }
+  if (o._.length) throw new Usage(`unexpected ${o._[0]} (see scripts/deploy --help)`);
+  return o;
+}
+
+function run(cmd, args, opts = {}) {
+  const r = cp.spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, env: cleanEnv(), ...opts });
+  if (r.status !== 0) die(`${cmd} ${args.join(' ')} failed:\n${(r.stdout || '') + (r.stderr || '')}`.trim());
+  return (r.stdout || '').trim();
+}
+const loud = (cmd, args, opts = {}) => { const r = cp.spawnSync(cmd, args, { stdio: ['ignore', process.stderr, process.stderr], env: cleanEnv(), ...opts }); if (r.status !== 0) die(`${cmd} ${args.join(' ')} failed`); };
+const say = msg => process.stderr.write(msg + '\n');
+
+function call(socket, method, params = {}, ms = 30000) {
+  return new Promise((resolve, reject) => {
+    const s = net.createConnection(socket); let buf = '';
+    const timer = setTimeout(() => { s.destroy(); reject(new Error(`${method}: no answer`)); }, ms);
+    s.setEncoding('utf8');
+    s.on('connect', () => s.write(JSON.stringify({ id: 1, method, params }) + '\n'));
+    s.on('data', d => { buf += d; const k = buf.indexOf('\n'); if (k < 0) return; clearTimeout(timer); s.destroy(); const m = JSON.parse(buf.slice(0, k)); m.error ? reject(new Error(m.error.message)) : resolve(m.result); });
+    s.on('error', e => { clearTimeout(timer); reject(e); });
+  });
+}
+const alive = pid => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+
+function readHistory() { try { return JSON.parse(fs.readFileSync(historyFile(), 'utf8')); } catch { return []; } }
+function writeHistory(h) { fs.mkdirSync(deploysDir(), { recursive: true }); fs.writeFileSync(historyFile(), JSON.stringify(h, null, 2) + '\n'); }
+
+const extensionsDir = o => o['--extensions-dir'] ? path.resolve(o['--extensions-dir']) : path.join(HOME, '.vscode/extensions');
+const codeArgs = o => [...(o['--user-data-dir'] ? ['--user-data-dir', path.resolve(o['--user-data-dir'])] : []), ...(o['--extensions-dir'] ? ['--extensions-dir', path.resolve(o['--extensions-dir'])] : [])];
+const daemonName = `overseerd-${process.platform}-${process.arch}`;
+
+function vsixInfo(vsix) {
+  const pkg = JSON.parse(run('unzip', ['-p', vsix, 'extension/package.json']));
+  return { id: `${pkg.publisher}.${pkg.name}`.toLowerCase(), version: pkg.version };
+}
+/** The daemon inside a VSIX says which commit it was built from. */
+function vsixBuild(vsix) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ovs-deploy-'));
+  try {
+    run('unzip', ['-q', '-o', vsix, `extension/bin/${daemonName}`, '-d', dir]);
+    const bin = path.join(dir, 'extension/bin', daemonName);
+    fs.chmodSync(bin, 0o755);
+    const v = run(bin, ['version']);
+    return (v.match(/build ([^)\s]+)/) || [])[1] || null;
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
+
+function installedDir(o, info) { return path.join(extensionsDir(o), `${info.id}-${info.version}`); }
+
+async function production(o) {
+  // The standard socket, as the installed daemon names it (never a dev one: clean environment).
+  const hist = readHistory();
+  const bins = [];
+  const ext = extensionsDir(o);
+  try { for (const d of fs.readdirSync(ext).filter(d => d.startsWith('beelol.overseer-')).sort().reverse()) bins.push(path.join(ext, d, 'bin', daemonName)); } catch {}
+  const bin = bins.find(exists);
+  const socket = bin ? run(bin, ['socket-path']) : null;
+  let hello = null;
+  if (socket) { try { hello = await call(socket, 'hello', {}, 3000); } catch {} }
+  if (hello?.instance) die(`the daemon at ${socket} reports dev daemon ${hello.instance}; deploy only ever touches production`);
+  return { bin, socket, hello, current: hist[hist.length - 1] || null, installed: bin ? run(bin, ['version']) : null };
+}
+
+// ------------------------------------------------------------------ steps
+
+function buildFromMain(o) {
+  const repo = path.resolve(o['--repo'] || SELF_REPO);
+  const ref = o['--ref'] || 'origin/main';
+  if (!o['--no-fetch']) { say(`fetching origin main in ${repo}`); run('git', ['-C', repo, 'fetch', '-q', 'origin', 'main']); }
+  const commit = run('git', ['-C', repo, 'rev-parse', '--verify', `${ref}^{commit}`]);
+  const build = path.join(cacheDir(), 'build');
+  if (!exists(path.join(build, '.git'))) { fs.mkdirSync(build, { recursive: true }); run('git', ['init', '-q', build]); }
+  run('git', ['-C', build, 'fetch', '-q', repo, `+${commit}:refs/deploy/target`]);
+  run('git', ['-C', build, 'checkout', '-q', '--force', '--detach', 'refs/deploy/target']);
+  run('git', ['-C', build, 'clean', '-q', '-ffdx', '-e', 'target/', '-e', 'node_modules/']);
+  say(`building ${commit.slice(0, 12)} (${ref}) in ${build}`);
+  loud('npm', ['ci', '--silent', '--prefix', 'extension/tooling/vsce', '--ignore-scripts'], { cwd: build });
+  loud('npm', ['ci', '--silent', '--prefix', 'extension/branch-diff/tooling/review', '--ignore-scripts'], { cwd: build });
+  loud(process.execPath, ['extension/scripts/package.js'], { cwd: build });
+  const dir = path.join(build, 'extension');
+  const vsix = fs.readdirSync(dir).filter(f => f.endsWith('.vsix')).map(f => path.join(dir, f)).sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
+  if (!vsix) die('the build made no VSIX');
+  return { vsix, ref, commit };
+}
+
+/** Keeps the VSIX in deploys/ (for rollbacks). */
+function keep(vsix, build) {
+  fs.mkdirSync(deploysDir(), { recursive: true });
+  const kept = path.join(deploysDir(), `overseer-${build || 'unknown'}-${new Date().toISOString().replace(/[:.]/g, '-')}.vsix`);
+  fs.copyFileSync(vsix, kept);
+  return kept;
+}
+
+async function confirm(o, what) {
+  if (o['--yes']) return;
+  if (!process.stdin.isTTY) die(`${what}: this changes the owner's installed Overseer. Run it yourself, or pass --yes when the owner asked for it.`, 2);
+  process.stderr.write(`${what}? [y/N] `);
+  const answer = await new Promise(r => { process.stdin.setEncoding('utf8'); process.stdin.once('data', d => r(String(d).trim())); });
+  process.stdin.pause();
+  if (!/^y(es)?$/i.test(answer)) die('not deployed', 2);
+}
+
+/** Waits until the production daemon has no active runs (or it is not running). */
+async function quiet(o, socket) {
+  if (!socket) return;
+  const minutes = o['--no-wait'] ? 0 : Number(o['--wait'] || 60);
+  const poll = Math.max(1, Number(o['--poll'] || 30)) * 1000;
+  const until = Date.now() + minutes * 60000;
+  for (let said = false; ; said = true) {
+    let active = [];
+    try { active = await call(socket, 'run.active', {}, 10000); } catch { return; } // not running: nothing to wait for
+    if (!active.length) return;
+    if (o['--no-wait'] || Date.now() > until) die(`${active.length} run${active.length === 1 ? ' is' : 's are'} active on the installed Overseer; nothing was changed. Deploy again when they finish (or with --wait MINUTES).`, 3);
+    if (!said) say(`${active.length} run${active.length === 1 ? ' is' : 's are'} active; waiting for quiet (checking every ${poll / 1000} s, up to ${minutes} min)`);
+    await sleep(poll);
+  }
+}
+
+/** Installs the VSIX and restarts the daemon once (or starts it when it was not running). */
+async function install(o, vsix, expect) {
+  const info = vsixInfo(vsix);
+  const before = await production(o);
+  await quiet(o, before.socket);
+  say(`installing ${path.basename(vsix)} into ${o['--extensions-dir'] ? extensionsDir(o) : 'your VS Code'}`);
+  run(CODE, [...codeArgs(o), '--install-extension', vsix, '--force']);
+  const dir = installedDir(o, info);
+  const bin = path.join(dir, 'bin', daemonName);
+  if (!exists(bin)) die(`the installed extension has no daemon at ${bin}`);
+  const notifier = path.join(dir, 'bin/Overseer Notifier.app');
+  if (process.platform === 'darwin' && exists(notifier) && !o['--skip-notifier-registration']) {
+    run('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister', ['-f', notifier]);
+  }
+  const socket = run(bin, ['socket-path']);
+  let old = null;
+  try { old = await call(socket, 'hello', {}, 3000); } catch {}
+  if (old) {
+    await quiet(o, socket); // a run may have started meanwhile
+    try { await call(socket, 'daemon.shutdown', {}, 20000); } catch {}
+    for (let k = 0; k < 150 && alive(old.pid); k++) await sleep(100);
+    if (alive(old.pid)) die(`the old daemon (pid ${old.pid}) did not stop; nothing else was changed`);
+  }
+  const child = cp.spawn(bin, ['serve'], { env: cleanEnv(), detached: true, stdio: 'ignore' });
+  child.unref();
+  let hello = null;
+  for (let k = 0; k < 150 && !hello; k++) { try { hello = await call(socket, 'hello', {}, 1000); } catch { await sleep(100); } }
+  if (!hello) die(`the new daemon did not answer at ${socket}`);
+  if (expect && hello.build !== expect) die(`the running daemon reports build ${hello.build}, expected ${expect}`);
+  return { info, hello, restarted: !!old, previousPid: old?.pid || null };
+}
+
+// ------------------------------------------------------------------ commands
+
+async function deploy(o) {
+  const artifact = o['--vsix'] ? { vsix: path.resolve(o['--vsix']), ref: null, commit: null } : buildFromMain(o);
+  const build = vsixBuild(artifact.vsix);
+  const hist = readHistory();
+  const current = hist[hist.length - 1];
+  await quiet(o, (await production(o)).socket); // --no-wait: nothing is kept or changed
+  await confirm(o, `Deploy build ${build || 'unknown'}${artifact.ref ? ` (${artifact.ref})` : ''} to the installed Overseer${current ? `, replacing ${current.build}` : ''}`);
+  const kept = keep(artifact.vsix, build);
+  const done = await install(o, kept, build);
+  const entry = { build, commit: artifact.commit, ref: artifact.ref, time: new Date().toISOString(), vsix: path.relative(dataDir(), kept), version: done.info.version, previous: current ? hist.length - 1 : null, pid: done.hello.pid };
+  writeHistory([...hist, entry]);
+  report(o, entry, done);
+}
+
+async function rollback(o) {
+  const hist = readHistory();
+  const current = hist[hist.length - 1];
+  if (!current || current.previous === null || current.previous === undefined) die('no previous deploy to roll back to');
+  const target = hist[current.previous];
+  const vsix = path.join(dataDir(), target.vsix);
+  if (!exists(vsix)) die(`the kept VSIX of build ${target.build} is missing (${vsix})`);
+  await quiet(o, (await production(o)).socket);
+  await confirm(o, `Roll the installed Overseer back from build ${current.build} to build ${target.build}`);
+  const done = await install(o, vsix, target.build);
+  const entry = { ...target, time: new Date().toISOString(), rollback_of: current.build, previous: target.previous ?? null, pid: done.hello.pid };
+  writeHistory([...hist, entry]);
+  report(o, entry, done);
+}
+
+function report(o, entry, done) {
+  const text = `Deployed build ${entry.build}${entry.rollback_of ? ` (rolled back from ${entry.rollback_of})` : ''}: extension ${done.info.id} ${done.info.version} installed; daemon ${done.restarted ? `restarted (pid ${done.previousPid} → ${done.hello.pid})` : `started (pid ${done.hello.pid})`}. Reload VS Code windows to use the new extension. Recorded in ${historyFile()}.`;
+  console.log(o['--json'] ? JSON.stringify({ ...entry, restarted: done.restarted, previous_pid: done.previousPid }, null, 2) : text);
+}
+
+async function status(o) {
+  const p = await production(o);
+  const hist = readHistory();
+  const out = { deployed: p.current, deploys: hist.length, installed: p.installed, running: p.hello ? { pid: p.hello.pid, build: p.hello.build || null } : null, socket: p.socket, history: historyFile() };
+  console.log(o['--json'] ? JSON.stringify(out, null, 2) : [
+    `Deployed:  ${p.current ? `build ${p.current.build} at ${p.current.time}${p.current.rollback_of ? ` (rollback from ${p.current.rollback_of})` : ''}` : 'nothing recorded yet'}`,
+    `Installed: ${p.installed || 'no Overseer extension found'}`,
+    `Running:   ${p.hello ? `pid ${p.hello.pid}, build ${p.hello.build || 'not stamped'}` : 'no daemon answering'}${p.socket ? ` (${p.socket})` : ''}`,
+    `History:   ${hist.length} deploy${hist.length === 1 ? '' : 's'} in ${historyFile()}`,
+  ].join('\n'));
+}
+
+async function main(argv) {
+  const o = parse(argv);
+  if (o['--help'] || o['-h']) { process.stdout.write(HELP); return; }
+  if (o['--wait'] && !(Number(o['--wait']) >= 0)) throw new Usage('--wait takes minutes');
+  if (!exists(CODE) && !o['--status']) die(`VS Code's command line tool is not at ${CODE} (set OVERSEER_CODE)`);
+  if (o['--status']) return status(o);
+  if (o['--rollback']) return rollback(o);
+  return deploy(o);
+}
+
+if (require.main === module) {
+  main(process.argv.slice(2)).catch(e => {
+    console.error(`scripts/deploy: ${e.message}`);
+    process.exit(e instanceof Usage ? 2 : e.exitCode || 1);
+  });
+}
+module.exports = { FLAGS, HELP };

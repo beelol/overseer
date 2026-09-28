@@ -211,11 +211,11 @@
       "target": 640,
       "width": 647,
       "audit": {
-        "chars": 1063,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "sample": "Refresh sessions once | Your login | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | session-refresh-c",
         "width": 647
       },
       "nameVisible": true,
@@ -238,11 +238,11 @@
       "target": 480,
       "width": 483,
       "audit": {
-        "chars": 1063,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "sample": "Refresh sessions once | Your login | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | session-refresh-c",
         "width": 483
       },
       "nameVisible": true,
@@ -265,11 +265,11 @@
       "target": 360,
       "width": 373,
       "audit": {
-        "chars": 1063,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "sample": "Refresh sessions once | Your login | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | session-refresh-c",
         "width": 373
       },
       "nameVisible": true,
@@ -292,11 +292,11 @@
       "target": 640,
       "width": 647,
       "audit": {
-        "chars": 1063,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "sample": "Refresh sessions once | Your login | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | session-refresh-c",
         "width": 647
       },
       "nameVisible": true,
@@ -319,11 +319,11 @@
       "target": 480,
       "width": 483,
       "audit": {
-        "chars": 1063,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "sample": "Refresh sessions once | Your login | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | session-refresh-c",
         "width": 483
       },
       "nameVisible": true,
@@ -346,11 +346,11 @@
       "target": 360,
       "width": 373,
       "audit": {
-        "chars": 1063,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "sample": "Refresh sessions once | Your login | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | session-refresh-c",
         "width": 373
       },
       "nameVisible": true,

@@ -1,5 +1,5 @@
- ◆ Overseer  page 1/1 · 2 agents · ● 1 active                                                                                                       ● connected 
-╭ 1 ● Still running ───────────────────────────────────────────── generic · 1s ╮┏ 2 ✓ Document sessions ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 0s ┓
+ ◆ Overseer  page 1/1 · 2 agents · ● 1 active                                                                                    phone access off · ● connected 
+╭ 1 ● Still running ───────────────────────────────────────────── generic · 3s ╮┏ 2 ✓ Document sessions ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 0s ┓
 │ working…                                                                     │┃ documented                                                                   ┃
 │                                                                              │┃                                                                              ┃
 │                                                                              │┃                                                                              ┃

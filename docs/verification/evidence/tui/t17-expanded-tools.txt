@@ -1,4 +1,4 @@
- ◆ Overseer  page 1/1 · 1 agent                                                                                                 ● connected 
+ ◆ Overseer  page 1/1 · 1 agent                                                                              phone access off · ● connected 
 ┏ 1 ✓ Writes a file ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ claude · 1s ┓
 ┃ › write perm.txt                                                                                                                         ┃
 ┃ ✎ perm.txt                                                                                                                               ┃

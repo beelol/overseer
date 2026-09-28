@@ -1,4 +1,4 @@
- ◆ Overseer  page 1/1 · 2 agents · /payments                                                                                                        ● connected 
+ ◆ Overseer  page 1/1 · 2 agents · /payments                                                                                     phone access off · ● connected 
 ┏ 1 ✓ Add idempotency keys ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 0s ┓╭ 2 ✓ Retry refunds ───────────────────────────────────────────── generic · 0s ╮
 ┃ ok                                                                           ┃│ ok                                                                           │
 ┃                                                                              ┃│                                                                              │

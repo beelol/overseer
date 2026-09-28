@@ -1,14 +1,14 @@
-[2026-09-27T16:17:33.788Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-27T16:17:43.185Z] screenshot docs/verification/evidence/ui/keyboard/01-needs-you.png
-[2026-09-27T16:17:43.186Z] PASS Needs you gathers permission requests, the failure and the finished run with changes, counted on the view and in the status bar {"list":[{"title":"Write file A","why":"Approve"},{"title":"Write file B","why":"Approve"},{"title":"Broken build","why":"Failed"},{"title":"Small edit","why":"Review"}],"badge":"4","status":"overseer-mark  Overseer 3 active   bell-dot  4, 3 agents running · 4 need you\nAgents keep running when VS Code closes.\nClick to open the dashboard."}
-[2026-09-27T16:17:44.155Z] after first ⌥⌘J {"mode":"chat","selected":"r-cb25d1fd4da4","visible":"visible","chatRun":"Write file A"}
-[2026-09-27T16:17:44.167Z] frames [{"mode":"chat","selected":"r-cb25d1fd4da4","visible":"visible"}]
-[2026-09-27T16:17:47.092Z] PASS ⌥⌘J goes to the next agent that needs you; ⌥⌘Y allows and ⌥⌘⌫ denies its request {"first":"r-cb25d1fd4da4","second":"r-e22a5fef2f2e","firstDone":"completed","secondDone":"completed","denied":true}
-[2026-09-27T16:17:51.803Z] PASS ⌥⌘J walks the rest of Needs you (the failure and finished runs with changes); visiting clears each {"visited":["r-a5455e71104b","r-cb25d1fd4da4","r-64a2550a603f"],"left":[]}
-[2026-09-27T16:17:55.498Z] PASS ⌥⌘A switches agents from a searchable quick pick and ⌥⌘. stops the selected agent {"switched":"r-b464b5ed6227","stopped":"interrupted"}
-[2026-09-27T16:17:58.159Z] PASS ⌥⌘N starts a new agent from the composer without the mouse; it becomes the selected agent {"created":"r-020b6ee1abce","nowSelected":"r-020b6ee1abce"}
-[2026-09-27T16:17:59.062Z] prompt before Enter {"value":"And add a test","focused":"prompt"}
-[2026-09-27T16:17:59.741Z] PASS Enter in the chat composer sends a follow-up {"turns":2}
-[2026-09-27T16:17:59.894Z] screenshot docs/verification/evidence/ui/keyboard/02-keyboard-done.png
-[2026-09-27T16:18:04.917Z] PASS the shortcuts also work from the side bar (⌥⌘A opens the agent switcher, ⌥⌘N the composer) {"inList":true,"switcher":true,"composer":true}
-[2026-09-27T16:18:04.918Z] PASS every control in the dashboard has a screen-reader label {"checked":36,"bad":[]}
+[2026-09-28T16:28:27.551Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-28T16:28:39.150Z] screenshot docs/verification/evidence/ui/keyboard/01-needs-you.png
+[2026-09-28T16:28:39.152Z] PASS Needs you gathers permission requests, the failure and the finished run with changes, counted on the view and in the status bar {"list":[{"title":"Write file A","why":"Approve"},{"title":"Write file B","why":"Approve"},{"title":"Broken build","why":"Failed"},{"title":"Small edit","why":"Review"}],"badge":"4","status":"overseer-mark  Overseer 3 active   bell-dot  4, 3 agents running · 4 need you\nAgents keep running when VS Code closes.\nClick to open the dashboard."}
+[2026-09-28T16:28:40.121Z] after first ⌥⌘J {"mode":"chat","selected":"r-1e2b2af70669","visible":"visible","chatRun":"Write file A"}
+[2026-09-28T16:28:40.132Z] frames [{"mode":"chat","selected":"r-1e2b2af70669","visible":"visible"}]
+[2026-09-28T16:28:43.062Z] PASS ⌥⌘J goes to the next agent that needs you; ⌥⌘Y allows and ⌥⌘⌫ denies its request {"first":"r-1e2b2af70669","second":"r-174b06bb96a8","firstDone":"completed","secondDone":"completed","denied":true}
+[2026-09-28T16:28:47.773Z] PASS ⌥⌘J walks the rest of Needs you (the failure and finished runs with changes); visiting clears each {"visited":["r-ecc1adbf8701","r-1e2b2af70669","r-1104bf4bc343"],"left":[]}
+[2026-09-28T16:28:51.473Z] PASS ⌥⌘A switches agents from a searchable quick pick and ⌥⌘. stops the selected agent {"switched":"r-5da34302d2d7","stopped":"interrupted"}
+[2026-09-28T16:28:54.138Z] PASS ⌥⌘N starts a new agent from the composer without the mouse; it becomes the selected agent {"created":"r-3e6f0fbae49c","nowSelected":"r-3e6f0fbae49c"}
+[2026-09-28T16:28:55.037Z] prompt before Enter {"value":"And add a test","focused":"prompt"}
+[2026-09-28T16:28:56.021Z] PASS Enter in the chat composer sends a follow-up {"turns":2}
+[2026-09-28T16:28:56.139Z] screenshot docs/verification/evidence/ui/keyboard/02-keyboard-done.png
+[2026-09-28T16:29:01.122Z] PASS the shortcuts also work from the side bar (⌥⌘A opens the agent switcher, ⌥⌘N the composer) {"inList":true,"switcher":true,"composer":true}
+[2026-09-28T16:29:01.123Z] PASS every control in the dashboard has a screen-reader label {"checked":46,"bad":[]}

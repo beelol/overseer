@@ -1,19 +1,19 @@
-[2026-09-27T23:01:15.193Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-27T23:01:25.269Z] PASS home shows the conversation with Overseer above the composer, whose target is New agent {"target":"agent"}
-[2026-09-27T23:01:27.386Z] PASS Enter at home starts an agent exactly as before, with no Overseer turn in the event log {"started":"r-d2daf9a19041","overseerTurns":0}
-[2026-09-27T23:01:27.793Z] screenshot docs/verification/evidence/ui/home/01-home-started.png
-[2026-09-27T23:01:27.793Z] PASS the start appears in the conversation as a card
-[2026-09-27T23:01:30.388Z] PASS typing @overseer first switches the target chip to Overseer {"chip":"overseer"}
-[2026-09-27T23:01:32.773Z] PASS the same text sent to Overseer starts no agent and is answered in the conversation {"runs":1,"answer":"OverseerHere is what everyone is doing:\n\n- **tidy the docs**: completed"}
-[2026-09-27T23:01:33.195Z] screenshot docs/verification/evidence/ui/home/02-home-overseer.png
-[2026-09-27T23:01:34.091Z] PASS `@` offers the agents by name, narrowed as you type ["tidy the docscompleted"]
-[2026-09-27T23:01:34.369Z] PASS Enter inserts the named agent {"inserted":"@overseer Tell @tidy the docs "}
-[2026-09-27T23:01:34.771Z] PASS a named agent reaches Overseer as that agent's id {"sent":"Tell @tidy the docs (r-d2daf9a19041) to add a changelog"}
-[2026-09-27T23:02:15.863Z] PASS *Start as an agent* starts one from a message sent to Overseer {"corrected":"r-b3464b6c7d7c"}
-[2026-09-27T23:02:20.923Z] PASS *Ask Overseer instead* stops the agent just started, removes its untouched worktree, and puts the words back for Overseer {"gone":true,"back":"what is the plan for the docs?","chip2":"overseer"}
-[2026-09-27T23:02:24.455Z] PASS the docked chat and home show the same conversation {"docked":"What is everyone doing?\nShared the state of 1 agent\nUsed\nmcp__overseer__check_in\n\nHere is what everyone is doing:\n\ntidy the docs: completed\nDone\n0s\n2 tokens\nTell @tidy the docs (r-d2daf9a19041) to add a changelog\nShared the state of 1 agent\n\nI could not find an agent called @tidy the docs (r-d2daf9a","home":"Started tidy the docs (claude) in home-repo\ntidy the docs\nAsk Overseer instead\nYou\nWhat is everyone doing?\nStart as an agent\nOverseer\nHere is what everyone is doing:\n\n- **tidy the docs**: completed\nYou\nTell @tidy the docs (r-d2daf9a19041) to add a changelog\nStart as an agent\nOverseer\nI could not fin"}
-[2026-09-27T23:02:24.616Z] screenshot docs/verification/evidence/ui/home/03-docked-same.png
-[2026-09-27T23:02:26.586Z] PASS *Start fresh* begins a new conversation and leaves a hold in place {"holds":[{"by":"owner","card":null,"reason":"kept through a fresh start","release_on":{"kind":"release"},"run_id":"r-d2daf9a19041","set_ms":1790550144624,"title":"tidy the docs"}]}
-[2026-09-27T23:02:26.780Z] screenshot docs/verification/evidence/ui/home/04-home-fresh.png
-[2026-09-27T23:02:30.965Z] screenshot docs/verification/evidence/ui/home/05-home-overseer-dark.png
-[2026-09-27T23:02:35.147Z] screenshot docs/verification/evidence/ui/home/06-home-overseer-light.png
+[2026-09-28T16:27:09.938Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-28T16:27:16.609Z] PASS home shows the conversation with Overseer above the composer, whose target is New agent {"target":"agent"}
+[2026-09-28T16:27:17.850Z] PASS Enter at home starts an agent exactly as before, with no Overseer turn in the event log {"started":"r-fbf9a877499d","overseerTurns":0}
+[2026-09-28T16:27:18.065Z] screenshot docs/verification/evidence/ui/home/01-home-started.png
+[2026-09-28T16:27:18.065Z] PASS the start appears in the conversation as a card
+[2026-09-28T16:27:20.516Z] PASS typing @overseer first switches the target chip to Overseer {"chip":"overseer"}
+[2026-09-28T16:27:22.010Z] PASS the same text sent to Overseer starts no agent and is answered in the conversation {"runs":1,"answer":"OverseerHere is what everyone is doing:\n\n- **tidy the docs**: completed"}
+[2026-09-28T16:27:22.234Z] screenshot docs/verification/evidence/ui/home/02-home-overseer.png
+[2026-09-28T16:27:23.082Z] PASS `@` offers the agents by name, narrowed as you type ["tidy the docscompleted"]
+[2026-09-28T16:27:23.347Z] PASS Enter inserts the named agent {"inserted":"@overseer Tell @tidy the docs "}
+[2026-09-28T16:27:23.703Z] PASS a named agent reaches Overseer as that agent's id {"sent":"Tell @tidy the docs (r-fbf9a877499d) to add a changelog"}
+[2026-09-28T16:28:04.877Z] PASS *Start as an agent* starts one from a message sent to Overseer {"corrected":"r-2e2c92820668"}
+[2026-09-28T16:28:10.471Z] PASS *Ask Overseer instead* stops the agent just started, removes its untouched worktree, and puts the words back for Overseer {"gone":true,"back":"what is the plan for the docs?","chip2":"overseer"}
+[2026-09-28T16:28:13.998Z] PASS the docked chat and home show the same conversation {"docked":"What is everyone doing?\nShared the state of 1 agent\nUsed\nmcp__overseer__check_in\n\nHere is what everyone is doing:\n\ntidy the docs: completed\nDone\n0s\n2 tokens\nTell @tidy the docs (r-fbf9a877499d) to add a changelog\nShared the state of 1 agent\n\nI could not find an agent called @tidy the docs (r-fbf9a87","home":"Started tidy the docs (claude) in home-repo\ntidy the docs\nAsk Overseer instead\nYou\nWhat is everyone doing?\nStart as an agent\nOverseer\nHere is what everyone is doing:\n\n- **tidy the docs**: completed\nYou\nTell @tidy the docs (r-fbf9a877499d) to add a changelog\nStart as an agent\nOverseer\nI could not fin"}
+[2026-09-28T16:28:14.193Z] screenshot docs/verification/evidence/ui/home/03-docked-same.png
+[2026-09-28T16:28:16.167Z] PASS *Start fresh* begins a new conversation and leaves a hold in place {"holds":[{"by":"owner","card":null,"reason":"kept through a fresh start","release_on":{"kind":"release"},"run_id":"r-fbf9a877499d","set_ms":1790612894202,"title":"tidy the docs"}]}
+[2026-09-28T16:28:16.374Z] screenshot docs/verification/evidence/ui/home/04-home-fresh.png
+[2026-09-28T16:28:20.582Z] screenshot docs/verification/evidence/ui/home/05-home-overseer-dark.png
+[2026-09-28T16:28:24.788Z] screenshot docs/verification/evidence/ui/home/06-home-overseer-light.png

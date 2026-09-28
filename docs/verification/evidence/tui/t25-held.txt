@@ -1,4 +1,4 @@
- ◆ Overseer  page 1/1 · 2 agents · ● 2 active                                                                                                                           ● connected 
+ ◆ Overseer  page 1/1 · 2 agents · ● 2 active                                                                                                        phone access off · ● connected 
 ┏ 1 ● Sleeper ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · ⏸ held · 1s ┓╭ 2 ● API tests ──────────────────────────────────────────────────────────── claude · 2s ╮
 ┃ working…                                                                               ┃│ › write the API                                                                        │
 ┃                                                                                        ┃│ ECHO                                                                                   │
@@ -6,10 +6,10 @@
 ┃                                                                                        ┃│ ","--permission-prompt-tool","stdio"],"kinds":["text"],"text":"write the API"}         │
 ┃                                                                                        ┃│ ■ done · 1 in / 1 out                                                                  │
 ┃                                                                                        ┃│ › From Overseer: Please add tests.                                                     │
-┃                                                                                        ┃│ ⚙ mcp__overseer__roster ✓                                                              │
+┃                                                                                        ┃│ ⚙ mcp__overseer__roster …                                                              │
 ┃                                                                                        ┃│ ◆ wants mcp__overseer__roster null                                                     │
-┃                                                                                        ┃│ I can tell you what your agents are doing, or pass a message to one of them.           │
-┃                                                                                        ┃│ ■ done · 1 in / 1 out                                                                  │
+┃                                                                                        ┃│                                                                                        │
+┃                                                                                        ┃│                                                                                        │
 ┃                                                                                        ┃│                                                                                        │
 ┃                                                                                        ┃│                                                                                        │
 ┃                                                                                        ┃│                                                                                        │

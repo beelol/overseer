@@ -2303,9 +2303,21 @@ rec(215, "Guided owner tests in a dev daemon (stage 3)", "verified", commit="83e
     evidence="[evidence](evidence/ac-215/README.md), [guided test](evidence/ac-215/guided-test.txt), pull request #22",
     live="Fixture harnesses; the Voice Mode dry run used no login and no paid turn. The owner's own run of the Voice Mode check is Gate R's (AC-162 to AC-164, AC-176, AC-177).",
     limits="Voice Mode's is the only owner check so far; other gates add theirs as data.")
-rec(214, "Deploy: the one path from dev to production (stage 4)", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
-    actual="Not started: added by the owner on 2026-09-27; stage 4, built on `claude/deploy` after stage 3 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
+rec(214, "Deploy: the one path from dev to production (stage 4)", "verified", commit="beca0317 (branch claude/deploy, pull request #23; b70cea70 adds a test retry only)", date="2026-09-28",
+    steps="""`node test/deploy/run.js` (in `scripts/test-all`). It uses a temporary production: HOME, VS Code profile and extensions folder, with `--skip-notifier-registration`. Two commits of this repository are made: A (HEAD) and B (A plus one change). Then:
+1. `scripts/deploy --yes --ref A`: build in its own clone, install, start.
+2. A generic run started; `--ref B --no-wait`.
+3. `--ref B --wait 20 --poll 1` in the background while the test watches the daemon's pid; the run is interrupted.
+4. `--rollback`, then `--status`.
+5. A deploy without `--yes` and without a terminal.""",
+    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md#stage-4--deploy-ac-214).",
+    actual="""- **Build and install:** the deploy built A in its own clone (never the checkout) with the release daemon stamped with the commit. It installed it into the temporary VS Code profile and started the daemon, whose hello reports `build` A and no instance. `deploys/history.json` records A, and its VSIX is kept under `deploys/`.
+- **Active runs:** with a run active, `--no-wait` exits 3 with "1 run is active on the installed Overseer; nothing was changed": same pid, A still installed, nothing recorded. With `--wait` it said it was waiting and did not restart or install while the run was active. When the run ended it installed B and restarted exactly once (two pids seen in total), and the daemon reports `build` B.
+- **Data and logins:** after `--rollback` the daemon reports A again and A is installed. Tasks, runs and profiles are unchanged and the data folder's files are kept. The two login files under the temporary HOME (`.codex/auth.json`, `.claude/.credentials.json`) are byte-identical to before the first deploy. `--status` shows build A as a rollback from B, running A, and three deploys.
+- **Who runs it:** without `--yes` and without a terminal it refuses with "Run it yourself, or pass --yes when the owner asked for it" (exit 2) and records nothing. `AGENTS.md` says agents deploy only when the owner asked.""",
+    evidence="[evidence](evidence/ac-214/README.md), [deploy test](evidence/ac-214/deploy-test.txt), [test-all](evidence/ac-214/test-all-jobs3.txt), pull request #23",
+    live="A temporary production only; the owner's VS Code, daemon, data and logins were never involved. The owner's first real deploy waits for their yes.",
+    limits="The notifier's LaunchServices registration is skipped in the test (it would touch the owner's LaunchServices database); the daemon registers it on first use as before.")
 
 SHORT_BLOCKERS = {
     154: "verified",
@@ -2449,7 +2461,7 @@ SHORT_BLOCKERS = {
     209: "verified",
     210: "not started: after PR #10 (the phone app and the gateway)",
     211: "verified",
-    214: "not started (Gate T, added by the owner on 2026-09-27)",
+    214: "verified",
     215: "verified",
 }
 TOTAL = 53

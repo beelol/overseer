@@ -1,5 +1,5 @@
- ◆ Overseer  page 1/1 · 2 agents · ● 2 active                                                                                                       ● connected 
-╭ 1 ● Started elsewhere ───────────────────────────────────────── generic · 0s ╮┏ 2 ● Echo agent ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 1s ┓
+ ◆ Overseer  page 1/1 · 2 agents · ● 2 active                                                                                    phone access off · ● connected 
+╭ 1 ● Started elsewhere ───────────────────────────────────────── generic · 0s ╮┏ 2 ● Echo agent ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 2s ┓
 │ made outside the tui                                                         │┃ ready                                                                        ┃
 │                                                                              │┃ › hello from the tui                                                         ┃
 │                                                                              │┃ echo: hello from the tui                                                     ┃
