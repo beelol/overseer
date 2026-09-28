@@ -71,6 +71,13 @@ pub fn parse_public_status(value: &Value, provider: &str, observed_ms: i64) -> R
         observed_ms, expires_ms:observed_ms.saturating_add(60_000) })
 }
 
+/// One endpoint: the same name, or for a verified local listener the same
+/// loopback port (another path on it is the same upstream).
+pub fn same_endpoint(left: &str, right: &str) -> bool {
+    left == right || matches!((crate::auto_opencode::verified_loopback_port(left),
+        crate::auto_opencode::verified_loopback_port(right)), (Some(a), Some(b)) if a == b)
+}
+
 /// Direct, scope-matched observations may exclude a route. Public status is
 /// advisory only: an incident degrades ranking, and green never clears a
 /// separate account quota or authentication block.
@@ -122,7 +129,7 @@ pub fn evaluate(route: &Route, observations: &[Observation], now_ms: i64) -> Hea
                 Some((0, Health::Healthy))
             }
             (Scope::Endpoint { provider, endpoint }, Signal::EndpointFailure)
-                if endpoint == &route.endpoint && (provider == &route.provider
+                if same_endpoint(endpoint, &route.endpoint) && (provider == &route.provider
                     || crate::auto_opencode::is_verified_loopback_endpoint(endpoint)) =>
             {
                 Some((1, Health::Unavailable))
@@ -137,7 +144,7 @@ pub fn evaluate(route: &Route, observations: &[Observation], now_ms: i64) -> Hea
             ) if profile_id == &route.profile_id
                 && (provider == &route.provider
                     || crate::auto_opencode::is_verified_loopback_endpoint(endpoint))
-                && endpoint == &route.endpoint =>
+                && same_endpoint(endpoint, &route.endpoint) =>
             {
                 Some((1, Health::Unavailable))
             }
@@ -429,6 +436,32 @@ mod tests {
             Signal::Throttled, 100, 300);
         assert_eq!(evaluate(&same_url, &[throttled.clone()], 200), Health::Unavailable);
         assert_eq!(evaluate(&independent, &[throttled], 200), Health::Unknown);
+    }
+
+    /// AUTO-AC-19: a model-turn failure on one local listener excludes an
+    /// OpenCode route that reaches the same listener through another path
+    /// (the same failed upstream), for endpoint failures and account-scoped
+    /// throttling alike, and for the shared recovery check. Another port is
+    /// independent.
+    #[test]
+    fn a_path_alias_of_a_failed_local_listener_does_not_evade_its_exclusion() {
+        let failure = obs(Scope::Endpoint {provider:"local_a".into(),
+            endpoint:"http://127.0.0.1:47811/v1".into()}, Signal::EndpointFailure, 100, 300);
+        let alias = route("alias", "opencode", "local_b", "http://127.0.0.1:47811/openai/v1", "p");
+        let independent = route("independent", "opencode", "local_b", "http://127.0.0.1:47812/v1", "p");
+        assert_eq!(evaluate(&alias, &[failure.clone()], 200), Health::Unavailable);
+        assert_eq!(evaluate(&independent, &[failure], 200), Health::Unknown);
+        let throttled = obs(Scope::AccountEndpoint {profile_id:"p".into(), provider:"local_a".into(),
+            endpoint:"http://127.0.0.1:47811/v1".into()}, Signal::Throttled, 100, 300);
+        assert_eq!(evaluate(&alias, &[throttled.clone()], 200), Health::Unavailable);
+        assert_eq!(evaluate(&independent, &[throttled], 200), Health::Unknown);
+        // A remote endpoint is compared by its exact name, as before.
+        let remote = obs(Scope::Endpoint {provider:"openai".into(), endpoint:"codex".into()},
+            Signal::EndpointFailure, 100, 300);
+        assert_eq!(evaluate(&alias, &[remote], 200), Health::Unknown);
+        assert!(same_endpoint("http://127.0.0.1:47811/v1", "http://127.0.0.1:47811/openai/v1"));
+        assert!(!same_endpoint("http://127.0.0.1:47811/v1", "http://127.0.0.1:47812/v1"));
+        assert!(same_endpoint("codex", "codex") && !same_endpoint("codex", "claude-code"));
     }
 
     #[test]

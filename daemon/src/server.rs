@@ -956,7 +956,7 @@ pub(crate) fn mark_endpoint_recovery(d: &Arc<Daemon>, routes: &mut [crate::auto_
     let store = d.store.lock().unwrap();
     let recovering = crate::auto_health::recovering_endpoints(&store, crate::daemon::now())?;
     for route in routes.iter_mut() {
-        if let Some(check) = recovering.iter().find(|r| r.provider == route.provider && r.endpoint == route.endpoint) {
+        if let Some(check) = recovering.iter().find(|r| r.provider == route.provider && crate::auto_health::same_endpoint(&r.endpoint, &route.endpoint)) {
             route.endpoint_recovery_in_flight = crate::auto_health::endpoint_recovery_in_flight(
                 &store.conn, check, requesting_parent)?;
         }
@@ -966,7 +966,7 @@ pub(crate) fn mark_endpoint_recovery(d: &Arc<Daemon>, routes: &mut [crate::auto_
 
 pub(crate) fn recovery_check_for(recovering: &[crate::auto_health::RecoveringEndpoint],
     route: &crate::auto_select::Route) -> Option<Value> {
-    recovering.iter().find(|r| r.provider == route.provider && r.endpoint == route.endpoint)
+    recovering.iter().find(|r| r.provider == route.provider && crate::auto_health::same_endpoint(&r.endpoint, &route.endpoint))
         .map(|r| json!({"provider":r.provider,"endpoint":r.endpoint,"failed_ms":r.failed_ms}))
 }
 
