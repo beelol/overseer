@@ -328,7 +328,8 @@ impl Daemon {
             store.conn.execute("INSERT INTO overseer_pending(session_id, message_id, ts, text) VALUES(?1, ?2, ?3, ?4)", rusqlite::params![sid, msg["id"].as_str(), crate::daemon::now(), text])?;
             return Ok(json!({"message": msg, "queued": true, "run_id": run_id}));
         }
-        let turn = self.overseer_turn(&session, &[text.to_string()], &harness, model)?;
+        let cause = if surface == "voice" { "voice" } else { "owner" };
+        let turn = self.overseer_turn(&session, &[text.to_string()], &harness, model, cause)?;
         Ok(json!({"message": msg, "queued": false, "run_id": turn["run_id"], "turn": turn["turn"]}))
     }
 
@@ -356,7 +357,7 @@ impl Daemon {
     }
 
     /// One turn of Overseer's run with the owner's words.
-    fn overseer_turn(self: &Arc<Self>, session: &Value, texts: &[String], harness: &str, model: Option<&str>) -> Result<Value> {
+    fn overseer_turn(self: &Arc<Self>, session: &Value, texts: &[String], harness: &str, model: Option<&str>, cause: &str) -> Result<Value> {
         let sid = session["id"].as_str().unwrap().to_string();
         let joined = texts.join("\n\n");
         let first = session["run_id"].is_null();
@@ -374,8 +375,8 @@ impl Daemon {
         let turn = turns.last().map(|t| t.id.clone());
         {
             let store = self.store.lock().unwrap();
-            store.conn.execute("UPDATE overseer_sessions SET last_seq=?2, last_turn_ms=?3, last_cause='owner' WHERE id=?1", rusqlite::params![sid, cursor, crate::daemon::now()])?;
-            store.conn.execute("INSERT INTO overseer_turns(ts, session_id, cause, turn_id) VALUES(?1, ?2, 'owner', ?3)", rusqlite::params![crate::daemon::now(), sid, turn])?;
+            store.conn.execute("UPDATE overseer_sessions SET last_seq=?2, last_turn_ms=?3, last_cause=?4 WHERE id=?1", rusqlite::params![sid, cursor, crate::daemon::now(), cause])?;
+            store.conn.execute("INSERT INTO overseer_turns(ts, session_id, cause, turn_id) VALUES(?1, ?2, ?3, ?4)", rusqlite::params![crate::daemon::now(), sid, cause, turn])?;
         }
         Ok(json!({"run_id": run_id, "turn": turn}))
     }
@@ -398,7 +399,12 @@ impl Daemon {
         }
         let texts: Vec<String> = pending.iter().map(|(_, t)| t.clone()).collect();
         let harness = session["harness"].as_str().unwrap_or("claude").to_string();
-        self.overseer_turn(&session, &texts, &harness, session["model"].as_str())?;
+        // Spoken words among them make it a spoken turn (Voice Mode's rules, AC-186).
+        let spoken: bool = {
+            let store = self.store.lock().unwrap();
+            store.conn.query_row("SELECT COUNT(*) FROM overseer_pending p JOIN overseer_messages m ON m.id=p.message_id WHERE p.session_id=?1 AND m.surface='voice'", [&sid], |r| r.get::<_, i64>(0)).unwrap_or(0) > 0
+        };
+        self.overseer_turn(&session, &texts, &harness, session["model"].as_str(), if spoken { "voice" } else { "owner" })?;
         let store = self.store.lock().unwrap();
         for (rowid, _) in pending {
             store.conn.execute("DELETE FROM overseer_pending WHERE rowid=?1", [rowid])?;
@@ -500,7 +506,8 @@ impl Daemon {
         }
         let mut checked = Vec::new();
         let cause: String = self.store.lock().unwrap().conn.query_row("SELECT COALESCE(last_cause, 'owner') FROM overseer_sessions WHERE id=?1", [&sid], |r| r.get(0)).unwrap_or_else(|_| "owner".into());
-        let owner_asked = cause == "owner";
+        let owner_asked = cause == "owner" || cause == "voice";
+        let voice = cause == "voice";
         for a in &list {
             let kind = a["action"].as_str().unwrap_or("");
             if !ACTIONS.contains(&kind) {
@@ -593,11 +600,23 @@ impl Daemon {
                 bail!("the owner denied {tool} {detail} to {title}; Overseer does not have another agent do it");
             }
         }
-        let confirm = checked.iter().any(|a| super::control::action_class(a["action"].as_str().unwrap_or("")) == Some(super::control::CONFIRM) || a["class"] == super::control::CONFIRM);
+        // A spoken request (Gate R): the owner's words quoted in each message, the delivery setting,
+        // more new agents than the owner's limit wait for a yes.
+        let mut needs_yes = false;
+        if voice {
+            needs_yes = crate::voice::request::decorate(self, &mut checked)?;
+        }
+        let confirm = needs_yes || checked.iter().any(|a| super::control::action_class(a["action"].as_str().unwrap_or("")) == Some(super::control::CONFIRM) || a["class"] == super::control::CONFIRM);
         // At Ask first everything waits for a yes. At Steer and Auto what the owner asked for goes
         // out after the settle window; what Overseer starts by itself goes at once when the level
         // allows it (quiet actions at Steer, every Steer action at Auto), else it is a proposal.
-        let (at_once, settle) = if confirm || level == "ask_first" {
+        // What the owner says by voice follows Gate R at every level: it goes out after the settle
+        // window, a stop at once, and a Confirm action waits for a yes.
+        let (at_once, settle) = if confirm {
+            (false, false)
+        } else if voice {
+            (checked.iter().all(|a| a["action"] == "stop"), !checked.iter().all(|a| a["action"] == "stop"))
+        } else if level == "ask_first" {
             (false, false)
         } else if owner_asked {
             (false, true)
@@ -614,7 +633,8 @@ impl Daemon {
         let last_message: Option<String> = self.store.lock().unwrap().conn.query_row("SELECT id FROM overseer_messages WHERE session_id=?1 AND source='overseer' ORDER BY seq DESC LIMIT 1", [&sid], |r| r.get(0)).ok();
         self.store.lock().unwrap().conn.execute("INSERT INTO overseer_proposals(id, session_id, message_id, ts, actions, state, source) VALUES(?1, ?2, ?3, ?4, ?5, 'open', ?6)", rusqlite::params![id, sid, last_message, now, serde_json::to_string(&checked)?, source])?;
         let state = if settle { "settling" } else { "open" };
-        let settle_until = if settle { Some(now + SETTLE_MS) } else { None };
+        let settle_ms = if voice { crate::voice::request::settle_ms(self, &checked) } else { SETTLE_MS };
+        let settle_until = if settle { Some(now + settle_ms) } else { None };
         self.store.lock().unwrap().conn.execute("UPDATE overseer_proposals SET state=?2, settle_until=?3, cause=?4 WHERE id=?1", rusqlite::params![id, state, settle_until, cause])?;
         let card = json!({"id": id, "actions": checked, "lines": lines, "state": state, "level": level, "via": source, "cause": cause, "settle_until": settle_until, "confirm": confirm,
             "note": if source == "text" { "Proposed in text: this harness has no tools, so the state was sent with the message." } else { "" }});
@@ -625,7 +645,7 @@ impl Daemon {
             return Ok(json!({"proposal": id, "state": result["state"], "done": true, "result": result["result"]}));
         }
         if settle {
-            return Ok(json!({"proposal": id, "state": "settling", "done": false, "result": format!("Going out in {} s unless the owner cancels.", SETTLE_MS / 1000)}));
+            return Ok(json!({"proposal": id, "state": "settling", "done": false, "result": format!("Going out in {} s unless the owner cancels.", settle_ms / 1000)}));
         }
         if confirm {
             return Ok(json!({"proposal": id, "state": "open", "done": false, "result": "Read back to the owner; it needs their yes."}));
@@ -698,6 +718,13 @@ impl Daemon {
         let result = format!("Done: {}.", done.join("; "));
         let _ = session;
         finish("yes", &result)
+    }
+
+    /// The cause of what Overseer proposes next (Voice Mode's built-in phrases propose directly).
+    pub fn overseer_set_cause(&self, cause: &str) -> Result<()> {
+        let session = self.overseer_session()?;
+        self.store.lock().unwrap().conn.execute("UPDATE overseer_sessions SET last_cause=?2 WHERE id=?1", rusqlite::params![session["id"].as_str(), cause])?;
+        Ok(())
     }
 
     /// Inside the settle window: nothing has gone out yet, and nothing will.

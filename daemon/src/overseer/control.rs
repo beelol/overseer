@@ -67,6 +67,9 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     ("profile.create", NEVER), ("profile.rename", NEVER), ("profile.login_command", NEVER), ("profile.logout", NEVER),
     ("account.create", NEVER), ("account.remove", NEVER), ("workspace.cleanup", NEVER), ("audio.set", NEVER), ("audio.preview", NEVER),
     ("audio.import_commander", NEVER), ("daemon.shutdown", NEVER), ("daemon.stop_all", NEVER), ("daemon.test_notice", NEVER),
+    // Voice Mode (Gate R): the owner's own, never from the conversation.
+    ("voice.get", "read"), ("voice.requests", "read"), ("voice.subscribe", "read"), ("voice.set", NEVER), ("voice.say", NEVER), ("voice.simulate", NEVER),
+    ("voice.speak", NEVER), ("voice.focus", NEVER), ("voice.download", NEVER), ("voice.cancel", NEVER), ("voice.read_back", NEVER),
     ("overseer.token", NEVER), ("overseer.level", NEVER), ("agent.share_deny", NEVER), ("overseer.cap", NEVER), ("overseer.fresh", NEVER), ("overseer.send", NEVER), ("overseer.answer", NEVER), ("overseer.cancel", NEVER),
 ];
 
