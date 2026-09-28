@@ -27,3 +27,7 @@ One setting, perhaps a slider:
 - Is a model table needed at all, or can measured telemetry alone decide? How does Overseer start before it has measurements (a seed table, refreshed)?
 - How is "effectiveness" measured without paid benchmark runs (outcomes of real tasks, reviews, retries)?
 - How does this fit Auto's qualified upper draw (`daemon/src/upper_draw.rs` on `claude/auto-swarm`) and Swarm's category allocation?
+
+## First live check (queued by the owner, 2026-09-27)
+
+After the dev instances (Gate T) and the daemon's menu-bar icon: a consistency test of Auto's choices. Run a fixed set of tasks several times, each in a dev daemon, over two routes: the owner's personal ChatGPT with GPT-5.6 Sol at medium effort, and the owner's personal Claude with Opus 4.8 at medium effort. Record every decision and its reasons (Auto's decision trace). Check that Auto keeps picking the same route for the same kind of task, and that the choices are sensible. The owner approved Sol medium and Opus 4.8 medium for this test only (beyond AGENTS.md's usual luna and haiku); turns stay small and runs few.
