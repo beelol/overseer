@@ -231,7 +231,10 @@ fn ac197_a_handed_off_agent_stays_one_agent_to_overseer() {
     let role_moved = l.kinds(&watcher, "role_moved");
     assert_eq!((role_moved[0]["role"].as_str(), role_moved[0]["read_only"].as_bool()), (Some("watcher"), Some(true)), "{role_moved:?}");
     assert_eq!(l.d.call("state", json!({}))["oversight"][&watcher]["role"], "watcher");
-    let start = l.starts("claude").into_iter().find(|s| s["prompt"].as_str().unwrap().contains("[Watch ")).expect("the watcher's start on Claude Code");
+    // The successor exists before its process has started: wait for Claude Code's own start.
+    let watcher_start = || l.starts("claude").into_iter().find(|s| s["prompt"].as_str().unwrap().contains("[Watch "));
+    l.until("the watcher's start on Claude Code", 30, || watcher_start().is_some());
+    let start = watcher_start().unwrap();
     let args = args_of(&start);
     let denied = flag(&args, "--disallowedTools").expect("read-only");
     for tool in ["Bash", "Edit", "Write", "WebFetch"] {
