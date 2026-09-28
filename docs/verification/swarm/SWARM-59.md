@@ -1,6 +1,6 @@
 # SWARM-59 — durable eligibility block and wake
 
-Status: partial. Initial revision: `c0c47c6`. Latest evidence revision: `3733cea2`. Support level: fixture-only observation of the agreed Auto Mode snapshot shape; no live telemetry feed or user-facing control.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. Initial revision: `c0c47c6`. Latest evidence revision: `3733cea2`. Support level: fixture-only observation of the agreed Auto Mode snapshot shape; no live telemetry feed or user-facing control.
 
 Input: four local replays cover (1) an allowed target missing at category start, daemon restart, repeat observation and later recovery; (2) loss of the only allowed target after the first of two jobs is admitted; (3) insufficient finishing capacity followed by increased headroom; and (4) an otherwise healthy recovery after the original 15-second run deadline. Each observation declares the required capability, native-unit estimate and purpose. The first replay also tries to turn the block into eligibility by changing only the purpose or estimate. A migration fixture supplies a legacy eligible observation without an assessment identity. The mid-run worker submits a discovery and artifact while availability is blocked.
 
@@ -84,3 +84,18 @@ there is still no normal owner control, live Auto update, or qualified provider
 interruption. Keep SWARM-59 partial.
 
 S0 start follow-up at `ccbedbf0`: the normal start reports why it cannot start instead of committing a run: no approved account (`needs_account_selection`), no qualified director (`blocked` / `no_qualified_director`, and nothing weaker runs) and no free app slot for the director (`blocked` / `global_agent_limit`); an approved account without a usable reading gives a `serial` read-back. Tests: `s0_variants_ask_once_fall_back_or_block_without_committing` and `product_start_without_fixture_api_is_blocked_for_the_director` (`daemon/tests/swarm_start.rs`). This covers the start only; losing every target mid-run and finishing-capacity exhaustion are as recorded above. SWARM-59 stays partial.
+
+## Verified at fixture scope (2026-09-28)
+
+The three fixtures the clause names are separate tests in `daemon/tests/swarm_availability.rs` (12 passed, serial, 2026-09-28):
+
+| Clause | Test |
+| --- | --- |
+| Start with no eligible target | `missing_target_blocks_durably_and_only_eligibility_change_wakes` (`allowed_target_missing`, kept across restart); the normal start refuses to commit without an approved account, a director or a slot (`s0_variants_ask_once_fall_back_or_block_without_committing`) |
+| Lose all allowed targets mid-run | `midrun_target_loss_preserves_worker_evidence_and_blocks_new_admission`; the S4-shaped `shipment_incident_stops_waking_when_no_qualified_selected_account_remains` (`swarm_dispatch_incident`, passed) |
+| Exhaust finishing capacity | `exhausted_finishing_capacity_blocks_then_wakes_with_more_headroom` (`finishing_reserve`) |
+| Specific blocked or incomplete reason; artifacts preserved | the reasons above in `swarm.get`; the mid-run worker's discovery and artifact stay readable; `director_can_close_a_fresh_target_block_without_claiming_success` records an incomplete outcome whose reason must match the fresh block |
+| No unchanged-state inference loop | repeated identical observations give `wake_count=0` and a `blocked` director batch; `unchanged_waiting_route_does_not_create_director_turns_until_recovery` |
+| Resume only on a relevant eligible change or user action, within the original deadline | one wake on the eligible observation or more headroom; `confirmed_target_selection_requires_fresh_observation_and_wakes_once` (owner action); `eligibility_recovery_after_original_deadline_does_not_wake_run` |
+
+Boundary: observations are injected in the agreed snapshot shape; live Auto Mode updates, a normal owner target control in the editor, and a live director's behaviour are not part of this clause's fixture proof.

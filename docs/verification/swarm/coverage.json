@@ -744,7 +744,7 @@
       "blocker": "A versioned LedgerPay fixture now connects a real PostgreSQL state probe to the durable daemon effect journal across restart: a lost ack leaves counter 1 and one duplicate queued, journal replay refuses execution, and a separate control proves blind redelivery would raise the counter to 2. The outcome is reconciled as applied through a submitted effect_probe. Arbitrary harness tool calls are not intercepted, absent outcomes lack a qualified adapter, cross-category identity and safe claim release remain open, and no live path is qualified."
     },
     "SWARM-59": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_availability.rs",
         "daemon/tests/swarm_policy.rs",
@@ -759,7 +759,7 @@
         "docs/verification/evidence/ui/swarm-allowance/result.json",
         "daemon/tests/swarm_start.rs"
       ],
-      "blocker": "Fixture observations persist eligibility blocks and suppress unchanged-state wakes, including S4 after all qualified selected accounts disappear. An owner-confirmed fixture target change invalidates the prior assessment, waits for a fresh observation, wakes once, and preserves prior attempts and artifacts; an account newly selected after first admission cannot gain a new pool allocation. A joined Atlas replay blocks J4 after an injected external allowance reduction while preserving J2 backend evidence; a separate cross-category regression fences an older generous admission snapshot. The daemon preserves selected-window numeric allowance changes and an isolated packaged UI fixture displays a 100-to-0.5-point drop, then unknown without inventing zero. An injected explicit account revocation cancels admitted jobs on every selected route with the same account ID, records one durable revoke operation across replay, preserves an independent account's eligibility, and leaves usage uncertain. Director-wide availability messages remain readable with null job and attempt IDs. The Atlas replay now asserts native-unit before/after/change through status APIs; the packaged UI fixture remains separate. Live Auto Mode updates, verified account identity feeds, a normal owner target control and live director behavior remain unverified. The normal start refuses to commit with no approved account, no qualified director or no free slot, and reads back serial for an account without a usable reading."
+      "blocker": null
     },
     "SWARM-60": {
       "status": "partial",
