@@ -337,8 +337,7 @@ fn a_folder_that_is_not_a_commander_pack_is_refused_with_the_reason() {
     std::fs::create_dir_all(&empty).unwrap();
     let missing = import(&empty);
     assert!(
-        missing
-            .contains("not a Commander pack: agent_started/transmission/commander.wav is missing"),
+        missing.contains("not a Commander pack: agent_started/transmission/commander.wav is missing"),
         "{missing}"
     );
 
@@ -479,10 +478,7 @@ fn a_session_lost_while_the_daemon_was_down_makes_no_sound() {
     d.spawn();
     let lost = d.run(&run);
     assert_eq!(lost["status"], "disconnected", "{lost}");
-    assert!(
-        lost["exit_reason"].as_str().unwrap().contains("lost"),
-        "{lost}"
-    );
+    assert!(lost["exit_reason"].as_str().unwrap().contains("lost"), "{lost}");
     assert_eq!(d.call("audio.get", json!({}))["enabled"], true);
     std::thread::sleep(std::time::Duration::from_millis(800));
     assert_eq!(

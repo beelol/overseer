@@ -24,28 +24,15 @@ fn short_sha(s: &str) -> String {
 
 fn strings(v: &Value) -> Vec<String> {
     match v {
-        Value::Array(a) => a
-            .iter()
-            .filter_map(|x| x.as_str())
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect(),
-        Value::String(s) => s
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect(),
+        Value::Array(a) => a.iter().filter_map(|x| x.as_str()).map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
+        Value::String(s) => s.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
         _ => Vec::new(),
     }
 }
 
 /// A relative path an agent may claim: no root, no `..`, no trailing slash.
 fn clean_path(p: &str) -> Result<String> {
-    let p = p
-        .trim()
-        .trim_start_matches("./")
-        .trim_end_matches('/')
-        .to_string();
+    let p = p.trim().trim_start_matches("./").trim_end_matches('/').to_string();
     if p.is_empty() || p.starts_with('/') || p.split('/').any(|c| c == "..") {
         bail!("{p:?} is not a path inside the repository");
     }
@@ -61,11 +48,7 @@ fn suggest_area(paths: &[String]) -> Vec<String> {
             *counts.entry(top).or_default() += 1;
         }
     }
-    counts
-        .into_iter()
-        .max_by_key(|(_, n)| *n)
-        .map(|(d, _)| vec![d])
-        .unwrap_or_default()
+    counts.into_iter().max_by_key(|(_, n)| *n).map(|(d, _)| vec![d]).unwrap_or_default()
 }
 
 fn cut(s: &str, max: usize) -> &str {
@@ -96,23 +79,8 @@ impl Daemon {
         }
         let (row, default) = {
             let store = self.store.lock().unwrap();
-            let row: Option<(i64, i64)> = store
-                .conn
-                .query_row(
-                    "SELECT briefing, channel FROM channels WHERE run_id=?1",
-                    [run_id],
-                    |r| Ok((r.get(0)?, r.get(1)?)),
-                )
-                .optional()?;
-            let default: String = store
-                .conn
-                .query_row(
-                    "SELECT value FROM meta WHERE key='overseer.channel'",
-                    [],
-                    |r| r.get(0),
-                )
-                .optional()?
-                .unwrap_or_else(|| "auto".into());
+            let row: Option<(i64, i64)> = store.conn.query_row("SELECT briefing, channel FROM channels WHERE run_id=?1", [run_id], |r| Ok((r.get(0)?, r.get(1)?))).optional()?;
+            let default: String = store.conn.query_row("SELECT value FROM meta WHERE key='overseer.channel'", [], |r| r.get(0)).optional()?.unwrap_or_else(|| "auto".into());
             (row, default)
         };
         if let Some((b, c)) = row {
@@ -135,44 +103,21 @@ impl Daemon {
     }
 
     /// The owner sets it per agent, or the default for every agent without a setting.
-    pub fn set_channel(
-        &self,
-        run_id: Option<&str>,
-        briefing: Option<bool>,
-        channel: Option<bool>,
-        default: Option<&str>,
-        by: &str,
-    ) -> Result<Value> {
+    pub fn set_channel(&self, run_id: Option<&str>, briefing: Option<bool>, channel: Option<bool>, default: Option<&str>, by: &str) -> Result<Value> {
         let store = self.store.lock().unwrap();
         if let Some(d) = default {
             if !["auto", "on", "off"].contains(&d) {
                 bail!("the default is auto, on or off");
             }
-            store.conn.execute(
-                "INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.channel', ?1)",
-                [d],
-            )?;
+            store.conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.channel', ?1)", [d])?;
         }
         if let Some(run) = run_id {
             let current: Option<(i64, i64)> = {
                 use rusqlite::OptionalExtension;
-                store
-                    .conn
-                    .query_row(
-                        "SELECT briefing, channel FROM channels WHERE run_id=?1",
-                        [run],
-                        |r| Ok((r.get(0)?, r.get(1)?)),
-                    )
-                    .optional()?
+                store.conn.query_row("SELECT briefing, channel FROM channels WHERE run_id=?1", [run], |r| Ok((r.get(0)?, r.get(1)?))).optional()?
             };
-            let b = briefing
-                .map(|b| b as i64)
-                .or(current.map(|c| c.0))
-                .unwrap_or(1);
-            let c = channel
-                .map(|c| c as i64)
-                .or(current.map(|c| c.1))
-                .unwrap_or(1);
+            let b = briefing.map(|b| b as i64).or(current.map(|c| c.0)).unwrap_or(1);
+            let c = channel.map(|c| c as i64).or(current.map(|c| c.1)).unwrap_or(1);
             store.conn.execute("INSERT OR REPLACE INTO channels(run_id, briefing, channel, set_by, set_ms) VALUES(?1, ?2, ?3, ?4, ?5)", rusqlite::params![run, b, c, by, crate::daemon::now()])?;
         }
         drop(store);
@@ -192,9 +137,7 @@ impl Daemon {
             if r.id == run.id || r.parent_run_id.is_some() || !ACTIVE.contains(&r.status.as_str()) {
                 continue;
             }
-            let same_repo = tasks
-                .iter()
-                .any(|t| t.id == r.task_id && t.repo_root == task.repo_root);
+            let same_repo = tasks.iter().any(|t| t.id == r.task_id && t.repo_root == task.repo_root);
             if same_repo && self.run_role(&r.id) == "agent" {
                 out.push(r);
             }
@@ -220,11 +163,7 @@ impl Daemon {
         for o in &others {
             let area = self.area_of(&o.id);
             let title = crate::redact::redact(&o.title);
-            parts.push(if area.is_empty() {
-                format!("“{title}” (no area claimed yet)")
-            } else {
-                format!("“{title}” in {}", area.join(", "))
-            });
+            parts.push(if area.is_empty() { format!("“{title}” (no area claimed yet)") } else { format!("“{title}” in {}", area.join(", ")) });
         }
         let mut text = format!(
             "[Briefing from Overseer: {} other agent{} work{} in this repository: {}. Leave their areas to them.",
@@ -254,18 +193,8 @@ impl Daemon {
 
     fn record_briefing(&self, run_id: &str, text: &str, how: &str) -> Result<()> {
         let run = self.run(run_id)?;
-        self.store.lock().unwrap().conn.execute(
-            "INSERT INTO briefings(run_id, ts, text, how) VALUES(?1, ?2, ?3, ?4)",
-            rusqlite::params![run_id, crate::daemon::now(), text, how],
-        )?;
-        self.emit(
-            Some(&run.task_id),
-            Some(run_id),
-            "briefing",
-            "overseer",
-            "exact",
-            json!({"text": text, "how": how, "line": "Overseer added a briefing"}),
-        )?;
+        self.store.lock().unwrap().conn.execute("INSERT INTO briefings(run_id, ts, text, how) VALUES(?1, ?2, ?3, ?4)", rusqlite::params![run_id, crate::daemon::now(), text, how])?;
+        self.emit(Some(&run.task_id), Some(run_id), "briefing", "overseer", "exact", json!({"text": text, "how": how, "line": "Overseer added a briefing"}))?;
         Ok(())
     }
 
@@ -281,17 +210,7 @@ impl Daemon {
             if text.is_empty() {
                 continue;
             }
-            let last: Option<String> = self
-                .store
-                .lock()
-                .unwrap()
-                .conn
-                .query_row(
-                    "SELECT text FROM briefings WHERE run_id=?1 ORDER BY ts DESC LIMIT 1",
-                    [&o.id],
-                    |r| r.get(0),
-                )
-                .optional()?;
+            let last: Option<String> = self.store.lock().unwrap().conn.query_row("SELECT text FROM briefings WHERE run_id=?1 ORDER BY ts DESC LIMIT 1", [&o.id], |r| r.get(0)).optional()?;
             if last.as_deref() == Some(text.as_str()) {
                 continue;
             }
@@ -305,9 +224,7 @@ impl Daemon {
 
     pub fn briefings_of(&self, run_id: &str) -> Result<Value> {
         let store = self.store.lock().unwrap();
-        let mut stmt = store
-            .conn
-            .prepare("SELECT ts, text, how FROM briefings WHERE run_id=?1 ORDER BY ts")?;
+        let mut stmt = store.conn.prepare("SELECT ts, text, how FROM briefings WHERE run_id=?1 ORDER BY ts")?;
         let rows: Vec<Value> = stmt.query_map([run_id], |r| Ok(json!({"ts": r.get::<_, i64>(0)?, "text": r.get::<_, String>(1)?, "how": r.get::<_, String>(2)?})))?.collect::<rusqlite::Result<_>>()?;
         Ok(json!({"briefings": rows}))
     }
@@ -323,11 +240,7 @@ impl Daemon {
         if (!channel && !watcher) || !["claude", "codex"].contains(&harness) {
             return Ok(Vec::new());
         }
-        let mut tools: Vec<&str> = if channel {
-            CHANNEL_TOOLS.to_vec()
-        } else {
-            vec!["roster"]
-        };
+        let mut tools: Vec<&str> = if channel { CHANNEL_TOOLS.to_vec() } else { vec!["roster"] };
         if watcher {
             for t in super::watch::WATCHER_TOOLS {
                 if !tools.contains(t) {
@@ -340,26 +253,11 @@ impl Daemon {
         let config = dir.join("overseer-mcp.json");
         let socket = crate::paths::socket_path().display().to_string();
         let exe = self.exe.display().to_string();
-        let token = match std::fs::read(&config)
-            .ok()
-            .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
-        {
-            Some(v) if v["mcpServers"]["overseer"]["env"]["OVERSEER_MCP_TOKEN"].is_string() => v
-                ["mcpServers"]["overseer"]["env"]["OVERSEER_MCP_TOKEN"]
-                .as_str()
-                .unwrap()
-                .to_string(),
+        let token = match std::fs::read(&config).ok().and_then(|b| serde_json::from_slice::<Value>(&b).ok()) {
+            Some(v) if v["mcpServers"]["overseer"]["env"]["OVERSEER_MCP_TOKEN"].is_string() => v["mcpServers"]["overseer"]["env"]["OVERSEER_MCP_TOKEN"].as_str().unwrap().to_string(),
             _ => {
-                let token = self.overseer_token(run_id, "agent")?["token"]
-                    .as_str()
-                    .unwrap()
-                    .to_string();
-                std::fs::write(
-                    &config,
-                    serde_json::to_vec_pretty(
-                        &json!({"mcpServers": {"overseer": {"type": "stdio", "command": exe, "args": ["mcp", "--socket", socket], "env": {"OVERSEER_MCP_TOKEN": token}}}}),
-                    )?,
-                )?;
+                let token = self.overseer_token(run_id, "agent")?["token"].as_str().unwrap().to_string();
+                std::fs::write(&config, serde_json::to_vec_pretty(&json!({"mcpServers": {"overseer": {"type": "stdio", "command": exe, "args": ["mcp", "--socket", socket], "env": {"OVERSEER_MCP_TOKEN": token}}}}))?)?;
                 {
                     use std::os::unix::fs::PermissionsExt;
                     std::fs::set_permissions(&config, std::fs::Permissions::from_mode(0o600))?;
@@ -368,36 +266,11 @@ impl Daemon {
             }
         };
         Ok(match harness {
-            "claude" => vec![
-                "--mcp-config".into(),
-                config.display().to_string(),
-                "--allowedTools".into(),
-                tools
-                    .iter()
-                    .map(|t| format!("mcp__overseer__{t}"))
-                    .collect::<Vec<_>>()
-                    .join(","),
-            ],
+            "claude" => vec!["--mcp-config".into(), config.display().to_string(), "--allowedTools".into(), tools.iter().map(|t| format!("mcp__overseer__{t}")).collect::<Vec<_>>().join(",")],
             "codex" => {
-                let mut args = vec![
-                    "-c".to_string(),
-                    format!("mcp_servers.overseer.command={}", json!(exe)),
-                    "-c".into(),
-                    format!(
-                        "mcp_servers.overseer.args=[\"mcp\",\"--socket\",{}]",
-                        json!(socket)
-                    ),
-                    "-c".into(),
-                    format!(
-                        "mcp_servers.overseer.env={{ OVERSEER_MCP_TOKEN = {} }}",
-                        json!(token)
-                    ),
-                ];
+                let mut args = vec!["-c".to_string(), format!("mcp_servers.overseer.command={}", json!(exe)), "-c".into(), format!("mcp_servers.overseer.args=[\"mcp\",\"--socket\",{}]", json!(socket)), "-c".into(), format!("mcp_servers.overseer.env={{ OVERSEER_MCP_TOKEN = {} }}", json!(token))];
                 for t in &tools {
-                    args.extend([
-                        "-c".into(),
-                        format!("mcp_servers.overseer.tools.{t}.approval_mode=\"approve\""),
-                    ]);
+                    args.extend(["-c".into(), format!("mcp_servers.overseer.tools.{t}.approval_mode=\"approve\"")]);
                 }
                 args
             }
@@ -411,10 +284,7 @@ impl Daemon {
     /// however often it is repeated. Returns the id and whether it was new.
     fn channel_message(&self, run_id: &str, kind: &str, body: &Value) -> Result<(String, bool)> {
         let canonical = serde_json::to_string(body)?;
-        let id = format!(
-            "{kind}-{}",
-            short_sha(&format!("{run_id}|{kind}|{canonical}"))
-        );
+        let id = format!("{kind}-{}", short_sha(&format!("{run_id}|{kind}|{canonical}")));
         let store = self.store.lock().unwrap();
         let n = store.conn.execute("INSERT OR IGNORE INTO agent_messages(id, run_id, kind, ts, body) VALUES(?1, ?2, ?3, ?4, ?5)", rusqlite::params![id, run_id, kind, crate::daemon::now(), canonical])?;
         Ok((id, n == 1))
@@ -427,10 +297,7 @@ impl Daemon {
     }
 
     fn session_id(&self) -> Result<String> {
-        Ok(self.overseer_session()?["id"]
-            .as_str()
-            .unwrap_or_default()
-            .to_string())
+        Ok(self.overseer_session()?["id"].as_str().unwrap_or_default().to_string())
     }
 
     /// report: what the agent is doing, has changed, needs and is blocked by.
@@ -449,14 +316,7 @@ impl Daemon {
             let mut payload = body.clone();
             payload["id"] = json!(id);
             payload["title"] = json!(run.title);
-            self.emit(
-                Some(&run.task_id),
-                Some(run_id),
-                "report",
-                "agent",
-                "exact",
-                payload,
-            )?;
+            self.emit(Some(&run.task_id), Some(run_id), "report", "agent", "exact", payload)?;
             let mut card = body.clone();
             card["kind"] = json!("report");
             card["id"] = json!(id);
@@ -477,11 +337,7 @@ impl Daemon {
                 self.check_in_due_at(run_id, &format!("report:{id}"), 0)?;
             }
         }
-        Ok(if new {
-            "Recorded.".into()
-        } else {
-            "Recorded (Overseer already had this report).".into()
-        })
+        Ok(if new { "Recorded.".into() } else { "Recorded (Overseer already had this report).".into() })
     }
 
     /// ask: a question for Overseer; the answer comes back as a message from Overseer.
@@ -494,38 +350,19 @@ impl Daemon {
         let (id, new) = self.channel_message(run_id, "ask", &json!({"question": question}))?;
         self.picked_up(run_id)?;
         if new {
-            self.emit(
-                Some(&run.task_id),
-                Some(run_id),
-                "ask",
-                "agent",
-                "exact",
-                json!({"id": id, "question": question, "title": run.title}),
-            )?;
+            self.emit(Some(&run.task_id), Some(run_id), "ask", "agent", "exact", json!({"id": id, "question": question, "title": run.title}))?;
             let card = json!({"kind": "ask", "id": id, "agent": run_id, "title": run.title, "question": question, "answer": Value::Null});
-            self.append_session_message(
-                &self.session_id()?,
-                "agent",
-                None,
-                &format!("{} asks: {question}", run.title),
-                Some(&card),
-            )?;
+            self.append_session_message(&self.session_id()?, "agent", None, &format!("{} asks: {question}", run.title), Some(&card))?;
             self.check_in_due_at(run_id, &format!("ask:{id}"), 0)?;
         }
-        Ok(
-            "Asked Overseer; its answer arrives as a message from Overseer. Carry on meanwhile."
-                .into(),
-        )
+        Ok("Asked Overseer; its answer arrives as a message from Overseer. Carry on meanwhile.".into())
     }
 
     /// claim: the paths the agent takes as its area.
     pub fn channel_claim(self: &Arc<Self>, run_id: &str, args: &Value) -> Result<String> {
         let run = self.run(run_id)?;
         let mut paths = Vec::new();
-        for p in strings(&args["paths"])
-            .into_iter()
-            .chain(args["path"].as_str().map(str::to_string))
-        {
+        for p in strings(&args["paths"]).into_iter().chain(args["path"].as_str().map(str::to_string)) {
             paths.push(clean_path(&p)?);
         }
         if paths.is_empty() {
@@ -542,22 +379,9 @@ impl Daemon {
             }
         }
         if new {
-            self.emit(
-                Some(&run.task_id),
-                Some(run_id),
-                "claim",
-                "agent",
-                "exact",
-                json!({"id": id, "paths": paths, "title": run.title}),
-            )?;
+            self.emit(Some(&run.task_id), Some(run_id), "claim", "agent", "exact", json!({"id": id, "paths": paths, "title": run.title}))?;
             let card = json!({"kind": "claim", "id": id, "agent": run_id, "title": run.title, "paths": paths});
-            self.append_session_message(
-                &self.session_id()?,
-                "agent",
-                None,
-                &format!("{} claims {}", run.title, paths.join(", ")),
-                Some(&card),
-            )?;
+            self.append_session_message(&self.session_id()?, "agent", None, &format!("{} claims {}", run.title, paths.join(", ")), Some(&card))?;
             self.conflicts_touch(run_id);
             // The agents beside it hear where it works.
             self.brief_companions(run_id)?;
@@ -600,85 +424,25 @@ impl Daemon {
 
     /// Overseer's answer to a question: recorded on it, sent to the agent as a message from
     /// Overseer, and shown in the conversation with the question.
-    pub fn answer_ask(
-        self: &Arc<Self>,
-        ask_id: &str,
-        text: &str,
-        proposal: &str,
-        by: &str,
-    ) -> Result<String> {
+    pub fn answer_ask(self: &Arc<Self>, ask_id: &str, text: &str, proposal: &str, by: &str) -> Result<String> {
         use rusqlite::OptionalExtension;
         let text = crate::redact::redact(text.trim());
         let text = text.as_str();
         if text.is_empty() {
             bail!("an answer needs text");
         }
-        let row: Option<(String, String)> = self
-            .store
-            .lock()
-            .unwrap()
-            .conn
-            .query_row(
-                "SELECT run_id, body FROM agent_messages WHERE id=?1 AND kind='ask'",
-                [ask_id],
-                |r| Ok((r.get(0)?, r.get(1)?)),
-            )
-            .optional()?;
+        let row: Option<(String, String)> = self.store.lock().unwrap().conn.query_row("SELECT run_id, body FROM agent_messages WHERE id=?1 AND kind='ask'", [ask_id], |r| Ok((r.get(0)?, r.get(1)?))).optional()?;
         let (run_id, body) = row.ok_or_else(|| anyhow!("no question {ask_id}"))?;
-        let question = serde_json::from_str::<Value>(&body)
-            .ok()
-            .and_then(|b| b["question"].as_str().map(str::to_string))
-            .unwrap_or_default();
+        let question = serde_json::from_str::<Value>(&body).ok().and_then(|b| b["question"].as_str().map(str::to_string)).unwrap_or_default();
         let run = self.run(&run_id)?;
-        self.store.lock().unwrap().conn.execute(
-            "UPDATE agent_messages SET answer=?2, answered_ms=?3 WHERE id=?1",
-            rusqlite::params![ask_id, text, crate::daemon::now()],
-        )?;
+        self.store.lock().unwrap().conn.execute("UPDATE agent_messages SET answer=?2, answered_ms=?3 WHERE id=?1", rusqlite::params![ask_id, text, crate::daemon::now()])?;
         let msg = format!("Answer to your question “{question}”: {text}");
-        let delivery = self.queue_message(
-            &run_id,
-            &msg,
-            "overseer",
-            json!({"proposal": proposal, "by": by, "ask": ask_id}),
-        )?;
-        self.dispatch_record(
-            proposal,
-            &run_id,
-            "answer",
-            "add",
-            &msg,
-            "asked",
-            if delivery == "queued" {
-                "held"
-            } else {
-                "delivered"
-            },
-        )?;
-        self.emit(
-            Some(&run.task_id),
-            Some(&run_id),
-            "answer",
-            "overseer",
-            "exact",
-            json!({"ask": ask_id, "question": question, "answer": text}),
-        )?;
+        let delivery = self.queue_message(&run_id, &msg, "overseer", json!({"proposal": proposal, "by": by, "ask": ask_id}))?;
+        self.dispatch_record(proposal, &run_id, "answer", "add", &msg, "asked", if delivery == "queued" { "held" } else { "delivered" })?;
+        self.emit(Some(&run.task_id), Some(&run_id), "answer", "overseer", "exact", json!({"ask": ask_id, "question": question, "answer": text}))?;
         let card = json!({"kind": "answer", "ask": ask_id, "agent": run_id, "title": run.title, "question": question, "answer": text});
-        self.append_session_message(
-            &self.session_id()?,
-            "overseer",
-            None,
-            &format!("To {} (“{question}”): {text}", run.title),
-            Some(&card),
-        )?;
-        Ok(format!(
-            "answered {}{}",
-            run.title,
-            if delivery == "queued" {
-                " (queued until its turn ends)"
-            } else {
-                ""
-            }
-        ))
+        self.append_session_message(&self.session_id()?, "overseer", None, &format!("To {} (“{question}”): {text}", run.title), Some(&card))?;
+        Ok(format!("answered {}{}", run.title, if delivery == "queued" { " (queued until its turn ends)" } else { "" }))
     }
 
     /// An area set from the conversation (rally's yes, or the owner): replaces what was there.
@@ -693,21 +457,12 @@ impl Daemon {
         }
         {
             let store = self.store.lock().unwrap();
-            store
-                .conn
-                .execute("DELETE FROM areas WHERE run_id=?1", [run_id])?;
+            store.conn.execute("DELETE FROM areas WHERE run_id=?1", [run_id])?;
             for p in &clean {
                 store.conn.execute("INSERT OR IGNORE INTO areas(run_id, path, set_by, created_ms) VALUES(?1, ?2, ?3, ?4)", rusqlite::params![run_id, p, by, crate::daemon::now()])?;
             }
         }
-        self.emit(
-            Some(&run.task_id),
-            Some(run_id),
-            "area",
-            by,
-            "exact",
-            json!({"paths": clean, "by": by}),
-        )?;
+        self.emit(Some(&run.task_id), Some(run_id), "area", by, "exact", json!({"paths": clean, "by": by}))?;
         self.conflicts_touch(run_id);
         self.brief_companions(run_id)?;
         Ok(json!({"run_id": run_id, "area": clean}))
@@ -723,59 +478,26 @@ impl Daemon {
             let store = self.store.lock().unwrap();
             (store.runs()?, store.tasks()?)
         };
-        let top: Vec<&crate::store::Run> = runs
-            .iter()
-            .filter(|r| {
-                r.parent_run_id.is_none()
-                    && self.run_role(&r.id) == "agent"
-                    && tasks
-                        .iter()
-                        .any(|t| t.id == r.task_id && t.archived_ms.is_none())
-            })
-            .collect();
-        let repo_of = |r: &crate::store::Run| {
-            tasks
-                .iter()
-                .find(|t| t.id == r.task_id)
-                .map(|t| t.repo_root.clone())
-                .unwrap_or_default()
-        };
+        let top: Vec<&crate::store::Run> = runs.iter().filter(|r| r.parent_run_id.is_none() && self.run_role(&r.id) == "agent" && tasks.iter().any(|t| t.id == r.task_id && t.archived_ms.is_none())).collect();
+        let repo_of = |r: &crate::store::Run| tasks.iter().find(|t| t.id == r.task_id).map(|t| t.repo_root.clone()).unwrap_or_default();
         let chosen: Vec<&crate::store::Run> = match agents {
-            Some(ids) if !ids.is_empty() => top
-                .iter()
-                .copied()
-                .filter(|r| ids.contains(&r.id))
-                .collect(),
+            Some(ids) if !ids.is_empty() => top.iter().copied().filter(|r| ids.contains(&r.id)).collect(),
             _ => {
                 let repo = match repo.filter(|r| !r.is_empty()) {
-                    Some(r) => crate::git::toplevel(std::path::Path::new(r))
-                        .map(|p| p.display().to_string())
-                        .unwrap_or_else(|_| r.to_string()),
+                    Some(r) => crate::git::toplevel(std::path::Path::new(r)).map(|p| p.display().to_string()).unwrap_or_else(|_| r.to_string()),
                     None => {
                         // The repository with the most active agents.
                         let mut counts: BTreeMap<String, usize> = BTreeMap::new();
                         for r in &top {
-                            *counts.entry(repo_of(r)).or_default() +=
-                                if ACTIVE.contains(&r.status.as_str()) {
-                                    100
-                                } else {
-                                    1
-                                };
+                            *counts.entry(repo_of(r)).or_default() += if ACTIVE.contains(&r.status.as_str()) { 100 } else { 1 };
                         }
-                        counts
-                            .into_iter()
-                            .max_by_key(|(_, n)| *n)
-                            .map(|(r, _)| r)
-                            .unwrap_or_default()
+                        counts.into_iter().max_by_key(|(_, n)| *n).map(|(r, _)| r).unwrap_or_default()
                     }
                 };
                 top.iter().copied().filter(|r| repo_of(r) == repo).collect()
             }
         };
-        let repository = chosen
-            .first()
-            .map(|r| repo_of(r))
-            .unwrap_or_else(|| repo.unwrap_or("").to_string());
+        let repository = chosen.first().map(|r| repo_of(r)).unwrap_or_else(|| repo.unwrap_or("").to_string());
         let mut map = Vec::new();
         let mut changed_by: BTreeMap<String, Vec<String>> = BTreeMap::new();
         let mut ask = Vec::new();
@@ -793,11 +515,7 @@ impl Daemon {
             for p in &paths {
                 changed_by.entry(p.clone()).or_default().push(r.id.clone());
             }
-            let suggested = if d.area.is_empty() {
-                suggest_area(&paths)
-            } else {
-                Vec::new()
-            };
+            let suggested = if d.area.is_empty() { suggest_area(&paths) } else { Vec::new() };
             if d.area.is_empty() && report.is_none() {
                 ask.push(r.id.clone());
             }
@@ -808,22 +526,9 @@ impl Daemon {
                 "open_questions": asks.iter().filter(|a| a["answer"].is_null()).map(|a| a["question"].clone()).collect::<Vec<_>>(),
             }));
         }
-        let overlaps: Vec<Value> = changed_by
-            .iter()
-            .filter(|(_, ids)| ids.len() > 1)
-            .map(|(p, ids)| json!({"path": p, "agents": ids}))
-            .collect();
+        let overlaps: Vec<Value> = changed_by.iter().filter(|(_, ids)| ids.len() > 1).map(|(p, ids)| json!({"path": p, "agents": ids})).collect();
         let ids: Vec<&str> = chosen.iter().map(|r| r.id.as_str()).collect();
-        let conflicts: Vec<Value> = self.conflicts_list(None, false)?["conflicts"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default()
-            .into_iter()
-            .filter(|c| {
-                ids.contains(&c["run_a"].as_str().unwrap_or(""))
-                    || ids.contains(&c["run_b"].as_str().unwrap_or(""))
-            })
-            .collect();
+        let conflicts: Vec<Value> = self.conflicts_list(None, false)?["conflicts"].as_array().cloned().unwrap_or_default().into_iter().filter(|c| ids.contains(&c["run_a"].as_str().unwrap_or("")) || ids.contains(&c["run_b"].as_str().unwrap_or(""))).collect();
         Ok(json!({
             "repository": repository, "agents": map, "overlaps": overlaps, "conflicts": conflicts, "ask": ask,
             "cost": format!("{} agent turn{}", ask.len(), if ask.len() == 1 { "" } else { "s" }),
@@ -835,29 +540,16 @@ impl Daemon {
 
     pub fn share_denied(&self, run_id: &str) -> bool {
         let store = self.store.lock().unwrap();
-        store
-            .conn
-            .query_row(
-                "SELECT COUNT(*) FROM share_denials WHERE run_id=?1",
-                [run_id],
-                |r| r.get::<_, i64>(0),
-            )
-            .map(|n| n > 0)
-            .unwrap_or(false)
+        store.conn.query_row("SELECT COUNT(*) FROM share_denials WHERE run_id=?1", [run_id], |r| r.get::<_, i64>(0)).map(|n| n > 0).unwrap_or(false)
     }
 
     pub fn share_deny(&self, run_id: &str, denied: bool, by: &str) -> Result<Value> {
         self.run(run_id)?;
         let store = self.store.lock().unwrap();
         if denied {
-            store.conn.execute(
-                "INSERT OR REPLACE INTO share_denials(run_id, set_by, set_ms) VALUES(?1, ?2, ?3)",
-                rusqlite::params![run_id, by, crate::daemon::now()],
-            )?;
+            store.conn.execute("INSERT OR REPLACE INTO share_denials(run_id, set_by, set_ms) VALUES(?1, ?2, ?3)", rusqlite::params![run_id, by, crate::daemon::now()])?;
         } else {
-            store
-                .conn
-                .execute("DELETE FROM share_denials WHERE run_id=?1", [run_id])?;
+            store.conn.execute("DELETE FROM share_denials WHERE run_id=?1", [run_id])?;
         }
         Ok(json!({"run_id": run_id, "denied": denied}))
     }
@@ -866,15 +558,11 @@ impl Daemon {
     fn diff_of(&self, run_id: &str, path: Option<&str>) -> Result<String> {
         let run = self.run(run_id)?;
         let ws = self.workspace(&run.workspace_id)?;
-        let root = std::fs::canonicalize(&ws.path)
-            .map_err(|_| anyhow!("the worktree of {} is gone", run.title))?;
+        let root = std::fs::canonicalize(&ws.path).map_err(|_| anyhow!("the worktree of {} is gone", run.title))?;
         let task = self.task(&run.task_id)?;
         let base = {
             let store = self.store.lock().unwrap();
-            task.start_snapshot
-                .as_deref()
-                .and_then(|id| store.snapshot(id).ok().flatten())
-                .map(|s| s.commit_sha)
+            task.start_snapshot.as_deref().and_then(|id| store.snapshot(id).ok().flatten()).map(|s| s.commit_sha)
         }
         .or_else(|| crate::git::head(&root))
         .ok_or_else(|| anyhow!("no base to diff against"))?;
@@ -887,23 +575,14 @@ impl Daemon {
             args.extend(["--", p]);
         }
         let diff = crate::git::git(&root, &args)?;
-        Ok(if diff.is_empty() {
-            format!(
-                "{} is unchanged against the task's base.",
-                path.unwrap_or("the worktree")
-            )
-        } else {
-            diff
-        })
+        Ok(if diff.is_empty() { format!("{} is unchanged against the task's base.", path.unwrap_or("the worktree")) } else { diff })
     }
 
     /// Where a share goes and where it comes from decide its class: Steer within one repository,
     /// Confirm across. `None` when the source is Overseer's own note.
     pub fn share_across_repositories(&self, a: &Value) -> Result<bool> {
         let to = a["to"].as_str().or(a["agent"].as_str()).unwrap_or("");
-        let Some(from) = a["from"].as_str().filter(|s| !s.is_empty()) else {
-            return Ok(false);
-        };
+        let Some(from) = a["from"].as_str().filter(|s| !s.is_empty()) else { return Ok(false) };
         let repo = |id: &str| -> Result<String> {
             let run = self.run(id).map_err(|_| anyhow!("no agent {id}"))?;
             Ok(self.task(&run.task_id)?.repo_root)
@@ -914,23 +593,15 @@ impl Daemon {
     /// Share: one agent's report, diff, messages, or a note or finding Overseer wrote, sent to
     /// another agent as a message from Overseer that names where it came from.
     pub fn share_perform(self: &Arc<Self>, a: &Value, proposal: &str, by: &str) -> Result<String> {
-        let to = a["to"]
-            .as_str()
-            .or(a["agent"].as_str())
-            .filter(|s| !s.is_empty())
-            .ok_or_else(|| anyhow!("share needs the agent it goes to (to)"))?;
+        let to = a["to"].as_str().or(a["agent"].as_str()).filter(|s| !s.is_empty()).ok_or_else(|| anyhow!("share needs the agent it goes to (to)"))?;
         let to_run = self.run(to).map_err(|_| anyhow!("no agent {to}"))?;
         if self.share_denied(to) {
             bail!("the owner denied shares to {}", to_run.title);
         }
         let from = a["from"].as_str().filter(|s| !s.is_empty());
-        let what = a["what"]
-            .as_str()
-            .unwrap_or(if from.is_some() { "report" } else { "note" });
+        let what = a["what"].as_str().unwrap_or(if from.is_some() { "report" } else { "note" });
         let from_title = match from {
-            Some(f) => Some(crate::redact::redact(
-                &self.run(f).map_err(|_| anyhow!("no agent {f}"))?.title,
-            )),
+            Some(f) => Some(crate::redact::redact(&self.run(f).map_err(|_| anyhow!("no agent {f}"))?.title)),
             None => None,
         };
         let (label, content) = match what {
@@ -944,33 +615,12 @@ impl Daemon {
             "report" => {
                 let f = from.ok_or_else(|| anyhow!("a report is shared from an agent (from)"))?;
                 let (report, _) = self.channel_summary(f);
-                let r = report.ok_or_else(|| {
-                    anyhow!(
-                        "{} has sent no report",
-                        from_title.clone().unwrap_or_default()
-                    )
-                })?;
-                (
-                    "report".to_string(),
-                    format!(
-                        "doing: {}\nchanged: {}\nneeds: {}\nblocked: {}",
-                        r["doing"].as_str().unwrap_or(""),
-                        strings(&r["changed"]).join(", "),
-                        r["needs"].as_str().unwrap_or(""),
-                        r["blocked"].as_str().unwrap_or("")
-                    ),
-                )
+                let r = report.ok_or_else(|| anyhow!("{} has sent no report", from_title.clone().unwrap_or_default()))?;
+                ("report".to_string(), format!("doing: {}\nchanged: {}\nneeds: {}\nblocked: {}", r["doing"].as_str().unwrap_or(""), strings(&r["changed"]).join(", "), r["needs"].as_str().unwrap_or(""), r["blocked"].as_str().unwrap_or("")))
             }
             "messages" => {
                 let f = from.ok_or_else(|| anyhow!("messages are shared from an agent (from)"))?;
-                (
-                    "messages".to_string(),
-                    self.conversation_text(
-                        f,
-                        a["after"].as_i64().unwrap_or(0),
-                        a["limit"].as_i64().unwrap_or(200),
-                    )?,
-                )
+                ("messages".to_string(), self.conversation_text(f, a["after"].as_i64().unwrap_or(0), a["limit"].as_i64().unwrap_or(200))?)
             }
             "note" | "finding" => {
                 let text = a["text"].as_str().unwrap_or("").trim();
@@ -979,9 +629,7 @@ impl Daemon {
                 }
                 (what.to_string(), text.to_string())
             }
-            other => bail!(
-                "share carries a diff, a report, messages, a note or a finding, not {other:?}"
-            ),
+            other => bail!("share carries a diff, a report, messages, a note or a finding, not {other:?}"),
         };
         let content = crate::redact::redact(&content);
         let source = match &from_title {
@@ -1002,27 +650,10 @@ impl Daemon {
                 use std::os::unix::fs::PermissionsExt;
                 std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
             }
-            (
-                format!(
-                    "{}\n[… the first part of {bytes} bytes; the whole piece is in {}]",
-                    cut(&content, SHARE_INLINE_BYTES - 256),
-                    path.display()
-                ),
-                Some(path.display().to_string()),
-            )
+            (format!("{}\n[… the first part of {bytes} bytes; the whole piece is in {}]", cut(&content, SHARE_INLINE_BYTES - 256), path.display()), Some(path.display().to_string()))
         };
-        let msg = format!(
-            "Shared by Overseer {source}{}:\n{inline}",
-            file.as_ref()
-                .map(|f| format!(", {bytes} bytes, the whole piece at {f}"))
-                .unwrap_or_default()
-        );
-        let delivery = self.queue_message(
-            to,
-            &msg,
-            "overseer",
-            json!({"proposal": proposal, "by": by, "share": id}),
-        )?;
+        let msg = format!("Shared by Overseer {source}{}:\n{inline}", file.as_ref().map(|f| format!(", {bytes} bytes, the whole piece at {f}")).unwrap_or_default());
+        let delivery = self.queue_message(to, &msg, "overseer", json!({"proposal": proposal, "by": by, "share": id}))?;
         {
             let store = self.store.lock().unwrap();
             store.conn.execute(
@@ -1031,49 +662,19 @@ impl Daemon {
             )?;
         }
         self.emit(Some(&to_run.task_id), Some(to), "share", "overseer", "exact", json!({"id": id, "from": from, "what": what, "source": source, "bytes": bytes, "inline_bytes": inline.len(), "file": file, "proposal": proposal, "by": by}))?;
-        self.dispatch_record(
-            proposal,
-            to,
-            "share",
-            "add",
-            &format!("{source}: {bytes} bytes"),
-            a["why"].as_str().unwrap_or("named"),
-            if delivery == "queued" {
-                "held"
-            } else {
-                "delivered"
-            },
-        )?;
-        Ok(format!(
-            "shared {source} with {}{}",
-            to_run.title,
-            if delivery == "queued" {
-                " (queued until its turn ends)"
-            } else {
-                ""
-            }
-        ))
+        self.dispatch_record(proposal, to, "share", "add", &format!("{source}: {bytes} bytes"), a["why"].as_str().unwrap_or("named"), if delivery == "queued" { "held" } else { "delivered" })?;
+        Ok(format!("shared {source} with {}{}", to_run.title, if delivery == "queued" { " (queued until its turn ends)" } else { "" }))
     }
 
     /// A share that turned out wrong: withdrawn, and everyone who received the same piece is told.
     pub fn share_withdraw(self: &Arc<Self>, id: &str, by: &str) -> Result<Value> {
         use rusqlite::OptionalExtension;
-        let content_id: Option<String> = self
-            .store
-            .lock()
-            .unwrap()
-            .conn
-            .query_row("SELECT content_id FROM shares WHERE id=?1", [id], |r| {
-                r.get(0)
-            })
-            .optional()?;
+        let content_id: Option<String> = self.store.lock().unwrap().conn.query_row("SELECT content_id FROM shares WHERE id=?1", [id], |r| r.get(0)).optional()?;
         let content_id = content_id.ok_or_else(|| anyhow!("no share {id}"))?;
         let rows: Vec<(String, String, String)> = {
             let store = self.store.lock().unwrap();
             let mut stmt = store.conn.prepare("SELECT id, to_run, source FROM shares WHERE content_id=?1 AND withdrawn_ms IS NULL ORDER BY ts")?;
-            let rows = stmt
-                .query_map([&content_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
-                .collect::<rusqlite::Result<_>>()?;
+            let rows = stmt.query_map([&content_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<rusqlite::Result<_>>()?;
             rows
         };
         if rows.is_empty() {
@@ -1081,37 +682,16 @@ impl Daemon {
         }
         let mut told = Vec::new();
         for (sid, to, source) in &rows {
-            self.store.lock().unwrap().conn.execute(
-                "UPDATE shares SET withdrawn_ms=?2 WHERE id=?1",
-                rusqlite::params![sid, crate::daemon::now()],
-            )?;
+            self.store.lock().unwrap().conn.execute("UPDATE shares SET withdrawn_ms=?2 WHERE id=?1", rusqlite::params![sid, crate::daemon::now()])?;
             let msg = format!("Withdrawn: what Overseer shared {source} (share {sid}) was wrong; do not rely on it.");
             self.queue_message(to, &msg, "overseer", json!({"withdraw": sid, "by": by}))?;
             if let Ok(run) = self.run(to) {
-                self.emit(
-                    Some(&run.task_id),
-                    Some(to),
-                    "share_withdrawn",
-                    "overseer",
-                    "exact",
-                    json!({"id": sid, "source": source, "by": by}),
-                )?;
+                self.emit(Some(&run.task_id), Some(to), "share_withdrawn", "overseer", "exact", json!({"id": sid, "source": source, "by": by}))?;
                 told.push(json!({"share": sid, "agent": to, "title": run.title}));
             }
         }
         let card = json!({"kind": "withdrawn", "share": id, "source": rows[0].2, "told": told});
-        self.append_session_message(
-            &self.session_id()?,
-            "overseer",
-            None,
-            &format!(
-                "Withdrew the share {} from {} agent{}",
-                rows[0].2,
-                told.len(),
-                if told.len() == 1 { "" } else { "s" }
-            ),
-            Some(&card),
-        )?;
+        self.append_session_message(&self.session_id()?, "overseer", None, &format!("Withdrew the share {} from {} agent{}", rows[0].2, told.len(), if told.len() == 1 { "" } else { "s" }), Some(&card))?;
         Ok(json!({"withdrawn": rows.iter().map(|r| r.0.clone()).collect::<Vec<_>>(), "told": told}))
     }
 
@@ -1135,25 +715,9 @@ impl Daemon {
         let moved: Vec<(&str, usize)> = {
             let store = self.store.lock().unwrap();
             let mut moved = Vec::new();
-            for (table, column) in [
-                ("holds", "run_id"),
-                ("guardrails", "run_id"),
-                ("areas", "run_id"),
-                ("cadences", "run_id"),
-                ("channels", "run_id"),
-                ("queued_messages", "run_id"),
-                ("share_denials", "run_id"),
-                ("watches", "subject"),
-                ("watches", "watcher"),
-                ("conflicts", "run_a"),
-                ("conflicts", "run_b"),
-                ("dispatches", "run_id"),
-            ] {
+            for (table, column) in [("holds", "run_id"), ("guardrails", "run_id"), ("areas", "run_id"), ("cadences", "run_id"), ("channels", "run_id"), ("queued_messages", "run_id"), ("share_denials", "run_id"), ("watches", "subject"), ("watches", "watcher"), ("conflicts", "run_a"), ("conflicts", "run_b"), ("dispatches", "run_id")] {
                 // Keys that would collide keep the successor's own row.
-                let n = store.conn.execute(
-                    &format!("UPDATE OR IGNORE {table} SET {column}=?2 WHERE {column}=?1"),
-                    rusqlite::params![predecessor, successor],
-                )?;
+                let n = store.conn.execute(&format!("UPDATE OR IGNORE {table} SET {column}=?2 WHERE {column}=?1"), rusqlite::params![predecessor, successor])?;
                 if n > 0 {
                     moved.push((table, n));
                 }

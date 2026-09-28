@@ -61,29 +61,9 @@ impl Daemon {
     pub fn cadence_of(&self, run_id: &str) -> Cadence {
         use rusqlite::OptionalExtension;
         let store = self.store.lock().unwrap();
-        let own: Option<String> = store
-            .conn
-            .query_row(
-                "SELECT cadence FROM cadences WHERE run_id=?1",
-                [run_id],
-                |r| r.get(0),
-            )
-            .optional()
-            .ok()
-            .flatten();
-        let global: Option<String> = store
-            .conn
-            .query_row(
-                "SELECT value FROM meta WHERE key='overseer.check_ins'",
-                [],
-                |r| r.get(0),
-            )
-            .optional()
-            .ok()
-            .flatten();
-        own.or(global)
-            .and_then(|s| Cadence::parse(&s).ok())
-            .unwrap_or(Cadence::Every(DEFAULT_EVERY))
+        let own: Option<String> = store.conn.query_row("SELECT cadence FROM cadences WHERE run_id=?1", [run_id], |r| r.get(0)).optional().ok().flatten();
+        let global: Option<String> = store.conn.query_row("SELECT value FROM meta WHERE key='overseer.check_ins'", [], |r| r.get(0)).optional().ok().flatten();
+        own.or(global).and_then(|s| Cadence::parse(&s).ok()).unwrap_or(Cadence::Every(DEFAULT_EVERY))
     }
 
     /// Set how closely one agent (or, with no run, every agent) is followed.
@@ -95,64 +75,33 @@ impl Daemon {
                 store.conn.execute("INSERT OR REPLACE INTO cadences(run_id, cadence, set_by, set_ms) VALUES(?1, ?2, ?3, ?4)", rusqlite::params![r, c.text(), by, crate::daemon::now()])?;
             }
             None => {
-                store.conn.execute(
-                    "INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.check_ins', ?1)",
-                    [c.text()],
-                )?;
+                store.conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.check_ins', ?1)", [c.text()])?;
             }
         }
         drop(store);
         let task = run_id.and_then(|r| self.run(r).ok()).map(|r| r.task_id);
-        self.emit(
-            task.as_deref(),
-            run_id,
-            "cadence",
-            by,
-            "exact",
-            json!({"cadence": c.text(), "by": by}),
-        )?;
+        self.emit(task.as_deref(), run_id, "cadence", by, "exact", json!({"cadence": c.text(), "by": by}))?;
         Ok(json!({"run_id": run_id, "cadence": c.text()}))
     }
 
     pub fn cap_of(&self) -> i64 {
         use rusqlite::OptionalExtension;
         let store = self.store.lock().unwrap();
-        store
-            .conn
-            .query_row("SELECT value FROM meta WHERE key='overseer.cap'", [], |r| {
-                r.get::<_, String>(0)
-            })
-            .optional()
-            .ok()
-            .flatten()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(DEFAULT_CAP)
+        store.conn.query_row("SELECT value FROM meta WHERE key='overseer.cap'", [], |r| r.get::<_, String>(0)).optional().ok().flatten().and_then(|v| v.parse().ok()).unwrap_or(DEFAULT_CAP)
     }
 
     pub fn set_cap(&self, cap: i64) -> Result<Value> {
         if !(1..=10_000).contains(&cap) {
             bail!("the cap is 1 to 10,000 turns a day");
         }
-        self.store.lock().unwrap().conn.execute(
-            "INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.cap', ?1)",
-            [cap.to_string()],
-        )?;
+        self.store.lock().unwrap().conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.cap', ?1)", [cap.to_string()])?;
         Ok(json!({"cap": cap}))
     }
 
     /// Turns Overseer started by itself in the last day.
     pub fn self_started_today(&self) -> i64 {
         let since = crate::daemon::now() - 24 * 3600 * 1000;
-        self.store
-            .lock()
-            .unwrap()
-            .conn
-            .query_row(
-                "SELECT COUNT(*) FROM overseer_turns WHERE cause != 'owner' AND ts > ?1",
-                [since],
-                |r| r.get(0),
-            )
-            .unwrap_or(0)
+        self.store.lock().unwrap().conn.query_row("SELECT COUNT(*) FROM overseer_turns WHERE cause != 'owner' AND ts > ?1", [since], |r| r.get(0)).unwrap_or(0)
     }
 
     // ------------------------------------------------------------------ what is due
@@ -163,55 +112,29 @@ impl Daemon {
         self.check_in_due_at(run_id, reason, 0)
     }
 
-    pub(crate) fn check_in_due_at(
-        &self,
-        run_id: &str,
-        reason: &str,
-        not_before: i64,
-    ) -> Result<()> {
+    pub(crate) fn check_in_due_at(&self, run_id: &str, reason: &str, not_before: i64) -> Result<()> {
         let run = self.run(run_id)?;
         if run.parent_run_id.is_some() || self.run_role(run_id) != "agent" {
             return Ok(());
         }
         let store = self.store.lock().unwrap();
-        let pending: i64 = store.conn.query_row(
-            "SELECT COUNT(*) FROM check_in_queue WHERE run_id=?1 AND reason=?2",
-            rusqlite::params![run_id, reason],
-            |r| r.get(0),
-        )?;
+        let pending: i64 = store.conn.query_row("SELECT COUNT(*) FROM check_in_queue WHERE run_id=?1 AND reason=?2", rusqlite::params![run_id, reason], |r| r.get(0))?;
         if pending > 0 {
             return Ok(());
         }
-        store.conn.execute(
-            "INSERT INTO check_in_queue(run_id, reason, ts, not_before) VALUES(?1, ?2, ?3, ?4)",
-            rusqlite::params![run_id, reason, crate::daemon::now(), not_before],
-        )?;
+        store.conn.execute("INSERT INTO check_in_queue(run_id, reason, ts, not_before) VALUES(?1, ?2, ?3, ?4)", rusqlite::params![run_id, reason, crate::daemon::now(), not_before])?;
         Ok(())
     }
 
     pub fn grace_ms(&self) -> i64 {
         use rusqlite::OptionalExtension;
         let store = self.store.lock().unwrap();
-        store
-            .conn
-            .query_row(
-                "SELECT value FROM meta WHERE key='overseer.grace_ms'",
-                [],
-                |r| r.get::<_, String>(0),
-            )
-            .optional()
-            .ok()
-            .flatten()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(DEFAULT_GRACE_MS)
+        store.conn.query_row("SELECT value FROM meta WHERE key='overseer.grace_ms'", [], |r| r.get::<_, String>(0)).optional().ok().flatten().and_then(|v| v.parse().ok()).unwrap_or(DEFAULT_GRACE_MS)
     }
 
     /// A new turn: the agent is not finished after all.
     pub fn turn_started_for_check_in(&self, run_id: &str) -> Result<()> {
-        self.store.lock().unwrap().conn.execute(
-            "DELETE FROM check_in_queue WHERE run_id=?1 AND reason='finished'",
-            [run_id],
-        )?;
+        self.store.lock().unwrap().conn.execute("DELETE FROM check_in_queue WHERE run_id=?1 AND reason='finished'", [run_id])?;
         Ok(())
     }
 
@@ -219,9 +142,7 @@ impl Daemon {
     pub fn turn_ended_for_check_in(&self, run_id: &str) -> Result<()> {
         let turns = self.store.lock().unwrap().turns(run_id)?.len() as i64;
         match self.cadence_of(run_id) {
-            Cadence::Every(n) if turns > 0 && turns % n == 0 => {
-                self.check_in_due(run_id, &format!("turn {turns}"))
-            }
+            Cadence::Every(n) if turns > 0 && turns % n == 0 => self.check_in_due(run_id, &format!("turn {turns}")),
             _ => Ok(()),
         }
     }
@@ -254,15 +175,7 @@ impl Daemon {
         if area.is_empty() || paths.is_empty() {
             return Ok(());
         }
-        let outside: Vec<&String> = paths
-            .iter()
-            .filter(|p| {
-                !area.iter().any(|a| {
-                    p.as_str() == a.trim_end_matches('/')
-                        || p.starts_with(&format!("{}/", a.trim_end_matches('/')))
-                })
-            })
-            .collect();
+        let outside: Vec<&String> = paths.iter().filter(|p| !area.iter().any(|a| p.as_str() == a.trim_end_matches('/') || p.starts_with(&format!("{}/", a.trim_end_matches('/'))))).collect();
         if outside.is_empty() {
             return Ok(());
         }
@@ -271,79 +184,36 @@ impl Daemon {
         if already > 0 {
             return Ok(());
         }
-        self.store.lock().unwrap().conn.execute(
-            "INSERT INTO free_checks(run_id, kind, detail, ts) VALUES(?1, 'outside_area', ?2, ?3)",
-            rusqlite::params![run_id, key, crate::daemon::now()],
-        )?;
+        self.store.lock().unwrap().conn.execute("INSERT INTO free_checks(run_id, kind, detail, ts) VALUES(?1, 'outside_area', ?2, ?3)", rusqlite::params![run_id, key, crate::daemon::now()])?;
         let run = self.run(run_id)?;
-        self.emit(
-            Some(&run.task_id),
-            Some(run_id),
-            "outside_area",
-            "daemon",
-            "exact",
-            json!({"paths": outside, "area": area}),
-        )?;
+        self.emit(Some(&run.task_id), Some(run_id), "outside_area", "daemon", "exact", json!({"paths": outside, "area": area}))?;
         self.free_check_tripped(run_id, "wrote outside its area")
     }
 
     /// The same command failing three times in a row. A tool's call carries its input and its
     /// result carries the outcome, joined by the tool id.
-    pub fn check_circles(
-        &self,
-        run_id: &str,
-        tool_id: &str,
-        input: &Value,
-        is_error: bool,
-        is_result: bool,
-    ) -> Result<()> {
+    pub fn check_circles(&self, run_id: &str, tool_id: &str, input: &Value, is_error: bool, is_result: bool) -> Result<()> {
         use rusqlite::OptionalExtension;
         let store = self.store.lock().unwrap();
         if !input.is_null() {
-            store.conn.execute(
-                "INSERT OR REPLACE INTO tool_inputs(run_id, tool_id, input) VALUES(?1, ?2, ?3)",
-                rusqlite::params![run_id, tool_id, input.to_string()],
-            )?;
+            store.conn.execute("INSERT OR REPLACE INTO tool_inputs(run_id, tool_id, input) VALUES(?1, ?2, ?3)", rusqlite::params![run_id, tool_id, input.to_string()])?;
             store.conn.execute("DELETE FROM tool_inputs WHERE run_id=?1 AND rowid NOT IN (SELECT rowid FROM tool_inputs WHERE run_id=?1 ORDER BY rowid DESC LIMIT 100)", [run_id])?;
             if !is_result {
                 return Ok(());
             }
         }
-        let key: Option<String> = if input.is_null() {
-            store
-                .conn
-                .query_row(
-                    "SELECT input FROM tool_inputs WHERE run_id=?1 AND tool_id=?2",
-                    rusqlite::params![run_id, tool_id],
-                    |r| r.get(0),
-                )
-                .optional()?
-        } else {
-            Some(input.to_string())
-        };
+        let key: Option<String> = if input.is_null() { store.conn.query_row("SELECT input FROM tool_inputs WHERE run_id=?1 AND tool_id=?2", rusqlite::params![run_id, tool_id], |r| r.get(0)).optional()? } else { Some(input.to_string()) };
         let Some(key) = key else { return Ok(()) };
-        let last: Option<(String, i64)> = store
-            .conn
-            .query_row(
-                "SELECT detail, count FROM circles WHERE run_id=?1",
-                [run_id],
-                |r| Ok((r.get(0)?, r.get(1)?)),
-            )
-            .optional()?;
+        let last: Option<(String, i64)> = store.conn.query_row("SELECT detail, count FROM circles WHERE run_id=?1", [run_id], |r| Ok((r.get(0)?, r.get(1)?))).optional()?;
         if !is_error {
-            store
-                .conn
-                .execute("DELETE FROM circles WHERE run_id=?1", [run_id])?;
+            store.conn.execute("DELETE FROM circles WHERE run_id=?1", [run_id])?;
             return Ok(());
         }
         let count = match last {
             Some((d, c)) if d == key => c + 1,
             _ => 1,
         };
-        store.conn.execute(
-            "INSERT OR REPLACE INTO circles(run_id, detail, count) VALUES(?1, ?2, ?3)",
-            rusqlite::params![run_id, key, count],
-        )?;
+        store.conn.execute("INSERT OR REPLACE INTO circles(run_id, detail, count) VALUES(?1, ?2, ?3)", rusqlite::params![run_id, key, count])?;
         drop(store);
         if count == CIRCLES {
             let run = self.run(run_id)?;
@@ -362,9 +232,7 @@ impl Daemon {
         let due: Vec<(i64, String, String, i64)> = {
             let store = self.store.lock().unwrap();
             let mut stmt = store.conn.prepare("SELECT rowid, run_id, reason, ts FROM check_in_queue WHERE not_before <= ?1 ORDER BY rowid")?;
-            let rows = stmt
-                .query_map([now], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
-                .collect::<rusqlite::Result<_>>()?;
+            let rows = stmt.query_map([now], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?.collect::<rusqlite::Result<_>>()?;
             rows
         };
         if due.is_empty() {
@@ -372,19 +240,7 @@ impl Daemon {
         }
         // The window runs from when the oldest entry became due.
         let oldest = due.iter().map(|d| d.3).min().unwrap_or(now);
-        let became_due: i64 = self
-            .store
-            .lock()
-            .unwrap()
-            .conn
-            .query_row(
-                "SELECT MIN(MAX(ts, not_before)) FROM check_in_queue WHERE not_before <= ?1",
-                [now],
-                |r| r.get::<_, Option<i64>>(0),
-            )
-            .ok()
-            .flatten()
-            .unwrap_or(oldest);
+        let became_due: i64 = self.store.lock().unwrap().conn.query_row("SELECT MIN(MAX(ts, not_before)) FROM check_in_queue WHERE not_before <= ?1", [now], |r| r.get::<_, Option<i64>>(0)).ok().flatten().unwrap_or(oldest);
         if now - became_due < BATCH_MS && due.len() < BATCH_MAX {
             return Ok(());
         }
@@ -392,18 +248,10 @@ impl Daemon {
         // A turn Overseer starts by itself never creates its run: until the owner has spoken to
         // Overseer there is no model to spend, and the free checks keep recording on their own.
         if session["run_id"].is_null() {
-            self.store
-                .lock()
-                .unwrap()
-                .conn
-                .execute("DELETE FROM check_in_queue", [])?;
+            self.store.lock().unwrap().conn.execute("DELETE FROM check_in_queue", [])?;
             return Ok(());
         }
-        let busy = session["run_id"]
-            .as_str()
-            .and_then(|r| self.run(r).ok())
-            .map(|r| ACTIVE.contains(&r.status.as_str()))
-            .unwrap_or(false);
+        let busy = session["run_id"].as_str().and_then(|r| self.run(r).ok()).map(|r| ACTIVE.contains(&r.status.as_str())).unwrap_or(false);
         if busy {
             return Ok(());
         }
@@ -415,11 +263,7 @@ impl Daemon {
             if said == 0 {
                 self.append_session_message(&sid, "overseer", None, &format!("At the cap: I started {cap} turns by myself today. I will check in again when you ask, or tomorrow; the free checks keep running."), None)?;
             }
-            self.store
-                .lock()
-                .unwrap()
-                .conn
-                .execute("DELETE FROM check_in_queue", [])?;
+            self.store.lock().unwrap().conn.execute("DELETE FROM check_in_queue", [])?;
             return Ok(());
         }
         // One entry per agent, reasons joined; agents that are gone are dropped.
@@ -440,9 +284,7 @@ impl Daemon {
         {
             let store = self.store.lock().unwrap();
             for (rowid, _, _, _) in &due {
-                store
-                    .conn
-                    .execute("DELETE FROM check_in_queue WHERE rowid=?1", [rowid])?;
+                store.conn.execute("DELETE FROM check_in_queue WHERE rowid=?1", [rowid])?;
             }
         }
         if per.is_empty() {
@@ -452,48 +294,16 @@ impl Daemon {
         let harness = session["harness"].as_str().unwrap_or("claude").to_string();
         // Questions and reports from the agents' channel ride the same turn; a turn with nothing
         // else is theirs.
-        let is_channel = |r: &String| {
-            r.starts_with("ask:") || r.starts_with("report:") || r.starts_with("finding:")
-        };
-        let cause = if per
-            .iter()
-            .any(|(_, reasons)| reasons.iter().any(|r| !is_channel(r)))
-        {
-            "check_in"
-        } else if per
-            .iter()
-            .any(|(_, reasons)| reasons.iter().any(|r| r.starts_with("finding:")))
-        {
-            "finding"
-        } else if per
-            .iter()
-            .any(|(_, reasons)| reasons.iter().any(|r| r.starts_with("ask:")))
-        {
-            "ask"
-        } else {
-            "report"
-        };
-        self.overseer_turn_with_cause(
-            &session,
-            &prompt,
-            &harness,
-            session["model"].as_str(),
-            cause,
-        )?;
+        let is_channel = |r: &String| r.starts_with("ask:") || r.starts_with("report:") || r.starts_with("finding:");
+        let cause = if per.iter().any(|(_, reasons)| reasons.iter().any(|r| !is_channel(r))) { "check_in" } else if per.iter().any(|(_, reasons)| reasons.iter().any(|r| r.starts_with("finding:"))) { "finding" } else if per.iter().any(|(_, reasons)| reasons.iter().any(|r| r.starts_with("ask:"))) { "ask" } else { "report" };
+        self.overseer_turn_with_cause(&session, &prompt, &harness, session["model"].as_str(), cause)?;
         for (run, reasons) in &per {
             let reasons: Vec<&String> = reasons.iter().filter(|r| !is_channel(r)).collect();
             if reasons.is_empty() {
                 continue;
             }
             let task = self.run(run).ok().map(|r| r.task_id);
-            self.emit(
-                task.as_deref(),
-                Some(run),
-                "check_in_started",
-                "overseer",
-                "exact",
-                json!({"reasons": reasons}),
-            )?;
+            self.emit(task.as_deref(), Some(run), "check_in_started", "overseer", "exact", json!({"reasons": reasons}))?;
         }
         Ok(())
     }
@@ -501,10 +311,7 @@ impl Daemon {
     /// What Overseer reads for a check-in: each agent's digest and why it is looked at.
     fn compose_check_in(&self, per: &[(String, Vec<String>)]) -> Result<String> {
         use rusqlite::OptionalExtension;
-        let level = self.overseer_session()?["level"]
-            .as_str()
-            .unwrap_or("ask_first")
-            .to_string();
+        let level = self.overseer_session()?["level"].as_str().unwrap_or("ask_first").to_string();
         let mut items = Vec::new();
         let mut questions = Vec::new();
         let mut reports = Vec::new();
@@ -513,54 +320,23 @@ impl Daemon {
         for (run, reasons) in per {
             let d = self.digest(run)?;
             let last_check = d.last_check_in.clone();
-            let plain: Vec<&String> = reasons
-                .iter()
-                .filter(|r| {
-                    !r.starts_with("ask:")
-                        && !r.starts_with("report:")
-                        && !r.starts_with("finding:")
-                })
-                .collect();
+            let plain: Vec<&String> = reasons.iter().filter(|r| !r.starts_with("ask:") && !r.starts_with("report:") && !r.starts_with("finding:")).collect();
             for r in reasons {
                 if let Some(id) = r.strip_prefix("finding:") {
                     if let Some(mut f) = self.finding_json(id) {
                         f["subject_title"] = json!(d.title);
-                        f["watcher_title"] = json!(self
-                            .run(f["watcher"].as_str().unwrap_or(""))
-                            .map(|r| r.title)
-                            .unwrap_or_default());
+                        f["watcher_title"] = json!(self.run(f["watcher"].as_str().unwrap_or("")).map(|r| r.title).unwrap_or_default());
                         f["held"] = json!(self.hold_of(run).is_some());
-                        f["hold_on_stop"] = json!(self
-                            .watch(f["watch"].as_str().unwrap_or(""))
-                            .map(|w| w.hold_on_stop)
-                            .unwrap_or(false));
+                        f["hold_on_stop"] = json!(self.watch(f["watch"].as_str().unwrap_or("")).map(|w| w.hold_on_stop).unwrap_or(false));
                         findings.push(f);
                     }
                 } else if let Some(id) = r.strip_prefix("ask:") {
-                    let q: Option<String> = self
-                        .store
-                        .lock()
-                        .unwrap()
-                        .conn
-                        .query_row(
-                            "SELECT body FROM agent_messages WHERE id=?1 AND answer IS NULL",
-                            [id],
-                            |r| r.get(0),
-                        )
-                        .optional()?;
+                    let q: Option<String> = self.store.lock().unwrap().conn.query_row("SELECT body FROM agent_messages WHERE id=?1 AND answer IS NULL", [id], |r| r.get(0)).optional()?;
                     if let Some(body) = q.and_then(|b| serde_json::from_str::<Value>(&b).ok()) {
                         questions.push(json!({"id": id, "agent": d.id, "title": d.title, "question": body["question"], "area": d.area, "repository": d.repository}));
                     }
                 } else if let Some(id) = r.strip_prefix("report:") {
-                    let b: Option<String> = self
-                        .store
-                        .lock()
-                        .unwrap()
-                        .conn
-                        .query_row("SELECT body FROM agent_messages WHERE id=?1", [id], |r| {
-                            r.get(0)
-                        })
-                        .optional()?;
+                    let b: Option<String> = self.store.lock().unwrap().conn.query_row("SELECT body FROM agent_messages WHERE id=?1", [id], |r| r.get(0)).optional()?;
                     if let Some(mut body) = b.and_then(|b| serde_json::from_str::<Value>(&b).ok()) {
                         body["agent"] = json!(d.id);
                         body["title"] = json!(d.title);
@@ -587,69 +363,26 @@ impl Daemon {
         if !findings.is_empty() {
             out.push_str(&format!("Findings from watchers. The watcher only reads; you act on its subject at your level with propose: for stop, at Ask first propose a hold and say why, at Steer hold now (a redirect is a proposal), at Auto hold and redirect; for concern, a message to the subject or nothing, as you judge; when `held` is true the daemon already holds the subject (hold on stop) and what follows is still yours. Tell the owner what you did. The level is {level}.\n\nFindings (JSON):\n{}\n\n", serde_json::to_string_pretty(&findings)?));
         }
-        out.push_str(&format!(
-            "Digests:\n{}\n{}\n",
-            texts.join("\n\n"),
-            super::session::CLOSE
-        ));
-        out.push_str(if items.is_empty() {
-            "\nAnswer the agents."
-        } else {
-            "\nCheck in on these agents."
-        });
+        out.push_str(&format!("Digests:\n{}\n{}\n", texts.join("\n\n"), super::session::CLOSE));
+        out.push_str(if items.is_empty() { "\nAnswer the agents." } else { "\nCheck in on these agents." });
         Ok(super::bound(&out, 32 * 1024))
     }
 
     /// The check_in tool: Overseer's result for one agent, recorded on that agent.
-    pub fn record_check_in(
-        self: &Arc<Self>,
-        agent: &str,
-        result: &str,
-        reason: &str,
-        left_out: &str,
-    ) -> Result<Value> {
+    pub fn record_check_in(self: &Arc<Self>, agent: &str, result: &str, reason: &str, left_out: &str) -> Result<Value> {
         if !["on_task", "drifting", "done"].contains(&result) {
             bail!("a check-in result is on_task, drifting or done");
         }
-        let run = self
-            .run(agent)
-            .map_err(|_| anyhow::anyhow!("no agent {agent}"))?;
+        let run = self.run(agent).map_err(|_| anyhow::anyhow!("no agent {agent}"))?;
         let now = crate::daemon::now();
         self.store.lock().unwrap().conn.execute("INSERT INTO check_ins(run_id, ts, result, reason, left_out) VALUES(?1, ?2, ?3, ?4, ?5)", rusqlite::params![agent, now, result, reason, left_out])?;
-        self.emit(
-            Some(&run.task_id),
-            Some(agent),
-            "check_in",
-            "overseer",
-            "exact",
-            json!({"result": result, "reason": reason, "left_out": left_out, "title": run.title}),
-        )?;
+        self.emit(Some(&run.task_id), Some(agent), "check_in", "overseer", "exact", json!({"result": result, "reason": reason, "left_out": left_out, "title": run.title}))?;
         if result == "done" {
             let session = self.overseer_session()?;
             let sid = session["id"].as_str().unwrap().to_string();
-            let asked: Vec<String> = self
-                .digest(agent)?
-                .asked
-                .iter()
-                .map(|a| a.text.clone())
-                .collect();
+            let asked: Vec<String> = self.digest(agent)?.asked.iter().map(|a| a.text.clone()).collect();
             let card = json!({"kind": "done", "agent": agent, "title": run.title, "asked": asked, "done": reason, "left_out": left_out});
-            self.append_session_message(
-                &sid,
-                "card",
-                None,
-                &format!(
-                    "{} is done: {}{}",
-                    run.title,
-                    reason,
-                    if left_out.is_empty() {
-                        String::new()
-                    } else {
-                        format!(" Left out: {left_out}.")
-                    }
-                ),
-                Some(&card),
-            )?;
+            self.append_session_message(&sid, "card", None, &format!("{} is done: {}{}", run.title, reason, if left_out.is_empty() { String::new() } else { format!(" Left out: {left_out}.") }), Some(&card))?;
         }
         Ok(json!({"agent": agent, "result": result, "recorded": true}))
     }
@@ -658,9 +391,7 @@ impl Daemon {
         // The cadence takes the store lock itself, so it is read before the lock below.
         let cadence = self.cadence_of(run_id).text();
         let store = self.store.lock().unwrap();
-        let mut stmt = store.conn.prepare(
-            "SELECT ts, result, reason, left_out FROM check_ins WHERE run_id=?1 ORDER BY ts",
-        )?;
+        let mut stmt = store.conn.prepare("SELECT ts, result, reason, left_out FROM check_ins WHERE run_id=?1 ORDER BY ts")?;
         let rows: Vec<Value> = stmt.query_map([run_id], |r| Ok(json!({"ts": r.get::<_, i64>(0)?, "result": r.get::<_, String>(1)?, "reason": r.get::<_, String>(2)?, "left_out": r.get::<_, String>(3)?})))?.collect::<rusqlite::Result<_>>()?;
         Ok(json!({"check_ins": rows, "cadence": cadence}))
     }

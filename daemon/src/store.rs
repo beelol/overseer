@@ -117,9 +117,7 @@ pub struct Event {
 
 fn json_col(row: &Row, idx: &str) -> rusqlite::Result<Value> {
     let text: Option<String> = row.get(idx)?;
-    Ok(text
-        .and_then(|t| serde_json::from_str(&t).ok())
-        .unwrap_or(Value::Null))
+    Ok(text.and_then(|t| serde_json::from_str(&t).ok()).unwrap_or(Value::Null))
 }
 
 impl Store {
@@ -228,26 +226,15 @@ impl Store {
               text TEXT NOT NULL, snapshot TEXT);
             "#,
         )?;
-        let has_pending: bool = self
-            .conn
-            .prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='pending_parent_native'")?
-            .exists([])?;
+        let has_pending: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='pending_parent_native'")?.exists([])?;
         if !has_pending {
-            self.conn
-                .execute_batch("ALTER TABLE runs ADD COLUMN pending_parent_native TEXT;")?;
+            self.conn.execute_batch("ALTER TABLE runs ADD COLUMN pending_parent_native TEXT;")?;
         }
-        let has_archived: bool = self
-            .conn
-            .prepare("SELECT 1 FROM pragma_table_info('tasks') WHERE name='archived_ms'")?
-            .exists([])?;
+        let has_archived: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('tasks') WHERE name='archived_ms'")?.exists([])?;
         if !has_archived {
-            self.conn
-                .execute_batch("ALTER TABLE tasks ADD COLUMN archived_ms INTEGER;")?;
+            self.conn.execute_batch("ALTER TABLE tasks ADD COLUMN archived_ms INTEGER;")?;
         }
-        self.conn.execute(
-            "INSERT OR IGNORE INTO meta(key, value) VALUES('schema_version', ?1)",
-            params![SCHEMA_VERSION.to_string()],
-        )?;
+        self.conn.execute("INSERT OR IGNORE INTO meta(key, value) VALUES('schema_version', ?1)", params![SCHEMA_VERSION.to_string()])?;
         Ok(())
     }
 
@@ -276,49 +263,28 @@ impl Store {
     }
 
     pub fn workspace(&self, id: &str) -> Result<Option<Workspace>> {
-        Ok(self
-            .conn
-            .query_row(
-                "SELECT * FROM workspaces WHERE id=?1",
-                params![id],
-                Self::map_workspace,
-            )
-            .optional()?)
+        Ok(self.conn.query_row("SELECT * FROM workspaces WHERE id=?1", params![id], Self::map_workspace).optional()?)
     }
 
     pub fn workspaces(&self) -> Result<Vec<Workspace>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT * FROM workspaces ORDER BY created_ms")?;
-        let rows = stmt
-            .query_map([], Self::map_workspace)?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let mut stmt = self.conn.prepare("SELECT * FROM workspaces ORDER BY created_ms")?;
+        let rows = stmt.query_map([], Self::map_workspace)?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
     }
 
     pub fn workspace_by_path(&self, path: &str) -> Result<Vec<Workspace>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT * FROM workspaces WHERE path=?1 AND removed_ms IS NULL")?;
-        let rows = stmt
-            .query_map(params![path], Self::map_workspace)?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let mut stmt = self.conn.prepare("SELECT * FROM workspaces WHERE path=?1 AND removed_ms IS NULL")?;
+        let rows = stmt.query_map(params![path], Self::map_workspace)?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
     }
 
     pub fn set_workspace_owner(&self, id: &str, run: Option<&str>) -> Result<()> {
-        self.conn.execute(
-            "UPDATE workspaces SET owner_run_id=?2 WHERE id=?1",
-            params![id, run],
-        )?;
+        self.conn.execute("UPDATE workspaces SET owner_run_id=?2 WHERE id=?1", params![id, run])?;
         Ok(())
     }
 
     pub fn mark_workspace_removed(&self, id: &str, ms: i64) -> Result<()> {
-        self.conn.execute(
-            "UPDATE workspaces SET removed_ms=?2 WHERE id=?1",
-            params![id, ms],
-        )?;
+        self.conn.execute("UPDATE workspaces SET removed_ms=?2 WHERE id=?1", params![id, ms])?;
         Ok(())
     }
 
@@ -348,40 +314,23 @@ impl Store {
     }
 
     pub fn task(&self, id: &str) -> Result<Option<Task>> {
-        Ok(self
-            .conn
-            .query_row(
-                "SELECT * FROM tasks WHERE id=?1",
-                params![id],
-                Self::map_task,
-            )
-            .optional()?)
+        Ok(self.conn.query_row("SELECT * FROM tasks WHERE id=?1", params![id], Self::map_task).optional()?)
     }
 
     pub fn tasks(&self) -> Result<Vec<Task>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT * FROM tasks ORDER BY created_ms")?;
-        let rows = stmt
-            .query_map([], Self::map_task)?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let mut stmt = self.conn.prepare("SELECT * FROM tasks ORDER BY created_ms")?;
+        let rows = stmt.query_map([], Self::map_task)?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
     }
 
     pub fn set_task_archived(&self, id: &str, archived_ms: Option<i64>) -> Result<bool> {
-        Ok(self.conn.execute(
-            "UPDATE tasks SET archived_ms=?2 WHERE id=?1",
-            params![id, archived_ms],
-        )? > 0)
+        Ok(self.conn.execute("UPDATE tasks SET archived_ms=?2 WHERE id=?1", params![id, archived_ms])? > 0)
     }
 
     /// Task ids matching `query` in titles, prompts, repositories, harness, model, status, account
     /// names, agent messages, tool calls and edited file paths (AC-63). Case-insensitive substring.
     pub fn search(&self, query: &str, limit: i64) -> Result<Vec<String>> {
-        let escaped = query
-            .replace('\\', "\\\\")
-            .replace('%', "\\%")
-            .replace('_', "\\_");
+        let escaped = query.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
         let like = format!("%{escaped}%");
         let mut stmt = self.conn.prepare(
             r"SELECT id FROM (
@@ -393,17 +342,12 @@ impl Store {
                   WHERE e.kind IN ('output', 'tool', 'file_activity', 'turn_started') AND e.payload LIKE ?1 ESCAPE '\'
               ) GROUP BY id ORDER BY MAX(at) DESC LIMIT ?2",
         )?;
-        let rows = stmt
-            .query_map(params![like, limit], |r| r.get::<_, String>(0))?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let rows = stmt.query_map(params![like, limit], |r| r.get::<_, String>(0))?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
     }
 
     pub fn set_task_start_snapshot(&self, id: &str, snap: &str) -> Result<()> {
-        self.conn.execute(
-            "UPDATE tasks SET start_snapshot=?2 WHERE id=?1",
-            params![id, snap],
-        )?;
+        self.conn.execute("UPDATE tasks SET start_snapshot=?2 WHERE id=?1", params![id, snap])?;
         Ok(())
     }
 
@@ -440,60 +384,35 @@ impl Store {
             process_generation: row.get("process_generation")?,
             attention: {
                 let v = json_col(row, "attention")?;
-                if v.is_null() {
-                    None
-                } else {
-                    Some(v)
-                }
+                if v.is_null() { None } else { Some(v) }
             },
         })
     }
 
     pub fn run(&self, id: &str) -> Result<Option<Run>> {
-        Ok(self
-            .conn
-            .query_row("SELECT * FROM runs WHERE id=?1", params![id], Self::map_run)
-            .optional()?)
+        Ok(self.conn.query_row("SELECT * FROM runs WHERE id=?1", params![id], Self::map_run).optional()?)
     }
 
     pub fn runs(&self) -> Result<Vec<Run>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT * FROM runs ORDER BY created_ms, id")?;
-        let rows = stmt
-            .query_map([], Self::map_run)?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let mut stmt = self.conn.prepare("SELECT * FROM runs ORDER BY created_ms, id")?;
+        let rows = stmt.query_map([], Self::map_run)?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
     }
 
     pub fn child_by_native(&self, parent: &str, native: &str) -> Result<Option<Run>> {
         Ok(self
             .conn
-            .query_row(
-                "SELECT * FROM runs WHERE parent_run_id=?1 AND native_id=?2",
-                params![parent, native],
-                Self::map_run,
-            )
+            .query_row("SELECT * FROM runs WHERE parent_run_id=?1 AND native_id=?2", params![parent, native], Self::map_run)
             .optional()?)
     }
 
     pub fn children(&self, parent: &str) -> Result<Vec<Run>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT * FROM runs WHERE parent_run_id=?1 ORDER BY created_ms, id")?;
-        let rows = stmt
-            .query_map(params![parent], Self::map_run)?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let mut stmt = self.conn.prepare("SELECT * FROM runs WHERE parent_run_id=?1 ORDER BY created_ms, id")?;
+        let rows = stmt.query_map(params![parent], Self::map_run)?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
     }
 
-    pub fn update_run_status(
-        &self,
-        id: &str,
-        status: &str,
-        reason: Option<&str>,
-        ended: Option<i64>,
-    ) -> Result<()> {
+    pub fn update_run_status(&self, id: &str, status: &str, reason: Option<&str>, ended: Option<i64>) -> Result<()> {
         self.conn.execute(
             "UPDATE runs SET status=?2, exit_reason=COALESCE(?3, exit_reason), ended_ms=?4 WHERE id=?1",
             params![id, status, reason, ended],
@@ -502,28 +421,16 @@ impl Store {
     }
 
     pub fn set_run_native(&self, id: &str, native: &str) -> Result<()> {
-        self.conn.execute(
-            "UPDATE runs SET native_id=?2 WHERE id=?1 AND native_id IS NULL",
-            params![id, native],
-        )?;
+        self.conn.execute("UPDATE runs SET native_id=?2 WHERE id=?1 AND native_id IS NULL", params![id, native])?;
         Ok(())
     }
 
     pub fn set_run_attention(&self, id: &str, attention: Option<&Value>) -> Result<()> {
-        self.conn.execute(
-            "UPDATE runs SET attention=?2 WHERE id=?1",
-            params![id, attention.map(|v| v.to_string())],
-        )?;
+        self.conn.execute("UPDATE runs SET attention=?2 WHERE id=?1", params![id, attention.map(|v| v.to_string())])?;
         Ok(())
     }
 
-    pub fn set_run_process(
-        &self,
-        id: &str,
-        run_dir: &str,
-        generation: i64,
-        launch: &Value,
-    ) -> Result<()> {
+    pub fn set_run_process(&self, id: &str, run_dir: &str, generation: i64, launch: &Value) -> Result<()> {
         self.conn.execute(
             "UPDATE runs SET run_dir=?2, process_generation=?3, segment=0, seg_offset=0, launch=?4 WHERE id=?1",
             params![id, run_dir, generation, launch.to_string()],
@@ -534,19 +441,14 @@ impl Store {
     pub fn run_process(&self, id: &str) -> Result<Option<(String, i64, i64)>> {
         Ok(self
             .conn
-            .query_row(
-                "SELECT run_dir, segment, seg_offset FROM runs WHERE id=?1 AND run_dir IS NOT NULL",
-                params![id],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-            )
+            .query_row("SELECT run_dir, segment, seg_offset FROM runs WHERE id=?1 AND run_dir IS NOT NULL", params![id], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+            })
             .optional()?)
     }
 
     pub fn set_run_cursor(&self, id: &str, segment: i64, offset: i64) -> Result<()> {
-        self.conn.execute(
-            "UPDATE runs SET segment=?2, seg_offset=?3 WHERE id=?1",
-            params![id, segment, offset],
-        )?;
+        self.conn.execute("UPDATE runs SET segment=?2, seg_offset=?3 WHERE id=?1", params![id, segment, offset])?;
         Ok(())
     }
 
@@ -573,20 +475,13 @@ impl Store {
     }
 
     pub fn turns(&self, run: &str) -> Result<Vec<Turn>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT * FROM turns WHERE run_id=?1 ORDER BY n")?;
-        let rows = stmt
-            .query_map(params![run], Self::map_turn)?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let mut stmt = self.conn.prepare("SELECT * FROM turns WHERE run_id=?1 ORDER BY n")?;
+        let rows = stmt.query_map(params![run], Self::map_turn)?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
     }
 
     pub fn finish_open_turns(&self, run: &str, status: &str, ms: i64) -> Result<()> {
-        self.conn.execute(
-            "UPDATE turns SET status=?2, ended_ms=?3 WHERE run_id=?1 AND ended_ms IS NULL",
-            params![run, status, ms],
-        )?;
+        self.conn.execute("UPDATE turns SET status=?2, ended_ms=?3 WHERE run_id=?1 AND ended_ms IS NULL", params![run, status, ms])?;
         Ok(())
     }
 
@@ -629,9 +524,7 @@ impl Store {
     }
 
     pub fn profiles(&self) -> Result<Vec<Profile>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT * FROM profiles ORDER BY created_ms, id")?;
+        let mut stmt = self.conn.prepare("SELECT * FROM profiles ORDER BY created_ms, id")?;
         let rows = stmt
             .query_map([], |row| {
                 Ok(Profile {
@@ -652,30 +545,17 @@ impl Store {
     }
 
     pub fn delete_profile(&self, id: &str) -> Result<()> {
-        self.conn.execute(
-            "DELETE FROM profiles WHERE id=?1 AND is_system=0",
-            params![id],
-        )?;
+        self.conn.execute("DELETE FROM profiles WHERE id=?1 AND is_system=0", params![id])?;
         Ok(())
     }
 
     pub fn rename_profile(&self, id: &str, name: &str) -> Result<()> {
-        self.conn
-            .execute("UPDATE profiles SET name=?2 WHERE id=?1", params![id, name])?;
+        self.conn.execute("UPDATE profiles SET name=?2 WHERE id=?1", params![id, name])?;
         Ok(())
     }
 
     // ---- events
-    pub fn insert_event(
-        &self,
-        ts: i64,
-        task: Option<&str>,
-        run: Option<&str>,
-        kind: &str,
-        source: &str,
-        confidence: &str,
-        payload: &Value,
-    ) -> Result<Event> {
+    pub fn insert_event(&self, ts: i64, task: Option<&str>, run: Option<&str>, kind: &str, source: &str, confidence: &str, payload: &Value) -> Result<Event> {
         self.conn.execute(
             "INSERT INTO events(ts,task_id,run_id,kind,source,confidence,payload) VALUES(?1,?2,?3,?4,?5,?6,?7)",
             params![ts, task, run, kind, source, confidence, payload.to_string()],
@@ -708,16 +588,12 @@ impl Store {
     pub fn events_after(&self, after: i64, run: Option<&str>, limit: i64) -> Result<Vec<Event>> {
         let mut out = Vec::new();
         if let Some(run) = run {
-            let mut stmt = self
-                .conn
-                .prepare("SELECT * FROM events WHERE seq>?1 AND run_id=?2 ORDER BY seq LIMIT ?3")?;
+            let mut stmt = self.conn.prepare("SELECT * FROM events WHERE seq>?1 AND run_id=?2 ORDER BY seq LIMIT ?3")?;
             for e in stmt.query_map(params![after, run, limit], Self::map_event)? {
                 out.push(e?);
             }
         } else {
-            let mut stmt = self
-                .conn
-                .prepare("SELECT * FROM events WHERE seq>?1 ORDER BY seq LIMIT ?2")?;
+            let mut stmt = self.conn.prepare("SELECT * FROM events WHERE seq>?1 ORDER BY seq LIMIT ?2")?;
             for e in stmt.query_map(params![after, limit], Self::map_event)? {
                 out.push(e?);
             }
@@ -726,26 +602,16 @@ impl Store {
     }
 
     pub fn max_seq(&self) -> Result<i64> {
-        Ok(self
-            .conn
-            .query_row("SELECT COALESCE(MAX(seq),0) FROM events", [], |r| r.get(0))?)
+        Ok(self.conn.query_row("SELECT COALESCE(MAX(seq),0) FROM events", [], |r| r.get(0))?)
     }
 
     pub fn oldest_retained(&self, run: &str) -> Result<Option<i64>> {
-        Ok(self.conn.query_row(
-            "SELECT MIN(seq) FROM events WHERE run_id=?1",
-            params![run],
-            |r| r.get(0),
-        )?)
+        Ok(self.conn.query_row("SELECT MIN(seq) FROM events WHERE run_id=?1", params![run], |r| r.get(0))?)
     }
 
     /// Prune a run's oldest events beyond the retention bound. Returns the highest pruned seq.
     pub fn prune_run_events(&self, run: &str, keep: i64) -> Result<Option<i64>> {
-        let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM events WHERE run_id=?1",
-            params![run],
-            |r| r.get(0),
-        )?;
+        let count: i64 = self.conn.query_row("SELECT COUNT(*) FROM events WHERE run_id=?1", params![run], |r| r.get(0))?;
         if count <= keep {
             return Ok(None);
         }
@@ -754,10 +620,7 @@ impl Store {
             params![run, keep],
             |r| r.get(0),
         )?;
-        self.conn.execute(
-            "DELETE FROM events WHERE run_id=?1 AND seq<=?2 AND kind<>'retention'",
-            params![run, cutoff],
-        )?;
+        self.conn.execute("DELETE FROM events WHERE run_id=?1 AND seq<=?2 AND kind<>'retention'", params![run, cutoff])?;
         Ok(Some(cutoff))
     }
 }

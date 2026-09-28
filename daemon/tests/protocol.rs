@@ -13,11 +13,7 @@ fn sh(d: &Daemon, repo: &Path, mode: &str, script: &str) -> serde_json::Value {
 }
 
 fn fixture(name: &str) -> String {
-    repo_root()
-        .join("fixtures")
-        .join(name)
-        .display()
-        .to_string()
+    repo_root().join("fixtures").join(name).display().to_string()
 }
 
 // ---------------------------------------------------------------- AC-05 / AC-07
@@ -27,12 +23,7 @@ fn ac05_ac07_state_survives_daemon_crash_and_reattaches() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let mut d = Daemon::start(&[]);
-    let created = sh(
-        &d,
-        &repo,
-        "worktree",
-        "echo started; sleep 4; echo x > out.txt; echo finished",
-    );
+    let created = sh(&d, &repo, "worktree", "echo started; sleep 4; echo x > out.txt; echo finished");
     let run = run_id(&created);
     d.wait_status(&run, |s| s == "running", 10);
     std::thread::sleep(Duration::from_millis(500));
@@ -42,15 +33,8 @@ fn ac05_ac07_state_survives_daemon_crash_and_reattaches() {
     std::thread::sleep(Duration::from_millis(300));
     d.spawn();
     let after = d.call("state", json!({}));
-    assert_eq!(
-        before["tasks"], after["tasks"],
-        "tasks identical after restart"
-    );
-    assert_eq!(
-        after["runs"].as_array().unwrap().len(),
-        1,
-        "no duplicate runs"
-    );
+    assert_eq!(before["tasks"], after["tasks"], "tasks identical after restart");
+    assert_eq!(after["runs"].as_array().unwrap().len(), 1, "no duplicate runs");
     let reattached = d.events(&run).iter().any(|e| e["kind"] == "reattached");
     assert!(reattached, "daemon reported reattachment");
     let done = d.wait_done(&run, 20);
@@ -58,25 +42,11 @@ fn ac05_ac07_state_survives_daemon_crash_and_reattaches() {
     assert_eq!(done["process_generation"], 1, "no replacement launch");
     let events = d.events(&run);
     assert!(events.len() > events_before);
-    let texts: Vec<String> = events
-        .iter()
-        .filter(|e| e["kind"] == "output")
-        .map(|e| e["payload"]["text"].as_str().unwrap().to_string())
-        .collect();
-    assert_eq!(
-        texts.iter().filter(|t| *t == "started").count(),
-        1,
-        "output not duplicated: {texts:?}"
-    );
-    assert!(
-        texts.contains(&"finished".to_string()),
-        "output produced while daemon was down was recovered"
-    );
+    let texts: Vec<String> = events.iter().filter(|e| e["kind"] == "output").map(|e| e["payload"]["text"].as_str().unwrap().to_string()).collect();
+    assert_eq!(texts.iter().filter(|t| *t == "started").count(), 1, "output not duplicated: {texts:?}");
+    assert!(texts.contains(&"finished".to_string()), "output produced while daemon was down was recovered");
     let seqs: Vec<i64> = events.iter().map(|e| e["seq"].as_i64().unwrap()).collect();
-    assert!(
-        seqs.windows(2).all(|w| w[0] < w[1]),
-        "event order preserved"
-    );
+    assert!(seqs.windows(2).all(|w| w[0] < w[1]), "event order preserved");
 }
 
 #[test]
@@ -95,10 +65,7 @@ fn ac07_lost_session_is_reported_not_running() {
     d.spawn();
     let run_now = d.run(&run);
     assert_eq!(run_now["status"], "disconnected", "{run_now}");
-    assert!(
-        run_now["exit_reason"].as_str().unwrap().contains("lost"),
-        "{run_now}"
-    );
+    assert!(run_now["exit_reason"].as_str().unwrap().contains("lost"), "{run_now}");
     assert_eq!(d.runs().len(), 1);
 }
 
@@ -127,10 +94,7 @@ fn ac06_lifecycle_states_follow_real_signals() {
     signal(shim["child_pid"].as_i64().unwrap(), 9); // external kill, not requested
     let k = d.wait_done(&killed, 10);
     assert_eq!(k["status"], "failed");
-    assert!(
-        k["exit_reason"].as_str().unwrap().contains("signal 9"),
-        "{k}"
-    );
+    assert!(k["exit_reason"].as_str().unwrap().contains("signal 9"), "{k}");
     d.wait_status(&sup, |s| s == "running", 10);
     let (shim2, _) = launch_info(&d, &sup);
     signal(shim2["shim_pid"].as_i64().unwrap(), 9); // supervisor lost
@@ -145,33 +109,14 @@ fn ac06_structured_harness_silence_is_not_completion() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let cut = r.path().join("cut.jsonl");
-    let full = std::fs::read_to_string(fixture("transcripts/codex-0.155-exec-subagent-live.jsonl"))
-        .unwrap();
+    let full = std::fs::read_to_string(fixture("transcripts/codex-0.155-exec-subagent-live.jsonl")).unwrap();
     std::fs::write(&cut, full.lines().take(5).collect::<Vec<_>>().join("\n")).unwrap();
-    let d = Daemon::start(&[
-        ("OVERSEER_CODEX_PATH", &fixture("fake-harness/replay.js")),
-        (
-            "OVERSEER_HARNESS_ENV_PASSTHROUGH",
-            "REPLAY_FILE,REPLAY_DELAY_MS",
-        ),
-        ("REPLAY_FILE", cut.to_str().unwrap()),
-        ("REPLAY_DELAY_MS", "10"),
-    ]);
-    let created = d.call(
-        "task.create",
-        json!({"repo": repo, "harness": "codex", "prompt": "x", "title": "cut"}),
-    );
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/replay.js")), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "REPLAY_FILE,REPLAY_DELAY_MS"), ("REPLAY_FILE", cut.to_str().unwrap()), ("REPLAY_DELAY_MS", "10")]);
+    let created = d.call("task.create", json!({"repo": repo, "harness": "codex", "prompt": "x", "title": "cut"}));
     let run = d.wait_done(&run_id(&created), 20);
     assert_eq!(run["status"], "unknown", "{run}");
-    let kids: Vec<_> = d
-        .runs()
-        .into_iter()
-        .filter(|x| x["parent_run_id"] == run["id"])
-        .collect();
-    assert!(
-        kids.iter().all(|k| k["status"] == "unknown"),
-        "child end never reported: {kids:?}"
-    );
+    let kids: Vec<_> = d.runs().into_iter().filter(|x| x["parent_run_id"] == run["id"]).collect();
+    assert!(kids.iter().all(|k| k["status"] == "unknown"), "child end never reported: {kids:?}");
 }
 
 // ---------------------------------------------------------------- AC-08
@@ -183,59 +128,22 @@ fn ac08_socket_is_owner_only_and_requests_are_not_shell() {
     let repo = repo(&r.path().join("repo"));
     let d = Daemon::start(&[]);
     let sock = d.socket();
-    assert_eq!(
-        std::fs::metadata(&sock).unwrap().permissions().mode() & 0o777,
-        0o600
-    );
-    assert_eq!(
-        std::fs::metadata(sock.parent().unwrap())
-            .unwrap()
-            .permissions()
-            .mode()
-            & 0o777,
-        0o700
-    );
+    assert_eq!(std::fs::metadata(&sock).unwrap().permissions().mode() & 0o777, 0o600);
+    assert_eq!(std::fs::metadata(sock.parent().unwrap()).unwrap().permissions().mode() & 0o777, 0o700);
     assert!(d.raw(b"{not json\n").contains("parse_error"));
-    assert!(d
-        .raw(b"{\"id\":1,\"method\":\"state\",\"params\":[1]}\n")
-        .contains("invalid_params"));
-    assert!(d
-        .raw(b"{\"id\":1,\"method\":7}\n")
-        .contains("invalid_request"));
-    let big = format!(
-        "{{\"id\":1,\"method\":\"state\",\"params\":{{\"x\":\"{}\"}}}}\n",
-        "a".repeat(1_100_000)
-    );
+    assert!(d.raw(b"{\"id\":1,\"method\":\"state\",\"params\":[1]}\n").contains("invalid_params"));
+    assert!(d.raw(b"{\"id\":1,\"method\":7}\n").contains("invalid_request"));
+    let big = format!("{{\"id\":1,\"method\":\"state\",\"params\":{{\"x\":\"{}\"}}}}\n", "a".repeat(1_100_000));
     assert!(d.raw(big.as_bytes()).contains("request_too_large"));
     let marker = r.path().join("pwned");
     let evil = format!("{}; touch {}", repo.display(), marker.display());
-    assert!(d
-        .try_call(
-            "task.create",
-            json!({"repo": evil, "harness": "generic", "program": "/bin/echo", "args": []})
-        )
-        .is_err());
-    assert!(d
-        .try_call(
-            "repo.inspect",
-            json!({"path": format!("$(touch {})", marker.display())})
-        )
-        .is_err());
+    assert!(d.try_call("task.create", json!({"repo": evil, "harness": "generic", "program": "/bin/echo", "args": []})).is_err());
+    assert!(d.try_call("repo.inspect", json!({"path": format!("$(touch {})", marker.display())})).is_err());
     // Arguments are passed as argv, never through a shell.
-    let created = d.generic(
-        &repo,
-        "worktree",
-        "/bin/echo",
-        &[&format!("$(touch {})", marker.display()), "; rm -rf /"],
-    );
+    let created = d.generic(&repo, "worktree", "/bin/echo", &[&format!("$(touch {})", marker.display()), "; rm -rf /"]);
     d.wait_done(&run_id(&created), 10);
     assert!(!marker.exists(), "no shell fragment executed");
-    let out: Vec<String> = d
-        .events(&run_id(&created))
-        .iter()
-        .filter(|e| e["kind"] == "output")
-        .map(|e| e["payload"]["text"].as_str().unwrap().to_string())
-        .collect();
+    let out: Vec<String> = d.events(&run_id(&created)).iter().filter(|e| e["kind"] == "output").map(|e| e["payload"]["text"].as_str().unwrap().to_string()).collect();
     assert!(out.iter().any(|t| t.contains("$(touch")), "{out:?}");
     assert!(d.try_call("no.such.method", json!({})).is_err());
 }
@@ -248,24 +156,13 @@ fn ac10_replay_cursor_burst_and_retention() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let d = Daemon::start(&[]);
-    let created = sh(
-        &d,
-        &repo,
-        "worktree",
-        "i=0; while [ $i -lt 12000 ]; do echo line$i; i=$((i+1)); done",
-    );
+    let created = sh(&d, &repo, "worktree", "i=0; while [ $i -lt 12000 ]; do echo line$i; i=$((i+1)); done");
     let run = run_id(&created);
     d.wait_done(&run, 60);
     let mut all = Vec::new();
     let mut after = 0;
     loop {
-        let page = d.call(
-            "events.list",
-            json!({"run_id": run, "after": after, "limit": 5000}),
-        )["events"]
-            .as_array()
-            .unwrap()
-            .clone();
+        let page = d.call("events.list", json!({"run_id": run, "after": after, "limit": 5000}))["events"].as_array().unwrap().clone();
         if page.is_empty() {
             break;
         }
@@ -273,41 +170,17 @@ fn ac10_replay_cursor_burst_and_retention() {
         all.extend(page);
     }
     let events = &all;
-    let retention = events
-        .iter()
-        .find(|e| e["kind"] == "retention")
-        .expect("retention marker present");
-    assert!(
-        retention["payload"]["events_truncated_through_seq"]
-            .as_i64()
-            .unwrap()
-            > 0
-    );
-    let first_output = events.iter().find(|e| e["kind"] == "output").unwrap()["payload"]["text"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    assert_ne!(
-        first_output, "line0",
-        "oldest events pruned, not silently kept"
-    );
-    let last = events.iter().rev().find(|e| e["kind"] == "output").unwrap()["payload"]["text"]
-        .as_str()
-        .unwrap()
-        .to_string();
+    let retention = events.iter().find(|e| e["kind"] == "retention").expect("retention marker present");
+    assert!(retention["payload"]["events_truncated_through_seq"].as_i64().unwrap() > 0);
+    let first_output = events.iter().find(|e| e["kind"] == "output").unwrap()["payload"]["text"].as_str().unwrap().to_string();
+    assert_ne!(first_output, "line0", "oldest events pruned, not silently kept");
+    let last = events.iter().rev().find(|e| e["kind"] == "output").unwrap()["payload"]["text"].as_str().unwrap().to_string();
     assert_eq!(last, "line11999");
     // Reconnect from a mid-stream cursor: exactly the retained events after it, no duplicates.
     let mid = events[events.len() / 2]["seq"].as_i64().unwrap();
     let mut conn = std::os::unix::net::UnixStream::connect(d.socket()).unwrap();
     conn.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
-    conn.write_all(
-        format!(
-            "{}\n",
-            json!({"id": 1, "method": "events.subscribe", "params": {"after": mid, "run_id": run}})
-        )
-        .as_bytes(),
-    )
-    .unwrap();
+    conn.write_all(format!("{}\n", json!({"id": 1, "method": "events.subscribe", "params": {"after": mid, "run_id": run}})).as_bytes()).unwrap();
     let mut seqs = Vec::new();
     for line in BufReader::new(conn).lines() {
         let msg: serde_json::Value = serde_json::from_str(&line.unwrap()).unwrap();
@@ -318,11 +191,7 @@ fn ac10_replay_cursor_burst_and_retention() {
             seqs.push(msg["params"]["seq"].as_i64().unwrap());
         }
     }
-    let expected: Vec<i64> = events
-        .iter()
-        .map(|e| e["seq"].as_i64().unwrap())
-        .filter(|s| *s > mid)
-        .collect();
+    let expected: Vec<i64> = events.iter().map(|e| e["seq"].as_i64().unwrap()).filter(|s| *s > mid).collect();
     assert_eq!(seqs, expected);
     // Raw output stays inspectable and redacted.
     let raw = d.call("run.raw_output", json!({"run_id": run, "max_bytes": 4096}));
@@ -334,16 +203,10 @@ fn ac10_redaction_of_secrets_in_output() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let d = Daemon::start(&[]);
-    let created = sh(
-        &d,
-        &repo,
-        "worktree",
-        "echo token sk-abcdefghijklmnopqrstuvwxyz0123; echo '{\"access_token\": \"abc\"}'",
-    );
+    let created = sh(&d, &repo, "worktree", "echo token sk-abcdefghijklmnopqrstuvwxyz0123; echo '{\"access_token\": \"abc\"}'");
     let run = run_id(&created);
     d.wait_done(&run, 10);
-    let text = serde_json::to_string(&d.events(&run)).unwrap()
-        + &d.call("run.raw_output", json!({"run_id": run})).to_string();
+    let text = serde_json::to_string(&d.events(&run)).unwrap() + &d.call("run.raw_output", json!({"run_id": run})).to_string();
     assert!(!text.contains("sk-abcdefghijklmnopqrstuvwxyz0123"));
     assert!(text.contains("[redacted]"));
 }
@@ -365,20 +228,11 @@ fn ac15_generic_harness_paths_with_spaces_failures_and_unknown_capabilities() {
     let run = run_id(&created);
     let done = d.wait_done(&run, 10);
     assert_eq!(done["status"], "completed");
-    let out: Vec<String> = d
-        .events(&run)
-        .iter()
-        .filter(|e| e["kind"] == "output")
-        .map(|e| e["payload"]["text"].as_str().unwrap().to_string())
-        .collect();
+    let out: Vec<String> = d.events(&run).iter().filter(|e| e["kind"] == "output").map(|e| e["payload"]["text"].as_str().unwrap().to_string()).collect();
     assert_eq!(out, vec!["arg:two words", "arg:x y z", "got:hello there"]);
     let caps = &done["capabilities"];
     for key in ["children", "usage", "quota", "approvals"] {
-        assert!(
-            caps[key].as_str().unwrap().starts_with("unknown"),
-            "{key}: {}",
-            caps[key]
-        );
+        assert!(caps[key].as_str().unwrap().starts_with("unknown"), "{key}: {}", caps[key]);
     }
     let failing = sh(&d, &repo, "worktree", "exit 7");
     let f = d.wait_done(&run_id(&failing), 10);
@@ -386,19 +240,8 @@ fn ac15_generic_harness_paths_with_spaces_failures_and_unknown_capabilities() {
     let missing = d.call("task.create", json!({"repo": repo, "harness": "generic", "program": "/no/such binary", "args": [], "prompt": ""}));
     let m = d.wait_done(&run_id(&missing), 10);
     assert_eq!(m["status"], "failed");
-    assert!(
-        m["exit_reason"]
-            .as_str()
-            .unwrap()
-            .contains("could not start"),
-        "{m}"
-    );
-    let slow = sh(
-        &d,
-        &repo,
-        "worktree",
-        "trap 'echo got-int; exit 130' INT; sleep 30 & wait",
-    );
+    assert!(m["exit_reason"].as_str().unwrap().contains("could not start"), "{m}");
+    let slow = sh(&d, &repo, "worktree", "trap 'echo got-int; exit 130' INT; sleep 30 & wait");
     d.wait_status(&run_id(&slow), |s| s == "running", 10);
     std::thread::sleep(Duration::from_millis(300));
     d.call("run.interrupt", json!({"run_id": run_id(&slow)}));
@@ -408,14 +251,7 @@ fn ac15_generic_harness_paths_with_spaces_failures_and_unknown_capabilities() {
 // ---------------------------------------------------------------- AC-16 (fixture only)
 
 fn claude_daemon(mode: &str) -> Daemon {
-    Daemon::start(&[
-        (
-            "OVERSEER_CLAUDE_PATH",
-            &fixture("fake-harness/claude-fixture.js"),
-        ),
-        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
-        ("FIXTURE_MODE", mode),
-    ])
+    Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"), ("FIXTURE_MODE", mode)])
 }
 
 #[test]
@@ -424,28 +260,15 @@ fn ac16_fixture_permission_allow_deny_and_interrupt_waiting_run() {
     let repo = repo(&r.path().join("repo"));
     for (answer, expect_file) in [(Some(true), true), (Some(false), false), (None, false)] {
         let d = claude_daemon("permission");
-        let created = d.call(
-            "task.create",
-            json!({"repo": repo, "harness": "claude", "prompt": "write perm.txt", "title": "perm"}),
-        );
+        let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "write perm.txt", "title": "perm"}));
         let run = run_id(&created);
         let waiting = d.wait_status(&run, |s| s == "waiting_for_user", 15);
-        let req = waiting["attention"]["request_id"]
-            .as_str()
-            .unwrap()
-            .to_string();
+        let req = waiting["attention"]["request_id"].as_str().unwrap().to_string();
         std::thread::sleep(Duration::from_millis(500));
-        assert_eq!(
-            d.run(&run)["status"],
-            "waiting_for_user",
-            "never auto-approved"
-        );
+        assert_eq!(d.run(&run)["status"], "waiting_for_user", "never auto-approved");
         match answer {
             Some(allow) => {
-                d.call(
-                    "run.permission",
-                    json!({"run_id": run, "request_id": req, "allow": allow}),
-                );
+                d.call("run.permission", json!({"run_id": run, "request_id": req, "allow": allow}));
                 assert_eq!(d.wait_done(&run, 15)["status"], "completed");
             }
             None => {
@@ -453,11 +276,7 @@ fn ac16_fixture_permission_allow_deny_and_interrupt_waiting_run() {
                 assert_eq!(d.wait_done(&run, 20)["status"], "interrupted");
             }
         }
-        assert_eq!(
-            ws_path(&d, &created).join("perm.txt").exists(),
-            expect_file,
-            "answer {answer:?}"
-        );
+        assert_eq!(ws_path(&d, &created).join("perm.txt").exists(), expect_file, "answer {answer:?}");
     }
 }
 
@@ -466,10 +285,7 @@ fn ac60_an_interrupted_claude_turn_is_interrupted_not_failed() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let d = claude_daemon("slow");
-    let created = d.call(
-        "task.create",
-        json!({"repo": repo, "harness": "claude", "prompt": "a long task", "title": "slow"}),
-    );
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "a long task", "title": "slow"}));
     let run = run_id(&created);
     d.wait_status(&run, |s| s == "running", 15);
     std::thread::sleep(Duration::from_millis(800));
@@ -483,30 +299,15 @@ fn ac60_an_interrupted_claude_turn_is_interrupted_not_failed() {
 fn ac16_fixture_error_classes_stay_distinct() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
-    for (mode, class) in [
-        ("auth", "auth"),
-        ("ratelimit", "rate_limit"),
-        ("quota", "quota"),
-    ] {
+    for (mode, class) in [("auth", "auth"), ("ratelimit", "rate_limit"), ("quota", "quota")] {
         let d = claude_daemon(mode);
-        let created = d.call(
-            "task.create",
-            json!({"repo": repo, "harness": "claude", "prompt": "x", "title": mode}),
-        );
+        let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "x", "title": mode}));
         let run = run_id(&created);
         let done = d.wait_done(&run, 15);
         assert_eq!(done["status"], "failed", "{mode}");
-        let classes: Vec<String> = d
-            .events(&run)
-            .iter()
-            .filter(|e| e["kind"] == "error")
-            .map(|e| e["payload"]["class"].as_str().unwrap().to_string())
-            .collect();
+        let classes: Vec<String> = d.events(&run).iter().filter(|e| e["kind"] == "error").map(|e| e["payload"]["class"].as_str().unwrap().to_string()).collect();
         assert!(classes.contains(&class.to_string()), "{mode}: {classes:?}");
-        assert!(
-            done["exit_reason"].as_str().unwrap().contains(class),
-            "{done}"
-        );
+        assert!(done["exit_reason"].as_str().unwrap().contains(class), "{done}");
     }
 }
 
@@ -517,70 +318,34 @@ fn ac18_fixture_recursive_tree_duplicates_and_delayed_parent() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let mut d = claude_daemon("nested");
-    let created = d.call(
-        "task.create",
-        json!({"repo": repo, "harness": "claude", "prompt": "nest", "title": "nest"}),
-    );
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "nest", "title": "nest"}));
     let root = run_id(&created);
     assert_eq!(d.wait_done(&root, 15)["status"], "completed");
     let check = |d: &Daemon| {
         let runs = d.runs();
-        assert_eq!(
-            runs.len(),
-            3,
-            "root + child + grandchild, no duplicates: {runs:?}"
-        );
-        let child = runs
-            .iter()
-            .find(|r| r["native_id"] == "toolu_child")
-            .unwrap();
-        let grand = runs
-            .iter()
-            .find(|r| r["native_id"] == "toolu_grand")
-            .unwrap();
+        assert_eq!(runs.len(), 3, "root + child + grandchild, no duplicates: {runs:?}");
+        let child = runs.iter().find(|r| r["native_id"] == "toolu_child").unwrap();
+        let grand = runs.iter().find(|r| r["native_id"] == "toolu_grand").unwrap();
         assert_eq!(child["parent_run_id"], root.as_str());
-        assert_eq!(
-            grand["parent_run_id"], child["id"],
-            "delayed parent adopted its child"
-        );
-        assert!(grand["relation_confidence"]
-            .as_str()
-            .unwrap()
-            .starts_with("exact"));
+        assert_eq!(grand["parent_run_id"], child["id"], "delayed parent adopted its child");
+        assert!(grand["relation_confidence"].as_str().unwrap().starts_with("exact"));
         assert_eq!(grand["status"], "completed");
         assert_eq!(child["status"], "completed");
-        assert_eq!(
-            grand["workspace_id"], child["workspace_id"],
-            "native children share the workspace"
-        );
+        assert_eq!(grand["workspace_id"], child["workspace_id"], "native children share the workspace");
         for run in &runs {
             let mut seen = std::collections::HashSet::new();
             let mut cur = Some(run["id"].as_str().unwrap().to_string());
             while let Some(id) = cur {
                 assert!(seen.insert(id.clone()), "cycle at {id}");
-                cur = runs.iter().find(|x| x["id"] == id.as_str()).unwrap()["parent_run_id"]
-                    .as_str()
-                    .map(str::to_string);
+                cur = runs.iter().find(|x| x["id"] == id.as_str()).unwrap()["parent_run_id"].as_str().map(str::to_string);
             }
         }
     };
     check(&d);
-    let child = d
-        .runs()
-        .into_iter()
-        .find(|r| r["native_id"] == "toolu_child")
-        .unwrap();
-    let err = d
-        .try_call(
-            "run.follow_up",
-            json!({"run_id": child["id"], "prompt": "x"}),
-        )
-        .unwrap_err();
+    let child = d.runs().into_iter().find(|r| r["native_id"] == "toolu_child").unwrap();
+    let err = d.try_call("run.follow_up", json!({"run_id": child["id"], "prompt": "x"})).unwrap_err();
     assert!(err.contains("top-level run"), "{err}");
-    assert!(d
-        .try_call("run.interrupt", json!({"run_id": child["id"]}))
-        .unwrap_err()
-        .contains("parent"));
+    assert!(d.try_call("run.interrupt", json!({"run_id": child["id"]})).unwrap_err().contains("parent"));
     d.kill9();
     d.spawn();
     check(&d);
@@ -591,38 +356,16 @@ fn ac20_prose_is_not_a_child_and_unknown_events_are_visible() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let d = claude_daemon("prose");
-    let created = d.call(
-        "task.create",
-        json!({"repo": repo, "harness": "claude", "prompt": "x", "title": "prose"}),
-    );
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "x", "title": "prose"}));
     d.wait_done(&run_id(&created), 15);
-    assert_eq!(
-        d.runs().len(),
-        1,
-        "text claiming delegation created no child"
-    );
+    assert_eq!(d.runs().len(), 1, "text claiming delegation created no child");
     // Parser-version mismatch: an unknown Codex event type is retained as unparsed with the parser version.
     let weird = r.path().join("weird.jsonl");
     std::fs::write(&weird, "{\"type\":\"thread.started\",\"thread_id\":\"t1\"}\n{\"type\":\"future.event\",\"x\":1}\n{\"type\":\"turn.completed\",\"usage\":{}}\n").unwrap();
-    let d2 = Daemon::start(&[
-        ("OVERSEER_CODEX_PATH", &fixture("fake-harness/replay.js")),
-        (
-            "OVERSEER_HARNESS_ENV_PASSTHROUGH",
-            "REPLAY_FILE,REPLAY_DELAY_MS",
-        ),
-        ("REPLAY_FILE", weird.to_str().unwrap()),
-        ("REPLAY_DELAY_MS", "10"),
-    ]);
-    let c2 = d2.call(
-        "task.create",
-        json!({"repo": repo, "harness": "codex", "prompt": "x", "title": "weird"}),
-    );
+    let d2 = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/replay.js")), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "REPLAY_FILE,REPLAY_DELAY_MS"), ("REPLAY_FILE", weird.to_str().unwrap()), ("REPLAY_DELAY_MS", "10")]);
+    let c2 = d2.call("task.create", json!({"repo": repo, "harness": "codex", "prompt": "x", "title": "weird"}));
     d2.wait_done(&run_id(&c2), 15);
-    let unparsed: Vec<_> = d2
-        .events(&run_id(&c2))
-        .into_iter()
-        .filter(|e| e["kind"] == "raw_unparsed")
-        .collect();
+    let unparsed: Vec<_> = d2.events(&run_id(&c2)).into_iter().filter(|e| e["kind"] == "raw_unparsed").collect();
     assert_eq!(unparsed.len(), 1);
     assert_eq!(unparsed[0]["confidence"], "unknown");
     assert!(unparsed[0]["payload"]["parser_version"].is_string());
@@ -633,37 +376,15 @@ fn ac19_fixture_codex_live_transcript_children() {
     // Replays the recorded LIVE Codex 0.155 transcript; the live capture itself is AC-19 evidence.
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
-    let d = Daemon::start(&[
-        ("OVERSEER_CODEX_PATH", &fixture("fake-harness/replay.js")),
-        (
-            "OVERSEER_HARNESS_ENV_PASSTHROUGH",
-            "REPLAY_FILE,REPLAY_DELAY_MS",
-        ),
-        (
-            "REPLAY_FILE",
-            &fixture("transcripts/codex-0.155-exec-subagent-live.jsonl"),
-        ),
-        ("REPLAY_DELAY_MS", "10"),
-    ]);
-    let created = d.call(
-        "task.create",
-        json!({"repo": repo, "harness": "codex", "prompt": "x", "title": "codex"}),
-    );
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/replay.js")), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "REPLAY_FILE,REPLAY_DELAY_MS"), ("REPLAY_FILE", &fixture("transcripts/codex-0.155-exec-subagent-live.jsonl")), ("REPLAY_DELAY_MS", "10")]);
+    let created = d.call("task.create", json!({"repo": repo, "harness": "codex", "prompt": "x", "title": "codex"}));
     let root = run_id(&created);
     assert_eq!(d.wait_done(&root, 15)["status"], "completed");
-    let kids: Vec<_> = d
-        .runs()
-        .into_iter()
-        .filter(|x| x["parent_run_id"] == root.as_str())
-        .collect();
+    let kids: Vec<_> = d.runs().into_iter().filter(|x| x["parent_run_id"] == root.as_str()).collect();
     assert_eq!(kids.len(), 1);
     assert_eq!(kids[0]["native_id"], "01a0d6e3-e523-7be1-a56d-243f00cb399c");
     assert_eq!(kids[0]["status"], "completed");
-    let child_out: Vec<_> = d
-        .events(kids[0]["id"].as_str().unwrap())
-        .into_iter()
-        .filter(|e| e["kind"] == "output")
-        .collect();
+    let child_out: Vec<_> = d.events(kids[0]["id"].as_str().unwrap()).into_iter().filter(|e| e["kind"] == "output").collect();
     assert!(child_out.iter().any(|e| e["payload"]["text"] == "hi"));
 }
 
@@ -684,26 +405,12 @@ fn ac21_parallel_worktrees_are_independent_and_collisions_are_safe() {
     d.wait_done(&run_id(&two), 10);
     let (p1, p2) = (ws_path(&d, &one), ws_path(&d, &two));
     assert_ne!(p1, p2);
-    assert_eq!(
-        std::fs::read_to_string(p1.join("shared.txt")).unwrap(),
-        "one\n"
-    );
-    assert_eq!(
-        std::fs::read_to_string(p2.join("shared.txt")).unwrap(),
-        "two\n"
-    );
+    assert_eq!(std::fs::read_to_string(p1.join("shared.txt")).unwrap(), "one\n");
+    assert_eq!(std::fs::read_to_string(p2.join("shared.txt")).unwrap(), "two\n");
     assert_eq!(one["workspace"]["branch"], "overseer/same-name-2");
     assert_eq!(two["workspace"]["branch"], "overseer/same-name-3");
-    assert_eq!(
-        git(&repo, &["rev-parse", "overseer/same-name"]),
-        git(&repo, &["rev-parse", "main"]),
-        "existing branch untouched"
-    );
-    assert_eq!(
-        fingerprint(&repo),
-        source_before,
-        "source checkout unchanged"
-    );
+    assert_eq!(git(&repo, &["rev-parse", "overseer/same-name"]), git(&repo, &["rev-parse", "main"]), "existing branch untouched");
+    assert_eq!(fingerprint(&repo), source_before, "source checkout unchanged");
 }
 
 #[test]
@@ -716,11 +423,7 @@ fn ac23_unrelated_writer_rejected_on_current_checkout() {
     assert!(err.unwrap_err().contains("already has an active writer"));
     d.wait_done(&run_id(&first), 10);
     let second = sh(&d, &repo, "current", "true");
-    assert_eq!(
-        d.wait_done(&run_id(&second), 10)["status"],
-        "completed",
-        "allowed once the first writer ended"
-    );
+    assert_eq!(d.wait_done(&run_id(&second), 10)["status"], "completed", "allowed once the first writer ended");
 }
 
 #[test]
@@ -730,26 +433,13 @@ fn ac24_cleanup_reports_and_preserves_until_confirmed() {
     let d = Daemon::start(&[]);
     let current = sh(&d, &repo, "current", "true");
     d.wait_done(&run_id(&current), 10);
-    let err = d
-        .try_call(
-            "workspace.cleanup",
-            json!({"workspace_id": current["workspace"]["id"], "discard_dirty": true}),
-        )
-        .unwrap_err();
+    let err = d.try_call("workspace.cleanup", json!({"workspace_id": current["workspace"]["id"], "discard_dirty": true})).unwrap_err();
     assert!(err.contains("never removed"), "{err}");
     let active = sh(&d, &repo, "worktree", "sleep 5");
-    let plan = d.call(
-        "workspace.cleanup_plan",
-        json!({"workspace_id": active["workspace"]["id"]}),
-    );
+    let plan = d.call("workspace.cleanup_plan", json!({"workspace_id": active["workspace"]["id"]}));
     assert_eq!(plan["removable"], false);
     assert_eq!(plan["active_runs"].as_array().unwrap().len(), 1);
-    assert!(d
-        .try_call(
-            "workspace.cleanup",
-            json!({"workspace_id": active["workspace"]["id"], "discard_dirty": true})
-        )
-        .is_err());
+    assert!(d.try_call("workspace.cleanup", json!({"workspace_id": active["workspace"]["id"], "discard_dirty": true})).is_err());
     let interrupted = sh(&d, &repo, "worktree", "echo work > untracked.txt; sleep 30");
     let run = run_id(&interrupted);
     d.wait_status(&run, |s| s == "running", 10);
@@ -757,36 +447,14 @@ fn ac24_cleanup_reports_and_preserves_until_confirmed() {
     d.call("run.interrupt", json!({"run_id": run}));
     assert_eq!(d.wait_done(&run, 15)["status"], "interrupted");
     let path = ws_path(&d, &interrupted);
-    assert!(
-        path.join("untracked.txt").exists(),
-        "interrupted work retained"
-    );
-    let plan = d.call(
-        "workspace.cleanup_plan",
-        json!({"workspace_id": interrupted["workspace"]["id"]}),
-    );
+    assert!(path.join("untracked.txt").exists(), "interrupted work retained");
+    let plan = d.call("workspace.cleanup_plan", json!({"workspace_id": interrupted["workspace"]["id"]}));
     assert_eq!(plan["dirty"]["untracked"][0], "untracked.txt");
-    assert!(d
-        .try_call(
-            "workspace.cleanup",
-            json!({"workspace_id": interrupted["workspace"]["id"]})
-        )
-        .unwrap_err()
-        .contains("uncommitted"));
+    assert!(d.try_call("workspace.cleanup", json!({"workspace_id": interrupted["workspace"]["id"]})).unwrap_err().contains("uncommitted"));
     assert!(path.join("untracked.txt").exists());
-    let res = d.call(
-        "workspace.cleanup",
-        json!({"workspace_id": interrupted["workspace"]["id"], "discard_dirty": true}),
-    );
+    let res = d.call("workspace.cleanup", json!({"workspace_id": interrupted["workspace"]["id"], "discard_dirty": true}));
     assert!(!path.exists());
-    assert!(
-        git(
-            &repo,
-            &["branch", "--list", res["branch_kept"].as_str().unwrap()]
-        )
-        .contains("overseer/"),
-        "branch kept"
-    );
+    assert!(git(&repo, &["branch", "--list", res["branch_kept"].as_str().unwrap()]).contains("overseer/"), "branch kept");
     d.wait_done(&run_id(&active), 10);
 }
 
@@ -810,23 +478,10 @@ fn ac22_current_checkout_preserves_preexisting_work() {
     std::thread::sleep(Duration::from_millis(600));
     d.call("run.interrupt", json!({"run_id": run}));
     assert_eq!(d.wait_done(&run, 15)["status"], "interrupted");
-    assert_eq!(
-        git(&repo, &["diff", "--cached"]),
-        index_before,
-        "staged work intact"
-    );
-    assert_eq!(
-        std::fs::read_to_string(repo.join("a.txt")).unwrap(),
-        "a staged then unstaged\n"
-    );
-    assert_eq!(
-        std::fs::read_to_string(repo.join("b.txt")).unwrap(),
-        "b unstaged\nagent-edit\n"
-    );
-    assert_eq!(
-        std::fs::read_to_string(repo.join("notes.txt")).unwrap(),
-        "untracked\n"
-    );
+    assert_eq!(git(&repo, &["diff", "--cached"]), index_before, "staged work intact");
+    assert_eq!(std::fs::read_to_string(repo.join("a.txt")).unwrap(), "a staged then unstaged\n");
+    assert_eq!(std::fs::read_to_string(repo.join("b.txt")).unwrap(), "b unstaged\nagent-edit\n");
+    assert_eq!(std::fs::read_to_string(repo.join("notes.txt")).unwrap(), "untracked\n");
     assert!(git(&repo, &["stash", "list"]).is_empty(), "nothing stashed");
     let ws = &created["workspace"];
     assert_eq!(ws["kind"], "current");
@@ -834,19 +489,9 @@ fn ac22_current_checkout_preserves_preexisting_work() {
     assert_eq!(ws["initial_dirty"]["untracked"][0], "notes.txt");
     assert_eq!(ws["initial_dirty"]["unsaved_drafts"][0], "draft.txt");
     let latest = option(&d, &run, "latest_run", None);
-    assert_eq!(
-        diff_paths(&d, &created, latest["base"].as_str().unwrap()),
-        vec![
-            ("A".into(), "agent.txt".into()),
-            ("M".into(), "b.txt".into())
-        ],
-        "only observed run changes"
-    );
+    assert_eq!(diff_paths(&d, &created, latest["base"].as_str().unwrap()), vec![("A".into(), "agent.txt".into()), ("M".into(), "b.txt".into())], "only observed run changes");
     let fork = option(&d, &run, "fork", None);
-    assert!(
-        fork["label"].as_str().unwrap().contains("detected"),
-        "current-checkout fork is a labeled candidate: {fork}"
-    );
+    assert!(fork["label"].as_str().unwrap().contains("detected"), "current-checkout fork is a labeled candidate: {fork}");
 }
 
 // ---------------------------------------------------------------- AC-26
@@ -873,91 +518,44 @@ fn ac26_snapshots_and_selectable_bases() {
     let created = d.call("task.create", json!({"repo": repo, "harness": "generic", "workspace_mode": "current", "program": "/bin/sh", "args": ["-c", "echo run1 >> pre.txt"], "prompt": "", "title": "snap"}));
     let run = run_id(&created);
     d.wait_done(&run, 10);
-    assert_eq!(
-        fingerprint(&repo).replace("pre-existing untracked\nrun1", "pre-existing untracked"),
-        before,
-        "snapshots did not mutate, stage or stash anything"
-    );
+    assert_eq!(fingerprint(&repo).replace("pre-existing untracked\nrun1", "pre-existing untracked"), before, "snapshots did not mutate, stage or stash anything");
     let latest1 = option(&d, &run, "latest_run", None);
     assert_eq!(latest1["default"], true);
-    assert_eq!(
-        diff_paths(&d, &created, latest1["base"].as_str().unwrap()),
-        vec![("M".into(), "pre.txt".into())],
-        "baseline included dirty+untracked contents"
-    );
+    assert_eq!(diff_paths(&d, &created, latest1["base"].as_str().unwrap()), vec![("M".into(), "pre.txt".into())], "baseline included dirty+untracked contents");
     // A user edit between runs, then turn 2 (follow-up) gets its own baseline.
     std::fs::write(repo.join("between.txt"), "user edit between runs\n").unwrap();
     d.call("run.follow_up", json!({"run_id": run, "prompt": ""}));
     d.wait_done(&run, 10);
     let latest2 = option(&d, &run, "latest_run", None);
     assert_ne!(latest1["base"], latest2["base"]);
-    assert_eq!(
-        diff_paths(&d, &created, latest2["base"].as_str().unwrap()),
-        vec![("M".into(), "pre.txt".into())],
-        "turn-2 diff excludes the between-runs user edit"
-    );
+    assert_eq!(diff_paths(&d, &created, latest2["base"].as_str().unwrap()), vec![("M".into(), "pre.txt".into())], "turn-2 diff excludes the between-runs user edit");
     let turn1 = option(&d, &run, "turn:1", None);
     assert_eq!(turn1["base"], latest1["base"], "prior baseline addressable");
     let start = option(&d, &run, "task_start", None);
     let since_start = diff_paths(&d, &created, start["base"].as_str().unwrap());
-    assert!(
-        since_start.contains(&("A".into(), "between.txt".into()))
-            && since_start.contains(&("M".into(), "pre.txt".into()))
-    );
-    assert!(
-        !since_start
-            .iter()
-            .any(|(_, p)| p == "a.txt" || p == "b.txt"),
-        "task start preserves dirty starting contents, not just HEAD: {since_start:?}"
-    );
+    assert!(since_start.contains(&("A".into(), "between.txt".into())) && since_start.contains(&("M".into(), "pre.txt".into())));
+    assert!(!since_start.iter().any(|(_, p)| p == "a.txt" || p == "b.txt"), "task start preserves dirty starting contents, not just HEAD: {since_start:?}");
     // Branch comparisons: merge-base vs tip, stacked parent, target advance, missing target.
     let mb = option(&d, &run, "branch_merge_base", Some("feature-a"));
     assert_eq!(mb["base"], git(&repo, &["rev-parse", "feature-a"]).as_str());
     let tip_main = option(&d, &run, "branch_tip", Some("main"));
-    assert_eq!(
-        tip_main["base"],
-        git(&repo, &["rev-parse", "main"]).as_str()
-    );
+    assert_eq!(tip_main["base"], git(&repo, &["rev-parse", "main"]).as_str());
     let branch_diff = diff_paths(&d, &created, mb["base"].as_str().unwrap());
-    assert!(
-        branch_diff.contains(&("M".into(), "b.txt".into())),
-        "branch mode includes committed + dirty: {branch_diff:?}"
-    );
+    assert!(branch_diff.contains(&("M".into(), "b.txt".into())), "branch mode includes committed + dirty: {branch_diff:?}");
     git(&repo, &["stash", "list"]);
     let wt = r.path().join("adv");
-    git(
-        &repo,
-        &["worktree", "add", "-q", wt.to_str().unwrap(), "main"],
-    );
+    git(&repo, &["worktree", "add", "-q", wt.to_str().unwrap(), "main"]);
     std::fs::write(wt.join("main-only.txt"), "advance\n").unwrap();
     git(&wt, &["add", "."]);
     git(&wt, &["commit", "-q", "-m", "main advances"]);
     let mb_main = option(&d, &run, "branch_merge_base", Some("main"));
     let tip_main2 = option(&d, &run, "branch_tip", Some("main"));
-    assert_ne!(
-        mb_main["base"], tip_main2["base"],
-        "target advance distinguishes merge-base from tip"
-    );
-    let missing = d.call(
-        "comparison.options",
-        json!({"run_id": run, "branch": "no-such-branch"}),
-    );
-    let miss = missing["options"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|o| o["mode"] == "branch_merge_base")
-        .unwrap();
+    assert_ne!(mb_main["base"], tip_main2["base"], "target advance distinguishes merge-base from tip");
+    let missing = d.call("comparison.options", json!({"run_id": run, "branch": "no-such-branch"}));
+    let miss = missing["options"].as_array().unwrap().iter().find(|o| o["mode"] == "branch_merge_base").unwrap();
     assert_eq!(miss["available"], false);
     assert!(miss["detail"].as_str().unwrap().contains("not found"));
-    assert!(
-        d.try_call(
-            "workspace.diff",
-            json!({"workspace_id": created["workspace"]["id"], "base": "no-such-branch"})
-        )
-        .is_err(),
-        "unresolved base is an error, not an empty diff"
-    );
+    assert!(d.try_call("workspace.diff", json!({"workspace_id": created["workspace"]["id"], "base": "no-such-branch"})).is_err(), "unresolved base is an error, not an empty diff");
     // Rebase cannot rewrite recorded snapshots; they survive a daemon restart.
     git(&repo, &["stash", "push", "-q", "-u", "-m", "test-only"]);
     git(&repo, &["rebase", "-q", "main"]);
@@ -966,12 +564,7 @@ fn ac26_snapshots_and_selectable_bases() {
     d.spawn();
     let again = option(&d, &run, "turn:1", None);
     assert_eq!(again["base"], latest1["base"]);
-    assert!(
-        git(
-            &repo,
-            &["cat-file", "-t", latest1["base"].as_str().unwrap()]
-        ) == "commit"
-    );
+    assert!(git(&repo, &["cat-file", "-t", latest1["base"].as_str().unwrap()]) == "commit");
     let fork = option(&d, &run, "fork", None);
     assert!(fork["available"] == true || fork["detail"].as_str().unwrap().starts_with("unknown"));
 }
@@ -1006,19 +599,9 @@ fn ac27_complete_change_and_dirty_views() {
     let run = run_id(&clean);
     d.wait_done(&run, 10);
     let head = git(&repo, &["rev-parse", "HEAD"]);
-    assert!(
-        diff_paths(&d, &clean, &head).is_empty(),
-        "clean main/main is empty"
-    );
-    let st = d.call(
-        "workspace.status",
-        json!({"workspace_id": clean["workspace"]["id"]}),
-    );
-    assert!(
-        st["staged"].as_array().unwrap().is_empty()
-            && st["unstaged"].as_array().unwrap().is_empty()
-            && st["untracked"].as_array().unwrap().is_empty()
-    );
+    assert!(diff_paths(&d, &clean, &head).is_empty(), "clean main/main is empty");
+    let st = d.call("workspace.status", json!({"workspace_id": clean["workspace"]["id"]}));
+    assert!(st["staged"].as_array().unwrap().is_empty() && st["unstaged"].as_array().unwrap().is_empty() && st["untracked"].as_array().unwrap().is_empty());
     // Dirty main/main: staged, unstaged, rename, delete, untracked, binary, oversized, ignored.
     std::fs::write(repo.join("a.txt"), "a changed\n").unwrap();
     git(&repo, &["add", "a.txt"]);
@@ -1037,44 +620,19 @@ fn ac27_complete_change_and_dirty_views() {
     assert!(changes.contains(&("M".into(), "a.txt".into())));
     assert!(changes.contains(&("R".into(), "b-renamed.txt".into())));
     for f in ["new.txt", "bin.dat", "big.txt"] {
-        assert!(
-            changes.contains(&("A".into(), f.into())),
-            "{f} listed: {changes:?}"
-        );
+        assert!(changes.contains(&("A".into(), f.into())), "{f} listed: {changes:?}");
     }
-    assert!(
-        !changes
-            .iter()
-            .any(|(_, p)| p.starts_with("ignored/") || p == "debug.log"),
-        "ignored files not listed"
-    );
-    let st = d.call(
-        "workspace.status",
-        json!({"workspace_id": clean["workspace"]["id"]}),
-    );
-    let staged: Vec<&str> = st["staged"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|c| c["path"].as_str().unwrap())
-        .collect();
-    assert!(
-        staged.contains(&"a.txt") && staged.contains(&"b-renamed.txt") && staged.contains(&"b.txt"),
-        "{staged:?}"
-    );
+    assert!(!changes.iter().any(|(_, p)| p.starts_with("ignored/") || p == "debug.log"), "ignored files not listed");
+    let st = d.call("workspace.status", json!({"workspace_id": clean["workspace"]["id"]}));
+    let staged: Vec<&str> = st["staged"].as_array().unwrap().iter().map(|c| c["path"].as_str().unwrap()).collect();
+    assert!(staged.contains(&"a.txt") && staged.contains(&"b-renamed.txt") && staged.contains(&"b.txt"), "{staged:?}");
     // A fresh run has an empty run diff but the dirty view still shows the work.
     let fresh = d.generic(&repo, "current", "/usr/bin/true", &[]);
     d.wait_done(&run_id(&fresh), 10);
     let latest = option(&d, &run_id(&fresh), "latest_run", None);
     assert!(diff_paths(&d, &fresh, latest["base"].as_str().unwrap()).is_empty());
-    let st2 = d.call(
-        "workspace.status",
-        json!({"workspace_id": fresh["workspace"]["id"]}),
-    );
-    assert!(
-        !st2["staged"].as_array().unwrap().is_empty()
-            && !st2["untracked"].as_array().unwrap().is_empty()
-    );
+    let st2 = d.call("workspace.status", json!({"workspace_id": fresh["workspace"]["id"]}));
+    assert!(!st2["staged"].as_array().unwrap().is_empty() && !st2["untracked"].as_array().unwrap().is_empty());
     // Deletion shows as D in branch mode.
     std::fs::remove_file(repo.join("a.txt")).unwrap();
     assert!(diff_paths(&d, &clean, &head).contains(&("D".into(), "a.txt".into())));
@@ -1091,39 +649,16 @@ fn ac28_opposing_layers_remain_inspectable() {
     std::fs::write(repo.join("a.txt"), "B\n").unwrap();
     git(&repo, &["add", "a.txt"]);
     std::fs::write(repo.join("a.txt"), "a\n").unwrap(); // restored without staging
-    assert!(
-        diff_paths(&d, &created, &head).is_empty(),
-        "net diff cancels out"
-    );
-    let st = d.call(
-        "workspace.status",
-        json!({"workspace_id": created["workspace"]["id"]}),
-    );
+    assert!(diff_paths(&d, &created, &head).is_empty(), "net diff cancels out");
+    let st = d.call("workspace.status", json!({"workspace_id": created["workspace"]["id"]}));
     assert_eq!(st["staged"][0]["path"], "a.txt");
     assert_eq!(st["unstaged"][0]["path"], "a.txt");
     // Staged deletion followed by untracked recreation.
     git(&repo, &["rm", "-q", "b.txt"]);
     std::fs::write(repo.join("b.txt"), "recreated\n").unwrap();
-    let st = d.call(
-        "workspace.status",
-        json!({"workspace_id": created["workspace"]["id"]}),
-    );
-    assert!(
-        st["staged"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|c| c["path"] == "b.txt" && c["status"] == "D"),
-        "{st}"
-    );
-    assert!(
-        st["untracked"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|p| p == "b.txt"),
-        "{st}"
-    );
+    let st = d.call("workspace.status", json!({"workspace_id": created["workspace"]["id"]}));
+    assert!(st["staged"].as_array().unwrap().iter().any(|c| c["path"] == "b.txt" && c["status"] == "D"), "{st}");
+    assert!(st["untracked"].as_array().unwrap().iter().any(|p| p == "b.txt"), "{st}");
     assert!(diff_paths(&d, &created, &head).contains(&("M".into(), "b.txt".into())));
 }
 
@@ -1133,44 +668,20 @@ fn ac28_opposing_layers_remain_inspectable() {
 fn ac13_isolated_profiles_have_separate_homes_and_no_keys() {
     // Login commands need an installed program; a harmless stand-in (never run here).
     let d = Daemon::start(&[("OVERSEER_CODEX_PATH", "/usr/bin/true")]);
-    let a = d.call(
-        "profile.create",
-        json!({"name": "Codex A", "harness": "codex"}),
-    );
-    let b = d.call(
-        "profile.create",
-        json!({"name": "Codex B", "harness": "codex"}),
-    );
+    let a = d.call("profile.create", json!({"name": "Codex A", "harness": "codex"}));
+    let b = d.call("profile.create", json!({"name": "Codex B", "harness": "codex"}));
     assert_ne!(a["home"], b["home"]);
     let la = d.call("profile.login_command", json!({"id": a["id"]}));
     let lb = d.call("profile.login_command", json!({"id": b["id"]}));
     assert_ne!(la["env"]["CODEX_HOME"], lb["env"]["CODEX_HOME"]);
     assert_eq!(la["args"], json!(["login"]));
-    let err = d
-        .try_call("profile.logout", json!({"id": "system-codex"}))
-        .unwrap_err();
+    let err = d.try_call("profile.logout", json!({"id": "system-codex"})).unwrap_err();
     assert!(err.contains("does not log out"), "{err}");
-    d.call(
-        "profile.rename",
-        json!({"id": a["id"], "name": "Codex Alpha"}),
-    );
-    let names: Vec<String> = d
-        .call("profile.list", json!({}))
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|p| p["name"].as_str().unwrap().to_string())
-        .collect();
+    d.call("profile.rename", json!({"id": a["id"], "name": "Codex Alpha"}));
+    let names: Vec<String> = d.call("profile.list", json!({})).as_array().unwrap().iter().map(|p| p["name"].as_str().unwrap().to_string()).collect();
     assert!(names.contains(&"Codex Alpha".to_string()));
     use std::os::unix::fs::PermissionsExt;
-    assert_eq!(
-        std::fs::metadata(a["home"].as_str().unwrap())
-            .unwrap()
-            .permissions()
-            .mode()
-            & 0o777,
-        0o700
-    );
+    assert_eq!(std::fs::metadata(a["home"].as_str().unwrap()).unwrap().permissions().mode() & 0o777, 0o700);
 }
 
 #[test]
@@ -1183,30 +694,16 @@ fn ac34_merge_conflicts_do_not_break_snapshots_or_diffs() {
     git(&repo, &["switch", "-q", "main"]);
     std::fs::write(repo.join("a.txt"), "ours\n").unwrap();
     git(&repo, &["commit", "-q", "-am", "ours"]);
-    let _ = std::process::Command::new("git")
-        .current_dir(&repo)
-        .args(["merge", "other"])
-        .output();
+    let _ = std::process::Command::new("git").current_dir(&repo).args(["merge", "other"]).output();
     let index_before = std::fs::read(repo.join(".git/index")).unwrap();
     let d = Daemon::start(&[]);
     let created = d.generic(&repo, "current", "/usr/bin/true", &[]);
-    assert_eq!(
-        d.wait_done(&run_id(&created), 10)["status"],
-        "completed",
-        "snapshot succeeded during a conflict"
-    );
-    let st = d.call(
-        "workspace.status",
-        json!({"workspace_id": created["workspace"]["id"]}),
-    );
+    assert_eq!(d.wait_done(&run_id(&created), 10)["status"], "completed", "snapshot succeeded during a conflict");
+    let st = d.call("workspace.status", json!({"workspace_id": created["workspace"]["id"]}));
     assert_eq!(st["conflicted"][0], "a.txt");
     let head = git(&repo, &["rev-parse", "HEAD"]);
     assert!(diff_paths(&d, &created, &head).contains(&("M".into(), "a.txt".into())));
-    assert_eq!(
-        std::fs::read(repo.join(".git/index")).unwrap(),
-        index_before,
-        "real index (with conflict stages) untouched"
-    );
+    assert_eq!(std::fs::read(repo.join(".git/index")).unwrap(), index_before, "real index (with conflict stages) untouched");
 }
 
 #[test]
@@ -1219,42 +716,16 @@ fn ac09_follow_up_reaches_only_the_selected_run() {
     let (ra, rb) = (run_id(&a), run_id(&b));
     d.wait_status(&ra, |s| s == "running", 10);
     d.wait_status(&rb, |s| s == "running", 10);
-    d.call(
-        "run.follow_up",
-        json!({"run_id": ra, "prompt": "only for A"}),
-    );
+    d.call("run.follow_up", json!({"run_id": ra, "prompt": "only for A"}));
     std::thread::sleep(Duration::from_millis(500));
-    assert_eq!(
-        d.call("run.turns", json!({"run_id": ra}))
-            .as_array()
-            .unwrap()
-            .len(),
-        2
-    );
-    assert_eq!(
-        d.call("run.turns", json!({"run_id": rb}))
-            .as_array()
-            .unwrap()
-            .len(),
-        1
-    );
-    assert_eq!(
-        std::fs::read_to_string(ws_path(&d, &a).join("input.txt")).unwrap_or_default(),
-        "only for A\n"
-    );
-    assert_eq!(
-        std::fs::read_to_string(ws_path(&d, &b).join("input.txt")).unwrap_or_default(),
-        ""
-    );
+    assert_eq!(d.call("run.turns", json!({"run_id": ra})).as_array().unwrap().len(), 2);
+    assert_eq!(d.call("run.turns", json!({"run_id": rb})).as_array().unwrap().len(), 1);
+    assert_eq!(std::fs::read_to_string(ws_path(&d, &a).join("input.txt")).unwrap_or_default(), "only for A\n");
+    assert_eq!(std::fs::read_to_string(ws_path(&d, &b).join("input.txt")).unwrap_or_default(), "");
     d.call("run.interrupt", json!({"run_id": ra}));
     d.call("run.interrupt", json!({"run_id": rb}));
     // Children cannot receive follow-ups or interrupts directly.
-    let err = d
-        .try_call(
-            "run.follow_up",
-            json!({"run_id": "r-missing", "prompt": "x"}),
-        )
-        .unwrap_err();
+    let err = d.try_call("run.follow_up", json!({"run_id": "r-missing", "prompt": "x"})).unwrap_err();
     assert!(err.contains("unknown run"));
 }
 
@@ -1262,74 +733,27 @@ fn ac09_follow_up_reaches_only_the_selected_run() {
 fn ac16_fixture_codex_app_server_approvals_interrupt_and_unsupported_requests() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
-    let d = Daemon::start(&[(
-        "OVERSEER_CODEX_PATH",
-        &fixture("fake-harness/codex-app-fixture.js"),
-    )]);
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js"))]);
     for mode in ["allow", "deny", "interrupt"] {
         let created = d.call("task.create", json!({"repo": repo, "harness": "codex-app", "prompt": "touch approved.txt", "title": mode, "approval_policy": "untrusted"}));
         let run = run_id(&created);
         let waiting = d.wait_status(&run, |s| s == "waiting_for_user", 15);
-        assert!(waiting["attention"]["tool"]
-            .as_str()
-            .unwrap()
-            .contains("touch approved.txt"));
+        assert!(waiting["attention"]["tool"].as_str().unwrap().contains("touch approved.txt"));
         std::thread::sleep(Duration::from_millis(400));
-        assert_eq!(
-            d.run(&run)["status"],
-            "waiting_for_user",
-            "never auto-approved"
-        );
-        let req = waiting["attention"]["request_id"]
-            .as_str()
-            .unwrap()
-            .to_string();
+        assert_eq!(d.run(&run)["status"], "waiting_for_user", "never auto-approved");
+        let req = waiting["attention"]["request_id"].as_str().unwrap().to_string();
         match mode {
-            "allow" => {
-                d.call(
-                    "run.permission",
-                    json!({"run_id": run, "request_id": req, "allow": true}),
-                );
-            }
-            "deny" => {
-                d.call(
-                    "run.permission",
-                    json!({"run_id": run, "request_id": req, "allow": false}),
-                );
-            }
-            _ => {
-                d.call("run.interrupt", json!({"run_id": run}));
-            }
+            "allow" => { d.call("run.permission", json!({"run_id": run, "request_id": req, "allow": true})); }
+            "deny" => { d.call("run.permission", json!({"run_id": run, "request_id": req, "allow": false})); }
+            _ => { d.call("run.interrupt", json!({"run_id": run})); }
         }
         let done = d.wait_done(&run, 20);
-        let expect = if mode == "interrupt" {
-            "interrupted"
-        } else {
-            "completed"
-        };
+        let expect = if mode == "interrupt" { "interrupted" } else { "completed" };
         assert_eq!(done["status"], expect, "{mode}: {done}");
-        assert_eq!(
-            ws_path(&d, &created).join("approved.txt").exists(),
-            mode == "allow",
-            "{mode}"
-        );
-        let text: Vec<String> = d
-            .events(&run)
-            .iter()
-            .filter(|e| e["kind"] == "output")
-            .map(|e| {
-                e["payload"]["text"]
-                    .as_str()
-                    .unwrap_or_default()
-                    .to_string()
-            })
-            .collect();
+        assert_eq!(ws_path(&d, &created).join("approved.txt").exists(), mode == "allow", "{mode}");
+        let text: Vec<String> = d.events(&run).iter().filter(|e| e["kind"] == "output").map(|e| e["payload"]["text"].as_str().unwrap_or_default().to_string()).collect();
         if mode != "interrupt" {
-            assert!(
-                text.iter()
-                    .any(|t| t.contains("unsupported request was refused")),
-                "{text:?}"
-            );
+            assert!(text.iter().any(|t| t.contains("unsupported request was refused")), "{text:?}");
         }
         assert_eq!(done["native_id"], "thr-fixture-1");
     }
@@ -1342,57 +766,33 @@ fn ac14_fixture_claude_background_subagent_keeps_session_open_for_permissions() 
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let d = claude_daemon("background");
-    let created = d.call(
-        "task.create",
-        json!({"repo": repo, "harness": "claude", "prompt": "bg", "title": "bg"}),
-    );
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "bg", "title": "bg"}));
     let run = run_id(&created);
     let waiting = d.wait_status(&run, |s| s == "waiting_for_user", 15);
-    d.call(
-        "run.permission",
-        json!({"run_id": run, "request_id": waiting["attention"]["request_id"], "allow": true}),
-    );
+    d.call("run.permission", json!({"run_id": run, "request_id": waiting["attention"]["request_id"], "allow": true}));
     assert_eq!(d.wait_done(&run, 15)["status"], "completed");
     assert!(ws_path(&d, &created).join("bg.txt").exists());
-    let kids: Vec<_> = d
-        .runs()
-        .into_iter()
-        .filter(|x| x["parent_run_id"] == run.as_str())
-        .collect();
+    let kids: Vec<_> = d.runs().into_iter().filter(|x| x["parent_run_id"] == run.as_str()).collect();
     assert_eq!(kids.len(), 1);
     assert_eq!(kids[0]["status"], "completed");
 }
 
 #[test]
-fn ac14_fixture_claude_background_task_finishing_before_the_interim_result_still_keeps_the_session_open(
-) {
+fn ac14_fixture_claude_background_task_finishing_before_the_interim_result_still_keeps_the_session_open() {
     // Regression for a live Claude run (2026-09-25, AC-43 live scenario): the background agent
     // finished and was reported before the interim `result`, so no task was "still running";
     // Claude then continued with another turn whose Write permission failed with "Stream closed".
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let d = claude_daemon("background-early");
-    let created = d.call(
-        "task.create",
-        json!({"repo": repo, "harness": "claude", "prompt": "bg", "title": "bg"}),
-    );
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "bg", "title": "bg"}));
     let run = run_id(&created);
     let waiting = d.wait_status(&run, |s| s == "waiting_for_user", 15);
     assert_eq!(waiting["attention"]["tool"], "Write");
-    d.call(
-        "run.permission",
-        json!({"run_id": run, "request_id": waiting["attention"]["request_id"], "allow": true}),
-    );
+    d.call("run.permission", json!({"run_id": run, "request_id": waiting["attention"]["request_id"], "allow": true}));
     assert_eq!(d.wait_done(&run, 15)["status"], "completed");
-    assert!(
-        ws_path(&d, &created).join("bg.txt").exists(),
-        "the continuation turn's Write was allowed and ran"
-    );
-    let dones = d
-        .events(&run)
-        .into_iter()
-        .filter(|e| e["kind"] == "turn_done")
-        .count();
+    assert!(ws_path(&d, &created).join("bg.txt").exists(), "the continuation turn's Write was allowed and ran");
+    let dones = d.events(&run).into_iter().filter(|e| e["kind"] == "turn_done").count();
     assert_eq!(dones, 1, "the interim result is not a finished turn");
 }
 
@@ -1404,17 +804,10 @@ fn ac14_fixture_claude_subagents_own_background_child_does_not_hold_the_run_open
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let d = claude_daemon("background-nested");
-    let created = d.call(
-        "task.create",
-        json!({"repo": repo, "harness": "claude", "prompt": "bg", "title": "bg"}),
-    );
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "bg", "title": "bg"}));
     let run = run_id(&created);
     assert_eq!(d.wait_done(&run, 15)["status"], "completed");
-    let dones = d
-        .events(&run)
-        .into_iter()
-        .filter(|e| e["kind"] == "turn_done")
-        .count();
+    let dones = d.events(&run).into_iter().filter(|e| e["kind"] == "turn_done").count();
     assert_eq!(dones, 1);
 }
 
@@ -1426,10 +819,7 @@ fn ac14_fixture_claude_background_notice_read_within_the_turn_does_not_hold_the_
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let d = claude_daemon("background-read-in-turn");
-    let created = d.call(
-        "task.create",
-        json!({"repo": repo, "harness": "claude", "prompt": "bg", "title": "bg"}),
-    );
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "bg", "title": "bg"}));
     let run = run_id(&created);
     assert_eq!(d.wait_done(&run, 15)["status"], "completed");
 }
@@ -1438,77 +828,25 @@ fn ac14_fixture_claude_background_notice_read_within_the_turn_does_not_hold_the_
 fn ac19_fixture_codex_app_child_threads_nest_and_do_not_end_the_parent() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
-    let d = Daemon::start(&[
-        (
-            "OVERSEER_CODEX_PATH",
-            &fixture("fake-harness/codex-app-fixture.js"),
-        ),
-        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
-        ("FIXTURE_MODE", "tree"),
-    ]);
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"), ("FIXTURE_MODE", "tree")]);
     let created = d.call("task.create", json!({"repo": repo, "harness": "codex-app", "prompt": "tree", "title": "tree", "approval_policy": "untrusted", "extra_args": ["-c", "agents.max_depth=2"]}));
     let root = run_id(&created);
     // The child's turn/completed must not end the root turn: the root still reaches its approval.
     let waiting = d.wait_status(&root, |s| s == "waiting_for_user", 15);
-    d.call(
-        "run.permission",
-        json!({"run_id": root, "request_id": waiting["attention"]["request_id"], "allow": true}),
-    );
+    d.call("run.permission", json!({"run_id": root, "request_id": waiting["attention"]["request_id"], "allow": true}));
     assert_eq!(d.wait_done(&root, 15)["status"], "completed");
     let runs = d.runs();
-    let child = runs
-        .iter()
-        .find(|x| x["native_id"] == "thr-child")
-        .expect("child");
-    let grand = runs
-        .iter()
-        .find(|x| x["native_id"] == "thr-grand")
-        .expect("grandchild");
+    let child = runs.iter().find(|x| x["native_id"] == "thr-child").expect("child");
+    let grand = runs.iter().find(|x| x["native_id"] == "thr-grand").expect("grandchild");
     assert_eq!(child["parent_run_id"], root.as_str());
     assert_eq!(grand["parent_run_id"], child["id"]);
     assert_eq!(child["status"], "completed");
-    let child_out: Vec<_> = d
-        .events(child["id"].as_str().unwrap())
-        .into_iter()
-        .filter(|e| e["kind"] == "output")
-        .map(|e| {
-            e["payload"]["text"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string()
-        })
-        .collect();
-    assert!(
-        child_out.contains(&"child output".to_string()),
-        "{child_out:?}"
-    );
-    let root_out: Vec<_> = d
-        .events(&root)
-        .into_iter()
-        .filter(|e| e["kind"] == "output")
-        .map(|e| {
-            e["payload"]["text"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string()
-        })
-        .collect();
-    assert!(
-        !root_out.contains(&"child output".to_string()),
-        "child text not attributed to the root"
-    );
-    let launch = std::fs::read_to_string(
-        d.home
-            .path()
-            .join("runs")
-            .join(&root)
-            .join("p1/launch.json"),
-    )
-    .unwrap();
-    assert!(
-        launch.contains("agents.max_depth=2"),
-        "extra args passed to the harness"
-    );
+    let child_out: Vec<_> = d.events(child["id"].as_str().unwrap()).into_iter().filter(|e| e["kind"] == "output").map(|e| e["payload"]["text"].as_str().unwrap_or_default().to_string()).collect();
+    assert!(child_out.contains(&"child output".to_string()), "{child_out:?}");
+    let root_out: Vec<_> = d.events(&root).into_iter().filter(|e| e["kind"] == "output").map(|e| e["payload"]["text"].as_str().unwrap_or_default().to_string()).collect();
+    assert!(!root_out.contains(&"child output".to_string()), "child text not attributed to the root");
+    let launch = std::fs::read_to_string(d.home.path().join("runs").join(&root).join("p1/launch.json")).unwrap();
+    assert!(launch.contains("agents.max_depth=2"), "extra args passed to the harness");
 }
 
 // ---------------------------------------------------------------- AC-45 visible background agents
@@ -1517,20 +855,10 @@ fn ac19_fixture_codex_app_child_threads_nest_and_do_not_end_the_parent() {
 fn vscode_window(d: &Daemon) -> std::os::unix::net::UnixStream {
     use std::io::{BufRead, BufReader, Write};
     let mut conn = std::os::unix::net::UnixStream::connect(d.socket()).unwrap();
-    conn.set_read_timeout(Some(Duration::from_secs(10)))
-        .unwrap();
-    conn.write_all(
-        format!(
-            "{}\n",
-            json!({"id": 1, "method": "hello", "params": {"client": "vscode"}})
-        )
-        .as_bytes(),
-    )
-    .unwrap();
+    conn.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+    conn.write_all(format!("{}\n", json!({"id": 1, "method": "hello", "params": {"client": "vscode"}})).as_bytes()).unwrap();
     let mut line = String::new();
-    BufReader::new(conn.try_clone().unwrap())
-        .read_line(&mut line)
-        .unwrap();
+    BufReader::new(conn.try_clone().unwrap()).read_line(&mut line).unwrap();
     assert!(line.contains("\"protocol\""), "{line}");
     conn
 }
@@ -1538,40 +866,20 @@ fn vscode_window(d: &Daemon) -> std::os::unix::net::UnixStream {
 fn notifier(dir: &Path) -> (String, std::path::PathBuf) {
     let log = dir.join("notices.log");
     let script = dir.join("notify.sh");
-    std::fs::write(
-        &script,
-        format!(
-            "#!/bin/sh\nprintf '%s|%s\\n' \"$1\" \"$2\" >> '{}'\n",
-            log.display()
-        ),
-    )
-    .unwrap();
-    std::process::Command::new("chmod")
-        .arg("+x")
-        .arg(&script)
-        .status()
-        .unwrap();
+    std::fs::write(&script, format!("#!/bin/sh\nprintf '%s|%s\\n' \"$1\" \"$2\" >> '{}'\n", log.display())).unwrap();
+    std::process::Command::new("chmod").arg("+x").arg(&script).status().unwrap();
     (script.display().to_string(), log)
 }
 
 fn notices(d: &Daemon) -> Vec<serde_json::Value> {
-    d.call("events.list", json!({"after": 0, "limit": 5000}))["events"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter(|e| e["kind"] == "background_notice")
-        .cloned()
-        .collect()
+    d.call("events.list", json!({"after": 0, "limit": 5000}))["events"].as_array().unwrap().iter().filter(|e| e["kind"] == "background_notice").cloned().collect()
 }
 
 #[test]
 fn ac45_last_vscode_window_closing_with_active_runs_posts_a_notice_but_a_reload_does_not() {
     let t = tmp();
     let (cmd, log) = notifier(t.path());
-    let d = Daemon::start(&[
-        ("OVERSEER_BACKGROUND_NOTICE_MS", "600"),
-        ("OVERSEER_NOTIFY_COMMAND", &cmd),
-    ]);
+    let d = Daemon::start(&[("OVERSEER_BACKGROUND_NOTICE_MS", "600"), ("OVERSEER_NOTIFY_COMMAND", &cmd)]);
     let repo = repo(&t.path().join("r"));
     let created = sh(&d, &repo, "worktree", "sleep 30");
     let run = run_id(&created);
@@ -1592,18 +900,13 @@ fn ac45_last_vscode_window_closing_with_active_runs_posts_a_notice_but_a_reload_
     // VS Code really closes: exactly one notice naming the running agent and how to stop it.
     drop(w3);
     for _ in 0..60 {
-        if log.exists() {
-            break;
-        }
+        if log.exists() { break; }
         std::thread::sleep(Duration::from_millis(100));
     }
     std::thread::sleep(Duration::from_millis(300));
     let text = std::fs::read_to_string(&log).expect("notice sent");
     assert_eq!(text.lines().count(), 1, "{text}");
-    assert!(
-        text.starts_with("Overseer: 1 agent still running|generic: /bin/sh -c sleep 30"),
-        "{text}"
-    );
+    assert!(text.starts_with("Overseer: 1 agent still running|generic: /bin/sh -c sleep 30"), "{text}");
     assert!(text.contains("Stop Agents and Daemon"), "{text}");
     let n = notices(&d);
     assert_eq!(n.len(), 1);
@@ -1618,20 +921,10 @@ fn ac45_last_vscode_window_closing_with_active_runs_posts_a_notice_but_a_reload_
 fn tui_client(d: &Daemon) -> std::os::unix::net::UnixStream {
     use std::io::{BufRead, BufReader, Write};
     let mut conn = std::os::unix::net::UnixStream::connect(d.socket()).unwrap();
-    conn.set_read_timeout(Some(Duration::from_secs(10)))
-        .unwrap();
-    conn.write_all(
-        format!(
-            "{}\n",
-            json!({"id": 1, "method": "hello", "params": {"client": "tui"}})
-        )
-        .as_bytes(),
-    )
-    .unwrap();
+    conn.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+    conn.write_all(format!("{}\n", json!({"id": 1, "method": "hello", "params": {"client": "tui"}})).as_bytes()).unwrap();
     let mut line = String::new();
-    BufReader::new(conn.try_clone().unwrap())
-        .read_line(&mut line)
-        .unwrap();
+    BufReader::new(conn.try_clone().unwrap()).read_line(&mut line).unwrap();
     assert!(line.contains("\"protocol\""), "{line}");
     conn
 }
@@ -1640,10 +933,7 @@ fn tui_client(d: &Daemon) -> std::os::unix::net::UnixStream {
 fn t11_an_attached_tui_counts_as_a_watching_ui() {
     let t = tmp();
     let (cmd, log) = notifier(t.path());
-    let d = Daemon::start(&[
-        ("OVERSEER_BACKGROUND_NOTICE_MS", "500"),
-        ("OVERSEER_NOTIFY_COMMAND", &cmd),
-    ]);
+    let d = Daemon::start(&[("OVERSEER_BACKGROUND_NOTICE_MS", "500"), ("OVERSEER_NOTIFY_COMMAND", &cmd)]);
     let repo = repo(&t.path().join("r"));
     let run = run_id(&sh(&d, &repo, "worktree", "sleep 30"));
     d.wait_status(&run, |s| s == "running", 20);
@@ -1657,19 +947,13 @@ fn t11_an_attached_tui_counts_as_a_watching_ui() {
     // The TUI quits too: now they are.
     drop(tui);
     for _ in 0..50 {
-        if log.exists() {
-            break;
-        }
+        if log.exists() { break; }
         std::thread::sleep(Duration::from_millis(100));
     }
     std::thread::sleep(Duration::from_millis(300));
     let text = std::fs::read_to_string(&log).expect("notice after the last UI closed");
     assert_eq!(text.lines().count(), 1, "{text}");
-    assert_eq!(
-        d.run(&run)["status"],
-        "running",
-        "quitting the TUI never stops agents"
-    );
+    assert_eq!(d.run(&run)["status"], "running", "quitting the TUI never stops agents");
     d.call("run.interrupt", json!({"run_id": run}));
     d.wait_done(&run, 20);
 }
@@ -1678,18 +962,11 @@ fn t11_an_attached_tui_counts_as_a_watching_ui() {
 fn ac45_one_notice_per_quit_a_brief_reconnect_does_not_repeat_it() {
     let t = tmp();
     let (cmd, log) = notifier(t.path());
-    let d = Daemon::start(&[
-        ("OVERSEER_BACKGROUND_NOTICE_MS", "600"),
-        ("OVERSEER_NOTIFY_COMMAND", &cmd),
-    ]);
+    let d = Daemon::start(&[("OVERSEER_BACKGROUND_NOTICE_MS", "600"), ("OVERSEER_NOTIFY_COMMAND", &cmd)]);
     let repo = repo(&t.path().join("r"));
     let run = run_id(&sh(&d, &repo, "worktree", "sleep 30"));
     d.wait_status(&run, |s| s == "running", 20);
-    let count = || {
-        std::fs::read_to_string(&log)
-            .map(|t| t.lines().count())
-            .unwrap_or(0)
-    };
+    let count = || std::fs::read_to_string(&log).map(|t| t.lines().count()).unwrap_or(0);
     drop(vscode_window(&d));
     std::thread::sleep(Duration::from_millis(1500));
     assert_eq!(count(), 1, "the quit notifies once");
@@ -1711,10 +988,7 @@ fn ac45_one_notice_per_quit_a_brief_reconnect_does_not_repeat_it() {
 fn ac45_no_notice_when_nothing_is_running() {
     let t = tmp();
     let (cmd, log) = notifier(t.path());
-    let d = Daemon::start(&[
-        ("OVERSEER_BACKGROUND_NOTICE_MS", "300"),
-        ("OVERSEER_NOTIFY_COMMAND", &cmd),
-    ]);
+    let d = Daemon::start(&[("OVERSEER_BACKGROUND_NOTICE_MS", "300"), ("OVERSEER_NOTIFY_COMMAND", &cmd)]);
     let repo = repo(&t.path().join("r"));
     let done = run_id(&sh(&d, &repo, "worktree", "echo finished"));
     d.wait_done(&done, 20);
@@ -1722,9 +996,7 @@ fn ac45_no_notice_when_nothing_is_running() {
     std::thread::sleep(Duration::from_millis(1200));
     assert!(!log.exists(), "no notice when nothing is running");
     assert!(notices(&d).is_empty());
-    assert!(std::fs::read_to_string(d.home.path().join("overseerd.log"))
-        .unwrap_or_default()
-        .contains("no active agents, no notice"));
+    assert!(std::fs::read_to_string(d.home.path().join("overseerd.log")).unwrap_or_default().contains("no active agents, no notice"));
 }
 
 #[test]
@@ -1735,73 +1007,32 @@ fn ac45_stop_all_interrupts_runs_forces_stragglers_and_exits_the_daemon() {
     let repo = repo(&t.path().join("r"));
     let polite = run_id(&sh(&d, &repo, "worktree", "sleep 60"));
     // Ignores SIGINT, so interrupt alone cannot stop it.
-    let stubborn = run_id(&sh(
-        &d,
-        &repo,
-        "worktree",
-        "trap '' INT; while true; do sleep 1; done",
-    ));
+    let stubborn = run_id(&sh(&d, &repo, "worktree", "trap '' INT; while true; do sleep 1; done"));
     for r in [&polite, &stubborn] {
         d.wait_status(r, |s| s == "running", 20);
     }
-    let pids: Vec<i64> = [&polite, &stubborn]
-        .iter()
-        .flat_map(|r| {
-            let (s, _) = launch_info(&d, r);
-            vec![
-                s["shim_pid"].as_i64().unwrap(),
-                s["child_pid"].as_i64().unwrap(),
-            ]
-        })
-        .collect();
+    let pids: Vec<i64> = [&polite, &stubborn].iter().flat_map(|r| { let (s, _) = launch_info(&d, r); vec![s["shim_pid"].as_i64().unwrap(), s["child_pid"].as_i64().unwrap()] }).collect();
     // Another window is subscribed; it must learn that the stop was deliberate (so it does not respawn).
     let mut sub = std::os::unix::net::UnixStream::connect(d.socket()).unwrap();
     sub.set_read_timeout(Some(Duration::from_secs(30))).unwrap();
-    sub.write_all(
-        format!(
-            "{}\n",
-            json!({"id": 1, "method": "events.subscribe", "params": {"after": 0}})
-        )
-        .as_bytes(),
-    )
-    .unwrap();
+    sub.write_all(format!("{}\n", json!({"id": 1, "method": "events.subscribe", "params": {"after": 0}})).as_bytes()).unwrap();
     let reader = std::thread::spawn(move || {
         let mut seen = Vec::new();
         for line in BufReader::new(sub).lines().map_while(Result::ok) {
-            if line.contains("daemon_stopping") {
-                seen.push(line);
-                break;
-            }
+            if line.contains("daemon_stopping") { seen.push(line); break; }
         }
         seen
     });
     let result = d.call("daemon.stop_all", json!({}));
     assert_eq!(result["stopped"].as_array().unwrap().len(), 2, "{result}");
-    assert!(
-        result["forced"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|x| x == stubborn.as_str()),
-        "{result}"
-    );
-    assert!(
-        result["remaining"].as_array().unwrap().is_empty(),
-        "{result}"
-    );
-    let exited = (0..50).any(|_| {
-        std::thread::sleep(Duration::from_millis(100));
-        d.child.as_mut().unwrap().try_wait().unwrap().is_some()
-    });
+    assert!(result["forced"].as_array().unwrap().iter().any(|x| x == stubborn.as_str()), "{result}");
+    assert!(result["remaining"].as_array().unwrap().is_empty(), "{result}");
+    let exited = (0..50).any(|_| { std::thread::sleep(Duration::from_millis(100)); d.child.as_mut().unwrap().try_wait().unwrap().is_some() });
     assert!(exited, "daemon exits after stop_all");
     for pid in pids {
         assert!(!pid_alive(pid), "process {pid} still alive");
     }
-    assert_eq!(
-        reader.join().unwrap().len(),
-        1,
-        "subscribers get daemon_stopping"
-    );
+    assert_eq!(reader.join().unwrap().len(), 1, "subscribers get daemon_stopping");
     // Restarting finds both runs stopped, not reattached.
     d.child = None;
     d.spawn();
@@ -1819,73 +1050,28 @@ fn ac43_fixture_tool_calls_carry_inputs_and_results_for_the_conversation_view() 
     let repo = repo(&r.path().join("repo"));
     // Claude: tool_use input and tool_result output, joined by the tool id; the Agent tool id is the child's native id.
     let d = claude_daemon("nested");
-    let created = d.call(
-        "task.create",
-        json!({"repo": repo, "harness": "claude", "prompt": "delegate", "title": "nested"}),
-    );
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "delegate", "title": "nested"}));
     let root = run_id(&created);
     assert_eq!(d.wait_done(&root, 15)["status"], "completed");
     let evs = d.events(&root);
-    let tool = evs
-        .iter()
-        .find(|e| e["kind"] == "tool" && e["payload"]["id"] == "toolu_child")
-        .expect("Agent tool event");
+    let tool = evs.iter().find(|e| e["kind"] == "tool" && e["payload"]["id"] == "toolu_child").expect("Agent tool event");
     assert_eq!(tool["payload"]["name"], "Agent");
-    let details: Vec<_> = evs
-        .iter()
-        .filter(|e| e["kind"] == "tool_result" && e["payload"]["id"] == "toolu_child")
-        .collect();
-    assert!(
-        details
-            .iter()
-            .any(|e| e["payload"]["input"]["description"] == "child task"),
-        "{details:?}"
-    );
-    assert!(
-        details
-            .iter()
-            .any(|e| e["payload"]["output"] == "done" && e["payload"]["status"] == "completed"),
-        "{details:?}"
-    );
-    let child = d
-        .runs()
-        .into_iter()
-        .find(|x| x["parent_run_id"] == root.as_str())
-        .unwrap();
-    assert_eq!(
-        child["native_id"], "toolu_child",
-        "the conversation nests the child under the tool with this id"
-    );
+    let details: Vec<_> = evs.iter().filter(|e| e["kind"] == "tool_result" && e["payload"]["id"] == "toolu_child").collect();
+    assert!(details.iter().any(|e| e["payload"]["input"]["description"] == "child task"), "{details:?}");
+    assert!(details.iter().any(|e| e["payload"]["output"] == "done" && e["payload"]["status"] == "completed"), "{details:?}");
+    let child = d.runs().into_iter().find(|x| x["parent_run_id"] == root.as_str()).unwrap();
+    assert_eq!(child["native_id"], "toolu_child", "the conversation nests the child under the tool with this id");
     // Codex app-server: the command's input and final status arrive as tool_result.
-    let d = Daemon::start(&[(
-        "OVERSEER_CODEX_PATH",
-        &fixture("fake-harness/codex-app-fixture.js"),
-    )]);
-    let created = d.call(
-        "task.create",
-        json!({"repo": repo, "harness": "codex-app", "prompt": "touch", "title": "app"}),
-    );
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js"))]);
+    let created = d.call("task.create", json!({"repo": repo, "harness": "codex-app", "prompt": "touch", "title": "app"}));
     let run = run_id(&created);
     let waiting = d.wait_status(&run, |s| s == "waiting_for_user", 20);
-    d.call(
-        "run.permission",
-        json!({"run_id": run, "request_id": waiting["attention"]["request_id"], "allow": true}),
-    );
+    d.call("run.permission", json!({"run_id": run, "request_id": waiting["attention"]["request_id"], "allow": true}));
     d.wait_done(&run, 20);
     let evs = d.events(&run);
-    let cmd: Vec<_> = evs
-        .iter()
-        .filter(|e| e["kind"] == "tool_result" && e["payload"]["id"] == "cmd1")
-        .collect();
-    assert!(
-        cmd.iter()
-            .any(|e| e["payload"]["input"]["command"] == "touch approved.txt"),
-        "{cmd:?}"
-    );
-    assert!(
-        cmd.iter().any(|e| e["payload"]["status"] == "completed"),
-        "{cmd:?}"
-    );
+    let cmd: Vec<_> = evs.iter().filter(|e| e["kind"] == "tool_result" && e["payload"]["id"] == "cmd1").collect();
+    assert!(cmd.iter().any(|e| e["payload"]["input"]["command"] == "touch approved.txt"), "{cmd:?}");
+    assert!(cmd.iter().any(|e| e["payload"]["status"] == "completed"), "{cmd:?}");
     assert!(evs.iter().any(|e| e["kind"] == "permission_answered"));
 }
 
@@ -1900,77 +1086,33 @@ fn ac44_clean_merge_back_commits_the_worktree_and_merges_only_on_request() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let d = Daemon::start(&[]);
-    let created = sh(
-        &d,
-        &repo,
-        "worktree",
-        "printf 'a\\nagent line\\n' > a.txt; printf 'new\\n' > new.txt",
-    );
+    let created = sh(&d, &repo, "worktree", "printf 'a\\nagent line\\n' > a.txt; printf 'new\\n' > new.txt");
     let run = run_id(&created);
     d.wait_done(&run, 20);
     let main_before = git(&repo, &["rev-parse", "main"]);
     std::thread::sleep(Duration::from_millis(300));
-    assert_eq!(
-        git(&repo, &["rev-parse", "main"]),
-        main_before,
-        "never merges automatically"
-    );
-    let plan = d.call(
-        "workspace.merge_plan",
-        json!({"workspace_id": ws_id(&created)}),
-    );
+    assert_eq!(git(&repo, &["rev-parse", "main"]), main_before, "never merges automatically");
+    let plan = d.call("workspace.merge_plan", json!({"workspace_id": ws_id(&created)}));
     assert_eq!(plan["ok"], true, "{plan}");
     assert_eq!(plan["state"], "idle");
     assert_eq!(plan["target"], "main");
-    assert_eq!(
-        plan["worktree_uncommitted"].as_array().unwrap().len(),
-        2,
-        "{plan}"
-    );
-    let prep = d.call(
-        "workspace.merge_prepare",
-        json!({"workspace_id": ws_id(&created)}),
-    );
+    assert_eq!(plan["worktree_uncommitted"].as_array().unwrap().len(), 2, "{plan}");
+    let prep = d.call("workspace.merge_prepare", json!({"workspace_id": ws_id(&created)}));
     assert_eq!(prep["state"], "ready", "{prep}");
-    assert_eq!(
-        git(&repo, &["rev-parse", "main"]),
-        main_before,
-        "prepare never touches the target"
-    );
-    let plan = d.call(
-        "workspace.merge_plan",
-        json!({"workspace_id": ws_id(&created)}),
-    );
+    assert_eq!(git(&repo, &["rev-parse", "main"]), main_before, "prepare never touches the target");
+    let plan = d.call("workspace.merge_plan", json!({"workspace_id": ws_id(&created)}));
     assert_eq!(plan["can_complete"], true, "{plan}");
-    let done = d.call(
-        "workspace.merge_complete",
-        json!({"workspace_id": ws_id(&created)}),
-    );
+    let done = d.call("workspace.merge_complete", json!({"workspace_id": ws_id(&created)}));
     assert_eq!(done["merged"], true);
-    assert_eq!(
-        std::fs::read_to_string(repo.join("a.txt")).unwrap(),
-        "a\nagent line\n"
-    );
+    assert_eq!(std::fs::read_to_string(repo.join("a.txt")).unwrap(), "a\nagent line\n");
     assert!(repo.join("new.txt").exists());
     assert_eq!(git(&repo, &["status", "--porcelain"]), "");
     assert!(git(&repo, &["log", "-1", "--format=%s"]).contains("Overseer merge back"));
-    assert!(d
-        .events(&run)
-        .iter()
-        .any(|e| e["kind"] == "merge_back" && e["payload"]["state"] == "merged"));
+    assert!(d.events(&run).iter().any(|e| e["kind"] == "merge_back" && e["payload"]["state"] == "merged"));
     // Afterwards there is nothing left to merge.
-    let again = d.call(
-        "workspace.merge_plan",
-        json!({"workspace_id": ws_id(&created)}),
-    );
+    let again = d.call("workspace.merge_plan", json!({"workspace_id": ws_id(&created)}));
     assert_eq!(again["ok"], false);
-    assert!(
-        again["reason"]
-            .as_str()
-            .unwrap()
-            .contains("Nothing to merge"),
-        "{again}"
-    );
+    assert!(again["reason"].as_str().unwrap().contains("Nothing to merge"), "{again}");
 }
 
 #[test]
@@ -1985,40 +1127,23 @@ fn ac44_conflicts_are_resolved_in_the_worktree_before_the_target_changes() {
     git(&repo, &["commit", "-qam", "main edit"]);
     let main_before = git(&repo, &["rev-parse", "main"]);
     let id = ws_id(&created);
-    let prep = d.call(
-        "workspace.merge_prepare",
-        json!({"workspace_id": id, "handoff": true}),
-    );
+    let prep = d.call("workspace.merge_prepare", json!({"workspace_id": id, "handoff": true}));
     assert_eq!(prep["state"], "conflicts", "{prep}");
     assert_eq!(prep["files"], json!(["a.txt"]));
-    assert_eq!(
-        prep["handoff"]["sent"], false,
-        "generic runs cannot take follow-ups: {prep}"
-    );
+    assert_eq!(prep["handoff"]["sent"], false, "generic runs cannot take follow-ups: {prep}");
     assert_eq!(git(&repo, &["rev-parse", "main"]), main_before);
-    assert_eq!(
-        d.call("workspace.merge_plan", json!({"workspace_id": id}))["state"],
-        "resolving"
-    );
+    assert_eq!(d.call("workspace.merge_plan", json!({"workspace_id": id}))["state"], "resolving");
     // Still conflicted: refuses to finish.
     let still = d.call("workspace.merge_resolved", json!({"workspace_id": id}));
     assert_eq!(still["state"], "resolving");
-    assert!(d
-        .try_call("workspace.merge_complete", json!({"workspace_id": id}))
-        .is_err());
+    assert!(d.try_call("workspace.merge_complete", json!({"workspace_id": id})).is_err());
     // The agent (here: the test) resolves the file; Overseer stages it and finishes the worktree merge.
     let ws = ws_path(&d, &created);
     std::fs::write(ws.join("a.txt"), "main version\nagent version\n").unwrap();
-    assert_eq!(
-        d.call("workspace.merge_resolved", json!({"workspace_id": id}))["state"],
-        "ready"
-    );
+    assert_eq!(d.call("workspace.merge_resolved", json!({"workspace_id": id}))["state"], "ready");
     let done = d.call("workspace.merge_complete", json!({"workspace_id": id}));
     assert_eq!(done["merged"], true);
-    assert_eq!(
-        std::fs::read_to_string(repo.join("a.txt")).unwrap(),
-        "main version\nagent version\n"
-    );
+    assert_eq!(std::fs::read_to_string(repo.join("a.txt")).unwrap(), "main version\nagent version\n");
     assert_eq!(git(&repo, &["status", "--porcelain"]), "");
 }
 
@@ -2034,67 +1159,37 @@ fn ac44_refuses_dirty_target_active_runs_and_current_checkout_tasks() {
     std::fs::write(repo.join("a.txt"), "user's unsaved work\n").unwrap();
     std::fs::write(repo.join("scratch.txt"), "untracked\n").unwrap();
     let before = fingerprint(&repo);
-    assert_eq!(
-        d.call("workspace.merge_prepare", json!({"workspace_id": id}))["state"],
-        "ready"
-    );
+    assert_eq!(d.call("workspace.merge_prepare", json!({"workspace_id": id}))["state"], "ready");
     let plan = d.call("workspace.merge_plan", json!({"workspace_id": id}));
     assert_eq!(plan["can_complete"], false);
-    assert!(
-        plan["blockers"][0]
-            .as_str()
-            .unwrap()
-            .contains("uncommitted changes (a.txt)"),
-        "{plan}"
-    );
-    let err = d
-        .try_call("workspace.merge_complete", json!({"workspace_id": id}))
-        .unwrap_err();
+    assert!(plan["blockers"][0].as_str().unwrap().contains("uncommitted changes (a.txt)"), "{plan}");
+    let err = d.try_call("workspace.merge_complete", json!({"workspace_id": id})).unwrap_err();
     assert!(err.contains("never disturbs"), "{err}");
     assert_eq!(fingerprint(&repo), before, "dirty target left untouched");
     // Target checkout on another branch: refused with an explanation.
     git(&repo, &["checkout", "-q", "--", "a.txt"]);
     git(&repo, &["switch", "-q", "-c", "elsewhere"]);
-    let err = d
-        .try_call("workspace.merge_complete", json!({"workspace_id": id}))
-        .unwrap_err();
+    let err = d.try_call("workspace.merge_complete", json!({"workspace_id": id})).unwrap_err();
     assert!(err.contains("switch it to main"), "{err}");
     git(&repo, &["switch", "-q", "main"]);
     // Active run: refused.
     let busy = sh(&d, &repo, "worktree", "sleep 30");
     d.wait_status(&run_id(&busy), |s| s == "running", 20);
-    let plan = d.call(
-        "workspace.merge_plan",
-        json!({"workspace_id": ws_id(&busy)}),
-    );
+    let plan = d.call("workspace.merge_plan", json!({"workspace_id": ws_id(&busy)}));
     assert_eq!(plan["ok"], false);
-    assert!(
-        plan["reason"].as_str().unwrap().contains("still running"),
-        "{plan}"
-    );
+    assert!(plan["reason"].as_str().unwrap().contains("still running"), "{plan}");
     d.call("run.interrupt", json!({"run_id": run_id(&busy)}));
     // Current-checkout task: nothing to merge back.
     let cur = sh(&d, &repo, "current", "true");
     d.wait_done(&run_id(&cur), 20);
     let plan = d.call("workspace.merge_plan", json!({"workspace_id": ws_id(&cur)}));
     assert_eq!(plan["ok"], false);
-    assert!(
-        plan["reason"]
-            .as_str()
-            .unwrap()
-            .contains("current checkout"),
-        "{plan}"
-    );
+    assert!(plan["reason"].as_str().unwrap().contains("current checkout"), "{plan}");
 }
 
 // ---------------------------------------------------------------- AC-46 / AC-11 accounts (fixture CLI)
 
-struct AccountLab {
-    d: Daemon,
-    _t: tempfile::TempDir,
-    sys: std::path::PathBuf,
-    next: std::path::PathBuf,
-}
+struct AccountLab { d: Daemon, _t: tempfile::TempDir, sys: std::path::PathBuf, next: std::path::PathBuf }
 
 fn account_lab() -> AccountLab {
     let t = tmp();
@@ -2102,22 +1197,9 @@ fn account_lab() -> AccountLab {
     std::fs::create_dir_all(&sys).unwrap();
     let next = t.path().join("next-login");
     let cli = fixture("fake-harness/account-cli.js");
-    let d = Daemon::start(&[
-        ("OVERSEER_CODEX_PATH", &cli),
-        ("OVERSEER_CLAUDE_PATH", &cli),
-        ("OVERSEER_TEST_SYSTEM_HOME", sys.to_str().unwrap()),
-        (
-            "OVERSEER_HARNESS_ENV_PASSTHROUGH",
-            "FIXTURE_LOGIN_ACCOUNT_FILE,OVERSEER_TEST_SYSTEM_HOME",
-        ),
-        ("FIXTURE_LOGIN_ACCOUNT_FILE", next.to_str().unwrap()),
-    ]);
-    AccountLab {
-        d,
-        _t: t,
-        sys,
-        next,
-    }
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &cli), ("OVERSEER_CLAUDE_PATH", &cli), ("OVERSEER_TEST_SYSTEM_HOME", sys.to_str().unwrap()),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_LOGIN_ACCOUNT_FILE,OVERSEER_TEST_SYSTEM_HOME"), ("FIXTURE_LOGIN_ACCOUNT_FILE", next.to_str().unwrap())]);
+    AccountLab { d, _t: t, sys, next }
 }
 
 impl AccountLab {
@@ -2126,32 +1208,15 @@ impl AccountLab {
         std::fs::write(&self.next, who).unwrap();
         let cmd = self.d.call("profile.login_command", json!({"id": id}));
         let mut c = std::process::Command::new(cmd["program"].as_str().unwrap());
-        c.args(
-            cmd["args"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|a| a.as_str().unwrap()),
-        )
-        .env("FIXTURE_LOGIN_ACCOUNT_FILE", &self.next);
-        for (k, v) in cmd["env"].as_object().unwrap() {
-            c.env(k, v.as_str().unwrap());
-        }
+        c.args(cmd["args"].as_array().unwrap().iter().map(|a| a.as_str().unwrap())).env("FIXTURE_LOGIN_ACCOUNT_FILE", &self.next);
+        for (k, v) in cmd["env"].as_object().unwrap() { c.env(k, v.as_str().unwrap()); }
         assert!(c.status().unwrap().success());
     }
     fn fp(&self, id: &str) -> (bool, String, String) {
         let st = self.d.call("profile.status", json!({"id": id}));
         let idn = &st["identity"];
-        let fp = idn["account_fingerprint"]
-            .as_str()
-            .or(idn["fingerprint"].as_str())
-            .unwrap_or("")
-            .to_string();
-        (
-            st["logged_in"] == true,
-            fp,
-            idn["plan"].as_str().unwrap_or("").to_string(),
-        )
+        let fp = idn["account_fingerprint"].as_str().or(idn["fingerprint"].as_str()).unwrap_or("").to_string();
+        (st["logged_in"] == true, fp, idn["plan"].as_str().unwrap_or("").to_string())
     }
 }
 
@@ -2160,57 +1225,22 @@ fn ac46_accounts_by_provider_fixed_vs_desktop_linked_and_isolated_resign_in_and_
     let lab = account_lab();
     let d = &lab.d;
     let list = d.call("account.list", json!({}));
-    let providers: Vec<_> = list["providers"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|p| {
-            (
-                p["id"].as_str().unwrap().to_string(),
-                p["available"] == true,
-            )
-        })
-        .collect();
-    assert_eq!(
-        providers.iter().map(|p| p.0.as_str()).collect::<Vec<_>>(),
-        ["openai", "anthropic", "local", "devin"]
-    );
+    let providers: Vec<_> = list["providers"].as_array().unwrap().iter().map(|p| (p["id"].as_str().unwrap().to_string(), p["available"] == true)).collect();
+    assert_eq!(providers.iter().map(|p| p.0.as_str()).collect::<Vec<_>>(), ["openai", "anthropic", "local", "devin"]);
     assert!(!providers[3].1, "Devin has no account login");
-    assert!(d
-        .try_call("account.create", json!({"provider": "devin", "name": "x"}))
-        .is_err());
-    let sys_codex = list["accounts"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|a| a["id"] == "system-codex")
-        .unwrap()
-        .clone();
+    assert!(d.try_call("account.create", json!({"provider": "devin", "name": "x"})).is_err());
+    let sys_codex = list["accounts"].as_array().unwrap().iter().find(|a| a["id"] == "system-codex").unwrap().clone();
     assert_eq!(sys_codex["kind"], "follows-app");
     assert_eq!(sys_codex["harnesses"], json!(["codex", "codex-app"]));
     // Add one fixed account per available provider; their folders exist immediately (AC-11).
-    let work = d.call(
-        "account.create",
-        json!({"provider": "openai", "name": "Work ChatGPT"}),
-    )["account"]
-        .clone();
-    let claude = d.call(
-        "account.create",
-        json!({"provider": "anthropic", "name": "Claude fixed"}),
-    )["account"]
-        .clone();
-    let (work_id, claude_id) = (
-        work["id"].as_str().unwrap().to_string(),
-        claude["id"].as_str().unwrap().to_string(),
-    );
+    let work = d.call("account.create", json!({"provider": "openai", "name": "Work ChatGPT"}))["account"].clone();
+    let claude = d.call("account.create", json!({"provider": "anthropic", "name": "Claude fixed"}))["account"].clone();
+    let (work_id, claude_id) = (work["id"].as_str().unwrap().to_string(), claude["id"].as_str().unwrap().to_string());
     use std::os::unix::fs::PermissionsExt;
     for (acct, sub) in [(&work, "codex"), (&claude, "claude")] {
         let dir = std::path::Path::new(acct["home"].as_str().unwrap()).join(sub);
         assert!(dir.is_dir(), "{} created at creation time", dir.display());
-        assert_eq!(
-            std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777,
-            0o700
-        );
+        assert_eq!(std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o700);
     }
     assert_eq!(lab.fp(&work_id).0, false, "missing login reported");
     lab.sign_in(&work_id, "work:team");
@@ -2219,19 +1249,13 @@ fn ac46_accounts_by_provider_fixed_vs_desktop_linked_and_isolated_resign_in_and_
     let (w_ok, w_fp, w_plan) = lab.fp(&work_id);
     let (c_ok, c_fp, c_plan) = lab.fp(&claude_id);
     let (_, d1, _) = lab.fp("system-codex");
-    assert!(
-        w_ok && c_ok && w_plan == "team" && c_plan == "max" && !w_fp.is_empty() && !c_fp.is_empty()
-    );
+    assert!(w_ok && c_ok && w_plan == "team" && c_plan == "max" && !w_fp.is_empty() && !c_fp.is_empty());
     assert_ne!(w_fp, d1);
     // The desktop app switches accounts: the linked account follows, the fixed one does not.
     lab.sign_in("system-codex", "desk2:plus");
     let (_, d2, _) = lab.fp("system-codex");
     assert_ne!(d1, d2, "desktop-linked account follows the app");
-    assert_eq!(
-        lab.fp(&work_id).1,
-        w_fp,
-        "fixed account unchanged by the desktop switch"
-    );
+    assert_eq!(lab.fp(&work_id).1, w_fp, "fixed account unchanged by the desktop switch");
     // Re-sign-in affects only that account.
     d.call("profile.logout", json!({"id": work_id}));
     assert_eq!(lab.fp(&work_id).0, false);
@@ -2248,19 +1272,9 @@ fn ac46_accounts_by_provider_fixed_vs_desktop_linked_and_isolated_resign_in_and_
     assert_eq!(lab.fp(&work_id).1, w2);
     assert_eq!(lab.fp("system-codex").1, d2);
     assert!(lab.sys.join(".codex/auth.json").exists());
-    assert!(d
-        .try_call("account.remove", json!({"id": "system-codex"}))
-        .unwrap_err()
-        .contains("never removes"));
-    assert!(d
-        .try_call("profile.logout", json!({"id": "system-codex"}))
-        .is_err());
-    let ids: Vec<String> = d.call("account.list", json!({}))["accounts"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|a| a["id"].as_str().unwrap().to_string())
-        .collect();
+    assert!(d.try_call("account.remove", json!({"id": "system-codex"})).unwrap_err().contains("never removes"));
+    assert!(d.try_call("profile.logout", json!({"id": "system-codex"})).is_err());
+    let ids: Vec<String> = d.call("account.list", json!({}))["accounts"].as_array().unwrap().iter().map(|a| a["id"].as_str().unwrap().to_string()).collect();
     assert!(!ids.contains(&claude_id) && ids.contains(&work_id));
     // Credentials never enter the database or events.
     let db = std::fs::read(d.home.path().join("overseer.sqlite")).unwrap();
@@ -2275,66 +1289,23 @@ fn ac08_connections_from_a_foreign_uid_are_rejected_and_logged() {
     use std::os::unix::fs::PermissionsExt;
     // Test-only override: the daemon treats uid 4242424 as its owner, so this test process
     // (the real owner) is a foreign peer. The override can only reject more, never admit more.
-    let home = tempfile::Builder::new()
-        .prefix("ovs-t")
-        .tempdir_in("/tmp")
-        .unwrap();
-    let mut child = std::process::Command::new(BIN)
-        .arg("serve")
-        .env("OVERSEER_HOME", home.path())
-        .env("OVERSEER_TEST_EXPECT_UID", "4242424")
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .unwrap();
-    let sock = std::path::PathBuf::from(
-        String::from_utf8(
-            std::process::Command::new(BIN)
-                .arg("socket-path")
-                .env("OVERSEER_HOME", home.path())
-                .output()
-                .unwrap()
-                .stdout,
-        )
-        .unwrap()
-        .trim(),
-    );
-    for _ in 0..100 {
-        if sock.exists() {
-            break;
-        }
-        std::thread::sleep(Duration::from_millis(50));
-    }
-    assert_eq!(
-        std::fs::metadata(&sock).unwrap().permissions().mode() & 0o777,
-        0o600,
-        "socket is owner-only"
-    );
-    assert_eq!(
-        std::fs::metadata(sock.parent().unwrap())
-            .unwrap()
-            .permissions()
-            .mode()
-            & 0o777,
-        0o700,
-        "socket directory is owner-only"
-    );
+    let home = tempfile::Builder::new().prefix("ovs-t").tempdir_in("/tmp").unwrap();
+    let mut child = std::process::Command::new(BIN).arg("serve").env("OVERSEER_HOME", home.path()).env("OVERSEER_TEST_EXPECT_UID", "4242424")
+        .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).spawn().unwrap();
+    let sock = std::path::PathBuf::from(String::from_utf8(std::process::Command::new(BIN).arg("socket-path").env("OVERSEER_HOME", home.path()).output().unwrap().stdout).unwrap().trim());
+    for _ in 0..100 { if sock.exists() { break; } std::thread::sleep(Duration::from_millis(50)); }
+    assert_eq!(std::fs::metadata(&sock).unwrap().permissions().mode() & 0o777, 0o600, "socket is owner-only");
+    assert_eq!(std::fs::metadata(sock.parent().unwrap()).unwrap().permissions().mode() & 0o777, 0o700, "socket directory is owner-only");
     let mut conn = std::os::unix::net::UnixStream::connect(&sock).unwrap();
     conn.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
     let _ = conn.write_all(format!("{}\n", json!({"id": 1, "method": "task.create", "params": {"repo": "/tmp", "harness": "generic", "program": "/usr/bin/touch", "args": ["/tmp/ovs-ac08-should-not-exist"]}})).as_bytes());
     let mut line = String::new();
     let n = BufReader::new(conn).read_line(&mut line).unwrap_or(0);
     assert_eq!(n, 0, "no reply to a foreign peer: {line}");
-    assert!(
-        !std::path::Path::new("/tmp/ovs-ac08-should-not-exist").exists(),
-        "nothing executed"
-    );
+    assert!(!std::path::Path::new("/tmp/ovs-ac08-should-not-exist").exists(), "nothing executed");
     let uid = unsafe { libc_getuid() };
     let log = std::fs::read_to_string(home.path().join("overseerd.log")).unwrap_or_default();
-    assert!(
-        log.contains(&format!("rejected connection from uid Some({uid})")),
-        "{log}"
-    );
+    assert!(log.contains(&format!("rejected connection from uid Some({uid})")), "{log}");
     let _ = child.kill();
     let _ = child.wait();
 }
@@ -2357,56 +1328,29 @@ fn ac51_worktree_tree_lists_one_directory_marks_changes_and_stays_inside() {
     git(&repo, &["add", "."]);
     git(&repo, &["commit", "-qm", "more"]);
     let d = Daemon::start(&[]);
-    let created = sh(
-        &d,
-        &repo,
-        "worktree",
-        "printf 'changed\\n' > src/deep/x.txt; printf 'new\\n' > added.txt; rm gone.txt",
-    );
+    let created = sh(&d, &repo, "worktree", "printf 'changed\\n' > src/deep/x.txt; printf 'new\\n' > added.txt; rm gone.txt");
     d.wait_done(&run_id(&created), 20);
     let id = ws_id(&created);
     let root = d.call("workspace.tree", json!({"workspace_id": id}));
-    let names: Vec<&str> = root["entries"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|e| e["name"].as_str().unwrap())
-        .collect();
+    let names: Vec<&str> = root["entries"].as_array().unwrap().iter().map(|e| e["name"].as_str().unwrap()).collect();
     assert_eq!(names[0], "src", "directories first: {names:?}");
     assert!(!names.contains(&".git"));
-    let find = |v: &serde_json::Value, n: &str| {
-        v["entries"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|e| e["name"] == n)
-            .cloned()
-            .unwrap()
-    };
+    let find = |v: &serde_json::Value, n: &str| v["entries"].as_array().unwrap().iter().find(|e| e["name"] == n).cloned().unwrap();
     assert_eq!(find(&root, "src")["changes_inside"], 1);
     assert_eq!(find(&root, "added.txt")["status"], "A");
     assert_eq!(find(&root, "gone.txt")["status"], "D");
     assert_eq!(find(&root, "gone.txt")["deleted"], true);
     assert!(find(&root, "a.txt")["status"].is_null());
-    let deep = d.call(
-        "workspace.tree",
-        json!({"workspace_id": id, "dir": "src/deep"}),
-    );
+    let deep = d.call("workspace.tree", json!({"workspace_id": id, "dir": "src/deep"}));
     assert_eq!(find(&deep, "x.txt")["status"], "M");
     assert_eq!(find(&deep, "x.txt")["path"], "src/deep/x.txt");
     for bad in ["..", "../..", "/etc", ".git", "src/../../x"] {
-        assert!(
-            d.try_call("workspace.tree", json!({"workspace_id": id, "dir": bad}))
-                .is_err(),
-            "{bad} must be refused"
-        );
+        assert!(d.try_call("workspace.tree", json!({"workspace_id": id, "dir": bad})).is_err(), "{bad} must be refused");
     }
     // Large directory: capped, counted, and fast.
     let big = ws_path(&d, &created).join("big");
     std::fs::create_dir_all(&big).unwrap();
-    for i in 0..6000 {
-        std::fs::write(big.join(format!("f{i:05}.txt")), "").unwrap();
-    }
+    for i in 0..6000 { std::fs::write(big.join(format!("f{i:05}.txt")), "").unwrap(); }
     let t0 = std::time::Instant::now();
     let listing = d.call("workspace.tree", json!({"workspace_id": id, "dir": "big"}));
     assert!(t0.elapsed() < Duration::from_secs(2), "{:?}", t0.elapsed());
@@ -2423,19 +1367,8 @@ fn fake_notifier(dir: &Path, code: i32) -> (std::path::PathBuf, std::path::PathB
     let bin = app.join("Contents/MacOS");
     std::fs::create_dir_all(&bin).unwrap();
     let log = dir.join(format!("notifier-{code}.log"));
-    std::fs::write(
-        bin.join("notifier"),
-        format!(
-            "#!/bin/sh\nprintf '%s\\n' \"$@\" >> '{}'\nexit {code}\n",
-            log.display()
-        ),
-    )
-    .unwrap();
-    std::process::Command::new("chmod")
-        .arg("+x")
-        .arg(bin.join("notifier"))
-        .status()
-        .unwrap();
+    std::fs::write(bin.join("notifier"), format!("#!/bin/sh\nprintf '%s\\n' \"$@\" >> '{}'\nexit {code}\n", log.display())).unwrap();
+    std::process::Command::new("chmod").arg("+x").arg(bin.join("notifier")).status().unwrap();
     (app, log)
 }
 
@@ -2443,71 +1376,29 @@ fn fake_notifier(dir: &Path, code: i32) -> (std::path::PathBuf, std::path::PathB
 fn ac52_notifications_use_the_overseer_helper_and_fall_back_when_denied_or_missing() {
     let t = tmp();
     let (fallback, fallback_log) = notifier(t.path()); // records fallback deliveries instead of osascript
-                                                       // Helper present and allowed.
+    // Helper present and allowed.
     let (ok_app, ok_log) = fake_notifier(t.path(), 0);
-    let d = Daemon::start(&[
-        ("OVERSEER_TEST_NOTIFIER_DIRECT", "1"),
-        ("OVERSEER_NOTIFIER_APP", ok_app.to_str().unwrap()),
-        ("OVERSEER_NOTIFY_FALLBACK", &fallback),
-    ]);
-    assert_eq!(
-        d.call("daemon.test_notice", json!({}))["delivered_via"],
-        "overseer-notifier (ok)"
-    );
+    let d = Daemon::start(&[("OVERSEER_TEST_NOTIFIER_DIRECT", "1"), ("OVERSEER_NOTIFIER_APP", ok_app.to_str().unwrap()), ("OVERSEER_NOTIFY_FALLBACK", &fallback)]);
+    assert_eq!(d.call("daemon.test_notice", json!({}))["delivered_via"], "overseer-notifier (ok)");
     let args = std::fs::read_to_string(&ok_log).unwrap();
-    assert!(
-        args.contains("--title\nOverseer notifications are on\n--body\n"),
-        "{args}"
-    );
-    assert!(
-        args.contains("--open\nvscode://beelol.overseer/open-center"),
-        "clicks open the Overseer view: {args}"
-    );
+    assert!(args.contains("--title\nOverseer notifications are on\n--body\n"), "{args}");
+    assert!(args.contains("--open\nvscode://beelol.overseer/open-center"), "clicks open the Overseer view: {args}");
     assert!(!fallback_log.exists(), "no fallback when the helper posted");
     drop(d);
     // Helper present but notifications denied: fall back, and say so.
     let (denied_app, _) = fake_notifier(t.path(), 3);
-    let d = Daemon::start(&[
-        ("OVERSEER_TEST_NOTIFIER_DIRECT", "1"),
-        ("OVERSEER_NOTIFIER_APP", denied_app.to_str().unwrap()),
-        ("OVERSEER_NOTIFY_FALLBACK", &fallback),
-    ]);
-    let via = d.call("daemon.test_notice", json!({}))["delivered_via"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    assert_eq!(
-        via,
-        format!("overseer-notifier (denied); fell back to {fallback} (ok)")
-    );
-    assert!(std::fs::read_to_string(&fallback_log)
-        .unwrap()
-        .contains("Overseer notifications are on"));
+    let d = Daemon::start(&[("OVERSEER_TEST_NOTIFIER_DIRECT", "1"), ("OVERSEER_NOTIFIER_APP", denied_app.to_str().unwrap()), ("OVERSEER_NOTIFY_FALLBACK", &fallback)]);
+    let via = d.call("daemon.test_notice", json!({}))["delivered_via"].as_str().unwrap().to_string();
+    assert_eq!(via, format!("overseer-notifier (denied); fell back to {fallback} (ok)"));
+    assert!(std::fs::read_to_string(&fallback_log).unwrap().contains("Overseer notifications are on"));
     drop(d);
     // No permission answer yet (exit 5) and helper missing: both fall back.
     let (pending_app, _) = fake_notifier(t.path(), 5);
-    let d = Daemon::start(&[
-        ("OVERSEER_TEST_NOTIFIER_DIRECT", "1"),
-        ("OVERSEER_NOTIFIER_APP", pending_app.to_str().unwrap()),
-        ("OVERSEER_NOTIFY_FALLBACK", &fallback),
-    ]);
-    assert!(d.call("daemon.test_notice", json!({}))["delivered_via"]
-        .as_str()
-        .unwrap()
-        .starts_with("overseer-notifier (permission not answered yet); fell back to"));
+    let d = Daemon::start(&[("OVERSEER_TEST_NOTIFIER_DIRECT", "1"), ("OVERSEER_NOTIFIER_APP", pending_app.to_str().unwrap()), ("OVERSEER_NOTIFY_FALLBACK", &fallback)]);
+    assert!(d.call("daemon.test_notice", json!({}))["delivered_via"].as_str().unwrap().starts_with("overseer-notifier (permission not answered yet); fell back to"));
     drop(d);
-    let d = Daemon::start(&[
-        ("OVERSEER_TEST_NOTIFIER_DIRECT", "1"),
-        (
-            "OVERSEER_NOTIFIER_APP",
-            "/nonexistent/Overseer Notifier.app",
-        ),
-        ("OVERSEER_NOTIFY_FALLBACK", &fallback),
-    ]);
-    assert!(d.call("daemon.test_notice", json!({}))["delivered_via"]
-        .as_str()
-        .unwrap()
-        .starts_with("overseer-notifier (not installed); fell back to"));
+    let d = Daemon::start(&[("OVERSEER_TEST_NOTIFIER_DIRECT", "1"), ("OVERSEER_NOTIFIER_APP", "/nonexistent/Overseer Notifier.app"), ("OVERSEER_NOTIFY_FALLBACK", &fallback)]);
+    assert!(d.call("daemon.test_notice", json!({}))["delivered_via"].as_str().unwrap().starts_with("overseer-notifier (not installed); fell back to"));
 }
 
 #[test]
@@ -2515,29 +1406,16 @@ fn ac52_background_notice_is_delivered_by_the_helper() {
     let t = tmp();
     let (fallback, _) = notifier(t.path());
     let (app, log) = fake_notifier(t.path(), 0);
-    let d = Daemon::start(&[
-        ("OVERSEER_TEST_NOTIFIER_DIRECT", "1"),
-        ("OVERSEER_NOTIFIER_APP", app.to_str().unwrap()),
-        ("OVERSEER_NOTIFY_FALLBACK", &fallback),
-        ("OVERSEER_BACKGROUND_NOTICE_MS", "300"),
-    ]);
+    let d = Daemon::start(&[("OVERSEER_TEST_NOTIFIER_DIRECT", "1"), ("OVERSEER_NOTIFIER_APP", app.to_str().unwrap()), ("OVERSEER_NOTIFY_FALLBACK", &fallback), ("OVERSEER_BACKGROUND_NOTICE_MS", "300")]);
     let repo = repo(&t.path().join("r"));
     let run = run_id(&sh(&d, &repo, "worktree", "sleep 30"));
     d.wait_status(&run, |s| s == "running", 20);
     drop(vscode_window(&d));
     let mut n = vec![];
-    for _ in 0..50 {
-        n = notices(&d);
-        if !n.is_empty() {
-            break;
-        }
-        std::thread::sleep(Duration::from_millis(100));
-    }
+    for _ in 0..50 { n = notices(&d); if !n.is_empty() { break; } std::thread::sleep(Duration::from_millis(100)); }
     assert_eq!(n.len(), 1);
     assert_eq!(n[0]["payload"]["delivered_via"], "overseer-notifier (ok)");
-    assert!(std::fs::read_to_string(&log)
-        .unwrap()
-        .contains("Overseer: 1 agent still running"));
+    assert!(std::fs::read_to_string(&log).unwrap().contains("Overseer: 1 agent still running"));
     d.call("run.interrupt", json!({"run_id": run}));
     d.wait_done(&run, 20);
 }
@@ -2553,38 +1431,13 @@ fn ac52_the_daemon_finds_the_notifier_app_next_to_its_own_binary() {
     let (fake, log) = fake_notifier(t.path(), 0);
     std::fs::rename(&fake, bin.join("Overseer Notifier.app")).unwrap();
     let home = t.path().join("home");
-    let mut child = std::process::Command::new(&daemon)
-        .arg("serve")
-        .env("OVERSEER_HOME", &home)
-        .env("OVERSEER_TEST_NOTIFIER_DIRECT", "1")
-        .env_remove("OVERSEER_NOTIFIER_APP")
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .unwrap();
-    let ctl = |m: &str| {
-        String::from_utf8(
-            std::process::Command::new(&daemon)
-                .args(["ctl", m, "{}"])
-                .env("OVERSEER_HOME", &home)
-                .output()
-                .unwrap()
-                .stdout,
-        )
-        .unwrap()
-    };
+    let mut child = std::process::Command::new(&daemon).arg("serve").env("OVERSEER_HOME", &home).env("OVERSEER_TEST_NOTIFIER_DIRECT", "1").env_remove("OVERSEER_NOTIFIER_APP")
+        .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).spawn().unwrap();
+    let ctl = |m: &str| String::from_utf8(std::process::Command::new(&daemon).args(["ctl", m, "{}"]).env("OVERSEER_HOME", &home).output().unwrap().stdout).unwrap();
     let mut out = String::new();
-    for _ in 0..50 {
-        out = ctl("daemon.test_notice");
-        if out.contains("delivered_via") {
-            break;
-        }
-        std::thread::sleep(Duration::from_millis(100));
-    }
+    for _ in 0..50 { out = ctl("daemon.test_notice"); if out.contains("delivered_via") { break; } std::thread::sleep(Duration::from_millis(100)); }
     assert!(out.contains("overseer-notifier (ok)"), "{out}");
-    assert!(std::fs::read_to_string(&log)
-        .unwrap()
-        .contains("--open\nvscode://beelol.overseer/open-center"));
+    assert!(std::fs::read_to_string(&log).unwrap().contains("--open\nvscode://beelol.overseer/open-center"));
     let _ = child.kill();
     let _ = child.wait();
 }
@@ -2602,107 +1455,37 @@ fn ac50_pr_plan_explains_refusals_and_prepares_a_github_branch_without_merging()
     // No remote.
     let plan = d.call("workspace.pr_plan", json!({"workspace_id": id}));
     assert_eq!(plan["ok"], false);
-    assert!(
-        plan["reason"]
-            .as_str()
-            .unwrap()
-            .contains("has no Git remote"),
-        "{plan}"
-    );
+    assert!(plan["reason"].as_str().unwrap().contains("has no Git remote"), "{plan}");
     // A non-GitHub remote.
-    git(
-        &repo,
-        &[
-            "remote",
-            "add",
-            "origin",
-            "https://gitlab.example.invalid/a/b.git",
-        ],
-    );
+    git(&repo, &["remote", "add", "origin", "https://gitlab.example.invalid/a/b.git"]);
     let plan = d.call("workspace.pr_plan", json!({"workspace_id": id}));
-    assert!(
-        plan["reason"].as_str().unwrap().contains("not on GitHub"),
-        "{plan}"
-    );
+    assert!(plan["reason"].as_str().unwrap().contains("not on GitHub"), "{plan}");
     // A GitHub remote whose pushes go to a local bare repository (insteadOf), as in the UI test.
     let bare = r.path().join("remote.git");
-    std::process::Command::new("git")
-        .args(["init", "-q", "--bare", bare.to_str().unwrap()])
-        .status()
-        .unwrap();
-    git(
-        &repo,
-        &[
-            "remote",
-            "set-url",
-            "origin",
-            "https://github.com/test-owner/test-repo.git",
-        ],
-    );
-    git(
-        &repo,
-        &[
-            "config",
-            &format!("url.{}.insteadOf", bare.display()),
-            "https://github.com/test-owner/test-repo.git",
-        ],
-    );
+    std::process::Command::new("git").args(["init", "-q", "--bare", bare.to_str().unwrap()]).status().unwrap();
+    git(&repo, &["remote", "set-url", "origin", "https://github.com/test-owner/test-repo.git"]);
+    git(&repo, &["config", &format!("url.{}.insteadOf", bare.display()), "https://github.com/test-owner/test-repo.git"]);
     let plan = d.call("workspace.pr_plan", json!({"workspace_id": id}));
     assert_eq!(plan["ok"], true, "{plan}");
-    assert_eq!(
-        (
-            plan["owner"].as_str(),
-            plan["repo"].as_str(),
-            plan["target"].as_str()
-        ),
-        (Some("test-owner"), Some("test-repo"), Some("main"))
-    );
+    assert_eq!((plan["owner"].as_str(), plan["repo"].as_str(), plan["target"].as_str()), (Some("test-owner"), Some("test-repo"), Some("main")));
     assert_eq!(plan["uncommitted"], json!(["a.txt"]));
     let main_before = git(&repo, &["rev-parse", "main"]);
     let prep = d.call("workspace.pr_prepare", json!({"workspace_id": id}));
     assert_eq!(prep["committed"], true);
     assert_eq!(prep["files"][0]["path"], "a.txt");
-    assert!(
-        prep["commits"][0]
-            .as_str()
-            .unwrap()
-            .starts_with("Overseer: "),
-        "{prep}"
-    );
-    assert_eq!(
-        git(&repo, &["rev-parse", "main"]),
-        main_before,
-        "nothing is merged"
-    );
+    assert!(prep["commits"][0].as_str().unwrap().starts_with("Overseer: "), "{prep}");
+    assert_eq!(git(&repo, &["rev-parse", "main"]), main_before, "nothing is merged");
     d.call("workspace.pr_opened", json!({"workspace_id": id, "url": "https://github.com/test-owner/test-repo/pull/7", "number": 7}));
-    assert!(d
-        .events(&run_id(&created))
-        .iter()
-        .any(|e| e["kind"] == "pull_request" && e["payload"]["number"] == 7));
-    assert!(d
-        .try_call(
-            "workspace.pr_opened",
-            json!({"workspace_id": id, "url": "javascript:alert(1)", "number": 1})
-        )
-        .is_err());
+    assert!(d.events(&run_id(&created)).iter().any(|e| e["kind"] == "pull_request" && e["payload"]["number"] == 7));
+    assert!(d.try_call("workspace.pr_opened", json!({"workspace_id": id, "url": "javascript:alert(1)", "number": 1})).is_err());
     // Active run and current checkout: refused with an explanation.
     let busy = sh(&d, &repo, "worktree", "sleep 30");
     d.wait_status(&run_id(&busy), |s| s == "running", 20);
-    assert!(
-        d.call("workspace.pr_plan", json!({"workspace_id": ws_id(&busy)}))["reason"]
-            .as_str()
-            .unwrap()
-            .contains("still running")
-    );
+    assert!(d.call("workspace.pr_plan", json!({"workspace_id": ws_id(&busy)}))["reason"].as_str().unwrap().contains("still running"));
     d.call("run.interrupt", json!({"run_id": run_id(&busy)}));
     let cur = sh(&d, &repo, "current", "true");
     d.wait_done(&run_id(&cur), 20);
-    assert!(
-        d.call("workspace.pr_plan", json!({"workspace_id": ws_id(&cur)}))["reason"]
-            .as_str()
-            .unwrap()
-            .contains("current checkout")
-    );
+    assert!(d.call("workspace.pr_plan", json!({"workspace_id": ws_id(&cur)}))["reason"].as_str().unwrap().contains("current checkout"));
 }
 
 #[test]
@@ -2712,69 +1495,21 @@ fn ac50_pr_plan_targets_the_branch_name_in_a_fresh_clone() {
     let r = tmp();
     let src = repo(&r.path().join("src"));
     let bare = r.path().join("remote.git");
-    std::process::Command::new("git")
-        .args([
-            "clone",
-            "-q",
-            "--bare",
-            src.to_str().unwrap(),
-            bare.to_str().unwrap(),
-        ])
-        .status()
-        .unwrap();
+    std::process::Command::new("git").args(["clone", "-q", "--bare", src.to_str().unwrap(), bare.to_str().unwrap()]).status().unwrap();
     let clone = r.path().join("clone");
-    std::process::Command::new("git")
-        .args([
-            "clone",
-            "-q",
-            bare.to_str().unwrap(),
-            clone.to_str().unwrap(),
-        ])
-        .status()
-        .unwrap();
-    git(
-        &clone,
-        &[
-            "remote",
-            "set-url",
-            "origin",
-            "https://github.com/test-owner/test-repo.git",
-        ],
-    );
-    git(
-        &clone,
-        &[
-            "config",
-            &format!("url.{}.insteadOf", bare.display()),
-            "https://github.com/test-owner/test-repo.git",
-        ],
-    );
-    assert_eq!(
-        git(
-            &clone,
-            &["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]
-        ),
-        "origin/main"
-    );
+    std::process::Command::new("git").args(["clone", "-q", bare.to_str().unwrap(), clone.to_str().unwrap()]).status().unwrap();
+    git(&clone, &["remote", "set-url", "origin", "https://github.com/test-owner/test-repo.git"]);
+    git(&clone, &["config", &format!("url.{}.insteadOf", bare.display()), "https://github.com/test-owner/test-repo.git"]);
+    assert_eq!(git(&clone, &["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]), "origin/main");
     let d = Daemon::start(&[]);
     let created = sh(&d, &clone, "worktree", "printf 'agent line\\n' >> a.txt");
     d.wait_done(&run_id(&created), 20);
-    let plan = d.call(
-        "workspace.pr_plan",
-        json!({"workspace_id": ws_id(&created)}),
-    );
+    let plan = d.call("workspace.pr_plan", json!({"workspace_id": ws_id(&created)}));
     assert_eq!(plan["ok"], true, "{plan}");
     assert_eq!(plan["target"], "main", "{plan}");
-    let prep = d.call(
-        "workspace.pr_prepare",
-        json!({"workspace_id": ws_id(&created)}),
-    );
+    let prep = d.call("workspace.pr_prepare", json!({"workspace_id": ws_id(&created)}));
     assert_eq!(prep["files"][0]["path"], "a.txt", "{prep}");
-    assert_eq!(
-        prep["commits"].as_array().map(Vec::len),
-        Some(1),
-        "only the run's commit, compared against main: {prep}"
-    );
+    assert_eq!(prep["commits"].as_array().map(Vec::len), Some(1), "only the run's commit, compared against main: {prep}");
 }
 
 // ---------------------------------------------------------------- AC-63 history that stays tidy
@@ -2784,77 +1519,30 @@ fn ac63_search_finds_tasks_by_title_output_and_status_and_archive_hides_without_
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let d = Daemon::start(&[]);
-    let a = sh(
-        &d,
-        &repo,
-        "current",
-        "echo 'refactoring the payment ledger'",
-    );
+    let a = sh(&d, &repo, "current", "echo 'refactoring the payment ledger'");
     d.wait_done(&run_id(&a), 20);
     let b = sh(&d, &repo, "current", "echo 'unrelated'; exit 3");
     d.wait_done(&run_id(&b), 20);
     let task = |v: &serde_json::Value| v["task"]["id"].as_str().unwrap().to_string();
-    let ids = |q: &str| {
-        d.call("search", json!({"query": q}))["task_ids"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|x| x.as_str().unwrap().to_string())
-            .collect::<Vec<_>>()
-    };
+    let ids = |q: &str| d.call("search", json!({"query": q}))["task_ids"].as_array().unwrap().iter().map(|x| x.as_str().unwrap().to_string()).collect::<Vec<_>>();
     // Conversation text (the agent's output), status and a missing term.
     assert_eq!(ids("payment ledger"), vec![task(&a)], "output text");
-    assert!(
-        ids("failed").contains(&task(&b)),
-        "status: {:?}",
-        ids("failed")
-    );
+    assert!(ids("failed").contains(&task(&b)), "status: {:?}", ids("failed"));
     assert!(ids("nothing-matches-this").is_empty());
     // LIKE wildcards are literal.
     assert!(ids("%").is_empty());
     // Archive hides (archived_ms set) and never deletes; restore clears it.
-    let res = d.call(
-        "task.archive",
-        json!({"task_id": task(&a), "archived": true}),
-    );
+    let res = d.call("task.archive", json!({"task_id": task(&a), "archived": true}));
     assert!(res["archived_ms"].as_i64().is_some());
     let state = d.call("state", json!({}));
-    let t = state["tasks"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|t| t["id"] == task(&a))
-        .unwrap()
-        .clone();
+    let t = state["tasks"].as_array().unwrap().iter().find(|t| t["id"] == task(&a)).unwrap().clone();
     assert!(t["archived_ms"].as_i64().is_some(), "{t}");
-    assert!(
-        state["runs"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|r| r["task_id"] == task(&a)),
-        "runs kept"
-    );
-    assert_eq!(
-        ids("payment ledger"),
-        vec![task(&a)],
-        "archived tasks stay searchable"
-    );
-    d.call(
-        "task.archive",
-        json!({"task_id": task(&a), "archived": false}),
-    );
+    assert!(state["runs"].as_array().unwrap().iter().any(|r| r["task_id"] == task(&a)), "runs kept");
+    assert_eq!(ids("payment ledger"), vec![task(&a)], "archived tasks stay searchable");
+    d.call("task.archive", json!({"task_id": task(&a), "archived": false}));
     let state = d.call("state", json!({}));
-    assert!(state["tasks"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|t| t["id"] == task(&a))
-        .unwrap()["archived_ms"]
-        .is_null());
-    assert!(d
-        .try_call("task.archive", json!({"task_id": "t-missing"}))
-        .is_err());
+    assert!(state["tasks"].as_array().unwrap().iter().find(|t| t["id"] == task(&a)).unwrap()["archived_ms"].is_null());
+    assert!(d.try_call("task.archive", json!({"task_id": "t-missing"})).is_err());
 }
 
 // ---------------------------------------------------------------- AC-60 native-CLI parity
@@ -2870,113 +1558,30 @@ fn ac60_turn_options_reach_claude_and_unsupported_ones_are_refused() {
         "model": "haiku", "effort": "high", "permission_mode": "plan", "images": [{"mime": "image/png", "data": png}]}));
     let run = created["run"]["id"].as_str().unwrap().to_string();
     d.wait_done(&run, 20);
-    let echo = |d: &Daemon| {
-        d.events(&run)
-            .iter()
-            .filter_map(|e| {
-                e["payload"]["text"]
-                    .as_str()
-                    .filter(|t| t.starts_with("ECHO "))
-                    .map(|t| serde_json::from_str::<serde_json::Value>(&t[5..]).unwrap())
-            })
-            .last()
-            .unwrap()
-    };
+    let echo = |d: &Daemon| d.events(&run).iter().filter_map(|e| e["payload"]["text"].as_str().filter(|t| t.starts_with("ECHO ")).map(|t| serde_json::from_str::<serde_json::Value>(&t[5..]).unwrap())).last().unwrap();
     let first = echo(&d);
-    let argv: Vec<String> = first["argv"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|a| a.as_str().unwrap().to_string())
-        .collect();
-    let after = |flag: &str| {
-        argv.iter()
-            .position(|a| a == flag)
-            .map(|i| argv[i + 1].clone())
-    };
-    assert_eq!(
-        (
-            after("--model"),
-            after("--effort"),
-            after("--permission-mode")
-        ),
-        (
-            Some("haiku".into()),
-            Some("high".into()),
-            Some("plan".into())
-        ),
-        "{argv:?}"
-    );
+    let argv: Vec<String> = first["argv"].as_array().unwrap().iter().map(|a| a.as_str().unwrap().to_string()).collect();
+    let after = |flag: &str| argv.iter().position(|a| a == flag).map(|i| argv[i + 1].clone());
+    assert_eq!((after("--model"), after("--effort"), after("--permission-mode")), (Some("haiku".into()), Some("high".into()), Some("plan".into())), "{argv:?}");
     assert_eq!(first["kinds"][0], "text");
-    assert!(
-        first["kinds"][1]
-            .as_str()
-            .unwrap()
-            .starts_with("image:image/png:"),
-        "{first}"
-    );
+    assert!(first["kinds"][1].as_str().unwrap().starts_with("image:image/png:"), "{first}");
     assert_eq!(first["text"], "describe the image");
     // The image is kept privately in the run folder.
     // A follow-up changes the model for this and later turns; effort and mode carry over.
-    d.call(
-        "run.follow_up",
-        json!({"run_id": run, "prompt": "again", "model": "opus"}),
-    );
+    d.call("run.follow_up", json!({"run_id": run, "prompt": "again", "model": "opus"}));
     d.wait_done(&run, 20);
     let second = echo(&d);
-    let argv2: Vec<String> = second["argv"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|a| a.as_str().unwrap().to_string())
-        .collect();
-    let after2 = |flag: &str| {
-        argv2
-            .iter()
-            .position(|a| a == flag)
-            .map(|i| argv2[i + 1].clone())
-    };
-    assert_eq!(
-        (
-            after2("--model"),
-            after2("--effort"),
-            after2("--permission-mode")
-        ),
-        (
-            Some("opus".into()),
-            Some("high".into()),
-            Some("plan".into())
-        ),
-        "{argv2:?}"
-    );
+    let argv2: Vec<String> = second["argv"].as_array().unwrap().iter().map(|a| a.as_str().unwrap().to_string()).collect();
+    let after2 = |flag: &str| argv2.iter().position(|a| a == flag).map(|i| argv2[i + 1].clone());
+    assert_eq!((after2("--model"), after2("--effort"), after2("--permission-mode")), (Some("opus".into()), Some("high".into()), Some("plan".into())), "{argv2:?}");
     assert!(argv2.contains(&"--resume".to_string()));
     let state = d.call("state", json!({}));
-    assert_eq!(
-        state["runs"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|x| x["id"] == run.as_str())
-            .unwrap()["model"],
-        "opus"
-    );
+    assert_eq!(state["runs"].as_array().unwrap().iter().find(|x| x["id"] == run.as_str()).unwrap()["model"], "opus");
     // Unsupported choices are refused with the harness's own options named.
-    let bad = d
-        .try_call(
-            "run.follow_up",
-            json!({"run_id": run, "prompt": "x", "effort": "ludicrous"}),
-        )
-        .unwrap_err();
+    let bad = d.try_call("run.follow_up", json!({"run_id": run, "prompt": "x", "effort": "ludicrous"})).unwrap_err();
     assert!(bad.contains("low, medium, high"), "{bad}");
     let bad = d.try_call("task.create", json!({"repo": repo.display().to_string(), "harness": "generic", "program": "/bin/echo", "args": [], "prompt": "", "title": "g", "workspace_mode": "worktree", "images": [{"mime": "image/png", "data": png}]}));
-    assert!(
-        bad.is_err()
-            || bad.unwrap()["launch_error"]
-                .as_str()
-                .unwrap_or_default()
-                .contains("image"),
-        "generic refuses images"
-    );
+    assert!(bad.is_err() || bad.unwrap()["launch_error"].as_str().unwrap_or_default().contains("image"), "generic refuses images");
     let bad = d.try_call("run.follow_up", json!({"run_id": run, "prompt": "x", "images": [{"mime": "text/html", "data": "PGI+"}]})).unwrap_err();
     assert!(bad.contains("PNG"), "{bad}");
 }
@@ -2990,33 +1595,12 @@ fn ac60_repo_files_lists_mentionable_files_best_first() {
     std::fs::write(repo.join("README.md"), "# r\n").unwrap();
     std::fs::write(repo.join("build.log"), "x").unwrap();
     let d = Daemon::start(&[]);
-    let files = d.call(
-        "repo.files",
-        json!({"repo": repo.display().to_string(), "query": "readme"}),
-    );
-    let list: Vec<&str> = files["files"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|f| f.as_str().unwrap())
-        .collect();
+    let files = d.call("repo.files", json!({"repo": repo.display().to_string(), "query": "readme"}));
+    let list: Vec<&str> = files["files"].as_array().unwrap().iter().map(|f| f.as_str().unwrap()).collect();
     assert_eq!(list.first().copied(), Some("README.md"), "{list:?}");
-    assert!(
-        list.contains(&"src/deep/readme-notes.txt"),
-        "untracked files are offered: {list:?}"
-    );
-    let all = d.call(
-        "repo.files",
-        json!({"repo": repo.display().to_string(), "query": ""}),
-    );
-    assert!(
-        !all["files"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|f| f == "build.log"),
-        "ignored files are not offered"
-    );
+    assert!(list.contains(&"src/deep/readme-notes.txt"), "untracked files are offered: {list:?}");
+    let all = d.call("repo.files", json!({"repo": repo.display().to_string(), "query": ""}));
+    assert!(!all["files"].as_array().unwrap().iter().any(|f| f == "build.log"), "ignored files are not offered");
     assert!(d.try_call("repo.files", json!({"query": "x"})).is_err());
 }
 
@@ -3028,27 +1612,15 @@ fn ac62_account_usage_is_what_the_harness_reports() {
     let repo = repo(&r.path().join("repo"));
     let d = claude_daemon("limits");
     // Before any run, nothing is reported (never invented).
-    assert_eq!(
-        d.call("account.usage", json!({"id": "system-claude"}))["reported"],
-        false
-    );
+    assert_eq!(d.call("account.usage", json!({"id": "system-claude"}))["reported"], false);
     let created = d.call("task.create", json!({"repo": repo.display().to_string(), "harness": "claude", "profile_id": "system-claude", "prompt": "hi", "title": "limits"}));
     d.wait_done(created["run"]["id"].as_str().unwrap(), 20);
     let u = d.call("account.usage", json!({"id": "system-claude"}));
     assert_eq!(u["reported"], true, "{u}");
-    let five = u["windows"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|w| w["label"] == "5 hours")
-        .unwrap()
-        .clone();
+    let five = u["windows"].as_array().unwrap().iter().find(|w| w["label"] == "5 hours").unwrap().clone();
     assert_eq!(five["used"], 0.95);
     assert!(five["resets_at_ms"].as_i64().unwrap() > 0);
     assert_eq!(u["source"], "Claude rate_limit_event");
     // Accounts whose harness reports nothing say so.
-    assert_eq!(
-        d.call("account.usage", json!({"id": "system-opencode"}))["reported"],
-        false
-    );
+    assert_eq!(d.call("account.usage", json!({"id": "system-opencode"}))["reported"], false);
 }
