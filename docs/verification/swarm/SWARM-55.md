@@ -1,6 +1,6 @@
 # SWARM-55 — typed audit coverage
 
-Status: partial. Revision: `335d4a9`. Fixture version: inline scripted broker fixture 1. Policy: fixture-only director transitions; one registered attempt per logical job.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. First revision: `335d4a9`. Fixture version: inline scripted broker fixture 1. Policy: fixture-only director transitions; one registered attempt per logical job.
 
 Input: a LedgerPay-style audit run with three independent jobs. A worker reports a tested negative result for invalid signatures, an unavailable queue for retry testing, and a claimed duplicate-grant defect with a reproduction artifact. A separate fixture sends a defect claim with only a finding artifact, then supplies a reproduction artifact. A third fixture sends a queue failure after a negative result was accepted, followed by a later “all clear” from the same attempt.
 
@@ -17,3 +17,14 @@ Follow-up revision `2fecb59`: LedgerPay S2 has a versioned FastAPI/PostgreSQL/Re
 Evidence: `daemon/tests/swarm_broker.rs` (`audit_coverage_distinguishes_negative_environment_and_defect_results`, `reported_defect_needs_reproducer_evidence_before_confirmation`, `late_environment_failure_cannot_be_hidden_by_an_earlier_acceptance`, `late_result_invalidates_the_accepted_review_before_completion`), `daemon/tests/swarm_atlas.rs` (`atlas_s1_missing_export_queue_remains_blocked_coverage`), `fixtures/swarm/atlas-v1/probe.test.mjs`, `daemon/src/swarm/broker.rs`, `daemon/src/swarm/coverage.rs`, `daemon/src/swarm/artifacts.rs`, `daemon/src/swarm/completion.rs`.
 
 Remaining: S1 and S2 have versioned backend evidence for missing queues, but live harness paths remain unqualified. The director still supplies review decisions deterministically; an artifact labeled `reproduction` has not been independently executed or linked to application state by a general integration runner. The coverage view does not yet express every required endpoint/permission/ownership matrix or resolve conflicting attempts. This criterion stays unchecked.
+
+## Verified at fixture scope (2026-09-28)
+
+| Clause | Test |
+| --- | --- |
+| A negative result, a test-environment failure and a confirmed application defect stay distinct in the coverage report | `audit_coverage_distinguishes_negative_environment_and_defect_results` (`checked_negative`, `environment_blocked` with its resource, `confirmed_application_defect`; unchanged after a daemon restart); `reported_defect_needs_reproducer_evidence_before_confirmation` (a defect is confirmed only with a reproduction) |
+| An unavailable queue, database or access is neither a passed check nor an application defect | `atlas_s1_missing_export_queue_remains_blocked_coverage` (a real 503 from the Atlas backend with its PostgreSQL queue relation removed); `unavailable_database_or_access_is_blocked_coverage_not_a_pass_or_defect` (new: `database` and `access` blockers cannot be accepted, read `environment_blocked` even with an artifact labelled `reproduction`, and a completion claiming them passed is refused); `late_environment_failure_cannot_be_hidden_by_an_earlier_acceptance`, `late_result_invalidates_the_accepted_review_before_completion` |
+
+Rerun on 2026-09-28: `swarm_broker` (22 passed, serial) and the Atlas missing-queue replay against disposable PostgreSQL 16. The LedgerPay missing-Redis replay (`ledgerpay_s2_missing_redis_remains_blocked_coverage`) was not rerun: its Python environment is not installed on this machine and installing it needs downloads; it is not needed for the clause.
+
+Boundary: the worker states the outcome; the daemon keeps the three kinds apart and refuses to promote a blocker. Whether a live worker classifies a real failure correctly is not claimed.

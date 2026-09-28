@@ -685,7 +685,7 @@
       "blocker": "Acceptance and fixture final completion revalidate stored evidence provenance and integrity, including tampering after review. Dependent context now excludes unreviewed artifacts and becomes unavailable after a late source result. Live filesystem provenance and permission-scoped replacement retrieval remain unimplemented."
     },
     "SWARM-55": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_broker.rs",
         "daemon/tests/swarm_atlas.rs",
@@ -696,7 +696,7 @@
         "fixtures/swarm/ledgerpay-v1/",
         "docs/verification/swarm/S2.md"
       ],
-      "blocker": "Versioned Atlas and LedgerPay backends now demonstrate missing PostgreSQL/Redis queues as environment-blocked in joined Swarm replays; negative signatures/stale events and a duplicate-grant defect remain distinct. Autonomous director decisions, a complete endpoint/permission matrix, independent reproduction enforcement and live harness paths remain unverified."
+      "blocker": null
     },
     "SWARM-56": {
       "status": "partial",

@@ -847,3 +847,51 @@ fn finished_attempt_late_result_cannot_submit_a_newer_attempt() {
         "type":"result","revision":1,"payload":{"artifact_ids":[]}}));
     assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"][0]["status"],"submitted");
 }
+
+/// SWARM-55: an unavailable database and missing access are environment
+/// blockers like a missing queue. Neither can be accepted as a passed check,
+/// neither reads as an application defect in the coverage report (also when
+/// the worker labels its artifact a reproduction), and the run cannot
+/// complete by claiming them passed.
+#[test]
+fn unavailable_database_or_access_is_blocked_coverage_not_a_pass_or_defect() {
+    let d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Unavailable services",
+        "objective":"Audit tenant isolation","allowed_targets":["fixture"]}));
+    let run_id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":run_id,"generation":1,"revision":0,"jobs":[
+        {"id":"db","title":"Row ownership","acceptance":"before/after rows","deps":[]},
+        {"id":"access","title":"Token scopes","acceptance":"token matrix","deps":[]}
+    ]}));
+    for (job, resource, kind) in [("db", "database", "reproduction"), ("access", "access", "log")] {
+        let attempt = d.call("swarm.attempt.register", json!({"run_id":run_id,
+            "job_id":job,"generation":1,"revision":1}));
+        let artifact = format!("proof-{job}");
+        d.call("swarm.artifact.put", json!({"run_id":run_id,"job_id":job,
+            "attempt_id":attempt["id"],"token":attempt["token"],"artifact_id":artifact,
+            "kind":kind,"content":format!("{resource} unavailable: connection refused"),
+            "source_revision":1}));
+        d.call("swarm.report", json!({"run_id":run_id,"job_id":job,
+            "attempt_id":attempt["id"],"token":attempt["token"],
+            "message_id":format!("result-{job}"),"type":"result","revision":1,
+            "payload":{"audit_outcome":"environment_failure","artifact_ids":[artifact],
+                "unavailable_resource":resource}}));
+        let refused = d.try_call("swarm.decide", json!({"run_id":run_id,"generation":1,
+            "revision":1,"job_id":job,"decision":"accept","evidence":[artifact]})).unwrap_err();
+        assert!(refused.contains("environment"), "{job}: {refused}");
+    }
+    let coverage = d.call("swarm.coverage", json!({"run_id":run_id}));
+    for row in coverage["rows"].as_array().unwrap() {
+        assert_eq!(row["coverage_state"], "environment_blocked", "{row}");
+        assert_ne!(row["job_status"], "accepted", "{row}");
+    }
+    let resources: Vec<&str> = coverage["rows"].as_array().unwrap().iter()
+        .map(|r| r["unavailable_resource"].as_str().unwrap()).collect();
+    assert_eq!(resources, vec!["access", "database"]);
+    let completed = d.try_call("swarm.complete", json!({"run_id":run_id,"generation":1,
+        "revision":1,"request_id":"claim-pass","summary":"All clear","verification":"none",
+        "checks":[{"job_id":"db","outcome":"passed","evidence":["proof-db"]},
+            {"job_id":"access","outcome":"passed","evidence":["proof-access"]}]}));
+    assert!(completed.is_err(), "{completed:?}");
+    assert_ne!(d.call("swarm.get", json!({"id":run_id}))["status"], "completed");
+}
