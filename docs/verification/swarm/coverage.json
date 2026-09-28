@@ -374,7 +374,7 @@
       "blocker": "A deterministic 100-job fixture admits 32 attempts at a time and accepts all 100 exactly once with intact synthetic evidence; a 130-job fixture now bounds the ready window to 100 and refills its durable backlog. A separate fixture runs 32 supervised local processes alongside a scripted active director turn, and quota headroom reduces effective concurrency with a reason. A working model director, executed checks and combined 100-job supervised/provider path remain unverified."
     },
     "SWARM-30": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_director.rs",
         "daemon/tests/swarm_director_owner.rs",
@@ -383,9 +383,10 @@
         "fixtures/swarm/director-loop-v1/serial.py",
         "fixtures/swarm/director-loop-v1/serial_review.py",
         "docs/verification/swarm/SWARM-30.md",
-        "docs/verification/swarm/milestone-11.md"
+        "docs/verification/swarm/milestone-11.md",
+        "daemon/tests/swarm_atlas.rs"
       ],
-      "blocker": "A fixture stalls on unknown director termination, preserves worker reservation/result and prior Pause state, and requeues an unapplied batch after confirmed replacement. Durable owner-token and lease tests fence plan, directive, review and inbox actions across restart; timeout retains ownership and blocks admission, active unowned turns cannot be taken over, and confirmed replacement waits for a newly bound generation. A supervised local scripted director receives a private credential and requires its recorded process exit before replacement, including after daemon restart. The owner/run link commits before spawn; startup automatically recovers proven no-spawn states in the unlinked reserved and linked pre-supervisor phases, while a requested spawn remains uncertain. Startup reattaches a live or exited orphan supervisor only when its private launch identity and process evidence match; missing or mismatched evidence stays stalled and reserved. The daemon refreshes a healthy linked scripted director's lease after a local control ping, including across restart, but will not revive an expired or exited owner. Confirmed death now requeues unsubmitted director self-work within the original attempt cap, preserves submitted evidence for replacement review, blocks unknown effects, waits for known native descendants, and settles scope-narrowed or expired self-work after confirmed exit. Model-director turns, qualified live process/descendant control, live replacement availability and provider-path death proof remain unverified."
+      "blocker": null
     },
     "SWARM-31": {
       "status": "partial",

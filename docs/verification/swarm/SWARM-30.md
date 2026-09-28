@@ -1,6 +1,6 @@
 # SWARM-30 — director replacement
 
-Status: partial. Latest code revision: `9981ec7b`; earlier no-spawn revisions `6f3dcdd1` and `3c4917a`, crash-boundary revision `f802c1c`, supervised-process revision `acc097a` and recovery revisions `0fc1446`, `3d7bc31` and `e89bc7d`.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. Earlier code revision: `9981ec7b`; earlier no-spawn revisions `6f3dcdd1` and `3c4917a`, crash-boundary revision `f802c1c`, supervised-process revision `acc097a` and recovery revisions `0fc1446`, `3d7bc31` and `e89bc7d`.
 
 Input: a fixture-admitted worker with a reserved quota window reports a discovery. The director claims it, and the daemon restarts before the batch is applied. The worker sends a late terminal result while director termination is uncertain. The fixture then reports confirmed director death.
 
@@ -81,3 +81,18 @@ including the `spawn_requested` fault that remains uncertain and reserved.
 Startup does not infer no-spawn from a missing process directory alone.
 This is local scripted recovery, not live model-director selection or shared
 Auto allowance admission. SWARM-30 remains partial.
+
+## Verified at fixture scope (2026-09-28)
+
+One gap remained against the clause: no test had a stale director try to **dispatch and accept** after its replacement (the earlier fence test used plan revision; the Atlas replay used batch claim, revision and directive). `replaced_director_cannot_dispatch_or_accept_and_worker_results_survive` (`daemon/tests/swarm_director_owner.rs`, new) closes it; it passed on first run, so it is coverage, not a fix.
+
+| Clause | Test |
+| --- | --- |
+| Crash the director while workers run; keep their results; resume or replace it from the durable plan | `atlas_s5_director_death_recovers_one_dispatched_worker` (joined, PostgreSQL); `supervised_director_needs_confirmed_exit_before_replacement`; `replacement_reviews_submitted_self_result_without_reexecuting_job`; the new test (the worker's result submitted during the crash is reviewed and accepted by generation 2, which then dispatches the plan's next job) |
+| A stale director's dispatch and acceptance are refused after replacement | the new test: `swarm.admit` and `swarm.decide` by generation 1 fail `stale or inactive director owner generation`; the old token under generation 2 fails `invalid director owner identity`; no attempt or decision is written; `durable_owner_fences_director_actions_after_restart_and_replacement` (plan and revision) |
+| Uncertain termination: reservations kept, new jobs paused, results kept | `uncertain_director_stalls_and_confirmed_replacement_replays_unapplied_batch`, `confirmed_director_replacement_preserves_a_paused_run`, `uncertain_spawn_remains_reserved_without_a_process_record`; the new test (while termination is unknown, admission is `run_not_admitting`; the worker's reservation stays through restart and replacement) |
+| Unavailable replacement | `restart_releases_director_ownership_when_capacity_rejected_before_any_spawn` (no slot for the replacement: the run waits for a replacement, admits nothing and keeps its state across restarts, then launches generation 2 when a slot frees); `owner_lease_expiry_blocks_mutation_without_authorizing_a_second_owner` |
+
+Rerun serially on 2026-09-28: `swarm_director_owner` 4 passed, `swarm_director_process` 14, `swarm_director_loop` 8, `swarm_director` 11, and the Atlas director-death replay against disposable PostgreSQL 16.
+
+Boundary: the directors are scripted local processes. A live model director's death detection and replacement through a provider are part of SWARM-25, not this clause's fixture proof.
