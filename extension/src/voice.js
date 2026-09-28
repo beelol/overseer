@@ -19,6 +19,12 @@ class Voice {
     this.status.command = 'overseer.voice.open';
     context.subscriptions.push(this.status);
     client.on('voice', m => this.live(m));
+    // A card's rows advance on its agents' turns (held → sent → delivered → picked up → answered).
+    this.cardsOfRun = new Map(); // run id -> proposal ids shown
+    client.on('event', ev => {
+      if (!ev || !['turn_started', 'turn_done', 'queued', 'status'].includes(ev.kind) || !this.panel) return;
+      for (const id of this.cardsOfRun.get(ev.run_id) || []) this.fetchCardSoon(id);
+    });
     client.on('connected', () => this.refresh());
     client.on('disconnected', () => { this.voice = null; this.render(); });
     // Reduced motion follows VS Code's own setting as well as the system's.
@@ -131,7 +137,22 @@ class Voice {
   }
 
   async fetchCard(id) {
-    try { this.post({ type: 'card', card: await this.client.request('overseer.card', { id }) }); } catch { /* not a card yet */ }
+    try {
+      const card = await this.client.request('overseer.card', { id });
+      for (const row of card.rows || []) {
+        if (!row.run_id) continue;
+        const ids = this.cardsOfRun.get(row.run_id) || new Set();
+        ids.add(id); this.cardsOfRun.set(row.run_id, ids);
+      }
+      this.post({ type: 'card', card });
+    } catch { /* not a card yet */ }
+  }
+
+  fetchCardSoon(id) {
+    this.pendingCards ||= new Set();
+    this.pendingCards.add(id);
+    clearTimeout(this.cardTimer);
+    this.cardTimer = setTimeout(() => { const ids = [...this.pendingCards]; this.pendingCards.clear(); for (const x of ids) this.fetchCard(x); }, 250);
   }
 
   /** Shows the voice view: the mark in the middle of the editor area. */

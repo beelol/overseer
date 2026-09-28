@@ -94,8 +94,24 @@ pub fn addressed(text: &str, agent_names: &[String], awaiting_answer: bool) -> b
     }
     // A question about the agents or their work.
     const QUESTION: &[&str] = &[
-        "what", "whats", "who", "whos", "how", "hows", "is", "are", "did", "has", "have", "any",
-        "where", "which", "why", "when",
+        "what",
+        "whats",
+        "who",
+        "whos",
+        "how",
+        "hows",
+        "is",
+        "are",
+        "did",
+        "has",
+        "have",
+        "any",
+        "where",
+        "which",
+        "why",
+        "when",
+        "whoever",
+        "whichever",
     ];
     const ABOUT_WORK: &[&str] = &[
         "agent",

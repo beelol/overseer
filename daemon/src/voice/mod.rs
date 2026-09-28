@@ -762,6 +762,10 @@ pub fn set(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         set_meta(d, k, v)?;
     }
     let v = get_voice()?;
+    if turning_on {
+        // The owner turned it on again: the crash count starts over (AC-175).
+        v.st.lock().unwrap().restarts.clear();
+    }
     let settings_changed: Vec<&str> = changes
         .iter()
         .map(|(k, _)| k.trim_start_matches("voice."))

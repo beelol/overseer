@@ -2651,3 +2651,173 @@ fn ac169_two_agents_in_flight_and_a_new_one_get_the_card_s_text_byte_for_byte() 
         let _ = env.d.try_call("run.interrupt", json!({"run_id": run}));
     }
 }
+
+fn quantile(v: &[u128], q: f64) -> u128 {
+    let mut s = v.to_vec();
+    s.sort();
+    s[((s.len() as f64 * q) as usize).min(s.len() - 1)]
+}
+
+/// AC-165: the three answers over 50 spoken requests through the simulated listener, measured
+/// from the end of each thought (the listener's final words): the heard signal, Overseer's voice
+/// starting "On it.", and "Sent." once the daemon has sent the message. Written to
+/// `OVERSEER_VOICE_TIMING_OUT` when set.
+#[test]
+fn ac165_the_three_answers_over_fifty_requests() {
+    let env = voice_daemon(&[]);
+    env.d.call("voice.set", json!({"settle_seconds": 1}));
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let phone = env.d.call("task.create", json!({"repo": repo, "harness": "generic", "workspace_mode": "worktree", "program": "/bin/sleep", "args": ["1800"], "prompt": "", "title": "Phone"}))["run"]["id"].as_str().unwrap().to_string();
+    let live = listening(&env);
+    let (mut heard, mut working, mut done) = (Vec::new(), Vec::new(), Vec::new());
+    for i in 0..50 {
+        live.clear();
+        env.d.call(
+            "voice.simulate",
+            json!({"speechlike": 0.8, "words": format!("Tell Phone to do step {i}.")}),
+        );
+        let end = live.wait("the end of the thought", 60, |v| {
+            v["kind"] == "heard" && v["final"] == true
+        });
+        let t_end = when(&live, &end);
+        let signal = live.wait("the heard signal", 20, |v| v["kind"] == "heard_signal");
+        let started = live.wait("On it.", 20, |v| {
+            v["kind"] == "spoke" && v["event"] == "start"
+        });
+        let taken = live.wait("taken", 20, |v| v["kind"] == "request");
+        let id = taken["request"]["id"].as_str().unwrap().to_string();
+        let sent = live.wait("Sent.", 90, |v| v["kind"] == "say" && v["text"] == "Sent.");
+        assert_eq!(request(&env.d, &id)["state"], "sent", "{id}");
+        heard.push(
+            when(&live, &signal)
+                .saturating_duration_since(t_end)
+                .as_millis(),
+        );
+        working.push(
+            when(&live, &started)
+                .saturating_duration_since(t_end)
+                .as_millis(),
+        );
+        done.push(
+            when(&live, &sent)
+                .saturating_duration_since(t_end)
+                .as_millis(),
+        );
+    }
+    let summary = json!({
+        "requests": 50,
+        "heard_ms": {"p50": quantile(&heard, 0.5), "p95": quantile(&heard, 0.95), "max": heard.iter().max()},
+        "working_on_it_ms": {"p50": quantile(&working, 0.5), "p95": quantile(&working, 0.95), "max": working.iter().max()},
+        "done_ms": {"p50": quantile(&done, 0.5), "p95": quantile(&done, 0.95), "max": done.iter().max()},
+        "settle_seconds": 1,
+    });
+    eprintln!("AC-165 timing: {summary}");
+    if let Some(out) = std::env::var_os("OVERSEER_VOICE_TIMING_OUT") {
+        std::fs::write(out, serde_json::to_string_pretty(&summary).unwrap()).unwrap();
+    }
+    assert!(quantile(&heard, 0.95) <= 300, "heard: {summary}");
+    assert!(
+        quantile(&working, 0.5) <= 1500 && quantile(&working, 0.95) <= 2500,
+        "working on it: {summary}"
+    );
+    assert_eq!(received(&env, &phone).len(), 50);
+    let _ = env.d.try_call("run.interrupt", json!({"run_id": phone}));
+}
+
+/// AC-167: "stop Phone" stops its turn within a second, with no settle window.
+#[test]
+fn ac167_stop_by_voice_interrupts_within_a_second() {
+    let env = voice_daemon(&[
+        ("FIXTURE_SLOW_MS", "120000"),
+        (
+            "OVERSEER_HARNESS_ENV_PASSTHROUGH",
+            "CLAUDE_FIXTURE_MODE_FILE,FIXTURE_SLOW_MS",
+        ),
+    ]);
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    std::fs::write(env.mode_file(), "slow").unwrap();
+    let phone = env.d.call(
+        "task.create",
+        json!({"repo": repo, "harness": "claude", "prompt": "keep working", "title": "Phone"}),
+    )["run"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    env.d.wait_status(&phone, |s| s == "running", 30);
+    std::fs::write(env.mode_file(), "overseer").unwrap();
+    listening(&env);
+    let t0 = Instant::now();
+    let r = env.d.call("voice.say", json!({"text": "stop Phone"}));
+    assert_eq!(r["built_in"], "stop", "{r}");
+    env.d.wait_status(
+        &phone,
+        |s| !["running", "starting", "queued"].contains(&s),
+        10,
+    );
+    let took = t0.elapsed();
+    assert!(took <= Duration::from_secs(1), "stopped in {took:?}");
+}
+
+/// AC-171 and AC-166: while a read-back waits for a yes or no, "maybe" is no answer, but a command
+/// said meanwhile is still taken, and the read-back keeps waiting.
+#[test]
+fn ac171_a_command_during_a_read_back_is_still_taken() {
+    let env = voice_daemon(&[]);
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let cont = agent(&env.d, &repo, "Continuity");
+    listening(&env);
+    let asks = permission_agent(&env, &repo, "Sessions");
+    std::fs::write(env.mode_file(), "overseer").unwrap();
+    let rb = env.d.call("voice.say", json!({"text": "What's waiting?"}));
+    assert_eq!(rb["read_back"]["agent"], json!(asks), "{rb}");
+    let maybe = env.d.call("voice.say", json!({"text": "maybe"}));
+    assert_eq!(maybe["why"], "unclear: no answer");
+    let t = env
+        .d
+        .call("voice.say", json!({"text": "talk to Continuity"}));
+    assert_eq!(t["target"], json!(cont), "{t}");
+    env.d.call("voice.say", json!({"text": "back to Overseer"}));
+    assert_eq!(env.d.call("voice.get", json!({}))["target"], "overseer");
+    // A request naming an agent, said while the read-back waits, still goes to Overseer and out.
+    let live = Live::open(&env.d);
+    env.d.call("voice.set", json!({"settle_seconds": 3}));
+    let id = say(&env, "Tell Continuity to wait for the review.");
+    wait_state(&live, &id, "settling");
+    let yes = env.d.call("voice.say", json!({"text": "yes"}));
+    assert_eq!(yes["allow"], true, "the read-back still waited: {yes}");
+    wait_state(&live, &id, "sent");
+    assert_eq!(received(&env, &cont).len(), 1);
+}
+
+/// A turn Overseer starts by itself (a check-in when an agent finishes) is not an answer to a
+/// spoken request made meanwhile: the request waits for its own turn and goes out.
+#[test]
+fn a_check_in_turn_is_not_the_answer_to_a_spoken_request() {
+    let env = voice_daemon(&[]);
+    env.d.call("voice.set", json!({"settle_seconds": 1}));
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let phone = env.d.call("task.create", json!({"repo": repo, "harness": "generic", "workspace_mode": "worktree", "program": "/bin/sleep", "args": ["600"], "prompt": "", "title": "Phone"}))["run"]["id"].as_str().unwrap().to_string();
+    let live = listening(&env);
+    // Agents that finish now: Overseer checks in on them by itself.
+    std::fs::write(env.mode_file(), "echo").unwrap();
+    for t in ["Notes", "Docs"] {
+        env.d.call(
+            "task.create",
+            json!({"repo": repo, "harness": "claude", "prompt": "say done", "title": t}),
+        );
+    }
+    std::fs::write(env.mode_file(), "overseer").unwrap();
+    let id = say(&env, "Tell Phone to add tests.");
+    wait_state(&live, &id, "sent");
+    let row = request(&env.d, &id);
+    assert!(
+        !row["answer"].as_str().unwrap_or("").starts_with("Check-in"),
+        "{row}"
+    );
+    assert_eq!(received(&env, &phone).len(), 1);
+    let _ = env.d.try_call("run.interrupt", json!({"run_id": phone}));
+}

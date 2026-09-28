@@ -41,6 +41,10 @@ pub struct Open {
     pub confirm_at: Option<Instant>,
     /// "Still working on it." was said (once at most, AC-165).
     pub holding_said: bool,
+    /// When Overseer's turn about it began (it may wait behind a turn Overseer started itself).
+    pub turn_seen: Option<Instant>,
+    /// Sent straight to the agent the owner is talking to, with no Overseer turn (AC-166).
+    pub direct: bool,
     /// The sent request this one corrects (a correction after the send, AC-170).
     pub replaces_sent: Option<String>,
 }
@@ -140,6 +144,16 @@ const NO: &[&str] = &[
     "reject",
     "reject it",
 ];
+
+/// A plan read back and waiting for a yes more recently than `than` (the answer is for it).
+fn newer_plan(than: Instant) -> bool {
+    req()
+        .lock()
+        .unwrap()
+        .open
+        .iter()
+        .any(|o| o.proposal.is_some() && o.confirm_at.is_some_and(|t| t > than))
+}
 
 /// Answering every permission at once is refused: one at a time (AC-171).
 const ALL_AT_ONCE: &[&str] = &[
@@ -478,6 +492,14 @@ fn agents_for(d: &Arc<Daemon>) -> Vec<super::candidates::Agent> {
                 .digest(&l.id)
                 .map(|g| g.changed.into_iter().map(|c| c.path).collect())
                 .unwrap_or_default();
+            let task: String = d
+                .store
+                .lock()
+                .unwrap()
+                .turns(&l.id)
+                .ok()
+                .and_then(|t| t.first().map(|t| t.prompt.chars().take(400).collect()))
+                .unwrap_or_default();
             super::candidates::Agent {
                 active: crate::daemon::ACTIVE.contains(&l.status.as_str()),
                 just_asked: l.status == "waiting_for_user" || l.waiting.is_some(),
@@ -486,6 +508,7 @@ fn agents_for(d: &Arc<Daemon>) -> Vec<super::candidates::Agent> {
                 repository: l.repository,
                 branch: l.branch,
                 files,
+                task,
             }
         })
         .collect()
@@ -531,9 +554,15 @@ impl Voice {
             );
             return json!({"taken": false, "why": "all at once is refused"});
         }
-        let short_unclear = p.split(' ').count() <= 4 && !CANCEL.contains(&p.as_str());
-        // 2. A read-back waiting for yes or no; anything unclear is no answer.
+        // A short reply that is neither a yes, a no nor a command ("maybe") is no answer; a command
+        // said meanwhile ("stop Phone", "talk to Continuity") is still taken.
+        let short_unclear = p.split(' ').count() <= 4
+            && !CANCEL.contains(&p.as_str())
+            && !floor::addressed(&text, &self.agent_names(), false);
+        // 2. A read-back waiting for yes or no; anything unclear is no answer. When a plan was read
+        // back after it, the answer is for the plan (the most recent question, 2b).
         let read_back = req().lock().unwrap().read_back.clone();
+        let read_back = read_back.filter(|rb| !newer_plan(rb.at));
         if let Some(rb) = read_back {
             if YES.contains(&p.as_str()) || NO.contains(&p.as_str()) {
                 return self.answer_permission(&rb, YES.contains(&p.as_str()));
@@ -794,6 +823,7 @@ impl Voice {
         };
         let found = candidates_for(words, &ctx);
         let replaces_sent = req().lock().unwrap().replaces_pending.remove(&id);
+        let direct = target != "overseer" && !plain(words).split(' ').any(|w| w == "overseer");
         req().lock().unwrap().open.push(Open {
             id: id.clone(),
             words: words.to_string(),
@@ -803,6 +833,8 @@ impl Voice {
             candidates: found.clone(),
             confirm_at: None,
             holding_said: false,
+            turn_seen: None,
+            direct,
             replaces_sent,
         });
         self.st.lock().unwrap().thinking += 1;
@@ -814,7 +846,7 @@ impl Voice {
             r.context.drain(..).map(|h| h.text).collect()
         };
         // Talking to one agent: the words go to it as they are, with no model turn (AC-166).
-        if target != "overseer" && !plain(words).split(' ').any(|w| w == "overseer") {
+        if direct {
             let action = json!([{"action": "message", "agent": target, "text": words, "why": "the owner is talking to it", "confidence": "high"}]);
             let _ = d.overseer_set_cause("voice");
             return match d.overseer_propose(&action, "voice") {
@@ -1256,6 +1288,22 @@ fn answer_limit() -> Duration {
 /// Every 100 ms: permission answers whose window has passed go to the agent; read-backs that
 /// waited 20 s lapse; a request Overseer has not answered in time is not sent (AC-175).
 fn tick(v: &Arc<Voice>) {
+    // Which requests Overseer's current turn is about: their answer clock starts now.
+    let unseen = req()
+        .lock()
+        .unwrap()
+        .open
+        .iter()
+        .any(|o| o.proposal.is_none() && o.turn_seen.is_none());
+    if unseen {
+        let now_about = turn_requests(&v.d, false);
+        let mut r = req().lock().unwrap();
+        for o in r.open.iter_mut() {
+            if o.turn_seen.is_none() && now_about.contains(&o.id) {
+                o.turn_seen = Some(Instant::now());
+            }
+        }
+    }
     // The holding line: once per request, when Overseer has neither planned nor answered.
     let holding: Vec<String> = {
         let mut r = req().lock().unwrap();
@@ -1297,7 +1345,14 @@ fn tick(v: &Arc<Voice>) {
         .unwrap()
         .open
         .iter()
-        .filter(|o| o.proposal.is_none() && o.at.elapsed() > answer_limit())
+        .filter(|o| {
+            o.proposal.is_none()
+                && match o.turn_seen {
+                    Some(t) => t.elapsed() > answer_limit(),
+                    // Waiting behind Overseer's own turns: four times as long at most.
+                    None => o.at.elapsed() > answer_limit() * 4,
+                }
+        })
         .cloned()
         .collect();
     for o in late {
@@ -1399,15 +1454,22 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
         "proposal" if p["cause"] == "voice" || p["via"] == "voice" => {
             let id = p["id"].as_str().unwrap_or("").to_string();
             let settle_until = p["settle_until"].as_i64();
-            let about = turn_requests(&v.d, false);
+            let about = turn_requests_known(&v.d, false);
             let open = {
                 let mut r = req().lock().unwrap();
                 // The request Overseer's turn is about; with several in flight, not just the first.
+                // A turn about none of them (a check-in Overseer started) links to none.
                 let at = r
                     .open
                     .iter()
-                    .position(|o| o.proposal.is_none() && about.contains(&o.id))
-                    .or_else(|| r.open.iter().position(|o| o.proposal.is_none()));
+                    .position(|o| o.proposal.is_none() && o.direct)
+                    .or_else(|| match &about {
+                        Some(ids) => r
+                            .open
+                            .iter()
+                            .position(|o| o.proposal.is_none() && ids.contains(&o.id)),
+                        None => r.open.iter().position(|o| o.proposal.is_none()),
+                    });
                 let o = at.map(|i| &mut r.open[i]);
                 o.map(|o| {
                     o.proposal = Some(id.clone());
@@ -1497,14 +1559,13 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
                 return;
             }
             let text = m["text"].as_str().unwrap_or("").trim().to_string();
-            let about = turn_requests(&v.d, false);
+            let about = turn_requests_known(&v.d, false);
             let o = {
                 let r = req().lock().unwrap();
-                r.open
-                    .iter()
-                    .find(|o| about.contains(&o.id))
-                    .or_else(|| r.open.first())
-                    .cloned()
+                match &about {
+                    Some(ids) => r.open.iter().find(|o| ids.contains(&o.id)).cloned(),
+                    None => r.open.first().cloned(),
+                }
             };
             let Some(o) = o else { return };
             update(&v.d, &o.id, "answer", &text);
@@ -1715,13 +1776,19 @@ fn first_sentences(text: &str, n: usize) -> String {
 /// over the model's choice of add or redirect (AC-167, AC-168).
 pub fn decorate(d: &Daemon, actions: &mut [Value]) -> Result<bool> {
     let s = settings(d)?;
-    let about = turn_requests(d, false);
+    let about = turn_requests_known(d, false);
     let open = {
         let r = req().lock().unwrap();
         r.open
             .iter()
-            .find(|o| o.proposal.is_none() && about.contains(&o.id))
-            .or_else(|| r.open.iter().find(|o| o.proposal.is_none()))
+            .find(|o| o.proposal.is_none() && o.direct)
+            .or_else(|| match &about {
+                Some(ids) => r
+                    .open
+                    .iter()
+                    .find(|o| o.proposal.is_none() && ids.contains(&o.id)),
+                None => r.open.iter().find(|o| o.proposal.is_none()),
+            })
             .cloned()
     };
     let (id, words) = match &open {
@@ -1952,6 +2019,7 @@ pub fn answer(_d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let v = super::voice().ok_or_else(|| anyhow!("the voice session is not running"))?;
     let yes = p["yes"].as_bool().unwrap_or(false);
     let rb = req().lock().unwrap().read_back.clone();
+    let rb = rb.filter(|rb| !newer_plan(rb.at));
     if let Some(rb) = rb {
         return Ok(v.answer_permission(&rb, yes));
     }
@@ -2019,35 +2087,126 @@ fn candidates_for(words: &str, ctx: &super::candidates::Context) -> Vec<(String,
 /// The spoken requests an Overseer turn is about, from its prompt ("Request V-0042: …"): the turn
 /// now running, or with `ended` the last one that ended.
 fn turn_requests(d: &Daemon, ended: bool) -> Vec<String> {
-    let Ok(session) = d.overseer_session() else {
-        return Vec::new();
-    };
-    let Some(run) = session["run_id"].as_str() else {
-        return Vec::new();
-    };
-    let turns = d.store.lock().unwrap().turns(run).unwrap_or_default();
+    turn_requests_known(d, ended).unwrap_or_default()
+}
+
+/// The same, or `None` when there is no Overseer turn to read (then the caller may fall back).
+fn turn_requests_known(d: &Daemon, ended: bool) -> Option<Vec<String>> {
+    let session = d.overseer_session().ok()?;
+    let run = session["run_id"].as_str()?.to_string();
+    let turns = d.store.lock().unwrap().turns(&run).unwrap_or_default();
     let turn = if ended {
         turns.iter().rev().find(|t| t.ended_ms.is_some())
     } else {
         turns.last()
-    };
-    let Some(prompt) = turn.map(|t| t.prompt.as_str()) else {
-        return Vec::new();
-    };
-    prompt
-        .match_indices("Request V-")
-        .map(|(i, _)| {
-            prompt[i + "Request ".len()..]
-                .chars()
-                .take_while(|c| c.is_ascii_alphanumeric() || *c == '-')
-                .collect()
-        })
-        .collect()
+    }?;
+    let prompt = turn.prompt.as_str();
+    Some(
+        prompt
+            .match_indices("Request V-")
+            .map(|(i, _)| {
+                prompt[i + "Request ".len()..]
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '-')
+                    .collect()
+            })
+            .collect(),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// AC-162: the words recorded from the chosen recognizer (small.en with the hint, three system
+    /// voices) replayed through the local rules. Every command reads as meant for Overseer; an agent
+    /// named and heard is a candidate, and one misheard is not ("phonation" names no one); a yes or
+    /// a cancel counts only when heard right, so a mishearing is no answer.
+    #[test]
+    fn the_recorded_words_replay_through_the_local_rules() {
+        use super::super::candidates::{candidates, Agent, Context};
+        let doc: Value = serde_json::from_str(include_str!(
+            "../../../voice/tests/fixtures/words-small-en.json"
+        ))
+        .unwrap();
+        let agent = |id: &str, title: &str, task: &str| Agent {
+            id: id.into(),
+            title: title.into(),
+            repository: "/w/overseer".into(),
+            branch: None,
+            active: true,
+            just_asked: false,
+            files: vec![],
+            task: task.into(),
+        };
+        let agents = vec![
+            agent("r-phone", "Phone app", ""),
+            agent("r-cont", "Continuity", ""),
+            agent("r-codex", "Codex", ""),
+            agent("r-swarm", "Swarm", ""),
+            agent(
+                "r-gw",
+                "Gateway tests",
+                "Work on AC-116: the gateway's tests.",
+            ),
+        ];
+        let names: Vec<String> = agents.iter().map(|a| a.title.clone()).collect();
+        let ctx = Context {
+            agents: &agents,
+            focus: None,
+            previous: &[],
+        };
+        let named = [
+            ("phone", "r-phone"),
+            ("continuity", "r-cont"),
+            ("codex", "r-codex"),
+            ("swarm", "r-swarm"),
+            ("ac-116", "r-gw"),
+        ];
+        let mut misheard = Vec::new();
+        let list = doc["utterances"].as_array().unwrap();
+        assert_eq!(list.len(), 36);
+        for u in list {
+            let said = u["said"].as_str().unwrap();
+            let heard = u["heard"].as_str().unwrap();
+            let p = plain(heard);
+            if p != plain(said) {
+                misheard.push(heard.to_string());
+            }
+            match said {
+                "Yes, allow it." => {
+                    assert_eq!(YES.contains(&p.as_str()), plain(said) == p, "{heard}");
+                    assert!(!NO.contains(&p.as_str()), "{heard}");
+                }
+                "Cancel that." => {
+                    assert_eq!(CANCEL.iter().any(|c| p == *c), plain(said) == p, "{heard}")
+                }
+                "Talk to Continuity." => assert_eq!(p, "talk to continuity"),
+                "Back to Overseer." => assert_eq!(p, "back to overseer"),
+                _ => {
+                    assert!(
+                        floor::addressed(heard, &names, false),
+                        "meant for Overseer: {heard}"
+                    );
+                    let got: Vec<String> =
+                        candidates(heard, &ctx).into_iter().map(|c| c.id).collect();
+                    let said_l = said.to_lowercase().replace("ac 116", "ac-116");
+                    let heard_l = heard.to_lowercase();
+                    for (word, id) in named {
+                        if said_l.contains(word) {
+                            assert_eq!(
+                                got.iter().any(|g| g == id),
+                                heard_l.contains(word),
+                                "{id} for {heard:?}: {got:?}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        // The recognizer's own mistakes in the recording: five utterances (four of Flo's, one of Eddy's).
+        assert_eq!(misheard.len(), 5, "{misheard:?}");
+    }
 
     /// AC-173: the rolling context keeps 10 minutes or 30 exchanges.
     #[test]

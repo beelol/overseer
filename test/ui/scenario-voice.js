@@ -6,12 +6,14 @@
 const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
+const { auditExpression } = require('./audit');
 
 (async () => {
   const s = new Session('voice');
   const result = { checks: [] };
   const check = (name, ok, detail) => { result.checks.push({ name, ok: !!ok, detail }); s.note(`${ok ? 'PASS' : 'FAIL'} ${name}`, detail); };
   const modeFile = path.join(s.root, 'claude-mode');
+  const micUsers = path.join(s.root, 'mic-users');
   try {
     const repo = makeRepo(path.join(s.root, 'voice-repo'), { dirty: false });
     s.settings({ 'workbench.colorTheme': 'Overseer', 'overseer.followNewRuns': false });
@@ -19,8 +21,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     fs.writeFileSync(modeFile, 'overseer');
     s.launch(repo, {
       OVERSEER_CLAUDE_PATH: path.join(repoRoot, 'fixtures/fake-harness/claude-fixture.js'), OVERSEER_CODEX_PATH: '/nonexistent/codex', OVERSEER_OPENCODE_PATH: '/nonexistent/opencode',
-      CLAUDE_FIXTURE_MODE_FILE: modeFile, OVERSEER_HARNESS_ENV_PASSTHROUGH: 'CLAUDE_FIXTURE_MODE_FILE',
-      OVERSEER_VOICE_SIMULATE: '1', OVERSEER_LISTENER_TEST_VOICE: '1',
+      CLAUDE_FIXTURE_MODE_FILE: modeFile, OVERSEER_HARNESS_ENV_PASSTHROUGH: 'CLAUDE_FIXTURE_MODE_FILE,FIXTURE_SLOW_MS', FIXTURE_SLOW_MS: '60000',
+      OVERSEER_VOICE_SIMULATE: '1', OVERSEER_LISTENER_TEST_VOICE: '1', OVERSEER_LISTENER_TEST_MIC_USERS: micUsers,
     });
     const cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
@@ -70,6 +72,26 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
       return { jumps: L.length, spacing: worst };
     })()`);
     check('levels arrive at least every 100 ms while the owner speaks (25 a second)', follow.jumps > 20, follow);
+    // The star follows the level curve within 100 ms: the time shift that best lines up the star's
+    // size with the levels (both from the page's own records), searched from 0 to 300 ms.
+    const lag = await view.eval(`(() => {
+      const L = window.__voice.levels.filter(l => l.source === 'owner');
+      const F = window.__voice.mark.stats.log.filter(l => l.state === 'hearing' && typeof l.t === 'number');
+      if (L.length < 10 || F.length < 30) return { n: F.length, levels: L.length };
+      const levelAt = t => { let v = 0; for (const l of L) { if (l.t > t) break; v = l.value; } return v; };
+      const scale = F.map(f => f.scale), mean = a => a.reduce((x, y) => x + y, 0) / a.length;
+      let best = { lag: -1, r: -2 };
+      for (let d = 0; d <= 300; d += 10) {
+        const lv = F.map(f => levelAt(f.t - d));
+        const ms = mean(scale), ml = mean(lv);
+        let num = 0, a = 0, b = 0;
+        for (let i = 0; i < F.length; i++) { num += (scale[i] - ms) * (lv[i] - ml); a += (scale[i] - ms) ** 2; b += (lv[i] - ml) ** 2; }
+        const r = num / Math.sqrt(a * b || 1);
+        if (r > best.r) best = { lag: d, r };
+      }
+      return { lag: best.lag, r: Math.round(best.r * 100) / 100, frames: F.length, levels: L.length };
+    })()`);
+    check('the star follows the level curve within 100 ms (best-aligned lag)', lag.lag >= 0 && lag.lag <= 100 && lag.r > 0.5, lag);
     await view.waitFor(`document.getElementById('voice-state').dataset.state === 'listening'`, 10000);
 
     // Overseer speaks: rings of light cross the core.
@@ -117,6 +139,22 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
       await view.waitFor(`window.__voice.mark.stats.pose.rings.length > 0`, 8000).catch(() => {});
       await s.screenshot(`speaking-${tag}`);
       await view.waitFor(`document.getElementById('voice-state').dataset.state === 'listening'`, 15000);
+      s.ctl('voice.say', { text: 'Tell Phone to keep the old format for now.' });
+      await view.waitFor(`document.getElementById('voice-state').dataset.state === 'thinking'`, 10000).catch(() => {});
+      await s.screenshot(`thinking-${tag}`);
+      await view.waitFor(`document.getElementById('voice-state').dataset.state === 'listening'`, 60000).catch(() => {});
+      await cdp.command('Overseer: Voice Mode: Mute or Unmute');
+      await view.waitFor(`document.getElementById('voice-state').dataset.state === 'muted'`, 10000).catch(() => {});
+      await delay(700);
+      await s.screenshot(`muted-${tag}`);
+      await cdp.command('Overseer: Voice Mode: Mute or Unmute');
+      await view.waitFor(`document.getElementById('voice-state').dataset.state === 'listening'`, 20000);
+      fs.writeFileSync(micUsers, 'us.zoom.xos\n');
+      await view.waitFor(`document.getElementById('voice-state').dataset.state === 'paused'`, 6000).catch(() => {});
+      await delay(500);
+      await s.screenshot(`paused-${tag}`);
+      fs.writeFileSync(micUsers, '');
+      await view.waitFor(`document.getElementById('voice-state').dataset.state === 'listening'`, 6000);
     }
     s.settings({ 'workbench.colorTheme': 'Overseer', 'overseer.followNewRuns': false });
     await delay(1500);
@@ -188,6 +226,201 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const still = s.ctl('state').runs.find(r => r.id === perm.run.id)?.status;
     check('the toast\'s Cancel withdraws the answer inside the window: the agent still waits', clicked && still === 'waiting_for_user', { clicked, still });
     await s.screenshot('permission-cancelled');
+
+    const generic = (title, secs = 900) => s.ctl('task.create', { repo, harness: 'generic', workspace_mode: 'worktree', program: '/bin/sleep', args: [String(secs)], prompt: '', title }).run.id;
+    const requestState = id => (s.ctl('voice.requests', { limit: 50 }).requests || []).find(r => r.id === id)?.state;
+    const untilState = async (id, states, ms = 60000) => { const end = Date.now() + ms; let st; while (Date.now() < end) { st = requestState(id); if (states.includes(st)) return st; await delay(250); } return st; };
+    const clearToasts = () => cdp.command('Notifications: Clear All Notifications').catch(() => {});
+
+    // ---------- The toast before and after the window, in the three themes (AC-171).
+    const toastShots = [];
+    for (const [theme, tag] of [['Overseer', 'overseer'], ['Overseer Dark', 'dark'], ['Overseer Light', 'light']]) {
+      s.settings({ 'workbench.colorTheme': theme, 'overseer.followNewRuns': false });
+      await delay(1500);
+      await clearToasts();
+      fs.writeFileSync(modeFile, 'permission');
+      const pa = s.ctl('task.create', { repo, harness: 'claude', prompt: 'write a file', title: `Asks ${tag}` });
+      for (let i = 0; i < 80 && s.ctl('state').runs.find(r => r.id === pa.run.id)?.status !== 'waiting_for_user'; i++) await delay(250);
+      fs.writeFileSync(modeFile, 'overseer');
+      s.ctl('voice.say', { text: 'What does it want?' });
+      await delay(300);
+      s.ctl('voice.say', { text: 'Yes, allow it.' });
+      const before = await cdp.waitFor(`[...document.querySelectorAll('.notification-toast')].some(t => /Allowed/.test(t.textContent) && /Cancel/.test(t.textContent))`, 10000).then(() => true, () => false);
+      await s.screenshot(`toast-before-window-${tag}`);
+      const after = await cdp.waitFor(`[...document.querySelectorAll('.notification-toast')].some(t => /Sent/.test(t.textContent))`, 12000).then(() => true, () => false);
+      await s.screenshot(`toast-sent-${tag}`);
+      toastShots.push({ tag, before, after });
+      await clearToasts();
+    }
+    check('the toast names what was answered with Cancel, then reads Sent, in the three themes', toastShots.every(t => t.before && t.after), toastShots);
+    s.settings({ 'workbench.colorTheme': 'Overseer', 'overseer.followNewRuns': false });
+    await delay(1500);
+
+    // ---------- Paused for a call (AC-173, AC-174): another app records; the strip says so.
+    await cdp.command('Overseer: Voice Mode: Show'); await delay(600);
+    fs.writeFileSync(micUsers, 'us.zoom.xos\n');
+    const paused = await view.waitFor(`document.getElementById('voice-state').dataset.state === 'paused'`, 6000).then(() => true, () => false);
+    const pausedLabel = await view.eval(`({ text: document.getElementById('voice-state').textContent, title: document.getElementById('voice-state').title })`);
+    await s.screenshot('paused-overseer');
+    fs.writeFileSync(micUsers, '');
+    const resumed = await view.waitFor(`document.getElementById('voice-state').dataset.state === 'listening'`, 6000).then(() => true, () => false);
+    check('paused for a call: shown with the app, and listening again after', paused && resumed && pausedLabel.text === 'Paused for a call' && /Zoom/.test(pausedLabel.title), pausedLabel);
+
+    // ---------- Who is spoken to (AC-166): from the strip, by command, by voice.
+    const continuity = generic('Continuity');
+    await delay(1500);
+    const tp = await s.webviewPoint(view, '#voice-target'); await cdp.click(tp.x, tp.y);
+    await cdp.pick('Voice Mode: talk to', 'Continuity');
+    const byStrip = await view.waitFor(`document.getElementById('voice-target').textContent === 'Continuity'`, 10000).then(() => true, () => false);
+    await s.screenshot('talking-to-continuity');
+    await cdp.command('Overseer: Voice Mode: Talk To…'); await cdp.pick('Voice Mode: talk to', 'Overseer');
+    const byCommand = await view.waitFor(`document.getElementById('voice-target').textContent === 'Overseer'`, 10000).then(() => true, () => false);
+    s.ctl('voice.say', { text: 'talk to Continuity' });
+    const byVoice = await view.waitFor(`document.getElementById('voice-target').textContent === 'Continuity'`, 10000).then(() => true, () => false);
+    s.ctl('voice.say', { text: 'back to Overseer' });
+    const back = await view.waitFor(`document.getElementById('voice-target').textContent === 'Overseer'`, 10000).then(() => true, () => false);
+    check('who is spoken to switches from the strip, by command and by voice, and the strip shows it', byStrip && byCommand && byVoice && back, { byStrip, byCommand, byVoice, back });
+
+    // ---------- Keyboard only (AC-174): mute, cancel and yes.
+    s.ctl('voice.set', { settle_seconds: 8 });
+    await cdp.focusWorkbench();
+    await cdp.key('m', { meta: true, alt: true, shift: true });
+    const keyMuted = await view.waitFor(`document.getElementById('voice-state').dataset.state === 'muted'`, 10000).then(() => true, () => false);
+    await cdp.key('m', { meta: true, alt: true, shift: true });
+    const keyUnmuted = await view.waitFor(`document.getElementById('voice-state').dataset.state === 'listening'`, 20000).then(() => true, () => false);
+    // A request inside its window: the voice mark on the target in the side bar and the grid, then cancelled by keyboard.
+    const cancelId = s.ctl('voice.say', { text: 'Tell Continuity to wait for the review.' }).request;
+    const settling = await untilState(cancelId, ['settling']);
+    await delay(1200);
+    const rows = await s.agentRows();
+    const sideMarked = rows.some(r => r.label === 'Continuity' && /voice/.test(r.description));
+    await s.screenshot('voice-mark-side-bar');
+    await cdp.command('Overseer: Toggle Agent Grid'); await delay(2000);
+    const gridFrame = await cdp.webview(`!!document.querySelector('.tile')`, 15000).catch(() => null);
+    const gridMarked = gridFrame ? await gridFrame.eval(`[...document.querySelectorAll('.tile')].some(t => /Continuity/.test(t.querySelector('.tile-title')?.textContent || '') && t.querySelector('.tile-voice') && !t.querySelector('.tile-voice').hidden)`) : false;
+    await s.screenshot('voice-mark-grid');
+    await cdp.command('Overseer: Toggle Agent Grid'); await delay(800);
+    await cdp.focusWorkbench();
+    await cdp.key('.', { meta: true, alt: true });
+    const cancelled = await untilState(cancelId, ['cancelled'], 10000);
+    const unmarked = await (async () => { for (let i = 0; i < 20; i++) { const r = await s.agentRows(); if (!r.some(x => x.label === 'Continuity' && /voice/.test(x.description))) return true; await delay(250); } return false; })();
+    check('the voice mark is on the targeted agent in the side bar and the grid while the request is open, and goes when it closes', settling === 'settling' && sideMarked && gridMarked && unmarked, { settling, sideMarked, gridMarked, unmarked });
+    // Yes by keyboard: a plan that waits for a yes (archiving is a Confirm action).
+    await cdp.command('Overseer: Voice Mode: Show'); await delay(600);
+    const yesId = s.ctl('voice.say', { text: 'Archive Continuity.' }).request;
+    const waiting = await untilState(yesId, ['waiting']);
+    const yesShown = await view.waitFor(`!document.getElementById('voice-yes').hidden`, 8000).then(() => true, () => false);
+    await s.screenshot('yes-waiting');
+    await cdp.focusWorkbench();
+    await cdp.key('y', { meta: true, alt: true });
+    const yesDone = await untilState(yesId, ['sent'], 15000);
+    check('mute, cancel and yes by keyboard only', keyMuted && keyUnmuted && cancelled === 'cancelled' && waiting === 'waiting' && yesShown && yesDone === 'sent', { keyMuted, keyUnmuted, cancelled, waiting, yesShown, yesDone });
+    s.ctl('voice.set', { settle_seconds: 2 });
+
+    // ---------- Home (AC-174): the voice strip and the spoken request in the conversation.
+    const writer = (() => { fs.writeFileSync(modeFile, 'slow'); const r = s.ctl('task.create', { repo, harness: 'claude', prompt: 'keep writing', title: 'Writer' }); return r.run.id; })();
+    for (let i = 0; i < 80 && s.ctl('state').runs.find(r => r.id === writer)?.status !== 'running'; i++) await delay(250);
+    fs.writeFileSync(modeFile, 'overseer');
+    s.ctl('voice.set', { settle_seconds: 6 });
+    await cdp.command('Overseer: Open Overseer View'); await delay(1500);
+    const homeFrame = await cdp.webview(`!!document.getElementById('home-voice')`, 20000);
+    const homeId = s.ctl('voice.say', { text: 'Tell Writer to add a changelog.' }).request;
+    await untilState(homeId, ['settling']);
+    await homeFrame.waitFor(`!document.getElementById('home').hidden && !document.getElementById('home-voice').hidden && !!document.querySelector('.home-msg.spoken') && !!document.querySelector('.proposal.spoken')`, 20000).catch(() => {});
+    const home = await homeFrame.eval(`(() => ({ strip: !document.getElementById('home-voice').hidden, state: document.querySelector('.home-voice-state')?.textContent, words: [...document.querySelectorAll('.home-msg.spoken .home-text')].map(e => e.textContent).find(t => /add a changelog/.test(t)), spokenCard: !!document.querySelector('.proposal.spoken') }))()`);
+    await s.screenshot('home-voice-strip');
+    const homeAudit = await homeFrame.eval(auditExpression({ root: '#home-voice' }));
+    check('home shows the voice strip, and the spoken request and its plan are marked in the conversation', home.strip && /Listening|Thinking|Speaking|Hearing/.test(home.state || '') && home.words === 'Tell Writer to add a changelog.' && home.spokenCard, home);
+
+    // ---------- A card filling in as its dispatches advance (AC-169, AC-174).
+    await cdp.command('Overseer: Voice Mode: Show'); await delay(800);
+    await untilState(homeId, ['sent'], 30000);
+    const rowState = () => view.eval(`(() => { const c = [...document.querySelectorAll('.vreq')].find(c => /add a changelog/.test(c.textContent)); return c && c.querySelector('.vreq-row-state')?.textContent; })()`);
+    const seen = [];
+    for (let i = 0; i < 40; i++) { const st = await rowState(); if (st && !seen.includes(st)) seen.push(st); if (st === 'held') break; await delay(250); }
+    await s.screenshot('card-held');
+    s.ctl('run.interrupt', { run_id: writer });
+    for (let i = 0; i < 80; i++) { const st = await rowState(); if (st && !seen.includes(st)) seen.push(st); if (st && st !== 'held') break; await delay(250); }
+    await s.screenshot('card-advanced');
+    check('a card fills in as its dispatches advance (held, then the next state on the daemon\'s events)', seen[0] === 'held' && seen.length >= 2, seen);
+    s.ctl('voice.set', { settle_seconds: 2 });
+
+    // ---------- Evidence (AC-169, AC-168): two agents in flight and one new agent; the card and
+    // each agent's chat, in the three themes; the new agent in the side bar with its prompt.
+    fs.writeFileSync(modeFile, 'slow');
+    const inflight = ['Gateway', 'Ledger'].map(title => s.ctl('task.create', { repo, harness: 'claude', prompt: 'keep working', title }).run.id);
+    for (const id of inflight) for (let i = 0; i < 80 && s.ctl('state').runs.find(r => r.id === id)?.status !== 'running'; i++) await delay(250);
+    fs.writeFileSync(modeFile, 'echo');
+    s.ctl('voice.set', { start_defaults: { harness: 'claude', workspace_mode: 'worktree', trusted: true } });
+    const evId = s.ctl('voice.say', { text: 'Tell Gateway and Ledger to use the new wire format, and someone should write the migration note.' }).request;
+    const evState = await untilState(evId, ['sent', 'partly_sent'], 90000);
+    const evReq = (s.ctl('voice.requests', { limit: 50 }).requests || []).find(r => r.id === evId);
+    const evCard = s.ctl('overseer.card', { id: evReq.proposal });
+    const newRun = (evCard.rows || []).find(r => r.action === 'start')?.run_id;
+    await cdp.command('Overseer: Voice Mode: Show'); await delay(1200);
+    await view.waitFor(`[...document.querySelectorAll('.vreq')].some(c => /migration note/.test(c.textContent) && c.querySelectorAll('.vreq-rows li').length === 3)`, 20000).catch(() => {});
+    const sideRow = (await s.agentRows()).find(r => /write the migration/.test(r.label || ''));
+    const chats = [];
+    for (const [theme, tag] of [['Overseer', 'overseer'], ['Overseer Dark', 'dark'], ['Overseer Light', 'light']]) {
+      s.settings({ 'workbench.colorTheme': theme, 'overseer.followNewRuns': false });
+      await delay(1500);
+      await cdp.command('Overseer: Voice Mode: Show'); await delay(800);
+      await s.screenshot(`card-three-targets-${tag}`);
+      for (const [i, id] of [...inflight, newRun].entries()) {
+        if (!id) continue;
+        await s.selectRun(id).catch(() => {});
+        await delay(1500);
+        const frame = await cdp.webview(`!!document.querySelector('.view-chat')`, 10000).catch(() => null);
+        const shows = frame ? await frame.eval(`document.body.innerText.includes('The owner said: “Tell Gateway and Ledger to use the new wire format')`) : false;
+        chats.push({ tag, id, shows });
+        await s.screenshot(`chat-${['gateway', 'ledger', 'new-agent'][i]}-${tag}`);
+      }
+    }
+    s.settings({ 'workbench.colorTheme': 'Overseer', 'overseer.followNewRuns': false });
+    fs.writeFileSync(modeFile, 'overseer');
+    for (const id of inflight) { try { s.ctl('run.interrupt', { run_id: id }); } catch {} }
+    check('two agents in flight and a new one: the card has three rows and each chat shows the owner\'s words, in the three themes', ['sent', 'partly_sent'].includes(evState) && (evCard.rows || []).length === 3 && chats.length === 9 && chats.every(c => c.shows), { evState, rows: (evCard.rows || []).length, chats });
+    check('the new agent appears in the side bar with its prompt', !!sideRow, sideRow);
+    await cdp.command('Overseer: Voice Mode: Show'); await delay(800);
+
+    // ---------- Stopped: four listener crashes turn Voice Mode off, with the reason shown (AC-175).
+    for (let i = 0; i < 4; i++) {
+      const pid = s.ctl('voice.get').listener.pid;
+      if (!pid) break;
+      try { process.kill(pid, 'SIGKILL'); } catch {}
+      for (let j = 0; j < 60; j++) { const v = s.ctl('voice.get'); if (!v.enabled || (v.listener.pid && v.listener.pid !== pid)) break; await delay(250); }
+    }
+    const stopped = await view.waitFor(`!document.getElementById('voice-off').hidden && document.getElementById('voice-off-reason').textContent.length > 0`, 15000).then(() => true, () => false);
+    const reason = await view.eval(`document.getElementById('voice-off-reason').textContent`);
+    await s.screenshot('stopped-after-four-crashes');
+    check('four crashes turn Voice Mode off, and the view says why', stopped && s.ctl('voice.get').enabled === false, { reason });
+    await cdp.command('Overseer: Voice Mode: Turn On or Off');
+    await view.waitFor(`document.getElementById('voice-state').dataset.state === 'listening'`, 30000);
+
+    // ---------- Widths and themes, with the visible-text and accessible-name audits (AC-174).
+    await cdp.command('View: Close Primary Side Bar').catch(() => {});
+    await cdp.command('Overseer: Voice Mode: Show'); await delay(800);
+    const audits = [];
+    for (const [theme, tag] of [['Overseer', 'overseer'], ['Overseer Dark', 'dark'], ['Overseer Light', 'light']]) {
+      s.settings({ 'workbench.colorTheme': theme, 'overseer.followNewRuns': false });
+      await delay(1500);
+      for (const w of [360, 900, 1280]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width: w, height: 820, deviceScaleFactor: 0, mobile: false }, cdp.workbench);
+        await delay(1500);
+        const whole = await view.eval(auditExpression({ root: 'main.voice' }));
+        const chrome = await view.eval(auditExpression({ root: 'main.voice', exclude: ['.voice-requests', '#voice-heard', '#voice-said', '#voice-error'] }));
+        audits.push({ tag, w, viewWidth: whole.width, overflow: whole.overflow.length, unnamed: whole.unnamed.length, chrome: chrome.chars, longRuns: whole.longRuns.length });
+        await s.screenshot(`width-${w}-${tag}`);
+      }
+    }
+    await cdp.call('Emulation.clearDeviceMetricsOverride', {}, cdp.workbench).catch(() => {});
+    s.settings({ 'workbench.colorTheme': 'Overseer', 'overseer.followNewRuns': false });
+    await cdp.command('View: Toggle Primary Side Bar Visibility').catch(() => {});
+    s.note('audits', audits);
+    check('no horizontal overflow and no long unbroken runs at 360, 900 and 1280 px in the three themes', audits.every(a => a.overflow === 0 && a.longRuns === 0), audits);
+    check('the accessible-name audit: every control has a name and a tooltip (the voice view and home’s strip)', audits.every(a => a.unnamed === 0) && homeAudit.unnamed.length === 0, { view: audits.map(a => a.unnamed), home: homeAudit.unnamed });
+    check('the visible-text audit: the voice view’s own text stays within 60 characters, and home’s strip within 60', audits.every(a => a.chrome <= 60) && homeAudit.chars <= 60, { view: Math.max(...audits.map(a => a.chrome)), home: homeAudit.chars });
+    void continuity;
     void phone;
   } catch (e) {
     s.note('ERROR ' + (e.stack || e.message));

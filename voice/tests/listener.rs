@@ -495,3 +495,54 @@ fn a_long_utterance_keeps_every_word_and_holds_thirty_seconds_at_most() {
         .unwrap();
     assert!(held > 20_000 && held <= 30_000, "held {held} ms at most");
 }
+
+/// AC-164: every noise the gate must reject, 100 times each, played while Overseer speaks: no
+/// utterance (so no request), no lowering, no stop, no level of the owner for the mark, and
+/// Overseer finishes its line every time.
+#[test]
+fn every_noise_100_times_while_overseer_speaks_changes_nothing() {
+    let mut runs = 0;
+    for kind in synth::NOISES {
+        for i in 0..100u64 {
+            let mut audio = synth::room(5.0, 0.002, 7_000 + i);
+            let noise = synth::noise(kind, 9_000 + i, 1.0).unwrap();
+            let noise: Vec<f32> = noise.into_iter().take(synth::secs(3.5)).collect();
+            synth::mix(&mut audio, &noise, synth::secs(0.4));
+            let r = listen(
+                &audio,
+                vec![],
+                vec![(
+                    100,
+                    Command::Speak {
+                        line: 1,
+                        text: "One phrase here, and a second one.".into(),
+                    },
+                )],
+                0.0,
+            );
+            let spoke = r.spoke();
+            assert!(
+                !spoke.iter().any(|e| e == "lowered" || e == "stopped"),
+                "{kind} #{i}: {spoke:?}"
+            );
+            assert_eq!(
+                spoke.last().map(String::as_str),
+                Some("done"),
+                "{kind} #{i}: {spoke:?}"
+            );
+            assert!(r.utterances().is_empty(), "{kind} #{i}");
+            let owner_levels = r.count(|e| {
+                matches!(
+                    e,
+                    Event::Level {
+                        source: Source::Owner,
+                        ..
+                    }
+                )
+            });
+            assert_eq!(owner_levels, 0, "{kind} #{i}: the mark stays at rest");
+            runs += 1;
+        }
+    }
+    assert_eq!(runs, 1_000);
+}

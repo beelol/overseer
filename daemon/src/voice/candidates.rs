@@ -16,6 +16,33 @@ pub struct Agent {
     pub just_asked: bool,
     /// Files it changed.
     pub files: Vec<String>,
+    /// The start of its task (the first prompt), where a criterion or ticket is named.
+    pub task: String,
+}
+
+/// Criteria and tickets said aloud: "AC-116", "AC 116", "#42".
+fn criteria(said: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+    for (i, w) in said.iter().enumerate() {
+        let w = w.trim_start_matches('#');
+        if let Some((prefix, n)) = w.split_once('-') {
+            if prefix.len() <= 4
+                && prefix.chars().all(|c| c.is_ascii_alphabetic())
+                && !n.is_empty()
+                && n.chars().all(|c| c.is_ascii_digit())
+            {
+                out.push(format!("{prefix}-{n}"));
+            }
+        } else if ["ac", "pr", "gate"].contains(&w) {
+            if let Some(n) = said
+                .get(i + 1)
+                .filter(|n| n.chars().all(|c| c.is_ascii_digit()))
+            {
+                out.push(format!("{w}-{n}"));
+            }
+        }
+    }
+    out
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -118,6 +145,20 @@ pub fn candidates(text: &str, ctx: &Context) -> Vec<Candidate> {
             named.push((first, a));
         }
     }
+    // Named by a criterion or ticket in its task or title ("whoever has AC-116").
+    let ids = criteria(&said);
+    if !ids.is_empty() {
+        for a in ctx.agents.iter().filter(|a| a.active) {
+            let hay = format!("{} {}", a.title, a.task)
+                .to_lowercase()
+                .replace(' ', "-");
+            if ids.iter().any(|id| hay.contains(id.as_str()))
+                && !named.iter().any(|(_, x)| x.id == a.id)
+            {
+                named.push((usize::MAX - 1, a));
+            }
+        }
+    }
     named.sort_by_key(|(i, _)| *i);
     for (_, a) in named {
         add(&a.id, "named", &mut out);
@@ -204,6 +245,7 @@ mod tests {
                     active: true,
                     just_asked,
                     files: files.iter().map(|f| f.to_string()).collect(),
+                    task: String::new(),
                 }
             };
         vec![
@@ -417,6 +459,7 @@ mod tests {
             active: true,
             just_asked: false,
             files: vec![],
+            task: String::new(),
         });
         let ctx = Context {
             agents: &b,

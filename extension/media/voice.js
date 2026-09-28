@@ -92,14 +92,19 @@
         const rows = document.createElement('ul'); rows.className = 'vreq-rows';
         for (const row of card.rows) {
           const li = document.createElement('li');
-          const who = document.createElement('button'); who.className = 'link vreq-agent'; who.textContent = row.title || row.run_id; who.title = 'Open this agent';
+          const who = document.createElement('button'); who.className = 'link vreq-agent'; who.textContent = row.title || (row.action === 'start' ? 'New agent' : row.run_id); who.title = 'Open this agent';
+          who.disabled = !row.run_id;
           who.addEventListener('click', () => vscode.postMessage({ type: 'open', run: row.run_id }));
-          const st = document.createElement('span'); st.className = 'vreq-row-state'; st.textContent = row.state.replace('_', ' ');
+          const why = document.createElement('span'); why.className = 'vreq-row-why'; why.textContent = [row.why, row.delivery].filter(Boolean).join(' · ');
+          why.title = `Why: ${row.why || '—'} · delivery: ${row.delivery || '—'}`;
+          const st = document.createElement('span'); st.className = `vreq-row-state state-${row.state}`; st.textContent = row.state.replace('_', ' ');
+          const at = row.answered_ms || row.picked_ms || row.delivered_ms || row.sent_ms || row.held_ms;
+          if (at) st.title = `${row.state.replace('_', ' ')} at ${new Date(at).toLocaleTimeString()}`;
           const details = document.createElement('details');
           const summary = document.createElement('summary'); summary.textContent = (row.message || '').split('\n').find(l => l.startsWith('For you:')) || (row.message || '').split('\n')[0];
           const full = document.createElement('pre'); full.textContent = row.message || '';
           details.append(summary, full);
-          li.append(who, st, details);
+          li.append(who, why, st, details);
           rows.append(li);
         }
         el.append(rows);
@@ -130,7 +135,7 @@
       renderRequests();
     } else if (m.type === 'live') {
       const v = m.msg;
-      if (v.kind === 'state' && voice) { voice.state = v.state; voice.reason = v.reason; applyState(); }
+      if (v.kind === 'state' && voice) { voice.state = v.state; voice.reason = v.reason; voice.enabled = v.state !== 'off'; applyState(); }
       else if (v.kind === 'level') {
         if (mark) mark.setLevel(v.source, v.value);
         $('voice-meter').firstElementChild.style.width = `${Math.round(v.value * 100)}%`;
