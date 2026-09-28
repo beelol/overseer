@@ -36,11 +36,25 @@ appId: ${APP}
     visible:
       id: "file.hunk.accept"
     timeout: 30000
-- tapOn:
-    id: "file.hunk.accept"
-    index: 0
-    retryTapIfNoChange: true
-# The phone shows the hunk as reviewed before it leaves: its button now takes the mark away.
+# Accept, tapped again if the tap is lost (on Android a tap can land as the hunks are drawn again).
+# The phone shows the hunk as reviewed at once: its button then takes the mark away, so a tap
+# that did land is never repeated.
+- repeat:
+    times: 3
+    while:
+      notVisible:
+        id: "file\\.hunk\\.accept"
+        text: "Unmark reviewed hunk 1"
+    commands:
+      - tapOn:
+          id: "file.hunk.accept"
+          index: 0
+      - extendedWaitUntil:
+          visible:
+            id: "file\\.hunk\\.accept"
+            text: "Unmark reviewed hunk 1"
+          timeout: 6000
+          optional: true
 - extendedWaitUntil:
     visible:
       id: "file\\.hunk\\.accept"
