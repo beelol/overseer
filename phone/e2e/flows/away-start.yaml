@@ -1,0 +1,17 @@
+# An agent's conversation is open while it writes; then the app leaves the screen.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- runFlow:
+    file: open-agent.yaml
+- extendedWaitUntil:
+    visible:
+      id: "agent.list"
+    timeout: 30000
+- takeScreenshot: stream-before-leaving
+- pressKey: home

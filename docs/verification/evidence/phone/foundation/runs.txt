@@ -1,0 +1,67 @@
+Overseer phone app: foundation. The four runs, 2026-09-26.
+All commands are run in phone/. The Android ones need ANDROID_HOME and JDK 17 (see phone/README.md).
+
+Run                Command                   Device                                   Result
+iOS debug          npm run ios               iPhone 17 Pro, iOS 26.5 simulator        built, installed, opened; JavaScript from Metro
+iOS release        npm run ios:release       iPhone 17 Pro, iOS 26.5 simulator        built, installed, opened; Metro not running
+Android debug      npm run android           Overseer_API_35 emulator, Android 15     built, installed, opened; JavaScript from Metro
+Android release    npm run android:release   Overseer_API_35 emulator, Android 15     built, installed, opened; Metro not running
+
+Build times (the native build only, as the run scripts print it)
+
+                   from clean     repeated, nothing changed
+iOS debug          82.5 s         28.1 s
+iOS release        176.2 s        29.1 s
+Android debug      89.0 s         not measured
+Android release    79.8 s         not measured
+
+"From clean" for iOS: an empty ios/build. For Android: a regenerated android/ and the
+libraries' build output removed from node_modules, with Gradle's own caches in ~/.gradle warm.
+The very first Android debug build, which also downloaded Gradle 9.3.1 and every dependency
+and ran beside an iOS build, took 4 min 13 s (through `expo run:android`, before the run
+scripts existed). Builds ran one at a time except where said.
+
+The theme follows the system setting without a restart
+Each run: light, then dark, then light again, set from the Mac
+(xcrun simctl ui <device> appearance dark|light; adb shell cmd uimode night yes|no),
+a screenshot three seconds after each change, and the app's process id read at each step.
+The same process id at all three steps means the app was not restarted.
+
+Run                Process id: light, dark, light again    Screenshots
+iOS debug          67491, 67491, 67491                     ios-debug-light.png, ios-debug-dark.png, ios-debug-light-again.png
+iOS release        99966, 99966, 99966                     ios-release-light.png, ios-release-dark.png, ios-release-light-again.png
+Android debug      5341, 5341, 5341                        android-debug-light.png, android-debug-dark.png, android-debug-light-again.png
+Android release    5502, 5502, 5502                        android-release-light.png, android-release-dark.png, android-release-light-again.png
+
+Landscape
+Android release, rotated on the emulator (same process id 5502): android-release-landscape-light.png.
+iOS: the built app declares all four orientations (UISupportedInterfaceOrientations in its
+Info.plist). The simulator was not rotated: simctl has no command for it.
+
+What the release builds are
+iOS      Release configuration; main.jsbundle inside the app is Hermes bytecode; no signing.
+Android  release variant; not debuggable; assets/index.android.bundle inside the APK;
+         signed with the Android debug certificate (CN=Android Debug).
+
+What the first screen shows
+Theme               Overseer Light or Overseer Dark, as the system is set (all four runs)
+Host addresses      127.0.0.1 on the iOS simulator, 10.0.2.2 on the Android emulator
+Addresses to try    127.0.0.1:47810 and 10.0.2.2:47810
+Engine              hermes
+New Architecture    on
+
+Capabilities on the Android emulator (the whole list: android-release-light-scrolled.png)
+  supported         secretStore, keyValue, random, launch, appearance, reduceMotion, appState, network
+  unsupported       discovery, push, deviceUnlock, camera, haptics, each with its reason
+
+Capabilities on the iOS simulator (the part of the list the screenshots reach)
+  supported         secretStore, keyValue, random, push, deviceUnlock
+  unsupported       discovery, camera, haptics, each with its reason
+  not in a screenshot: launch, appearance, reduceMotion, appState, network. They are below the
+  fold and simctl cannot scroll. Their support checks have no condition in the code.
+
+Other files here
+versions.txt        every version used
+check.log           the output of `npm run check`
+run-*.log           what each run command printed, with the time of each line
+                    (the two iOS logs are of the repeated builds)

@@ -1,0 +1,14 @@
+# What needs the owner, shown by the app itself while it is open. A tap opens that agent.
+appId: ${APP}
+---
+- extendedWaitUntil:
+    visible:
+      id: "notification.banner"
+    timeout: 60000
+- takeScreenshot: banner
+- tapOn:
+    id: "notification.banner"
+- extendedWaitUntil:
+    visible:
+      id: "agent.permission.allow"
+    timeout: 30000

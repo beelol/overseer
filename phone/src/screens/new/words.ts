@@ -1,0 +1,53 @@
+/**
+ * The words of the New agent form. Those VS Code also says are copied from its New Task form
+ * and its composer (extension/media/new-task.js, composer.js, prompt-tools.js,
+ * extension/src/task-launcher.js); the model does not hold them yet.
+ */
+export const WORDS = {
+  title: 'New agent',
+  task: 'Task',
+  taskHint: 'Describe the task',
+  options: 'Options',
+  repository: 'Repository',
+  agent: 'Agent',
+  account: 'Account',
+  model: 'Model',
+  effort: 'Effort',
+  permissions: 'Permissions',
+  workspace: 'Workspace',
+  standard: 'Default',
+  none: 'None yet',
+  otherModel: 'Other model',
+  use: 'Use',
+  worktree: 'New worktree',
+  worktreeDetail: 'Isolated branch and worktree; your checkout is not touched',
+  current: 'Current checkout',
+  currentDetail: 'Works directly in your checkout',
+  signedIn: 'signed in',
+  notSignedIn: 'not signed in',
+  signIn: 'Sign in',
+  signInDetail: (account: string): string => `${account} is not signed in.`,
+  start: 'Start',
+  starting: 'Starting…',
+  queued: (agents: number): string => (agents === 1 ? 'Queued. It starts when the Mac is back.' : `${agents} agents queued. They start when the Mac is back.`),
+  notStarted: (why: string): string => `Not started. ${why}`,
+  noRepositories: 'A repository appears here once an agent has worked in it on the Mac.',
+  noAgents: 'No agent is installed on the Mac.',
+  noAccounts: 'No account for this agent yet. Add one from Accounts.',
+  missing: {
+    repository: 'Choose a repository.',
+    agent: 'Choose an agent.',
+    account: 'Choose an account.',
+    signedIn: 'Choose a signed-in account.',
+    task: 'Describe the task.',
+  },
+  /** How VS Code names the permission modes (prompt-tools.js). A mode it does not name is shown as it is. */
+  mode: {
+    manual: 'Ask first',
+    acceptEdits: 'Accept edits',
+    plan: 'Plan only',
+    auto: 'Auto',
+    'workspace-write': 'Can edit',
+    'read-only': 'Read only',
+  } as Readonly<Record<string, string>>,
+} as const;

@@ -507,7 +507,7 @@ async function clean(o) {
   for (const i of targets) {
     if (readMeta(i)) await down({ ...o, '--keep-clients': false, '--quiet': true }, i);
     fs.rmSync(i.dir, { recursive: true, force: true });
-    console.log(`Dev daemon ${i.id}: stopped and removed (${i.dir}).`);
+    if (!QUIET) console.log(`Dev daemon ${i.id}: stopped and removed (${i.dir}).`);
   }
   if (all) { try { fs.rmdirSync(DEV_ROOT); } catch {} }
   if (all && !targets.length) console.log(`no dev daemons under ${DEV_ROOT}`);

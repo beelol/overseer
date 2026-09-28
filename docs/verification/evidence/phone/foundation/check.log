@@ -1,0 +1,48 @@
+
+> overseer-phone@0.1.0 check
+> npm run tokens:check && npm run lint && npm run typecheck && npm test && npm run check:platform-rule
+
+
+> overseer-phone@0.1.0 tokens:check
+> node scripts/gen-tokens.mjs --check
+
+tokens: src/theme/tokens.generated.ts matches its source
+
+> overseer-phone@0.1.0 lint
+> eslint . --max-warnings 0
+
+
+> overseer-phone@0.1.0 typecheck
+> tsc --noEmit
+
+
+> overseer-phone@0.1.0 test
+> jest
+
+PASS scripts/__tests__/gen-tokens.test.ts
+PASS src/screens/__tests__/HomeScreen.test.tsx
+PASS src/platform/__tests__/fakes.test.tsx
+PASS src/theme/__tests__/useTheme.test.tsx
+PASS src/platform/__tests__/native.test.ts
+PASS src/platform/__tests__/base.test.ts
+
+Test Suites: 6 passed, 6 total
+Tests:       119 passed, 119 total
+Snapshots:   0 total
+Time:        3.952 s
+Ran all test suites.
+
+> overseer-phone@0.1.0 check:platform-rule
+> node scripts/check-platform-rule.mjs
+
+  caught  src/__platform_rule_probe__/import-platform.ts  (no-restricted-imports: 'Platform' import from 'react-native' is restricted)
+  caught  src/__platform_rule_probe__/platform-os.ts  (no-restricted-syntax: Platform.OS)
+  caught  src/__platform_rule_probe__/platform-select.ts  (no-restricted-syntax: Platform.select)
+  caught  src/__platform_rule_probe__/import-ios-file.ts  (no-restricted-imports: A platform's file is chosen by the bundler)
+  caught  src/__platform_rule_probe__/import-android-file.ts  (no-restricted-imports: A platform's file is chosen by the bundler)
+  caught  src/__platform_rule_probe__/compare-platform-name.ts  (no-restricted-syntax: A comparison with a platform's name)
+  the same 6 files in a package beside the app were caught
+  the same 6 files inside src/platform/ were allowed
+  without the violations the lint passes
+platform rule: ok. 6 seeded violations failed the lint; the clean tree passes.
+exit code: 0

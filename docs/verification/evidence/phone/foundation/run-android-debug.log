@@ -1,0 +1,17 @@
+start 20:02:10
+20:02:10 > overseer-phone@0.1.0 android
+20:02:10 > node scripts/run-android.mjs
+20:02:10 Emulator: Overseer_API_35 (emulator-5554, arm64-v8a)
+20:03:39 Build output: android/build/gradle-debug.log
+20:03:39 gradle :app:assembleDebug: 89.0 s
+20:03:39 Performing Streamed Install
+20:03:39 Success
+20:03:39 Starting Metro on port 8081
+20:03:40 Starting project at <repo>/phone
+20:03:40 Starting Metro Bundler
+20:03:41 Waiting on http://localhost:8081
+20:03:41 Logs for your project will appear below.
+20:03:41 com.beelol.overseer.phone (debug) is open on Overseer_API_35
+20:03:41 Metro runs in the foreground. Stop it with Ctrl-C.
+20:03:43 Android Bundled 327ms node_modules/expo-router/entry.js (1090 modules)
+end 20:04:21

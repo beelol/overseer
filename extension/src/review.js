@@ -33,6 +33,9 @@ class Review {
     for (const [runId, state] of Object.entries(context.workspaceState.get('overseer.follow', {}))) {
       if (state === 'following' || state === 'paused') { this.follow.set(runId, 'paused'); this.followNotes.set(runId, 'Follow was on before VS Code reloaded. It stays paused until you resume it.'); }
     }
+    // Reviewed marks live in the daemon (Gate N), so every surface shows the same marks.
+    this.marks = new Map(); // runId -> Set of hunk keys
+    this.marksLoading = new Map(); // runId -> Promise
     this.observed = new Map(); // abs path -> last observed text (bounded)
     this.userSaves = new Map(); // abs path -> ms of last user save
     this.lastReveal = new Map(); // runId -> last reveal message
@@ -47,7 +50,7 @@ class Review {
       pauseFollow: (runId, reason) => this.pauseFollow(runId, reason),
       followReady: runId => { const last = this.lastReveal.get(runId); if (last && this.follow.get(runId) === 'following') this.manager.reveal(runId, last); },
       restore: state => this.restore(state),
-      reviewedKeys: runId => Object.keys(this.reviewed()[runId] || {}),
+      reviewedKeys: runId => this.reviewedKeys(runId),
       reviewHunk: (session, message) => this.reviewHunk(session, message),
       closed: runId => this.onClosed?.(runId),
       setScope: (runId, scope) => this.setScope(runId, scope),
@@ -122,37 +125,68 @@ class Review {
 
   // ------------------------------------------------------------ reviewed hunks (AC-42)
 
-  reviewed() { return this.context.workspaceState.get('overseer.reviewedHunks', {}); }
+  /** The keys marked reviewed for a run, from the daemon. Loads them the first time they are asked for. */
+  reviewedKeys(runId) {
+    if (!runId) return [];
+    this.loadMarks(runId);
+    return [...(this.marks.get(runId) || [])];
+  }
+
+  loadMarks(runId) {
+    if (this.marksLoading.has(runId)) return this.marksLoading.get(runId);
+    const loading = (async () => {
+      // Marks VS Code kept itself, before the daemon kept them, are handed over once.
+      const old = this.context.workspaceState.get('overseer.reviewedHunks', {});
+      if (old[runId] && Object.keys(old[runId]).length) {
+        await this.client.request('review.import', { run_id: runId, marks: Object.entries(old[runId]).map(([key, v]) => ({ key, path: v.path, at: v.at })) });
+        const rest = { ...old }; delete rest[runId];
+        await this.context.workspaceState.update('overseer.reviewedHunks', rest);
+      }
+      const got = await this.client.request('review.marks', { run_id: runId });
+      this.marks.set(runId, new Set(got.keys));
+      this.showMarks(runId);
+    })().catch(error => { this.marksLoading.delete(runId); this.log('reviewed marks: ' + error.message); });
+    this.marksLoading.set(runId, loading);
+    return loading;
+  }
+
+  showMarks(runId) {
+    const found = this.manager.panelFor(runId);
+    if (found) this.manager.postOverseer(found.session);
+  }
 
   /**
    * Accept = mark a hunk reviewed (no Git staging). Keys hash the hunk's base and working text,
-   * so a hunk that changes again is simply no longer reviewed. The hunk is re-checked against
-   * the current text first: if the agent changed it meanwhile, that is a conflict.
+   * so a hunk that changes again is simply no longer reviewed. The daemon checks the hunk against
+   * the file first: if the agent changed it meanwhile, that is a conflict. An unsaved edit in
+   * VS Code is newer than the file, so it is checked here.
    */
   async reviewHunk(session, msg) {
     const runId = session.overseer?.runId;
     if (!runId || !/^[a-f0-9]{16}$/.test(String(msg.key)) || typeof msg.path !== 'string') throw new Error('Invalid hunk.');
-    const all = this.reviewed();
-    const run = { ...(all[runId] || {}) };
-    if (!msg.reviewed) { delete run[msg.key]; }
-    else {
-      const uri = vscode.Uri.joinPath(session.repo.rootUri, ...msg.path.split('/'));
-      if (path.relative(session.repo.rootUri.fsPath, uri.fsPath).startsWith('..')) throw new Error('File is outside this review.');
-      const open = vscode.workspace.textDocuments.find(d => d.uri.toString() === uri.toString());
-      // A clean document may lag an agent's write by a moment; disk is the truth unless it has unsaved edits.
-      const text = open?.isDirty ? open.getText() : await fs.readFile(uri.fsPath, 'utf8').catch(() => '');
-      const lines = text.split(/\r?\n/);
-      const modified = Array.isArray(msg.modified) ? msg.modified : [];
-      const start = Number(msg.modifiedStart) || 0, end = Number(msg.modifiedEnd) || 0;
+    await this.loadMarks(runId);
+    const keys = this.marks.get(runId) || new Set();
+    this.marks.set(runId, keys);
+    if (!msg.reviewed) {
+      await this.client.request('review.unaccept', { run_id: runId, key: msg.key });
+      keys.delete(msg.key);
+      return;
+    }
+    const uri = vscode.Uri.joinPath(session.repo.rootUri, ...msg.path.split('/'));
+    if (path.relative(session.repo.rootUri.fsPath, uri.fsPath).startsWith('..')) throw new Error('File is outside this review.');
+    const modified = Array.isArray(msg.modified) ? msg.modified : [];
+    const start = Number(msg.modifiedStart) || 0, end = Number(msg.modifiedEnd) || 0;
+    const open = vscode.workspace.textDocuments.find(d => d.uri.toString() === uri.toString());
+    if (open?.isDirty) {
+      const lines = open.getText().split(/\r?\n/);
       const same = end ? lines.slice(start - 1, end).join('\n') === modified.join('\n') : (start === 0 || lines[start - 1] === msg.anchor);
       if (!same) throw new Error(`Not marked reviewed: ${msg.path} changed while you were accepting this hunk (conflict). Review the current content.`);
-      run[msg.key] = { path: msg.path, at: Date.now() };
+      // The unsaved text is what was reviewed; the file on disk may differ until it is saved.
+      await this.client.request('review.accept', { run_id: runId, path: msg.path, key: msg.key, modified_start: 0, modified_lines: [] });
+    } else {
+      await this.client.request('review.accept', { run_id: runId, path: msg.path, key: msg.key, modified_start: start, modified_lines: end ? modified : [], anchor: end ? undefined : msg.anchor });
     }
-    const next = { ...all, [runId]: run };
-    // Bound the stored state: the newest 2,000 hunks per run and 200 runs.
-    for (const id of Object.keys(next)) { const entries = Object.entries(next[id]).sort((a, b) => b[1].at - a[1].at).slice(0, 2000); next[id] = Object.fromEntries(entries); }
-    const runs = Object.keys(next).slice(-200);
-    await this.context.workspaceState.update('overseer.reviewedHunks', Object.fromEntries(runs.map(id => [id, next[id]])));
+    keys.add(msg.key);
   }
 
   /** Staged (HEAD → index, read-only), unstaged (index → working tree) or untracked files. */
@@ -271,7 +305,17 @@ class Review {
   provideGitContent(uri) {
     const q = JSON.parse(uri.query || '{}');
     if (q.empty) return '';
-    return gitShow(q.root, `${q.ref}:${q.path}`).then(b => b.toString('utf8'), () => '');
+    return this.baseText(q.root, q.ref, q.path);
+  }
+
+  /** A file at a comparison, from the daemon (the same method a phone uses); Git directly when the daemon does not know the folder. */
+  async baseText(root, ref, rel) {
+    const ws = (this.model.state?.workspaces || []).find(w => w.path === root && !w.removed_ms);
+    if (ws) {
+      const file = await this.client.request('workspace.file', { workspace_id: ws.id, path: rel, base: ref }).catch(() => undefined);
+      if (file) return file.before.kind === 'text' ? file.before.text : '';
+    }
+    return gitShow(root, `${ref}:${rel}`).then(b => b.toString('utf8'), () => '');
   }
 
   async restore(state) {
@@ -332,6 +376,14 @@ class Review {
   }
 
   async onEvent(event) {
+    // A mark made on another surface (a phone, another window) shows here at once.
+    if (event.kind === 'review_mark' && event.run_id && this.marks.has(event.run_id)) {
+      const keys = this.marks.get(event.run_id);
+      if (event.payload.reviewed) keys.add(event.payload.key); else keys.delete(event.payload.key);
+      this.showMarks(event.run_id);
+      return;
+    }
+    if (event.kind === 'review_reject' && event.run_id) { this.manager.panelFor(event.run_id)?.session.invalidate(true); this.showMarks(event.run_id); return; }
     if (event.kind !== 'file_activity' || !event.run_id) return;
     const run = this.model.run(event.run_id) || (await this.model.refresh(), this.model.run(event.run_id));
     if (!run) return;
@@ -347,7 +399,7 @@ class Review {
       if (before === undefined) {
         // Not observed yet: compare with the selected comparison base instead of guessing line 1.
         const base = (await this.currentComparison(root.id).catch(() => undefined))?.base;
-        if (base) before = await gitShow(ws.path, `${base}:${rel}`).then(b => b.toString('utf8'), () => '');
+        if (base) before = await this.baseText(ws.path, base, rel);
       }
       let text;
       for (const delay of [0, 250, 750, 1500]) {

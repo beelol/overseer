@@ -167,6 +167,9 @@ const G = 2 ** 30;
     const moved = s.ctl('task.create', { repo, harness: 'codex', title: 'Rename the helpers', prompt: 'write moved.txt done by the local model; say done' });
     let successor; for (let i = 0; i < 100 && !successor; i++) { await delay(300); successor = s.ctl('continuity.handoffs').handoffs.find(h => h.predecessor === moved.run.id)?.successor; }
     await waitStatus(successor, /completed|failed/);
+    // The handed-off agent folds under its successor in the side bar; until it has, two rows carry
+    // the title and a click on the lower one opens the predecessor.
+    for (let i = 0; i < 75 && (await s.agentRows()).filter(r => r.label === 'Rename the helpers').length > 1; i++) await delay(200);
     await s.selectAgent('Rename the helpers');
     dash = await s.editorView(`document.getElementById('title')?.textContent === 'Rename the helpers'`);
     const opened = await dash.waitFor(`[...document.querySelectorAll('#conv .cont-note')].map(n => n.textContent)`, 15000);

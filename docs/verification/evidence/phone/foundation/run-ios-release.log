@@ -1,0 +1,9 @@
+start 20:07:59
+20:07:59 > overseer-phone@0.1.0 ios:release
+20:07:59 > node scripts/run-ios.mjs --release
+20:07:59 Simulator: iPhone 17 Pro, iOS 26.5 (E6105FAE-0651-4D7B-801A-40FF49980468)
+20:08:28 Build output: ios/build/xcodebuild-Release.log
+20:08:28 xcodebuild Release: 29.1 s
+20:08:29 com.beelol.overseer.phone: 99966
+20:08:29 com.beelol.overseer.phone (Release) is open on iPhone 17 Pro
+end 20:08:29

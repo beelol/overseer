@@ -3,6 +3,8 @@
 //! terminal buffer (the same `ui::draw` the binary uses).
 #![allow(dead_code)]
 
+pub mod qr_read;
+
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 use overseer_tui::app::App;
 use overseer_tui::client::{Client, Msg, Requests};
@@ -258,7 +260,8 @@ pub fn buffer_text(buf: &Buffer) -> String {
 /// docs/verification/evidence/tui/ (evidence for the pull request).
 pub fn snapshot(buf: &Buffer, name: &str) {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().join("docs/verification/evidence/tui");
-    std::fs::create_dir_all(&dir).unwrap();
+    // A name may hold a folder ("phone-access/pairing").
+    std::fs::create_dir_all(dir.join(name).parent().unwrap()).unwrap();
     std::fs::write(dir.join(format!("{name}.txt")), buffer_text(buf)).unwrap();
     std::fs::write(dir.join(format!("{name}.svg")), overseer_tui_svg(buf, false)).unwrap();
     // The same screen in a light terminal (terminal default colors flip; accents stay).
@@ -295,16 +298,49 @@ fn overseer_tui_svg(buf: &Buffer, light: bool) -> String {
             (Color::Indexed(141), true) => "#7c5ce0".into(),
             (Color::Indexed(214), false) => "#f2a83b".into(),
             (Color::Indexed(214), true) => "#b86a00".into(),
+            // The fixed black and white of the 256-colour cube (a drawn QR code).
+            (Color::Indexed(16), _) => "#000000".into(),
+            (Color::Indexed(231), _) => "#ffffff".into(),
             (Color::Rgb(r, g, b), _) => format!("#{r:02x}{g:02x}{b:02x}"),
             _ => default.to_string(),
         }
     };
     let esc = |s: &str| s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
     let mut out = format!("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\"><rect width=\"100%\" height=\"100%\" rx=\"10\" fill=\"{bg}\"/><g font-family=\"ui-monospace, SFMono-Regular, Menlo, monospace\" font-size=\"14\">");
+    // Cells with a background of their own (a drawn QR code) are rectangles, so the picture is
+    // exact whatever font shows the rest: the paper, then each dark half of a block character.
+    for y in 0..buf.area.height {
+        for x in 0..buf.area.width {
+            let cell = &buf[(x, y)];
+            if cell.bg == Color::Reset {
+                continue;
+            }
+            let (px, py) = (12.0 + x as f32 * cw, 12.0 + y as f32 * ch);
+            out.push_str(&format!("<rect x=\"{px:.1}\" y=\"{py:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"{}\"/>", cw + 0.2, ch + 0.2, color(cell.bg, bg)));
+            let (top, bottom) = match cell.symbol() {
+                "█" => (true, true),
+                "▀" => (true, false),
+                "▄" => (false, true),
+                _ => (false, false),
+            };
+            let ink = color(cell.fg, fg_default);
+            if top {
+                out.push_str(&format!("<rect x=\"{px:.1}\" y=\"{py:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"{ink}\"/>", cw + 0.2, ch / 2.0 + 0.2));
+            }
+            if bottom {
+                out.push_str(&format!("<rect x=\"{px:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"{ink}\"/>", py + ch / 2.0, cw + 0.2, ch / 2.0 + 0.2));
+            }
+        }
+    }
     for y in 0..buf.area.height {
         let mut x = 0;
         while x < buf.area.width {
             let cell = &buf[(x, y)];
+            // Drawn as rectangles above.
+            if cell.bg != Color::Reset && matches!(cell.symbol(), "█" | "▀" | "▄" | " ") {
+                x += 1;
+                continue;
+            }
             let fg = color(cell.fg, fg_default);
             let bold = cell.modifier.contains(Modifier::BOLD);
             let italic = cell.modifier.contains(Modifier::ITALIC);
@@ -314,7 +350,7 @@ fn overseer_tui_svg(buf: &Buffer, light: bool) -> String {
             let mut cells = 0u16;
             while x < buf.area.width {
                 let c = &buf[(x, y)];
-                if color(c.fg, fg_default) != fg || c.modifier.contains(Modifier::BOLD) != bold || c.modifier.contains(Modifier::ITALIC) != italic {
+                if color(c.fg, fg_default) != fg || c.modifier.contains(Modifier::BOLD) != bold || c.modifier.contains(Modifier::ITALIC) != italic || (c.bg != Color::Reset) != (cell.bg != Color::Reset) {
                     break;
                 }
                 text.push_str(c.symbol());

@@ -1,0 +1,16 @@
+# Full control again: the controls are back by themselves, on the conversation the phone shows
+# (the watch flow ends there) and on the agents list.
+appId: ${APP}
+---
+- extendedWaitUntil:
+    visible:
+      id: "agent.composer.text"
+    timeout: 20000
+- assertNotVisible:
+    id: "watch.line"
+- tapOn:
+    id: "agent.back"
+- extendedWaitUntil:
+    visible:
+      id: "agents.new"
+    timeout: 45000

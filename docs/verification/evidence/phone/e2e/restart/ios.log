@@ -1,0 +1,19 @@
+21:58:08 The phone's scenarios on ios. Commit ad949b93.
+21:58:09 scenario pair (AC-117, AC-118, AC-141): a code typed on the phone, confirmed on the Mac, and the agents list
+21:58:10 flow opened
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow opened
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: pair.code is not visible... COMPLETED
+Assert that id: pair.submit is not visible... COMPLETED
+21:59:20 ok   pair
+21:59:20 scenario restart (AC-141): the phone restarted: the app opens on the agents list with no prompt and connects by itself
+21:59:34 flow opened
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow opened
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: pair.code is not visible... COMPLETED
+Assert that id: pair.submit is not visible... COMPLETED
+22:02:10 ok   restart

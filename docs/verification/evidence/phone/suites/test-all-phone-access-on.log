@@ -1,0 +1,71 @@
+$ OVERSEER_TEST_PHONE_ACCESS=on node scripts/test-all --jobs=3   (2026-09-28 03:29:01, commit b8587cc7, load 2.31 2.79 3.63 )
+▶ Rust (cargo test --workspace) … ok (781s) 337 passed, 0 failed
+▶ Unit (test/unit) … ok (0s) 6 of 6 passed
+▶ Check (extension sources) … ok (0s)
+▶ Links (README and ledger) … ok (0s) 745 links checked in 218 files; 0 broken
+▶ Build the VSIX … ok (17s)
+(UI scenarios, 3 at a time)
+▶ UI audio … ok (35s)
+▶ UI arrangement … ok (38s)
+▶ UI accounts … ok (62s)
+▶ UI brand … ok (27s)
+▶ UI chat … ok (38s)
+▶ UI center … ok (48s)
+▶ UI audit … ok (106s)
+▶ UI composer … ok (51s)
+▶ UI conversation … ok (30s)
+▶ UI continuity … FAILED (75s)
+    (node:38056) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.
+    [2026-09-28T10:44:34.240Z] FAIL the successor is the task's agent; its chat says where it continues from ["The connection was lost; the agent keeps trying to reconnect. · 1 attempts","The work continu
+    [2026-09-28T10:44:41.042Z] PASS a waiting agent shows one quiet card: what is kept, the next check, Use a local model now, Retry now and Stop; its status is waiting, not failed {"title":"Waiting for a
+    SCENARIO FAILED /private/tmp/ovs-ui-AVJoEf
+▶ UI continuity-settings … ok (55s)
+▶ UI dragout … ok (20s)
+▶ UI endings … ok (37s)
+▶ UI dashboard … ok (52s)
+▶ UI first-click … ok (37s)
+▶ UI follow … ok (36s)
+▶ UI grid … ok (39s)
+▶ UI followups … ok (105s)
+▶ UI grid-track … ok (30s)
+▶ UI gallery … ok (128s)
+▶ UI grid-drag … ok (68s)
+▶ UI hunks … ok (43s)
+▶ UI home … ok (75s)
+▶ UI inventory … ok (53s)
+▶ UI keyboard … ok (33s)
+▶ UI look … ok (81s)
+▶ UI main … FAILED (93s)
+    (node:16460) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.
+    [2026-09-28T10:51:18.653Z] FAIL follow navigated across files ["Following: a.txt:20 (agent tool input (tool-input))","Following: a.txt:60 (agent tool input (tool-input))","Following: a.txt:150 (agent 
+    SCENARIO FAILED /private/tmp/ovs-ui-O5yA2Q
+▶ UI modes … ok (56s)
+▶ UI narrow-chat … ok (44s)
+▶ UI history … ok (259s)
+▶ UI notify … ok (22s)
+▶ UI parity … ok (31s)
+▶ UI phone-access … FAILED (28s)
+    (node:18907) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.
+    [2026-09-28T10:52:54.026Z] FAIL 1. phone access is off in the daemon and nothing listens on its port {"enabled":true,"port":52119,"configured":52012,"refused":true}
+    [2026-09-28T10:53:14.312Z] ERROR Error: Timed out waiting for quick input Phone access: off (last: false)
+    [2026-09-28T10:53:14.385Z] screenshot docs/verification/evidence/ui/phone-access/02-error.png
+    SCENARIO FAILED /private/tmp/ovs-ui-b5XAtP
+▶ UI place … ok (59s)
+▶ UI pr … ok (68s)
+▶ UI restore … ok (80s)
+▶ UI review-files … ok (33s)
+▶ UI review-width … ok (28s)
+▶ UI review … ok (81s)
+▶ UI scopes … ok (44s)
+▶ UI sidebar … ok (37s)
+▶ UI signin … ok (42s)
+▶ UI talk … ok (33s)
+▶ UI trust … ok (13s)
+▶ UI usage … ok (29s)
+▶ UI theme … ok (79s)
+▶ UI windows … ok (52s)
+▶ UI sidebar-search … ok (236s)
+(not run: background, claude-live, codex-approval, codex-follow, codex-live, conversation-live, live-gatej, merge, offline-session, perf, talk-live; LIVE ones need --live, perf needs --perf)
+
+50 of 53 passed; failed: UI continuity, UI main, UI phone-access
+exit: 1 (03:59:06, load 10.14 20.44 15.42 )

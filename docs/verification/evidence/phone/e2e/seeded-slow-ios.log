@@ -1,0 +1,31 @@
+22:02:10 The phone's scenarios on ios. Commit ad949b93.
+22:02:10 scenario pair (AC-117, AC-118, AC-141): a code typed on the phone, confirmed on the Mac, and the agents list
+22:02:10 flow opened
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow opened
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: pair.code is not visible... COMPLETED
+Assert that id: pair.submit is not visible... COMPLETED
+22:02:55 ok   pair
+22:02:56 seeded: every start is held for 400 ms; the budgets must notice
+Measuring on ios (E6105FAE-0651-4D7B-801A-40FF49980468), 3 cold starts, 2026-09-27T22:02:57.727Z
+With the door:
+  launch 1: first screen 1197.4 ms, interactive 1202.8 ms, door shown 1196.9 ms, opening 629.6 ms, dropped 0
+  launch 2: first screen 1043.7 ms, interactive 1048.9 ms, door shown 1043.2 ms, opening 630.9 ms, dropped 0
+  launch 3: first screen 1156.8 ms, interactive 1163.7 ms, door shown 1156.2 ms, opening 625.3 ms, dropped 0
+With the door turned off by the test setting:
+  launch 1: first screen 1219.4 ms, interactive 1223.3 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 2: first screen 1234.4 ms, interactive 1238.1 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 3: first screen 1000.2 ms, interactive 1003.3 ms, door shown NaN ms, opening NaN ms, dropped n/a
+
+ok   every launch reaches the agents list: 3 (limit 3)
+ok   launches that showed pairing or any other question, of 6: 0 (limit 0)
+FAIL agents list interactive, p95 (ms): 1202.8 (limit 1000)
+ok   the door is on screen with the first screen or before it, worst launch (ms after the first screen): -0.4 (limit 17) — 3 of 3 launches marked both
+ok   the door opens in 600 ms within 60 ms, shortest (ms): 625.3 (limit 540)
+ok   the door opens in 600 ms within 60 ms, longest (ms): 630.9 (limit 660)
+ok   frames dropped while the door opens, worst launch (%): 0 (limit 1) — 0 of 33 frames
+ok   the door makes the first screen no later, median (ms): 1163.7 (limit 1365.6) — without the door 1223.3 ms
+1 budget missed
+22:03:50 FAIL budgets

@@ -1,0 +1,68 @@
+$ OVERSEER_TEST_PHONE_ACCESS=on cargo test --workspace   (2026-09-28 06:58:50, commit 295f97f2, main merged in, load 2.48 3.66 3.57 )
+     Running unittests src/lib.rs (target/debug/deps/overseer_listener-948c3eacb8ff602d)
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.49s
+     Running unittests src/main.rs (target/debug/deps/overseer_listener-c2f24908d2d5292f)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/listener.rs (target/debug/deps/listener-76f7567a0ac1a482)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.68s
+     Running tests/offline.rs (target/debug/deps/offline-6de852fdefdeb329)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.01s
+     Running tests/speech_gate.rs (target/debug/deps/speech_gate-6797aeeb62d24f99)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.38s
+     Running unittests src/lib.rs (target/debug/deps/overseer_tui-dc285366e8e6411d)
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.21s
+     Running unittests src/main.rs (target/debug/deps/overseer_tui-04089d71cb20def5)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/audio.rs (target/debug/deps/audio-337885f15ed3fc35)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.63s
+     Running tests/control.rs (target/debug/deps/control-c0e81d72673f18c7)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.25s
+     Running tests/interact.rs (target/debug/deps/interact-87683c281d822134)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.76s
+     Running tests/live.rs (target/debug/deps/live-ff673f2df7d7c016)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.81s
+     Running tests/live_harness.rs (target/debug/deps/live_harness-0631650a4950c71b)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/look.rs (target/debug/deps/look-c83ccc760f75aa84)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.72s
+     Running tests/overseer.rs (target/debug/deps/overseer-6a9e6aa31c8cf737)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.66s
+     Running tests/phone.rs (target/debug/deps/phone-9fcda09cef05bc82)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.89s
+     Running tests/qr.rs (target/debug/deps/qr-cd4542c2c94bf9d1)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.20s
+     Running unittests src/main.rs (target/debug/deps/overseerd-0ebf943a4a92c544)
+test result: ok. 90 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.66s
+     Running tests/audio.rs (target/debug/deps/audio-d0bbb9c7dedfd470)
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.22s
+     Running tests/continuity.rs (target/debug/deps/continuity-ae4adbc46d5dddf7)
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.75s
+     Running tests/dev_instance.rs (target/debug/deps/dev_instance-2096eb296e94555e)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.21s
+     Running tests/downloads.rs (target/debug/deps/downloads-4c61dfef2df798d3)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.70s
+     Running tests/gateway.rs (target/debug/deps/gateway-6af709a0bd05f187)
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 102.49s
+     Running tests/handoff.rs (target/debug/deps/handoff-e724d7fd130d5454)
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.09s
+     Running tests/local_runs.rs (target/debug/deps/local_runs-4330e63b5b8de5a3)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.94s
+     Running tests/netsim.rs (target/debug/deps/netsim-f489b9f8500ffd7f)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 71.22s
+     Running tests/ollama_install.rs (target/debug/deps/ollama_install-920ec58a47c8b95d)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.96s
+     Running tests/overseer.rs (target/debug/deps/overseer-fc3a67547558936a)
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 459.21s
+     Running tests/phone_methods.rs (target/debug/deps/phone_methods-f50ec67c605a6d1e)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.01s
+     Running tests/protocol.rs (target/debug/deps/protocol-c3589611ab39c358)
+test result: ok. 56 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.94s
+     Running tests/protocol_shapes.rs (target/debug/deps/protocol_shapes-e2ab33e451e6a913)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.41s
+     Running tests/voice.rs (target/debug/deps/voice-9dff3a1c4e743930)
+test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 218.57s
+     Running tests/voice_live.rs (target/debug/deps/voice_live-20c3325f3d3f5706)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+exit: 0 (07:16:39)

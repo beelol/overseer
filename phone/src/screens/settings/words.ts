@@ -1,0 +1,46 @@
+/** The words of Settings, as the brief gives them (phone/docs/app-spec.md). */
+export const SETTINGS = {
+  title: 'Settings',
+  notifications: {
+    title: 'Notifications',
+    all: 'Notifications',
+    permission: 'Permission requests',
+    question: 'Questions',
+    failure: 'Errors',
+    finished: 'Finished',
+    text: 'Show text in notifications',
+    offOnTheMac: 'Notifications are off on the Mac for every phone.',
+    refused: 'The Mac did not take this change.',
+    notAllowed: 'Notifications are not allowed for Overseer on this phone.',
+  },
+  phone: {
+    title: 'This phone',
+    name: 'Name',
+    access: 'Access',
+    full: 'Full control',
+    watch: 'Watch only',
+    changeOnTheMac: 'Change it on the Mac.',
+    paired: 'Paired since',
+  },
+  mac: {
+    title: 'The Mac',
+    name: 'Name',
+    contact: 'Last contact',
+    never: 'Not yet',
+    fingerprint: 'Fingerprint',
+  },
+  appearance: { title: 'Appearance', follows: 'Follows your phone.' },
+  safety: {
+    title: 'Safety',
+    lock: 'App lock',
+    unlock: 'Ask for unlock before changes that cannot be undone',
+    reason: 'Change the safety settings of Overseer',
+    failed: 'The unlock did not work. Nothing was changed.',
+  },
+  forget: {
+    action: 'Forget this Mac',
+    question: 'Forget this Mac?',
+    detail: 'You will pair again to use Overseer here.',
+    failed: 'This Mac could not be forgotten. Try again.',
+  },
+} as const;

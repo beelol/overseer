@@ -34,9 +34,14 @@ All license texts are in `media/vendor/licenses/`.
 | Syntax highlighting | `media/vendor/highlight.min.js` | `@highlightjs/cdn-assets` 11.12.0 (common languages) | BSD-3-Clause |
 | Claude, Claude Code, Anthropic, OpenCode and GitHub logos | `media/logos.js`, `media/logos/{claude,claudecode,anthropic,opencode,github}-*.svg` | Simple Icons 16.32.0 | CC0-1.0 |
 | OpenAI and Codex logos | `media/logos.js`, `media/logos/{openai,codex}-*.svg` | LobeHub Icons (`@lobehub/icons-static-svg` 1.95.1) | MIT |
+| QR code encoder (Pair a Phone) | `media/vendor/toqr.js` | `toqr` 0.1.1, https://github.com/kitten/toqr (`dist/toqr.js` of the npm package, unchanged; SHA-256 `13ebe3e35afaacfab3d205ef8b6d88169e04805e4fadc9f7a112dd83c541d049`) | MIT |
 
 **About the logos (AC-65):**
 - Each mark identifies the product it names: the harness or provider an agent or account uses, or GitHub for pull requests. This follows those brands' guidelines for referring to their products.
 - Overseer is not affiliated with or endorsed by Anthropic, OpenAI, OpenCode or GitHub, and the marks remain their owners' trademarks.
 - Overseer draws the marks in one color that follows the active theme. It does not recolor, distort or combine them with other marks.
 - Every provider in Overseer has a licensed logo, so no neutral stand-in was needed. Generic programs use the codicon `terminal`.
+
+**About the QR code (AC-117):** the pairing code is drawn on this Mac by `toqr`
+(Copyright (c) Phil Pluckthun, Copyright (c) 650 Industries, Inc.), with no network request. Its
+license is in `media/vendor/licenses/toqr-LICENSE.md`.
