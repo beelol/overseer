@@ -110,12 +110,18 @@ clause, then record them through `docs/verification/records.py`.
   tip of the latest phone-remote source, signed with the team distribution cert and a profile for
   `com.beelol.overseer.phone`. **Verify:** the build log shows the commit, bundle id and profile;
   the `.ipa` passes validation (Xcode Organizer or `xcrun altool`/notary validate).
-- [~] **TF-7 — Uploaded to TestFlight.** Uploaded 2026-09-27 (UPLOAD SUCCEEDED); build 0.1.0 (1)
-  **Processing** on Apple's side. **Verify (pending):** the build flips to "Ready to Test"; export
-  compliance shows no outstanding action (answered in the binary).
-- [~] **TF-8 — Installed on the iPhone (owner).** Internal group "Overseer Internal" created with the
-  owner as tester and auto-distribution on. **Verify (pending owner):** once processing finishes the
-  owner installs and launches from the TestFlight app on the iPhone (owner action).
+- [x] **TF-7 — Uploaded to TestFlight.** Uploaded 2026-09-27 (UPLOAD SUCCEEDED); build 0.1.0 (1)
+  processed to **Testing** and available to the internal group; export compliance answered in the
+  binary (Binary State: Validated, App Uses Non-Exempt Encryption: No).
+- [x] **TF-8 — Installed on the iPhone (owner).** Internal group "Overseer Internal", owner as
+  tester. **Owner confirmed install AND launch on the iPhone 2026-09-27** ("finally i got it" /
+  "its open on my phone"). Note: the first build took a while to surface to the tester (Apple's
+  internal-distribution propagation for a new app's first build); the App Store Connect side was
+  correct throughout.
+
+**GOAL COMPLETE (2026-09-27):** Overseer is on TestFlight and running on the owner's iPhone. TF-1
+through TF-8 done; TF-9 (Android) deferred with blocker. Built locally from phone tip `95b0946d`,
+real brand mark, only-Overseer in the Apple account (aquafriends untouched).
 - [ ] **TF-9 — Android (optional).** **Not started (blocker recorded 2026-09-27):** the TestFlight
   goal is iOS; the Android equivalent (Play Console internal testing) needs a **Google Play
   Developer account** (a separate one-time paid account the owner hasn't set up), which the goal put

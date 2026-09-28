@@ -23,7 +23,6 @@ Only the owner can do these (AC-160). Each is one step; the criterion it unblock
 - Start Voice Mode: paste the goal in [voice-mode-goal.md](docs/rfcs/voice-mode-goal.md) into `/goal`. It builds everything it can with a simulated voice first, on top of Gate S's pull request #14, then sends you one list of live checks [Gate R, AC-162 to AC-177].
 - Later, when no agent is running: turn Wi-Fi off and on while `node test/local/wifi-live.js` runs; it tells you when [AC-205].
 - Run *Overseer: Test Notification* in VS Code, allow notifications when macOS asks, and screenshot the banner and the helper (Overseer Notifier) in Finder [AC-179].
-- Install the Overseer TestFlight build on your iPhone: open the TestFlight app (sign in as the account holder), install **Overseer**, launch it, and say it ran [TF-8, [testflight-goal.md](docs/goals/testflight-goal.md)].
 - Later: a second Claude account [AC-53]; a Linux machine [AC-41]; the owner-confirmed session of the phone app when its agent finishes [AC-133].
 
 ## Acceptance criteria
