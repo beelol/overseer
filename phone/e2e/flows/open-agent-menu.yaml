@@ -14,3 +14,4 @@ appId: ${APP}
     timeout: 30000
 - tapOn:
     id: "agent.more"
+    retryTapIfNoChange: true

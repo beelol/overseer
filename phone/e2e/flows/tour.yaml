@@ -33,6 +33,7 @@ appId: ${APP}
 - takeScreenshot: conversation
 - tapOn:
     id: "agent.changes"
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
       id: "changes.comparison"
@@ -40,6 +41,7 @@ appId: ${APP}
 # Everything the agent changed since its task started, whatever its latest run did.
 - tapOn:
     id: "changes.comparison"
+    retryTapIfNoChange: true
 - tapOn:
     id: "changes.comparison.menu.task_start"
 - extendedWaitUntil:
@@ -68,6 +70,7 @@ appId: ${APP}
     timeout: 10000
 - tapOn:
     id: "agent.more"
+    retryTapIfNoChange: true
 - tapOn:
     id: "agent.more.merge"
 - extendedWaitUntil:
@@ -83,6 +86,7 @@ appId: ${APP}
     timeout: 10000
 - tapOn:
     id: "agent.more"
+    retryTapIfNoChange: true
 - tapOn:
     id: "agent.more.pr"
 - extendedWaitUntil:
@@ -117,6 +121,7 @@ appId: ${APP}
     timeout: 10000
 - tapOn:
     id: "agents.menu"
+    retryTapIfNoChange: true
 - takeScreenshot: agents-menu
 - tapOn:
     id: "agents.menu.accounts"
@@ -133,6 +138,7 @@ appId: ${APP}
     timeout: 10000
 - tapOn:
     id: "agents.menu"
+    retryTapIfNoChange: true
 - tapOn:
     id: "agents.menu.settings"
 - extendedWaitUntil:

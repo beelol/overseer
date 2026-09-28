@@ -15,6 +15,7 @@ appId: ${APP}
     timeout: 30000
 - tapOn:
     id: "agent.changes"
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
       id: "changes.comparison"
@@ -22,6 +23,7 @@ appId: ${APP}
 # Everything the agent changed since its task started, whatever its latest run did.
 - tapOn:
     id: "changes.comparison"
+    retryTapIfNoChange: true
 - tapOn:
     id: "changes.comparison.menu.task_start"
 - extendedWaitUntil:

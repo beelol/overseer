@@ -16,6 +16,7 @@ appId: ${APP}
     timeout: 60000
 - tapOn:
     id: "merge.complete"
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
       id: "merge.ask.confirm"
@@ -25,6 +26,7 @@ appId: ${APP}
 - takeScreenshot: merge-complete-asks-once
 - tapOn:
     id: "merge.ask.confirm"
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
       id: "merge.done"

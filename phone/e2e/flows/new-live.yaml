@@ -15,10 +15,12 @@ appId: ${APP}
     timeout: 30000
 - tapOn:
     id: "new.repo"
+    retryTapIfNoChange: true
 - tapOn:
     id: "new.repo.${REPO}"
 - tapOn:
     id: "new.agent"
+    retryTapIfNoChange: true
 - tapOn:
     id: "new.agent.${HARNESS}"
 - extendedWaitUntil:
@@ -27,6 +29,7 @@ appId: ${APP}
     timeout: 20000
 - tapOn:
     id: "new.model"
+    retryTapIfNoChange: true
 - tapOn:
     id: "new.model.other"
 # The form remembers the last model: the field is emptied before the model is typed.
@@ -40,6 +43,7 @@ appId: ${APP}
     commands:
       - tapOn:
           id: "new.effort"
+          retryTapIfNoChange: true
       - tapOn:
           id: "new.effort.${EFFORT}"
 - takeScreenshot: live-${HARNESS}-form

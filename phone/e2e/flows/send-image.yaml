@@ -10,6 +10,7 @@ appId: ${APP}
 - runFlow: open-agent.yaml
 - tapOn:
     id: "agent.composer.attach"
+    retryTapIfNoChange: true
 - tapOn:
     id: "agent.composer.attach.library"
 - runFlow:

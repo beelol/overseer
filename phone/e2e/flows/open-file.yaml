@@ -14,12 +14,14 @@ appId: ${APP}
     timeout: 30000
 - tapOn:
     id: "agent.changes"
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
       id: "changes.comparison"
     timeout: 30000
 - tapOn:
     id: "changes.comparison"
+    retryTapIfNoChange: true
 - tapOn:
     id: "changes.comparison.menu.task_start"
 - extendedWaitUntil:

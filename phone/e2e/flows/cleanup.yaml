@@ -13,3 +13,4 @@ appId: ${APP}
 - takeScreenshot: cleanup-asks-once
 - tapOn:
     id: "agent.more.cleanup.confirm"
+    retryTapIfNoChange: true

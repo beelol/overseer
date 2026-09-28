@@ -3,6 +3,7 @@ appId: ${APP}
 ---
 - tapOn:
     id: "agents.menu"
+    retryTapIfNoChange: true
 # Offered once the phone knows an agent is going: the news may still be on its way.
 - extendedWaitUntil:
     visible:
@@ -16,5 +17,6 @@ appId: ${APP}
     timeout: 10000
 - tapOn:
     id: "agents.stop.confirm"
+    retryTapIfNoChange: true
 - runFlow:
     file: unlock-prompt.yaml

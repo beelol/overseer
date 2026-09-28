@@ -10,6 +10,7 @@ appId: ${APP}
     timeout: 30000
 - tapOn:
     id: "agents.menu"
+    retryTapIfNoChange: true
 - tapOn:
     id: "agents.menu.settings"
 - scrollUntilVisible:

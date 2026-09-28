@@ -9,6 +9,7 @@ appId: ${APP}
     timeout: 30000
 - tapOn:
     id: "agents.menu"
+    retryTapIfNoChange: true
 # Offered once the phone knows an agent is going: the news may still be on its way.
 - extendedWaitUntil:
     visible:
@@ -23,3 +24,4 @@ appId: ${APP}
 - takeScreenshot: stop-all-asks-once
 - tapOn:
     id: "agents.stop.confirm"
+    retryTapIfNoChange: true
