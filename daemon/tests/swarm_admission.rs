@@ -1782,3 +1782,68 @@ fn forty_jobs_hold_at_eight_reviews_then_recover_from_an_outage_in_bounded_waves
     for n in 16..20 { let r = after(n); assert_eq!(r["status"], "admitted", "j{n}: {r}"); }
     assert_eq!(after(20)["reason"], "growth_wave_full");
 }
+
+/// SWARM-40: one frozen allocation pays for the run's workers, their
+/// replacement attempts and independent reproductions. With 60 points (60,000
+/// milli-points) of fresh unreserved allowance and no override the run gets
+/// 6,000 and keeps 1,200 for finishing, so ordinary work may book 4,800. A
+/// worker (1,500), its replacement attempt after a failure (1,500) and a first
+/// reproduction (1,500) draw on that one allocation; a second reproduction's
+/// 1,500 would pass 4,800 and is refused. A later, larger observation of the
+/// account does not enlarge it; there is one allocation row, in points.
+/// (The director's own work at one slot draws on it too: see
+/// `one_slot_director_executes_and_accepts_a_job_without_spawning_a_worker`.)
+#[test]
+fn workers_replacements_and_reproductions_share_one_frozen_allocation() {
+    let d = Daemon::start(&[]);
+    let id = setup(&d, "One allocation", 4);
+    let owner = d.call("swarm.director.owner.begin", json!({"run_id":id,"generation":1}));
+    let token = owner["owner_token"].as_str().unwrap().to_string();
+    let at = now();
+    let request = |job: &str, request: &str, estimate: i64, purpose: &str, remaining: i64| json!({"run_id":id,
+        "generation":1,"revision":1,"job_id":job,"target_id":"codex-a","request_id":request,
+        "snapshot":snapshot(at, remaining),"now_ms":at,"required_capabilities":["code"],
+        "estimate_milli":{"points":estimate},"purpose":purpose,"owner_token":token});
+    let workers: Vec<Value> = ["j1","j2","j3"].iter().map(|j| json!({"id":j,"elapsed_ms":100,"usage_milli":{"points":10}})).collect();
+    let cost = json!({"elapsed_ms":10,"usage_milli":{"points":1}});
+    let serial = json!({"planning":cost,"context":cost,"integration":cost,"review":cost,"retries":cost,"workers":workers});
+    let mut parallel = serial.clone();
+    parallel["context"]["elapsed_ms"] = json!(20);
+    d.call("swarm.benefit.commit", json!({"run_id":id,"generation":1,"revision":1,"owner_token":token,
+        "estimate":{"independent":true,"max_workers":3,"allocation_milli":{"points":6000},
+            "finishing_reserve_milli":{"points":1200},"serial":serial,"parallel":parallel}}));
+    // A worker: 1,500. It fails before any effect and is replaced: another 1,500.
+    let worker = d.call("swarm.admit", request("j1", "worker-1", 1500, "worker", 60000));
+    assert_eq!(worker["status"], "admitted", "{worker}");
+    assert_eq!(worker["allocation_milli"], 6000, "10% of 60 points");
+    d.call("swarm.artifact.put", json!({"run_id":id,"job_id":"j1","attempt_id":worker["attempt_id"],
+        "token":worker["token"],"artifact_id":"j1-attempt-1","source_revision":1,"kind":"finding","content":"crashed"}));
+    d.call("swarm.report", json!({"run_id":id,"job_id":"j1","attempt_id":worker["attempt_id"],"token":worker["token"],
+        "message_id":"j1-result-1","type":"result","revision":1,"payload":{"artifact_ids":["j1-attempt-1"]}}));
+    d.call("swarm.decide", json!({"run_id":id,"generation":1,"revision":1,"job_id":"j1","decision":"reject",
+        "evidence":["j1-attempt-1"],"owner_token":token}));
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":id,"generation":1,"revision":1,"job_id":"j1",
+        "attempt_id":worker["attempt_id"],"owner_token":token}));
+    let replacement = d.call("swarm.admit", request("j1", "worker-1-replacement", 1500, "worker", 60000));
+    assert_eq!(replacement["status"], "admitted", "{replacement}");
+    assert_ne!(replacement["attempt_id"], worker["attempt_id"]);
+    // An independent reproduction fits (4,500 of 4,800); a second would not.
+    let reproduction = d.call("swarm.admit", request("j2", "reproduction", 1500, "worker", 60000));
+    assert_eq!(reproduction["status"], "admitted", "{reproduction}");
+    let second = d.call("swarm.admit", request("j3", "second-reproduction", 1500, "worker", 60000));
+    assert_eq!((second["status"].as_str(), second["reason"].as_str()),
+        (Some("blocked"), Some("finishing_reserve")), "{second}");
+    // A much larger later observation does not enlarge the frozen allocation.
+    let later = d.call("swarm.admit", request("j3", "second-after-reset", 1500, "worker", 600000));
+    assert_ne!(later["status"], "admitted", "{later}");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let allocations: Vec<(i64, i64, String)> = {
+        let mut stmt = db.prepare("SELECT allocation_milli,reserve_milli,unit FROM swarm_allocations WHERE run_id=?1").unwrap();
+        let rows = stmt.query_map([&id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap().map(Result::unwrap).collect();
+        rows
+    };
+    assert_eq!(allocations, vec![(6000, 1200, "points".to_string())]);
+    let (booked, units): (i64, i64) = db.query_row("SELECT SUM(amount_milli),COUNT(DISTINCT unit) FROM swarm_reservations
+        WHERE run_id=?1 AND status!='reconciled'", [&id], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+    assert_eq!((booked, units), (4500, 1), "worker, replacement and reproduction on one allocation, in points");
+}

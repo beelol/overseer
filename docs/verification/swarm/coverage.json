@@ -499,9 +499,10 @@
         "daemon/tests/swarm_policy.rs",
         "docs/verification/swarm/milestone-4.md",
         "daemon/tests/swarm_admission.rs",
-        "docs/verification/swarm/milestone-7.md"
+        "docs/verification/swarm/milestone-7.md",
+        "docs/verification/swarm/SWARM-40.md"
       ],
-      "blocker": "The fixture allocation freezes 10% of available native units, preserves at least 20% for finishing, and rejects zero estimates; all cost classes and live shared accounting remain incomplete."
+      "blocker": "Covered at fixture scope except planning: in a run with workers the native director's own turns run unbooked (its swarm/director draw is not qualified), so they are not metered against the run's allocation. Needs a qualified swarm/director draw (live calibration on the owner's Claude account; RFC note D4)."
     },
     "SWARM-41": {
       "status": "verified",
