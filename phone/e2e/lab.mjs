@@ -4,6 +4,7 @@
 // Mac. It never touches the owner's running daemon, checkouts or logins.
 //
 //   node e2e/lab.mjs start [--port 47811] [--state <file>]    runs until it is stopped
+//   node e2e/lab.mjs start --live ...                          the real Claude Code and Codex, nothing seeded
 //   node e2e/lab.mjs call <state file> <method> [json]        a request as the Mac makes it
 //   node e2e/lab.mjs code <state file>                        a new pairing code
 //   node e2e/lab.mjs agent <state file> <mode> <title>        starts a fixture agent
@@ -115,7 +116,15 @@ async function start(args) {
   const stateFile = args.state || DEFAULT_STATE;
   // A short path: a Unix socket's path is limited to about 100 characters.
   const home = fs.mkdtempSync(path.join('/tmp', 'ovs-e2e'));
-  const env = { ...envFor(home), ...(args.push ? { OVERSEER_TEST_PUSH_DIR: path.join(home, 'push') } : {}) };
+  // --live: the Mac's own Claude Code and Codex, with the owner's own logins, for the few live
+  // turns the owner's paid-turn rules allow (e2e/live.mjs). Nothing is seeded then.
+  const live = Boolean(args.live);
+  const base = envFor(home);
+  if (live) {
+    delete base.OVERSEER_CLAUDE_PATH;
+    delete base.OVERSEER_CODEX_PATH;
+  }
+  const env = { ...base, ...(args.push ? { OVERSEER_TEST_PUSH_DIR: path.join(home, 'push') } : {}) };
   fs.writeFileSync(path.join(home, 'fixture-mode'), 'showcase');
   if (!fs.existsSync(BIN)) throw new Error(`${BIN} is missing. Build it: cargo build -p overseerd`);
   const log = fs.openSync(path.join(home, 'lab.log'), 'a');
@@ -128,7 +137,7 @@ async function start(args) {
   const repo = makeRepo(home);
   const state = { home, socket, port, repo, pid: child.pid, code: null, runs: {} };
 
-  if (args.seed !== 'none') {
+  if (args.seed !== 'none' && !live) {
     state.runs.showcase = await agent(state, 'showcase', 'Tidy the cart totals', 'tidy the cart');
     state.runs.nested = await agent(state, 'nested', 'Split the checkout in two', 'split the checkout');
     state.runs.permission = await agent(state, 'showcase-permission', 'Add a discount rule', 'add a discount');
