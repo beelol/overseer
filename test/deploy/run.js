@@ -146,7 +146,9 @@ const history = () => JSON.parse(fs.readFileSync(path.join(home, 'Library/Applic
   });
 
   await check('it refuses to run unattended without --yes', () => {
-    const r = cp.spawnSync(process.execPath, [DEPLOY, '--rollback', ...target], { env, encoding: 'utf8', input: '' });
+    const kept = path.join(home, 'Library/Application Support/Overseer', history()[0].vsix);
+    const r = cp.spawnSync(process.execPath, [DEPLOY, '--vsix', kept, ...target], { env, encoding: 'utf8', input: '' });
+    assert.strictEqual(history().length, 3, 'nothing recorded');
     assert.strictEqual(r.status, 2); assert.ok(/Run it yourself, or pass --yes when the owner asked/.test(r.stderr), r.stderr);
   });
 
