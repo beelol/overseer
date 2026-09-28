@@ -217,6 +217,20 @@ fn talking_over_overseer_lowers_its_voice_and_it_comes_back() {
         Some("restored"),
         "nobody said stop, so it comes back: {spoke:?}"
     );
+    // Lowering needs two recognized words: within 0.35 s of the second word, which ends at 1.8 s
+    // here (the budget as the spike revised it, docs/rfcs/voice-mode.md#the-spike-measurements-and-decisions).
+    let at = r
+        .events
+        .iter()
+        .find_map(|e| match e {
+            Event::Spoke { event, t_ms, .. } if event == "lowered" => Some(*t_ms),
+            _ => None,
+        })
+        .unwrap();
+    assert!(
+        (1800..=2150).contains(&at),
+        "lowered at {at} ms; the second word ended at 1800 ms"
+    );
     assert_eq!(spoke.last().map(String::as_str), Some("done"));
     assert_eq!(
         r.count(|e| matches!(

@@ -844,12 +844,18 @@ fn ac164_side_talk_over_overseer_lets_it_finish_and_addressed_words_stop_it() {
     live.wait("lowered", 6, |v| {
         v["kind"] == "floor" && v["event"] == "lowered"
     });
-    live.wait("yields", 6, |v| {
+    let yielded = live.wait("yields", 6, |v| {
         v["kind"] == "floor" && v["event"] == "yield"
     });
-    live.wait("stopped at the end of the phrase", 6, |v| {
+    let stopped = live.wait("stopped at the end of the phrase", 6, |v| {
         v["kind"] == "spoke" && v["event"] == "stopped"
     });
+    // The end of the phrase: within one phrase of the test voice (1 s), with slack for the channel.
+    let took = when(&live, &stopped).saturating_duration_since(when(&live, &yielded));
+    assert!(
+        took <= Duration::from_millis(1500),
+        "stopped {took:?} after yielding"
+    );
     assert!(!live
         .all()
         .iter()
