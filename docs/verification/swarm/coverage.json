@@ -76,7 +76,7 @@
       "blocker": null
     },
     "SWARM-07": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "docs/verification/swarm/SWARM-07.md",
         "daemon/tests/swarm_admission.rs",
@@ -87,9 +87,12 @@
         "daemon/tests/swarm_dispatch.rs",
         "test/ui/scenario-swarm-scale.js",
         "daemon/tests/swarm_director_loop.rs",
-        "fixtures/swarm/director-loop-v1/serial.py"
+        "fixtures/swarm/director-loop-v1/serial.py",
+        "daemon/tests/swarm_gate_s.rs",
+        "daemon/tests/auto_gate_s.rs",
+        "daemon/tests/shared_launch.rs"
       ],
-      "blocker": "The app setting is the total-agent ceiling; fixtures cover manual reservations, native-child exclusion, lower-limit drain, a supervised director plus 32 live workers at a 33-slot cap, a supervised director plus two live workers at a three-slot cap with confirmed-exit reuse, director-first dispatch into the remaining slot at a two-agent cap, and a one-slot scripted director completing its own metered job without a worker launch. Stop interrupts an active one-slot director; confirmed death outside Stop now reconciles unsubmitted self-work, preserves submitted evidence for replacement review, and blocks unknown effects. Separate reviewer/watch and Overseer-started admission, coordinating-run allowance accounting, and live-harness qualification remain unverified."
+      "blocker": null
     },
     "SWARM-08": {
       "status": "verified",

@@ -1,6 +1,6 @@
 # SWARM-07 — one application agent ceiling
 
-Status: partial. Revision: `5b39f0f` (fixture-only daemon).
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. First revision: `5b39f0f`.
 
 Input: `agents.max_active` defaults to 9 and is saved once for the application. Tests set it to 1, 2, 3, 4 or 33. Manual `/bin/sleep` runs, synthetic native children, registered Swarm attempts and running directors share one daemon and SQLite store. The Swarm run policy can lower `max_workers` but cannot set the former `max_executing` total ceiling.
 
@@ -35,3 +35,21 @@ Stop/recovery follow-up (this revision): a supervised one-slot director now link
 Confirmed-death follow-up at `fac2185`: the one-slot scripted director now recovers outside Stop as well. If it dies before submitting a result, the exact linked self-attempt closes only after confirmed exit and the job retains its two-attempt limit. A submitted result waits for a replacement director to review, and an unknown side effect blocks retry. The replacement remains within the same reserved category slot. See [SWARM-30](SWARM-30.md) for fixture steps and test results. This does not qualify a live provider or the separate reviewer/watch and Overseer-started slots, so SWARM-07 remains partial.
 
 Director-first dispatch follow-up: `daemon/tests/swarm_dispatch.rs::running_director_can_dispatch_first_worker_into_second_app_slot` starts the supervised director before any worker with `agents.max_active=2`. The first run failed with `global_agent_limit`: the planning run counted both the live director process and a virtual director slot. Admission now reserves the virtual slot only while no active supervised director process occupies it. The green replay launches one worker into the free second slot, rejects a third ordinary agent, and stops both supervised processes. The affected admission, dispatch, scheduler and director-process suites passed (35 + 7 + 4 + 13 tests). This remains a local fixture, not proof that Gate S watchers or Auto-routed accounts share the admission authority; SWARM-07 stays partial.
+
+## Verified at fixture scope (2026-09-28)
+
+Joining the Gate S parts found a bug: Overseer's own coordinating run was refused at a full house (`agent limit reached: 3 of 3`) although the slot count already left it out, because starting and resuming it reserved a slot. Fixed in `a38613c4`; regression `a_full_house_refuses_overseer_started_agents_but_not_overseers_own_run` (`daemon/tests/swarm_gate_s.rs`), red before the fix.
+
+| Clause | Test |
+| --- | --- |
+| `agents.max_active=3`: one director slot reserved, at most two top-level workers, ordinary agents or separately launched reviewers | `three_slot_limit_runs_director_and_two_workers_then_reuses_confirmed_slot`, `three_slot_limit_counts_live_director_and_workers_until_confirmed_exit` (`swarm_admission.rs`) |
+| Native descendants stay within their parent's slot | `app_agent_limit_serializes_manual_launches_and_ignores_native_children` |
+| No fourth admission across manual, Overseer-started and Swarm launches | the new test: with the director and two workers holding all three slots, a reviewer Overseer starts after the owner's yes is refused `agent limit`, as is a manual start; `ordinary_auto_swarm_and_booked_starts_race_for_the_last_slot_and_one_wins` (`shared_launch.rs`); `overseer_starts_manual_and_auto_launches_share_one_admission` (`auto_gate_s.rs`) |
+| Director activation while both workers run | the three-slot test launches the director after both workers are admitted (three active) |
+| Slot reuse after confirmed completion; draining after max is lowered | the three-slot test (an ordinary start takes the slot freed by a confirmed exit); `lowering_app_limit_holds_new_workers_until_existing_work_drains`, `lowering_one_run_worker_ceiling_drains_without_discarding_active_attempts` |
+| Overseer's own coordinating run stays reachable and takes allowance, not a slot | the new test (Overseer answers two messages at a full house; three slots stay in use); `overseer_turns_enter_the_same_metering_path_once` (`auto_gate_s.rs`: its turns are metered once) |
+| Max=1 performs serial director work | `one_slot_director_executes_and_accepts_a_job_without_spawning_a_worker` (`swarm_director_loop.rs`) |
+
+Watchers start through the same start path (`create_watcher` → `create_task`), which takes a slot like any other agent; no test here wakes a watcher at a full house.
+
+Rerun serially on 2026-09-28: `swarm_gate_s` 3, `auto_gate_s` 2, `swarm_admission` 41, `overseer` 24, `shared_launch` 7, `swarm_director_loop` 8.
