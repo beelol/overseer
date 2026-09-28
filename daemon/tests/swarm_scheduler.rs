@@ -253,3 +253,65 @@ fn identical_persisted_state_replays_scheduler_decisions_and_provider_labels_do_
     assert_eq!(left_blocked["reason"], "all_categories_blocked");
     assert_eq!(left_blocked["candidates"][0]["reason"], "target_unhealthy");
 }
+
+/// SWARM-36: two categories share accounts but not their scopes, ledgers or
+/// budgets, and nothing passes between them implicitly. B's plan cannot name
+/// A's job as a dependency; a B worker cannot read A's evidence (a handoff
+/// would have to be explicit); each category freezes its own allocation from
+/// the same shared pool; and a conflicting exclusive claim across them is held
+/// explicitly rather than shared.
+#[test]
+fn categories_share_accounts_but_not_scopes_ledgers_budgets_or_evidence() {
+    let d = Daemon::start(&[]);
+    let a = make_run(&d, "Category A", 3);
+    let b = d.call("swarm.create", json!({"category":"Category B","objective":"Audit",
+        "allowed_targets":["fixture"]}));
+    let b = b["id"].as_str().unwrap().to_string();
+    let across = d.try_call("swarm.plan", json!({"id":b,"generation":1,"revision":0,"jobs":[
+        {"id":"uses-a","title":"Use A's result","acceptance":"evidence","deps":["j000"]}]}));
+    assert!(across.unwrap_err().contains("unknown dependency"), "a dependency on another category is not implicit");
+    d.call("swarm.plan", json!({"id":b,"generation":1,"revision":0,"jobs":[
+        {"id":"j000","title":"B work","acceptance":"evidence","deps":[],
+            "resource_claims":[{"resource":"db:shared","mode":"write"}]}]}));
+    commit_beneficial_batch(&d, &a, &["j000".into(), "j001".into()]);
+    let at = now();
+    let admit = |run: &str, job: &str, request: &str| d.call("swarm.admit", json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":job,"target_id":"fixture","request_id":request,"snapshot":snapshot(at),"now_ms":at,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker",
+        "resource_claims":[{"resource":"db:shared","mode":"write"}]}));
+    let in_a = admit(&a, "j000", "a-0");
+    assert_eq!(in_a["status"], "admitted", "{in_a}");
+    d.call("swarm.artifact.put", json!({"run_id":a,"job_id":"j000","attempt_id":in_a["attempt_id"],
+        "token":in_a["token"],"artifact_id":"a-evidence","source_revision":1,"kind":"finding","content":"A's finding"}));
+    // A's exclusive claim holds B's writer explicitly.
+    let held = admit(&b, "j000", "b-0");
+    assert_eq!(held["reason"], "resource_conflict", "{held}");
+    let in_a2 = d.call("swarm.admit", json!({"run_id":a,"generation":1,"revision":1,"job_id":"j001",
+        "target_id":"fixture","request_id":"a-1","snapshot":snapshot(at),"now_ms":at,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(in_a2["status"], "admitted", "{in_a2}");
+    // Release A's claim; B admits with its own allocation.
+    d.call("swarm.report", json!({"run_id":a,"job_id":"j000","attempt_id":in_a["attempt_id"],"token":in_a["token"],
+        "message_id":"a-result","type":"result","revision":1,"payload":{"artifact_ids":["a-evidence"]}}));
+    d.call("swarm.decide", json!({"run_id":a,"generation":1,"revision":1,"job_id":"j000","decision":"accept",
+        "evidence":["a-evidence"]}));
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":a,"generation":1,"revision":1,"job_id":"j000",
+        "attempt_id":in_a["attempt_id"]}));
+    let in_b = admit(&b, "j000", "b-1");
+    assert_eq!(in_b["status"], "admitted", "{in_b}");
+    // B's worker cannot read A's evidence.
+    let read = d.try_call("swarm.context.get", json!({"run_id":b,"job_id":"j000","attempt_id":in_b["attempt_id"],
+        "token":in_b["token"],"artifact_id":"a-evidence"}));
+    assert!(read.is_err(), "no implicit handoff of another category's evidence: {read:?}");
+    let read_as_a = d.try_call("swarm.context.get", json!({"run_id":a,"job_id":"j000","attempt_id":in_b["attempt_id"],
+        "token":in_b["token"],"artifact_id":"a-evidence"}));
+    assert!(read_as_a.is_err(), "a B attempt is not an A attempt: {read_as_a:?}");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let allocations: i64 = db.query_row("SELECT COUNT(DISTINCT run_id) FROM swarm_allocations WHERE run_id IN (?1,?2)",
+        [&a, &b], |r| r.get(0)).unwrap();
+    assert_eq!(allocations, 2, "each category froze its own allocation");
+    let crossed: i64 = db.query_row("SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND job_id IN
+        (SELECT id FROM swarm_jobs WHERE run_id=?2) AND attempt_id IN (SELECT id FROM swarm_attempts WHERE run_id=?2)",
+        [&b, &a], |r| r.get(0)).unwrap();
+    assert_eq!(crossed, 0, "separate ledgers");
+}

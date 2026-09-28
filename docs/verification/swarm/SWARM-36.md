@@ -1,6 +1,6 @@
 # SWARM-36 — fair admissions across categories
 
-Status: partial. Fixture-only implementation at `09d1a89`; no live director or Auto Mode integration.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. Fixture implementation at `09d1a89`.
 
 Input: two active category runs, one with 100 ready jobs and one with two, share a fresh synthetic account/pool snapshot. A fixture-only central scheduler is asked for four worker admissions with stable request IDs. The daemon restarts between the third and fourth requests; one earlier request is replayed, and a changed replay is attempted.
 
@@ -57,3 +57,16 @@ real supervised director/worker evidence with separate repository scopes.
 The dispatcher still takes an injected route, quota snapshot and requested
 checkout rather than obtaining those from Auto; cross-category handoffs and
 the shared live account authority remain unverified. SWARM-36 stays partial.
+
+## Verified at fixture scope (2026-09-28)
+
+| Clause | Test |
+| --- | --- |
+| Two eligible categories with backlogs of 100 and 2 on shared accounts: under default round-robin, each gets one of the next two worker admissions | `round_robin_admission_is_durable_and_replay_safe_across_unequal_categories` (`swarm_scheduler.rs`: A, B, A, then B after a restart; replay-safe per request) |
+| …when its director slot is reserved | `dispatch_skips_category_outside_requested_repository_before_reserving_attempt` (`swarm_dispatch.rs`: both categories' supervised directors hold their slots; B launches first, A second, a fifth process is refused at a four-agent ceiling); `active_category_director_uses_its_reserved_app_slot` |
+| Separate scopes, ledgers and budgets | the dispatch replay (separate approved repositories); `categories_share_accounts_but_not_scopes_ledgers_budgets_or_evidence` (`swarm_scheduler.rs`, new; passed once its setup reported before deciding): each category freezes its own allocation from the same pool, and no message of one category's attempts appears in the other's ledger; `shared_pool_reservation_blocks_stale_capacity_across_categories` (shared account, separate allocations) |
+| Cross-category resource conflicts and handoffs stay explicit | the new test: A's exclusive write claim holds B's writer as `resource_conflict`; B's plan cannot depend on A's job (`unknown dependency`); B's worker cannot read A's accepted evidence, under either run; `shared_reads_and_exclusive_claims_span_categories` |
+
+Rerun serially on 2026-09-28: `swarm_scheduler` 6, `swarm_dispatch` 8.
+
+Boundary: an explicit cross-category handoff operation does not exist yet; the clause requires that none happens implicitly, which is what is shown.
