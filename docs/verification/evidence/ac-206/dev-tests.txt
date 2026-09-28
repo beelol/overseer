@@ -1,0 +1,20 @@
+$ node test/dev/run.js   (commit 0fef4d33)
+ok   AC-211: --help names every command and flag; unknown ones are refused (0s)
+ok   AC-211: AGENTS.md's section says when, the command, cleanup and never production (0s)
+ok   AC-206: two instances start side by side from the checkout, each with its own everything (1s)
+ok   AC-206: each instance's state holds only its own agent; list and status show both (1s)
+ok   AC-207: a dev daemon's environment: fixture harnesses, no owner logins, no Ollama, its own gateway (0s)
+ok   AC-209: tui --dry-run resolves the instance; a stopped instance is refused (1s)
+ok   AC-206, AC-211: clean --all leaves no process, socket or folder; the default data folder was never created (1s)
+ok   a standard daemon runs under the temporary HOME (the "production" of this test) (0s)
+ok   AC-207, AC-208: dev daemons beside it, busy, then cleaned, leave the standard daemon as it was (4s)
+ok   AC-208: the daemon and TUI never read the dev root (0s)
+ok   AC-211: nothing is left running (0s)
+11 of 11 passed
+
+$ node test/unit/dev-pin.js
+ok   a pinned window with its instance down says so, never starts a daemon, never falls back
+ok   a pinned window refuses a daemon reporting another instance, or none
+ok   production ignores the pin
+ok   the pin settings are machine-scoped (a workspace cannot set them)
+all passed

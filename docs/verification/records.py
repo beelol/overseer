@@ -2248,24 +2248,50 @@ rec(212, "Production can never point at a dev version (stage 1)", "verified", co
 rec(213, "The production phone app never pairs with a dev daemon (after pull request #10)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
     actual="Not started: the phone app and the gateway are being finished in pull request #10 by another agent; this criterion starts after #10 is on main.", live="—", blocker="After PR #10: the phone app and the gateway must be on main first.")
-rec(206, "One command gives a dev daemon (stage 2)", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
-    actual="Not started: added by the owner on 2026-09-27; stage 2, built on `claude/dev-instance` after stage 1 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
-rec(207, "A dev daemon never interferes with the running Overseer (stage 2)", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
-    actual="Not started: added by the owner on 2026-09-27; stage 2, built on `claude/dev-instance` after stage 1 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
-rec(208, "Production knows nothing of dev daemons (stage 2)", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
-    actual="Not started: added by the owner on 2026-09-27; stage 2, built on `claude/dev-instance` after stage 1 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
-rec(209, "VS Code and the TUI pointed at one dev daemon (stage 2)", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
-    actual="Not started: added by the owner on 2026-09-27; stage 2, built on `claude/dev-instance` after stage 1 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
+rec(206, "One command gives a dev daemon (stage 2)", "verified", commit="0fef4d33 (branch claude/dev-instance, pull request #21)", date="2026-09-28",
+    steps="""`node test/dev/run.js` (in `scripts/test-all`), phase A, with a temporary HOME and dev root: `scripts/dev up --name a` (build) and `up --name b --no-build`; agents in each; `list`, `status`, `env`, `down`, `clean --all`.""",
+    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md#stage-2--the-dev-daemons-tooling-ac-206-to-ac-211).",
+    actual="""- Both start from the checkout (repo and commit recorded), with the dev marker next to their binaries, as `dev-a` and `dev-b`, with fixture logins. Their sockets, folders, gateway ports (from 47900, never 47810) and pids differ. `up` on a running one says `already_running` with the same pid.
+- Each `state` holds only its own agent (`agent of a`, `agent of b`). `list` shows both running; `status --json` gives the pid; `env` prints the exports.
+- `down --name b` stops it, removes its socket and leaves nothing running from its folder, with `a` untouched. `clean --all` removes the dev root and leaves no process. The default data folder, `Library/LaunchAgents`, VS Code's folders and `~/.overseer-dev` were never created under the temporary HOME.""",
+    evidence="[stage 2 evidence](evidence/ac-206/README.md), [dev tests](evidence/ac-206/dev-tests.txt), [test-all](evidence/ac-206/test-all-jobs2.txt)",
+    live="Fixture harnesses; no paid turns. The owner's daemon, VS Code, data and logins were never involved (temporary HOME and dev roots).")
+rec(207, "A dev daemon never interferes with the running Overseer (stage 2)", "verified", commit="0fef4d33 (branch claude/dev-instance, pull request #21)", date="2026-09-28",
+    steps="""`node test/dev/run.js` phase B: a standard daemon under a temporary HOME; two dev daemons beside it through `scripts/dev`, each with a busy agent, then `down` and `clean --all`. Phase A reads a dev daemon's environment with `ps -E`.""",
+    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md#stage-2--the-dev-daemons-tooling-ac-206-to-ac-211).",
+    actual="""- The standard daemon's pid, socket, data folder, instance (none), tasks, runs, profiles and `daemon.clients` are identical while the dev daemons run and after they are cleaned. Its data folder's file list is unchanged, and no file in it mentions the dev root, `dev-c` or `dev-d`. No `Library/LaunchAgents` and no VS Code folders appeared.
+- A dev daemon's environment has `OVERSEER_INSTANCE=dev-a`, the fixture Claude harness in its own `bin/`, Codex and OpenCode pointed nowhere, `OVERSEER_TEST_SYSTEM_HOME` in its own folder (no owner logins), `OVERSEER_OLLAMA_URL=http://127.0.0.1:9`, its own `OVERSEER_GATEWAY_PORT` with mDNS off, and a notification command (never the notifier). The daemon-level refusals are AC-212's.""",
+    evidence="[stage 2 evidence](evidence/ac-206/README.md), [dev tests](evidence/ac-206/dev-tests.txt), [test-all](evidence/ac-206/test-all-jobs2.txt)",
+    live="Fixture harnesses; no paid turns. The owner's daemon, VS Code, data and logins were never involved (temporary HOME and dev roots).")
+rec(208, "Production knows nothing of dev daemons (stage 2)", "verified", commit="0fef4d33 (branch claude/dev-instance, pull request #21)", date="2026-09-28",
+    steps="""`node test/dev/run.js` phase B (the standard daemon with two busy dev daemons beside it), its source check of `daemon/src` and `tui/src`, and `node test/unit/dev-pin.js` (the manifest).""",
+    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md#stage-2--the-dev-daemons-tooling-ac-206-to-ac-211).",
+    actual="""- The standard daemon's state, clients, data folder and log hold no dev path, task or connection.
+- `daemon/src` and `tui/src` never mention `OVERSEER_DEV_ROOT` or `.overseer-dev`.
+- `overseer.daemonPath`, `overseer.daemonSocket` and `overseer.devInstance` are machine-scoped, and the production client ignores the pin.
+- Dev daemons run with `OVERSEER_GATEWAY_MDNS=off`, so they advertise nothing. The `_overseer-dev._tcp` form and the browse check come with the gateway (AC-213, after #10).""",
+    evidence="[stage 2 evidence](evidence/ac-206/README.md), [dev tests](evidence/ac-206/dev-tests.txt), [test-all](evidence/ac-206/test-all-jobs2.txt)",
+    live="Fixture harnesses; no paid turns. The owner's daemon, VS Code, data and logins were never involved (temporary HOME and dev roots).")
+rec(209, "VS Code and the TUI pointed at one dev daemon (stage 2)", "verified", commit="0fef4d33 (branch claude/dev-instance, pull request #21)", date="2026-09-28",
+    steps="""`node test/ui/scenario-dev-instance.js` (packaged VSIX; passed alone at 04:53 and in `scripts/test-all --jobs=2`); `node test/unit/dev-pin.js`; `node test/dev/run.js`'s TUI checks.""",
+    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md#stage-2--the-dev-daemons-tooling-ac-206-to-ac-211).",
+    actual="""- The window opened by `scripts/dev code --name a` lists `Agent of A` and not `Agent of B`. It reads "Overseer dev-a 1 active" and its title is `[dev-a] shop-a`. A counts 1 client, B 0. The profile's pin settings point at A, and the profile lives in the instance folder.
+- After `scripts/dev down --name a --keep-clients` the window shows "Overseer: Dev daemon dev-a is not running (socket …). Start it with scripts/dev up --name a." No daemon starts at A's socket and nothing connects to B. After `scripts/dev up --name a` the window reconnects by itself.
+- The unit test checks the pinned client's refusals: another instance, or none. It checks that it never runs the binary, says the outage once, picks up a restart, and that production ignores the pin.
+- `scripts/dev tui --dry-run --name a` resolves A's `bin/overseer-tui --daemon bin/overseerd` and socket. A stopped instance is refused.""",
+    evidence="[stage 2 evidence](evidence/ac-206/README.md), [dev tests](evidence/ac-206/dev-tests.txt), [test-all](evidence/ac-206/test-all-jobs2.txt)",
+    live="Fixture harnesses; no paid turns. The owner's daemon, VS Code, data and logins were never involved (temporary HOME and dev roots).")
 rec(210, "The phone simulators pinned to a dev daemon (after pull request #10)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
     actual="Not started: the phone app and the gateway are being finished in pull request #10 by another agent; this criterion starts after #10 is on main.", live="—", blocker="After PR #10: the phone app and the gateway must be on main first.")
-rec(211, "Agents learn it from the repository, and leave nothing running (stage 2)", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
-    actual="Not started: added by the owner on 2026-09-27; stage 2, built on `claude/dev-instance` after stage 1 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
+rec(211, "Agents learn it from the repository, and leave nothing running (stage 2)", "verified", commit="0fef4d33 (branch claude/dev-instance, pull request #21)", date="2026-09-28",
+    steps="""`node test/dev/run.js`: the `--help` and `AGENTS.md` checks; its last check; the scenario's cleanup.""",
+    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md#stage-2--the-dev-daemons-tooling-ac-206-to-ac-211).",
+    actual="""- `--help` (see [help.txt](evidence/ac-206/help.txt)) names every command and flag the script accepts, the dev root, the logins rule and the cleanup. An unknown flag exits 2 and a bad name exits 1.
+- `AGENTS.md`'s "Running a dev Overseer" names `scripts/dev up --name`, `scripts/dev clean --name`, `scripts/dev --help`, never touching the production daemon, and never deploying unless the owner asked.
+- After each test and the scenario, `pgrep` finds no process with the dev root path and the dev roots are gone. The scenario closes its VS Code and runs `clean --all`, then checks again.""",
+    evidence="[stage 2 evidence](evidence/ac-206/README.md), [dev tests](evidence/ac-206/dev-tests.txt), [test-all](evidence/ac-206/test-all-jobs2.txt)",
+    live="Fixture harnesses; no paid turns. The owner's daemon, VS Code, data and logins were never involved (temporary HOME and dev roots).")
 rec(215, "Guided owner tests in a dev daemon (stage 3)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md#stage-3--guided-owner-tests-ac-215).",
     actual="Not started: added by the owner on 2026-09-27; stage 3, built on `claude/guided-tests` after stage 2 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
@@ -2409,12 +2435,12 @@ SHORT_BLOCKERS = {
     204: "not started (Gate Q, added by the owner on 2026-09-27)",
     212: "verified",
     213: "not started: after PR #10 (the phone app and the gateway)",
-    206: "not started (Gate T, added by the owner on 2026-09-27)",
-    207: "not started (Gate T, added by the owner on 2026-09-27)",
-    208: "not started (Gate T, added by the owner on 2026-09-27)",
-    209: "not started (Gate T, added by the owner on 2026-09-27)",
+    206: "verified",
+    207: "verified",
+    208: "verified",
+    209: "verified",
     210: "not started: after PR #10 (the phone app and the gateway)",
-    211: "not started (Gate T, added by the owner on 2026-09-27)",
+    211: "verified",
     214: "not started (Gate T, added by the owner on 2026-09-27)",
     215: "not started (Gate T, added by the owner on 2026-09-27)",
 }

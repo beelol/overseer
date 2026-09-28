@@ -1,0 +1,59 @@
+     Running unittests src/lib.rs (target/debug/deps/overseer_listener-6ebfdf617bc62ac3)
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.12s
+     Running unittests src/main.rs (target/debug/deps/overseer_listener-eb300895729a2860)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/listener.rs (target/debug/deps/listener-176c37a93602d761)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.88s
+     Running tests/offline.rs (target/debug/deps/offline-d688ee58be55baaf)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.01s
+     Running tests/speech_gate.rs (target/debug/deps/speech_gate-88d357da9489bcbd)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.06s
+     Running unittests src/lib.rs (target/debug/deps/overseer_tui-1d3afd908582c408)
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.21s
+     Running unittests src/main.rs (target/debug/deps/overseer_tui-171c1844060ac29d)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/audio.rs (target/debug/deps/audio-92320edb88d086fb)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.60s
+     Running tests/control.rs (target/debug/deps/control-5b9714c0a49888fa)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.51s
+     Running tests/interact.rs (target/debug/deps/interact-4e60255e18a6f58a)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.49s
+     Running tests/live.rs (target/debug/deps/live-130ff425dd43405a)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.63s
+     Running tests/live_harness.rs (target/debug/deps/live_harness-44a80e2773ed2408)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/look.rs (target/debug/deps/look-a84d2f91ddaeefa3)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.03s
+     Running tests/overseer.rs (target/debug/deps/overseer-2e6079949348961b)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.67s
+     Running unittests src/main.rs (target/debug/deps/overseerd-88edd398d06528ba)
+test result: ok. 72 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+     Running tests/audio.rs (target/debug/deps/audio-e6a79879efa614e3)
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.30s
+     Running tests/continuity.rs (target/debug/deps/continuity-df37330207906efb)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.11s
+     Running tests/dev_instance.rs (target/debug/deps/dev_instance-0e81d32dbf5e8407)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.24s
+     Running tests/downloads.rs (target/debug/deps/downloads-4f305471b09998c2)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.74s
+     Running tests/handoff.rs (target/debug/deps/handoff-f94cf88502946c01)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.45s
+     Running tests/local_runs.rs (target/debug/deps/local_runs-66f2172453cae9de)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.60s
+     Running tests/netsim.rs (target/debug/deps/netsim-933e767e0eecb89d)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 71.20s
+     Running tests/ollama_install.rs (target/debug/deps/ollama_install-6bc41ba50645fae1)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.64s
+     Running tests/overseer.rs (target/debug/deps/overseer-c39f080486d8d071)
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 469.63s
+     Running tests/protocol.rs (target/debug/deps/protocol-e971086891266310)
+test ac45_one_notice_per_quit_a_brief_reconnect_does_not_repeat_it ... FAILED
+thread 'ac45_one_notice_per_quit_a_brief_reconnect_does_not_repeat_it' panicked at daemon/tests/protocol.rs:972:5:
+test result: FAILED. 51 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.61s
+     Running tests/voice.rs (target/debug/deps/voice-7603aa94392bbc2c)
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 183.99s
+     Running tests/voice_live.rs (target/debug/deps/voice_live-c0df8f66b5671bc1)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+EXIT 101
