@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 pub const LEVELS: &[&str] = &["ask_first", "steer", "auto"];
 /// Actions Overseer may ask for today; watch arrives with its step.
-pub const ACTIONS: &[&str] = &["message", "stop", "start", "pin", "hold", "release", "guardrail", "redirect", "archive", "cadence", "answer", "report", "area", "share", "withdraw", "watch"];
+pub const ACTIONS: &[&str] = &["message", "stop", "start", "pin", "hold", "release", "guardrail", "redirect", "archive", "cadence", "answer", "report", "area", "share", "withdraw", "watch", "permission", "merge_back", "pull_request"];
 /// The settle window in which what the owner asked for can still be cancelled (AC-170's).
 pub const SETTLE_MS: i64 = 2000;
 const TURN_BYTES: usize = 32 * 1024;
@@ -466,6 +466,9 @@ impl Daemon {
             "guardrail" => format!("Guardrail on {}: {}{}{}", who(a["agent"].as_str().unwrap_or("?")), a["words"].as_str().or(a["text"].as_str()).unwrap_or(""), a["allow"].as_array().filter(|x| !x.is_empty()).map(|x| format!(" · stay inside {}", x.iter().filter_map(|p| p.as_str()).collect::<Vec<_>>().join(", "))).unwrap_or_default(), a["deny"].as_array().filter(|x| !x.is_empty()).map(|x| format!(" · do not change {}", x.iter().filter_map(|p| p.as_str()).collect::<Vec<_>>().join(", "))).unwrap_or_default()),
             "redirect" => format!("Redirect {}: “{}”", who(a["agent"].as_str().unwrap_or("?")), a["text"].as_str().unwrap_or("")),
             "archive" => format!("Archive {}", who(a["agent"].as_str().unwrap_or("?"))),
+            "permission" => format!("{} {}'s request{}", if a["allow_request"] == true || a["allow"] == true { "Allow" } else { "Deny" }, who(a["agent"].as_str().unwrap_or("?")), a["request"].as_str().filter(|s| !s.is_empty()).map(|r| format!(" ({r})")).unwrap_or_default()),
+            "merge_back" => format!("Merge {} back into its target branch", who(a["agent"].as_str().unwrap_or("?"))),
+            "pull_request" => format!("Open a pull request for {} (VS Code pushes with your GitHub sign-in)", who(a["agent"].as_str().unwrap_or("?"))),
             "answer" => format!("Answer {}: “{}”", who(a["agent"].as_str().unwrap_or("?")), a["text"].as_str().unwrap_or("")),
             "report" => format!("Ask {} for a report (one agent turn)", who(a["agent"].as_str().unwrap_or("?"))),
             "area" => format!("Set {}'s area to {}", who(a["agent"].as_str().unwrap_or("?")), a["paths"].as_array().map(|p| p.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(", ")).unwrap_or_default()),
@@ -871,6 +874,47 @@ impl Daemon {
                 let agent = a["agent"].as_str().filter(|s| !s.is_empty());
                 let r = self.set_cadence(agent, a["cadence"].as_str().or(a["text"].as_str()).unwrap_or(""), "overseer")?;
                 Ok(format!("check-ins on {} set to {}", if title.is_empty() { "every agent".to_string() } else { title.clone() }, r["cadence"].as_str().unwrap_or("")))
+            }
+            // Confirm actions (AC-185): only when the owner asked, read back, and after a yes.
+            "permission" => {
+                let agent = a["agent"].as_str().unwrap_or("");
+                let run = self.run(agent)?;
+                let attention = run.attention.clone().filter(|x| x["kind"] == "permission").ok_or_else(|| anyhow!("{title} has no permission request waiting"))?;
+                let request = attention["request_id"].as_str().unwrap_or("").to_string();
+                if a["request"].as_str().is_some_and(|r| !r.is_empty() && r != request) {
+                    bail!("{title}'s waiting request is another one now; ask again");
+                }
+                let allow = a["allow_request"] == true || a["allow"] == true;
+                self.answer_permission(agent, &request, allow, "Denied by the owner through Overseer")?;
+                self.dispatch_record(proposal, agent, "permission", if allow { "allow" } else { "deny" }, "", a["why"].as_str().unwrap_or("named"), "delivered")?;
+                Ok(format!("{} {title}'s request", if allow { "allowed" } else { "denied" }))
+            }
+            "merge_back" => {
+                let agent = a["agent"].as_str().unwrap_or("");
+                let run = self.run(agent)?;
+                if ACTIVE.contains(&run.status.as_str()) {
+                    bail!("{title} is still working; merge back when it has finished");
+                }
+                let prepared = self.merge_prepare(&run.workspace_id, false)?;
+                let plan = self.merge_plan(&run.workspace_id)?;
+                let done = if plan["can_complete"] == true { Some(self.merge_complete(&run.workspace_id)?) } else { None };
+                self.dispatch_record(proposal, agent, "merge_back", "merge", "", a["why"].as_str().unwrap_or("named"), if done.is_some() { "answered" } else { "held" })?;
+                Ok(match done {
+                    Some(_) => format!("merged {title} into {}", plan["target"].as_str().unwrap_or("its target")),
+                    None => format!("prepared {title}'s merge ({}); {}", prepared["state"].as_str().or(plan["state"].as_str()).unwrap_or("not ready"), plan["blockers"].as_array().map(|b| b.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(" ")).filter(|b| !b.is_empty()).unwrap_or_else(|| "finish it from the review".into())),
+                })
+            }
+            "pull_request" => {
+                let agent = a["agent"].as_str().unwrap_or("");
+                let run = self.run(agent)?;
+                let plan = self.pr_plan(&run.workspace_id)?;
+                if plan["ok"] != true {
+                    bail!("{}", plan["reason"].as_str().unwrap_or("no pull request can be opened for it"));
+                }
+                // VS Code pushes and opens it with the owner's own GitHub sign-in; no token reaches the daemon.
+                self.emit(Some(&run.task_id), Some(agent), "overseer_action", "overseer", "exact", json!({"action": "pull_request", "proposal": proposal, "by": by, "branch": plan["branch"], "target": plan["target"]}))?;
+                self.dispatch_record(proposal, agent, "pull_request", "open", "", a["why"].as_str().unwrap_or("named"), "sent")?;
+                Ok(format!("asked VS Code to open a pull request for {title} ({} → {})", plan["branch"].as_str().unwrap_or("?"), plan["target"].as_str().unwrap_or("?")))
             }
             "archive" => {
                 let agent = a["agent"].as_str().unwrap_or("");

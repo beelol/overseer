@@ -2449,3 +2449,53 @@ fn ac200_no_credential_in_overseer_s_traffic() {
     let ws = PathBuf::from(d.call("agent.digest", json!({"run_id": leaky}))["digest"]["worktree"].as_str().unwrap());
     assert!(std::fs::read_to_string(ws.join(".env.local")).unwrap().contains(KEYS[0]));
 }
+
+/// AC-185: the Confirm actions answering a permission, merge back and a pull request happen only
+/// when the owner asked, wait for a yes even at Auto, and then are carried out with a row on
+/// their card: the waiting request is answered, the branch lands in the target, and VS Code is
+/// asked to open the pull request (the daemon holds no token).
+#[test]
+fn ac185_confirm_actions_permission_merge_back_and_pull_request() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    git(&repo, &["remote", "add", "origin", "https://github.com/example/demo.git"]);
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call("overseer.level", json!({"level": "auto"}));
+    let asker = claude_task(&d, &repo, &mode_file, "permission", "Asker", "write perm.txt");
+    d.wait_status(&asker, |s| s == "waiting_for_user", 20);
+    let writer = d.generic(&repo, "worktree", "/bin/sh", &["-c", "echo landed > landed.txt"]);
+    let writer_id = run_id(&writer);
+    d.wait_done(&writer_id, 20);
+    let proposer = run_id(&d.generic(&repo, "worktree", "/bin/sh", &["-c", "echo proposed > proposed.txt"]));
+    d.wait_done(&proposer, 20);
+    let actions = json!([{"action": "permission", "agent": asker, "allow_request": true}, {"action": "merge_back", "agent": writer_id}, {"action": "pull_request", "agent": proposer}]);
+    // Not asked for by the owner: refused, each of them.
+    sql(&d, "UPDATE overseer_sessions SET last_cause='check_in';");
+    for a in actions.as_array().unwrap() {
+        let e = d.try_call("overseer.propose", json!({"actions": [a], "source": "test"})).unwrap_err();
+        assert!(e.contains("only when the owner asks"), "{e}");
+    }
+    // Asked for: read back, and at Auto still waiting for the yes.
+    sql(&d, "UPDATE overseer_sessions SET last_cause='owner';");
+    let p = d.call("overseer.propose", json!({"actions": actions, "source": "ctl"}));
+    assert_eq!(p["state"], "open", "{p}");
+    std::thread::sleep(Duration::from_secs(3));
+    let lines = session(&d)["proposals"].as_array().unwrap().iter().find(|x| x["id"] == p["proposal"]).cloned().unwrap()["lines"].clone();
+    assert_eq!(lines, json!(["Allow Asker's request", format!("Merge {} back into its target branch", d.run(&writer_id)["title"].as_str().unwrap()), format!("Open a pull request for {} (VS Code pushes with your GitHub sign-in)", d.run(&proposer)["title"].as_str().unwrap())]));
+    assert_eq!(d.run(&asker)["status"], "waiting_for_user", "nothing before the yes");
+    assert!(git(&repo, &["ls-tree", "--name-only", "HEAD"]).lines().all(|l| l != "landed.txt"));
+    let answered = d.call("overseer.answer", json!({"id": p["proposal"], "yes": true, "surface": "ctl", "by": "owner"}));
+    let result = answered["result"].as_str().unwrap_or("").to_string();
+    assert!(result.contains("allowed Asker's request") && result.contains("merged") && result.contains("asked VS Code to open a pull request"), "{answered}");
+    d.wait_done(&asker, 20);
+    assert!(d.events(&asker).iter().any(|e| e["kind"] == "permission_answered" && e["payload"]["allow"] == true));
+    assert!(git(&repo, &["ls-tree", "--name-only", "HEAD"]).lines().any(|l| l == "landed.txt"), "the branch landed in the target");
+    assert!(d.events(&proposer).iter().any(|e| e["kind"] == "overseer_action" && e["payload"]["action"] == "pull_request"), "VS Code is asked to open it");
+    let card = d.call("overseer.card", json!({"id": p["proposal"]}));
+    let actions_done: Vec<&str> = card["rows"].as_array().unwrap().iter().map(|r| r["action"].as_str().unwrap()).collect();
+    assert_eq!(actions_done, ["permission", "merge_back", "pull_request"], "{card}");
+}

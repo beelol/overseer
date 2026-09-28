@@ -84,9 +84,12 @@ window.addEventListener('message', e => { if (e.data.type === 'notice') { docume
     return false;
   }
 
-  /** Actions the daemon carried out that the UI performs: pinning an agent to the grid. */
+  /** Actions the daemon carried out that the UI performs: pinning an agent to the grid, and
+   *  opening a pull request the owner said yes to (VS Code pushes with its own GitHub sign-in and
+   *  still shows what it will do before it does it; no token reaches the daemon). */
   onEvent(event) {
     if (event?.kind === 'overseer_action' && event.payload?.action === 'pin' && event.run_id) this.setPinned(event.run_id, true);
+    if (event?.kind === 'overseer_action' && event.payload?.action === 'pull_request' && event.run_id) vscode.commands.executeCommand('overseer.openPullRequest', event.run_id).then(undefined, () => {});
   }
 }
 
