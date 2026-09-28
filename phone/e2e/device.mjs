@@ -68,6 +68,17 @@ function ios() {
       simctl('spawn', udid, 'notifyutil', '-p', 'com.apple.BiometricKit.enrollmentChanged');
     },
     unlockMatch: () => void simctl('spawn', udid, 'notifyutil', '-p', 'com.apple.BiometricKit_Sim.pearl.match'),
+    /** Everything the app keeps on disk, copied to `dest`: more than a backup of the app carries. */
+    appFiles: (dest) => void execFileSync('cp', ['-R', `${simctl('get_app_container', udid, BUNDLE, 'data')}/.`, dest]),
+    /** The app's items in this simulator's keychain: their access group and accessibility class. */
+    keychainItems: () => {
+      const db = path.join(os.homedir(), 'Library', 'Developer', 'CoreSimulator', 'Devices', udid, 'data', 'Library', 'Keychains', 'keychain-2-debug.db');
+      const rows = quiet('sqlite3', ['-separator', '\t', db, "select agrp, pdmn from genp where agrp like '%overseer%'"]);
+      return rows.split('\n').filter(Boolean).map((row) => {
+        const [group, accessible] = row.split('\t');
+        return { group, accessible };
+      });
+    },
     unlockTearDown: () => {
       simctl('spawn', udid, 'notifyutil', '-s', 'com.apple.BiometricKit.enrollmentChanged', '0');
       simctl('spawn', udid, 'notifyutil', '-p', 'com.apple.BiometricKit.enrollmentChanged');
@@ -131,6 +142,15 @@ function android() {
     // typed by the flow into the system's prompt, and cleared afterwards.
     unlockSetUp: () => void shell(`locksettings set-pin ${PIN}`),
     unlockMatch: () => undefined,
+    /** Everything the app keeps on disk, copied to `dest` as root: more than a backup of the app carries. */
+    appFiles: (dest) => {
+      const tar = execFileSync(ADB, ['-s', serial, 'exec-out', `tar -C /data/data/${BUNDLE} -cf - .`], { maxBuffer: 512 * 1024 * 1024 });
+      fs.writeFileSync(path.join(dest, 'app.tar'), tar);
+      execFileSync('tar', ['-xf', path.join(dest, 'app.tar'), '-C', dest]);
+      fs.rmSync(path.join(dest, 'app.tar'));
+    },
+    /** Android keeps no keychain of this kind: the Keystore's keys never leave it. */
+    keychainItems: () => [],
     unlockTearDown: () => void quiet(ADB, ['-s', serial, 'shell', `locksettings clear --old ${PIN}`]),
     // `monkey` reports failure (exit 251) on this emulator image and starts nothing; the activity is started by name.
     launch: () => void shell(`am start -n ${BUNDLE}/.MainActivity >/dev/null 2>&1`),

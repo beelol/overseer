@@ -2,6 +2,7 @@
 // then asks the daemon what happened, as the Mac sees it: a scenario passes only when both agree.
 
 import { execFileSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
@@ -69,6 +70,54 @@ function gitDiff(dir, base, file) {
     else if (line.startsWith('+')) added.push(line.slice(1));
   }
   return { removed, added };
+}
+
+
+/** The X25519 public key of a 32-byte private key. */
+function publicOf(secret) {
+  const prefix = Buffer.from('302e020100300506032b656e04220420', 'hex');
+  const key = crypto.createPrivateKey({ key: Buffer.concat([prefix, secret]), format: 'der', type: 'pkcs8' });
+  return crypto.createPublicKey(key).export({ format: 'der', type: 'spki' }).subarray(-32);
+}
+
+/**
+ * Every file under `dir` searched for a private key whose public key is `publicKey`: any 32 bytes
+ * written as hex, base64 or base64url. Returns the files where one was found.
+ */
+function keyIn(dir, publicKey) {
+  const found = [];
+  const tried = new Map();
+  const matches = (bytes) => {
+    if (bytes.length !== 32) return false;
+    const id = bytes.toString('hex');
+    if (!tried.has(id)) {
+      let same = false;
+      try {
+        same = publicOf(bytes).equals(publicKey);
+      } catch {
+        same = false;
+      }
+      tried.set(id, same);
+    }
+    return tried.get(id);
+  };
+  for (const entry of fs.readdirSync(dir, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const file = path.join(entry.parentPath ?? entry.path, entry.name);
+    const text = fs.readFileSync(file).toString('latin1');
+    let hit = false;
+    for (const run of text.match(/[0-9a-fA-F]{64,}/g) ?? []) {
+      for (let at = 0; !hit && at + 64 <= run.length; at += 2) hit = matches(Buffer.from(run.slice(at, at + 64), 'hex'));
+    }
+    // Base64 and base64url: every 43 characters of a run (a longer run is tried at each offset up
+    // to 2,048 characters, beyond that at the 4-character steps a key inside it would keep).
+    for (const run of text.match(/[A-Za-z0-9+/_-]{43,}/g) ?? []) {
+      const step = run.length > 2048 ? 4 : 1;
+      for (let at = 0; !hit && at + 43 <= run.length; at += step) hit = matches(Buffer.from(`${run.slice(at, at + 43).replace(/-/g, '+').replace(/_/g, '/')}=`, 'base64'));
+    }
+    if (hit) found.push(path.relative(dir, file));
+  }
+  return found;
 }
 
 export const scenarios = [
@@ -413,6 +462,36 @@ export const scenarios = [
         c.dev.write('settings.appLock', false);
         c.dev.write('settings.unlockBeforeChanges', false);
         c.dev.unlockTearDown();
+      }
+    },
+  },
+  {
+    name: 'backup',
+    criteria: ['AC-130'],
+    says: "an attempt to read the phone's key from everything the app keeps on disk (more than a backup carries) fails",
+    async run(c) {
+      const db = path.join(c.lab.info().home, 'overseer.sqlite');
+      const hex = execFileSync('sqlite3', [db, `select public_key from devices where id = '${c.deviceId}'`], { encoding: 'utf8' }).trim();
+      expect(/^[0-9a-f]{64}$/.test(hex), "the Mac has no public key for this phone");
+      const publicKey = Buffer.from(hex, 'hex');
+      const copy = fs.mkdtempSync(path.join(os.tmpdir(), 'overseer-backup-'));
+      try {
+        c.dev.appFiles(copy);
+        const files = fs.readdirSync(copy, { recursive: true }).length;
+        // The search is proven first: a key planted in the copy, as the app would write it, is found.
+        const planted = crypto.randomBytes(32);
+        fs.writeFileSync(path.join(copy, 'planted.json'), JSON.stringify({ devicePrivateKey: planted.toString('hex') }));
+        expect(keyIn(copy, publicOf(planted)).includes('planted.json'), 'the search did not find a planted key');
+        fs.rmSync(path.join(copy, 'planted.json'));
+        const found = keyIn(copy, publicKey);
+        expect(found.length === 0, `the phone's private key was read from ${found.join(', ')}`);
+        const items = c.dev.keychainItems();
+        // On iOS the key is in the keychain, marked for this device only: a backup never carries it.
+        if (c.platform === 'ios') expect(items.length > 0 && items.every((i) => i.accessible === 'cku'), `the app's keychain items: ${JSON.stringify(items)}`);
+        c.log.say(`  ${files} files of the app searched: no private key of this phone; a planted key was found; keychain items ${JSON.stringify(items)}`);
+        return { files, keychain: items };
+      } finally {
+        fs.rmSync(copy, { recursive: true, force: true });
       }
     },
   },
