@@ -1,6 +1,6 @@
 # SWARM-09 — shared account identity
 
-Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. Earlier: partial. Revision: `47643df`.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. First revision: `47643df`.
 
 Input: a policy snapshot gives two targets the same account ID but disjoint pool IDs. A second version gives them one shared pool plus a model-specific extra pool. A separate admission fixture has two harness targets sharing one quota pool across categories.
 
