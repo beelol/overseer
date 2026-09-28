@@ -38,12 +38,15 @@ fn excluded(outcome: &Value, route: &str) -> Option<String> {
 fn codex_world(dir: &Path) -> (Daemon, std::path::PathBuf, std::path::PathBuf) {
     let accounts = dir.join("account-ids");
     let meters = dir.join("quota-modes");
+    // Absent until a test upgrades the harness (`codex-app-fixture.js`).
+    let version_file = dir.join("codex-version");
     std::fs::create_dir_all(&accounts).unwrap();
     std::fs::create_dir_all(&meters).unwrap();
     let codex = fixture("fake-harness/codex-app-fixture.js");
     let d = Daemon::start(&[
         ("OVERSEER_CODEX_PATH", codex.as_str()),
-        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_ACCOUNT_IDS_DIR,FIXTURE_QUOTA_MODES_DIR"),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_ACCOUNT_IDS_DIR,FIXTURE_QUOTA_MODES_DIR,FIXTURE_VERSION_FILE"),
+        ("FIXTURE_VERSION_FILE", version_file.to_str().unwrap()),
         ("FIXTURE_MODE", "managed-models"),
         ("FIXTURE_ACCOUNT_IDS_DIR", accounts.to_str().unwrap()),
         ("FIXTURE_QUOTA_MODES_DIR", meters.to_str().unwrap()),
@@ -330,4 +333,80 @@ fn auto_one_shared_recovery_check_per_endpoint_across_accounts() {
         "min_tier":"general","required_tools":[],"allowed_profiles":[a, b],"prompt":"x","title":"x"}));
     assert_eq!(next["state"], "dispatched", "the check's success clears the endpoint: {next}");
     assert_eq!(d.wait_done(&run_id(&next), 20)["status"], "completed");
+}
+
+/// AUTO-AC-36 through `auto.dispatch`: measured history steers later work
+/// with no routing file, does not churn, and is forgotten on an upgrade.
+/// Five isolated checks calibrate Sol/medium on account A (as above).
+/// - Three more units with the same kind of evidence (each moves A's meter
+///   one point) all get A's Sol on its qualified draw: no churn.
+/// - The harness is upgraded. The next unit still sees the old version as
+///   the newest recorded one and is booked on the draw; its own run records
+///   the new version. From then on the old samples are not comparable:
+///   A's Sol has no qualified draw (fit unknown) and nothing is booked on it.
+#[test]
+fn auto_adapts_from_measured_draw_without_churn_and_forgets_it_on_upgrade() {
+    let r = tmp();
+    let checkout = repo(&r.path().join("repo"));
+    let (d, accounts, meters) = codex_world(r.path());
+    let profile = |name: &str| -> String {
+        let id = d.call("profile.create", json!({"name":name,"harness":"codex"}))["id"]
+            .as_str().unwrap().to_string();
+        std::fs::write(accounts.join(&id), format!("account-{name}")).unwrap();
+        id
+    };
+    let (a, b) = (profile("alpha"), profile("beta"));
+    let meter = |id: &str, used: f64| std::fs::write(meters.join(id), format!("{used}")).unwrap();
+    meter(&b, 40.0);
+    refresh(&d, &b);
+    let parent = run_id(&d.call("task.create", json!({"repo":checkout,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let a_sol = format!("{a}/gpt-6-sol/medium");
+    let dispatch = |unit: &str, allowed: Vec<&str>| d.call("auto.dispatch", json!({"work_unit_id":unit,
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],"allowed_profiles":allowed,
+        "task_class":"browser_check","prompt":"check the page","title":"browser check"}));
+    let mut used = 30.0;
+    meter(&a, used);
+    refresh(&d, &a);
+    let mut run_unit = |unit: &str, allowed: Vec<&str>| -> Value {
+        let out = dispatch(unit, allowed);
+        assert_eq!(out["state"], "dispatched", "{out}");
+        assert_eq!(d.wait_done(&run_id(&out), 20)["status"], "completed");
+        used += 1.0;
+        meter(&a, used);
+        std::thread::sleep(Duration::from_millis(400));
+        refresh(&d, &a);
+        out
+    };
+    for n in 0..5 {
+        let child = run_unit(&format!("calibrate-{n}"), vec![a.as_str()]);
+        assert_eq!(child["decision"]["selected"], a_sol, "{child}");
+    }
+    let fit_of = |unit: &str| decision_event(&d, &parent, unit)["payload"]["estimator"]["routes"]
+        .as_array().unwrap().iter().find(|entry| entry["route_id"] == a_sol).cloned().unwrap();
+    let draw_source = |unit: &str| -> Option<String> { db(&d).query_row(
+        "SELECT draw_source FROM shared_booking_intents WHERE work_unit_id=?1", [unit], |row| row.get(0)).ok() };
+
+    for n in 0..3 {
+        let unit = format!("steady-{n}");
+        let out = run_unit(&unit, vec![a.as_str(), b.as_str()]);
+        assert_eq!(out["decision"]["selected"], a_sol, "{unit}: {out}");
+        assert_eq!(fit_of(&unit)["reason"], "qualified_draw_fits", "{unit}");
+        assert_eq!(draw_source(&unit).as_deref(), Some("qualified"), "{unit}");
+    }
+
+    std::fs::write(r.path().join("codex-version"), "codex-app-fixture 0.1.0 (synthetic)").unwrap();
+    let bridge = run_unit("upgrade-1", vec![a.as_str(), b.as_str()]);
+    assert_eq!(bridge["decision"]["selected"], a_sol, "{bridge}");
+    assert_eq!(draw_source("upgrade-1").as_deref(), Some("qualified"));
+    let version: String = db(&d).query_row("SELECT harness_version FROM runs WHERE id=?1",
+        [run_id(&bridge)], |row| row.get(0)).unwrap();
+    assert_eq!(version, "codex-app-fixture 0.1.0 (synthetic)");
+    let after = dispatch("upgrade-2", vec![a.as_str(), b.as_str()]);
+    assert_eq!(after["state"], "dispatched", "{after}");
+    assert_eq!(fit_of("upgrade-2")["fit"], "unknown", "{}", fit_of("upgrade-2"));
+    assert_ne!(fit_of("upgrade-2")["reason"], "qualified_draw_fits");
+    assert_ne!(draw_source("upgrade-2").as_deref(), Some("qualified"), "no booking on the old samples");
+    assert_eq!(d.wait_done(&run_id(&after), 20)["status"], "completed");
 }
