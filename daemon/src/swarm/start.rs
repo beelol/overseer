@@ -72,7 +72,7 @@ fn account(store: &Store, target: &str, effective: &Value, now: i64) -> Result<V
         None => ("unknown", Value::Null, json!([])),
         Some(reading) => {
             let snapshot = &reading.snapshot;
-            let state = if snapshot.needs_refresh(now) { "stale" }
+            let state = if !store.reading_backs_booking(target, reading, now)? { "stale" }
                 else if snapshot.ordinary_usage_allowed == Some(true) { "measured" }
                 else if snapshot.ordinary_usage_allowed == Some(false) { "exhausted" }
                 else { "allowance_unknown" };

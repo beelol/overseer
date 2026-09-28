@@ -40,7 +40,10 @@ if (process.argv.includes('auth') && process.argv.includes('status')) {
   // A profile folder holding a `signed-out` file reads as signed out (Voice Mode's problem rows, AC-168).
   console.log(JSON.stringify({ loggedIn: !(process.env.CLAUDE_CONFIG_DIR && fs.existsSync(path.join(process.env.CLAUDE_CONFIG_DIR, 'signed-out'))),
     authMethod: process.env.CLAUDE_FIXTURE_AUTH_MODE === 'api-key' ? 'api-key' : 'claude.ai',
-    email, orgId: 'fixture-org', subscriptionType: 'fixture' }));
+    email, orgId: 'fixture-org',
+    // CLAUDE_FIXTURE_PLAN_FILE: the reported plan, so a test can change it between identity reads.
+    subscriptionType: (process.env.CLAUDE_FIXTURE_PLAN_FILE && fs.existsSync(process.env.CLAUDE_FIXTURE_PLAN_FILE)
+      && fs.readFileSync(process.env.CLAUDE_FIXTURE_PLAN_FILE, 'utf8').trim()) || 'fixture' }));
   process.exit(0);
 }
 if (process.argv.includes('--help')) {

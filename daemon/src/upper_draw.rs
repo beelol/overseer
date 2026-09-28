@@ -17,7 +17,14 @@
 //! - no other run that may share the account (a profile with the same
 //!   account fingerprint, or one whose identity is unknown) was active at
 //!   any time between the two readings. External work on another machine
-//!   cannot be excluded; it can only enlarge a sample, never shrink it;
+//!   cannot be excluded; it can only enlarge a sample, never shrink it.
+//!   Claude reports readings only inside runs, so for a Claude bucket the
+//!   before reading may be the previous run's last and the after reading
+//!   the next run's first (the owner's decision of 2026-09-28): those two
+//!   runs must not overlap this one (the previous ended, turns included,
+//!   by the time it was created; the next began after it ended) and are
+//!   then the only other work allowed between the readings. Their tail and
+//!   head can only enlarge the sample;
 //! - both readings report the cited plan, every cited window is present
 //!   with the same scope and the same reset (no reset was crossed), and no
 //!   meter decreased. A visible change of zero is kept as the interval
@@ -96,6 +103,10 @@ pub struct SampleRef {
     pub before_seq: i64,
     pub after_seq: i64,
     pub after_observed_ms: i64,
+    /// A Claude run bracketed by its neighbours' readings: the previous and
+    /// the next run whose readings these are (empty for a strict bracket).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub neighbours: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -529,31 +540,56 @@ fn attribute_run(
         .chain(last_turn)
         .max()
         .unwrap_or(created_ms);
-    let reading = |sql: &str, at: i64| -> Result<Option<(i64, i64, String)>> {
+    let reading = |sql: &str, at: i64| -> Result<Option<(i64, i64, String, Option<String>)>> {
         Ok(conn
             .query_row(sql, params![profile_id, at, now_ms], |row| {
-                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
             })
             .optional()?)
     };
-    let Some((before_seq, before_ms, before)) = reading(
-        "SELECT event_seq,observed_ms,snapshot FROM auto_quota_observations
-         WHERE pool_id=?1 AND observed_ms<=?2 AND observed_ms<=?3
-         ORDER BY observed_ms DESC,event_seq DESC LIMIT 1",
+    let Some((before_seq, before_ms, before, before_run)) = reading(
+        "SELECT o.event_seq,o.observed_ms,o.snapshot,e.run_id FROM auto_quota_observations o
+         LEFT JOIN events e ON e.seq=o.event_seq
+         WHERE o.pool_id=?1 AND o.observed_ms<=?2 AND o.observed_ms<=?3
+         ORDER BY o.observed_ms DESC,o.event_seq DESC LIMIT 1",
         created_ms,
     )?
     else {
         return Ok(Err("before_reading_missing"));
     };
-    let Some((after_seq, after_ms, after)) = reading(
-        "SELECT event_seq,observed_ms,snapshot FROM auto_quota_observations
-         WHERE pool_id=?1 AND observed_ms>=?2 AND observed_ms<=?3
-         ORDER BY observed_ms ASC,event_seq ASC LIMIT 1",
+    let Some((after_seq, after_ms, after, after_run)) = reading(
+        "SELECT o.event_seq,o.observed_ms,o.snapshot,e.run_id FROM auto_quota_observations o
+         LEFT JOIN events e ON e.seq=o.event_seq
+         WHERE o.pool_id=?1 AND o.observed_ms>=?2 AND o.observed_ms<=?3
+         ORDER BY o.observed_ms ASC,o.event_seq ASC LIMIT 1",
         end_ms.saturating_add(reporting_settle_ms()),
     )?
     else {
         return Ok(Err("after_reading_missing"));
     };
+    // Claude has no reading between runs (the owner's decision of
+    // 2026-09-28, bracketing (b)): the previous run's last reading and the
+    // next run's first may bracket this run when neither overlaps it; those
+    // two runs are then the only other work allowed between the readings.
+    // Their tail and head can only enlarge the sample.
+    let mut neighbours = Vec::new();
+    let mut excluded: Vec<String> = Vec::new();
+    if bucket.harness == "claude" {
+        let in_work = |id: &str| work.iter().any(|(w, _, _)| w == id);
+        if let Some(previous) = before_run.filter(|id| !in_work(id)) {
+            if let Some(set) = neighbour_work(conn, &previous, |start, end| end.is_some_and(|end| end <= created_ms)
+                && start <= created_ms)? {
+                neighbours.push(previous);
+                excluded.extend(set);
+            }
+        }
+        if let Some(next) = after_run.filter(|id| !in_work(id) && !neighbours.contains(id)) {
+            if let Some(set) = neighbour_work(conn, &next, |start, _| start >= end_ms)? {
+                neighbours.push(next);
+                excluded.extend(set);
+            }
+        }
+    }
     // Any other run that may share this account and was active between the
     // two readings makes the movement ambiguous.
     let overlap: bool = conn.query_row(
@@ -561,6 +597,7 @@ fn attribute_run(
             "{WORK_SET} SELECT EXISTS(SELECT 1 FROM runs o
              LEFT JOIN auto_account_identity a ON a.profile_id=o.profile_id
              WHERE o.id NOT IN (SELECT id FROM w) AND o.harness<>'generic'
+               AND o.id NOT IN (SELECT value FROM json_each(?5))
                AND (a.fingerprint IS NULL OR a.fingerprint=?2)
                AND o.created_ms<=?4
                AND (o.ended_ms IS NULL OR o.ended_ms>=?3
@@ -568,7 +605,7 @@ fn attribute_run(
                     OR EXISTS(SELECT 1 FROM turns t WHERE t.run_id=o.id
                         AND (t.ended_ms IS NULL OR t.ended_ms>=?3))))"
         ),
-        params![run_id, fingerprint, before_ms, after_ms],
+        params![run_id, fingerprint, before_ms, after_ms, serde_json::to_string(&excluded)?],
         |row| row.get(0),
     )?;
     if overlap {
@@ -585,11 +622,42 @@ fn attribute_run(
                     before_seq,
                     after_seq,
                     after_observed_ms: after_ms,
+                    neighbours,
                 },
                 draws,
             )
         }),
     )
+}
+
+/// A neighbouring run's whole work (it and its native descendants) when
+/// every part of it satisfies `fits(created_ms, ended_ms)` for each run and
+/// each turn (`started_ms`, `ended_ms`); None when any part does not.
+fn neighbour_work(
+    conn: &Connection,
+    run_id: &str,
+    fits: impl Fn(i64, Option<i64>) -> bool,
+) -> Result<Option<Vec<String>>> {
+    let spans: Vec<(String, i64, Option<i64>)> = {
+        let mut stmt = conn.prepare(&format!(
+            "{WORK_SET} SELECT r.id,r.created_ms,r.ended_ms FROM runs r JOIN w ON w.id=r.id
+             UNION ALL SELECT t.run_id,t.started_ms,t.ended_ms FROM turns t JOIN w ON w.id=t.run_id
+             LIMIT ?2"
+        ))?;
+        let rows = stmt.query_map(params![run_id, 4 * (MAX_DESCENDANTS as i64 + 1)], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })?;
+        rows.collect::<rusqlite::Result<_>>()?
+    };
+    if spans.is_empty() || spans.len() >= 4 * (MAX_DESCENDANTS + 1)
+        || !spans.iter().all(|(_, start, end)| fits(*start, *end))
+    {
+        return Ok(None);
+    }
+    let mut ids: Vec<String> = spans.into_iter().map(|(id, _, _)| id).collect();
+    ids.sort();
+    ids.dedup();
+    Ok(Some(ids))
 }
 
 #[cfg(test)]
@@ -1497,42 +1565,45 @@ mod tests {
 
     /// Claude Code's native `rate_limit_event`s arrive only during a run's
     /// own turns: the first after its first model response, the last before
-    /// its result. Recorded through the real parser, six serial Claude runs
-    /// whose only readings are their own give no sample: the readings carry
-    /// no plan, and even with one stamped on, no reading brackets a run. A
-    /// run's first reading already counts part of its draw and its last
-    /// misses the rest, so using them would under-state the draw.
+    /// its result. The owner's decision of 2026-09-28 (bracketing (b)): a
+    /// Claude run is bracketed by the previous run's last reading and the next
+    /// run's first, only when those two runs are the only other work on the
+    /// account in between and neither overlaps it. Readings are recorded
+    /// through the real parser with the identity read's plan stamped on, as
+    /// the daemon records them.
     #[test]
-    fn claude_in_run_readings_cannot_bracket_their_own_run() {
-        let f = Fixture::new();
+    fn claude_neighbour_readings_bracket_a_run_only_when_they_are_the_only_other_work() {
         const CLAUDE: &str = "claude-a";
-        f.store.record_auto_account_identity(CLAUDE, &"c".repeat(64)).unwrap();
-        let reading = |at: i64, five: f64, plan: Option<&str>| -> i64 {
+        let claude = |f: &Fixture| {
+            f.store.record_claude_identity(CLAUDE, &crate::auto_collect::ClaudeAuth {
+                fingerprint: "c".repeat(64), observed_ms: 0, plan: Some("max".into()) }).unwrap();
+        };
+        let reading = |f: &Fixture, run: &str, at: i64, five: f64| -> i64 {
             let event = serde_json::json!({"type":"rate_limit_event","rate_limit_info":{
                 "status":"allowed","rateLimitType":"five_hour","resetsAt":f.reset / 1000,
                 "unifiedWindows":{"five_hour":{"utilization":five,"resetsAt":f.reset / 1000},
                     "seven_day":{"utilization":0.05,"resetsAt":f.reset / 1000 + 86_400}}}});
             let mut snapshot = crate::auto_quota::parse_claude_rate_limit_event(&event, CLAUDE, at).unwrap();
             assert_eq!(snapshot.reported_plan_type(), None, "Claude's event reports no plan");
-            assert_eq!(snapshot.ordinary_usage_allowed, None, "nor an explicit allowance");
-            for window in &mut snapshot.windows {
-                window.plan_type = plan.map(str::to_string);
-            }
-            let seq = f.store.insert_event(at, None, None, "auto_quota", "harness", "normalized",
-                &serde_json::json!({"pool_id":CLAUDE})).unwrap().seq;
-            assert!(f.store.insert_auto_quota(seq, CLAUDE, "claude/native-rate-limit-event", &snapshot).unwrap());
+            assert_eq!(snapshot.ordinary_usage_allowed, Some(true), "an allowed event is an allowance");
+            let plan = f.store.auto_account_plan(CLAUDE).unwrap();
+            for window in &mut snapshot.windows { window.plan_type = plan.clone(); }
+            let seq = f.store.insert_event(at, Some(&format!("t-{run}")), Some(run), "auto_quota", "harness",
+                "normalized", &serde_json::json!({"pool_id":CLAUDE})).unwrap().seq;
+            assert!(f.store.insert_auto_quota(seq, CLAUDE, crate::account_booking::CLAUDE_READING_SOURCE,
+                &snapshot).unwrap());
             seq
         };
         // True meter: 10% before run 0; each run draws one point, of which
         // 0.3 is counted by its first reading and 0.8 by its last.
-        let record = |plan: Option<&str>, offset: i64| {
-            for n in 0..6 {
-                let start = offset + n * 10;
-                let base = 0.10 + n as f64 * 0.01;
-                f.run_full(&format!("claude-{offset}-{n}"), Some(CLAUDE), "claude", "sonnet",
-                    Some("medium"), "2.1.246", start, Some(start + 5), "completed");
-                reading(f.at(start + 1), base + 0.003, plan);
-                reading(f.at(start + 4), base + 0.008, plan);
+        let series = |f: &Fixture, runs: i64, first_start: &dyn Fn(i64) -> i64, end: &dyn Fn(i64) -> i64| {
+            for n in 0..runs {
+                let (start, base) = (first_start(n), 0.10 + n as f64 * 0.01);
+                let id = format!("claude-{n}");
+                f.run_full(&id, Some(CLAUDE), "claude", "sonnet", Some("medium"), "2.1.246",
+                    start, Some(end(n)), "completed");
+                reading(f, &id, f.at(start + 1), base + 0.003);
+                reading(f, &id, f.at(start + 4), base + 0.008);
             }
         };
         let bucket = DrawBucket::agent("claude", Some("sonnet"), Some("medium"));
@@ -1540,37 +1611,87 @@ mod tests {
             let cited = f.store.latest_auto_quota(CLAUDE).unwrap().unwrap().event_seq;
             qualified_upper_draw_in_tx(&f.store.conn, CLAUDE, cited, &bucket, crate::daemon::now()).unwrap()
         };
-        record(None, 0);
-        assert_eq!(unknown(&draw(&f)).0, "plan_unknown", "as recorded today");
 
-        // Even with a plan, the bracket rule rejects all twelve runs: the
-        // first has no earlier reading, the last no later one, and every
-        // other run's nearest readings fall inside its neighbours' spans.
-        record(Some("max"), 100);
+        // Eight serial runs, ten minutes apart: runs 1-6 each have a previous
+        // and a next run, the only other work between their readings.
+        let f = Fixture::new();
+        claude(&f);
+        series(&f, 8, &|n| n * 10, &|n| n * 10 + 5);
+        match draw(&f) {
+            UpperDraw::Qualified { upper_draw_milli, provenance } => {
+                let ids: Vec<&str> = provenance.samples.iter().map(|s| s.run_id.as_str()).collect();
+                assert_eq!(ids, ["claude-6", "claude-5", "claude-4", "claude-3", "claude-2", "claude-1"]);
+                assert_eq!(provenance.plan_type, "max", "the identity read's plan");
+                let sample = &provenance.samples[0];
+                assert_eq!(sample.neighbours, ["claude-5", "claude-7"], "{sample:?}");
+                // Each movement is the run's point plus its neighbours' tail
+                // (0.2) and head (0.3): 1.5 points, never less than the run's
+                // own draw; plus two reading errors.
+                assert_eq!(upper_draw_milli, vec![3_500, 2_000]);
+                assert!(upper_draw_milli[0] >= 1_000);
+            }
+            other => panic!("expected a qualified draw, got {other:?}"),
+        }
+        // Runs 0 and 7 have no neighbour on one side.
+        let cited = load_cited(&f.store.conn, f.store.latest_auto_quota(CLAUDE).unwrap().unwrap().event_seq);
+        let edge = |run: &str, created: i64| attribute_run(&f.store.conn, run, CLAUDE, f.at(created),
+            Some("2.1.246"), "2.1.246", &"c".repeat(64), &bucket, &cited, "max", crate::daemon::now())
+            .unwrap().err();
+        assert_eq!(edge("claude-0", 0), Some("before_reading_missing"));
+        assert_eq!(edge("claude-7", 70), Some("after_reading_missing"));
+
+        // Other work on the account between the neighbours' readings (a
+        // linked profile's run, which reports no reading of this profile)
+        // leaves the two runs around it without a sample.
+        let f = Fixture::new();
+        claude(&f);
+        f.store.record_auto_account_identity("claude-linked", &"c".repeat(64)).unwrap();
+        series(&f, 8, &|n| n * 10, &|n| n * 10 + 5);
+        f.run_full("intruder", Some("claude-linked"), "claude", "haiku", None, "2.1.246", 36, Some(37), "completed");
         let (reason, samples, rejected) = unknown(&draw(&f));
-        assert_eq!((reason, samples), ("upper_draw_uncalibrated", 0));
-        assert_eq!(rejected.get("overlapping_work"), Some(&10), "{rejected:?}");
-        assert_eq!(rejected.get("after_reading_missing"), Some(&1), "{rejected:?}");
-        assert_eq!(rejected.get("before_reading_missing"), Some(&1), "{rejected:?}");
+        assert_eq!((reason, samples), ("upper_draw_uncalibrated", 4), "{rejected:?}");
+        assert_eq!(rejected.get("overlapping_work"), Some(&2), "runs 3 and 4: {rejected:?}");
 
-        // A run's own first and last readings are not a before and an after:
-        // the first is taken after the run began and the last before it ended.
-        let snapshot = |seq: i64| -> QuotaSnapshot {
-            let encoded: String = f.store.conn.query_row(
-                "SELECT snapshot FROM auto_quota_observations WHERE event_seq=?1", [seq], |r| r.get(0)).unwrap();
-            serde_json::from_str(&encoded).unwrap()
-        };
-        let first = reading(f.at(201), 0.203, Some("max"));
-        let last = reading(f.at(204), 0.208, Some("max"));
+        // A neighbour that overlaps the run is not a bracket: run 3 starts
+        // while run 2 is still working, so neither has a sample.
+        let f = Fixture::new();
+        claude(&f);
+        series(&f, 8, &|n| n * 10, &|n| if n == 2 { 32 } else { n * 10 + 5 });
+        let (reason, samples, rejected) = unknown(&draw(&f));
+        assert_eq!((reason, samples), ("upper_draw_uncalibrated", 4), "{rejected:?}");
+        assert_eq!(rejected.get("overlapping_work"), Some(&2), "runs 2 and 3: {rejected:?}");
+
+        // A changed plan (a new identity read) starts a new bucket: the runs
+        // recorded before it no longer compare with a reading after it.
+        let f = Fixture::new();
+        claude(&f);
+        series(&f, 8, &|n| n * 10, &|n| n * 10 + 5);
+        f.store.record_claude_identity(CLAUDE, &crate::auto_collect::ClaudeAuth {
+            fingerprint: "c".repeat(64), observed_ms: 0, plan: Some("pro".into()) }).unwrap();
+        f.run_full("after-change", Some(CLAUDE), "claude", "sonnet", Some("medium"), "2.1.246", 80, Some(85), "completed");
+        reading(&f, "after-change", f.at(81), 0.183);
+        let (reason, _, rejected) = unknown(&draw(&f));
+        assert_eq!(reason, "upper_draw_uncalibrated");
+        assert!(rejected.get("plan_changed").is_some_and(|n| *n >= 6), "{rejected:?}");
+
+        // A run's own first and last readings are still not a before and an
+        // after: the first is taken after the run began and the last before
+        // it ended, and together they miss half of its one-point draw.
+        let snapshot = |seq: i64| -> QuotaSnapshot { load_cited(&f.store.conn, seq) };
+        let first = reading(&f, "after-change", f.at(201), 0.203);
+        let last = reading(&f, "after-change", f.at(204), 0.208);
         let (first, last) = (snapshot(first), snapshot(last));
-        assert_eq!(attribute_window_movement(&first, &last, &last, "max", f.at(200), f.at(205)),
+        assert_eq!(attribute_window_movement(&first, &last, &last, "pro", f.at(200), f.at(205)),
             Err("before_reading_not_prior"));
-        assert_eq!(attribute_window_movement(&first, &last, &last, "max", f.at(201), f.at(205)),
+        assert_eq!(attribute_window_movement(&first, &last, &last, "pro", f.at(201), f.at(205)),
             Err("reporting_not_settled"));
-        // Were both rules waived, the visible movement (0.5 of a point) would
-        // miss half of the run's one-point draw: an under-count, unsafe for
-        // an upper bound.
         let visible = last.windows[0].used_percent - first.windows[0].used_percent;
         assert!((visible - 0.5).abs() < 1e-9 && visible < 1.0, "{visible}");
+    }
+
+    fn load_cited(conn: &Connection, seq: i64) -> QuotaSnapshot {
+        let encoded: String = conn.query_row(
+            "SELECT snapshot FROM auto_quota_observations WHERE event_seq=?1", [seq], |r| r.get(0)).unwrap();
+        serde_json::from_str(&encoded).unwrap()
     }
 }

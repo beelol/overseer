@@ -837,7 +837,7 @@ fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
                         &crate::daemon::Daemon::profile_env(&profile),
                         Duration::from_millis(remaining_metadata_ms(deadline)?), crate::daemon::now())?;
                     let store = d.store.lock().unwrap();
-                    store.record_auto_account_identity(profile_id, &auth.fingerprint)?;
+                    store.record_claude_identity(profile_id, &auth)?;
                     let generation = store.auto_account_generation(profile_id)?
                         .ok_or_else(|| anyhow!("Claude account generation unavailable"))?;
                     Ok(ClaudeAuthRead { auth, generation })
@@ -923,7 +923,7 @@ fn recheck_claude_account_before_child(d: &Arc<Daemon>, profile_id: &str,
         &crate::daemon::Daemon::profile_env(&profile),
         Duration::from_millis(remaining_metadata_ms(deadline)?), crate::daemon::now())?;
     let store = d.store.lock().unwrap();
-    store.record_auto_account_identity(profile_id, &auth.fingerprint)?;
+    store.record_claude_identity(profile_id, &auth)?;
     if store.auto_account_generation(profile_id)? != Some(expected_generation) {
         return Err(anyhow!("Claude account changed before child creation"));
     }
@@ -2808,6 +2808,21 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "auto.quota.refresh" => {
             let deadline = metadata_deadline(p)?;
             let profile = d.profile(s(p, "profile_id")?)?;
+            if profile.harness == "claude" {
+                // Claude has no usage read; its identity read (local, no model
+                // turn) records the account and the plan that its in-run
+                // quota readings stand for until the next identity read.
+                let gate = d.profile_gate(&profile.id);
+                let _profile_guard = lock_gate_until(&gate, deadline)?;
+                let program = crate::adapters::resolve_program("claude")
+                    .ok_or_else(|| anyhow!("Claude executable unavailable"))?;
+                let auth = crate::auto_collect::claude_auth_status(&program, &Daemon::profile_env(&profile),
+                    Duration::from_millis(remaining_metadata_ms(deadline)?), crate::daemon::now())?;
+                let changed = d.store.lock().unwrap().record_claude_identity(&profile.id, &auth)?;
+                return Ok(json!({"pool_id":profile.id,"identity":"recorded","account_changed":changed,
+                    "plan":auth.plan,"usage":"unavailable",
+                    "note":"Claude has no usage read; its quota readings arrive during its runs"}));
+            }
             if profile.harness != "codex" {
                 return Err(anyhow!("structured quota refresh is not supported for this profile"));
             }

@@ -1847,7 +1847,7 @@ impl Daemon {
                 let auth = crate::auto_collect::claude_auth_status(&program, &Self::profile_env(&profile),
                     std::time::Duration::from_secs(5), now())?;
                 let store = self.store.lock().unwrap();
-                store.record_auto_account_identity(profile_id, &auth.fingerprint)?;
+                store.record_claude_identity(profile_id, &auth)?;
                 if store.auto_account_generation(profile_id)? != Some(expected) {
                     bail!("automatic Claude account changed before the model turn");
                 }
@@ -2791,6 +2791,13 @@ impl Daemon {
                                 native_uncertain_until_ms:None,
                             },
                         };
+                        // The event reports no plan: the latest identity read's
+                        // plan stands for it (the owner's decision of 2026-09-28).
+                        if let Some(plan) = store.auto_account_plan(pool_id)? {
+                            for window in snapshot.windows.iter_mut().filter(|w| w.plan_type.is_none()) {
+                                window.plan_type = Some(plan.clone());
+                            }
+                        }
                         if let Some(prior) = store.latest_auto_quota(pool_id)? {
                             snapshot.reconcile_unordered_native_evidence(&prior.snapshot, observed_ms);
                         }

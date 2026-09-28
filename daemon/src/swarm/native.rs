@@ -457,12 +457,14 @@ fn snapshot(store: &Store, current: &Value, job: &str, target: &str, model: Opti
                 "capabilities":capabilities,"health":"up",
                 "auth":if pool.is_some() { "ok" } else { "unknown" }}));
             let windows: Vec<Value> = match store.latest_auto_quota(id)? {
-                Some(reading) if !reading.snapshot.needs_refresh(now)
-                    && reading.snapshot.ordinary_usage_allowed == Some(true) =>
+                Some(reading) if store.reading_backs_booking(id, &reading, now)?
+                    && reading.snapshot.ordinary_usage_allowed == Some(true) => {
+                    let expires = crate::account_booking::booking_term_end(&reading.source, &reading.snapshot);
                     reading.snapshot.windows.iter().map(|w| json!({"id":w.window,"unit":"percent_milli",
                         "remaining_milli":((100.0 - w.used_percent.clamp(0.0, 100.0)) * 1000.0).floor() as i64,
                         "protected_milli":0,"reserved_milli":0,"confidence":"exact",
-                        "expires_ms":reading.snapshot.expires_ms})).collect(),
+                        "expires_ms":expires})).collect()
+                }
                 _ => Vec::new(),
             };
             let pool_id = pool.unwrap_or_else(|| format!("profile/{id}"));

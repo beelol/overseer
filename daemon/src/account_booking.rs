@@ -479,6 +479,78 @@ pub fn unbooked_run_on_account(conn: &Connection, fingerprint: &str) -> Result<b
         [fingerprint], |row| row.get(0))?)
 }
 
+/// Claude Code's native `rate_limit_event`, recorded as a quota observation
+/// of the run's profile.
+pub const CLAUDE_READING_SOURCE: &str = "claude/native-rate-limit-event";
+/// How long a Claude reading may back a booking (the owner's decision of
+/// 2026-09-28). Claude has no reading between runs, so a one-minute term
+/// would book only right after a run; the longer term is safe because every
+/// draw committed on the account since the reading still counts against it
+/// (a settled booking's draw is retained until a later reading), and
+/// unbooked work since the reading refuses.
+pub const CLAUDE_BOOKING_TERM_MS: i64 = 15 * 60_000;
+
+/// The plan the latest Claude identity read reported for this profile.
+pub fn recorded_plan(conn: &Connection, profile_id: &str) -> Result<Option<String>> {
+    Ok(conn.query_row("SELECT plan FROM auto_account_plans WHERE profile_id=?1", [profile_id],
+        |row| row.get::<_, Option<String>>(0)).optional()?.flatten())
+}
+
+/// When a stored reading stops backing a booking: its own expiry, or for a
+/// Claude reading the end of its booking term (each window by its own
+/// observation, a partial update carries an older one); never past a reset.
+pub fn booking_term_end(source: &str, quota: &QuotaSnapshot) -> i64 {
+    let term = |observed: i64, expires: i64| if source == CLAUDE_READING_SOURCE {
+        observed.saturating_add(CLAUDE_BOOKING_TERM_MS)
+    } else { expires };
+    quota.windows.iter()
+        .map(|w| term(w.observed_ms, w.expires_ms).min(w.reset_ms.unwrap_or(i64::MAX)))
+        .fold(term(quota.observed_ms, quota.expires_ms), i64::min)
+}
+
+/// Whether the account's latest reading may back a booking now, and why not.
+pub fn reading_backs_booking(
+    conn: &Connection,
+    fingerprint: &str,
+    profile_id: &str,
+    source: &str,
+    quota: &QuotaSnapshot,
+    now_ms: i64,
+) -> Result<std::result::Result<(), &'static str>> {
+    if quota.native_uncertain_until_ms.is_some_and(|until| now_ms < until)
+        || now_ms < quota.observed_ms
+        || quota.windows.iter().any(|w| now_ms < w.observed_ms)
+        || now_ms >= booking_term_end(source, quota)
+    {
+        return Ok(Err("snapshot_expired"));
+    }
+    if source != CLAUDE_READING_SOURCE {
+        return Ok(Ok(()));
+    }
+    // The reading's plan is the identity read's that stood when it was taken;
+    // a later identity read with another value is a new plan.
+    if let Some(plan) = quota.reported_plan_type() {
+        if recorded_plan(conn, profile_id)?.as_deref() != Some(plan) {
+            return Ok(Err("plan_changed"));
+        }
+    }
+    // Work started on the account after the reading, with no committed draw
+    // (it would otherwise have its own later reading or its booking).
+    let unbooked_since: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM runs r JOIN auto_account_identity a ON a.profile_id=r.profile_id
+         WHERE a.fingerprint=?1 AND r.harness<>'generic' AND r.created_ms>?2
+           AND NOT EXISTS(SELECT 1 FROM shared_booking_intents b WHERE b.run_id=r.id)
+           AND NOT EXISTS(SELECT 1 FROM shared_booking_intents b
+              WHERE b.caller='auto' AND b.work_unit_id IN (
+                  SELECT work_unit_id FROM auto_root_intents WHERE run_id=r.id
+                  UNION SELECT work_unit_id FROM managed_work_units WHERE child_run_id=r.id)))",
+        params![fingerprint, quota.observed_ms], |row| row.get(0))?;
+    if unbooked_since {
+        return Ok(Err("unbooked_work_since_reading"));
+    }
+    Ok(Ok(()))
+}
+
 /// The room a window leaves for new work, in thousandths of a reported
 /// percentage point. A reading may be rounded by up to one whole point
 /// until an adapter proves its meter's precision (the qualified upper
@@ -565,24 +637,20 @@ pub fn preview_account_fit_with(
     let Some(fingerprint) = fingerprint else {
         return Ok(AccountFitPreview::Unknown("account_identity_unknown"));
     };
-    let observation: Option<(i64, String)> = conn
+    let observation: Option<(i64, String, String)> = conn
         .query_row(
-            "SELECT event_seq,snapshot FROM auto_quota_observations WHERE pool_id=?1
+            "SELECT event_seq,snapshot,source FROM auto_quota_observations WHERE pool_id=?1
          ORDER BY observed_ms DESC,event_seq DESC LIMIT 1",
             [profile_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
         .optional()?;
-    let Some((event_seq, encoded)) = observation else {
+    let Some((event_seq, encoded, source)) = observation else {
         return Ok(AccountFitPreview::Unknown("quota_unknown"));
     };
     let quota: QuotaSnapshot = serde_json::from_str(&encoded)?;
-    if quota.needs_refresh(now_ms)
-        || quota
-            .native_uncertain_until_ms
-            .is_some_and(|until| now_ms < until)
-    {
-        return Ok(AccountFitPreview::Unknown("snapshot_expired"));
+    if let Err(reason) = reading_backs_booking(conn, &fingerprint, profile_id, &source, &quota, now_ms)? {
+        return Ok(AccountFitPreview::Unknown(reason));
     }
     match quota.ordinary_usage_allowed {
         Some(true) => {}
@@ -724,30 +792,29 @@ pub fn book_shared_account_in_tx(
         return Ok(BookingDecision::Blocked("account_identity_changed"));
     }
     let account_pool = format!("account/{fingerprint}");
-    let observation: Option<(i64, String)> = conn
+    let observation: Option<(i64, String, String)> = conn
         .query_row(
-            "SELECT event_seq,snapshot FROM auto_quota_observations WHERE pool_id=?1
+            "SELECT event_seq,snapshot,source FROM auto_quota_observations WHERE pool_id=?1
          ORDER BY observed_ms DESC,event_seq DESC LIMIT 1",
             [req.quota_profile_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
         .optional()?;
-    let Some((event_seq, encoded)) = observation else {
+    let Some((event_seq, encoded, source)) = observation else {
         return Ok(BookingDecision::Blocked("quota_unknown"));
     };
     if event_seq != req.quota_event_seq {
         return Ok(BookingDecision::Blocked("snapshot_superseded"));
     }
     let quota: QuotaSnapshot = serde_json::from_str(&encoded)?;
-    if quota.needs_refresh(req.now_ms)
-        || quota
-            .native_uncertain_until_ms
-            .is_some_and(|until| req.now_ms < until)
+    if let Err(reason) =
+        reading_backs_booking(conn, &fingerprint, req.quota_profile_id, &source, &quota, req.now_ms)?
     {
-        return Ok(BookingDecision::Blocked("snapshot_expired"));
+        return Ok(BookingDecision::Blocked(reason));
     }
     // Only an explicit allowance books. A reading that reports none (a
-    // Claude `allowed` rate-limit event) is unknown, not exhausted.
+    // scoped Claude rejection, a reconciled out-of-order meter) is unknown,
+    // not exhausted.
     match quota.ordinary_usage_allowed {
         Some(true) => {}
         Some(false) => return Ok(BookingDecision::Blocked("account_exhausted")),
@@ -1386,6 +1453,104 @@ mod tests {
             .insert_auto_quota(event.seq, profile, "fixture/structured", &snapshot)
             .unwrap();
         event.seq
+    }
+
+    /// A Claude reading as the daemon records one: an `allowed` event
+    /// (explicit allowance) stamped with the identity read's plan, recorded
+    /// by the run `run` it arrived in.
+    fn claude_reading(store: &Store, run: Option<&str>, used: [f64; 2], plan: &str, at_ms: i64) -> i64 {
+        reading_of(store, "claude", CLAUDE_READING_SOURCE, run, used, plan, at_ms)
+    }
+
+    fn reading_of(store: &Store, profile: &str, source: &str, run: Option<&str>, used: [f64; 2], plan: &str,
+        at_ms: i64) -> i64 {
+        let snapshot = QuotaSnapshot {
+            ordinary_usage_allowed: Some(true),
+            observed_ms: at_ms,
+            expires_ms: at_ms + 60_000,
+            native_uncertain_until_ms: None,
+            windows: ["five_hour", "seven_day"].into_iter().zip(used)
+                .map(|(name, used_percent)| QuotaWindow {
+                    pool_id: profile.into(), bucket_id: name.into(), window: name.into(),
+                    model: None, model_family: None, plan_type: Some(plan.into()), used_percent,
+                    reset_ms: Some(at_ms + 36_000_000), duration_mins: None,
+                    observed_ms: at_ms, expires_ms: at_ms + 60_000,
+                }).collect(),
+        };
+        let event = store.insert_event(at_ms, None, run, "auto_quota", "harness", "normalized",
+            &serde_json::json!({})).unwrap();
+        assert!(store.insert_auto_quota(event.seq, profile, source, &snapshot).unwrap());
+        event.seq
+    }
+
+    fn claude_run(store: &Store, run: &str, from: i64, to: i64) {
+        store.conn.execute(
+            "INSERT INTO workspaces(id,path,repo_root,common_dir,kind,initial_dirty,created_ms)
+            VALUES('w-'||?1,'/repo/'||?1,'/repo','/repo','worktree','{}',?2)", params![run, from]).unwrap();
+        store.conn.execute(
+            "INSERT INTO tasks(id,title,prompt,repo_root,workspace_id,created_ms)
+            VALUES('t-'||?1,'task','prompt','/repo','w-'||?1,?2)", params![run, from]).unwrap();
+        store.conn.execute(
+            "INSERT INTO runs(id,task_id,harness,profile_id,workspace_id,status,created_ms,ended_ms,title,capabilities)
+            VALUES(?1,'t-'||?1,'claude','claude','w-'||?1,'completed',?2,?3,'run','{}')",
+            params![run, from, to]).unwrap();
+    }
+
+    /// The owner's decision of 2026-09-28: a Claude reading backs a booking
+    /// for up to 15 minutes, combined with every draw committed on the
+    /// account since it; its plan is the identity read's, and a changed plan
+    /// or unbooked work since the reading refuses. Other readings keep their
+    /// own one-minute term.
+    #[test]
+    fn a_claude_reading_backs_a_booking_for_fifteen_minutes_with_the_draws_since() {
+        const MIN: i64 = 60_000;
+        let t0 = 10 * MIN;
+        let store = Store::open(Path::new(":memory:")).unwrap();
+        let auth = |plan: &str| crate::auto_collect::ClaudeAuth {
+            fingerprint: "c".repeat(64), observed_ms: 0, plan: Some(plan.into()) };
+        store.record_claude_identity("claude", &auth("max")).unwrap();
+        // The reading arrived inside the run that last used the account.
+        claude_run(&store, "reader", t0 - MIN, t0 + 5_000);
+        let reading = claude_reading(&store, Some("reader"), [80.0, 10.0], "max", t0);
+        let at = |id: &'static str, now: i64, draw: &'static [i64]| AccountBookingRequest {
+            id, request_hash: id, caller: "ordinary", route_id: "claude/sonnet",
+            profile_id: "claude", quota_profile_id: "claude", account_generation: 1,
+            quota_event_seq: reading, now_ms: now, draw: BookingDraw::Fixture(draw),
+            allocation_remaining_milli: None };
+        // 19 points of room in the five-hour window (80% used, one point held back).
+        assert_eq!(store.book_shared_account(&at("late", t0 + 15 * MIN, &[1_000, 1_000])).unwrap(),
+            BookingDecision::Blocked("snapshot_expired"), "15 minutes is the whole term");
+        assert_eq!(store.book_shared_account(&at("first", t0 + 2 * MIN, &[10_000, 1_000])).unwrap(),
+            BookingDecision::Booked, "a two-minute-old Claude reading backs a booking");
+        assert!(matches!(preview_account_fit_with(&store.conn, "claude",
+            PreviewDraw::Fixture { quota_event_seq: reading, upper_draw_milli: &[1_000, 1_000] }, t0 + 14 * MIN).unwrap(),
+            AccountFitPreview::Windows { .. }), "selection sees the same term");
+        // Every draw committed since the reading counts against it.
+        assert_eq!(store.book_shared_account(&at("second", t0 + 14 * MIN, &[10_000, 1_000])).unwrap(),
+            BookingDecision::Blocked("shared_pool_headroom"));
+        assert_eq!(store.book_shared_account(&at("third", t0 + 14 * MIN, &[8_000, 1_000])).unwrap(),
+            BookingDecision::Booked);
+        // Unbooked work since the reading has no committed draw: refused.
+        claude_run(&store, "unbooked", t0 + 3 * MIN, t0 + 4 * MIN);
+        assert_eq!(store.book_shared_account(&at("fourth", t0 + 5 * MIN, &[1, 1])).unwrap(),
+            BookingDecision::Blocked("unbooked_work_since_reading"));
+        store.conn.execute("DELETE FROM runs WHERE id='unbooked'", []).unwrap();
+        assert_eq!(store.book_shared_account(&at("fifth", t0 + 5 * MIN, &[1, 1])).unwrap(),
+            BookingDecision::Booked);
+        // A new identity read with another plan: the reading is of the old plan.
+        store.record_claude_identity("claude", &auth("pro")).unwrap();
+        assert_eq!(store.book_shared_account(&at("sixth", t0 + 5 * MIN, &[1, 1])).unwrap(),
+            BookingDecision::Blocked("plan_changed"));
+        // Another source keeps its own one-minute term.
+        store.record_auto_account_identity("codex", &"d".repeat(64)).unwrap();
+        let codex = reading_of(&store, "codex", "codex-app/native-update", None, [10.0, 10.0], "pro", t0);
+        let codex_at = |now: i64| AccountBookingRequest { id: "codex", request_hash: "codex", caller: "ordinary",
+            route_id: "codex/sol", profile_id: "codex", quota_profile_id: "codex", account_generation: 1,
+            quota_event_seq: codex, now_ms: now, draw: BookingDraw::Fixture(&[1, 1]),
+            allocation_remaining_milli: None };
+        assert_eq!(store.book_shared_account(&codex_at(t0 + 2 * MIN)).unwrap(),
+            BookingDecision::Blocked("snapshot_expired"));
+        assert_eq!(store.book_shared_account(&codex_at(t0 + 30_000)).unwrap(), BookingDecision::Booked);
     }
 
     #[test]

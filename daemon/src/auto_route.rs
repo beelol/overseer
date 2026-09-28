@@ -306,7 +306,7 @@ mod tests {
     #[test]
     fn claude_alias_routes_keep_family_quota_and_do_not_claim_tools_or_model_charges() {
         let now = 1_800_000_000_000_i64;
-        let auth = crate::auto_collect::ClaudeAuth { fingerprint:"f".repeat(64), observed_ms:now };
+        let auth = crate::auto_collect::ClaudeAuth { fingerprint:"f".repeat(64), observed_ms:now, plan:None };
         let quota = crate::auto_quota::parse_claude_rate_limit_event(&json!({"type":"rate_limit_event",
             "rate_limit_info":{"status":"rejected","rateLimitType":"seven_day_opus",
                 "resetsAt":1800003600,"unifiedWindows":{"five_hour":{"utilization":0.3,"resetsAt":1800003600}}}}),

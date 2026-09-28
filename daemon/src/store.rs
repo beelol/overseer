@@ -395,6 +395,8 @@ impl Store {
             CREATE TABLE IF NOT EXISTS auto_account_identity(
               profile_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, generation INTEGER NOT NULL,
               observed_ms INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS auto_account_plans(
+              profile_id TEXT PRIMARY KEY, plan TEXT, observed_ms INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS auto_model_catalogs(
               profile_id TEXT PRIMARY KEY, observed_ms INTEGER NOT NULL, catalog TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS auto_thread_usage_observations(
@@ -1373,7 +1375,8 @@ impl Store {
             return Ok(false);
         }
         let Some(latest) = self.latest_auto_quota(&route.profile_id)? else { return Ok(false) };
-        if latest.snapshot.needs_refresh(now_ms) {
+        if crate::account_booking::reading_backs_booking(&self.conn, fingerprint, &route.profile_id,
+            &latest.source, &latest.snapshot, now_ms)?.is_err() {
             return Ok(false);
         }
         let bucket = crate::upper_draw::DrawBucket {
@@ -1866,6 +1869,7 @@ impl Store {
                 self.conn.execute("DELETE FROM auto_run_account_evidence WHERE profile_id=?1", params![profile_id])?;
                 self.conn.execute("DELETE FROM auto_quota_observations WHERE pool_id=?1", params![profile_id])?;
                 self.conn.execute("DELETE FROM auto_model_catalogs WHERE profile_id=?1", params![profile_id])?;
+                self.conn.execute("DELETE FROM auto_account_plans WHERE profile_id=?1", params![profile_id])?;
             }
             self.conn.execute(
                 "INSERT INTO auto_account_identity(profile_id,fingerprint,generation,observed_ms) VALUES(?1,?2,?3,?4) ON CONFLICT(profile_id) DO UPDATE SET fingerprint=excluded.fingerprint,generation=excluded.generation,observed_ms=excluded.observed_ms",
@@ -1880,6 +1884,47 @@ impl Store {
                 Err(error)
             }
         }
+    }
+
+    /// Whether this profile's latest reading may back a booking now (its own
+    /// term; a Claude reading's is longer, see `account_booking`).
+    pub fn reading_backs_booking(&self, profile_id: &str, reading: &StoredQuotaObservation, now_ms: i64)
+        -> Result<bool> {
+        // Without a recorded identity nothing books; the reading keeps its own term.
+        let Some(pool) = self.auto_account_pool_id(profile_id)? else {
+            return Ok(!reading.snapshot.needs_refresh(now_ms));
+        };
+        Ok(crate::account_booking::reading_backs_booking(&self.conn, pool.trim_start_matches("account/"),
+            profile_id, &reading.source, &reading.snapshot, now_ms)?.is_ok())
+    }
+
+    /// A Claude identity read (`claude auth status --json`): the account's
+    /// identity, and its `subscriptionType` as the plan of the profile's
+    /// Claude quota readings until the next identity read (the owner's
+    /// decision of 2026-09-28). A changed value is a new plan; an absent or
+    /// unreadable one is unknown. Returns whether the account changed.
+    pub fn record_claude_identity(&self, profile_id: &str, auth: &crate::auto_collect::ClaudeAuth) -> Result<bool> {
+        self.conn.execute_batch("SAVEPOINT claude_identity")?;
+        let result = (|| -> Result<bool> {
+            let changed = self.record_auto_account_identity(profile_id, &auth.fingerprint)?;
+            self.conn.execute(
+                "INSERT INTO auto_account_plans(profile_id,plan,observed_ms) VALUES(?1,?2,?3)
+                 ON CONFLICT(profile_id) DO UPDATE SET plan=excluded.plan,observed_ms=excluded.observed_ms",
+                params![profile_id, auth.plan, crate::daemon::now()])?;
+            Ok(changed)
+        })();
+        match result {
+            Ok(changed) => { self.conn.execute_batch("RELEASE claude_identity")?; Ok(changed) }
+            Err(error) => {
+                let _ = self.conn.execute_batch("ROLLBACK TO claude_identity; RELEASE claude_identity");
+                Err(error)
+            }
+        }
+    }
+
+    /// The plan the latest identity read reported for this profile's account.
+    pub fn auto_account_plan(&self, profile_id: &str) -> Result<Option<String>> {
+        crate::account_booking::recorded_plan(&self.conn, profile_id)
     }
 
     /// A failed account-scoped metadata read cannot leave prior capacity or
@@ -2812,6 +2857,25 @@ mod schema_migration_tests {
         assert_eq!(store.conn.query_row(
             "SELECT value FROM meta WHERE key='execution-after-oversize'", [], |row| row.get::<_, String>(0)
         ).unwrap(), "ok");
+    }
+
+    #[test]
+    fn a_claude_identity_read_records_its_plan_until_the_next_read() {
+        let store = Store::open(Path::new(":memory:")).unwrap();
+        let auth = |who: char, plan: Option<&str>| crate::auto_collect::ClaudeAuth {
+            fingerprint: who.to_string().repeat(64), observed_ms: 1, plan: plan.map(str::to_string) };
+        assert_eq!(store.auto_account_plan("claude").unwrap(), None);
+        assert!(!store.record_claude_identity("claude", &auth('a', Some("pro"))).unwrap());
+        assert_eq!(store.auto_account_plan("claude").unwrap().as_deref(), Some("pro"));
+        // The next read replaces it: a changed value is a new plan, an absent one unknown.
+        store.record_claude_identity("claude", &auth('a', Some("max"))).unwrap();
+        assert_eq!(store.auto_account_plan("claude").unwrap().as_deref(), Some("max"));
+        store.record_claude_identity("claude", &auth('a', None)).unwrap();
+        assert_eq!(store.auto_account_plan("claude").unwrap(), None);
+        // Another account's plan never carries over.
+        store.record_claude_identity("claude", &auth('a', Some("max"))).unwrap();
+        assert!(store.record_auto_account_identity("claude", &"b".repeat(64)).unwrap());
+        assert_eq!(store.auto_account_plan("claude").unwrap(), None);
     }
 
     #[test]

@@ -1,5 +1,8 @@
-//! Claude Code's quota readings as the daemon records them (Auto Mode's
-//! observation contract; the qualified upper draw's calibration source).
+//! Claude Code's quota readings as the daemon records them, and the owner's
+//! decisions of 2026-09-28 that make them a calibration source for the
+//! qualified upper draw: the identity read's plan stands for the readings,
+//! an `allowed` event is an explicit allowance, a run is bracketed by its
+//! neighbours' readings, and a reading backs a booking for up to 15 minutes.
 //! Synthetic Claude stream-json fixture and a synthetic account meter only:
 //! no provider allowance is spent, read or measured.
 
@@ -15,36 +18,40 @@ fn now_ms() -> i64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64
 }
 
-/// Six serial Claude runs on one account, each emitting the two native
+/// Serial Claude runs on one account, each emitting the two native
 /// `rate_limit_event`s a live turn emits (after its first model response and
-/// before its result). The daemon records every one as a structured quota
-/// observation of the run's profile. Each lies inside its own run's span, so
-/// no run is bracketed by a reading taken before it began and one taken
-/// after it ended; the readings report no plan and no explicit allowance.
-/// A booked start on the qualified draw is refused, and an ordinary start
-/// still runs unbooked.
+/// before its result), after an identity read that reported plan `max`.
+/// Every reading lies inside its own run, carries the identity read's plan
+/// and an explicit allowance. With six runs, four are bracketed by their
+/// neighbours and a booked start is refused (`upper_draw_unknown`); the
+/// seventh run makes five, and a booked start is priced on the qualified
+/// draw from the neighbours' readings. A new identity read with another plan
+/// refuses the next booking (`plan_changed`); an ordinary start still runs.
 #[test]
-fn claude_readings_arrive_inside_runs_and_cannot_price_a_booking() {
+fn claude_neighbour_readings_price_a_booking_after_the_identity_read() {
     let temp = tmp();
     let checkout = repo(&temp.path().join("claude-readings"));
     let meter = temp.path().join("meter.json");
+    let plan = temp.path().join("plan.txt");
+    std::fs::write(&plan, "max").unwrap();
     let resets_at = now_ms() / 1000 + 3 * 3600;
     std::fs::write(&meter, json!({"used":0.10,"weekly":0.05,"resets_at":resets_at,
         "first":0.003,"last":0.008,"step":0.01}).to_string()).unwrap();
     let claude = repo_root().join("fixtures/fake-harness/claude-fixture.js").display().to_string();
     let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", claude.as_str()),
-        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_METER_FILE"),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_METER_FILE,CLAUDE_FIXTURE_PLAN_FILE"),
         ("FIXTURE_MODE", "echo"), ("CLAUDE_FIXTURE_METER_FILE", meter.to_str().unwrap()),
+        ("CLAUDE_FIXTURE_PLAN_FILE", plan.to_str().unwrap()),
         ("OVERSEER_TEST_DRAW_SETTLE_MS", "300")]);
     let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
     db.busy_timeout(Duration::from_secs(10)).unwrap();
-    // The account identity, as the identity read records it; it is not the
-    // question here.
-    db.execute("INSERT INTO auto_account_identity(profile_id,fingerprint,generation,observed_ms)
-        VALUES('system-claude',?1,1,?2)", rusqlite::params!["c".repeat(64), now_ms()]).unwrap();
 
-    let mut runs = Vec::new();
-    for n in 0..6 {
+    // The identity read (local, no model turn) records the account and its plan.
+    let identity = d.call("auto.quota.refresh", json!({"profile_id":"system-claude"}));
+    assert_eq!((identity["identity"].as_str(), identity["plan"].as_str()), (Some("recorded"), Some("max")), "{identity}");
+    assert!(!identity.to_string().contains("fixture@example.test"), "{identity}");
+
+    let run_one = |n: usize| -> String {
         let run = d.call("task.create", json!({"repo":checkout,"harness":"claude",
             "profile_id":"system-claude","model":"sonnet","effort":"medium",
             "prompt":format!("sample {n}"),"title":format!("sample {n}")}))["run"]["id"]
@@ -52,9 +59,13 @@ fn claude_readings_arrive_inside_runs_and_cannot_price_a_booking() {
         let ended = d.wait_status(&run, |status| !HOLDING.contains(&status), 30);
         assert_eq!(ended["status"], "completed", "{ended}");
         std::thread::sleep(Duration::from_millis(400));
-        runs.push(run);
-    }
+        run
+    };
+    let booked_start = |id: &str| d.try_call("task.create", json!({"repo":checkout,"harness":"claude",
+        "profile_id":"system-claude","model":"sonnet","effort":"medium","prompt":"priced",
+        "title":"priced","shared_booking":{"work_unit_id":id,"draw":"qualified"}}));
 
+    let mut runs: Vec<String> = (0..6).map(run_one).collect();
     for run in &runs {
         let (created, ended): (i64, i64) = db.query_row(
             "SELECT created_ms,ended_ms FROM runs WHERE id=?1", [run], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
@@ -72,27 +83,55 @@ fn claude_readings_arrive_inside_runs_and_cannot_price_a_booking() {
             assert!(*observed > created && *observed <= ended,
                 "a Claude reading lies inside its run: {created} < {observed} <= {ended}");
             let snapshot: Value = serde_json::from_str(snapshot).unwrap();
-            assert!(snapshot["ordinary_usage_allowed"].is_null(), "{snapshot}");
+            assert_eq!(snapshot["ordinary_usage_allowed"], true, "an allowed event is an allowance: {snapshot}");
             assert_eq!(snapshot["windows"].as_array().unwrap().len(), 2, "{snapshot}");
-            assert!(snapshot["windows"].as_array().unwrap().iter().all(|w| w["plan_type"].is_null()),
-                "Claude's event reports no plan: {snapshot}");
+            assert!(snapshot["windows"].as_array().unwrap().iter().all(|w| w["plan_type"] == "max"),
+                "the identity read's plan stands for the reading: {snapshot}");
         }
+        let booked: i64 = db.query_row("SELECT COUNT(*) FROM shared_booking_intents WHERE run_id=?1",
+            [run], |r| r.get(0)).unwrap();
+        assert_eq!(booked, 0, "an uncalibrated ordinary start runs unbooked");
     }
-    // No reading of the account exists outside the runs' spans.
     let outside: i64 = db.query_row("SELECT COUNT(*) FROM auto_quota_observations o
         WHERE o.pool_id='system-claude' AND NOT EXISTS(SELECT 1 FROM runs r
           WHERE r.profile_id='system-claude' AND o.observed_ms>r.created_ms AND o.observed_ms<=r.ended_ms)",
         [], |r| r.get(0)).unwrap();
     assert_eq!(outside, 0, "Claude has no reading between runs");
 
-    // The latest reading is fresh (seconds old), yet it cannot book: it
-    // reports no explicit allowance, and no run has a bracketing pair.
-    let booked = d.try_call("task.create", json!({"repo":checkout,"harness":"claude",
-        "profile_id":"system-claude","model":"sonnet","effort":"medium","prompt":"priced",
-        "title":"priced","shared_booking":{"work_unit_id":"claude-priced","draw":"qualified"}}));
-    let error = booked.unwrap_err();
-    assert!(error.contains("account_allowance_unknown"), "{error}");
-    // An ordinary start is unaffected: it falls back to an unbooked start.
+    // Six runs: runs 1-4 have both neighbours, four samples, below five.
+    let refused = booked_start("claude-priced-early").unwrap_err();
+    assert!(refused.contains("upper_draw_unknown"), "{refused}");
+
+    // The seventh run gives run 5 its next neighbour: five samples.
+    runs.push(run_one(6));
+    let priced = booked_start("claude-priced").unwrap();
+    let priced_run = priced["run"]["id"].as_str().unwrap().to_string();
+    let (source, provenance): (String, String) = db.query_row(
+        "SELECT draw_source,draw_provenance FROM shared_booking_intents WHERE work_unit_id='claude-priced'",
+        [], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+    assert_eq!(source, "qualified");
+    let provenance: Value = serde_json::from_str(&provenance).unwrap();
+    assert_eq!((provenance["sample_count"].as_i64(), provenance["plan_type"].as_str()), (Some(5), Some("max")),
+        "{provenance}");
+    let sampled: Vec<&str> = provenance["samples"].as_array().unwrap().iter()
+        .map(|s| s["run_id"].as_str().unwrap()).collect();
+    assert_eq!(sampled, runs[1..6].iter().rev().map(String::as_str).collect::<Vec<_>>());
+    for (sample, n) in provenance["samples"].as_array().unwrap().iter().zip((1..6).rev()) {
+        assert_eq!(sample["neighbours"], json!([runs[n - 1], runs[n + 1]]), "{sample}");
+    }
+    // Each sample moved 1.5 points (the run's point with its neighbours'
+    // tail and head) plus two reading errors; never below the run's one point.
+    let bound: Vec<i64> = provenance["windows"].as_array().unwrap().iter()
+        .map(|w| w["upper_milli"].as_i64().unwrap()).collect();
+    assert_eq!(bound, [3_500, 2_000], "{provenance}");
+    d.wait_status(&priced_run, |status| !HOLDING.contains(&status), 30);
+
+    // A new identity read reports another plan: the latest reading is of the
+    // old plan and cannot back a booking; an ordinary start is unaffected.
+    std::fs::write(&plan, "pro").unwrap();
+    assert_eq!(d.call("auto.quota.refresh", json!({"profile_id":"system-claude"}))["plan"], "pro");
+    let changed = booked_start("claude-after-plan-change").unwrap_err();
+    assert!(changed.contains("plan_changed"), "{changed}");
     let plain = d.call("task.create", json!({"repo":checkout,"harness":"claude",
         "profile_id":"system-claude","model":"sonnet","effort":"medium","prompt":"plain",
         "title":"plain"}))["run"]["id"].as_str().unwrap().to_string();

@@ -350,7 +350,8 @@ fn claude_meter(name: &str, value: &Value, pool: &str, observed_ms: i64) -> Resu
         observed_ms, expires_ms:observed_ms.saturating_add(FRESH_MS) }))
 }
 
-/// Native Claude Code `rate_limit_event` only. A rejected, unrecognized scope
+/// Native Claude Code `rate_limit_event` only. An allowed event is an explicit
+/// allowance for the reading's term; a rejected, unrecognized scope
 /// conservatively blocks this account; absent or malformed meters never become
 /// an invented balance. The caller must retain only this normalized snapshot.
 pub fn parse_claude_rate_limit_event(value: &Value, pool_id: &str, observed_ms: i64) -> Result<QuotaSnapshot> {
@@ -401,7 +402,14 @@ pub fn parse_claude_rate_limit_event(value: &Value, pool_id: &str, observed_ms: 
             }
         }
     }
-    Ok(QuotaSnapshot { ordinary_usage_allowed:(rejected && current.and_then(claude_window).is_none()).then_some(false),
+    // An `allowed`/`allowed_warning` event is an explicit allowance for the
+    // reading's own term (the owner's decision of 2026-09-28); a rejection of
+    // an unrecognized scope denies the account; a scoped rejection blocks its
+    // window and leaves the account-wide allowance unknown.
+    let ordinary_usage_allowed = if !rejected { Some(true) }
+        else if current.and_then(claude_window).is_none() { Some(false) }
+        else { None };
+    Ok(QuotaSnapshot { ordinary_usage_allowed,
         observed_ms, expires_ms:observed_ms.saturating_add(FRESH_MS), windows:out,
         native_uncertain_until_ms:None })
 }
@@ -472,6 +480,26 @@ mod tests {
             "system-claude", now).unwrap();
         assert_eq!(rejected.state_for("claude-opus-4-5", now), QuotaState::Exhausted);
         assert_eq!(rejected.state_for("claude-sonnet-4-5", now), QuotaState::ObservedNonExhausted);
+    }
+
+    /// The owner's decision of 2026-09-28: an `allowed` or `allowed_warning`
+    /// event is an explicit allowance for its freshness period, as Codex's
+    /// `ordinaryUsageAllowed` is. A scoped rejection is not an account-wide
+    /// allowance, and an unscoped one is an account-wide denial.
+    #[test]
+    fn a_claude_allowed_event_is_an_explicit_allowance() {
+        let now = 1_800_000_000_000_i64;
+        let event = |status: &str, scope: &str| parse_claude_rate_limit_event(&json!({"type":"rate_limit_event",
+            "rate_limit_info":{"status":status,"rateLimitType":scope,"resetsAt":1800003600,
+                "unifiedWindows":{"five_hour":{"utilization":0.2,"resetsAt":1800003600}}}}), "pool", now).unwrap();
+        assert_eq!(event("allowed", "five_hour").ordinary_usage_allowed, Some(true));
+        assert_eq!(event("allowed_warning", "five_hour").ordinary_usage_allowed, Some(true));
+        assert_eq!(event("rejected", "seven_day_opus").ordinary_usage_allowed, None, "a scoped block");
+        assert_eq!(event("rejected", "new_window").ordinary_usage_allowed, Some(false));
+        // The allowance lasts only as long as the reading: after it, unknown.
+        let allowed = event("allowed", "five_hour");
+        assert_eq!(allowed.state_for("claude-sonnet-4-5", now + 59_999), QuotaState::ObservedNonExhausted);
+        assert_eq!(allowed.state_for("claude-sonnet-4-5", now + 60_000), QuotaState::Unknown);
     }
 
     #[test]

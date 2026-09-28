@@ -294,6 +294,7 @@ pub fn select(
 pub fn route_scoped_refusal(reason: &str) -> bool {
     matches!(reason, "account_identity_unknown" | "account_identity_changed" | "quota_unknown"
         | "snapshot_superseded" | "snapshot_expired" | "account_exhausted" | "account_allowance_unknown"
+        | "plan_changed" | "unbooked_work_since_reading"
         | "upper_draw_unknown" | "account_pool_busy" | "allocation_exhausted" | "shared_pool_headroom"
         | "duplicate_window")
 }

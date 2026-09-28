@@ -17,6 +17,19 @@ const MAX_FRAMES: usize = 100;
 pub struct ClaudeAuth {
     pub fingerprint: String,
     pub observed_ms: i64,
+    /// The account's `subscriptionType`, bounded to a plain identifier
+    /// (anything else is unknown). It stands for the plan of the account's
+    /// Claude quota readings until the next identity read (the owner's
+    /// decision of 2026-09-28).
+    pub plan: Option<String>,
+}
+
+/// A plan label as reported, if it is a short plain identifier.
+pub fn bounded_plan(value: Option<&Value>) -> Option<String> {
+    value.and_then(Value::as_str)
+        .filter(|plan| !plan.is_empty() && plan.len() <= 40
+            && plan.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_')))
+        .map(str::to_string)
 }
 
 fn parse_claude_auth_status(value: &Value, observed_ms: i64) -> Result<ClaudeAuth> {
@@ -34,7 +47,8 @@ fn parse_claude_auth_status(value: &Value, observed_ms: i64) -> Result<ClaudeAut
     digest.update(email.to_ascii_lowercase().as_bytes());
     digest.update(b"\0");
     digest.update(org.as_bytes());
-    Ok(ClaudeAuth { fingerprint:format!("{:x}", digest.finalize()), observed_ms })
+    Ok(ClaudeAuth { fingerprint:format!("{:x}", digest.finalize()), observed_ms,
+        plan:bounded_plan(value.get("subscriptionType")) })
 }
 
 /// `claude auth status --json` is a local metadata read. The child has no API
@@ -344,6 +358,18 @@ mod claude_auth_tests {
         assert_ne!(auth.fingerprint, parse_claude_auth_status(&json!({"loggedIn":true,
             "authMethod":"claude.ai","email":"other@example.test","orgId":"private-org"}), 2000)
             .unwrap().fingerprint);
+    }
+
+    #[test]
+    fn the_identity_read_carries_a_bounded_plan() {
+        let read = |plan: Value| parse_claude_auth_status(&json!({"loggedIn":true,"authMethod":"claude.ai",
+            "email":"a@example.test","subscriptionType":plan}), 1000).unwrap().plan;
+        assert_eq!(read(json!("max")).as_deref(), Some("max"));
+        assert_eq!(read(json!("team_premium")).as_deref(), Some("team_premium"));
+        assert_eq!(read(Value::Null), None);
+        assert_eq!(read(json!("Max plan (billed to someone@example.test)")), None, "free text is unknown");
+        assert_eq!(read(json!(5)), None);
+        assert_eq!(read(json!("x".repeat(41))), None);
     }
 
     #[test]
