@@ -299,6 +299,8 @@ struct Shared {
     last_system: SystemNet,
     newest_error_ms: i64,
     force: bool,
+    /// When the round whose answers are kept began: a round that began earlier is stale.
+    probe_started: Option<Instant>,
 }
 
 static SHARED: OnceLock<Mutex<Shared>> = OnceLock::new();
@@ -400,7 +402,7 @@ pub fn start(d: Arc<Daemon>) -> Result<()> {
     let first = decide(&system, None, &BTreeMap::new(), false, &evidence(&d));
     let at = now();
     let status = Status { state: first.state, reason: first.reason.clone(), unreachable: first.unreachable.clone(), acts_offline: first.acts_offline, providers: first.providers.clone(), system: system.clone(), baseline: None, probes: probes_on, since_ms: at, changed_ms: at, checked_ms: at, probed_ms: None };
-    let shared = Shared { settings, status: status.clone(), pending: None, baseline: None, probes: BTreeMap::new(), last_probe: None, last_system: system.state, newest_error_ms: 0, force: true };
+    let shared = Shared { settings, status: status.clone(), pending: None, baseline: None, probes: BTreeMap::new(), last_probe: None, last_system: system.state, newest_error_ms: 0, force: true, probe_started: None };
     if SHARED.set(Mutex::new(shared)).is_err() {
         bail!("Continuity was started twice");
     }
@@ -449,19 +451,28 @@ fn check(d: &Arc<Daemon>) -> Result<Status> {
         let due = s.force || system.state != s.last_system || agents.newest_ms > s.newest_error_ms || s.last_probe.is_none_or(|t| t.elapsed() >= every);
         (probes_allowed(&s.settings), due)
     };
+    let started = Instant::now();
     let fresh = (probes_on && due && system.state != SystemNet::NoNetwork).then(net::probe_round);
     let mut s = shared()?;
     if let Some((baseline, probes)) = fresh {
-        s.baseline = baseline;
-        s.probes = probes;
-        s.last_probe = Some(Instant::now());
-        s.status.probed_ms = Some(now());
+        // Rounds can overlap (Check now beside the periodic check), and one that waits on a
+        // host's timeout can end after a later one: its answer is older, so it is dropped rather
+        // than undoing the newer one (found with the simulated network: a stale timeout put the
+        // state back to "unreachable" for up to five minutes).
+        if s.probe_started.is_none_or(|t| t <= started) {
+            s.baseline = baseline;
+            s.probes = probes;
+            s.last_probe = Some(Instant::now());
+            s.probe_started = Some(started);
+            s.status.probed_ms = Some(now());
+        }
     }
     if !probes_on || system.state == SystemNet::NoNetwork {
         s.baseline = None;
         s.probes.clear();
         if system.state == SystemNet::NoNetwork {
             s.last_probe = None; // probe as soon as the system says connected again
+            s.probe_started = Some(Instant::now()); // and drop any round that began before
         }
     }
     s.force = false;

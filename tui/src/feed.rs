@@ -239,23 +239,55 @@ impl Feed {
         self.bump()
     }
 
-    /// Display-only: the workspace path becomes `.`, the repository `name`, home `~`.
-    pub fn shorten(&self, text: &str) -> String {
-        let mut out = text.to_string();
-        if let Some(r) = self.root.as_deref().filter(|r| r.len() > 1) {
-            out = out.replace(&format!("{r}/"), "./").replace(r, ".");
-        }
-        if let Some((path, name)) = &self.repo {
-            if path.len() > 1 {
-                out = out.replace(path.as_str(), name);
+    /// Once the workspace is known, shortens the paths of items added before it was: an agent
+    /// created after the TUI attached streams events before the state reload names its workspace.
+    pub fn relocate(&mut self) {
+        let Some(r) = self.root.clone().filter(|r| r.len() > 1) else { return };
+        let prefix = format!("{r}/");
+        let mut changed = false;
+        for item in self.items.values_mut() {
+            let text = match item.kind {
+                Kind::Out | Kind::ErrOut => {
+                    let (root, repo) = (self.root.as_deref(), self.repo.as_ref());
+                    shorten_with(&item.text, root, repo)
+                }
+                Kind::Tool { .. } | Kind::Permission { .. } | Kind::Edit => item.text.replace(&prefix, ""),
+                _ => continue,
+            };
+            if text != item.text {
+                item.text = text;
+                changed = true;
             }
         }
-        if let Some(home) = std::env::var_os("HOME").map(|h| h.to_string_lossy().to_string()).filter(|h| h.len() > 1) {
-            out = out.replace(&home, "~");
+        if changed {
+            self.bump();
         }
-        out
     }
 
+    /// Display-only: the workspace path becomes `.`, the repository `name`, home `~`.
+    pub fn shorten(&self, text: &str) -> String {
+        shorten_with(text, self.root.as_deref(), self.repo.as_ref())
+    }
+}
+
+/// Display-only: the workspace path becomes `.`, the repository `name`, home `~`.
+fn shorten_with(text: &str, root: Option<&str>, repo: Option<&(String, String)>) -> String {
+    let mut out = text.to_string();
+    if let Some(r) = root.filter(|r| r.len() > 1) {
+        out = out.replace(&format!("{r}/"), "./").replace(r, ".");
+    }
+    if let Some((path, name)) = repo {
+        if path.len() > 1 {
+            out = out.replace(path.as_str(), name);
+        }
+    }
+    if let Some(home) = std::env::var_os("HOME").map(|h| h.to_string_lossy().to_string()).filter(|h| h.len() > 1) {
+        out = out.replace(&home, "~");
+    }
+    out
+}
+
+impl Feed {
     fn bump(&mut self) -> bool {
         self.version += 1;
         true

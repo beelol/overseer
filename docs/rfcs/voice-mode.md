@@ -209,7 +209,7 @@ None of these starts a request, lowers or stops Overseer's speech, or moves the 
 | --- | --- |
 | makes a noise, coughs, types | keeps talking at full voice |
 | says one word or a backchannel | keeps talking |
-| says two or more words (recognized, not a backchannel) | lowers its voice within 150 ms of the second word and keeps listening |
+| says two or more words (recognized, not a backchannel) | lowers its voice within 150 ms of the second word and keeps listening (revised by the spike: within 0.35 s of the second word, about 0.6 to 1 s after the owner starts, since lowering needs recognized words) |
 | is still speaking 0.7 s later, and the words are meant for Overseer | stops at the end of its phrase |
 | is still speaking, and the words are not meant for Overseer | returns to full voice and finishes |
 | says "stop", "wait" or "hold on" | stops within 300 ms |
@@ -263,8 +263,8 @@ is archived, the target returns to Overseer and Overseer says so once.
 | Answer | What | Budget, from the end of the thought |
 | --- | --- | --- |
 | Heard | A soft signal; the words appear in the voice strip | 300 ms (p95) |
-| Working on it | One spoken sentence: what will be done and for whom | starts within 1.5 s (p50), 2.5 s (p95) |
-| Holding line | "Working on it.", once, if the sentence above is late | at 2.5 s |
+| Working on it | One spoken sentence: what will be done and for whom | starts within 1.5 s (p50), 2.5 s (p95); revised by the spike: "On it." at once, the plan when it comes ([the spike](#the-spike-measurements-and-decisions)) |
+| Holding line | "Working on it.", once, if the sentence above is late | at 2.5 s; revised by the spike: "Still working on it." at 8 s |
 | Done | One short line once the messages are out | when the last dispatch is sent |
 
 - **Heard** is decided on the Mac. It needs no model.
@@ -680,6 +680,93 @@ a real room, their real voice, and the session.
 These defaults stand without an answer: the system voice first, picked by ear later; Overseer
 speaks only in answer (Audio Mode's cue says when an agent needs the owner); the typed chat keeps
 Gate S's level; and the listener is a Rust process of its own, started by the daemon.
+
+## The spike: measurements and decisions
+
+AC-162, measured on files and with speech made by macOS at test time (no microphone yet; the
+owner's checks are below). Machine: Mac17,6, Apple M5 Max, 128 GiB, macOS 26.6.2 (25G83), with a
+load average of about 300 from other agents throughout, so the times are upper bounds. Versions:
+whisper-rs 0.16.0 (whisper-rs-sys 0.15.0, whisper.cpp with Metal), the ggml English models pinned
+by SHA-256 (small.en `c6138d6d…`, 487,614,201 bytes; base.en `a03779c8…`, 147,964,211 bytes),
+Claude Code 2.1.246 with Claude Haiku for the orchestrator's timing.
+
+**Recognizer.** 36 utterances (12 sentences in three system voices: Daniel, Eddy, Flo), with and
+without the vocabulary hint (agent names and Overseer's words, given to the model as a prompt).
+
+| Model | Load | Per utterance: median, p95, max | Per second of speech | Word error rate | Peak memory |
+| --- | --- | --- | --- | --- | --- |
+| tiny.en | 19,484 ms (cold) | 58, 184, 220 ms | 37 ms | 26.4% | 215 MiB |
+| tiny.en + hint | 714 ms | 112, 205, 278 ms | 50 ms | 21.1% | 212 MiB |
+| base.en | 635 ms | 327, 618, 654 ms | 147 ms | 19.1% | 297 MiB |
+| base.en + hint | 402 ms | 42, 63, 65 ms | 18 ms | 13.0% | 305 MiB |
+| small.en | 6,648 ms (cold) | 137, 191, 196 ms | 60 ms | 15.4% | 714 MiB |
+| **small.en + hint** | 328 ms | 148, 221, 259 ms | 66 ms | **4.5%** | 708 MiB |
+
+Words so far (a partial result) take 122 ms for 1 s of speech and 138 ms for 2 s with small.en
+and the hint. The words recorded from it are the words-layer fixture
+`voice/tests/fixtures/words-small-en.json` (text only), replayed by the daemon's tests.
+
+**Orchestrator.** The first sentence from Claude Haiku through Claude Code takes 4.69 s in a new
+session (3.40 s of it the API) and 3.87 s when resumed (2.08 s); a whole Overseer turn in Gate S
+takes about 10 s.
+
+**Speech gate.** Ten kinds of noise, 100 times each while nobody speaks and while Overseer speaks
+(3,000 in all including its own voice), opened the gate 0 times. Over 30 spoken sentences in five
+voices the gate opened after a median of 155 ms (p90 299 ms, at most 434 ms); the level for the
+mark averaged 0.44 while speaking.
+
+**Decisions** (the budgets above are revised where marked):
+
+1. **small.en with the hint** is the recognizer: a quarter of base.en's errors at 148 ms an
+   utterance. It is loaded only when Gate L's memory budget has room (852 MB, whisper.cpp's
+   figure; checked before the listener starts). base.en stays selectable.
+2. **"On it." at once, from the daemon.** The orchestrator's first sentence (3.9 to 4.7 s) misses
+   the 1.5 s budget, so the daemon says "On it." when it takes the request, with no model; the plan
+   line ("Telling Phone…") is spoken when the proposal comes, and "Sent." from the daemon's own
+   records. The holding line moves from 2.5 s to 8 s ("Still working on it.", once): at 2.5 s it
+   would follow "On it." every time.
+3. **Lowering needs words**, so it comes within 0.35 s of the owner's second word (words are asked
+   for every 0.3 s while Overseer speaks), about 0.6 to 1 s after the owner starts, not 150 ms after
+   the second word; the listener's test measures 240 ms. Stop words still stop it within 300 ms of
+   the words.
+4. **The gate opens within 300 ms for 9 in 10, 450 ms at most.**
+5. **Overseer's voice is made in memory** with macOS's speech synthesizer writing into callbacks,
+   not with `say` into a file, so no audio is written at all, the owner's or Overseer's. `say` is
+   used only by tests, to make speech at test time in a temporary folder.
+6. **Audio held is 30 s at most, an utterance 90 s:** past 30 s the first 25 s of a long utterance
+   is turned into words and let go, and the words are joined at the end.
+7. **Calls** are found in Core Audio's list of processes that record (macOS 14.2 and later): any
+   process but the listener that records pauses Voice Mode within 2 s.
+8. **The GPU's shader cache.** Loading the model on Metal writes macOS's shader cache
+   (`com.apple.metal` in the user cache folder) and opens the listener's own folder for writing;
+   neither holds audio. The offline test allows those two and checks the cache for audio.
+
+Still to measure with the owner (step 4): echo cancellation through real speakers
+(VoiceProcessingIO), the microphone prompt naming Overseer, and the times from a real microphone.
+
+## The owner's checks
+
+What the simulated voice cannot show. About 20 minutes on the owner's Mac, plus the session (AC-176).
+Everything else in Gate R is tested with the simulated voice and fixtures.
+
+1. **In a dev daemon (Gate T's guided test):** an isolated dev Overseer beside the installed one
+   ([dev-instance.md](dev-instance.md)); nothing is installed into the owner's own VS Code. The owner
+   says "let's start the voice mode test" and an agent opens it and walks through the steps below.
+2. **Turn it on (AC-163):** ⌘⌥⇧V (*Overseer: Voice Mode: Turn On or Off*). Accept the speech model
+   download (small.en, 465 MiB, once). macOS asks for the microphone: the prompt must name
+   **Overseer Listener**. Allow.
+3. **Mute (AC-163):** ⌘⌥⇧M. The orange microphone dot in the menu bar goes off within a second. ⌘⌥⇧M
+   again to unmute.
+4. **The mark (AC-177):** ⌘⌥V shows the voice view. Talk normally: the star grows and swings with
+   the voice. Tap the desk, type, cough: it stays at rest.
+5. **A quiet room (AC-164):** ten minutes of ordinary work (typing, moving, a video playing) with
+   Voice Mode on and nobody talking to Overseer: no request, no interruption.
+6. **Echo on speakers (AC-162):** on speakers, not headphones, say "what's running?". Overseer
+   answers aloud and its own voice does not come back as a request. While it talks, say
+   "Overseer, stop": it stops at the end of the phrase.
+7. **VS Code closed (AC-163):** quit VS Code and say "Overseer, what's running?". It answers aloud.
+8. **The session (AC-176):** real work by voice for a while; then the date, what worked, what did
+   not, and the friction points.
 
 ## Order of work
 

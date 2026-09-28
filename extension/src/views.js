@@ -500,7 +500,8 @@ class AgentsProvider {
     // Working agents show their badge (●); finished ones say how long ago. Oversight (AC-199):
     // held, watched, watching and in conflict, from the daemon's state.
     const o = (m.state.overseer && m.state.overseer.run_id ? (m.state.oversight || {})[run.id] : undefined) || {};
-    const marks = [o.held && '⏸ held', o.watched && '◉ watched', o.watching && o.watching.length && '◉ watching', o.conflicts && `⚠ ${o.conflicts} conflict${o.conflicts === 1 ? '' : 's'}`].filter(Boolean);
+    const voiced = this.handlers.voiceTargeted?.().has(run.id);
+    const marks = [voiced && '🎙 voice', o.held && '⏸ held', o.watched && '◉ watched', o.watching && o.watching.length && '◉ watching', o.conflicts && `⚠ ${o.conflicts} conflict${o.conflicts === 1 ? '' : 's'}`].filter(Boolean);
     item.description = [ACTIVE.has(run.status) ? '' : ago(run.ended_ms || run.created_ms), ...marks].filter(Boolean).join(' · ');
     const profile = run.profile_id ? m.profile(run.profile_id) : undefined;
     const ws = m.workspace(run.workspace_id);
@@ -508,7 +509,7 @@ class AgentsProvider {
     item.tooltip = new vscode.MarkdownString([`**${task.title}**`, `${status}${run.exit_reason && !ACTIVE.has(run.status) ? ` — ${run.exit_reason}` : ''}`,
       [run.harness, profile?.name, run.model].filter(Boolean).join(' · '), ws ? `${ws.kind === 'current' ? 'current checkout' : ws.branch} · ${path.basename(task.repo_root)}` : ''].filter(Boolean).join('\n\n'));
     item.accessibilityInformation = { label: `${task.title}, ${status}, ${run.harness}${profile ? ', ' + profile.name : ''}${marks.length ? ', ' + marks.map(x => x.replace(/^\S+ /, '')).join(', ') : ''}` };
-    if (marks.length) item.tooltip.appendMarkdown(`\n\n${[o.held && `Held: ${o.hold_reason || ''}`, o.watched && 'Watched by another agent', o.watching && o.watching.length && 'Watching another agent', o.conflicts && `${o.conflicts} open conflict${o.conflicts === 1 ? '' : 's'}`, o.area && o.area.length && `Area: ${o.area.join(', ')}`].filter(Boolean).join('\n\n')}`);
+    if (marks.length) item.tooltip.appendMarkdown(`\n\n${[voiced && 'A spoken request is for this agent', o.held && `Held: ${o.hold_reason || ''}`, o.watched && 'Watched by another agent', o.watching && o.watching.length && 'Watching another agent', o.conflicts && `${o.conflicts} open conflict${o.conflicts === 1 ? '' : 's'}`, o.area && o.area.length && `Area: ${o.area.join(', ')}`].filter(Boolean).join('\n\n')}`);
     const pinned = (this.handlers.pinned?.() || []).includes(run.id);
     item.contextValue = `agent-${ACTIVE.has(run.status) ? 'active' : 'done'}${task.archived_ms ? '-archived' : ''}${pinned ? '-pinned' : ''}`;
     item.command = { command: 'overseer.selectRun', title: 'Open', arguments: [run.id] };
@@ -592,6 +593,15 @@ class AccountsProvider {
         if (!st.installed) detail = 'harness not installed';
         else if (st.logged_in) detail = [st.identity?.plan, (st.identity?.account_fingerprint || st.identity?.fingerprint || '').slice(0, 8)].filter(Boolean).join(' · ') || 'signed in';
         else detail = 'signed out';
+      }
+      // Local models run through Ollama on this machine: there is no account to sign in to (AC-95).
+      if (a.id === 'local-ollama') {
+        item.description = 'no account needed';
+        item.iconPath = new vscode.ThemeIcon('server');
+        item.accessibilityInformation = { label: `${a.name}, no account needed` };
+        item.tooltip = 'Local models through Ollama on this machine. No account, no network, no cost.';
+        item.contextValue = 'profile-local';
+        return { item, profile: p, account: a };
       }
       const usage = this.model.accountUsage?.get(a.id);
       const near = usage?.reported ? (usage.windows || []).filter(w => w.used >= 0.8).sort((x, y) => y.used - x.used)[0] : undefined;

@@ -1,5 +1,26 @@
 # AC-146: merges
 
+## Pull request #19 (production guard, Gate T stage 1), 2026-09-28
+
+- **Finished:** marked ready by the dev daemons agent; AC-212 verified on main (`5b994d28`).
+- **Throwaway copy:** one conflict, `extension/src/daemon-client.js`. The guard waits for the daemon's `hello` answer before connecting, and main's Voice Mode subscribes to `voice.subscribe` on connect. The resolution keeps the guard's flow and subscribes to Voice's channel once connected (`a6d7086f`).
+- **Tests on the merge:** unit 5 of 5, source check, links; `dev_instance` 2 of 2; the TUI suite; the daemon's `voice` 36 of 36; UI scenarios voice and home passed. The branch's own `scripts/test-all` was run by its agent (load-only misses passed alone). The whole suite runs again on main after the phone agent's quiet window (05:15 to 06:55).
+- **Merged:** squash, `66731002`.
+
+## Pull request #16 (Voice Mode, Gate R), 2026-09-28
+
+- **Finished:** marked ready by the Voice Mode agent, with main merged in.
+- **Throwaway copy:** merged into current main without conflicts.
+- **Tests:** `scripts/test-all --jobs=2` at load 44 to 59: 46 of 53. At load 6 to 12, accounts, continuity and center pass here and on main. Review's conflict check is flaky on both (one fail, one pass alone). Arrangement, audit's review count and the TUI's t10 miss only under load, as on main.
+- **Merged:** squash, `b8be3812`. Records on main: AC-165 to AC-175 verified. AC-162, 163, 164 and 177 are partial and AC-176 is not started: all wait on the owner's checks, run in a dev daemon through Gate T's guided test.
+
+## Pull request #15 (Continuity follow-up), 2026-09-28
+
+- **Finished:** marked ready by the Continuity agent.
+- **Throwaway copy:** main merged in without conflicts.
+- **Tests:** `scripts/test-all --jobs=2`: 50 of 52. The review scenario and Gate S's ac192, ac193 and ac200 passed alone (and pass on main).
+- **Merged:** squash, `f2161079`. Its records were on the branch: AC-97 verified with the owner's screenshots, AC-83 partial.
+
 ## Pull request #14 (Overseer itself, Gate S), 2026-09-27
 
 - **Finished:** marked ready. The monitor's first run found nine UI scenarios failing that pass on main; the agent fixed them (`3650000e`) and then handed the pull request to the monitor.

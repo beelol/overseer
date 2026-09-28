@@ -115,10 +115,16 @@ pub fn probe_round() -> (Option<Baseline>, BTreeMap<String, Probe>) {
         let providers = v["providers"].as_object().map(|m| m.iter().map(|(k, p)| (k.clone(), Probe::fixture(p))).collect()).unwrap_or_default();
         return (baseline, providers);
     }
-    let mut urls: Vec<(String, &str)> = vec![("baseline:name".into(), BASELINE_NAME), ("baseline:ip".into(), BASELINE_IP)];
+    // A test that simulates the network points the real probes at hosts it controls
+    // (`OVERSEER_TEST_PROBE_URLS`: a JSON object with "baseline:name", "baseline:ip" and each
+    // provider's list of URLs); the probing itself is unchanged.
+    let custom: Option<Value> = std::env::var("OVERSEER_TEST_PROBE_URLS").ok().and_then(|t| serde_json::from_str(&t).ok());
+    let at = |key: &str, default: &str| custom.as_ref().and_then(|c| c[key].as_str()).unwrap_or(default).to_string();
+    let mut urls: Vec<(String, String)> = vec![("baseline:name".into(), at("baseline:name", BASELINE_NAME)), ("baseline:ip".into(), at("baseline:ip", BASELINE_IP))];
     for (id, hosts) in PROVIDERS {
-        for host in *hosts {
-            urls.push((id.to_string(), host));
+        match custom.as_ref().and_then(|c| c[*id].as_array()) {
+            Some(list) => urls.extend(list.iter().filter_map(|u| u.as_str()).map(|u| (id.to_string(), u.to_string()))),
+            None => urls.extend(hosts.iter().map(|h| (id.to_string(), h.to_string()))),
         }
     }
     let results: Vec<(String, Probe)> = std::thread::scope(|s| {
@@ -168,6 +174,17 @@ pub fn classify_transport(kind: ureq::ErrorKind, text: &str) -> &'static str {
 
 /// The system's own answer: is this machine connected to a network with a default route?
 pub fn system() -> SystemAnswer {
+    // A test that simulates Wi-Fi going off replaces only this answer (`OVERSEER_TEST_SYSTEM_NET`
+    // names a file holding `connected`, `none` or `unknown`); the probes stay real.
+    if let Some(path) = std::env::var_os("OVERSEER_TEST_SYSTEM_NET") {
+        let word = std::fs::read_to_string(path).map(|t| t.trim().to_string()).unwrap_or_default();
+        let state = match word.as_str() {
+            "connected" => SystemNet::Connected,
+            "none" => SystemNet::NoNetwork,
+            _ => SystemNet::Unknown,
+        };
+        return SystemAnswer { state, detail: format!("simulated: {}", if word.is_empty() { "unknown" } else { word.as_str() }) };
+    }
     if let Some(v) = fixture_file() {
         let state = match v["system"].as_str() {
             Some("connected") => SystemNet::Connected,
@@ -362,6 +379,15 @@ mod tests {
         assert_eq!(r.system.state, SystemNet::NoNetwork);
         assert!(r.baseline.is_none(), "no probe is needed when the system says there is no network");
         std::env::remove_var("OVERSEER_TEST_NET");
+        // A simulated network replaces only the system's answer; the probes would be real.
+        let answer = dir.path().join("system");
+        std::env::set_var("OVERSEER_TEST_SYSTEM_NET", &answer);
+        std::fs::write(&answer, "none\n").unwrap();
+        assert_eq!((system().state, system().detail), (SystemNet::NoNetwork, "simulated: none".to_string()));
+        assert!(read(true).baseline.is_none(), "Wi-Fi off: nothing is probed");
+        std::fs::write(&answer, "connected").unwrap();
+        assert_eq!(system().state, SystemNet::Connected);
+        std::env::remove_var("OVERSEER_TEST_SYSTEM_NET");
     }
 
     #[cfg(target_os = "macos")]

@@ -1,0 +1,31 @@
+# Checks on every pull request and push to main (AC-148): Rust (daemon and TUI), the extension's unit
+# tests and source check. The packaged-UI suite runs nightly and on demand (it needs VS Code and a
+# desktop session, and takes about forty minutes).
+name: checks
+on:
+  pull_request:
+    paths-ignore: ['docs/**', '**/*.md']
+  push:
+    branches: [main]
+    paths-ignore: ['docs/**', '**/*.md']
+  workflow_dispatch:
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Rust (daemon and TUI)
+        run: cargo test --workspace --no-fail-fast
+      - name: Extension unit tests
+        run: node test/unit/run.js
+      - name: Extension source check
+        run: npm run --silent check --prefix extension

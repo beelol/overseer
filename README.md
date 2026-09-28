@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **134 / 204** · **43** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-64, AC-66, AC-83, AC-97, AC-114, AC-115, AC-117, AC-120, AC-121, AC-122, AC-124, AC-125, AC-126, AC-128, AC-129, AC-130, AC-131, AC-132, AC-133, AC-135, AC-136, AC-137, AC-141, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-165, AC-166, AC-167, AC-168, AC-169, AC-170, AC-171, AC-172, AC-173, AC-174, AC-175, AC-176, AC-177, AC-178, AC-179, AC-182, AC-183, AC-185, AC-186, AC-187, AC-188, AC-189, AC-190, AC-191, AC-192, AC-193, AC-194, AC-195, AC-196, AC-197, AC-198, AC-199, AC-200, AC-201, AC-202, AC-204. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+criteria: **148 / 215** · **46** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-121, AC-122, AC-124, AC-125, AC-126, AC-128, AC-129, AC-130, AC-131, AC-132, AC-133, AC-135, AC-136, AC-137, AC-141, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-182, AC-183, AC-185, AC-186, AC-187, AC-188, AC-189, AC-190, AC-191, AC-192, AC-193, AC-194, AC-195, AC-196, AC-197, AC-198, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-206, AC-207, AC-208, AC-209, AC-210, AC-211, AC-213, AC-214, AC-215. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), Voice Mode (Gate R, AC-162 to AC-177, added by the owner on 2026-09-27: a voice to talk to constantly that redirects every agent from context, answers quickly and shows every word it sent, with audio collected on the Rust side and the animated mark in the middle moving with the voice; [design](docs/rfcs/voice-mode.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -16,15 +16,21 @@ which is out of scope for now. The full list is under [Acceptance criteria](#acc
 Only the owner can do these (AC-160). Each is one step; the criterion it unblocks is in brackets. The everything goal (`docs/goals/everything.md`) keeps this list current.
 
 - Try the Gate K build in your own VS Code [AC-114].
-- Let the GitHub CLI push workflow files: `gh auth refresh -s workflow` (the checks for every pull request are written and waiting) [AC-148].
 - Say whether the Gate J design review still needs marks or the Gate K review replaces it [AC-66].
 - Work an hour using only Overseer [AC-64].
 - Mark the phone's door and motion on the [review page](https://claude.ai/artifact/FzD5ido4NdwX3annWoY9Uq): *Right* or *Needs work* for each [AC-136, AC-137].
-- Start Voice Mode: paste the goal in [voice-mode-goal.md](docs/rfcs/voice-mode-goal.md) into `/goal`. It builds everything it can with a simulated voice first, on top of Gate S's pull request #14, then sends you one list of live checks [Gate R, AC-162 to AC-177].
-- Turn Wi-Fi off and on while `node test/local/wifi-live.js` runs; it tells you when [AC-83].
-- Work a short session offline: `node test/local/owner-session.js start` opens an isolated VS Code and prints the steps; `node test/local/owner-session.js report` records it [AC-97].
+- When the live tests are ready (an agent will ask): approve the sign-ins of your personal Claude and your personal ChatGPT Plus into Overseer, in your non-work browser. The work Claude Max and work ChatGPT Pro are never used [AC-53, Auto and Swarm accounts].
+- Decide seven Auto and Swarm questions (defaults are proposed; nothing live runs until you answer). For Claude calibration: whether `subscriptionType` stands for the plan, whether an `allowed` reading counts as an explicit allowance, strict run isolation or neighbouring readings, how fresh a reading must be. For a real Swarm: what qualifies a director (proposed: Claude with the daemon's Swarm tools, native Agent denied), how native workers report (proposed: the same tools), whether native workers may run in audit runs. In the Auto and Swarm RFCs on `claude/auto-swarm` [AUTO-AC-17, SWARM-01, S0].
+- Later, once the dev daemons feature is merged (Gate T): tell any agent "let's start the voice mode test". It opens a dev Overseer beside yours (your installed one is never touched), pulls up what the test needs and walks you through the checks in [Voice Mode's RFC](docs/rfcs/voice-mode.md) one at a time: the microphone prompt, the star with your voice, ten minutes of an ordinary room, echo on your speakers, a request with VS Code closed, then your session [AC-162, AC-163, AC-164, AC-176, AC-177].
+- Later, when no agent is running: turn Wi-Fi off and on while `node test/local/wifi-live.js` runs; it tells you when [AC-205].
 - Run *Overseer: Test Notification* in VS Code, allow notifications when macOS asks, and screenshot the banner and the helper (Overseer Notifier) in Finder [AC-179].
-- Later: a second Claude account [AC-53]; a Linux machine [AC-41]; the owner-confirmed session of the phone app when its agent finishes [AC-133].
+- Later: a Linux machine [AC-41]; the owner-confirmed session of the phone app when its agent finishes [AC-133].
+
+## Releasing the phone app (TestFlight)
+
+The iOS app ships through TestFlight — App Store Connect app **Overseer Remote**, bundle `com.beelol.overseer.phone`. Full setup and IDs: [testflight-goal.md](docs/goals/testflight-goal.md). Build, sign and upload with `scripts/testflight-release.sh`, or let `.github/workflows/ios-testflight.yml` do it from `main` (on changes to `phone/**` or manual dispatch). The workflow needs the repository secrets in the owner-actions list.
+
+**⚠️ Build-number rule:** every TestFlight upload must have a **higher build number** (`CFBundleVersion`) than the previous one, or App Store Connect rejects it. The release script stamps a unique timestamp build number so this never bites — never reuse a number or ship the default `1` twice.
 
 ## Acceptance criteria
 
@@ -116,7 +122,7 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-80** Remembered place — [evidence](docs/verification/AC-80.md)
 - [x] **AC-81** Gate J still holds — [evidence](docs/verification/AC-81.md)
 - [x] **AC-82** Gate K design review (owner-confirmed) — [evidence](docs/verification/AC-82.md)
-- [ ] **AC-83** Offline is not an outage — ◐ partial: the daemon keeps one connection state decided from the system's own answer, the probes and the agents' errors, with every change an event; a provider outage gives degraded naming the provider, a failing baseline or the system's no-network gives offline, and a 429 or a usage limit leaves it online; on this machine the system's answer, both baseline probes and both providers are read live; the status bar and the side bar show each state in the packaged extension / deferred: the owner turning Wi-Fi off and on while the daemon logs the change (offline within 10 s of the system signal, online after the checks agree): this session needs the network itself — [evidence](docs/verification/AC-83.md)
+- [x] **AC-83** Offline is not an outage — [evidence](docs/verification/AC-83.md)
 - [x] **AC-84** Fail over to the best working provider — [evidence](docs/verification/AC-84.md)
 - [x] **AC-85** Local inventory read from the machine — [evidence](docs/verification/AC-85.md)
 - [x] **AC-86** Memory budget and fit — [evidence](docs/verification/AC-86.md)
@@ -130,7 +136,7 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-94** Local models as a first-class choice — [evidence](docs/verification/AC-94.md)
 - [x] **AC-95** Honest offline UI — [evidence](docs/verification/AC-95.md)
 - [x] **AC-96** Several local agents — [evidence](docs/verification/AC-96.md)
-- [ ] **AC-97** Offline session (owner-confirmed) — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-97.md)
+- [x] **AC-97** Offline session (owner-confirmed) — [evidence](docs/verification/AC-97.md)
 - [x] **AC-98** On by default, explained once — [evidence](docs/verification/AC-98.md)
 - [x] **AC-99** The review is where files live — [evidence](docs/verification/AC-99.md)
 - [x] **AC-100** Nothing shown twice — [evidence](docs/verification/AC-100.md)
@@ -195,22 +201,22 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-159** The toolchain works without Xcode's license — [evidence](docs/verification/AC-159.md)
 - [x] **AC-160** Owner actions in one place — [evidence](docs/verification/AC-160.md)
 - [ ] **AC-161** Everything merged into one main — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-161.md)
-- [ ] **AC-162** Voice spike before lock-in — not started (Gate R, added by the owner on 2026-09-27; the goal's first step) — [evidence](docs/verification/AC-162.md)
-- [ ] **AC-163** Owned by the daemon, heard in Rust, off until asked — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-163.md)
-- [ ] **AC-164** Holds the floor; noise never interrupts — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-164.md)
-- [ ] **AC-165** A quick answer that it is working on it — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-165.md)
-- [ ] **AC-166** The right agents, from context, or the one you chose — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-166.md)
-- [ ] **AC-167** Redirect without trampling — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-167.md)
-- [ ] **AC-168** New agents from a request — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-168.md)
-- [ ] **AC-169** Evidence for every word sent — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-169.md)
-- [ ] **AC-170** Correct and cancel — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-170.md)
-- [ ] **AC-171** What voice may do — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-171.md)
-- [ ] **AC-172** One speaker at a time — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-172.md)
-- [ ] **AC-173** Private and bounded — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-173.md)
-- [ ] **AC-174** Voice in the UI — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-174.md)
-- [ ] **AC-175** Keeps working when things fail — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-175.md)
-- [ ] **AC-176** Voice Mode by voice (owner-confirmed) — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-176.md)
-- [ ] **AC-177** The mark shows it is hearing you — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-177.md)
+- [ ] **AC-162** Voice spike before lock-in — ◐ partial: the measurement table with the versions and the machine, and eight decisions with the revised budgets, in the side RFC; the words recorded from the chosen recognizer (small.en with the hint) as `voice/tests/fixtures/words-small-en.json` (text only), all 36 utterances replayed through the local rules by `voice::request::tests::the_recorded_words_replay_through_the_local_rules`; no recorded or generated voice file in the repository (the only audio is Audio Mode's twelve approved MP3s, per its pack check) / deferred: echo cancellation through real speakers, which needs the owner's Mac (the owner's checks (docs/rfcs/voice-mode.md#the-owners-checks), step 6) — [evidence](docs/verification/AC-162.md)
+- [ ] **AC-163** Owned by the daemon, heard in Rust, off until asked — ◐ partial: off by default and kept across a daemon kill; no listener process while off or muted; one utterance makes exactly one request with no window open and with two; a second listener with the daemon's lock is refused; a killed listener leaves the daemon and a running agent untouched, and a fourth death in ten minutes turns Voice Mode off with the reason; the listener is its own process, spawned with responsibility disclaimed so macOS names it, and sends words and one level, never audio / deferred: live on macOS: the prompt names Overseer, the indicator goes off within 1 s of mute, a spoken request with VS Code closed (the owner's checks (docs/rfcs/voice-mode.md#the-owners-checks), steps 2, 3 and 7) — [evidence](docs/verification/AC-163.md)
+- [ ] **AC-164** Holds the floor; noise never interrupts — ◐ partial: every noise (taps, clicks, typing, a chair, a door, a cup, a cough, a laugh, a fan, music) 100 times each: while nobody speaks it never opens the gate or moves the mark; while Overseer speaks it makes no utterance, no lowering, no stop and no level; speech still opens the gate after noise; a pause in mid-thought stays one utterance; Overseer's own voice coming back and a cue make no utterance; side talk and a phone call make no request and no answer, and Overseer returns to full voice and finishes; the lowering, the stop at the end of a phrase and the stop words are measured by the listener's tests (the lowering budget revised by the spike); a line due while the owner speaks waits and is then spoken, and one kept waiting past the limit goes to the card alone / deferred: ten minutes of an ordinary room on the owner's Mac (the owner's checks (docs/rfcs/voice-mode.md#the-owners-checks), step 5) — [evidence](docs/verification/AC-164.md)
+- [x] **AC-165** A quick answer that it is working on it — [evidence](docs/verification/AC-165.md)
+- [x] **AC-166** The right agents, from context, or the one you chose — [evidence](docs/verification/AC-166.md)
+- [x] **AC-167** Redirect without trampling — [evidence](docs/verification/AC-167.md)
+- [x] **AC-168** New agents from a request — [evidence](docs/verification/AC-168.md)
+- [x] **AC-169** Evidence for every word sent — [evidence](docs/verification/AC-169.md)
+- [x] **AC-170** Correct and cancel — [evidence](docs/verification/AC-170.md)
+- [x] **AC-171** What voice may do — [evidence](docs/verification/AC-171.md)
+- [x] **AC-172** One speaker at a time — [evidence](docs/verification/AC-172.md)
+- [x] **AC-173** Private and bounded — [evidence](docs/verification/AC-173.md)
+- [x] **AC-174** Voice in the UI — [evidence](docs/verification/AC-174.md)
+- [x] **AC-175** Keeps working when things fail — [evidence](docs/verification/AC-175.md)
+- [ ] **AC-176** Voice Mode by voice (owner-confirmed) — not started: waits for the owner's session (in a dev daemon, Gate T's guided test) — [evidence](docs/verification/AC-176.md)
+- [ ] **AC-177** The mark shows it is hearing you — ◐ partial: the Star motion ported unchanged, its poses equal the reference's within 1% for every state (`test/unit/voice-mark.js`); in the packaged UI the mark is centred (measured), the star follows the level curve with a 40 ms lag (best-aligned, r 0.88), noise leaves it at rest, each state in screenshots in the three themes and in grayscale, frame work p95 0.2 ms beside a streaming chat at the display's rate, no frame while hidden, reduced motion shows the still mark and a meter; two windows get the same levels from one listener; the listener's output carries levels and no audio, and nothing of them is stored / deferred: the owner speaks with Voice Mode on and sees the star follow their real voice and stay at rest for taps and typing (the owner's checks (docs/rfcs/voice-mode.md#the-owners-checks), step 4) — [evidence](docs/verification/AC-177.md)
 - [ ] **AC-178** The phone app uses the owner's mark — not started (Brand, added by the owner on 2026-09-27): the phone app's agent uses the owner's files — [evidence](docs/verification/AC-178.md)
 - [ ] **AC-179** The Mac surfaces use the owner's mark — ◐ partial: the notification helper's `.icns` is built from `docs/design/brand/exports/overseer-app-icon-macos-1024.png` by `extension/notifier/build.js` (sips for every macOS size, iconutil); the brand scenario unpacks the installed helper's icon and finds every size, the owner's violet tile (`node test/ui/scenario-brand.js`); Overseer has no menu-bar item and no other Mac app, so those parts do not apply yet / deferred: a screenshot of a real notification banner and of the helper in Finder: macOS asks the owner to allow the helper's notifications, and screenshots of the desktop need the owner's screen-recording permission; the menu-bar image when a menu-bar item exists — [evidence](docs/verification/AC-179.md)
 - [x] **AC-180** Spikes before lock-in — [evidence](docs/verification/AC-180.md)
@@ -238,6 +244,17 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-202** Orchestration session (owner-confirmed) — not started (Gate S, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-202.md)
 - [x] **AC-203** Stalled work is taken over, and handed back — [evidence](docs/verification/AC-203.md)
 - [ ] **AC-204** Finished slices merge; the rest becomes criteria — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-204.md)
+- [ ] **AC-205** Offline on a real Wi-Fi toggle (owner step) — not started — [evidence](docs/verification/AC-205.md)
+- [ ] **AC-206** One command gives a dev daemon (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-206.md)
+- [ ] **AC-207** A dev daemon never interferes with the running Overseer (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-207.md)
+- [ ] **AC-208** Production knows nothing of dev daemons (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-208.md)
+- [ ] **AC-209** VS Code and the TUI pointed at one dev daemon (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-209.md)
+- [ ] **AC-210** The phone simulators pinned to a dev daemon (after pull request #10) — not started: after PR #10 (the phone app and the gateway) — [evidence](docs/verification/AC-210.md)
+- [ ] **AC-211** Agents learn it from the repository, and leave nothing running (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-211.md)
+- [x] **AC-212** Production can never point at a dev version (stage 1) — [evidence](docs/verification/AC-212.md)
+- [ ] **AC-213** The production phone app never pairs with a dev daemon (after pull request #10) — not started: after PR #10 (the phone app and the gateway) — [evidence](docs/verification/AC-213.md)
+- [ ] **AC-214** Deploy: the one path from dev to production (stage 4) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-214.md)
+- [ ] **AC-215** Guided owner tests in a dev daemon (stage 3) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-215.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -379,7 +396,10 @@ agent and the daemon, `?` lists every key, `q` quits.
 
 - State lives in `~/Library/Application Support/Overseer` (`overseer.sqlite`, per-run
   output under `runs/`, worktrees under `worktrees/`, profiles under `profiles/`). Linux
-  uses `$XDG_DATA_HOME/overseer`. `OVERSEER_HOME` overrides it.
+  uses `$XDG_DATA_HOME/overseer`. `OVERSEER_HOME` overrides it for tests and dev instances
+  only: the installed extension and TUI ignore `OVERSEER_HOME`, `OVERSEER_SOCKET` and
+  `OVERSEER_INSTANCE` in their environment and refuse any daemon marked dev
+  ([AC-212](docs/verification/AC-212.md), [dev instances](docs/rfcs/dev-instance.md)).
 - The daemon binary is `target/release/overseerd` in a build, or
   `~/.vscode/extensions/beelol.overseer-0.1.0/bin/overseerd-darwin-arm64` once installed.
   `overseerd serve` runs it in the foreground without VS Code (the extension normally starts
@@ -399,8 +419,6 @@ the owner action or decision each one needs.
 - [ ] [AC-53](docs/verification/AC-53.md) (Fixed Claude accounts): Needs a second Claude account (the owner has one today); not to be tested yet (owner, 2026-09-25). Next: check whether Claude keeps a separate Keychain entry per CLAUDE_CONFIG_DIR, otherwise add Overseer-managed Claude credentials (docs/rfcs/claude-credentials.md); then Add Account → Anthropic → Sign In with it, Sign Out and Sign In again while a Claude run on the desktop login keeps working; confirm both identities and the macOS Keychain entries stay separate.
 - [ ] [AC-64](docs/verification/AC-64.md) (Default-to-Overseer session (owner-confirmed)): Owner action after the design review (AC-66): work for an hour using only Overseer for Claude Code and Codex; log friction.
 - [ ] [AC-66](docs/verification/AC-66.md) (Design review against references (owner-confirmed)): Waiting for the owner's marks. Next: read the marks from the page, change each marked item, republish the page and ask for confirmation.
-- [ ] [AC-83](docs/verification/AC-83.md) (Offline is not an outage): Owner: run `node test/local/wifi-live.js` (a real daemon in its own home, real network) and turn Wi-Fi off when it asks, then on again when it says Overseer is offline. It measures the gap from Wi-Fi power going off to the offline event (must be 10 s or less), reads the reason and the return online, and writes `evidence/ac-83/wifi.txt` and `wifi-events.jsonl`. Its rehearsal against the network fixture (`node test/local/wifi-live.js rehearse`) passed 4 of 4 on 2026-09-27; the script only reads Wi-Fi power, it never changes the network.
-- [ ] [AC-97](docs/verification/AC-97.md) (Offline session (owner-confirmed)): Owner: `node test/local/owner-session.js start` opens an isolated VS Code (own profile, extensions folder and OVERSEER_HOME; your own VS Code, daemon, logins and settings untouched) with this branch's VSIX on a scratch repository and prints the steps: start a small agent, turn Wi-Fi off while it runs and screenshot the transition announcement, the run tree and the review, turn Wi-Fi on and take Switch back, screenshot that; quit, then `node test/local/owner-session.js report` writes the daemon's record to `evidence/ac-97/` and the screenshots go to `/private/tmp/ac-97/`. `node test/local/owner-session.js check` confirmed on 2026-09-27: the VSIX, VS Code, Ollama running and `qwen3-coder:30b` installed.
 - [ ] [AC-114](docs/verification/AC-114.md) (Gate K in the owner's VS Code (owner-confirmed)): Not started (Gate K follow-up from the owner's marks on 2026-09-26).
 - [ ] [AC-115](docs/verification/AC-115.md) (Feasibility and reuse before lock-in): not blocked
 - [ ] [AC-117](docs/verification/AC-117.md) (Pairing needs the Mac): not blocked
@@ -426,22 +444,11 @@ the owner action or decision each one needs.
 - [ ] [AC-151](docs/verification/AC-151.md) (Every live scenario rerun on the current build): The app-server live runs need either effort support in that transport or the owner's allowance for its default effort.
 - [ ] [AC-156](docs/verification/AC-156.md) (Every agent works from the same rules): Waits for the Auto agent's next merge of main.
 - [ ] [AC-161](docs/verification/AC-161.md) (Everything merged into one main): Not started (Gate Q, added by the owner on 2026-09-27).
-- [ ] [AC-162](docs/verification/AC-162.md) (Voice spike before lock-in): Not started (Gate R, added by the owner on 2026-09-27; the goal's first step).
-- [ ] [AC-163](docs/verification/AC-163.md) (Owned by the daemon, heard in Rust, off until asked): Not started (Gate R, added by the owner on 2026-09-27).
-- [ ] [AC-164](docs/verification/AC-164.md) (Holds the floor; noise never interrupts): Not started (Gate R, added by the owner on 2026-09-27).
-- [ ] [AC-165](docs/verification/AC-165.md) (A quick answer that it is working on it): Not started (Gate R, added by the owner on 2026-09-27).
-- [ ] [AC-166](docs/verification/AC-166.md) (The right agents, from context, or the one you chose): Not started (Gate R, added by the owner on 2026-09-27).
-- [ ] [AC-167](docs/verification/AC-167.md) (Redirect without trampling): Not started (Gate R, added by the owner on 2026-09-27).
-- [ ] [AC-168](docs/verification/AC-168.md) (New agents from a request): Not started (Gate R, added by the owner on 2026-09-27).
-- [ ] [AC-169](docs/verification/AC-169.md) (Evidence for every word sent): Not started (Gate R, added by the owner on 2026-09-27).
-- [ ] [AC-170](docs/verification/AC-170.md) (Correct and cancel): Not started (Gate R, added by the owner on 2026-09-27).
-- [ ] [AC-171](docs/verification/AC-171.md) (What voice may do): Not started (Gate R, added by the owner on 2026-09-27).
-- [ ] [AC-172](docs/verification/AC-172.md) (One speaker at a time): Not started (Gate R, added by the owner on 2026-09-27).
-- [ ] [AC-173](docs/verification/AC-173.md) (Private and bounded): Not started (Gate R, added by the owner on 2026-09-27).
-- [ ] [AC-174](docs/verification/AC-174.md) (Voice in the UI): Not started (Gate R, added by the owner on 2026-09-27).
-- [ ] [AC-175](docs/verification/AC-175.md) (Keeps working when things fail): Not started (Gate R, added by the owner on 2026-09-27).
-- [ ] [AC-176](docs/verification/AC-176.md) (Voice Mode by voice (owner-confirmed)): Not started (Gate R, added by the owner on 2026-09-27).
-- [ ] [AC-177](docs/verification/AC-177.md) (The mark shows it is hearing you): Not started (Gate R, added by the owner on 2026-09-27).
+- [ ] [AC-162](docs/verification/AC-162.md) (Voice spike before lock-in): The owner: echo through real speakers (the owner's checks, step 6). Run later in a dev daemon through Gate T's guided test (docs/rfcs/dev-instance.md), once that feature is built.
+- [ ] [AC-163](docs/verification/AC-163.md) (Owned by the daemon, heard in Rust, off until asked): The owner: the microphone prompt, the indicator after mute, a request with VS Code closed (the owner's checks, steps 2, 3 and 7). Run later in a dev daemon through Gate T's guided test (docs/rfcs/dev-instance.md), once that feature is built.
+- [ ] [AC-164](docs/verification/AC-164.md) (Holds the floor; noise never interrupts): The owner: ten minutes of an ordinary room (the owner's checks, step 5). Run later in a dev daemon through Gate T's guided test (docs/rfcs/dev-instance.md), once that feature is built.
+- [ ] [AC-176](docs/verification/AC-176.md) (Voice Mode by voice (owner-confirmed)): The owner's session (the owner's checks (docs/rfcs/voice-mode.md#the-owners-checks), step 8). Run later in a dev daemon through Gate T's guided test (docs/rfcs/dev-instance.md), once that feature is built.
+- [ ] [AC-177](docs/verification/AC-177.md) (The mark shows it is hearing you): The owner: the star with their real voice, and a dated confirmation (the owner's checks, step 4). Run later in a dev daemon through Gate T's guided test (docs/rfcs/dev-instance.md), once that feature is built.
 - [ ] [AC-178](docs/verification/AC-178.md) (The phone app uses the owner's mark): Not started: the phone app's agent (Gate N) replaces its placeholder marks with the owner's files in docs/design/brand/.
 - [ ] [AC-179](docs/verification/AC-179.md) (The Mac surfaces use the owner's mark): Owner: run Overseer: Test Notification in VS Code, allow notifications when macOS asks, and screenshot the banner and the helper (Overseer Notifier) in Finder.
 - [ ] [AC-182](docs/verification/AC-182.md) (One conversation, from home): The keyboard-only corrections and the AC-54 measure remain.
@@ -465,6 +472,16 @@ the owner action or decision each one needs.
 - [ ] [AC-201](docs/verification/AC-201.md) (Regression coverage): The clean-clone run at the merge.
 - [ ] [AC-202](docs/verification/AC-202.md) (Orchestration session (owner-confirmed)): Not started (Gate S, added by the owner on 2026-09-27).
 - [ ] [AC-204](docs/verification/AC-204.md) (Finished slices merge; the rest becomes criteria): Not started (Gate Q, added by the owner on 2026-09-27).
+- [ ] [AC-205](docs/verification/AC-205.md) (Offline on a real Wi-Fi toggle (owner step)): Owner, when no agents are in flight: run `node test/local/wifi-live.js`, switch Wi-Fi off when it asks and on again when it says Overseer is offline (about a minute). It writes `evidence/ac-205/`; then this record is updated.
+- [ ] [AC-206](docs/verification/AC-206.md) (One command gives a dev daemon (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
+- [ ] [AC-207](docs/verification/AC-207.md) (A dev daemon never interferes with the running Overseer (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
+- [ ] [AC-208](docs/verification/AC-208.md) (Production knows nothing of dev daemons (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
+- [ ] [AC-209](docs/verification/AC-209.md) (VS Code and the TUI pointed at one dev daemon (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
+- [ ] [AC-210](docs/verification/AC-210.md) (The phone simulators pinned to a dev daemon (after pull request #10)): After PR #10: the phone app and the gateway must be on main first.
+- [ ] [AC-211](docs/verification/AC-211.md) (Agents learn it from the repository, and leave nothing running (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
+- [ ] [AC-213](docs/verification/AC-213.md) (The production phone app never pairs with a dev daemon (after pull request #10)): After PR #10: the phone app and the gateway must be on main first.
+- [ ] [AC-214](docs/verification/AC-214.md) (Deploy: the one path from dev to production (stage 4)): Not started (Gate T, added by the owner on 2026-09-27).
+- [ ] [AC-215](docs/verification/AC-215.md) (Guided owner tests in a dev daemon (stage 3)): Not started (Gate T, added by the owner on 2026-09-27).
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.
