@@ -16,6 +16,13 @@ use std::path::Path;
 /// main's Gate S (Overseer itself) tables, which main created without
 /// bumping its own label; every one is `CREATE TABLE IF NOT EXISTS`. 24
 /// adds `app_slot_holds`, the durable form of an in-flight start's slot.
+/// The learning file's database-page cap.
+pub const LEARNING_FILE_CAP_BYTES: u64 = 128 * 1024 * 1024;
+/// Free space a learning write requires: the file at its cap, a DELETE-mode
+/// rollback journal (at most the pages one transaction changes, so at most
+/// the file) and 16 MiB for SQLite's own headers and temporary files.
+pub const LEARNING_VOLUME_FLOOR_BYTES: u64 = 2 * LEARNING_FILE_CAP_BYTES + 16 * 1024 * 1024;
+
 pub const SCHEMA_VERSION: i64 = 24;
 /// Retained normalized events per run before older ones are pruned (with a marker).
 pub const EVENTS_PER_RUN: i64 = 5000;
@@ -276,7 +283,7 @@ impl Store {
             // file must fail quickly while callers hold the shared Store lock.
             learning_conn.busy_timeout(std::time::Duration::from_millis(25))?;
             let page_size: i64 = learning_conn.pragma_query_value(None, "page_size", |row| row.get(0))?;
-            let max_pages = (128 * 1024 * 1024 / page_size).max(1);
+            let max_pages = (LEARNING_FILE_CAP_BYTES as i64 / page_size).max(1);
             learning_conn.pragma_update(None, "max_page_count", max_pages)?;
             // SQLite cannot lower this limit beneath an existing file's page count.
             // Treat an oversized file as unavailable instead of silently bypassing the cap.
@@ -2107,6 +2114,16 @@ impl Store {
     pub fn insert_auto_measurement(&self, event_seq: i64, m: &Measurement) -> Result<bool> {
         const DAY_MS: i64 = 86_400_000;
         if !self.learning_persistent || self.learning_reset_pending()? { return Err(anyhow!("Auto learning storage unavailable")); }
+        // Whole-volume bound: never grow a volume that could not hold the
+        // learning store at its limit (the file's page cap plus a rollback
+        // journal of at most the same size). The caller reports learning
+        // paused; the execution event has already committed.
+        if let Some(path) = self.learning_conn.path().filter(|p| !p.is_empty()) {
+            if crate::sys::disk_free(std::path::Path::new(path))
+                .is_some_and(|free| free < LEARNING_VOLUME_FLOOR_BYTES) {
+                return Err(anyhow!("Auto learning paused: the volume has less free space than the learning store may need"));
+            }
+        }
         if !crate::auto_telemetry::valid_for_store(m) {
             return Err(anyhow!("invalid Auto measurement"));
         }
