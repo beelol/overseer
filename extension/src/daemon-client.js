@@ -57,6 +57,8 @@ class DaemonClient extends EventEmitter {
         this.request('hello', { client: 'vscode' }).catch(e => this.log('hello failed: ' + e.message));
         this.emit('connected');
         this.request('events.subscribe', { after: this.cursor }).catch(e => this.log('subscribe failed: ' + e.message));
+        // Voice Mode's live channel (state, levels, words in progress): never stored by the daemon.
+        this.request('voice.subscribe', {}).catch(() => { /* a daemon without Voice Mode */ });
         resolve();
       });
       socket.on('data', chunk => this.onData(chunk));
@@ -103,6 +105,8 @@ class DaemonClient extends EventEmitter {
         this.request('events.subscribe', { after: this.cursor }).catch(() => {});
       } else if (msg.method === 'replayed') {
         this.emit('replayed', msg.params);
+      } else if (msg.method === 'voice') {
+        this.emit('voice', msg.params);
       } else if (msg.id !== undefined && this.pending.has(msg.id)) {
         const { resolve, reject } = this.pending.get(msg.id); this.pending.delete(msg.id);
         if (msg.error) reject(new Error(msg.error.message || msg.error.code)); else resolve(msg.result);

@@ -18,6 +18,7 @@ const { Dashboard } = require('./dashboard-mode');
 const { Immersive } = require('./immersive');
 const { OverseerChat } = require('./overseer-chat');
 const { Continuity } = require('./continuity');
+const { Voice } = require('./voice');
 
 let client;
 let centerRef;
@@ -206,6 +207,8 @@ async function activate(context) {
   context.subscriptions.push(vscode.window.registerWebviewViewProvider('overseer.talk', overseerChat, { webviewOptions: { retainContextWhenHidden: true } }));
   const pullRequests = new PullRequests(client, model, say);
   const newTaskPanel = new NewTaskPanel(context, client, model, { selectRun: (...a) => selectRun(...a), launcher, column: () => vscode.ViewColumn.Beside });
+  // Voice Mode (Gate R): the voice view, its status bar item and toasts; the daemon listens.
+  const voice = new Voice(context, client, { selectRun: (...a) => selectRun(...a) });
   // An agent dragged from the side bar into the editor opens its chat there (AC-71): a read-only
   // virtual file per agent (overseer-chat:/<run id>/<title>.overseer-chat) shown by a custom editor.
   context.subscriptions.push(
@@ -246,6 +249,7 @@ async function activate(context) {
     if (!STREAM_ONLY.has(event.kind)) model.scheduleRefresh();
     if (event.kind === 'profile') accountsSoon();
     if (event.kind === 'permission') {
+      if (event.payload?.auto_allowed) return; // the daemon allowed its own tool (Overseer's reads): nothing waits
       if (center.panel?.visible) return; // the dashboard's Needs you shows it
       vscode.window.showWarningMessage(`An agent is waiting for permission to use ${event.payload.tool}.`, 'Show').then(choice => { if (!choice) return; if (center.active) { center.open(); selectRun(model.rootRun(model.run(event.run_id) || {})?.id || event.run_id); } else outputs.show(event.run_id, { preserveFocus: false }); });
     }
@@ -766,6 +770,12 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.newAgent', guard(async () => { requireTrust(); await arrangement.chatOnly(); center.setMode('composer'); center.focus('composer'); })),
     vscode.commands.registerCommand('overseer.whereAmI', guard(() => whereAmI())),
     vscode.commands.registerCommand('overseer.talk', guard(() => vscode.commands.executeCommand('overseer.talk.focus'))),
+    vscode.commands.registerCommand('overseer.voice.toggle', guard(() => voice.toggle())),
+    vscode.commands.registerCommand('overseer.voice.open', guard(() => voice.open())),
+    vscode.commands.registerCommand('overseer.voice.mute', guard(() => voice.mute())),
+    vscode.commands.registerCommand('overseer.voice.talkTo', guard(() => voice.talkTo())),
+    vscode.commands.registerCommand('overseer.voice.cancel', guard(() => voice.cancel())),
+    vscode.commands.registerCommand('overseer.voice.simulate', guard(() => voice.simulate())),
     vscode.commands.registerCommand('overseer.resetGridLayout', guard(() => center.panel?.webview.postMessage({ type: 'gridReset' }))),
     vscode.commands.registerCommand('overseer.toggleGrid', guard(async () => {
       if (center.mode === 'grid') { center.setMode(selectedRun ? 'chat' : 'composer'); return; }
@@ -829,7 +839,7 @@ async function activate(context) {
     say('daemon start failed: ' + error.message);
     vscode.window.showErrorMessage(`Overseer could not start its daemon: ${error.message}`);
   }
-  return { client, model, review, outputs, selectRun, agents, agentsView, center, dashboard, arrangement, attention, selectedRun: () => selectedRun }; // exported for UI tests
+  return { client, model, review, outputs, selectRun, agents, agentsView, center, dashboard, arrangement, attention, voice, selectedRun: () => selectedRun }; // exported for UI tests
 }
 
 function deactivate() { if (centerRef) centerRef.shuttingDown = true; client?.dispose(); }

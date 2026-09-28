@@ -1,0 +1,136 @@
+{
+  "checks": [
+    {
+      "name": "Voice Mode is off until the owner turns it on",
+      "ok": true
+    },
+    {
+      "name": "the voice view opens listening, and the status bar says so",
+      "ok": true
+    },
+    {
+      "name": "the mark is centred in the voice view (measured)",
+      "ok": true,
+      "detail": {
+        "cx": 540.99609375,
+        "w": 438.8984375,
+        "vw": 1082
+      }
+    },
+    {
+      "name": "noise (typing, taps, a door, music) never moves the mark and never reads as hearing",
+      "ok": true,
+      "detail": {
+        "levels": 0,
+        "maxScale": 1
+      }
+    },
+    {
+      "name": "hearing: the star grows with the voice and swings with its syllables",
+      "ok": true,
+      "detail": {
+        "frames": 171,
+        "max": 1.8166063392968557,
+        "min": 1.4441508986534712
+      }
+    },
+    {
+      "name": "levels arrive at least every 100 ms while the owner speaks (25 a second)",
+      "ok": true,
+      "detail": {
+        "jumps": 74,
+        "spacing": 39.700000047683716
+      }
+    },
+    {
+      "name": "speaking: rings of light cross the core and the star stays under 1.3x",
+      "ok": true,
+      "detail": {
+        "scale": 1.2932026998478074,
+        "glow": 0.5187985500367702,
+        "rings": 1,
+        "still": false,
+        "meter": null,
+        "state": "speaking"
+      }
+    },
+    {
+      "name": "thinking: the star turns, 12% larger",
+      "ok": true,
+      "detail": {
+        "scale": 1.1972107948643977,
+        "glow": 0.3506474208702352,
+        "rings": 0,
+        "still": false,
+        "meter": null,
+        "state": "thinking"
+      }
+    },
+    {
+      "name": "the request card shows the owner's words and the text sent to the agent",
+      "ok": true,
+      "detail": {
+        "words": "“Tell Phone to use the new wire format.”",
+        "row": "PhonedeliveredFor you: Please use the new wire format.(voice, request V-0001) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.",
+        "full": "(voice, request V-0001) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format."
+      }
+    },
+    {
+      "name": "muted: the mark is still with the mute sign, and no listener runs",
+      "ok": true,
+      "detail": {
+        "scale": 1.000396267014065,
+        "glow": 0.1804623034297919,
+        "rings": 0,
+        "still": true,
+        "meter": null,
+        "state": "muted"
+      }
+    },
+    {
+      "name": "screenshots of each state in the three themes and in grayscale",
+      "ok": true
+    },
+    {
+      "name": "beside a streaming chat, the animation keeps up at 60 frames a second: work per frame p95 under 16 ms, and frames arrive at the display's rate",
+      "ok": true,
+      "detail": {
+        "n": 234,
+        "work_p95": 0.20000004768371582,
+        "interval_median": 16.69999999999709,
+        "interval_p95": 18.30000000000291,
+        "dropped": 1,
+        "groups": 2
+      }
+    },
+    {
+      "name": "no frame is drawn while the view is behind another tab",
+      "ok": true,
+      "detail": {
+        "visibility": "visible",
+        "f1": 4850,
+        "f2": 4850
+      }
+    },
+    {
+      "name": "reduced motion: a still mark and a level meter",
+      "ok": true,
+      "detail": {
+        "scale": 1.6544328212332247,
+        "glow": 0.7949457965401218,
+        "rings": 0,
+        "still": true,
+        "meter": 0.7699209661567349,
+        "state": "hearing"
+      }
+    },
+    {
+      "name": "the toast's Cancel withdraws the answer inside the window: the agent still waits",
+      "ok": true,
+      "detail": {
+        "clicked": true,
+        "still": "waiting_for_user"
+      }
+    }
+  ]
+}

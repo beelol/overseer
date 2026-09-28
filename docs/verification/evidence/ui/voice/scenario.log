@@ -1,0 +1,35 @@
+[2026-09-28T00:36:23.072Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-28T00:36:25.780Z] PASS Voice Mode is off until the owner turns it on
+[2026-09-28T00:36:27.546Z] PASS the voice view opens listening, and the status bar says so
+[2026-09-28T00:36:27.546Z] PASS the mark is centred in the voice view (measured) {"cx":540.99609375,"w":438.8984375,"vw":1082}
+[2026-09-28T00:36:27.673Z] screenshot docs/verification/evidence/ui/voice/01-listening-overseer.png
+[2026-09-28T00:36:40.749Z] PASS noise (typing, taps, a door, music) never moves the mark and never reads as hearing {"levels":0,"maxScale":1}
+[2026-09-28T00:36:41.498Z] screenshot docs/verification/evidence/ui/voice/02-hearing-overseer.png
+[2026-09-28T00:36:43.999Z] PASS hearing: the star grows with the voice and swings with its syllables {"frames":171,"max":1.8166063392968557,"min":1.4441508986534712}
+[2026-09-28T00:36:44.000Z] PASS levels arrive at least every 100 ms while the owner speaks (25 a second) {"jumps":74,"spacing":39.700000047683716}
+[2026-09-28T00:36:45.569Z] screenshot docs/verification/evidence/ui/voice/03-speaking-overseer.png
+[2026-09-28T00:36:45.569Z] PASS speaking: rings of light cross the core and the star stays under 1.3x {"scale":1.2932026998478074,"glow":0.5187985500367702,"rings":1,"still":false,"meter":null,"state":"speaking"}
+[2026-09-28T00:36:51.288Z] screenshot docs/verification/evidence/ui/voice/04-thinking-overseer.png
+[2026-09-28T00:36:51.288Z] PASS thinking: the star turns, 12% larger {"scale":1.1972107948643977,"glow":0.3506474208702352,"rings":0,"still":false,"meter":null,"state":"thinking"}
+[2026-09-28T00:36:52.705Z] PASS the request card shows the owner's words and the text sent to the agent {"words":"“Tell Phone to use the new wire format.”","row":"PhonedeliveredFor you: Please use the new wire format.(voice, request V-0001) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.","full":"(voice, request V-0001) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format."}
+[2026-09-28T00:36:52.852Z] screenshot docs/verification/evidence/ui/voice/05-request-card-overseer.png
+[2026-09-28T00:36:54.509Z] PASS muted: the mark is still with the mute sign, and no listener runs {"scale":1.000396267014065,"glow":0.1804623034297919,"rings":0,"still":true,"meter":null,"state":"muted"}
+[2026-09-28T00:36:54.614Z] screenshot docs/verification/evidence/ui/voice/06-muted-overseer.png
+[2026-09-28T00:37:07.320Z] screenshot docs/verification/evidence/ui/voice/07-listening-dark.png
+[2026-09-28T00:37:07.889Z] screenshot docs/verification/evidence/ui/voice/08-hearing-dark.png
+[2026-09-28T00:37:10.687Z] screenshot docs/verification/evidence/ui/voice/09-speaking-dark.png
+[2026-09-28T00:37:25.131Z] screenshot docs/verification/evidence/ui/voice/10-listening-light.png
+[2026-09-28T00:37:25.735Z] screenshot docs/verification/evidence/ui/voice/11-hearing-light.png
+[2026-09-28T00:37:28.529Z] screenshot docs/verification/evidence/ui/voice/12-speaking-light.png
+[2026-09-28T00:37:33.421Z] screenshot docs/verification/evidence/ui/voice/13-hearing-grayscale.png
+[2026-09-28T00:37:35.977Z] screenshot docs/verification/evidence/ui/voice/14-listening-grayscale.png
+[2026-09-28T00:37:35.977Z] PASS screenshots of each state in the three themes and in grayscale
+[2026-09-28T00:37:44.616Z] editor groups 2
+[2026-09-28T00:37:46.228Z] screenshot docs/verification/evidence/ui/voice/15-beside-a-streaming-chat.png
+[2026-09-28T00:37:48.533Z] PASS beside a streaming chat, the animation keeps up at 60 frames a second: work per frame p95 under 16 ms, and frames arrive at the display's rate {"n":234,"work_p95":0.20000004768371582,"interval_median":16.69999999999709,"interval_p95":18.30000000000291,"dropped":1,"groups":2}
+[2026-09-28T00:37:54.750Z] PASS no frame is drawn while the view is behind another tab {"visibility":"visible","f1":4850,"f2":4850}
+[2026-09-28T00:38:01.592Z] PASS reduced motion: a still mark and a level meter {"scale":1.6544328212332247,"glow":0.7949457965401218,"rings":0,"still":true,"meter":0.7699209661567349,"state":"hearing"}
+[2026-09-28T00:38:01.709Z] screenshot docs/verification/evidence/ui/voice/16-reduced-motion.png
+[2026-09-28T00:38:05.026Z] screenshot docs/verification/evidence/ui/voice/17-permission-toast.png
+[2026-09-28T00:38:08.043Z] PASS the toast's Cancel withdraws the answer inside the window: the agent still waits {"clicked":true,"still":"waiting_for_user"}
+[2026-09-28T00:38:08.197Z] screenshot docs/verification/evidence/ui/voice/18-permission-cancelled.png
