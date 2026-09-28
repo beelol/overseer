@@ -1282,17 +1282,31 @@ impl Store {
     /// refuses; the caller then takes its existing unknown-draw path.
     fn book_auto_account_in_tx(&self, work_unit_id: &str, route_id: &str, pool_id: &str,
         account_generation: Option<i64>, trace: &Value) -> Result<bool> {
+        match self.book_auto_account_decision_in_tx(work_unit_id, route_id, pool_id,
+            account_generation, trace)? {
+            Some(crate::account_booking::BookingDecision::Booked) => Ok(true),
+            // A qualified draw that cannot fit is a known refusal, not an
+            // unknown draw: pause rather than take the whole-account claim.
+            Some(crate::account_booking::BookingDecision::Blocked("shared_pool_headroom")) =>
+                Err(crate::daemon::AutoDrawExceedsAllowance.into()),
+            _ => Ok(false),
+        }
+    }
+
+    fn book_auto_account_decision_in_tx(&self, work_unit_id: &str, route_id: &str, pool_id: &str,
+        account_generation: Option<i64>, trace: &Value)
+        -> Result<Option<crate::account_booking::BookingDecision>> {
         let (Some(_), Some(generation)) = (pool_id.strip_prefix("account/"), account_generation) else {
-            return Ok(false);
+            return Ok(None);
         };
         let route = &trace["selected_route"];
         let (Some(profile_id), Some(harness)) = (route["profile_id"].as_str(), route["harness"].as_str()) else {
-            return Ok(false);
+            return Ok(None);
         };
         if self.auto_account_pool_id(profile_id)?.as_deref() != Some(pool_id) {
-            return Ok(false);
+            return Ok(None);
         }
-        let Some(latest) = self.latest_auto_quota(profile_id)? else { return Ok(false) };
+        let Some(latest) = self.latest_auto_quota(profile_id)? else { return Ok(None) };
         let bucket = crate::upper_draw::DrawBucket {
             harness: harness.into(),
             model: route["model"].as_str().unwrap_or_default().into(),
@@ -1307,8 +1321,7 @@ impl Store {
             draw: crate::account_booking::BookingDraw::Qualified(&bucket),
             allocation_remaining_milli: None,
         };
-        Ok(crate::account_booking::book_shared_account_in_tx(&self.conn, &request)?
-            == crate::account_booking::BookingDecision::Booked)
+        Ok(Some(crate::account_booking::book_shared_account_in_tx(&self.conn, &request)?))
     }
 
     /// For selection: an Auto route whose pool is held only by known-window

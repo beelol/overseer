@@ -1163,6 +1163,186 @@ mod tests {
         assert_eq!(claim("unit-child"), "released");
     }
 
+    /// AUTO-AC-13 and 16 on the shared booking's numbers: selection sees
+    /// the same comparison admission makes. A calibrated route whose
+    /// qualified upper draw cannot fit its account's windows (less one
+    /// reading error, beside live commitments) is excluded and a suitable
+    /// route that fits is preferred; a pinned unaffordable route pauses; a
+    /// stale reading or uncalibrated bucket stays unknown; the recorded
+    /// input replays to the same fit; and admission that finds no room
+    /// refuses rather than launching on an unknown-draw claim.
+    #[test]
+    fn selection_fit_uses_the_booking_comparison_and_admission_never_falls_back() {
+        use crate::account_booking::{AccountBookingRequest, BookingDecision, BookingDraw};
+        use crate::auto_fit::{apply_scoped_fit_with_inputs, evaluate_fit, select_with_estimates,
+            FitEvidenceInput};
+        use crate::auto_select::{Allowance, CapabilityTier, Fit, Health, Route, Sandbox, WorkUnit};
+        const OTHER: &str = "codex-b";
+        let f = Fixture::new();
+        f.store.set_auto_mode_enabled(true).unwrap();
+        f.store.record_auto_account_identity(OTHER, &"b".repeat(64)).unwrap();
+        let pool_a = format!("account/{}", "a".repeat(64));
+        let pool_b = format!("account/{}", "b".repeat(64));
+        // Five isolated Sol/medium browser checks move the meter one point
+        // each (upper draw 3,000 in the five-hour window, 2,000 weekly).
+        for n in 0..5 {
+            f.auto_sample(&format!("sol-{n}"), n * 20, "browser_check");
+        }
+        // Five isolated Astra/high browser checks move it thirteen points.
+        for n in 0..5 {
+            let id = format!("astra-{n}");
+            let start = 200 + n * 20;
+            f.observe(start, [10.0, 1.0]);
+            f.run_full(&id, Some(PROFILE), "codex-app", "gpt-6-astra", Some("high"), "0.155",
+                start + 1, Some(start + 5), "completed");
+            let event = f.store.insert_event(f.at(start + 1), Some(&format!("t-{id}")), Some(&id),
+                "auto_decision", "daemon", "exact",
+                &serde_json::json!({"selection_input":{"work":{"task_class":"browser_check"}}})).unwrap();
+            f.store.conn.execute(
+                "INSERT INTO auto_root_intents(work_unit_id,requirements_hash,repo_root,workspace_mode,
+                 route_id,account_generation,phase,task_id,run_id,workspace_id,created_ms,decision_event_seq)
+                 VALUES('unit-'||?1,?2,'/repo','worktree','codex-app/gpt-6-astra/high',1,'queued',
+                 't-'||?1,?1,'w-'||?1,?3,?4)",
+                params![id, "h".repeat(64), f.at(start + 1), event.seq]).unwrap();
+            f.observe(start + 7, [23.0, 1.0]);
+        }
+        let route = |id: &str, profile: &str, pool: &str, model: &str, effort: &str,
+            tier: CapabilityTier| Route {
+            id:id.into(), harness:"codex-app".into(), provider:"openai".into(),
+            endpoint:"codex".into(), profile_id:profile.into(), pool_id:pool.into(),
+            model:model.into(), resolved_model_version:None, effort:effort.into(), tier,
+            tools:Default::default(), context_limit:None, supports_approvals:true,
+            sandbox:Sandbox::WorkspaceWrite, supported_sandboxes:None,
+            recommended_default:tier == CapabilityTier::General,
+            quota:Allowance::ObservedNonExhausted, quota_blocks:Vec::new(), fit:Fit::Unknown,
+            health:Health::Healthy, unresolved_quota_pool_identity:false, in_flight_pool_claim:false };
+        let candidates = || vec![
+            route("a/sol", PROFILE, &pool_a, "gpt-6-sol", "medium", CapabilityTier::General),
+            route("a/astra", PROFILE, &pool_a, "gpt-6-astra", "high", CapabilityTier::Frontier),
+            route("b/sol", OTHER, &pool_b, "gpt-6-sol", "medium", CapabilityTier::General),
+            route("b/astra", OTHER, &pool_b, "gpt-6-astra", "high", CapabilityTier::Frontier)];
+        let unit = |tier: CapabilityTier, pin: Option<&str>| WorkUnit {
+            id:"unit".into(), min_tier:tier, required_tools:Default::default(), context_needed:0,
+            requires_approvals:false, min_sandbox:Sandbox::WorkspaceWrite,
+            max_sandbox:Sandbox::WorkspaceWrite,
+            allowed_profiles:[PROFILE.to_string(), OTHER.to_string()].into(),
+            pinned_route:pin.map(str::to_string), preferred_harness:None,
+            task_class:Some("browser_check".into()), execution_budget_ms:Some(300_000) };
+        let generations: BTreeMap<String, i64> = [(PROFILE.to_string(), 1), (OTHER.to_string(), 1)].into();
+        let assess = |work: &WorkUnit| {
+            let mut routes = candidates();
+            let now = crate::daemon::now();
+            let (inputs, evidence) = apply_scoped_fit_with_inputs(&f.store, work, &mut routes,
+                &generations, now);
+            let decision = select_with_estimates(work, &routes, &inputs, now);
+            let fits: BTreeMap<String, Fit> = routes.iter().map(|r| (r.id.clone(), r.fit)).collect();
+            (fits, decision, inputs, evidence, routes, now)
+        };
+        let excluded_for = |decision: &crate::auto_select::Decision, id: &str| decision.exclusions
+            .iter().find(|e| e.route_id == id).map(|e| e.reason.clone());
+        let now_reading = |profile: &str, used: [f64; 2]| {
+            std::thread::sleep(std::time::Duration::from_millis(2));
+            f.observe_at(profile, crate::daemon::now(), used, "pro");
+        };
+        now_reading(OTHER, [40.0, 2.0]);
+
+        // 85% used: 14,000 of room after one reading error. Sol's 3,000
+        // fits; Astra's 15,000 does not. The uncalibrated second account
+        // stays unknown (eligible as cold start, never a fit).
+        now_reading(PROFILE, [85.0, 2.0]);
+        let (fits, decision, inputs, evidence, routes, now) = assess(&unit(CapabilityTier::General, None));
+        assert_eq!(fits["a/sol"], Fit::Fits);
+        assert_eq!(fits["a/astra"], Fit::Unaffordable);
+        assert_eq!(fits["b/sol"], Fit::Unknown);
+        assert_eq!(decision.selected.as_deref(), Some("a/sol"), "a fitting route beats an unknown one");
+        assert_eq!(excluded_for(&decision, "a/astra").as_deref(), Some("estimated_draw_exceeds_allowance"));
+        let sol_evidence = evidence.iter().find(|e| e["route_id"] == "a/sol").unwrap();
+        assert_eq!(sol_evidence["reason"], "qualified_draw_fits");
+        assert_eq!(sol_evidence["source"], "qualified_upper_draw");
+        // The recorded input replays to the same fit, and malformed numbers
+        // are unknown, not a fit.
+        let index = routes.iter().position(|r| r.id == "a/astra").unwrap();
+        let replayed: Vec<FitEvidenceInput> = serde_json::from_value(serde_json::to_value(&inputs).unwrap()).unwrap();
+        let work = unit(CapabilityTier::General, None);
+        assert_eq!(evaluate_fit(&work, &routes[index], &replayed[index], now).fit, Fit::Unaffordable);
+        let FitEvidenceInput::QualifiedDraw { windows, .. } = &replayed[index] else { panic!("qualified input") };
+        assert_eq!(windows[0].headroom_milli, 14_000);
+        assert_eq!(windows[0].upper_draw_milli, 15_000);
+        let mut bad = replayed[index].clone();
+        if let FitEvidenceInput::QualifiedDraw { windows, .. } = &mut bad { windows[0].upper_draw_milli = 0; }
+        assert_eq!(evaluate_fit(&work, &routes[index], &bad, now).fit, Fit::Unknown);
+        // Frontier work: the calibrated Astra cannot fit, so the other
+        // account's Astra runs; pinned to the one that cannot fit, pause.
+        let (_, frontier, ..) = assess(&unit(CapabilityTier::Frontier, None));
+        assert_eq!(frontier.selected.as_deref(), Some("b/astra"));
+        let (_, pinned, ..) = assess(&unit(CapabilityTier::Frontier, Some("a/astra")));
+        assert_eq!(pinned.selected, None);
+        assert_eq!(pinned.reason, "no_eligible_route");
+        assert_eq!(excluded_for(&pinned, "a/astra").as_deref(), Some("estimated_draw_exceeds_allowance"));
+
+        // Live commitments count: a 12,000 booking in the five-hour window
+        // leaves 2,000, less than Sol's 3,000.
+        let cited = f.store.latest_auto_quota(PROFILE).unwrap().unwrap().event_seq;
+        assert_eq!(f.store.book_shared_account(&AccountBookingRequest {
+            id:"swarm/held", request_hash:"swarm/held", caller:"swarm", route_id:"claude/sonnet",
+            profile_id:PROFILE, quota_profile_id:PROFILE, account_generation:1,
+            quota_event_seq:cited, now_ms:crate::daemon::now(),
+            draw:BookingDraw::Fixture(&[12_000, 1_000]), allocation_remaining_milli:None,
+        }).unwrap(), BookingDecision::Booked);
+        let (fits, decision, ..) = assess(&unit(CapabilityTier::General, None));
+        assert_eq!(fits["a/sol"], Fit::Unaffordable);
+        assert_eq!(decision.selected.as_deref(), Some("b/sol"));
+        assert!(f.store.release_shared_booking_pre_effect("swarm/held").unwrap());
+
+        // Coarse precision: at 96.5% the displayed 3,500 of room would take
+        // Sol's 3,000, but one point of rounding leaves 2,500; at 96% the
+        // 3,000 that remains is exactly enough.
+        now_reading(PROFILE, [96.5, 2.0]);
+        assert_eq!(assess(&unit(CapabilityTier::General, None)).0["a/sol"], Fit::Unaffordable);
+        now_reading(PROFILE, [96.0, 2.0]);
+        assert_eq!(assess(&unit(CapabilityTier::General, None)).0["a/sol"], Fit::Fits);
+        // A reading that has expired (or crossed its reset) is no basis.
+        f.observe_at(PROFILE, crate::daemon::now() + 5, [96.0, 2.0], "pro");
+        f.store.conn.execute("UPDATE auto_quota_observations SET snapshot=json_set(snapshot,
+            '$.expires_ms', observed_ms - 1) WHERE pool_id=?1", [PROFILE]).unwrap();
+        assert_eq!(assess(&unit(CapabilityTier::General, None)).0["a/sol"], Fit::Unknown);
+        // An uncalibrated class is unknown however full the account.
+        now_reading(PROFILE, [85.0, 2.0]);
+        let mut diagnosis = unit(CapabilityTier::General, None);
+        diagnosis.task_class = Some("difficult_diagnosis".into());
+        let mut routes = candidates();
+        apply_scoped_fit_with_inputs(&f.store, &diagnosis, &mut routes, &generations, crate::daemon::now());
+        assert!(routes.iter().all(|r| r.fit == Fit::Unknown));
+
+        // Admission makes the same comparison and refuses: no root, no
+        // claim, no fallback to the whole-account unknown-draw claim.
+        now_reading(PROFILE, [98.5, 2.0]);
+        let at = crate::daemon::now();
+        let workspace = crate::store::Workspace { id:"w-late".into(), path:"/repo/late".into(),
+            repo_root:"/repo".into(), common_dir:"/repo/.git".into(), kind:"worktree".into(),
+            branch:Some("codex/late".into()), owner_run_id:None,
+            initial_dirty:serde_json::json!({"clean":true}), created_ms:at, removed_ms:None };
+        let task = crate::store::Task { id:"t-late".into(), title:"root".into(), prompt:"prompt".into(),
+            repo_root:"/repo".into(), target_ref:None, workspace_id:workspace.id.clone(),
+            start_snapshot:None, fork_commit:None, fork_provenance:None, created_ms:at, archived_ms:None };
+        let run = crate::store::Run { id:"late".into(), task_id:task.id.clone(), parent_run_id:None,
+            harness:"codex-app".into(), harness_version:Some("0.155".into()),
+            profile_id:Some(PROFILE.into()), model:Some("gpt-6-sol".into()),
+            effort:Some("medium".into()), workspace_id:workspace.id.clone(), native_id:None,
+            status:"queued".into(), exit_reason:None, created_ms:at, ended_ms:None,
+            title:"root".into(), relation_source:None, relation_confidence:None,
+            capabilities:serde_json::json!({}), process_generation:0, attention:None };
+        let trace = serde_json::json!({"selected_route":{"harness":"codex-app","profile_id":PROFILE,
+            "model":"gpt-6-sol","effort":"medium"},"selection_input":{"work":{"task_class":"browser_check"}}});
+        let refused = f.store.insert_auto_root_selected("unit-late", &"h".repeat(64),
+            "a/sol", &pool_a, Some(1), &workspace, &task, &run,
+            &serde_json::json!({"generic":{}}), &trace).unwrap_err();
+        assert!(refused.downcast_ref::<crate::daemon::AutoDrawExceedsAllowance>().is_some(), "{refused}");
+        assert!(f.store.auto_root_intent("unit-late").unwrap().is_none());
+        assert!(f.store.run("late").unwrap().is_none());
+        assert!(!f.store.auto_pool_claimed(&pool_a).unwrap(), "no claim was left behind");
+    }
+
     /// Claude Code's native `rate_limit_event`s arrive only during a run's
     /// own turns: the first after its first model response, the last before
     /// its result. Recorded through the real parser, six serial Claude runs

@@ -479,6 +479,137 @@ pub fn unbooked_run_on_account(conn: &Connection, fingerprint: &str) -> Result<b
         [fingerprint], |row| row.get(0))?)
 }
 
+/// The room a window leaves for new work, in thousandths of a reported
+/// percentage point. A reading may be rounded by up to one whole point
+/// until an adapter proves its meter's precision (the qualified upper
+/// draw's reading error), so one point is held back: coarse precision can
+/// only make a booking refuse, never admit work the meter could not take.
+pub fn window_headroom_milli(used_percent: f64) -> i64 {
+    ((100.0 - used_percent) * 1000.0).floor() as i64 - crate::upper_draw::READING_ERROR_MILLI
+}
+
+/// Draw already committed to one window of an account by live bookings.
+fn committed_window_milli(conn: &Connection, account_pool: &str, key: &str) -> Result<i64> {
+    Ok(conn.query_row(
+        "SELECT COALESCE(SUM(w.amount_milli),0) FROM shared_booking_windows w
+         JOIN auto_pool_claims c ON c.work_unit_id=w.work_unit_id
+         WHERE w.pool_id=?1 AND w.window_key=?2 AND c.state IN ('active','uncertain')",
+        params![account_pool, key],
+        |row| row.get(0),
+    )?)
+}
+
+/// One window of a selection-time fit preview, in thousandths of a
+/// reported percentage point. Recorded in the decision trace so a replay
+/// recomputes the same fit from the same numbers.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct WindowFitInput {
+    pub bucket_id: String,
+    pub window: String,
+    /// [`window_headroom_milli`] of the cited reading.
+    pub headroom_milli: i64,
+    /// Live known-window bookings on the account in this window.
+    pub committed_milli: i64,
+    /// The bucket's qualified upper draw in this window.
+    pub upper_draw_milli: i64,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum AccountFitPreview {
+    Windows {
+        quota_event_seq: i64,
+        observed_ms: i64,
+        sample_count: usize,
+        windows: Vec<WindowFitInput>,
+    },
+    Unknown(&'static str),
+}
+
+/// What the one booking would compare for a route of `bucket` on
+/// `profile_id`'s account, without writing anything: the latest reading's
+/// per-window headroom, the live commitments and the qualified upper draw.
+/// Selection uses it to exclude a route whose known draw cannot fit and to
+/// prefer one that fits; admission books (and rechecks) in its own
+/// transaction. Anything the booking would refuse before comparing windows
+/// is `Unknown`, never a fit.
+pub fn preview_account_fit(
+    conn: &Connection,
+    profile_id: &str,
+    bucket: &crate::upper_draw::DrawBucket,
+    now_ms: i64,
+) -> Result<AccountFitPreview> {
+    let fingerprint: Option<String> = conn
+        .query_row(
+            "SELECT fingerprint FROM auto_account_identity WHERE profile_id=?1",
+            [profile_id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let Some(fingerprint) = fingerprint else {
+        return Ok(AccountFitPreview::Unknown("account_identity_unknown"));
+    };
+    let observation: Option<(i64, String)> = conn
+        .query_row(
+            "SELECT event_seq,snapshot FROM auto_quota_observations WHERE pool_id=?1
+         ORDER BY observed_ms DESC,event_seq DESC LIMIT 1",
+            [profile_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+    let Some((event_seq, encoded)) = observation else {
+        return Ok(AccountFitPreview::Unknown("quota_unknown"));
+    };
+    let quota: QuotaSnapshot = serde_json::from_str(&encoded)?;
+    if quota.needs_refresh(now_ms)
+        || quota
+            .native_uncertain_until_ms
+            .is_some_and(|until| now_ms < until)
+    {
+        return Ok(AccountFitPreview::Unknown("snapshot_expired"));
+    }
+    match quota.ordinary_usage_allowed {
+        Some(true) => {}
+        Some(false) => return Ok(AccountFitPreview::Unknown("account_exhausted")),
+        None => return Ok(AccountFitPreview::Unknown("account_allowance_unknown")),
+    }
+    let (upper_draw_milli, sample_count) =
+        match crate::upper_draw::qualified_upper_draw_in_tx(conn, profile_id, event_seq, bucket, now_ms)? {
+            crate::upper_draw::UpperDraw::Qualified { upper_draw_milli, provenance } => {
+                (upper_draw_milli, provenance.sample_count)
+            }
+            crate::upper_draw::UpperDraw::Unknown { .. } => {
+                return Ok(AccountFitPreview::Unknown("upper_draw_unknown"))
+            }
+        };
+    if quota.windows.is_empty() || quota.windows.len() > 32 || upper_draw_milli.len() != quota.windows.len() {
+        return Ok(AccountFitPreview::Unknown("upper_draw_unknown"));
+    }
+    let account_pool = format!("account/{fingerprint}");
+    let mut windows = Vec::with_capacity(quota.windows.len());
+    for (n, window) in quota.windows.iter().enumerate() {
+        if !(1..=100_000).contains(&upper_draw_milli[n])
+            || !window.used_percent.is_finite()
+            || !(0.0..=100.0).contains(&window.used_percent)
+        {
+            return Ok(AccountFitPreview::Unknown("upper_draw_unknown"));
+        }
+        let key = window_key(window)?;
+        windows.push(WindowFitInput {
+            bucket_id: window.bucket_id.clone(),
+            window: window.window.clone(),
+            headroom_milli: window_headroom_milli(window.used_percent),
+            committed_milli: committed_window_milli(conn, &account_pool, &key)?,
+            upper_draw_milli: upper_draw_milli[n],
+        });
+    }
+    Ok(AccountFitPreview::Windows {
+        quota_event_seq: event_seq,
+        observed_ms: quota.observed_ms,
+        sample_count,
+        windows,
+    })
+}
+
 /// Called inside the *caller's* IMMEDIATE SQLite transaction. This is the
 /// integration seam for Swarm's existing admission transaction. The same
 /// auto_pool_claims row is the account booking for all caller types; no
@@ -660,14 +791,8 @@ pub fn book_shared_account_in_tx(
         {
             return Ok(BookingDecision::Blocked("allocation_exhausted"));
         }
-        let remaining = ((100.0 - window.used_percent) * 1000.0).floor() as i64;
-        let committed: i64 = conn.query_row(
-            "SELECT COALESCE(SUM(w.amount_milli),0) FROM shared_booking_windows w
-             JOIN auto_pool_claims c ON c.work_unit_id=w.work_unit_id
-             WHERE w.pool_id=?1 AND w.window_key=?2 AND c.state IN ('active','uncertain')",
-            params![account_pool, key],
-            |row| row.get(0),
-        )?;
+        let remaining = window_headroom_milli(window.used_percent);
+        let committed = committed_window_milli(conn, &account_pool, &key)?;
         if amount > remaining.saturating_sub(committed) {
             return Ok(BookingDecision::Blocked("shared_pool_headroom"));
         }

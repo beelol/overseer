@@ -1131,7 +1131,7 @@ fn auto_root_preview(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
             "harness":route.harness,"provider":route.provider,"profile_id":route.profile_id,
             "model":route.model,"effort":route.effort,"quota":route.quota,
             "fit":route.fit,"health":route.health})),
-        "estimator":{"state":"scoped_fit","version":"v2","now_ms":fit_now_ms,
+        "estimator":{"state":"scoped_fit","version":"v3","now_ms":fit_now_ms,
             "inputs":fit_inputs,"routes":fit_evidence},
         "ranking":{"version":"v1","complete_costs":crate::auto_fit::complete_costs(
             &work, &routes, &fit_inputs, fit_now_ms)},
@@ -1775,9 +1775,22 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 "auto_allowed_profiles":if auto_routing { Some(work.allowed_profiles.iter()
                     .cloned().collect::<Vec<_>>()) } else { None },
                 "auto_parent_budget_ms":crate::daemon::DEFAULT_AUTO_PARENT_BUDGET_MS}});
-            let admitted = d.store.lock().unwrap().insert_auto_root_selected(work_unit_id,
+            let admitted = match d.store.lock().unwrap().insert_auto_root_selected(work_unit_id,
                 &request_hash, &route.id, &route.pool_id, generation,
-                &workspace, &task, &run, &launch, &preview["trace"])?;
+                &workspace, &task, &run, &launch, &preview["trace"]) {
+                Err(error) if error.downcast_ref::<crate::daemon::AutoDrawExceedsAllowance>().is_some() => {
+                    let mut paused: crate::auto_select::Decision = serde_json::from_value(decision.clone())?;
+                    paused.selected = None;
+                    paused.reason = "estimated_draw_exceeds_allowance".into();
+                    paused.exclusions.push(crate::auto_select::Exclusion {
+                        route_id: route.id.clone(), reason: "estimated_draw_exceeds_allowance".into(),
+                    });
+                    return Ok(json!({"state":"paused","work_unit_id":work_unit_id,
+                        "decision":paused,"pause_reason":"estimated_draw_exceeds_allowance",
+                        "actions":["refresh","choose_manual_route"]}));
+                }
+                other => other?,
+            };
             if admitted.is_none() {
                 return Ok(json!({"state":"paused","work_unit_id":work_unit_id,
                     "decision":decision,"pause_reason":"admission_conflict",
@@ -2235,7 +2248,7 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     }));
                 let trace = json!({"selector_version":"multi-harness-preflight-v8","decision":decision,
                     "selected_route":selected_route,
-                    "estimator":{"state":"scoped_fit","version":"v2","now_ms":fit_now_ms,
+                    "estimator":{"state":"scoped_fit","version":"v3","now_ms":fit_now_ms,
                         "inputs":fit_inputs,"routes":fit_evidence},
                     "ranking":{"version":"v1","complete_costs":crate::auto_fit::complete_costs(
                         &work, &routes, &fit_inputs, fit_now_ms)},
@@ -2259,9 +2272,30 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                             .ok_or_else(|| anyhow!("selected account generation unavailable"))?)
                     };
                     let required = required_tools.iter().cloned().collect::<Vec<_>>();
-                    let admitted = d.record_auto_selected_decision(work_unit_id, &parent,
+                    let admitted = match d.record_auto_selected_decision(work_unit_id, &parent,
                         &requirements_hash, selected, &route.pool_id, generation.copied(),
-                        execution_budget_ms, trace.clone())?;
+                        execution_budget_ms, trace.clone()) {
+                        Err(error) if error.downcast_ref::<crate::daemon::AutoDrawExceedsAllowance>().is_some() => {
+                            // Selection's preview fitted, but the booking
+                            // no longer does (another unit booked the room
+                            // first). A known draw that cannot fit pauses.
+                            let mut paused = decision.clone();
+                            paused.selected = None;
+                            paused.reason = "estimated_draw_exceeds_allowance".into();
+                            paused.exclusions.push(crate::auto_select::Exclusion {
+                                route_id: selected.into(), reason: "estimated_draw_exceeds_allowance".into(),
+                            });
+                            let mut pause_trace = trace;
+                            pause_trace["decision"] = json!(paused);
+                            pause_trace["selected_route"] = Value::Null;
+                            pause_trace["selection_input"]["admission_draw_exceeds_allowance"] = json!(selected);
+                            d.emit(Some(&parent.task_id), Some(&parent.id), "auto_decision",
+                                "daemon", "exact", pause_trace)?;
+                            return Ok(json!({"state":"paused","work_unit_id":work_unit_id,
+                                "decision":paused,"actions":["refresh","choose_manual_route"]}));
+                        }
+                        other => other?,
+                    };
                     if admitted.is_none() {
                         // The pool was claimed after selection. This is an
                         // admission race, not evidence of provider failure or
@@ -2375,7 +2409,8 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let estimator_matches_recorded = if matches!(selector_version,
                 "multi-harness-preflight-v7" | "multi-harness-preflight-v8") {
                 let estimator = &payload["estimator"];
-                if estimator["state"] != "scoped_fit" || estimator["version"] != "v2"
+                if estimator["state"] != "scoped_fit"
+                    || !matches!(estimator["version"].as_str(), Some("v2" | "v3"))
                     || payload["inference"]["state"] != "not_used"
                     || !payload["inference"]["output"].is_null() {
                     return Err(anyhow!("unsupported automatic estimator or inference replay"));
@@ -2446,6 +2481,13 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                             decision.reason = "pool_in_flight_unknown_draw".into();
                             decision.exclusions.push(crate::auto_select::Exclusion {
                                 route_id: route_id.into(), reason: "pool_in_flight_unknown_draw".into(),
+                            });
+                        }
+                        if let Some(route_id) = input["admission_draw_exceeds_allowance"].as_str() {
+                            decision.selected = None;
+                            decision.reason = "estimated_draw_exceeds_allowance".into();
+                            decision.exclusions.push(crate::auto_select::Exclusion {
+                                route_id: route_id.into(), reason: "estimated_draw_exceeds_allowance".into(),
                             });
                         }
                     }

@@ -60,6 +60,9 @@ pub enum Fit {
 pub enum DrawSource {
     ProviderReported,
     AttributedActualWork,
+    /// The shared booking's per-window bound from this account's isolated
+    /// runs of the same bucket (`upper_draw.rs`).
+    QualifiedUpperDraw,
 }
 
 /// A positive, uncertainty-bounded draw in the *same* quota window. This is
@@ -745,6 +748,74 @@ mod tests {
             .exclusions
             .iter()
             .any(|x| x.reason == "missing_tool"));
+    }
+
+    /// AUTO-AC-11 in one place: a preferred harness is a soft tie-break that
+    /// loses to capability (tools, tier, context); an explicit pin binds even
+    /// against the preference; routes outside the allowed accounts, without
+    /// the approvals the unit needs, or unable to run in its sandbox (a
+    /// permission downgrade or widening) are excluded with their reasons.
+    #[test]
+    fn preference_is_soft_pins_bind_and_permission_mismatches_exclude() {
+        let mut preferred = route("preferred", "claude", "pool-a", CapabilityTier::General, "medium", &[]);
+        let capable = route("capable", "codex", "pool-b", CapabilityTier::General, "medium", &["browser"]);
+        let frontier = route("frontier", "codex", "pool-b", CapabilityTier::Frontier, "high", &["browser"]);
+        let reason = |decision: &Decision, id: &str| decision.exclusions.iter()
+            .find(|x| x.route_id == id).map(|x| x.reason.clone());
+        // Preference loses to missing tools, to tier and to context.
+        let mut work = unit(CapabilityTier::General, &["browser"]);
+        work.preferred_harness = Some("claude".into());
+        let decision = select(&work, &[preferred.clone(), capable.clone()]);
+        assert_eq!(decision.selected.as_deref(), Some("capable"));
+        assert_eq!(reason(&decision, "preferred").as_deref(), Some("missing_tool"));
+        preferred.tools = ["browser".to_string()].into();
+        assert_eq!(select(&work, &[preferred.clone(), capable.clone()]).selected.as_deref(),
+            Some("preferred"), "between equally capable routes the preference decides");
+        let mut deep = work.clone();
+        deep.min_tier = CapabilityTier::Frontier;
+        let decision = select(&deep, &[preferred.clone(), frontier.clone()]);
+        assert_eq!(decision.selected.as_deref(), Some("frontier"));
+        assert_eq!(reason(&decision, "preferred").as_deref(), Some("insufficient_capability"));
+        let mut long = work.clone();
+        long.context_needed = 200_000;
+        assert_eq!(reason(&select(&long, &[preferred.clone()]), "preferred").as_deref(),
+            Some("context_unavailable"));
+        // A pin binds against the preference; a pin elsewhere excludes.
+        let mut pinned = work.clone();
+        pinned.pinned_route = Some("capable".into());
+        let decision = select(&pinned, &[preferred.clone(), capable.clone()]);
+        assert_eq!(decision.selected.as_deref(), Some("capable"));
+        assert_eq!(reason(&decision, "preferred").as_deref(), Some("pinned_elsewhere"));
+        // Account boundary.
+        let mut narrow = work.clone();
+        narrow.allowed_profiles = ["pool-b".to_string()].into();
+        assert_eq!(reason(&select(&narrow, &[preferred.clone()]), "preferred").as_deref(),
+            Some("account_not_allowed"));
+        // Approvals the unit requires cannot be dropped by the route.
+        let mut no_approvals = capable.clone();
+        no_approvals.supports_approvals = false;
+        let mut approvals = work.clone();
+        approvals.requires_approvals = true;
+        assert_eq!(reason(&select(&approvals, &[no_approvals]), "capable").as_deref(),
+            Some("approvals_unsupported"));
+        // A read-only-only route cannot take write work; a write-only route
+        // cannot take read-only work; a route offering both takes either.
+        let mut read_only = capable.clone();
+        read_only.sandbox = Sandbox::ReadOnly;
+        let mut write = work.clone();
+        write.min_sandbox = Sandbox::WorkspaceWrite;
+        write.max_sandbox = Sandbox::WorkspaceWrite;
+        assert_eq!(reason(&select(&write, &[read_only.clone()]), "capable").as_deref(),
+            Some("sandbox_incompatible"));
+        let mut read = work.clone();
+        read.min_sandbox = Sandbox::ReadOnly;
+        read.max_sandbox = Sandbox::ReadOnly;
+        assert_eq!(reason(&select(&read, &[capable.clone()]), "capable").as_deref(),
+            Some("sandbox_incompatible"));
+        let mut both = capable.clone();
+        both.supported_sandboxes = Some([Sandbox::ReadOnly, Sandbox::WorkspaceWrite].into());
+        assert_eq!(select(&read, &[both.clone()]).selected.as_deref(), Some("capable"));
+        assert_eq!(select(&write, &[both]).selected.as_deref(), Some("capable"));
     }
 
     #[test]

@@ -39,6 +39,21 @@ impl std::fmt::Display for AgentLimitError {
 
 impl std::error::Error for AgentLimitError {}
 
+/// Admission found that the selected Auto unit's qualified upper draw no
+/// longer fits its account's windows beside the live commitments. The unit
+/// pauses: a known draw that cannot fit never falls back to launching on an
+/// unknown-draw claim.
+#[derive(Debug)]
+pub struct AutoDrawExceedsAllowance;
+
+impl std::fmt::Display for AutoDrawExceedsAllowance {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "estimated draw exceeds the account's remaining allowance")
+    }
+}
+
+impl std::error::Error for AutoDrawExceedsAllowance {}
+
 /// A durable app-slot hold (`app_slot_holds`) for a start whose run row does
 /// not exist yet. The hold is one occupant in the one app-slot count
 /// (`account_booking::app_slots_in_use`); it is deleted in the commit that

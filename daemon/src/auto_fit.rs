@@ -29,6 +29,15 @@ pub(crate) enum FitEvidenceInput {
         snapshots: Vec<QuotaSnapshot>,
         estimate: Option<AllowanceEstimate>,
     },
+    /// The same comparison the shared booking makes at admission: the
+    /// bucket's qualified upper draw against the cited reading's headroom
+    /// (less one reading error) and the account's live commitments.
+    QualifiedDraw {
+        quota_event_seq: i64,
+        observed_ms: i64,
+        sample_count: usize,
+        windows: Vec<crate::account_booking::WindowFitInput>,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -56,6 +65,20 @@ pub(crate) fn evaluate_fit(
     let (snapshots, estimate) = match input {
         FitEvidenceInput::Unavailable { reason } => {
             result.reason = reason.clone();
+            return result;
+        }
+        FitEvidenceInput::QualifiedDraw { observed_ms, windows, .. } => {
+            result.source = Some(DrawSource::QualifiedUpperDraw);
+            result.observed_ms = Some(*observed_ms);
+            result.expected_windows = windows.iter().map(|w| WindowDraw {
+                bucket_id: w.bucket_id.clone(), window: w.window.clone(),
+                upper_percent: w.upper_draw_milli as f64 / 1000.0 }).collect();
+            result.fit = qualified_window_fit(windows);
+            result.reason = match result.fit {
+                Fit::Fits => "qualified_draw_fits",
+                Fit::Unaffordable => "qualified_draw_exceeds_allowance",
+                Fit::Unknown => "qualified_draw_not_comparable",
+            }.into();
             return result;
         }
         FitEvidenceInput::Observed {
@@ -96,6 +119,22 @@ pub(crate) fn evaluate_fit(
     result
 }
 
+/// Every window must leave room for the draw beside the live commitments;
+/// one that cannot makes the route unaffordable. Malformed numbers are
+/// unknown, never a fit.
+fn qualified_window_fit(windows: &[crate::account_booking::WindowFitInput]) -> Fit {
+    if windows.is_empty() || windows.len() > 32 || windows.iter().any(|w|
+        !(1..=100_000).contains(&w.upper_draw_milli) || w.committed_milli < 0
+            || w.headroom_milli > 100_000) {
+        return Fit::Unknown;
+    }
+    if windows.iter().any(|w| w.upper_draw_milli > w.headroom_milli.saturating_sub(w.committed_milli)) {
+        Fit::Unaffordable
+    } else {
+        Fit::Fits
+    }
+}
+
 /// Ranking may use only a complete-work prediction that already passed the
 /// same strict allowance-fit evaluation. Older admission-only envelopes do
 /// not imply anything about context/cache or verification overhead.
@@ -132,6 +171,8 @@ pub(crate) fn fit_inputs_within_bounds(inputs: &[FitEvidenceInput]) -> bool {
     !(inputs.len() > 128
         || inputs.iter().any(|input| match input {
             FitEvidenceInput::Unavailable { reason } => reason.len() > 80,
+            FitEvidenceInput::QualifiedDraw { windows, .. } => windows.len() > 32
+                || windows.iter().any(|w| w.bucket_id.len() > 128 || w.window.len() > 128),
             FitEvidenceInput::Observed {
                 snapshots,
                 estimate,
@@ -176,6 +217,32 @@ fn unavailable(reason: &str) -> FitEvidenceInput {
     }
 }
 
+/// The shared booking's comparison for a calibrated route: its account's
+/// latest reading, live commitments and the qualified upper draw of the
+/// bucket admission would book (`auto/<task class>`). None when the route
+/// is not on a verified account of the current generation or its draw is
+/// not qualified; the older learning-estimate path then applies.
+fn qualified_draw_input(store: &Store, work: &WorkUnit, route: &Route,
+    account_generations: &BTreeMap<String, i64>, now_ms: i64) -> Option<FitEvidenceInput> {
+    if !route.pool_id.starts_with("account/") { return None; }
+    let generation = account_generations.get(&route.profile_id)?;
+    if store.auto_account_generation(&route.profile_id).ok().flatten() != Some(*generation)
+        || store.auto_account_pool_id(&route.profile_id).ok().flatten().as_deref()
+            != Some(route.pool_id.as_str()) {
+        return None;
+    }
+    let bucket = crate::upper_draw::DrawBucket {
+        harness: route.harness.clone(), model: route.model.clone(), effort: route.effort.clone(),
+        task_class: format!("auto/{}", work.task_class.as_deref().unwrap_or("unclassified")),
+    };
+    match crate::account_booking::preview_account_fit(&store.conn, &route.profile_id, &bucket, now_ms) {
+        Ok(crate::account_booking::AccountFitPreview::Windows { quota_event_seq, observed_ms,
+            sample_count, windows }) =>
+            Some(FitEvidenceInput::QualifiedDraw { quota_event_seq, observed_ms, sample_count, windows }),
+        _ => None,
+    }
+}
+
 /// Capture the bounded normalized evidence before selecting. The returned
 /// inputs are the only source from which this decision's fit is calculated.
 pub(crate) fn apply_scoped_fit_with_inputs(
@@ -192,6 +259,10 @@ pub(crate) fn apply_scoped_fit_with_inputs(
     for route in routes.iter() {
         if route.quota != Allowance::ObservedNonExhausted {
             inputs.push(unavailable("allowance_not_observed_nonexhausted"));
+            continue;
+        }
+        if let Some(input) = qualified_draw_input(store, work, route, account_generations, now_ms) {
+            inputs.push(input);
             continue;
         }
         let Some(version) = route
