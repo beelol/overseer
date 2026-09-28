@@ -592,7 +592,7 @@
       "blocker": "A durable J2/J7 conflict preserves both chains, blocks acceptance and completion, and resolves only after one independent accepted J8 reproduction and confirmed exit; explicit unresolved state stays visible and blocked. A separate fixture registers a conflict after both findings were accepted, survives restart, and refuses to resolve against an accepted contradicted job until that job is revised. A transitive ready dependent is demoted and held at admission while its ancestor is disputed. A registered active dependent gets a durable checkpoint and targeted interrupt; confirmed exit leaves it blocked while unrelated work continues. Previously accepted dependent conclusions are invalidated as current coverage, kept as historical evidence, and require explicit revision and fresh review before descendants resume. A late conflict before a dependent patch's Git commit prevents acknowledgement. A post-commit/pre-ack restart reconciles the exact private patch effect; unfamiliar edits remain held for review and prevent plan revision. Acknowledged dependent patches remain in the private branch; an in-flight second integration is reconciled, and conflict ancestry plus artifact revision hold later integration and verification until fresh accepted repairs. A two-job integrated dependency chain repairs in order, retaining historical commits. A separate fixture exhausts two actual attempts, then shows a failed job and attempts_exhausted coverage after late conflict, refusing a third attempt and stale branch verification even after reproduction resolves the disagreement. A stopped unresolved run now reads incomplete after restart with both artifact chains and unrelated accepted coverage. A director-authored unresolved or attempts-exhausted partial report now closes the fixture run atomically with Stop, survives restart and cannot invent its reason from absent evidence. Independent overlapping multi-patch repair, a no-code disposition, autonomous semantic judgment and qualified live director review remain unverified."
     },
     "SWARM-48": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
         "daemon/tests/swarm_revision_replay.rs",
@@ -601,9 +601,10 @@
         "daemon/src/swarm/schema.rs",
         "docs/verification/swarm/milestone-2.md",
         "daemon/tests/swarm_state.rs",
-        "docs/verification/swarm/SWARM-48.md"
+        "docs/verification/swarm/SWARM-48.md",
+        "daemon/tests/swarm_atlas.rs"
       ],
-      "blocker": "Fixture plan validation, independent subgraphs, two failed plan/repair validation turns, rejected superseded-job ID reuse across restart, exact request-ID replay of semantic and unknown-dependency repair rejections without a second count, recorded accepted-evidence and resolved-conflict progress, and durable two-turn no-progress stalls pass. Legacy active turns conservatively backfill accepted-decision and resolved-conflict snapshots on migration. No-ID retries, other material-progress and repair-error classes, live director behavior, and complete S3/S5 traces remain unverified."
+      "blocker": null
     },
     "SWARM-49": {
       "status": "verified",

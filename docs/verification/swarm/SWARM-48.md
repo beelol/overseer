@@ -1,6 +1,6 @@
 # SWARM-48 — invalid planning subgraphs
 
-Status: partial. Revisions: `77774af`, `49617a6`, `b71a451`.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. Revisions: `77774af`, `49617a6`, `b71a451`.
 
 Input: a 10-job fixture containing a valid root and child, another independent valid job, a missing dependency and its dependent, a two-job cycle, a missing acceptance check, and two jobs with the same ID. The director explicitly sets `allow_partial: true`; the default remains strict validation.
 
@@ -96,3 +96,19 @@ passed 5 + 11 + 19 + 11 tests. `git diff --check` passed.
 
 The no-ID path still treats repeated invalid submissions as distinct turns;
 other semantic repair errors and live director behavior remain unverified.
+
+## Verified at fixture scope (2026-09-28)
+
+The earlier partial-plan fixture had every invalid shape except conflicting exclusive claims. `invalid_plan_shapes_are_rejected_and_conflicting_writers_cannot_dispatch_together` (`daemon/tests/swarm_plan.rs`, new; passed on first run once its benefit wave was set up) puts all five in one plan:
+
+| Clause | What the tests show |
+| --- | --- |
+| Cycles, nonexistent dependencies, duplicate logical jobs, missing acceptance checks are rejected | the J8→J9→J8 cycle (`dependency cycle or dependent on cycle`), a job needing J99 (`unavailable dependency j99`), a missing acceptance (`missing field acceptance`) and a duplicated ID (`duplicate job id`) are rejected with indexed reasons; none of them can register an attempt |
+| Conflicting exclusive claims: invalid dispatch rejected | two jobs writing `db:shared` are legitimate serial work, so both are kept; while writer A holds the claim, writer B's admission is `resource_conflict` with no attempt |
+| Independent valid subgraphs allowed | writer A and the independent job are admitted together; the earlier `partial_plan_keeps_independent_valid_subgraphs` keeps a root/child chain beside the rejected jobs; the joined Atlas `atlas_s5_invalid_dependency_subgraph_does_not_block_valid_audit` completes J2 beside the rejected J8/J9/J99 (passed again against PostgreSQL 16) |
+| Two failed planning/repair turns stall visibly | `two_invalid_planning_turns_stall_but_stale_calls_do_not_count`, `two_invalid_repair_revisions_share_the_planning_stall_limit`, `two_semantically_invalid_repair_turns_stall_after_restart` (`stall_reason: planning_failed`) |
+| Two no-progress director turns stall visibly, no new planners | `two_no_progress_director_turns_stall_durably_without_replaying_completion`, `unsupported_progress_claim_does_not_reset_the_director_stall_counter` (`director_no_progress`; further batches are refused, so no further planning turn starts) |
+
+Rerun serially on 2026-09-28: `swarm_plan` 12, `swarm_state` 21, `swarm_revision_replay` 5, `swarm_conflict` 10, `swarm_director` 12.
+
+Boundary: a planning turn here is a scripted plan or revision call; a live director's repair behaviour is not claimed.

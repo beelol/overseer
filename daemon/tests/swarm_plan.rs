@@ -385,3 +385,79 @@ fn malformed_job_capability_requirement_is_rejected_before_dispatch() {
     assert!(error.contains("invalid required capability"), "{error}");
     assert!(d.call("swarm.jobs",json!({"id":id}))["jobs"].as_array().unwrap().is_empty());
 }
+
+/// SWARM-48 joined: one partial plan carries every invalid shape the clause
+/// names (a cycle, a nonexistent dependency, a duplicate logical job, a
+/// missing acceptance check) plus two jobs claiming one exclusive database.
+/// The invalid jobs are rejected with reasons and never dispatchable; the
+/// valid independent subgraphs are kept. The two writers are valid serial
+/// work, so their conflict is refused at dispatch: while one holds the
+/// exclusive claim the other gets `resource_conflict` with no attempt, while
+/// an unrelated valid job is admitted alongside.
+#[test]
+fn invalid_plan_shapes_are_rejected_and_conflicting_writers_cannot_dispatch_together() {
+    let d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Plan validation",
+        "objective":"Audit","allowed_targets":["fixture"]}));
+    let id = run["id"].as_str().unwrap().to_string();
+    let planned = d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,
+        "allow_partial":true,"jobs":[
+            {"id":"writer-a","title":"Writer A","acceptance":"evidence","deps":[],
+                "resource_claims":[{"resource":"db:shared","mode":"write"}]},
+            {"id":"writer-b","title":"Writer B","acceptance":"evidence","deps":[],
+                "resource_claims":[{"resource":"db:shared","mode":"write"}]},
+            {"id":"independent","title":"Independent","acceptance":"evidence","deps":[]},
+            {"id":"j8","title":"J8","acceptance":"evidence","deps":["j9"]},
+            {"id":"j9","title":"J9","acceptance":"evidence","deps":["j8"]},
+            {"id":"after-j99","title":"Needs J99","acceptance":"evidence","deps":["j99"]},
+            {"id":"no-check","title":"No check","deps":[]},
+            {"id":"twice","title":"Once","acceptance":"evidence","deps":[]},
+            {"id":"twice","title":"Twice","acceptance":"evidence","deps":[]}
+        ]}));
+    let reasons: Vec<String> = planned["rejected"].as_array().unwrap().iter()
+        .map(|r| r["reason"].as_str().unwrap().to_string()).collect();
+    assert_eq!(planned["job_count"], 3, "{planned}");
+    assert_eq!(reasons.len(), 6, "{reasons:?}");
+    for want in ["dependency cycle", "unavailable dependency j99", "acceptance", "duplicate job id"] {
+        assert!(reasons.iter().any(|r| r.contains(want)), "{want}: {reasons:?}");
+    }
+    let jobs = d.call("swarm.jobs", json!({"id":id,"limit":100}));
+    let mut kept: Vec<String> = jobs["jobs"].as_array().unwrap().iter()
+        .map(|j| j["id"].as_str().unwrap().to_string()).collect();
+    kept.sort();
+    assert_eq!(kept, vec!["independent", "writer-a", "writer-b"]);
+    let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
+    let admit = |job: &str, request: &str| d.call("swarm.admit", json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":job,"target_id":"fixture","request_id":request,"now_ms":at,
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture","account_id":"a","pool_ids":["p"],"capabilities":["audit"],
+                "health":"up","auth":"ok"}],
+            "pools":[{"id":"p","windows":[{"id":"w","unit":"points","remaining_milli":1000000,
+                "protected_milli":0,"reserved_milli":0,"confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":[],"estimate_milli":{"points":100},"purpose":"worker"}));
+    for rejected in ["j8", "j9", "after-j99", "no-check", "twice"] {
+        assert!(d.try_call("swarm.attempt.register", json!({"run_id":id,"generation":1,"revision":1,
+            "job_id":rejected})).is_err(), "{rejected} is not dispatchable");
+    }
+    // The benefit wave holds writer A and the independent job; a wave with
+    // both writers would be serial because of their planned exclusive claim.
+    let workers: Vec<serde_json::Value> = ["writer-a","independent"].iter().map(|job| json!({"id":job,
+        "elapsed_ms":100,"usage_milli":{"points":10}})).collect();
+    let cost = json!({"elapsed_ms":10,"usage_milli":{"points":1}});
+    let serial = json!({"planning":cost,"context":cost,"integration":cost,"review":cost,"retries":cost,"workers":workers});
+    let mut parallel = serial.clone();
+    parallel["context"]["elapsed_ms"] = json!(20);
+    d.call("swarm.benefit.commit", json!({"run_id":id,"generation":1,"revision":1,"estimate":{
+        "independent":true,"max_workers":2,"allocation_milli":{"points":100000},
+        "finishing_reserve_milli":{"points":20000},"serial":serial,"parallel":parallel}}));
+    let a = admit("writer-a", "writer-a-1");
+    assert_eq!(a["status"], "admitted", "{a}");
+    let b = admit("writer-b", "writer-b-1");
+    assert_eq!((b["status"].as_str(), b["reason"].as_str()), (Some("blocked"), Some("resource_conflict")), "{b}");
+    let c = admit("independent", "independent-1");
+    assert_eq!(c["status"], "admitted", "{c}");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let attempts: i64 = db.query_row("SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND job_id='writer-b'",
+        [&id], |r| r.get(0)).unwrap();
+    assert_eq!(attempts, 0);
+}
