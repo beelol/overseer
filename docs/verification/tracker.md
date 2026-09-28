@@ -24,5 +24,6 @@ Owners: **goal** = the agent running the everything goal. **owner** = only the o
 | T-NN (TUI) | Tiles show full temporary paths (reported by the Audio Mode agent) | goal | main | not reproduced from the recorded screens (only the new-agent form's Repository field shows a full path, as intended); needs the Audio Mode agent's exact case |
 | AC-203, AC-204 | Takeovers and partial merges (Gate Q) | goal | main | AC-203 verified; AC-204 with the first finished slice (the shared account booking) |
 | AC-156, AC-161 | Cover everything (Gate Q) | goal | main | AC-156: Auto's next merge of main; AC-161 closes last |
+| AC-206 to AC-211 | Overseer develops Overseer (Gate T): dev instances beside the installed Overseer (`scripts/dev`), VS Code, the TUI and the phone simulators pointed at one, never touching the installed daemon | agent: dev instance | branch `claude/dev-instance` (its pull request); [side RFC](../rfcs/dev-instance.md) | watch; merge when it is marked ready; AC-210's app side waits for PR #10 |
 
 New criteria or new agents get a row the pass they appear.
