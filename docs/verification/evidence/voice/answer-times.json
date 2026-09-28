@@ -1,0 +1,19 @@
+{
+  "done_ms": {
+    "max": 2362,
+    "p50": 1692,
+    "p95": 2140
+  },
+  "heard_ms": {
+    "max": 5,
+    "p50": 1,
+    "p95": 4
+  },
+  "requests": 50,
+  "settle_seconds": 1,
+  "working_on_it_ms": {
+    "max": 23,
+    "p50": 0,
+    "p95": 18
+  }
+}
