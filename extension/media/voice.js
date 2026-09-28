@@ -36,7 +36,10 @@
   window.__voice = { mark: null, messages: 0 };
 
   // A read-back or a plan that waits for a yes: Yes and No in the strip (and on the keyboard).
+  // A read-back and a plan each ask on their own: a lapsed read-back leaves a waiting plan asking.
+  let askReadBack = false, askPlan = null;
   function setAsking(on) { $('voice-yes').hidden = !on; $('voice-no').hidden = !on; }
+  function updateAsking() { setAsking(askReadBack || !!askPlan); }
   // The listener's or the recognizer's last error, for ten minutes (AC-175).
   function showError(message, at) {
     const fresh = message && (!at || Date.now() - at < 600000);
@@ -155,8 +158,9 @@
         const el = $('voice-heard'); el.textContent = v.text; el.classList.add('aside'); el.title = 'Not meant for Overseer: kept in memory only';
       } else if (v.kind === 'request' && v.request) {
         requests.set(v.request.id, v.request);
-        if (v.request.state === 'waiting') setAsking(true);
-        else if (['sent', 'not_sent', 'cancelled', 'partly_sent', 'done'].includes(v.request.state)) setAsking(false);
+        if (v.request.state === 'waiting') askPlan = v.request.id;
+        else if (askPlan === v.request.id) askPlan = null;
+        updateAsking();
         renderRequests();
       } else if (v.kind === 'say') {
         // Every spoken line is also text (AC-174).
@@ -166,11 +170,11 @@
       } else if (v.kind === 'listener' && v.event === 'error') {
         showError(v.message, Date.now());
       } else if (v.kind === 'read_back') {
-        setAsking(!v.lapsed && !!v.agent);
+        askReadBack = !v.lapsed && !!v.agent; updateAsking();
       } else if (v.kind === 'confirm' && v.lapsed) {
-        setAsking(false);
+        askPlan = null; updateAsking();
       } else if (v.kind === 'toast' && v.cancel) {
-        setAsking(false);
+        askReadBack = false; updateAsking();
       } else if (v.kind === 'target' && voice) { voice.target = v.target; voice.target_title = v.target_title || (v.target === 'overseer' ? 'Overseer' : voice.target_title); applyState(); }
     }
   });
@@ -178,8 +182,8 @@
   $('voice-on').addEventListener('click', () => vscode.postMessage({ type: 'toggle' }));
   $('voice-target').addEventListener('click', () => vscode.postMessage({ type: 'target' }));
   $('voice-cancel').addEventListener('click', e => vscode.postMessage({ type: 'cancel', id: e.currentTarget.dataset.id }));
-  $('voice-yes').addEventListener('click', () => { setAsking(false); vscode.postMessage({ type: 'answer', yes: true }); });
-  $('voice-no').addEventListener('click', () => { setAsking(false); vscode.postMessage({ type: 'answer', yes: false }); });
+  $('voice-yes').addEventListener('click', () => { askReadBack = false; askPlan = null; updateAsking(); vscode.postMessage({ type: 'answer', yes: true }); });
+  $('voice-no').addEventListener('click', () => { askReadBack = false; askPlan = null; updateAsking(); vscode.postMessage({ type: 'answer', yes: false }); });
   vscode.postMessage({ type: 'ready' });
   void heardFinal;
 })();

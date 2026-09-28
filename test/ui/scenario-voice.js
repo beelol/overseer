@@ -300,10 +300,15 @@ const { auditExpression } = require('./audit');
     const gridMarked = gridFrame ? await gridFrame.eval(`[...document.querySelectorAll('.tile')].some(t => /Continuity/.test(t.querySelector('.tile-title')?.textContent || '') && t.querySelector('.tile-voice') && !t.querySelector('.tile-voice').hidden)`) : false;
     await s.screenshot('voice-mark-grid');
     await cdp.command('Overseer: Toggle Agent Grid'); await delay(800);
+    // The mark goes when the request closes (it goes out after its window).
+    await untilState(cancelId, ['sent', 'cancelled'], 30000);
+    const unmarked = await (async () => { for (let i = 0; i < 20; i++) { const r = await s.agentRows(); if (!r.some(x => x.label === 'Continuity' && /voice/.test(x.description))) return true; await delay(250); } return false; })();
+    // Cancel by keyboard: a new request, cancelled as soon as it settles.
+    const cancelId2 = s.ctl('voice.say', { text: 'Tell Continuity to pause for now.' }).request;
+    await untilState(cancelId2, ['settling']);
     await cdp.focusWorkbench();
     await cdp.key('.', { meta: true, alt: true });
-    const cancelled = await untilState(cancelId, ['cancelled'], 10000);
-    const unmarked = await (async () => { for (let i = 0; i < 20; i++) { const r = await s.agentRows(); if (!r.some(x => x.label === 'Continuity' && /voice/.test(x.description))) return true; await delay(250); } return false; })();
+    const cancelled = await untilState(cancelId2, ['cancelled'], 10000);
     check('the voice mark is on the targeted agent in the side bar and the grid while the request is open, and goes when it closes', settling === 'settling' && sideMarked && gridMarked && unmarked, { settling, sideMarked, gridMarked, unmarked });
     // Yes by keyboard: a plan that waits for a yes (archiving is a Confirm action).
     await cdp.command('Overseer: Voice Mode: Show'); await delay(600);
@@ -324,13 +329,19 @@ const { auditExpression } = require('./audit');
     s.ctl('voice.set', { settle_seconds: 6 });
     await cdp.command('Overseer: Open Overseer View'); await delay(1500);
     const homeFrame = await cdp.webview(`!!document.getElementById('home-voice')`, 20000);
+    // Home is the composer with no agent selected (Overseer: New Agent), as in scenario-home.
+    for (let i = 0; i < 3; i++) {
+      await cdp.command('Overseer: New Agent');
+      if (await homeFrame.waitFor(`document.body.dataset.mode === 'composer'`, 8000).then(() => true, () => false)) break;
+    }
+    await delay(800);
     const homeId = s.ctl('voice.say', { text: 'Tell Writer to add a changelog.' }).request;
     await untilState(homeId, ['settling']);
     await homeFrame.waitFor(`!document.getElementById('home').hidden && !document.getElementById('home-voice').hidden && !!document.querySelector('.home-msg.spoken') && !!document.querySelector('.proposal.spoken')`, 20000).catch(() => {});
-    const home = await homeFrame.eval(`(() => ({ strip: !document.getElementById('home-voice').hidden, state: document.querySelector('.home-voice-state')?.textContent, words: [...document.querySelectorAll('.home-msg.spoken .home-text')].map(e => e.textContent).find(t => /add a changelog/.test(t)), spokenCard: !!document.querySelector('.proposal.spoken') }))()`);
+    const home = await homeFrame.eval(`(() => ({ mode: document.body.dataset.mode, strip: document.getElementById('home-voice').checkVisibility(), state: document.querySelector('.home-voice-state')?.textContent, words: [...document.querySelectorAll('.home-msg.spoken .home-text')].map(e => e.textContent).find(t => /add a changelog/.test(t)), spokenCard: !!document.querySelector('.proposal.spoken') }))()`);
     await s.screenshot('home-voice-strip');
-    const homeAudit = await homeFrame.eval(auditExpression({ root: '#home-voice' }));
-    check('home shows the voice strip, and the spoken request and its plan are marked in the conversation', home.strip && /Listening|Thinking|Speaking|Hearing/.test(home.state || '') && home.words === 'Tell Writer to add a changelog.' && home.spokenCard, home);
+    const homeAudit = await homeFrame.eval(auditExpression({ root: '#home-voice', exclude: ['.home-voice-heard'] }));
+    check('home shows the voice strip, and the spoken request and its plan are marked in the conversation', home.mode === 'composer' && home.strip && /Listening|Thinking|Speaking|Hearing/.test(home.state || '') && home.words === 'Tell Writer to add a changelog.' && home.spokenCard, home);
 
     // ---------- A card filling in as its dispatches advance (AC-169, AC-174).
     await cdp.command('Overseer: Voice Mode: Show'); await delay(800);
@@ -419,7 +430,7 @@ const { auditExpression } = require('./audit');
     s.note('audits', audits);
     check('no horizontal overflow and no long unbroken runs at 360, 900 and 1280 px in the three themes', audits.every(a => a.overflow === 0 && a.longRuns === 0), audits);
     check('the accessible-name audit: every control has a name and a tooltip (the voice view and home’s strip)', audits.every(a => a.unnamed === 0) && homeAudit.unnamed.length === 0, { view: audits.map(a => a.unnamed), home: homeAudit.unnamed });
-    check('the visible-text audit: the voice view’s own text stays within 60 characters, and home’s strip within 60', audits.every(a => a.chrome <= 60) && homeAudit.chars <= 60, { view: Math.max(...audits.map(a => a.chrome)), home: homeAudit.chars });
+    check('the visible-text audit: the voice view’s own text stays within 60 characters, and home’s strip within 60', audits.every(a => a.chrome <= 60) && homeAudit.chars > 0 && homeAudit.chars <= 60, { view: Math.max(...audits.map(a => a.chrome)), home: homeAudit.chars });
     void continuity;
     void phone;
   } catch (e) {
@@ -435,6 +446,7 @@ const { auditExpression } = require('./audit');
     fs.writeFileSync(path.join(s.evidence, 'result.json'), JSON.stringify(result, null, 2));
     const failed = result.checks.filter(c => !c.ok);
     console.log(failed.length ? `${failed.length} check(s) failed` : `all ${result.checks.length} checks passed`);
+    console.log(failed.length ? 'SCENARIO FAILED' : 'SCENARIO PASSED', s.root);
     process.exit(failed.length ? 1 : 0);
   }
 })();

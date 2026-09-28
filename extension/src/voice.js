@@ -14,6 +14,8 @@ class Voice {
     this.targeted = new Set(); // agents that open spoken requests are for (a voice mark, AC-169)
     this.heard = '';
     this.asking = false; // a read-back or a plan waits for a yes
+    this.askReadBack = false; // a permission read back
+    this.askPlan = null; // the request whose plan waits for a yes
     this.listeners = [];
     this.status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 49);
     this.status.command = 'overseer.voice.open';
@@ -42,6 +44,10 @@ class Voice {
     const state = v.state || 'starting';
     return { on: true, state, label: LABEL[state] || state, reason: v.reason || '', heard: this.heard, muted: !!v.muted, target: v.target_title || 'Overseer', asking: this.asking };
   }
+
+  /** Asking while a read-back or a plan waits; each clears on its own (a lapsed read-back does not
+   * clear a plan that still waits). */
+  updateAsking() { this.setAsking(this.askReadBack || !!this.askPlan); }
 
   setAsking(on) {
     if (this.asking === on) return;
@@ -86,13 +92,14 @@ class Voice {
     if (m.kind === 'target' && this.voice) { this.voice.target = m.target; this.titleTarget().then(() => { this.render(); this.changed(); this.post({ type: 'live', msg: { ...m, target_title: this.voice.target_title } }); }); return; }
     if (m.kind === 'targets') { this.targeted = new Set(m.runs || []); this.changed('targets'); }
     if (m.kind === 'heard' || m.kind === 'not_meant') { this.heard = m.text || ''; this.changed(); }
-    if (m.kind === 'read_back') this.setAsking(!m.lapsed && !!m.agent);
-    if (m.kind === 'confirm' && m.lapsed) this.setAsking(false);
+    if (m.kind === 'read_back') { this.askReadBack = !m.lapsed && !!m.agent; this.updateAsking(); }
+    if (m.kind === 'confirm' && m.lapsed) { this.askPlan = null; this.updateAsking(); }
     if (m.kind === 'request' && m.request) {
-      if (m.request.state === 'waiting') this.setAsking(true);
-      else if (this.asking && ['sent', 'not_sent', 'cancelled', 'partly_sent', 'done'].includes(m.request.state)) this.setAsking(false);
+      if (m.request.state === 'waiting') this.askPlan = m.request.id;
+      else if (this.askPlan === m.request.id) this.askPlan = null;
+      this.updateAsking();
     }
-    if (m.kind === 'toast') { if (m.cancel) this.setAsking(false); this.toast(m); }
+    if (m.kind === 'toast') { if (m.cancel) { this.askReadBack = false; this.updateAsking(); } this.toast(m); }
     if (m.kind === 'open') this.openPlace(m.place);
     if (m.kind === 'download') this.downloadProgress?.(m.progress);
     if (m.kind === 'request' && m.request?.proposal) this.fetchCard(m.request.proposal);
@@ -123,7 +130,8 @@ class Voice {
   /** Yes or no from the keyboard to what was read back (AC-171, AC-174). */
   async answer(yes) {
     await this.client.request('voice.answer', { yes });
-    this.setAsking(false);
+    this.askReadBack = false; this.askPlan = null;
+    this.updateAsking();
   }
 
   post(m) { this.panel?.webview.postMessage(m); }
