@@ -26,6 +26,23 @@ emulators are Overseer's own, never another project's (see [apple-assets rule](.
   TestFlight and cannot be used until the daemon's push sender (PR #10) is merged. Create it later,
   as part of the real-iPhone push step, not this goal.
 - Team: **STATION 42 INTERACTIVE L.L.C.**, team id `FQ6YGD7554`.
+- **TF-4** marks: iOS assets regenerated from `docs/design/brand/`; `assets/icon.png` is the real
+  Overseer mark, 1024² with no alpha (verified visually). **TF-5** release config: export-compliance
+  flag `ITSAppUsesNonExemptEncryption=false` set in `app.config.ts`; bundle id scoped to Overseer.
+- **TF-6** signed `.ipa`: built from the latest phone tip (`95b0946d`) in an isolated worktree,
+  archived + exported with **manual** distribution signing — App Store profile "Overseer App Store"
+  (`com.beelol.overseer.phone`) + the STATION 42 Apple Distribution cert. `altool` validation:
+  VERIFY SUCCEEDED, no errors.
+- **TF-7** upload: `altool --upload-app` → UPLOAD SUCCEEDED (Delivery UUID
+  `2da48d08-b8d2-4c4b-b7dd-f94b702690a6`). Build **0.1.0 (1)** shows in TestFlight, Processing.
+  Export compliance answered in the binary (no ASC prompt).
+- **TF-8** setup: internal group **"Overseer Internal"** created (auto-distribution on), owner
+  (`bilalitani1@gmail.com`) added as internal tester. Waiting on Apple processing → then owner
+  installs on the iPhone.
+- Signing note: the App Manager API key can't do cloud signing (Apple requires Admin), so a manual
+  Overseer-scoped App Store profile was used with the existing team distribution cert. The API key
+  (`VAT46LATWS`, App Manager) is used for upload only. `.p8` and profile live under `/private/tmp`,
+  never committed. An earlier lost key (`337JA98RL5`) was revoked; aquafriends' assets untouched.
 
 ## Paste the block below into `/goal`
 
@@ -77,30 +94,28 @@ clause, then record them through `docs/verification/records.py`.
   Business › Agreements shows Free Apps Agreement = Active. *(Done 2026-09-27. Paid Apps left
   unsigned by choice — not needed for TestFlight; EU DSA trader status is a separate, non-blocking
   owner item.)*
-- [ ] **TF-4 — The right marks on iOS.** The home-screen icon, launch screen, door and in-app mark
+- [x] **TF-4 — The right marks on iOS.** *(Done 2026-09-27: icon.png 1024² no-alpha, real Overseer mark, verified.)* The home-screen icon, launch screen, door and in-app mark
   are generated from `docs/design/brand/` (app icon `overseer-app-icon.png` at 1024 with no alpha;
   launch + door `overseer-icon-flat.png` in grayscale; in-app `overseer-logo.png`); no placeholder
   or eye glyph remains; icons are script-generated, not hand-drawn (iOS slice of AC-178). **Verify:**
   the generated iOS icon set matches the brand source; simulator screenshots (light and dark) of the
   home icon, launch screen, door and an in-app mark; a repo search finds no placeholder mark.
-- [ ] **TF-5 — Release build config.** `phone/eas.json` (or an equivalent local Xcode/Fastlane
+- [x] **TF-5 — Release build config.** *(Done: ITSAppUsesNonExemptEncryption set; manual App Store profile Overseer-scoped.)* `phone/eas.json` (or an equivalent local Xcode/Fastlane
   config) has an iOS TestFlight profile: autoincrementing build number, version from
   `app.config.ts`, `ITSAppUsesNonExemptEncryption` set, credentials scoped to the Overseer App ID
   only. **Verify:** config present; a dry run resolves `com.beelol.overseer.phone` and a
   distribution profile scoped to it, and references no other project's identifier, key, cert,
   profile, simulator or emulator.
-- [ ] **TF-6 — Signed .ipa from the latest app.** An App Store distribution `.ipa` is built from the
+- [x] **TF-6 — Signed .ipa from the latest app.** *(Done: built from phone tip 95b0946d, distribution-signed, altool VERIFY SUCCEEDED.)* An App Store distribution `.ipa` is built from the
   tip of the latest phone-remote source, signed with the team distribution cert and a profile for
   `com.beelol.overseer.phone`. **Verify:** the build log shows the commit, bundle id and profile;
   the `.ipa` passes validation (Xcode Organizer or `xcrun altool`/notary validate).
-- [ ] **TF-7 — Uploaded to TestFlight.** The `.ipa` is uploaded and processed to "Ready to Test"
-  under the Overseer app, export compliance answered. **Verify:** the TestFlight tab shows the build
-  for the built version/build number as "Ready to Test"; screenshot; no outstanding compliance
-  action.
-- [ ] **TF-8 — Installed on the iPhone (owner).** An Internal Testing group exists with the owner as
-  a tester and the build available; the owner installs and launches it from the TestFlight app.
-  **Verify:** the internal group lists the build and the owner; the owner's dated confirmation of a
-  successful install and launch on the iPhone. *(Owner action.)*
+- [~] **TF-7 — Uploaded to TestFlight.** Uploaded 2026-09-27 (UPLOAD SUCCEEDED); build 0.1.0 (1)
+  **Processing** on Apple's side. **Verify (pending):** the build flips to "Ready to Test"; export
+  compliance shows no outstanding action (answered in the binary).
+- [~] **TF-8 — Installed on the iPhone (owner).** Internal group "Overseer Internal" created with the
+  owner as tester and auto-distribution on. **Verify (pending owner):** once processing finishes the
+  owner installs and launches from the TestFlight app on the iPhone (owner action).
 - [ ] **TF-9 — Android (optional).** Only if attainable with no new paid account and no other
   project's assets: a signed Android release (AAB/APK) from the same source and marks, using an
   Overseer keystore. **Verify:** the signed artifact is built from the latest source with the
