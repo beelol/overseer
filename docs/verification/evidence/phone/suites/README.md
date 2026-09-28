@@ -4,8 +4,8 @@
 
 - `test-all-phone-access-off.log`: the whole suite with phone access off, at 376146ef (main merged in), 44 of 53 passed. The load was 13 to 66 during this run: other agents' suites, a local model and virtual machines shared the Mac.
 - `test-all-phone-access-on.log`: the whole suite with phone access on, at b8587cc7, 50 of 53 passed; the Rust workspace 337 of 337.
-- `reruns-alone.log`: every check that failed in either run, run again alone, one at a time (AGENTS.md: a timing check that fails under load is rerun alone before it is called a regression). All pass.
-- `cargo-test-final-phone-access-{off,on}.log`: the Rust workspace at the final commit, in both settings, after the fixes below.
+- `reruns-alone.log`: every check that failed in either run, run again alone, one at a time (AGENTS.md: a timing check that fails under load is rerun alone before it is called a regression). All pass alone but `continuity` with phone access on, which failed alone too and passed after its fix (the last lines of the log).
+- `cargo-test-final-phone-access-{off,on}.log`: `cargo test --workspace` after the fixes below (the code of cc4a556), in both settings: 338 tests in 25 test binaries with phone access off and 338 in 25 with it on, none failed.
 
 What the failures were:
 
