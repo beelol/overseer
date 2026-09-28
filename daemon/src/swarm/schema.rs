@@ -573,6 +573,14 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           PRIMARY KEY(run_id,finding_id,job_id,artifact_id,endpoint),
           FOREIGN KEY(run_id,finding_id) REFERENCES swarm_findings(run_id,finding_id)
         );
+        CREATE TABLE IF NOT EXISTS swarm_finding_entries(
+          run_id TEXT NOT NULL,
+          finding_id TEXT NOT NULL,
+          endpoint TEXT NOT NULL,
+          entry TEXT NOT NULL,
+          updated_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,finding_id,endpoint)
+        );
         CREATE TABLE IF NOT EXISTS swarm_reproductions(
           run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
           finding_id TEXT NOT NULL,

@@ -1522,6 +1522,7 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             crate::swarm::reproduce(&mut d.store.lock().unwrap(), p)?
         }
         "swarm.findings" => crate::swarm::findings(&d.store.lock().unwrap(), p)?,
+        "swarm.report.final" => crate::swarm::final_report(&d.store.lock().unwrap(), p)?,
         "swarm.complete" => {
             fixture_only()?;
             crate::swarm::complete(&mut d.store.lock().unwrap(), p)?

@@ -32,7 +32,7 @@ pub use admission::admit;
 pub use availability::observe as observe_availability;
 pub use benefit::preview as preview_benefit;
 pub use benefit::commit as commit_benefit;
-pub use findings::{list as findings, merge as merge_findings, record as record_finding, reproduce};
+pub use findings::{final_report, list as findings, merge as merge_findings, record as record_finding, reproduce};
 pub use broker::{ack, direct, messages, overseer_advisory, register, report, watcher_advisory};
 pub use requirements::change as change_requirements;
 pub use route::replay as replay_route;

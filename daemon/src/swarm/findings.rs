@@ -25,6 +25,11 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashSet};
 
+/// The fields of one report entry (S1): what was called, by whom, on whose object, at which
+/// source revision, how to reproduce it, what should and did happen, why, and the fix direction.
+const REPORT_FIELDS: &[&str] = &["endpoint", "caller_permission", "object_ownership", "source_revision",
+    "reproduction_command", "expected", "observed", "root_cause", "fix_direction"];
+
 fn bounded_id(value: &str, what: &str) -> Result<()> {
     if value.is_empty() || value.len() > 100
         || !value.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b)) {
@@ -94,6 +99,26 @@ pub fn record(store: &mut Store, p: &Value) -> Result<Value> {
     if evidence.is_empty() || evidence.len() > 100 {
         bail!("a finding needs 1-100 evidence entries");
     }
+    // Report entries (S1's expected artifact): one per endpoint, each field bounded text.
+    let mut report_entries = Vec::new();
+    if let Some(given) = p.get("entries").filter(|v| !v.is_null()) {
+        let given = given.as_array().ok_or_else(|| anyhow!("entries must be an array"))?;
+        if given.len() > 100 {
+            bail!("too many report entries");
+        }
+        for entry in given {
+            let endpoint = required(entry, "endpoint")?.trim().to_string();
+            let mut clean = serde_json::Map::new();
+            for field in REPORT_FIELDS {
+                if let Some(value) = entry.get(*field).filter(|v| !v.is_null()) {
+                    let text = value.as_str().ok_or_else(|| anyhow!("report field {field} must be text"))?;
+                    bounded_text(text, 2000, &format!("report field {field}"))?;
+                    clean.insert(field.to_string(), json!(text.trim()));
+                }
+            }
+            report_entries.push((endpoint, Value::Object(clean)));
+        }
+    }
     let mut entries = Vec::new();
     for e in evidence {
         let (job, artifact, endpoint) = (required(e, "job_id")?, required(e, "artifact_id")?, required(e, "endpoint")?);
@@ -119,6 +144,16 @@ pub fn record(store: &mut Store, p: &Value) -> Result<Value> {
     for (job, artifact, endpoint) in &entries {
         tx.execute("INSERT OR IGNORE INTO swarm_finding_evidence(run_id,finding_id,job_id,artifact_id,endpoint,created_ms)
             VALUES(?1,?2,?3,?4,?5,?6)", params![run, finding, job, artifact, endpoint, crate::daemon::now()])?;
+    }
+    for (endpoint, entry) in &report_entries {
+        let known: bool = tx.prepare("SELECT 1 FROM swarm_finding_evidence WHERE run_id=?1 AND finding_id=?2 AND endpoint=?3")?
+            .exists(params![run, finding, endpoint])?;
+        if !known {
+            bail!("a report entry for {endpoint} needs evidence for that endpoint");
+        }
+        tx.execute("INSERT INTO swarm_finding_entries(run_id,finding_id,endpoint,entry,updated_ms) VALUES(?1,?2,?3,?4,?5)
+            ON CONFLICT(run_id,finding_id,endpoint) DO UPDATE SET entry=excluded.entry,updated_ms=excluded.updated_ms",
+            params![run, finding, endpoint, entry.to_string(), crate::daemon::now()])?;
     }
     tx.commit()?;
     readout(&store.conn, &run, finding)
@@ -373,4 +408,85 @@ pub fn list(store: &Store, p: &Value) -> Result<Value> {
     let ids: Vec<String> = stmt.query_map([run], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
     let findings = ids.iter().map(|id| readout(&store.conn, run, id)).collect::<Result<Vec<_>>>()?;
     Ok(json!({"run_id":run,"findings":findings}))
+}
+
+/// The run's final report as one artifact (S1's expected artifact): an entry for every
+/// confirmed endpoint of a finding, with the director's report fields and the evidence behind
+/// it; the entries that lack fields, named rather than filled in; and a coverage matrix that
+/// keeps confirmed findings, checked paths and unresolved areas apart. An unconfirmed finding,
+/// an environment failure, an unreported job or a disputed result is unresolved, never a
+/// checked path. The same state gives the same document and digest.
+pub fn final_report(store: &Store, p: &Value) -> Result<Value> {
+    let run = required(p, "run_id")?;
+    let coverage = super::coverage_report(store, &json!({"run_id":run}))?;
+    let listed = list(store, p)?;
+    let mut entries = Vec::new();
+    let mut incomplete = Vec::new();
+    let mut confirmed = Vec::new();
+    let mut unresolved = Vec::new();
+    let mut finding_jobs = HashSet::new();
+    for finding in listed["findings"].as_array().cloned().unwrap_or_default() {
+        if finding["status"] == "merged" {
+            continue;
+        }
+        let id = finding["finding_id"].as_str().unwrap_or_default().to_string();
+        for endpoint in finding["endpoints"].as_array().cloned().unwrap_or_default() {
+            let name = endpoint["endpoint"].as_str().unwrap_or_default().to_string();
+            for e in endpoint["evidence"].as_array().cloned().unwrap_or_default() {
+                finding_jobs.insert(e["job_id"].as_str().unwrap_or_default().to_string());
+            }
+            if endpoint["confirmed"] != true {
+                unresolved.push(json!({"reason":"unconfirmed_finding","finding_id":id,"endpoint":name}));
+                continue;
+            }
+            confirmed.push(json!({"finding_id":id,"endpoint":name}));
+            let saved: Option<String> = store.conn.query_row(
+                "SELECT entry FROM swarm_finding_entries WHERE run_id=?1 AND finding_id=?2 AND endpoint=?3",
+                params![run, id, name], |r| r.get(0)).optional()?;
+            let fields: Value = saved.and_then(|raw| serde_json::from_str(&raw).ok()).unwrap_or(json!({}));
+            let mut entry = json!({"finding_id":id,"title":finding["title"],"discovery":finding["root_cause"],
+                "evidence":endpoint["evidence"],"reproducer":finding["reproducer"]});
+            let mut missing = Vec::new();
+            for field in REPORT_FIELDS {
+                let value = fields[*field].clone();
+                if value.as_str().is_none_or(str::is_empty) {
+                    missing.push(*field);
+                }
+                entry[*field] = value;
+            }
+            if entry["endpoint"].is_null() {
+                entry["endpoint"] = json!(name);
+                missing.retain(|f| *f != "endpoint");
+            }
+            if !missing.is_empty() {
+                incomplete.push(json!({"finding_id":id,"endpoint":name,"missing":missing}));
+            }
+            entries.push(entry);
+        }
+    }
+    let mut checked = Vec::new();
+    let mut excluded = Vec::new();
+    for row in coverage["rows"].as_array().cloned().unwrap_or_default() {
+        let job = row["job_id"].as_str().unwrap_or_default().to_string();
+        match row["coverage_state"].as_str().unwrap_or("") {
+            "checked_negative" => checked.push(json!({"job_id":job,"artifact_ids":row["artifact_ids"]})),
+            "excluded_by_scope" => excluded.push(json!({"job_id":job})),
+            "confirmed_application_defect" if finding_jobs.contains(&job) => {}
+            "confirmed_application_defect" => unresolved.push(json!({"reason":"defect_without_finding","job_id":job})),
+            "environment_blocked" => unresolved.push(json!({"reason":"environment_blocked","job_id":job,
+                "unavailable_resource":row["unavailable_resource"]})),
+            _ if finding_jobs.contains(&job) && row["job_status"] == "accepted" => {}
+            state => unresolved.push(json!({"reason":state,"job_id":job})),
+        }
+    }
+    for conflict in coverage["conflicts"].as_array().cloned().unwrap_or_default() {
+        unresolved.push(json!({"reason":"conflict_unresolved","conflict_id":conflict["conflict_id"]}));
+    }
+    let mut report = json!({"run_id":run,"run_status":coverage["run_status"],"outcome":coverage["outcome"],
+        "entries":entries,"incomplete_entries":incomplete,
+        "coverage_matrix":{"confirmed_findings":confirmed,"checked_paths":checked,"unresolved":unresolved,
+            "excluded":excluded}});
+    let digest = format!("{:x}", Sha256::digest(report.to_string().as_bytes()));
+    report["sha256"] = json!(digest);
+    Ok(report)
 }
