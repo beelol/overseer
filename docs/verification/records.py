@@ -1992,6 +1992,8 @@ GRT = "`cargo test -p overseerd --test voice`"
 GRL = "`cargo test -p overseer-listener`"
 GRUI = "`node extension/scripts/package.js`, then `node test/ui/scenario-voice.js` ([evidence](https://github.com/beelol/overseer/blob/8b903bab09aa710640c17094487ae8474b4c4f4e/docs/verification/evidence/ui/voice/))"
 GROWN = "the owner's checks (docs/rfcs/voice-mode.md#the-owners-checks)"
+# The owner runs them later in a dev daemon, through Gate T's guided test (not a branch build in their own VS Code).
+GRDEV = " Run later in a dev daemon through Gate T's guided test (docs/rfcs/dev-instance.md), once that feature is built."
 rec(162, "Voice spike before lock-in", "partial", commit=GR, date="2026-09-28",
     harness="whisper.cpp (whisper-rs 0.16, Metal) on speech made by macOS `say` at test time; Claude Haiku through Claude Code 2.1.246 for the orchestrator's timing (two turns)",
     proven="the measurement table with the versions and the machine, and eight decisions with the revised budgets, in the side RFC; the words recorded from the chosen recognizer (small.en with the hint) as `voice/tests/fixtures/words-small-en.json` (text only), all 36 utterances replayed through the local rules by `voice::request::tests::the_recorded_words_replay_through_the_local_rules`; no recorded or generated voice file in the repository (the only audio is Audio Mode's twelve approved MP3s, per its pack check)",
@@ -2000,20 +2002,20 @@ rec(162, "Voice spike before lock-in", "partial", commit=GR, date="2026-09-28",
     expected="See the RFC criterion (Gate R).",
     actual="small.en with the hint: 4.5% word errors, 148 ms an utterance (p95 221 ms), 708 MiB. The orchestrator's first sentence takes 3.9 to 4.7 s, so \"On it.\" comes from the daemon at once. The replay passes: every command reads as meant; a name heard right is a candidate and a misheard one is not; a yes or a cancel counts only when heard right, so a mishearing is no answer.",
     evidence="[side RFC: the spike](../rfcs/voice-mode.md#the-spike-measurements-and-decisions), `voice/tests/fixtures/words-small-en.json`, `voice/examples/spike_recognizer.rs`",
-    live="The spike's two Haiku turns.", blocker="The owner: echo through real speakers (the owner's checks, step 6).")
+    live="The spike's two Haiku turns.", blocker="The owner: echo through real speakers (the owner's checks, step 6)." + GRDEV)
 rec(163, "Owned by the daemon, heard in Rust, off until asked", "partial", commit=GR, date="2026-09-28", harness=GRFIX,
     proven="off by default and kept across a daemon kill; no listener process while off or muted; one utterance makes exactly one request with no window open and with two; a second listener with the daemon's lock is refused; a killed listener leaves the daemon and a running agent untouched, and a fourth death in ten minutes turns Voice Mode off with the reason; the listener is its own process, spawned with responsibility disclaimed so macOS names it, and sends words and one level, never audio",
     deferred="live on macOS: the prompt names Overseer, the indicator goes off within 1 s of mute, a spoken request with VS Code closed (" + GROWN + ", steps 2, 3 and 7)",
     steps=GRT + ": `ac163_off_by_default_kept_across_a_kill_and_muted_means_no_listener`, `ac163_one_utterance_one_request_and_a_second_listener_is_refused`, `ac175_a_dying_listener_never_touches_an_agent_and_four_deaths_turn_voice_off`.",
     expected="See the RFC criterion (Gate R).", actual="The protocol tests pass.",
     evidence="`daemon/tests/voice.rs`, `daemon/src/voice/`, `voice/src/main.rs`", live="Fixtures only.",
-    blocker="The owner: the microphone prompt, the indicator after mute, a request with VS Code closed.")
+    blocker="The owner: the microphone prompt, the indicator after mute, a request with VS Code closed (the owner's checks, steps 2, 3 and 7)." + GRDEV)
 rec(164, "Holds the floor; noise never interrupts", "partial", commit=GR, date="2026-09-28", harness=GRFIX,
     proven="every noise (taps, clicks, typing, a chair, a door, a cup, a cough, a laugh, a fan, music) 100 times each: while nobody speaks it never opens the gate or moves the mark; while Overseer speaks it makes no utterance, no lowering, no stop and no level; speech still opens the gate after noise; a pause in mid-thought stays one utterance; Overseer's own voice coming back and a cue make no utterance; side talk and a phone call make no request and no answer, and Overseer returns to full voice and finishes; the lowering, the stop at the end of a phrase and the stop words are measured by the listener's tests (the lowering budget revised by the spike); a line due while the owner speaks waits and is then spoken, and one kept waiting past the limit goes to the card alone",
     deferred="ten minutes of an ordinary room on the owner's Mac (" + GROWN + ", step 5)",
     steps=GRL + " (`speech_gate.rs`; `listener.rs`: `every_noise_100_times_while_overseer_speaks_changes_nothing`, `a_pause_in_mid_thought_stays_one_utterance`, `talking_over_overseer_lowers_its_voice_and_it_comes_back`, `stop_stops_overseer_at_once`, `overseer_s_own_voice_coming_back_is_not_the_owner`, `a_suppressed_moment_is_not_heard`); " + GRT + ": `ac164_noise_never_moves_the_mark_and_speech_does`, `ac164_side_talk_over_overseer_lets_it_finish_and_addressed_words_stop_it`, `ac164_lines_wait_for_the_owner_and_side_talk_makes_no_request`.",
     expected="See the RFC criterion (Gate R).", actual="All pass.", evidence="`voice/tests/`, `daemon/tests/voice.rs`", live="Fixtures only.",
-    blocker="The owner: ten minutes of an ordinary room.")
+    blocker="The owner: ten minutes of an ordinary room (the owner's checks, step 5)." + GRDEV)
 rec(165, "A quick answer that it is working on it", "verified", commit=GR, date="2026-09-28", harness=GRFIX + "; the live run on the default Claude account with Haiku",
     steps=GRT + ": `ac165_the_three_answers_over_fifty_requests` (`OVERSEER_VOICE_TIMING_OUT` writes the times), `ac165_the_holding_line_once_and_a_failed_dispatch_is_spoken`, `ac165_a_spoken_request_is_taken_at_once_planned_and_sent_with_the_owner_s_words`; live: `OVERSEER_VOICE_LIVE=1 cargo test -p overseerd --test voice_live`.",
     expected="See the RFC criterion (Gate R), with the budgets revised by the spike (\"On it.\" from the daemon at once; the holding line at 8 s).",
@@ -2070,14 +2072,14 @@ rec(175, "Keeps working when things fail", "verified", commit=GR, date="2026-09-
     evidence="`daemon/tests/voice.rs`, [voice scenario](https://github.com/beelol/overseer/blob/8b903bab09aa710640c17094487ae8474b4c4f4e/docs/verification/evidence/ui/voice/result.json)", live="Fixtures only.")
 rec(176, "Voice Mode by voice (owner-confirmed)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R).",
-    actual="Waits for the owner's session.", live="—", blocker="The owner's session (" + GROWN + ", step 8).")
+    actual="Waits for the owner's session.", live="—", blocker="The owner's session (" + GROWN + ", step 8)." + GRDEV)
 rec(177, "The mark shows it is hearing you", "partial", commit=GR, date="2026-09-28", harness=GRFIX,
     proven="the Star motion ported unchanged, its poses equal the reference's within 1% for every state (`test/unit/voice-mark.js`); in the packaged UI the mark is centred (measured), the star follows the level curve with a 40 ms lag (best-aligned, r 0.88), noise leaves it at rest, each state in screenshots in the three themes and in grayscale, frame work p95 0.2 ms beside a streaming chat at the display's rate, no frame while hidden, reduced motion shows the still mark and a meter; two windows get the same levels from one listener; the listener's output carries levels and no audio, and nothing of them is stored",
     deferred="the owner speaks with Voice Mode on and sees the star follow their real voice and stay at rest for taps and typing (" + GROWN + ", step 4)",
     steps="`node test/unit/voice-mark.js`; " + GRUI + "; " + GRT + ": `ac177_two_windows_see_the_same_levels_from_one_listener`, `ac173_levels_and_side_talk_are_never_stored`; " + GRL + ": `the_output_carries_no_audio`.",
     expected="See the RFC criterion (Gate R).", actual="All pass.",
     evidence="[voice scenario](https://github.com/beelol/overseer/blob/8b903bab09aa710640c17094487ae8474b4c4f4e/docs/verification/evidence/ui/voice/result.json), `extension/media/voice-mark.js`", live="Fixtures only.",
-    blocker="The owner: the star with their real voice, and a dated confirmation.")
+    blocker="The owner: the star with their real voice, and a dated confirmation (the owner's checks, step 4)." + GRDEV)
 rec(180, "Spikes before lock-in", "verified (research criterion)", commit="aee0b5b (branch claude/orchestrator-agent-control-rfc-8e2009)", date="2026-09-27",
     harness="Claude Code 2.1.246 on the owner's claude.ai login (haiku, 2 tiny turns); Codex 0.155.0-alpha.16.4 on the owner's ChatGPT login (gpt-5.6-luna, low effort, 2 tiny turns); OpenCode 1.15.13 with the mock model (no paid turn)",
     fixture="An isolated OVERSEER_HOME with 4, then 16, fixture agents (Claude fixture, `showcase`); `overseerd mcp` as the MCP server; a generated 10,000-file repository with two agents' commits",
@@ -2359,9 +2361,9 @@ SHORT_BLOCKERS = {
     136: "not started (Gate N, added by the owner on 2026-09-26)",
     137: "not started (Gate N, added by the owner on 2026-09-26)",
     141: "not started (Gate N, added by the owner on 2026-09-26)",
-    162: "partial: the spike's measurements, decisions and words-layer fixture (pull request #16); echo on real speakers waits for the owner",
-    163: "partial: the protocol tests pass (pull request #16); the microphone prompt, mute indicator and VS Code closed wait for the owner",
-    164: "partial: the audio-layer tests pass (pull request #16); ten minutes of an ordinary room wait for the owner",
+    162: "partial: the spike's measurements, decisions and words-layer fixture (pull request #16); echo on real speakers waits for the owner (in a dev daemon, Gate T's guided test)",
+    163: "partial: the protocol tests pass (pull request #16); the microphone prompt, mute indicator and VS Code closed wait for the owner (in a dev daemon, Gate T's guided test)",
+    164: "partial: the audio-layer tests pass (pull request #16); ten minutes of an ordinary room wait for the owner (in a dev daemon, Gate T's guided test)",
     165: "verified (pull request #16)",
     166: "verified (pull request #16)",
     167: "verified (pull request #16)",
@@ -2373,8 +2375,8 @@ SHORT_BLOCKERS = {
     173: "verified (pull request #16)",
     174: "verified (pull request #16)",
     175: "verified (pull request #16)",
-    176: "not started: waits for the owner's session",
-    177: "partial: the port, the scenario and the traces (pull request #16); the owner's real voice waits for the owner",
+    176: "not started: waits for the owner's session (in a dev daemon, Gate T's guided test)",
+    177: "partial: the port, the scenario and the traces (pull request #16); the owner's real voice waits for the owner (in a dev daemon, Gate T's guided test)",
     178: "not started (Brand, added by the owner on 2026-09-27): the phone app's agent uses the owner's files",
     179: "partial: the helper's icon is built from the owner's mark and checked as installed; the banner and Finder screenshots need the owner",
     180: "verified",
