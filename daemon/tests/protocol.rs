@@ -4295,6 +4295,49 @@ fn auto_pre_effect_account_rejection_selects_an_allowed_independent_route() {
     assert_eq!(d.call("auto.decision.replay", json!({"event_seq":decisions[0]["seq"]}))["matches_recorded"], true);
 }
 
+/// AUTO-AC-19: the preferred route's harness is removed after discovery, so
+/// its launch would be rejected before any work. The same work unit runs
+/// the eligible alternate (Claude) and replays it; no Codex child exists.
+#[test]
+fn auto_launch_rejection_after_discovery_selects_the_eligible_alternate() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let quota = r.path().join("codex-quota-mode");
+    std::fs::write(&quota, "unknown").unwrap();
+    let codex = r.path().join("codex-app-fixture.js");
+    std::fs::copy(fixture("fake-harness/codex-app-fixture.js"), &codex).unwrap();
+    let marker = r.path().join("remove-codex");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", codex.to_str().unwrap()),
+        ("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_MODE,FIXTURE_QUOTA_MODE_FILE,FIXTURE_TOOL_READ_ACTION,FIXTURE_REMOVE_MARKER"),
+        ("FIXTURE_MODE", "managed-models"), ("CLAUDE_FIXTURE_MODE", "prose"),
+        ("FIXTURE_TOOL_READ_ACTION", "remove_program"), ("FIXTURE_REMOVE_MARKER", marker.to_str().unwrap()),
+        ("FIXTURE_QUOTA_MODE_FILE", quota.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    std::fs::write(&marker, "remove").unwrap();
+    let request = json!({"work_unit_id":"launch-reject-1",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":["system-codex","system-claude"],"preferred_harness":"codex-app",
+        "prompt":"safe bounded result"});
+    let outcome = d.call("auto.dispatch", request.clone());
+    assert!(!codex.exists(), "the harness was removed after its discovery");
+    assert_eq!(outcome["state"], "dispatched", "{outcome}");
+    assert_eq!(outcome["run"]["harness"], "claude", "{outcome}");
+    let failures = outcome["pre_effect_failures"].as_array().unwrap();
+    assert_eq!(failures.len(), 1, "{outcome}");
+    assert_eq!(failures[0]["reason"], "harness_program_unavailable_before_child");
+    assert!(outcome["decision"]["exclusions"].as_array().unwrap().iter()
+        .any(|entry| entry["route_id"] == "system-codex/gpt-6-sol/medium" && entry["reason"] == "route_unavailable"), "{outcome}");
+    assert_eq!(d.wait_done(&run_id(&outcome), 15)["status"], "completed");
+    assert_eq!(d.runs().len(), 2, "the rejected route created no child");
+    assert_eq!(d.call("auto.dispatch", request)["run"]["id"], outcome["run"]["id"],
+        "the same work unit replays its alternate");
+    let decision = d.events(&parent).into_iter().find(|e| e["kind"] == "auto_decision").unwrap();
+    assert_eq!(d.call("auto.decision.replay", json!({"event_seq":decision["seq"]}))["matches_recorded"], true);
+}
+
 #[test]
 fn auto_pre_effect_rejections_stop_after_three_distinct_routes_without_a_child() {
     let r = tmp();

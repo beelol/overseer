@@ -2217,6 +2217,26 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     }
                     let route = routes.iter().find(|route| route.id == selected)
                         .ok_or_else(|| anyhow!("selected route disappeared"))?;
+                    // The harness was discovered but can no longer be
+                    // launched (uninstalled or replaced): the launch would be
+                    // rejected before any work, so no child or Git effect is
+                    // created and every route of that harness is excluded.
+                    if crate::adapters::resolve_program(&route.harness).is_none() {
+                        pre_effect_failures.push(json!({"profile_id":route.profile_id,
+                            "route_id":route.id,"reason":"harness_program_unavailable_before_child"}));
+                        let harness = route.harness.clone();
+                        for alternate in routes.iter_mut().filter(|candidate| candidate.harness == harness) {
+                            alternate.health = crate::auto_select::Health::Unavailable;
+                        }
+                        decision = crate::auto_fit::select_with_estimates(
+                            &work, &routes, &fit_inputs, fit_now_ms);
+                        if attempt == 2 && decision.selected.is_some() {
+                            attempt_limit_reached = true;
+                            decision.selected = None;
+                            decision.reason = "pre_effect_attempt_limit".into();
+                        }
+                        continue;
+                    }
                     if route.harness == "opencode" {
                         let local_profile = d.profile(&route.profile_id)?;
                         let parent_workspace = d.workspace(&parent.workspace_id)?;

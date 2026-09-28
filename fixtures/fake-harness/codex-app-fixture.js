@@ -200,6 +200,10 @@ rl.on('line', line => {
       fs.writeFileSync(process.env.FIXTURE_QUOTA_MODE_FILE, 'exhausted');
     } else if (process.env.FIXTURE_MODE === 'managed-models' && process.env.FIXTURE_TOOL_READ_ACTION === 'switch_account') {
       fs.writeFileSync(process.env.FIXTURE_ACCOUNT_ID_FILE, 'account-B');
+    } else if (process.env.FIXTURE_MODE === 'managed-models' && process.env.FIXTURE_TOOL_READ_ACTION === 'remove_program'
+      && process.env.FIXTURE_REMOVE_MARKER && fs.existsSync(process.env.FIXTURE_REMOVE_MARKER)) {
+      // The harness is uninstalled after discovery: its launch is rejected before any work.
+      fs.unlinkSync(process.argv[1]);
     }
     if (toolMode === 'error') out({ id: m.id, error: { code: -32601, message: 'private-tool-error-sentinel' } });
     else out({ id: m.id, result: { data: toolMode === 'missing' ? [] : [{ name: 'browser', runtimeStatus: 'connected', toolsError: null,
