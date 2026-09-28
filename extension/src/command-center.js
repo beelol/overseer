@@ -69,7 +69,9 @@ class CommandCenter {
     if (!m || typeof m !== 'object') return;
     const post = x => this.panel?.webview.postMessage(x);
     switch (m.type) {
-      case 'ready': await this.push(); await this.pushOverseer(); if (this.inDashboard) post({ type: 'dashboard', on: true }); return;
+      case 'ready': await this.push(); await this.pushOverseer(); this.pushVoice(); if (this.inDashboard) post({ type: 'dashboard', on: true }); return;
+      case 'voiceMute': await vscode.commands.executeCommand('overseer.voice.mute'); return;
+      case 'voiceShow': await vscode.commands.executeCommand('overseer.voice.open'); return;
       // Home (AC-182): the one conversation with Overseer, from the daemon.
       case 'overseerSend': {
         const text = String(m.text || '').trim(); if (!text) return;
@@ -147,6 +149,12 @@ class CommandCenter {
   }
 
   /** Home's conversation: the daemon's session, whole (its messages are few and their ids stable). */
+  /** Voice Mode (Gate R): home's voice strip and the voice mark on the grid's tiles. */
+  pushVoice() {
+    if (!this.panel || !this.voiceSource) return;
+    this.panel.webview.postMessage({ type: 'voice', voice: this.voiceSource.summary(), targets: [...this.voiceSource.targeted] });
+  }
+
   async pushOverseer() {
     if (!this.panel || !this.client.connected) return;
     if (this.pushingOverseer) { this.pushOverseerAgain = true; return; }

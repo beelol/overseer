@@ -1,0 +1,415 @@
+{
+  "checks": [
+    {
+      "name": "Voice Mode is off until the owner turns it on",
+      "ok": true
+    },
+    {
+      "name": "the voice view opens listening, and the status bar says so",
+      "ok": true
+    },
+    {
+      "name": "the mark is centred in the voice view (measured)",
+      "ok": true,
+      "detail": {
+        "cx": 540.99609375,
+        "w": 438.8984375,
+        "vw": 1082
+      }
+    },
+    {
+      "name": "noise (typing, taps, a door, music) never moves the mark and never reads as hearing",
+      "ok": true,
+      "detail": {
+        "levels": 0,
+        "maxScale": 1
+      }
+    },
+    {
+      "name": "hearing: the star grows with the voice and swings with its syllables",
+      "ok": true,
+      "detail": {
+        "frames": 342,
+        "max": 1.805097644581534,
+        "min": 1.4210269168893654
+      }
+    },
+    {
+      "name": "levels arrive at least every 100 ms while the owner speaks (25 a second)",
+      "ok": true,
+      "detail": {
+        "jumps": 75,
+        "spacing": 43.700000047683716
+      }
+    },
+    {
+      "name": "the star follows the level curve within 100 ms (best-aligned lag)",
+      "ok": true,
+      "detail": {
+        "lag": 40,
+        "r": 0.9,
+        "frames": 342,
+        "levels": 75
+      }
+    },
+    {
+      "name": "speaking: rings of light cross the core and the star stays under 1.3x",
+      "ok": true,
+      "detail": {
+        "scale": 1.2127707646481432,
+        "glow": 0.426759231900185,
+        "rings": 1,
+        "still": false,
+        "meter": null,
+        "state": "speaking"
+      }
+    },
+    {
+      "name": "thinking: the star turns, 12% larger",
+      "ok": true,
+      "detail": {
+        "scale": 1.122975353255049,
+        "glow": 0.18401643823971978,
+        "rings": 0,
+        "still": false,
+        "meter": null,
+        "state": "thinking"
+      }
+    },
+    {
+      "name": "the request card shows the owner's words and the text sent to the agent",
+      "ok": true,
+      "detail": {
+        "words": "“Tell Phone to use the new wire format.”",
+        "row": "Phonenamed · adddeliveredFor you: Please use the new wire format.(voice, request V-0001) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.",
+        "full": "(voice, request V-0001) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format."
+      }
+    },
+    {
+      "name": "muted: the mark is still with the mute sign, and no listener runs",
+      "ok": true,
+      "detail": {
+        "scale": 1.0003509425358368,
+        "glow": 0.18040942559227244,
+        "rings": 0,
+        "still": true,
+        "meter": null,
+        "state": "muted"
+      }
+    },
+    {
+      "name": "screenshots of each state in the three themes and in grayscale",
+      "ok": true
+    },
+    {
+      "name": "beside a streaming chat, the animation keeps up at 60 frames a second: work per frame p95 under 16 ms, and frames arrive at the display's rate",
+      "ok": true,
+      "detail": {
+        "n": 455,
+        "work_p95": 0.19999992847442627,
+        "interval_median": 8.30000000000291,
+        "interval_p95": 9.900000000008731,
+        "dropped": 0,
+        "groups": 2
+      }
+    },
+    {
+      "name": "no frame is drawn while the view is behind another tab",
+      "ok": true,
+      "detail": {
+        "visibility": "visible",
+        "f1": 11858,
+        "f2": 11858
+      }
+    },
+    {
+      "name": "reduced motion: a still mark and a level meter",
+      "ok": true,
+      "detail": {
+        "scale": 1.675115137211426,
+        "glow": 0.8163868649907204,
+        "rings": 0,
+        "still": true,
+        "meter": 0.7942531026016776,
+        "state": "hearing"
+      }
+    },
+    {
+      "name": "the toast's Cancel withdraws the answer inside the window: the agent still waits",
+      "ok": true,
+      "detail": {
+        "clicked": true,
+        "still": "waiting_for_user"
+      }
+    },
+    {
+      "name": "the toast names what was answered with Cancel, then reads Sent, in the three themes",
+      "ok": true,
+      "detail": [
+        {
+          "tag": "overseer",
+          "before": true,
+          "after": true
+        },
+        {
+          "tag": "dark",
+          "before": true,
+          "after": true
+        },
+        {
+          "tag": "light",
+          "before": true,
+          "after": true
+        }
+      ]
+    },
+    {
+      "name": "paused for a call: shown with the app, and listening again after",
+      "ok": true,
+      "detail": {
+        "text": "Paused for a call",
+        "title": "Paused for a call: Paused while Zoom uses the microphone"
+      }
+    },
+    {
+      "name": "who is spoken to switches from the strip, by command and by voice, and the strip shows it",
+      "ok": true,
+      "detail": {
+        "byStrip": true,
+        "byCommand": true,
+        "byVoice": true,
+        "back": true
+      }
+    },
+    {
+      "name": "the voice mark is on the targeted agent in the side bar and the grid while the request is open, and goes when it closes",
+      "ok": true,
+      "detail": {
+        "settling": "settling",
+        "sideMarked": true,
+        "gridMarked": true,
+        "unmarked": true
+      }
+    },
+    {
+      "name": "mute, cancel and yes by keyboard only",
+      "ok": true,
+      "detail": {
+        "keyMuted": true,
+        "keyUnmuted": true,
+        "cancelled": "cancelled",
+        "waiting": "waiting",
+        "yesShown": true,
+        "yesDone": "sent"
+      }
+    },
+    {
+      "name": "home shows the voice strip, the spoken request marked as spoken, and Overseer’s plan for it",
+      "ok": true,
+      "detail": {
+        "mode": "composer",
+        "strip": true,
+        "state": "Speaking",
+        "words": "Tell Writer to add a changelog.",
+        "spokenMark": true,
+        "plan": true
+      }
+    },
+    {
+      "name": "a card fills in as its dispatches advance (held, then the next state on the daemon's events)",
+      "ok": true,
+      "detail": [
+        "held",
+        "answered"
+      ]
+    },
+    {
+      "name": "two agents in flight and a new one: the card has three rows and each chat shows the owner's words, in the three themes",
+      "ok": true,
+      "detail": {
+        "evState": "sent",
+        "rows": 3,
+        "chats": [
+          {
+            "tag": "overseer",
+            "id": "r-6bf9740d5b84",
+            "shows": true
+          },
+          {
+            "tag": "overseer",
+            "id": "r-972a0860714f",
+            "shows": true
+          },
+          {
+            "tag": "overseer",
+            "id": "r-7ed03e785dce",
+            "shows": true
+          },
+          {
+            "tag": "dark",
+            "id": "r-6bf9740d5b84",
+            "shows": true
+          },
+          {
+            "tag": "dark",
+            "id": "r-972a0860714f",
+            "shows": true
+          },
+          {
+            "tag": "dark",
+            "id": "r-7ed03e785dce",
+            "shows": true
+          },
+          {
+            "tag": "light",
+            "id": "r-6bf9740d5b84",
+            "shows": true
+          },
+          {
+            "tag": "light",
+            "id": "r-972a0860714f",
+            "shows": true
+          },
+          {
+            "tag": "light",
+            "id": "r-7ed03e785dce",
+            "shows": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "the new agent appears in the side bar with its prompt",
+      "ok": true,
+      "detail": {
+        "label": "write the migration",
+        "description": "now",
+        "level": 2,
+        "expanded": null,
+        "selected": false,
+        "focused": false,
+        "aria": "write the migration, done, claude, Your login"
+      }
+    },
+    {
+      "name": "four crashes turn Voice Mode off, and the view says why",
+      "ok": true,
+      "detail": {
+        "reason": "the listener stopped four times in ten minutes (last: killed by signal 9)"
+      }
+    },
+    {
+      "name": "no horizontal overflow and no long unbroken runs at 360, 900 and 1280 px in the three themes",
+      "ok": true,
+      "detail": [
+        {
+          "tag": "overseer",
+          "w": 360,
+          "viewWidth": 302,
+          "overflow": 0,
+          "unnamed": 0,
+          "chrome": 17,
+          "longRuns": 0
+        },
+        {
+          "tag": "overseer",
+          "w": 900,
+          "viewWidth": 842,
+          "overflow": 0,
+          "unnamed": 0,
+          "chrome": 17,
+          "longRuns": 0
+        },
+        {
+          "tag": "overseer",
+          "w": 1280,
+          "viewWidth": 1222,
+          "overflow": 0,
+          "unnamed": 0,
+          "chrome": 17,
+          "longRuns": 0
+        },
+        {
+          "tag": "dark",
+          "w": 360,
+          "viewWidth": 302,
+          "overflow": 0,
+          "unnamed": 0,
+          "chrome": 17,
+          "longRuns": 0
+        },
+        {
+          "tag": "dark",
+          "w": 900,
+          "viewWidth": 842,
+          "overflow": 0,
+          "unnamed": 0,
+          "chrome": 17,
+          "longRuns": 0
+        },
+        {
+          "tag": "dark",
+          "w": 1280,
+          "viewWidth": 1222,
+          "overflow": 0,
+          "unnamed": 0,
+          "chrome": 17,
+          "longRuns": 0
+        },
+        {
+          "tag": "light",
+          "w": 360,
+          "viewWidth": 302,
+          "overflow": 0,
+          "unnamed": 0,
+          "chrome": 17,
+          "longRuns": 0
+        },
+        {
+          "tag": "light",
+          "w": 900,
+          "viewWidth": 842,
+          "overflow": 0,
+          "unnamed": 0,
+          "chrome": 17,
+          "longRuns": 0
+        },
+        {
+          "tag": "light",
+          "w": 1280,
+          "viewWidth": 1222,
+          "overflow": 0,
+          "unnamed": 0,
+          "chrome": 17,
+          "longRuns": 0
+        }
+      ]
+    },
+    {
+      "name": "the accessible-name audit: every control has a name and a tooltip (the voice view and home’s strip)",
+      "ok": true,
+      "detail": {
+        "view": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "home": []
+      }
+    },
+    {
+      "name": "the visible-text audit: the voice view’s own text stays within 60 characters, and home’s strip within 60",
+      "ok": true,
+      "detail": {
+        "view": 17,
+        "home": 8
+      }
+    }
+  ]
+}

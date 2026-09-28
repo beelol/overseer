@@ -58,6 +58,8 @@
 
   function create(host, { post, open, getState, loadLayout, saveLayout }) {
     const tiles = new Map(); // runId -> tile
+    let voiced = new Set(); // agents an open spoken request is for (Voice Mode, AC-169)
+    const markVoice = t => { t.voice.hidden = !voiced.has(t.run.id); };
     let visible = false, order = [];
     const savedLayout = loadLayout?.();
     let tree = savedLayout && savedLayout.tree && valid(savedLayout.tree) ? savedLayout.tree : null, custom = !!savedLayout?.custom && !!tree;
@@ -108,9 +110,10 @@
       const status = el('span', 'tile-status');
       const title = el('button', 'tile-title'); title.type = 'button';
       const who = el('span', 'tile-who');
+      const voice = ui.icon('mic', 'xs'); voice.classList.add('tile-voice'); voice.title = 'A spoken request is for this agent'; voice.removeAttribute('aria-hidden'); voice.setAttribute('role', 'img'); voice.setAttribute('aria-label', 'Spoken request'); voice.hidden = true;
       const pin = ui.iconButton('pin', 'Pin to grid', { cls: 'sm tile-pin', pressed: false });
       const openBtn = ui.iconButton('screen-full', 'Open agent', { cls: 'sm tile-open', shortcut: 'Enter' });
-      head.append(status, title, who, pin, openBtn);
+      head.append(status, title, voice, who, pin, openBtn);
       head.draggable = true; head.title = 'Drag to move this tile';
       head.addEventListener('dragstart', e => { e.dataTransfer.setData('application/x-overseer-run', run.id); e.dataTransfer.setData('text/plain', run.title); e.dataTransfer.effectAllowed = 'move'; dragging = run.id; t.classList.add('dragging'); });
       head.addEventListener('dragend', () => { dragging = undefined; t.classList.remove('dragging'); hideDrop(); });
@@ -122,7 +125,7 @@
       const send = ui.iconButton('arrow-up', 'Send', { cls: 'sm' }); send.type = 'submit';
       foot.append(input, send);
       t.append(head, bodyEl, perm, foot);
-      const tile = { el: t, run, status, title, who, pin, openBtn, bodyEl, convEl, perm, input, send, conv: new window.OverseerConversation(convEl, { post: m => post({ ...m, runId: m.runId || run.id, scope: 'tile' }), compact: true }) };
+      const tile = { el: t, run, status, title, voice, who, pin, openBtn, bodyEl, convEl, perm, input, send, conv: new window.OverseerConversation(convEl, { post: m => post({ ...m, runId: m.runId || run.id, scope: 'tile' }), compact: true }) };
       title.addEventListener('click', e => { e.stopPropagation(); post({ type: 'track', runId: run.id }); });
       // A click anywhere on the tile (not on its controls or reply) tracks the agent (AC-105).
       t.addEventListener('click', e => { if (!e.target.closest('button, input, a, form, summary, .tile-perm')) post({ type: 'track', runId: run.id }); });
@@ -210,7 +213,7 @@
       for (const id of order) {
         const run = runs.get(id);
         let tile = tiles.get(id);
-        if (!tile) { tile = makeTile(run); tiles.set(id, tile); }
+        if (!tile) { tile = makeTile(run); tiles.set(id, tile); markVoice(tile); }
         update(tile, run, state);
         tile.el.classList.toggle('tracked', id === tracked);
       }
@@ -310,6 +313,7 @@
       /** Back to the balanced shapes (the Reset Grid Layout command). */
       reset() { custom = false; tree = balanced(leaves(tree)); if (visible) layout(getState()); },
       run(m) { const t = tiles.get(m.run.id); if (t) t.conv.setRun(m); },
+      voiceTargets(list) { voiced = new Set(list); for (const t of tiles.values()) markVoice(t); },
       history(m) { const t = tiles.get(m.root); if (!t) return; for (const x of m.events) t.conv.add(x.event); t.bodyEl.scrollTop = t.bodyEl.scrollHeight; },
       events(items) {
         const touched = new Set();

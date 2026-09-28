@@ -14,7 +14,16 @@
     const level = el('span', 'home-level'); level.id = 'home-level';
     const fresh = el('button', 'link', 'Start fresh'); fresh.type = 'button'; fresh.id = 'home-fresh'; fresh.title = 'Archive this conversation and begin a new one (holds, guardrails, areas, conflicts and watches stay)';
     fresh.addEventListener('click', () => post({ type: 'overseerFresh' }));
-    head.append(el('span', 'spacer'), level, fresh);
+    // Voice Mode's strip (AC-174): the state, the words as they are heard, mute, and the voice view.
+    const vstrip = el('div', 'home-voice'); vstrip.id = 'home-voice'; vstrip.hidden = true;
+    const vState = el('span', 'home-voice-state'); vState.setAttribute('role', 'status');
+    const vHeard = el('span', 'home-voice-heard'); vHeard.setAttribute('aria-live', 'polite');
+    const vMute = ui.iconButton('mic', 'Mute Voice Mode', { cls: 'sm', pressed: false }); vMute.id = 'home-voice-mute';
+    vMute.addEventListener('click', () => post({ type: 'voiceMute' }));
+    const vShow = ui.iconButton('screen-full', 'Show Voice Mode', { cls: 'sm' }); vShow.id = 'home-voice-show';
+    vShow.addEventListener('click', () => post({ type: 'voiceShow' }));
+    vstrip.append(vState, vHeard, vMute, vShow);
+    head.append(vstrip, el('span', 'spacer'), level, fresh);
     const list = el('div', 'home-list'); list.id = 'home-conv'; list.setAttribute('role', 'log'); list.setAttribute('aria-live', 'polite'); list.setAttribute('aria-label', 'Conversation with Overseer');
     wrap.append(head, list);
     wrap.hidden = true;
@@ -26,12 +35,15 @@
       if (m.card) { const c = card(m); c.dataset.id = m.id; return c; }
       const r = el('div', `home-msg from-${src}`); r.dataset.id = m.id;
       const who = el('div', 'home-from');
+      // A spoken request (Voice Mode): the owner's words, not the notes the daemon adds for Overseer.
+      const spoken = src === 'owner' && m.surface === 'voice' && /Request (V-\d+): ([\s\S]*)$/.exec(m.text || '');
       if (src === 'overseer') who.append(ui.mark('sm'), el('span', null, 'Overseer'));
+      else if (spoken) { const mic = ui.icon('mic', 'xs'); who.append(mic, el('span', null, `You, by voice · ${spoken[1]}`)); r.classList.add('spoken'); }
       else if (src === 'owner') who.append(ui.icon('account', 'xs'), el('span', null, 'You'));
       else who.append(ui.icon('info', 'xs'), el('span', null, src));
-      const text = el('div', 'home-text', m.text || '');
+      const text = el('div', 'home-text', spoken ? spoken[2].trim() : m.text || '');
       r.append(who, text);
-      if (src === 'owner') {
+      if (src === 'owner' && !spoken) {
         // A message meant for an agent: start one from it (AC-182's correction).
         const b = el('button', 'link', 'Start as an agent'); b.type = 'button'; b.dataset.action = 'start-as-agent';
         b.addEventListener('click', () => startWith(m.text || ''));
@@ -67,6 +79,7 @@
     function proposal(p) {
       const card = el('div', 'proposal'); card.setAttribute('role', 'group'); card.setAttribute('aria-label', 'Overseer proposes'); card.dataset.id = p.id;
       const head = el('div', 'proposal-head'); head.append(ui.mark('sm'), el('span', null, 'Overseer will'));
+      if (p.cause === 'voice') { const mic = ui.icon('mic', 'xs'); mic.removeAttribute('aria-hidden'); mic.setAttribute('role', 'img'); mic.setAttribute('aria-label', 'From a spoken request'); mic.title = 'From a spoken request'; head.append(mic); card.classList.add('spoken'); }
       const list = el('ul', 'proposal-list');
       for (const line of p.lines || (p.actions || []).map(a => a.action + (a.title ? ' ' + a.title : ''))) list.append(el('li', null, line));
       const status = el('div', 'proposal-status'); status.setAttribute('role', 'status');
@@ -108,6 +121,21 @@
       /** A message came back for a proposal card (an error, a state). */
       proposalStatus(id, text) { const e = shown.get('p:' + id); if (e) e.querySelector('.proposal-status').textContent = text; },
       get current() { return session; },
+      /** Voice Mode's strip: shown while it is on. */
+      voice(v) {
+        vstrip.hidden = !(v && v.on);
+        if (!v || !v.on) return;
+        vstrip.dataset.state = v.state;
+        vState.replaceChildren(ui.icon(v.state === 'muted' ? 'mute' : v.state === 'paused' ? 'debug-pause' : 'mic', 'xs'), el('span', null, v.label));
+        vState.title = `Voice Mode: ${v.label}${v.reason ? ` (${v.reason})` : ''} · talking to ${v.target}`;
+        vHeard.textContent = v.heard ? `“${v.heard}”` : '';
+        vHeard.title = v.heard || '';
+        vMute.setAttribute('aria-pressed', String(!!v.muted));
+        const label = v.muted ? 'Unmute Voice Mode' : 'Mute Voice Mode';
+        vMute.setAttribute('aria-label', label); vMute.title = label;
+        vMute.replaceChildren(ui.icon(v.muted ? 'mute' : 'mic'));
+        if (session && session.run_id) wrap.hidden = false;
+      },
     };
   }
   window.OverseerHome = { create };

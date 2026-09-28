@@ -421,7 +421,7 @@ must stay within 10% of it. How the app meets the budget:
   not wait for the connection and has no minimum time on screen. Launch to a usable list is the
   same with the door turned off.
 - **Cold start only** (the owner's decision): returning from the background shows no door.
-- **About 600 ms**, interruptible by a touch. With Reduce Motion on it fades.
+- **About 1 s** (600 ms at first; the owner found it too fast), interruptible by a touch. With Reduce Motion on it fades.
 
 The rest of the app moves with the same care. One motion system, with durations, easing and
 springs as tokens, drives every transition. Motion explains where a thing came from or what

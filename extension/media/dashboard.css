@@ -102,3 +102,14 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .agent-mention { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: 0; background: none; color: var(--ov-text); text-align: left; border-radius: 4px; }
 .agent-mention.active, .agent-mention:hover { background: var(--ov-hover); }
 .agent-mention-hint { margin-left: auto; color: var(--ov-muted); font-size: var(--ov-font-xs); }
+/* Voice Mode (Gate R, AC-174): home's voice strip and the marks of spoken requests. */
+.home-head .spacer { flex: 1; }
+.home-voice { display: flex; align-items: center; gap: var(--ov-space-1); min-width: 0; flex: 0 1 auto; overflow: hidden; padding: 0 var(--ov-space-2); border: 1px solid var(--ov-border); border-radius: var(--ov-radius-pill); }
+.home-voice[hidden] { display: none; }
+.home-voice-state { display: inline-flex; align-items: center; gap: var(--ov-space-1); color: var(--ov-text); white-space: nowrap; }
+.home-voice[data-state="hearing"] .home-voice-state, .home-voice[data-state="speaking"] .home-voice-state { color: var(--ov-accent); }
+.home-voice-heard { min-width: 0; max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ov-muted); }
+.home-voice-heard:empty { display: none; }
+.home-msg.spoken .home-from .codicon-mic, .proposal.spoken .proposal-head .codicon-mic { color: var(--ov-accent); }
+.tile-voice { color: var(--ov-accent); flex: none; }
+.tile-voice[hidden] { display: none; }
