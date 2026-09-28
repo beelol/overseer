@@ -1,6 +1,6 @@
 # SWARM-61 — Stop ordering around local launch
 
-Status: partial. Latest evidence revision: `dc1c880`.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`) for every surface available today; the phone clause is not yet in force (Gate N's gateway is not on `main` or this branch) and re-opens this criterion when it lands. See the last section. Earlier evidence revision: `dc1c880`.
 
 Input: a fixture-admitted attempt has a durable but unlinked launch intent. Stop commits before the request is replayed. Separately, Stop reaches a linked `/bin/sleep` worker after a daemon restart.
 
@@ -74,3 +74,19 @@ the stale partial request cannot attach its report afterward. Replaying a
 successful partial close after daemon restart returns the one saved result;
 changing its input is rejected. These are local ordered fixture cases, not
 a simultaneous phone/VS Code race. SWARM-61 remains partial.
+
+## Verified at fixture scope (2026-09-28)
+
+Two gaps remained: the earlier ordering tests applied the four operations one after another, never at the same moment; and no test showed that a worker event cannot resume a paused or stopped run. Two new tests in `daemon/tests/swarm_context.rs` close them; both passed on first run (coverage, not a fix).
+
+| Clause | Test |
+| --- | --- |
+| Race Stop, revocation, final result and acceptance; persist a deterministic order | `concurrent_stop_revocation_result_and_acceptance_commit_one_consistent_order` (new): eight rounds, the four calls released together from four connections. The committed orders differed between rounds (for example `result, accept, revoke, stop`; `revoke, result, stop`; `stop, result, revoke`; `stop, revoke, result`). In every round Stop, revocation and the result are recorded once; an acceptance is recorded only if it committed, and then after the result and before Stop and revocation; the order is unchanged after a daemon restart. The scripted orderings `stop_revocation_result_and_acceptance_keep_one_durable_order`, `identity_revocation_stop_result_and_review_have_one_durable_order` and the Atlas `atlas_s5_stop_as_last_result_arrives_preserves_evidence_without_completion` cover the named sequences |
+| Once stopped or revoked, no later directive launches work | the new race test (no worker launch or completion after Stop); `pending_worker_launch_cannot_resume_after_stop`, `stop_blocks_new_attempts_without_discarding_late_evidence`, `revoked_artifact_stops_dependent_delivery_and_worker_but_not_unrelated_work` |
+| Late artifacts kept with their actual state | the late result stays in the director inbox with its artifact; the run reads `stopping`, never complete |
+| Explicit user resume; never auto-resume from a worker event | `worker_events_never_resume_a_paused_or_stopped_run` (new): progress, discovery and a result from the active worker leave a paused run paused and its queued job unadmitted; only the owner's Resume resumes; after Stop a late result is kept, Resume is refused (`run is not paused`) and nothing is admitted |
+| Phone (when Gate N is available) | not in force: no phone gateway exists on `main` or this branch. The daemon side is ready for it (`swarm_create.rs` start request IDs scoped per client; `swarm_stop_replay.rs` versioned Stop replay, stale queued Stop loses to newer controls); the joined phone tests are owed when Gate N merges |
+
+Rerun serially on 2026-09-28: `swarm_context` 7 passed, `swarm_stop_replay` 1, `swarm_create` 2, `swarm_availability` 12, `swarm_runtime` Stop tests 3, and the Atlas Stop/last-result replay against disposable PostgreSQL 16.
+
+Boundary: native-process timing and native descendants in a live harness are SWARM-25/31 material; the race here is between daemon requests.

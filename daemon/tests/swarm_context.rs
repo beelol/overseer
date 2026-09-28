@@ -477,3 +477,174 @@ fn stop_revocation_result_and_acceptance_keep_one_durable_order() {
         assert_eq!(after - before, observed.len() as i64);
     }
 }
+
+/// SWARM-61 as an actual race: Stop, a permission revocation, the final
+/// result and the director's acceptance are sent at the same moment from four
+/// connections, eight times. Whatever order the daemon commits, it records one
+/// durable operation order and every outcome agrees with it: Stop, revocation
+/// and the result each appear once; an acceptance appears only if it
+/// committed, and then after the result and before Stop and revocation. After
+/// Stop nothing launches or completes, the late result is kept in the
+/// director's inbox, and a daemon restart replays the same order.
+#[test]
+fn concurrent_stop_revocation_result_and_acceptance_commit_one_consistent_order() {
+    for round in 0..8 {
+        let mut d = Daemon::start(&[]);
+        let temp = tmp();
+        let checkout = repo(&temp.path().join("race-source"));
+        let run = d.call("swarm.create", json!({"category":format!("Concurrent race {round}"),
+            "objective":"Inspect backend","allowed_targets":["account-a"]}));
+        let id = run["id"].as_str().unwrap().to_string();
+        d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+            {"id":"source","title":"Contract","acceptance":"evidence","deps":[]},
+            {"id":"child","title":"Dependent","acceptance":"evidence","deps":["source"]}
+        ]}));
+        let source = d.call("swarm.attempt.register", json!({"run_id":id,"job_id":"source",
+            "generation":1,"revision":1}));
+        d.call("swarm.artifact.put", json!({"run_id":id,"job_id":"source",
+            "attempt_id":source["id"],"token":source["token"],"artifact_id":"contract",
+            "source_revision":1,"kind":"contract","content":"checked contract"}));
+        d.call("swarm.report", json!({"run_id":id,"job_id":"source","attempt_id":source["id"],
+            "token":source["token"],"message_id":"source-result","type":"result","revision":1,
+            "payload":{"artifact_ids":["contract"]}}));
+        d.call("swarm.decide", json!({"run_id":id,"generation":1,"revision":1,
+            "job_id":"source","decision":"accept","evidence":["contract"]}));
+        d.call("swarm.attempt.confirm_exit", json!({"run_id":id,"generation":1,
+            "revision":1,"job_id":"source","attempt_id":source["id"]}));
+        let child = admit(&d, &id, "child", "account-a");
+        d.call("swarm.artifact.put", json!({"run_id":id,"job_id":"child",
+            "attempt_id":child["attempt_id"],"token":child["token"],"artifact_id":"child-proof",
+            "source_revision":1,"kind":"finding","content":"local reproduction"}));
+        let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+        db.busy_timeout(std::time::Duration::from_secs(10)).unwrap();
+        let before: i64 = db.query_row("SELECT COALESCE(MAX(seq),0) FROM swarm_operation_order",
+            [], |r| r.get(0)).unwrap();
+        let result = json!({"run_id":id,"job_id":"child","attempt_id":child["attempt_id"],
+            "token":child["token"],"message_id":"child-result","type":"result","revision":1,
+            "payload":{"artifact_ids":["child-proof"]}});
+        let accept = json!({"run_id":id,"generation":1,"revision":1,"job_id":"child",
+            "decision":"accept","evidence":["child-proof"]});
+        let revoke = json!({"run_id":id,"generation":1,"revision":1,"artifact_id":"contract",
+            "target_id":"account-a"});
+        let stop = json!({"run_id":id,"generation":1,"revision":1});
+        let barrier = std::sync::Barrier::new(4);
+        let outcomes: Vec<(&str, Result<Value, String>)> = std::thread::scope(|scope| {
+            let calls = [("result", "swarm.report", &result), ("accept", "swarm.decide", &accept),
+                ("revoke", "swarm.context.revoke", &revoke), ("stop", "swarm.stop", &stop)];
+            let handles: Vec<_> = calls.into_iter().map(|(name, method, params)| {
+                let (d, barrier) = (&d, &barrier);
+                scope.spawn(move || { barrier.wait(); (name, d.try_call(method, params.clone())) })
+            }).collect();
+            handles.into_iter().map(|h| h.join().unwrap()).collect()
+        });
+        let ok = |name: &str| outcomes.iter().find(|(n, _)| *n == name).unwrap().1.is_ok();
+        for name in ["result", "revoke", "stop"] {
+            assert!(ok(name), "round {round}: {name} always commits: {outcomes:?}");
+        }
+        let order: Vec<String> = {
+            let mut stmt = db.prepare("SELECT kind FROM swarm_operation_order WHERE run_id=?1 AND seq>?2 ORDER BY seq").unwrap();
+            let rows = stmt.query_map(rusqlite::params![id, before], |r| r.get(0)).unwrap()
+                .collect::<rusqlite::Result<_>>().unwrap();
+            rows
+        };
+        let at = |kind: &str| order.iter().position(|k| k == kind);
+        for kind in ["result", "revoke", "stop"] {
+            assert_eq!(order.iter().filter(|k| *k == kind).count(), 1, "round {round}: {order:?}");
+        }
+        match at("accept") {
+            Some(accepted) => {
+                assert!(ok("accept"), "round {round}: a recorded acceptance committed: {outcomes:?}");
+                assert!(at("result").unwrap() < accepted && accepted < at("stop").unwrap()
+                    && accepted < at("revoke").unwrap(), "round {round}: {order:?}");
+            }
+            None => assert!(!ok("accept"), "round {round}: an acceptance that committed is recorded: {order:?}"),
+        }
+        assert_eq!(order.len(), 3 + ok("accept") as usize, "round {round}: {order:?}");
+        // After Stop: nothing launches or completes; the late result is kept.
+        assert!(d.try_call("swarm.worker.launch", json!({"run_id":id,"job_id":"child",
+            "attempt_id":child["attempt_id"],"token":child["token"],"repo":checkout,
+            "program":"/bin/true","args":[],"prompt":"Inspect","title":"Late worker"})).is_err());
+        assert!(d.try_call("swarm.complete", json!({"run_id":id,"generation":1,"revision":1,
+            "summary":"finished","verification":"fixture","checks":[]})).is_err());
+        let inbox = d.call("swarm.messages", json!({"run_id":id,"recipient":"director"}));
+        assert!(inbox["messages"].as_array().unwrap().iter().any(|m| m["message_id"] == "child-result"));
+        assert_eq!(d.call("swarm.get", json!({"id":id}))["status"], "stopping");
+        d.kill9();
+        d.spawn();
+        let replayed: Vec<String> = {
+            let mut stmt = db.prepare("SELECT kind FROM swarm_operation_order WHERE run_id=?1 AND seq>?2 ORDER BY seq").unwrap();
+            let rows = stmt.query_map(rusqlite::params![id, before], |r| r.get(0)).unwrap()
+                .collect::<rusqlite::Result<_>>().unwrap();
+            rows
+        };
+        assert_eq!(replayed, order, "round {round}: the order survives a restart");
+        assert_eq!(d.call("swarm.report", result)["duplicate"], true);
+    }
+}
+
+/// SWARM-61: a worker event never resumes work. While a run is paused, the
+/// active worker's progress, discovery and final result are kept but the run
+/// stays paused and the queued job is not admitted; only the owner's Resume
+/// resumes it. After Stop, the worker's late result is kept and the run stays
+/// stopping; Resume cannot revive a stopped run.
+#[test]
+fn worker_events_never_resume_a_paused_or_stopped_run() {
+    let d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"No auto-resume",
+        "objective":"Audit","allowed_targets":["account-a"]}));
+    let id = run["id"].as_str().unwrap().to_string();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"active","title":"Active","acceptance":"evidence","deps":[]},
+        {"id":"queued","title":"Queued","acceptance":"evidence","deps":[]},
+        {"id":"later","title":"Later","acceptance":"evidence","deps":[]}
+    ]}));
+    let active = admit(&d, &id, "active", "account-a");
+    assert_eq!(d.call("swarm.pause", json!({"run_id":id,"generation":1,"revision":1}))["status"], "paused");
+    d.call("swarm.artifact.put", json!({"run_id":id,"job_id":"active","attempt_id":active["attempt_id"],
+        "token":active["token"],"artifact_id":"active-proof","source_revision":1,"kind":"finding",
+        "content":"checked"}));
+    for (message, kind, payload) in [("p1", "progress", json!({"step":"reading"})),
+        ("d1", "discovery", json!({"symbol":"findTask"})),
+        ("r1", "result", json!({"artifact_ids":["active-proof"]}))] {
+        d.call("swarm.report", json!({"run_id":id,"job_id":"active","attempt_id":active["attempt_id"],
+            "token":active["token"],"message_id":message,"type":kind,"revision":1,"payload":payload}));
+        assert_eq!(d.call("swarm.get", json!({"id":id}))["status"], "paused", "after {kind}");
+    }
+    let at = now();
+    let queued = |d: &Daemon, job: &str, request: &str| d.try_call("swarm.admit", json!({"run_id":id,
+        "generation":1,"revision":1,"job_id":job,"target_id":"account-a","request_id":request,"now_ms":at,
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"account-a","account_id":"a","pool_ids":["pool-a"],"capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"pool-a","windows":[{"id":"run","unit":"points","remaining_milli":100000,"protected_milli":0,"reserved_milli":0,"confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    let held = queued(&d, "queued", "queued-while-paused");
+    assert!(held.as_ref().map(|r| r["status"] != "admitted").unwrap_or(true), "{held:?}");
+    let inbox = d.call("swarm.messages", json!({"run_id":id,"recipient":"director"}));
+    let kept: Vec<&str> = inbox["messages"].as_array().unwrap().iter()
+        .filter_map(|m| m["message_id"].as_str()).collect();
+    assert!(kept.contains(&"d1") && kept.contains(&"r1"), "{kept:?}");
+    // Only the owner's Resume resumes.
+    assert_eq!(d.call("swarm.resume", json!({"run_id":id,"generation":1,"revision":1}))["status"], "running");
+    assert_eq!(d.call("swarm.decide", json!({"run_id":id,"generation":1,"revision":1,"job_id":"active",
+        "decision":"accept","evidence":["active-proof"]}))["status"], "accepted");
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"active","attempt_id":active["attempt_id"]}));
+    let queued_attempt = queued(&d, "queued", "queued-after-resume").unwrap();
+    assert_eq!(queued_attempt["status"], "admitted", "{queued_attempt}");
+    // After Stop, a late result is kept and nothing resumes.
+    d.call("swarm.stop", json!({"run_id":id,"generation":1,"revision":1}));
+    d.call("swarm.artifact.put", json!({"run_id":id,"job_id":"queued","attempt_id":queued_attempt["attempt_id"],
+        "token":queued_attempt["token"],"artifact_id":"queued-proof","source_revision":1,"kind":"finding",
+        "content":"late"}));
+    d.call("swarm.report", json!({"run_id":id,"job_id":"queued","attempt_id":queued_attempt["attempt_id"],
+        "token":queued_attempt["token"],"message_id":"late-result","type":"result","revision":1,
+        "payload":{"artifact_ids":["queued-proof"]}}));
+    assert_eq!(d.call("swarm.get", json!({"id":id}))["status"], "stopping");
+    assert_eq!(d.try_call("swarm.resume", json!({"run_id":id,"generation":1,"revision":1})).unwrap_err(),
+        "run is not paused", "a stopped run is not revived");
+    assert_eq!(d.call("swarm.get", json!({"id":id}))["status"], "stopping");
+    let later = queued(&d, "later", "later-after-stop");
+    assert!(later.as_ref().map(|r| r["status"] != "admitted").unwrap_or(true), "{later:?}");
+    let inbox = d.call("swarm.messages", json!({"run_id":id,"recipient":"director"}));
+    assert!(inbox["messages"].as_array().unwrap().iter().any(|m| m["message_id"] == "late-result"));
+}

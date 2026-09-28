@@ -773,7 +773,7 @@
       "blocker": "Worker discoveries reach a durable director inbox and fixture director advisories reach only selected peers with applied receipts. Worker-inbox reads now require the recipient's attempt token, so a peer cannot read a targeted directive using its attempt ID alone. Live peer delivery, automatic relevance selection and artifact permissions are not implemented."
     },
     "SWARM-61": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_broker.rs",
         "docs/verification/swarm/milestone-1.md",
@@ -793,7 +793,7 @@
         "daemon/tests/swarm_conflict.rs",
         "daemon/tests/swarm_integration.rs"
       ],
-      "blocker": "Scripted local and Atlas-backed final-result/Stop orderings persist one operation sequence, preserve the artifact and result, reject acceptance/completion, and deduplicate replay. Local selected-account revocation/result/review/Stop orderings record revocation in the same cancellation transaction. Start and versioned Stop request IDs now replay one durable effect across daemon restart; a stale phone-style Stop loses to newer Pause/Resume, limit or plan state in a local fixture. A director partial close uses the same ordered Stop transaction and request replay, and cannot attach a report after user Stop in an ordered fixture. No phone gateway yet derives request scope from an authenticated device or proves joined Full control/Watch only permissions, cross-surface races, native descendants, qualified live paths or explicit user resume."
+      "blocker": "Phone clause not in force: Gate N's gateway is not on main or this branch; re-open for the joined phone tests when it lands."
     },
     "SWARM-62": {
       "status": "partial",
