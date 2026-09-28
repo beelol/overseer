@@ -159,16 +159,17 @@
       "blocker": "Confirmed exit retains uncertain reservation, and the shared contract now distinguishes Auto percentage windows from estimated thread credits. Live adapter enforcement, attributable native-unit settlement, delayed-usage overrun replay and parent/child dedupe are still absent."
     },
     "SWARM-14": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_policy.rs",
         "daemon/tests/swarm_availability.rs",
         "docs/verification/swarm/milestone-4.md",
         "docs/verification/swarm/SWARM-14.md",
         "docs/verification/swarm/CONTRACT-03.md",
-        "daemon/src/swarm/policy.rs"
+        "daemon/src/swarm/policy.rs",
+        "daemon/tests/swarm_native.rs"
       ],
-      "blocker": "Fixture health scopes now exclude endpoint aliases, account-auth aliases and every route needing a failed local harness; exact zero quota has a separate reason and a healthy OpenCode endpoint still admits work. Auto Mode live observations, model-window exclusions, actual harness failure/reconnect and active-process reconciliation remain unverified."
+      "blocker": null
     },
     "SWARM-15": {
       "status": "verified",
