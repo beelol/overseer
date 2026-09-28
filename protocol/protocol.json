@@ -50,6 +50,7 @@
       "harness_version": "string?",
       "profile_id": "string?",
       "model": "string?",
+      "effort": "string?",
       "workspace_id": "string",
       "native_id": "string?",
       "status": "RunStatus",
@@ -117,7 +118,8 @@
         "pid": "number",
         "started_ms": "number",
         "version": "string",
-        "parser_version": "string"
+        "parser_version": "string",
+        "swarm_storage": "'blocked'|'ready'"
       }
     },
     "Harness": {
@@ -1863,6 +1865,822 @@
       "summary": "Simulate speech for tests",
       "phone": "mac_only",
       "reason": "Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose",
+      "params": "json",
+      "result": "json"
+    },
+    "agents.limit.get": {
+      "class": "mac_only",
+      "summary": "The app's agent limit and who is running",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "agents.limit.set": {
+      "class": "mac_only",
+      "summary": "Change the app's agent limit",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.bridge.result": {
+      "class": "mac_only",
+      "summary": "An Auto child's result for its parent (run-bound bridge)",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.bridge.submit": {
+      "class": "mac_only",
+      "summary": "An Auto parent's request to delegate a work unit (run-bound bridge)",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.decision.replay": {
+      "class": "mac_only",
+      "summary": "Replay a recorded Auto decision from its inputs",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.dispatch": {
+      "class": "mac_only",
+      "summary": "Choose a route for a work unit and launch its child",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.mode.get": {
+      "class": "mac_only",
+      "summary": "Whether Auto Mode is on",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.mode.set": {
+      "class": "mac_only",
+      "summary": "Turn Auto Mode on or off",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.models.list": {
+      "class": "mac_only",
+      "summary": "An account's recorded model catalog",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.models.refresh": {
+      "class": "mac_only",
+      "summary": "Read an account's model catalog (metadata only, no model turn)",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.opencode.local.inspect": {
+      "class": "mac_only",
+      "summary": "Inspect OpenCode's local model endpoints",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.quota.list": {
+      "class": "mac_only",
+      "summary": "Recorded quota readings",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.quota.refresh": {
+      "class": "mac_only",
+      "summary": "Read an account's quota (Codex) or its identity and plan (Claude), no model turn",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.quota.state": {
+      "class": "mac_only",
+      "summary": "One account's quota state for a model",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.root.preview": {
+      "class": "mac_only",
+      "summary": "The route Auto would choose for a new task",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.start": {
+      "class": "mac_only",
+      "summary": "Start a task on the route Auto chooses",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.tools.inspect": {
+      "class": "mac_only",
+      "summary": "An account's tool inventory in a repository",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.usage.clear": {
+      "class": "mac_only",
+      "summary": "Clear the local learning history",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.usage.export": {
+      "class": "mac_only",
+      "summary": "Export the local learning history",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.usage.list": {
+      "class": "mac_only",
+      "summary": "Recorded usage measurements",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.usage.summary": {
+      "class": "mac_only",
+      "summary": "A summary of the local learning history",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.usage.thread.list": {
+      "class": "mac_only",
+      "summary": "Recorded thread usage estimates",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.usage.thread.refresh": {
+      "class": "mac_only",
+      "summary": "Read a finished thread's usage estimate",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "auto.usage.work.list": {
+      "class": "mac_only",
+      "summary": "Recorded work observations",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "broker.envelopes": {
+      "class": "mac_only",
+      "summary": "The one broker ledger of reports, asks and claims",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "claims.ledger": {
+      "class": "mac_only",
+      "summary": "The one claim ledger of paths owned by agents and Swarm jobs",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "run.delegate": {
+      "class": "mac_only",
+      "summary": "Delegate a work unit from a run (managed child)",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "run.result": {
+      "class": "mac_only",
+      "summary": "A managed child's result",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.ack": {
+      "class": "mac_only",
+      "summary": "Acknowledge a Swarm message",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.admit": {
+      "class": "mac_only",
+      "summary": "Admit a Swarm job on a target (booking included)",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.artifact.put": {
+      "class": "mac_only",
+      "summary": "Store a Swarm worker's artifact",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.attempt.confirm_exit": {
+      "class": "mac_only",
+      "summary": "Confirm a Swarm attempt's process exit",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.attempt.register": {
+      "class": "mac_only",
+      "summary": "Register a Swarm attempt",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.availability.observe": {
+      "class": "mac_only",
+      "summary": "Record a Swarm availability snapshot",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.benefit.commit": {
+      "class": "mac_only",
+      "summary": "Commit a Swarm run's benefit estimate",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.benefit.preview": {
+      "class": "mac_only",
+      "summary": "Preview a Swarm run's benefit estimate",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.claim": {
+      "class": "mac_only",
+      "summary": "Claim a Swarm resource",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.complete": {
+      "class": "mac_only",
+      "summary": "Complete a Swarm run with its checks",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.conflict.open": {
+      "class": "mac_only",
+      "summary": "Open a Swarm conflict",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.conflict.resolve": {
+      "class": "mac_only",
+      "summary": "Resolve a Swarm conflict",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.conflicts": {
+      "class": "mac_only",
+      "summary": "A Swarm run's conflicts",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.context.get": {
+      "class": "mac_only",
+      "summary": "A Swarm job's context",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.context.grant": {
+      "class": "mac_only",
+      "summary": "Grant a Swarm job access to an artifact",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.context.revoke": {
+      "class": "mac_only",
+      "summary": "Revoke a Swarm job's access to an artifact",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.coverage": {
+      "class": "mac_only",
+      "summary": "A Swarm run's coverage",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.create": {
+      "class": "mac_only",
+      "summary": "Create a Swarm run",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.deadline.extend": {
+      "class": "mac_only",
+      "summary": "Extend a Swarm run's deadline",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.decide": {
+      "class": "mac_only",
+      "summary": "Accept or reject a Swarm job's result",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.direct": {
+      "class": "mac_only",
+      "summary": "Send a Swarm director's message",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.director.claim_batch": {
+      "class": "mac_only",
+      "summary": "Claim a batch of a director's inbox",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.director.complete_batch": {
+      "class": "mac_only",
+      "summary": "Complete a director's inbox batch",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.director.launch": {
+      "class": "mac_only",
+      "summary": "Launch a Swarm director",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.director.owner.begin": {
+      "class": "mac_only",
+      "summary": "Begin a Swarm director's ownership",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.director.owner.expire_due": {
+      "class": "mac_only",
+      "summary": "Expire due Swarm director ownerships",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.director.owner.refresh_linked": {
+      "class": "mac_only",
+      "summary": "Refresh linked Swarm director ownerships",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.director.owner.renew": {
+      "class": "mac_only",
+      "summary": "Renew a Swarm director's ownership",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.director.recover": {
+      "class": "mac_only",
+      "summary": "Recover a Swarm director",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.director.summary": {
+      "class": "mac_only",
+      "summary": "A Swarm director's summary",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.dispatch.next": {
+      "class": "mac_only",
+      "summary": "Dispatch the next Swarm job",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.effect.begin": {
+      "class": "mac_only",
+      "summary": "Begin a Swarm job's external effect",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.effect.reconcile": {
+      "class": "mac_only",
+      "summary": "Reconcile a Swarm job's external effect",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.estimate.revoke": {
+      "class": "mac_only",
+      "summary": "Revoke a Swarm estimate",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.finding.merge": {
+      "class": "mac_only",
+      "summary": "Merge Swarm findings",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.finding.record": {
+      "class": "mac_only",
+      "summary": "Record a Swarm finding",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.findings": {
+      "class": "mac_only",
+      "summary": "A Swarm run's findings",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.get": {
+      "class": "mac_only",
+      "summary": "One Swarm run",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.integrate": {
+      "class": "mac_only",
+      "summary": "Integrate a Swarm job's patch",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.job.deadline.persist_due": {
+      "class": "mac_only",
+      "summary": "Persist due Swarm job deadlines",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.jobs": {
+      "class": "mac_only",
+      "summary": "A Swarm run's jobs",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.limit.set": {
+      "class": "mac_only",
+      "summary": "Change a Swarm run's worker limit",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.list": {
+      "class": "mac_only",
+      "summary": "Swarm runs",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.messages": {
+      "class": "mac_only",
+      "summary": "A Swarm run's messages",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.native_director.get": {
+      "class": "mac_only",
+      "summary": "Whether the native Swarm director is on",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.native_director.set": {
+      "class": "mac_only",
+      "summary": "Turn the native Swarm director on or off",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.off": {
+      "class": "mac_only",
+      "summary": "Turn Swarm off for a run",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.partial": {
+      "class": "mac_only",
+      "summary": "Record a Swarm worker's partial result",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.pause": {
+      "class": "mac_only",
+      "summary": "Pause a Swarm run",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.plan": {
+      "class": "mac_only",
+      "summary": "Record a Swarm run's plan",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.policy.preview": {
+      "class": "mac_only",
+      "summary": "Preview a Swarm policy",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.policy.set": {
+      "class": "mac_only",
+      "summary": "Set a Swarm policy",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.redirect.persist_due": {
+      "class": "mac_only",
+      "summary": "Persist due Swarm redirects",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.report": {
+      "class": "mac_only",
+      "summary": "A Swarm worker's report",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.report.final": {
+      "class": "mac_only",
+      "summary": "A Swarm run's final report",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.reproduce": {
+      "class": "mac_only",
+      "summary": "Reproduce a Swarm finding",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.requirements.change": {
+      "class": "mac_only",
+      "summary": "Change a Swarm run's requirements",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.resume": {
+      "class": "mac_only",
+      "summary": "Resume a Swarm run",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.revise": {
+      "class": "mac_only",
+      "summary": "Revise a Swarm run's plan",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.route.replay": {
+      "class": "mac_only",
+      "summary": "Replay a Swarm route decision",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.schedule.next": {
+      "class": "mac_only",
+      "summary": "Schedule the next Swarm admission",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.start": {
+      "class": "mac_only",
+      "summary": "Start a Swarm run from one read-back",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.stop": {
+      "class": "mac_only",
+      "summary": "Stop a Swarm run",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.storage.limit_pages": {
+      "class": "mac_only",
+      "summary": "Limit Swarm storage pages (test)",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.storage.recover": {
+      "class": "mac_only",
+      "summary": "Recover Swarm storage",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.storage.status": {
+      "class": "mac_only",
+      "summary": "Swarm storage status",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.targets.set": {
+      "class": "mac_only",
+      "summary": "Set a Swarm run's targets",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.verify": {
+      "class": "mac_only",
+      "summary": "Run a Swarm verification",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.worker.brief": {
+      "class": "mac_only",
+      "summary": "A Swarm worker's brief",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.worker.launch": {
+      "class": "mac_only",
+      "summary": "Launch a Swarm worker",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.worker.liveness": {
+      "class": "mac_only",
+      "summary": "A Swarm worker's liveness",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.worker.liveness.poll": {
+      "class": "mac_only",
+      "summary": "Poll Swarm worker liveness",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.worker.liveness.sample": {
+      "class": "mac_only",
+      "summary": "Sample a Swarm worker's liveness (test)",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
+      "params": "json",
+      "result": "json"
+    },
+    "swarm.worker.reconcile": {
+      "class": "mac_only",
+      "summary": "Reconcile a Swarm worker's exit",
+      "phone": "mac_only",
+      "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
       "params": "json",
       "result": "json"
     }

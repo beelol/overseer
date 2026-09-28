@@ -49,6 +49,7 @@ export interface Run {
   harness_version?: string | null;
   profile_id?: string | null;
   model?: string | null;
+  effort?: string | null;
   workspace_id: string;
   native_id?: string | null;
   status: RunStatus;
@@ -123,6 +124,7 @@ export interface State {
     started_ms: number;
     version: string;
     parser_version: string;
+    swarm_storage: 'blocked' | 'ready';
   };
 }
 
@@ -994,6 +996,210 @@ export interface Methods {
   "voice.download": { class: 'mac_only'; params: unknown; result: unknown };
   /** Simulate speech for tests. The Mac only: Voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose. */
   "voice.simulate": { class: 'mac_only'; params: unknown; result: unknown };
+  /** The app's agent limit and who is running. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "agents.limit.get": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Change the app's agent limit. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "agents.limit.set": { class: 'mac_only'; params: unknown; result: unknown };
+  /** An Auto child's result for its parent (run-bound bridge). The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.bridge.result": { class: 'mac_only'; params: unknown; result: unknown };
+  /** An Auto parent's request to delegate a work unit (run-bound bridge). The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.bridge.submit": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Replay a recorded Auto decision from its inputs. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.decision.replay": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Choose a route for a work unit and launch its child. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.dispatch": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Whether Auto Mode is on. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.mode.get": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Turn Auto Mode on or off. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.mode.set": { class: 'mac_only'; params: unknown; result: unknown };
+  /** An account's recorded model catalog. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.models.list": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Read an account's model catalog (metadata only, no model turn). The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.models.refresh": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Inspect OpenCode's local model endpoints. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.opencode.local.inspect": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Recorded quota readings. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.quota.list": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Read an account's quota (Codex) or its identity and plan (Claude), no model turn. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.quota.refresh": { class: 'mac_only'; params: unknown; result: unknown };
+  /** One account's quota state for a model. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.quota.state": { class: 'mac_only'; params: unknown; result: unknown };
+  /** The route Auto would choose for a new task. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.root.preview": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Start a task on the route Auto chooses. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.start": { class: 'mac_only'; params: unknown; result: unknown };
+  /** An account's tool inventory in a repository. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.tools.inspect": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Clear the local learning history. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.usage.clear": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Export the local learning history. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.usage.export": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Recorded usage measurements. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.usage.list": { class: 'mac_only'; params: unknown; result: unknown };
+  /** A summary of the local learning history. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.usage.summary": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Recorded thread usage estimates. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.usage.thread.list": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Read a finished thread's usage estimate. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.usage.thread.refresh": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Recorded work observations. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "auto.usage.work.list": { class: 'mac_only'; params: unknown; result: unknown };
+  /** The one broker ledger of reports, asks and claims. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "broker.envelopes": { class: 'mac_only'; params: unknown; result: unknown };
+  /** The one claim ledger of paths owned by agents and Swarm jobs. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "claims.ledger": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Delegate a work unit from a run (managed child). The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "run.delegate": { class: 'mac_only'; params: unknown; result: unknown };
+  /** A managed child's result. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "run.result": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Acknowledge a Swarm message. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.ack": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Admit a Swarm job on a target (booking included). The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.admit": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Store a Swarm worker's artifact. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.artifact.put": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Confirm a Swarm attempt's process exit. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.attempt.confirm_exit": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Register a Swarm attempt. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.attempt.register": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Record a Swarm availability snapshot. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.availability.observe": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Commit a Swarm run's benefit estimate. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.benefit.commit": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Preview a Swarm run's benefit estimate. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.benefit.preview": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Claim a Swarm resource. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.claim": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Complete a Swarm run with its checks. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.complete": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Open a Swarm conflict. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.conflict.open": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Resolve a Swarm conflict. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.conflict.resolve": { class: 'mac_only'; params: unknown; result: unknown };
+  /** A Swarm run's conflicts. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.conflicts": { class: 'mac_only'; params: unknown; result: unknown };
+  /** A Swarm job's context. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.context.get": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Grant a Swarm job access to an artifact. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.context.grant": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Revoke a Swarm job's access to an artifact. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.context.revoke": { class: 'mac_only'; params: unknown; result: unknown };
+  /** A Swarm run's coverage. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.coverage": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Create a Swarm run. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.create": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Extend a Swarm run's deadline. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.deadline.extend": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Accept or reject a Swarm job's result. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.decide": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Send a Swarm director's message. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.direct": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Claim a batch of a director's inbox. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.director.claim_batch": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Complete a director's inbox batch. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.director.complete_batch": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Launch a Swarm director. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.director.launch": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Begin a Swarm director's ownership. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.director.owner.begin": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Expire due Swarm director ownerships. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.director.owner.expire_due": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Refresh linked Swarm director ownerships. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.director.owner.refresh_linked": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Renew a Swarm director's ownership. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.director.owner.renew": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Recover a Swarm director. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.director.recover": { class: 'mac_only'; params: unknown; result: unknown };
+  /** A Swarm director's summary. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.director.summary": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Dispatch the next Swarm job. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.dispatch.next": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Begin a Swarm job's external effect. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.effect.begin": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Reconcile a Swarm job's external effect. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.effect.reconcile": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Revoke a Swarm estimate. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.estimate.revoke": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Merge Swarm findings. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.finding.merge": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Record a Swarm finding. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.finding.record": { class: 'mac_only'; params: unknown; result: unknown };
+  /** A Swarm run's findings. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.findings": { class: 'mac_only'; params: unknown; result: unknown };
+  /** One Swarm run. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.get": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Integrate a Swarm job's patch. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.integrate": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Persist due Swarm job deadlines. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.job.deadline.persist_due": { class: 'mac_only'; params: unknown; result: unknown };
+  /** A Swarm run's jobs. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.jobs": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Change a Swarm run's worker limit. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.limit.set": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Swarm runs. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.list": { class: 'mac_only'; params: unknown; result: unknown };
+  /** A Swarm run's messages. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.messages": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Whether the native Swarm director is on. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.native_director.get": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Turn the native Swarm director on or off. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.native_director.set": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Turn Swarm off for a run. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.off": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Record a Swarm worker's partial result. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.partial": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Pause a Swarm run. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.pause": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Record a Swarm run's plan. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.plan": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Preview a Swarm policy. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.policy.preview": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Set a Swarm policy. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.policy.set": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Persist due Swarm redirects. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.redirect.persist_due": { class: 'mac_only'; params: unknown; result: unknown };
+  /** A Swarm worker's report. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.report": { class: 'mac_only'; params: unknown; result: unknown };
+  /** A Swarm run's final report. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.report.final": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Reproduce a Swarm finding. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.reproduce": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Change a Swarm run's requirements. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.requirements.change": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Resume a Swarm run. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.resume": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Revise a Swarm run's plan. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.revise": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Replay a Swarm route decision. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.route.replay": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Schedule the next Swarm admission. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.schedule.next": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Start a Swarm run from one read-back. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.start": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Stop a Swarm run. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.stop": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Limit Swarm storage pages (test). The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.storage.limit_pages": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Recover Swarm storage. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.storage.recover": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Swarm storage status. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.storage.status": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Set a Swarm run's targets. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.targets.set": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Run a Swarm verification. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.verify": { class: 'mac_only'; params: unknown; result: unknown };
+  /** A Swarm worker's brief. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.worker.brief": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Launch a Swarm worker. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.worker.launch": { class: 'mac_only'; params: unknown; result: unknown };
+  /** A Swarm worker's liveness. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.worker.liveness": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Poll Swarm worker liveness. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.worker.liveness.poll": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Sample a Swarm worker's liveness (test). The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.worker.liveness.sample": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Reconcile a Swarm worker's exit. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
+  "swarm.worker.reconcile": { class: 'mac_only'; params: unknown; result: unknown };
 }
 
 export type MethodName = keyof Methods;
@@ -1161,6 +1367,108 @@ export const METHOD_CLASS = {
   "voice.requests": 'mac_only',
   "voice.download": 'mac_only',
   "voice.simulate": 'mac_only',
+  "agents.limit.get": 'mac_only',
+  "agents.limit.set": 'mac_only',
+  "auto.bridge.result": 'mac_only',
+  "auto.bridge.submit": 'mac_only',
+  "auto.decision.replay": 'mac_only',
+  "auto.dispatch": 'mac_only',
+  "auto.mode.get": 'mac_only',
+  "auto.mode.set": 'mac_only',
+  "auto.models.list": 'mac_only',
+  "auto.models.refresh": 'mac_only',
+  "auto.opencode.local.inspect": 'mac_only',
+  "auto.quota.list": 'mac_only',
+  "auto.quota.refresh": 'mac_only',
+  "auto.quota.state": 'mac_only',
+  "auto.root.preview": 'mac_only',
+  "auto.start": 'mac_only',
+  "auto.tools.inspect": 'mac_only',
+  "auto.usage.clear": 'mac_only',
+  "auto.usage.export": 'mac_only',
+  "auto.usage.list": 'mac_only',
+  "auto.usage.summary": 'mac_only',
+  "auto.usage.thread.list": 'mac_only',
+  "auto.usage.thread.refresh": 'mac_only',
+  "auto.usage.work.list": 'mac_only',
+  "broker.envelopes": 'mac_only',
+  "claims.ledger": 'mac_only',
+  "run.delegate": 'mac_only',
+  "run.result": 'mac_only',
+  "swarm.ack": 'mac_only',
+  "swarm.admit": 'mac_only',
+  "swarm.artifact.put": 'mac_only',
+  "swarm.attempt.confirm_exit": 'mac_only',
+  "swarm.attempt.register": 'mac_only',
+  "swarm.availability.observe": 'mac_only',
+  "swarm.benefit.commit": 'mac_only',
+  "swarm.benefit.preview": 'mac_only',
+  "swarm.claim": 'mac_only',
+  "swarm.complete": 'mac_only',
+  "swarm.conflict.open": 'mac_only',
+  "swarm.conflict.resolve": 'mac_only',
+  "swarm.conflicts": 'mac_only',
+  "swarm.context.get": 'mac_only',
+  "swarm.context.grant": 'mac_only',
+  "swarm.context.revoke": 'mac_only',
+  "swarm.coverage": 'mac_only',
+  "swarm.create": 'mac_only',
+  "swarm.deadline.extend": 'mac_only',
+  "swarm.decide": 'mac_only',
+  "swarm.direct": 'mac_only',
+  "swarm.director.claim_batch": 'mac_only',
+  "swarm.director.complete_batch": 'mac_only',
+  "swarm.director.launch": 'mac_only',
+  "swarm.director.owner.begin": 'mac_only',
+  "swarm.director.owner.expire_due": 'mac_only',
+  "swarm.director.owner.refresh_linked": 'mac_only',
+  "swarm.director.owner.renew": 'mac_only',
+  "swarm.director.recover": 'mac_only',
+  "swarm.director.summary": 'mac_only',
+  "swarm.dispatch.next": 'mac_only',
+  "swarm.effect.begin": 'mac_only',
+  "swarm.effect.reconcile": 'mac_only',
+  "swarm.estimate.revoke": 'mac_only',
+  "swarm.finding.merge": 'mac_only',
+  "swarm.finding.record": 'mac_only',
+  "swarm.findings": 'mac_only',
+  "swarm.get": 'mac_only',
+  "swarm.integrate": 'mac_only',
+  "swarm.job.deadline.persist_due": 'mac_only',
+  "swarm.jobs": 'mac_only',
+  "swarm.limit.set": 'mac_only',
+  "swarm.list": 'mac_only',
+  "swarm.messages": 'mac_only',
+  "swarm.native_director.get": 'mac_only',
+  "swarm.native_director.set": 'mac_only',
+  "swarm.off": 'mac_only',
+  "swarm.partial": 'mac_only',
+  "swarm.pause": 'mac_only',
+  "swarm.plan": 'mac_only',
+  "swarm.policy.preview": 'mac_only',
+  "swarm.policy.set": 'mac_only',
+  "swarm.redirect.persist_due": 'mac_only',
+  "swarm.report": 'mac_only',
+  "swarm.report.final": 'mac_only',
+  "swarm.reproduce": 'mac_only',
+  "swarm.requirements.change": 'mac_only',
+  "swarm.resume": 'mac_only',
+  "swarm.revise": 'mac_only',
+  "swarm.route.replay": 'mac_only',
+  "swarm.schedule.next": 'mac_only',
+  "swarm.start": 'mac_only',
+  "swarm.stop": 'mac_only',
+  "swarm.storage.limit_pages": 'mac_only',
+  "swarm.storage.recover": 'mac_only',
+  "swarm.storage.status": 'mac_only',
+  "swarm.targets.set": 'mac_only',
+  "swarm.verify": 'mac_only',
+  "swarm.worker.brief": 'mac_only',
+  "swarm.worker.launch": 'mac_only',
+  "swarm.worker.liveness": 'mac_only',
+  "swarm.worker.liveness.poll": 'mac_only',
+  "swarm.worker.liveness.sample": 'mac_only',
+  "swarm.worker.reconcile": 'mac_only',
 } as const satisfies Record<MethodName, MethodClass>;
 
 export type PhoneMethod = { [K in MethodName]: Methods[K]['class'] extends 'mac_only' ? never : K }[MethodName];

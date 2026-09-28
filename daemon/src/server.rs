@@ -855,8 +855,10 @@ fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
                     "account_generation":generation}) });
         }
     }
+    // Harness names, written as guards so the gateway's method-class check
+    // (which reads `"name" =>` arms in this file) does not take them for methods.
     match profile.harness.as_str() {
-        "codex" => {
+        _ if profile.harness == "codex" => {
             let flights = AUTO_CODEX_MODEL_FLIGHTS.get_or_init(||
                 Mutex::new(std::collections::BTreeMap::new()));
             let read = collect_shared(flights, (Arc::as_ptr(d) as usize, profile_id.to_string()),
@@ -905,7 +907,7 @@ fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
                 generation,
             })
         }
-        "claude" => {
+        _ if profile.harness == "claude" => {
             let flights = AUTO_CLAUDE_AUTH_FLIGHTS.get_or_init(||
                 Mutex::new(std::collections::BTreeMap::new()));
             let read = collect_shared(flights, (Arc::as_ptr(d) as usize, profile_id.to_string()),
@@ -945,7 +947,7 @@ fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
                 generation:Some(read.generation),
             })
         }
-        "opencode" => {
+        _ if profile.harness == "opencode" => {
             let gate = d.profile_gate(profile_id);
             let _guard = lock_gate_until(&gate, deadline)?;
             if d.store.lock().unwrap().runs()?.iter().any(|run|

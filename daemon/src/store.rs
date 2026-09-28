@@ -679,6 +679,11 @@ impl Store {
         crate::swarm::schema::migrate(&self.conn)?;
         // One broker ledger over Swarm's and Gate S's envelopes (SWARM-60).
         crate::broker::migrate(&self.conn)?;
+        // Who answered each permission request first (several surfaces can answer at once).
+        self.conn.execute_batch("CREATE TABLE IF NOT EXISTS permission_answers(run_id TEXT NOT NULL, request_id TEXT NOT NULL, allow INTEGER NOT NULL, by TEXT NOT NULL, ts INTEGER NOT NULL, PRIMARY KEY(run_id, request_id));")?;
+        crate::review::migrate(&self.conn)?;
+        // Gate N: paired devices and the outcomes of their requests.
+        crate::gateway::devices::migrate(&self.conn)?;
         self.conn.execute("INSERT INTO meta(key, value) VALUES('schema_version', ?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value", params![SCHEMA_VERSION.to_string()])?;
         Ok(())
     }
@@ -807,11 +812,6 @@ impl Store {
              ON CONFLICT(key) DO UPDATE SET value=excluded.value",
             [if enabled { "1" } else { "0" }],
         )?;
-        // Who answered each permission request first (several surfaces can answer at once).
-        self.conn.execute_batch("CREATE TABLE IF NOT EXISTS permission_answers(run_id TEXT NOT NULL, request_id TEXT NOT NULL, allow INTEGER NOT NULL, by TEXT NOT NULL, ts INTEGER NOT NULL, PRIMARY KEY(run_id, request_id));")?;
-        crate::review::migrate(&self.conn)?;
-        // Gate N: paired devices and the outcomes of their requests.
-        crate::gateway::devices::migrate(&self.conn)?;
         Ok(())
     }
 
