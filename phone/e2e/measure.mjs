@@ -27,10 +27,12 @@ const ALLOWED = 1.1;
  * millisecond; a door that came a whole frame later was seen later.
  */
 const FRAME = 17;
+/** The door's opening, from the design tokens the app is built with (AC-136: within 60 ms of it). */
+const DOOR_MS = JSON.parse(fs.readFileSync(path.join(here, '..', 'design', 'phone-tokens.json'), 'utf8')).motion.door.open;
 /** Budgets that hold whatever the baseline says, in milliseconds (the RFC's numbers). */
 const LIMITS = {
-  ios: { 'agents.interactive.p95': 1000, 'door.opening.low': 540, 'door.opening.high': 660 },
-  android: { 'agents.interactive.p95': 2000, 'door.opening.low': 540, 'door.opening.high': 660 },
+  ios: { 'agents.interactive.p95': 1000, 'door.opening.low': DOOR_MS - 60, 'door.opening.high': DOOR_MS + 60 },
+  android: { 'agents.interactive.p95': 2000, 'door.opening.low': DOOR_MS - 60, 'door.opening.high': DOOR_MS + 60 },
 };
 
 function parse(argv) {
@@ -71,22 +73,37 @@ async function coldStart(dev, settle, before) {
   }
 }
 
+/**
+ * `runs` cold starts with the door and `runs` without it, taken in turn (with, without, with, ...)
+ * so that whatever else the Mac does in the meantime weighs on both alike. One launch before
+ * them is not counted: the first start after the scenarios pays for what later starts find ready.
+ */
 async function series(dev, runs, settle, log) {
-  const records = [];
+  const kinds = { on: [], off: [] };
   let last = stored(dev, 'perf.last')?.launch ?? -1;
-  for (let i = 0; i < runs; i += 1) {
+  const once = async (door, label) => {
+    dev.stop();
+    await sleep(300);
+    dev.write('test.door', door);
     const record = await coldStart(dev, settle, last);
     if (!record) {
-      log(`  launch ${i + 1}: no record (the app did not reach its first screen)`);
-      records.push(null);
-      continue;
+      log(`  ${label}: no record (the app did not reach its first screen)`);
+      return null;
     }
     last = record.launch;
-    records.push(record);
     const m = record.marks;
-    log(`  launch ${i + 1}: first screen ${round(m['screen.agents.shown'] ?? NaN)} ms, interactive ${round(m['screen.agents.interactive'] ?? NaN)} ms, door shown ${round(m['door.shown'] ?? NaN)} ms, opening ${round(record.summary['door.opening']?.max ?? NaN)} ms, dropped ${record.summary['door.dropped']?.max ?? 'n/a'}`);
+    log(`  ${label}: first screen ${round(m['screen.agents.shown'] ?? NaN)} ms, interactive ${round(m['screen.agents.interactive'] ?? NaN)} ms, door shown ${round(m['door.shown'] ?? NaN)} ms, opening ${round(record.summary['door.opening']?.max ?? NaN)} ms, dropped ${record.summary['door.dropped']?.max ?? 'n/a'}`);
+    return record;
+  };
+  await once('on', 'warm-up launch (not counted)');
+  for (let i = 0; i < runs; i += 1) {
+    kinds.on.push(await once('on', `launch ${i + 1} with the door`));
+    kinds.off.push(await once('off', `launch ${i + 1} without the door`));
   }
-  return records;
+  dev.stop();
+  await sleep(300);
+  dev.write('test.door', 'on');
+  return kinds;
 }
 
 function figures(records) {
@@ -129,8 +146,8 @@ export function verdicts(platform, withDoor, withoutDoor, baseline) {
   const late = withDoor['door.late'].max;
   say('the door is on screen with the first screen or before it, worst launch (ms after the first screen)', late, FRAME, late !== null && late <= FRAME, `${withDoor['door.late'].count} of ${withDoor.launches} launches marked both`);
   const opening = withDoor['door.opening'];
-  say('the door opens in 600 ms within 60 ms, shortest (ms)', opening.min, limits['door.opening.low'], opening.min !== null && opening.min >= limits['door.opening.low']);
-  say('the door opens in 600 ms within 60 ms, longest (ms)', opening.max, limits['door.opening.high'], opening.max !== null && opening.max <= limits['door.opening.high']);
+  say(`the door opens in ${DOOR_MS} ms within 60 ms, shortest (ms)`, opening.min, limits['door.opening.low'], opening.min !== null && opening.min >= limits['door.opening.low']);
+  say(`the door opens in ${DOOR_MS} ms within 60 ms, longest (ms)`, opening.max, limits['door.opening.high'], opening.max !== null && opening.max <= limits['door.opening.high']);
   const frames = withDoor['door.frames'].min ?? 0;
   const dropped = withDoor['door.dropped'].max ?? 0;
   const share = frames + dropped === 0 ? 100 : round((dropped / (frames + dropped)) * 100);
@@ -159,20 +176,10 @@ async function main() {
   log(`Load average (1, 5, 15 min) at the start: ${load()}`);
   const startLoad = os.loadavg();
 
-  log('With the door:');
-  dev.stop();
-  await sleep(300);
-  dev.write('test.door', 'on');
-  const withDoor = figures(await series(dev, args.runs, args.settle, log));
-
-  log('With the door turned off by the test setting:');
-  dev.stop();
-  await sleep(300);
-  dev.write('test.door', 'off');
-  const withoutDoor = figures(await series(dev, args.runs, args.settle, log));
-  dev.stop();
-  await sleep(300);
-  dev.write('test.door', 'on');
+  log(`Cold starts with the door and without it (turned off by the test setting), in turn; the door opens in ${DOOR_MS} ms:`);
+  const kinds = await series(dev, args.runs, args.settle, log);
+  const withDoor = figures(kinds.on);
+  const withoutDoor = figures(kinds.off);
 
   const baselines = fs.existsSync(BASELINES) ? JSON.parse(fs.readFileSync(BASELINES, 'utf8')) : {};
   const result = { platform: args.platform, device: dev.id, at: new Date().toISOString(), runs: args.runs, withDoor, withoutDoor };

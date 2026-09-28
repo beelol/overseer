@@ -237,7 +237,7 @@ export const phone = {
   },
   motion: {
     door: {
-      open: 600,
+      open: 1000,
       fade: 200,
       lightLoop: 2400,
       angle: 24,
