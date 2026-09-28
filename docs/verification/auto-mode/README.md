@@ -813,6 +813,7 @@ This completes AUTO-AC-28 at its stated live/controlled scope. Linux is explicit
   - A dispatched unit leaves no `swarm_runs` or `swarm_worker_launches` row.
   - The existing four-way matrix (`swarm_native`, 5/5 in this session's rerun) shows the same for an Auto root.
 - **Not an Auto gap, but open:** the reverse direction ("Swarm on: automode routes each job within the same allowed pool") is Swarm's SWARM-24 and CONTRACT-04. Native workers book through the shared booking, but their targets come from the director inside the approved pool; Auto's selector is not consulted per job.
+  - **Update (`9c3f6569`, 2026-09-28):** closed on the Swarm side. Auto's selector now chooses each job's route within the approved pool (`daemon/src/swarm/route.rs`); the director states requirements only. See `docs/verification/swarm/SWARM-24.md` and `CONTRACT-04.md`. This does not let Auto start a Swarm; the refusals above are unchanged.
 
 ## Selection on the booking's numbers (2026-09-27)
 

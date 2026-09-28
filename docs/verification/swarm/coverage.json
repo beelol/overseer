@@ -314,9 +314,11 @@
         "daemon/src/account_booking.rs",
         "docs/verification/swarm/CONTRACT-01.md",
         "docs/verification/swarm/CONTRACT-05.md",
-        "daemon/src/upper_draw.rs"
+        "daemon/src/upper_draw.rs",
+        "daemon/tests/swarm_native.rs",
+        "daemon/src/swarm/route.rs"
       ],
-      "blocker": "Swarm admission of an account target books Auto's shared booking inside its own admission transaction with its remaining category allocation per window (thousandths of a reported percentage point), and the worker launch claims effects and binds its run; swarm_reservations is no account authority for it. Without fixture inputs the booking now uses Auto's qualified upper draw from isolated same-bucket runs and records its provenance (refused upper_draw_unknown below five samples). Still partial: the tests' readings are fixture meters and no live delta is attributed, Swarm targets are injected snapshots rather than Auto's route producer, and Gate S's turn cap has not been replayed alongside an approved Swarm director."
+      "blocker": "Auto's selector now chooses each job's route within the approved pool (daemon/src/swarm/route.rs): Auto's eligibility, the booking's fit against account headroom and the category's remaining allocation, and Auto's task-aware ranking; the director states requirements only and a named account is refused. Admission books through Auto's shared booking with the category allocation and the qualified or fixture draw. Still partial: the tests' draws and readings are fixture values, route candidates come from recorded identity and readings (no fresh metadata read at dispatch), only Claude workers exist, and Gate S's turn cap has not been replayed alongside an approved Swarm director."
     },
     "SWARM-25": {
       "status": "unverified",

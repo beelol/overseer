@@ -42,3 +42,39 @@ admitted at five with the five runs as provenance, the worker launched and bound
 Still partial: the test's readings are fixture meters (Claude readings written directly, as
 Claude has no between-run metadata read), no live delta has been attributed, targets are still
 injected snapshots, and Gate S's cap replay is not implemented.
+
+Auto's selector chooses each job's route (`9c3f6569`, 2026-09-28): with Swarm on, the native
+director's `swarm_dispatch` no longer names the worker's account, model or effort. It states
+requirements only (`min_tier`, `required_tools`, `preferred_harness`, `task_class`); a named
+account is refused (`unknown argument (target)`; a generic fixture target can be named only under
+the Swarm fixture API). `daemon/src/swarm/route.rs` builds the capability priors of every approved
+account profile a Swarm worker can launch on (Claude today; Codex and OpenCode profiles are
+excluded `swarm_worker_launch_unsupported`) and applies:
+- Auto's eligibility (`auto_select::select`): recorded identity (`unresolved_quota_pool_identity`),
+  exhaustion across profiles of one account, scoped health, the endpoint recovery check, tier,
+  tools and sandbox;
+- fit as the booking computes it: the worker's upper draw (qualified, or a fixture draw behind the
+  booking's fixture API) against the account's headroom less its live bookings
+  (`estimated_draw_exceeds_allowance`) and against the category's remaining allocation in the
+  same windows (`category_allocation_exceeded`). A route the booking could not admit (unknown
+  draw, a busy account) is excluded with that reason;
+- Auto's task-aware ranking (lowest adequate tier, health, allowance, fit, default, preferred
+  harness).
+Admission stays the one authority and rechecks everything. Each decision is recorded as a
+`swarm_route_decision` event with the selection input, fit evidence and `inference: not_used`.
+
+Evidence: `daemon/tests/swarm_native.rs`
+`auto_selects_each_jobs_route_within_the_approved_pool` (pool: two healthy accounts, one at 97%,
+one never identified and the director's own unidentified profile; a sixth healthy account outside
+the pool). Job a lands on Sonnet/medium of the first eligible account, job b with
+`min_tier: frontier` on Opus/high of the same account, job c on the other account's Sonnet because
+the first account's category allowance (2,000 left) cannot take the 3,000 draw. The 97% account is
+excluded on its own allowance, the unidentified ones on identity, the outside account is never a
+candidate, and each worker runs on the profile it was booked on. The four existing native tests
+(S0, S0 across a restart, native workers, the four-way launch matrix) pass with the director
+naming no account. The whole `swarm_native` file passed 7/7 serially.
+
+Still partial: the draws in these tests are fixture draws on fixture readings (no live account);
+route candidates come from recorded identity and readings, not a fresh metadata read at dispatch
+(the booking rechecks the generation); only Claude workers exist; Gate S's turn-cap replay with an
+approved Swarm director is not implemented.
