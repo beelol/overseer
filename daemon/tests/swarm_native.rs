@@ -13,7 +13,7 @@ use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-const DIRECTOR_TOOLS: [&str; 7] = ["swarm_status", "swarm_plan", "swarm_dispatch", "swarm_inbox",
+const DIRECTOR_TOOLS: [&str; 8] = ["swarm_status", "swarm_plan", "swarm_revise", "swarm_dispatch", "swarm_inbox",
     "swarm_message", "swarm_decide", "swarm_complete"];
 const WORKER_TOOLS: [&str; 6] = ["swarm_progress", "swarm_ask", "swarm_discovery", "swarm_inbox", "swarm_applied",
     "swarm_result"];
