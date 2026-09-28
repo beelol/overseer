@@ -576,14 +576,30 @@ step), `P` opens a GitHub pull request with your `gh`, `C` removes a finished wo
 Commander folder, preview; the daemon plays, and the terminal bell rings only when it does not), `X` stops every
 agent and the daemon, `?` lists every key, `q` quits.
 
+## Developing Overseer: dev daemons
+
+A dev daemon is Overseer built from a checkout and run beside the installed one, with its own
+data folder, socket, gateway port and VS Code profile ([design](docs/rfcs/dev-instance.md)).
+Agents use it to build and try Overseer without touching yours:
+
+```bash
+scripts/dev up --name a            # build this checkout, start dev-a, print where everything is
+scripts/dev code --name a          # an isolated VS Code pinned to dev-a ("Overseer dev-a")
+scripts/dev clean --name a         # stop everything of dev-a and remove it
+```
+
+`scripts/dev --help` has every command. The installed Overseer never sees dev daemons, and
+never uses one even when their variables leak into its environment
+([AC-212](docs/verification/AC-212.md)).
+
 ## Recovery
 
 - State lives in `~/Library/Application Support/Overseer` (`overseer.sqlite`, per-run
   output under `runs/`, worktrees under `worktrees/`, profiles under `profiles/`). Linux
-  uses `$XDG_DATA_HOME/overseer`. `OVERSEER_HOME` overrides it for tests and dev instances
+  uses `$XDG_DATA_HOME/overseer`. `OVERSEER_HOME` overrides it for tests and dev daemons
   only: the installed extension and TUI ignore `OVERSEER_HOME`, `OVERSEER_SOCKET` and
   `OVERSEER_INSTANCE` in their environment and refuse any daemon marked dev
-  ([AC-212](docs/verification/AC-212.md), [dev instances](docs/rfcs/dev-instance.md)).
+  ([AC-212](docs/verification/AC-212.md), [dev daemons](docs/rfcs/dev-instance.md)).
 - The daemon binary is `target/release/overseerd` in a build, or
   `~/.vscode/extensions/beelol.overseer-0.1.0/bin/overseerd-darwin-arm64` once installed.
   `overseerd serve` runs it in the foreground without VS Code (the extension normally starts
