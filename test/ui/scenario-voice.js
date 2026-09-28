@@ -326,26 +326,30 @@ const { auditExpression } = require('./audit');
     const writer = (() => { fs.writeFileSync(modeFile, 'slow'); const r = s.ctl('task.create', { repo, harness: 'claude', prompt: 'keep writing', title: 'Writer' }); return r.run.id; })();
     for (let i = 0; i < 80 && s.ctl('state').runs.find(r => r.id === writer)?.status !== 'running'; i++) await delay(250);
     fs.writeFileSync(modeFile, 'overseer');
-    s.ctl('voice.set', { settle_seconds: 6 });
+    s.ctl('voice.set', { settle_seconds: 10 });
     await cdp.command('Overseer: Open Overseer View'); await delay(1500);
-    const homeFrame = await cdp.webview(`!!document.getElementById('home-voice')`, 20000);
     // Home is the composer with no agent selected (Overseer: New Agent), as in scenario-home.
-    for (let i = 0; i < 3; i++) {
-      await cdp.command('Overseer: New Agent');
-      if (await homeFrame.waitFor(`document.body.dataset.mode === 'composer'`, 8000).then(() => true, () => false)) break;
-    }
+    await cdp.command('Overseer: New Agent'); await delay(1200);
+    const homeFrame = await cdp.webview(`!!document.getElementById('home-voice') && document.body.dataset.mode === 'composer'`, 20000);
     await delay(800);
     const homeId = s.ctl('voice.say', { text: 'Tell Writer to add a changelog.' }).request;
     await untilState(homeId, ['settling']);
-    await homeFrame.waitFor(`!document.getElementById('home').hidden && !document.getElementById('home-voice').hidden && !!document.querySelector('.home-msg.spoken') && !!document.querySelector('.proposal.spoken')`, 20000).catch(() => {});
-    const home = await homeFrame.eval(`(() => ({ mode: document.body.dataset.mode, strip: document.getElementById('home-voice').checkVisibility(), state: document.querySelector('.home-voice-state')?.textContent, words: [...document.querySelectorAll('.home-msg.spoken .home-text')].map(e => e.textContent).find(t => /add a changelog/.test(t)), spokenCard: !!document.querySelector('.proposal.spoken') }))()`);
+    // The conversation sits above the composer; with many messages, focusing the composer scrolls it
+    // up out of view, so the owner scrolls back to it (as scenario-home does). Checked on screen:
+    // rendered and inside the view, not merely present.
+    const onView = e => `(() => { const x = [...document.querySelectorAll(${JSON.stringify(e)})].pop(); if (!x || !x.checkVisibility()) return false; const r = x.getBoundingClientRect(); return r.height > 0 && r.bottom > 0 && r.top < innerHeight; })()`;
+    const toHome = `(document.getElementById('home').scrollIntoView({ block: 'start' }), true)`;
+    const planLine = `[...document.querySelectorAll('#home-conv .home-msg.from-overseer .home-text')].some(e => /Writer/.test(e.textContent) && /changelog/.test(e.textContent))`;
+    await homeFrame.waitFor(`${toHome} && ${onView('#home-voice')} && ${onView('#home-conv .home-msg.spoken')} && ${planLine}`, 20000).catch(() => {});
+    const home = await homeFrame.eval(`(() => ({ mode: document.body.dataset.mode, strip: ${onView('#home-voice')}, state: document.querySelector('.home-voice-state')?.textContent, words: [...document.querySelectorAll('#home-conv .home-msg.spoken .home-text')].map(e => e.textContent).find(t => /add a changelog/.test(t)), spokenMark: ${onView('#home-conv .home-msg.spoken')} && /by voice/.test([...document.querySelectorAll('#home-conv .home-msg.spoken')].pop().textContent), plan: ${planLine} }))()`);
     await s.screenshot('home-voice-strip');
     const homeAudit = await homeFrame.eval(auditExpression({ root: '#home-voice', exclude: ['.home-voice-heard'] }));
-    check('home shows the voice strip, and the spoken request and its plan are marked in the conversation', home.mode === 'composer' && home.strip && /Listening|Thinking|Speaking|Hearing/.test(home.state || '') && home.words === 'Tell Writer to add a changelog.' && home.spokenCard, home);
+    check('home shows the voice strip, the spoken request marked as spoken, and Overseer\u2019s plan for it', home.mode === 'composer' && home.strip && /Listening|Thinking|Speaking|Hearing/.test(home.state || '') && home.words === 'Tell Writer to add a changelog.' && home.spokenMark && home.plan, home);
 
     // ---------- A card filling in as its dispatches advance (AC-169, AC-174).
     await cdp.command('Overseer: Voice Mode: Show'); await delay(800);
     await untilState(homeId, ['sent'], 30000);
+    s.ctl('voice.set', { settle_seconds: 2 });
     const rowState = () => view.eval(`(() => { const c = [...document.querySelectorAll('.vreq')].find(c => /add a changelog/.test(c.textContent)); return c && c.querySelector('.vreq-row-state')?.textContent; })()`);
     const seen = [];
     for (let i = 0; i < 40; i++) { const st = await rowState(); if (st && !seen.includes(st)) seen.push(st); if (st === 'held') break; await delay(250); }
