@@ -511,7 +511,7 @@
       "blocker": "The joined S1 replay deduplicates D1, claims it before J2 finishes, and records targeted J1/J4 advisory receipts; the guarded J7 fault replay records scripted retractions with receipts. A separately supervised scripted director now consumes J2's early D1, sends one targeted J4 advisory, and reviews both results; J2 waits for J4's applied receipt before completing. Live harness delivery, semantic recipient choice and actual director inference remain unimplemented."
     },
     "SWARM-42": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
@@ -521,7 +521,7 @@
         "daemon/tests/swarm_atlas.rs",
         "daemon/tests/swarm_revision_replay.rs"
       ],
-      "blocker": "Stable-ID dedupe, terminal exact-receipt replay after restart, stale generation checks, late finished-attempt result isolation and requeued undecided-result review pass; the joined S1 replay includes duplicate D1, and joined S5 collapses 2,000 J2 progress replays to one director envelope during Stop. A committed or no-change director plan revision now replays its exact result after restart without applying the plan twice, while changed input, stale fresh requests and forged owner tokens fail. Worker-inbox reads require the recipient's attempt token. Live dispatch/accounting and broader delayed/reordered cross-harness message traces remain untested."
+      "blocker": null
     },
     "SWARM-43": {
       "status": "partial",

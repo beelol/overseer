@@ -895,3 +895,118 @@ fn unavailable_database_or_access_is_blocked_coverage_not_a_pass_or_defect() {
     assert!(completed.is_err(), "{completed:?}");
     assert_ne!(d.call("swarm.get", json!({"id":run_id}))["status"], "completed");
 }
+
+/// SWARM-42: duplicated, delayed and reordered progress, discovery, result
+/// and acknowledgement messages each have one effect. The worker's result
+/// arrives before its earlier progress and discovery; the applied
+/// acknowledgement arrives before the delivered one; every message is sent
+/// twice, and the result a third time after a daemon kill. One message row
+/// per ID, one submission, one acceptance, one reservation, the directive
+/// stays applied, and the late progress changes no job state. Unknown
+/// identities, a message for another run and a stale director generation are
+/// refused.
+#[test]
+fn duplicated_delayed_and_reordered_messages_have_one_effect_each() {
+    let mut d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Reordered","objective":"Audit routes",
+        "allowed_targets":["fixture"]}));
+    let id = run["id"].as_str().unwrap().to_string();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"routes","title":"Inspect routes","acceptance":"route table","deps":[]}]}));
+    let other = d.call("swarm.create", json!({"category":"Other run","objective":"Audit",
+        "allowed_targets":["fixture"]}));
+    let other_id = other["id"].as_str().unwrap().to_string();
+    d.call("swarm.plan", json!({"id":other_id,"generation":1,"revision":0,"jobs":[
+        {"id":"routes","title":"Inspect routes","acceptance":"route table","deps":[]}]}));
+    let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
+    let admitted = d.call("swarm.admit", json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"routes","target_id":"fixture","request_id":"routes-once","now_ms":at,
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture","account_id":"a","pool_ids":["p"],"capabilities":["audit"],
+                "health":"up","auth":"ok"}],
+            "pools":[{"id":"p","windows":[{"id":"w","unit":"points","remaining_milli":1000000,
+                "protected_milli":0,"reserved_milli":0,"confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["audit"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(admitted["status"], "admitted", "{admitted}");
+    let (attempt, token) = (admitted["attempt_id"].as_str().unwrap().to_string(),
+        admitted["token"].as_str().unwrap().to_string());
+    let directive = json!({"run_id":id,"job_id":"routes","attempt_id":attempt,"message_id":"focus-1",
+        "generation":1,"revision":1,"type":"advisory","payload":{"focus":"pagination"}});
+    d.call("swarm.direct", directive.clone());
+    d.call("swarm.artifact.put", json!({"run_id":id,"job_id":"routes","attempt_id":attempt,"token":token,
+        "artifact_id":"table","source_revision":1,"kind":"finding","content":"route table"}));
+    let report = |message: &str, kind: &str, payload: serde_json::Value| json!({"run_id":id,"job_id":"routes",
+        "attempt_id":attempt,"token":token,"message_id":message,"type":kind,"revision":1,"payload":payload});
+    let result = report("result-1", "result", json!({"artifact_ids":["table"]}));
+    let progress = report("progress-1", "progress", json!({"step":"reading routes"}));
+    let discovery = report("discovery-1", "discovery", json!({"symbol":"findRoute"}));
+    let ack = |phase: &str| json!({"run_id":id,"message_id":"focus-1","recipient":attempt,"token":token,
+        "phase":phase,"revision":1});
+    // Reordered and duplicated: the applied acknowledgement arrives before the
+    // delivered one. It is refused without a receipt, so the worker retries it
+    // after the delivered one; then a delayed duplicate of the delivered one
+    // arrives last. The result arrives before the progress and discovery that
+    // preceded it.
+    let early = d.try_call("swarm.ack", ack("applied")).unwrap_err();
+    assert!(early.contains("delivered before it is applied"), "{early}");
+    for _ in 0..2 {
+        d.call("swarm.ack", ack("delivered"));
+        d.call("swarm.report", result.clone());
+    }
+    for _ in 0..2 {
+        d.call("swarm.ack", ack("applied"));
+    }
+    let late = d.try_call("swarm.ack", ack("delivered"));
+    let phase: String = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap()
+        .query_row("SELECT phase FROM swarm_messages WHERE run_id=?1 AND message_id='focus-1'", [&id],
+            |r| r.get(0)).unwrap();
+    assert_eq!(phase, "applied", "a delayed delivered acknowledgement does not regress it: {late:?}");
+    for _ in 0..2 {
+        d.call("swarm.report", progress.clone());
+        d.call("swarm.report", discovery.clone());
+    }
+    assert_eq!(d.call("swarm.jobs", json!({"id":id}))["jobs"][0]["status"], "submitted",
+        "late progress changes no job state");
+    // The result's receipt is lost in a crash; the worker replays it.
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.report", result.clone())["duplicate"], true);
+    assert_eq!(d.call("swarm.direct", directive)["duplicate"], true);
+    assert_eq!(d.call("swarm.decide", json!({"run_id":id,"generation":1,"revision":1,"job_id":"routes",
+        "decision":"accept","evidence":["table"]}))["status"], "accepted");
+    let again = d.try_call("swarm.decide", json!({"run_id":id,"generation":1,"revision":1,"job_id":"routes",
+        "decision":"accept","evidence":["table"]}));
+    assert!(again.as_ref().map(|r| r["duplicate"] == true).unwrap_or(true), "{again:?}");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    for message in ["result-1", "progress-1", "discovery-1", "focus-1"] {
+        let n: i64 = db.query_row("SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND message_id=?2",
+            [&id, &message.to_string()], |r| r.get(0)).unwrap();
+        assert_eq!(n, 1, "{message}");
+    }
+    let (decisions, reservations, attempts): (i64, i64, i64) = db.query_row("SELECT
+        (SELECT COUNT(*) FROM swarm_decisions WHERE run_id=?1),
+        (SELECT COUNT(*) FROM swarm_reservations WHERE run_id=?1),
+        (SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1)", [&id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap();
+    assert_eq!((decisions, reservations, attempts), (1, 1, 1), "one acceptance, one reservation, one attempt");
+    let results: i64 = db.query_row("SELECT COUNT(*) FROM swarm_operation_order WHERE run_id=?1 AND kind='result'",
+        [&id], |r| r.get(0)).unwrap();
+    assert_eq!(results, 1, "one submission");
+    // Unknown identities, another run's attempt and a stale director generation.
+    let mut unknown = progress.clone();
+    unknown["attempt_id"] = json!("sa-unknown");
+    unknown["message_id"] = json!("unknown-1");
+    assert!(d.try_call("swarm.report", unknown).is_err());
+    let mut forged = progress.clone();
+    forged["token"] = json!("0".repeat(32));
+    forged["message_id"] = json!("forged-1");
+    assert!(d.try_call("swarm.report", forged).is_err());
+    let mut cross = progress.clone();
+    cross["run_id"] = json!(other_id);
+    cross["message_id"] = json!("cross-1");
+    assert!(d.try_call("swarm.report", cross).is_err(), "another run's attempt is refused");
+    assert!(d.try_call("swarm.direct", json!({"run_id":id,"job_id":"routes","attempt_id":attempt,
+        "message_id":"stale-gen","generation":2,"revision":1,"type":"advisory","payload":{}})).is_err());
+    let n: i64 = db.query_row("SELECT COUNT(*) FROM swarm_messages WHERE message_id IN
+        ('unknown-1','forged-1','cross-1','stale-gen')", [], |r| r.get(0)).unwrap();
+    assert_eq!(n, 0);
+}
