@@ -37,6 +37,13 @@ appId: ${APP}
 - tapOn:
     id: "file.hunk.accept"
     index: 0
+    retryTapIfNoChange: true
+# The phone shows the hunk as reviewed before it leaves: its button now takes the mark away.
+- extendedWaitUntil:
+    visible:
+      id: "file\\.hunk\\.accept"
+      text: "Unmark reviewed hunk 1"
+    timeout: 20000
 - tapOn:
     id: "file.back"
 - tapOn:

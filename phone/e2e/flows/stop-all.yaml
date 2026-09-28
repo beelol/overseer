@@ -9,6 +9,11 @@ appId: ${APP}
     timeout: 30000
 - tapOn:
     id: "agents.menu"
+# Offered once the phone knows an agent is going: the news may still be on its way.
+- extendedWaitUntil:
+    visible:
+      id: "agents.menu.stop"
+    timeout: 20000
 - tapOn:
     id: "agents.menu.stop"
 - extendedWaitUntil:
