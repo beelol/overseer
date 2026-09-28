@@ -1,5 +1,12 @@
 # AC-146: merges
 
+## Pull request #14 (Overseer itself, Gate S), 2026-09-27
+
+- **Finished:** marked ready. The monitor's first run found nine UI scenarios failing that pass on main; the agent fixed them (`3650000e`) and then handed the pull request to the monitor.
+- **Throwaway copy:** the branch already contained main; it merged into current main without conflicts.
+- **Tests:** `scripts/test-all --jobs=2` at load 25 to 94: 45 of 52. Each remaining failure was checked one scenario at a time: review and scopes passed alone; center, review-width at 900 px, arrangement's first edit and audit's review count also fail on main under the same load (tracker rows added for center and the audit count). Gate S's Rust suite: 22 of 24 under load; ac189 and ac200 pass alone.
+- **Merged:** squash, `4c371ecd`. Its criteria were already recorded on main (AC-180, AC-181, AC-184 verified; the rest partial with their gaps).
+
 ## Pull request #9 (Continuity, Gate L), 2026-09-27
 
 - **Agent finished:** marked ready; the monitor asked for a compact first-use notice (the audit's composer budget), the agent fixed it and merged main.
