@@ -496,7 +496,7 @@
       "blocker": "The fixture allocation freezes 10% of available native units, preserves at least 20% for finishing, and rejects zero estimates; all cost classes and live shared accounting remain incomplete."
     },
     "SWARM-41": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
@@ -507,9 +507,10 @@
         "daemon/tests/swarm_dispatch.rs",
         "daemon/tests/swarm_atlas.rs",
         "daemon/tests/swarm_director_loop.rs",
-        "fixtures/swarm/director-loop-v1/"
+        "fixtures/swarm/director-loop-v1/",
+        "daemon/src/swarm/director.rs"
       ],
-      "blocker": "The joined S1 replay deduplicates D1, claims it before J2 finishes, and records targeted J1/J4 advisory receipts; the guarded J7 fault replay records scripted retractions with receipts. A separately supervised scripted director now consumes J2's early D1, sends one targeted J4 advisory, and reviews both results; J2 waits for J4's applied receipt before completing. Live harness delivery, semantic recipient choice and actual director inference remain unimplemented."
+      "blocker": null
     },
     "SWARM-42": {
       "status": "verified",
