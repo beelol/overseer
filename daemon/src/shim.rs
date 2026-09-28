@@ -48,7 +48,10 @@ pub struct ExitInfo {
 }
 
 pub fn now_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 pub fn segment_path(dir: &Path, n: u64) -> PathBuf {
@@ -68,9 +71,17 @@ impl SegmentWriter {
         while segment_path(dir, n + 1).exists() {
             n += 1;
         }
-        let file = std::fs::OpenOptions::new().create(true).append(true).open(segment_path(dir, n))?;
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(segment_path(dir, n))?;
         let len = file.metadata()?.len();
-        Ok(Self { dir: dir.to_path_buf(), n, file, len })
+        Ok(Self {
+            dir: dir.to_path_buf(),
+            n,
+            file,
+            len,
+        })
     }
 
     fn record(&mut self, stream: &str, data: &[u8]) {
@@ -90,7 +101,11 @@ impl SegmentWriter {
         let mut line = rec.to_string();
         line.push('\n');
         if self.len + line.len() as u64 > SEGMENT_BYTES && self.len > 0 {
-            if let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(segment_path(&self.dir, self.n + 1)) {
+            if let Ok(file) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(segment_path(&self.dir, self.n + 1))
+            {
                 self.n += 1;
                 self.file = file;
                 self.len = 0;
@@ -112,7 +127,11 @@ fn write_json(path: &Path, value: &impl Serialize) {
     }
 }
 
-fn pump<R: Read + Send + 'static>(reader: R, stream: &'static str, out: Arc<Mutex<SegmentWriter>>) -> std::thread::JoinHandle<()> {
+fn pump<R: Read + Send + 'static>(
+    reader: R,
+    stream: &'static str,
+    out: Arc<Mutex<SegmentWriter>>,
+) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let mut reader = BufReader::new(reader);
         let mut buf = Vec::new();
@@ -155,13 +174,30 @@ pub fn run(dir: PathBuf) -> anyhow::Result<()> {
     let mut child = match cmd.spawn() {
         Ok(child) => child,
         Err(error) => {
-            out.lock().unwrap().record("x", format!("spawn failed: {error}").as_bytes());
-            write_json(&dir.join("exit.json"), &ExitInfo { code: None, signal: None, spawn_error: Some(error.to_string()), ended_ms: now_ms() });
+            out.lock()
+                .unwrap()
+                .record("x", format!("spawn failed: {error}").as_bytes());
+            write_json(
+                &dir.join("exit.json"),
+                &ExitInfo {
+                    code: None,
+                    signal: None,
+                    spawn_error: Some(error.to_string()),
+                    ended_ms: now_ms(),
+                },
+            );
             return Ok(());
         }
     };
     let child_pid = child.id();
-    write_json(&dir.join("shim.json"), &ShimInfo { shim_pid: std::process::id(), child_pid, started_ms: now_ms() });
+    write_json(
+        &dir.join("shim.json"),
+        &ShimInfo {
+            shim_pid: std::process::id(),
+            child_pid,
+            started_ms: now_ms(),
+        },
+    );
     let stdin = Arc::new(Mutex::new(child.stdin.take()));
     let t_out = pump(child.stdout.take().unwrap(), "o", out.clone());
     let t_err = pump(child.stderr.take().unwrap(), "e", out.clone());
@@ -212,7 +248,15 @@ pub fn run(dir: PathBuf) -> anyhow::Result<()> {
         }
         Err(_) => (None, None),
     };
-    write_json(&dir.join("exit.json"), &ExitInfo { code, signal, spawn_error: None, ended_ms: now_ms() });
+    write_json(
+        &dir.join("exit.json"),
+        &ExitInfo {
+            code,
+            signal,
+            spawn_error: None,
+            ended_ms: now_ms(),
+        },
+    );
     let _ = std::fs::remove_file(&sock_path);
     Ok(())
 }
@@ -228,18 +272,39 @@ pub fn peer_uid_fd(fd: i32) -> Option<u32> {
     let mut uid: libc::uid_t = 0;
     let mut gid: libc::gid_t = 0;
     let rc = unsafe { libc::getpeereid(fd, &mut uid, &mut gid) };
-    if rc == 0 { Some(uid) } else { None }
+    if rc == 0 {
+        Some(uid)
+    } else {
+        None
+    }
 }
 
 #[cfg(target_os = "linux")]
 pub fn peer_uid_fd(fd: i32) -> Option<u32> {
     let mut cred: libc::ucred = unsafe { std::mem::zeroed() };
     let mut len = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
-    let rc = unsafe { libc::getsockopt(fd, libc::SOL_SOCKET, libc::SO_PEERCRED, &mut cred as *mut _ as *mut libc::c_void, &mut len) };
-    if rc == 0 { Some(cred.uid) } else { None }
+    let rc = unsafe {
+        libc::getsockopt(
+            fd,
+            libc::SOL_SOCKET,
+            libc::SO_PEERCRED,
+            &mut cred as *mut _ as *mut libc::c_void,
+            &mut len,
+        )
+    };
+    if rc == 0 {
+        Some(cred.uid)
+    } else {
+        None
+    }
 }
 
-fn handle_control(conn: UnixStream, stdin: Arc<Mutex<Option<std::process::ChildStdin>>>, out: Arc<Mutex<SegmentWriter>>, child_pid: u32) {
+fn handle_control(
+    conn: UnixStream,
+    stdin: Arc<Mutex<Option<std::process::ChildStdin>>>,
+    out: Arc<Mutex<SegmentWriter>>,
+    child_pid: u32,
+) {
     let mut writer = match conn.try_clone() {
         Ok(w) => w,
         Err(_) => return,
@@ -255,7 +320,10 @@ fn handle_control(conn: UnixStream, stdin: Arc<Mutex<Option<std::process::ChildS
                     let mut guard = stdin.lock().unwrap();
                     match guard.as_mut() {
                         Some(pipe) => {
-                            let ok = pipe.write_all(data.as_bytes()).and_then(|_| pipe.flush()).is_ok();
+                            let ok = pipe
+                                .write_all(data.as_bytes())
+                                .and_then(|_| pipe.flush())
+                                .is_ok();
                             drop(guard);
                             if ok {
                                 out.lock().unwrap().record("i", data.as_bytes());
@@ -275,7 +343,10 @@ fn handle_control(conn: UnixStream, stdin: Arc<Mutex<Option<std::process::ChildS
                         serde_json::json!({"ok": false, "error": "signal not allowed"})
                     } else {
                         let rc = unsafe { libc::kill(-(child_pid as i32), sig) };
-                        out.lock().unwrap().record("x", format!("signal {sig} sent to process group").as_bytes());
+                        out.lock().unwrap().record(
+                            "x",
+                            format!("signal {sig} sent to process group").as_bytes(),
+                        );
                         serde_json::json!({"ok": rc == 0})
                     }
                 }

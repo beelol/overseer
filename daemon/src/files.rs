@@ -15,13 +15,28 @@ pub const MAX_ENTRIES: usize = 5000;
 impl Daemon {
     /// Files for @-mentions (AC-60): tracked and untracked (not ignored) files in a run's worktree or
     /// a repository, best matches first (file-name matches before path matches, shorter paths first).
-    pub fn repo_files(&self, workspace_id: Option<&str>, repo: Option<&str>, query: &str, limit: usize) -> Result<Value> {
+    pub fn repo_files(
+        &self,
+        workspace_id: Option<&str>,
+        repo: Option<&str>,
+        query: &str,
+        limit: usize,
+    ) -> Result<Value> {
         let root = match (workspace_id, repo) {
             (Some(id), _) => std::path::PathBuf::from(self.workspace(id)?.path),
             (None, Some(r)) => git::toplevel(Path::new(r))?,
             _ => bail!("give a workspace_id or a repo"),
         };
-        let listing = git::git(&root, &["ls-files", "--cached", "--others", "--exclude-standard", "-z"])?;
+        let listing = git::git(
+            &root,
+            &[
+                "ls-files",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+                "-z",
+            ],
+        )?;
         let q = query.to_lowercase();
         let mut hits: Vec<(u8, usize, &str)> = listing
             .split('\0')
@@ -29,7 +44,17 @@ impl Daemon {
             .filter_map(|f| {
                 let lower = f.to_lowercase();
                 let name = lower.rsplit('/').next().unwrap_or(&lower);
-                let rank = if q.is_empty() { 2 } else if name.starts_with(&q) { 0 } else if name.contains(&q) { 1 } else if lower.contains(&q) { 2 } else { return None };
+                let rank = if q.is_empty() {
+                    2
+                } else if name.starts_with(&q) {
+                    0
+                } else if name.contains(&q) {
+                    1
+                } else if lower.contains(&q) {
+                    2
+                } else {
+                    return None;
+                };
                 Some((rank, f.len(), f))
             })
             .collect();
@@ -49,16 +74,33 @@ impl Daemon {
         let base = {
             let store = self.store.lock().unwrap();
             let task = store.tasks()?.into_iter().find(|t| t.workspace_id == ws.id);
-            task.and_then(|t| t.start_snapshot).and_then(|id| store.snapshot(&id).ok().flatten()).map(|s| s.commit_sha)
+            task.and_then(|t| t.start_snapshot)
+                .and_then(|id| store.snapshot(&id).ok().flatten())
+                .map(|s| s.commit_sha)
         }
         .or_else(|| git::head(root));
-        let Some(base) = base else { return Ok(json!({"files": 0, "added": 0, "removed": 0, "names": []})) };
+        let Some(base) = base else {
+            return Ok(json!({"files": 0, "added": 0, "removed": 0, "names": []}));
+        };
         let trees = git::capture_trees(root, &crate::paths::data_dir().join("tmp"))?;
-        let numstat = git::git(root, &["diff", "--numstat", "--no-renames", &base, &trees.worktree_tree])?;
+        let numstat = git::git(
+            root,
+            &[
+                "diff",
+                "--numstat",
+                "--no-renames",
+                &base,
+                &trees.worktree_tree,
+            ],
+        )?;
         let (mut files, mut added, mut removed, mut names) = (0u64, 0u64, 0u64, Vec::new());
         for line in numstat.lines() {
             let mut parts = line.splitn(3, '\t');
-            let (a, r, path) = (parts.next().unwrap_or("0"), parts.next().unwrap_or("0"), parts.next().unwrap_or(""));
+            let (a, r, path) = (
+                parts.next().unwrap_or("0"),
+                parts.next().unwrap_or("0"),
+                parts.next().unwrap_or(""),
+            );
             if path.is_empty() {
                 continue;
             }
@@ -69,7 +111,9 @@ impl Daemon {
                 names.push(path.to_string());
             }
         }
-        Ok(json!({"files": files, "added": added, "removed": removed, "names": names, "base": base}))
+        Ok(
+            json!({"files": files, "added": added, "removed": removed, "names": names, "base": base}),
+        )
     }
 
     pub fn workspace_tree(&self, workspace_id: &str, dir: &str) -> Result<Value> {
@@ -78,11 +122,20 @@ impl Daemon {
             bail!("this workspace was removed");
         }
         let rel = Path::new(dir.trim_start_matches("./"));
-        if rel.is_absolute() || rel.components().any(|c| matches!(c, Component::ParentDir | Component::RootDir | Component::Prefix(_))) || rel.components().any(|c| c.as_os_str() == ".git") {
+        if rel.is_absolute()
+            || rel.components().any(|c| {
+                matches!(
+                    c,
+                    Component::ParentDir | Component::RootDir | Component::Prefix(_)
+                )
+            })
+            || rel.components().any(|c| c.as_os_str() == ".git")
+        {
             bail!("path must be inside the workspace");
         }
         let root = std::fs::canonicalize(&ws.path)?;
-        let target = std::fs::canonicalize(root.join(rel)).map_err(|_| anyhow!("no such directory: {dir}"))?;
+        let target = std::fs::canonicalize(root.join(rel))
+            .map_err(|_| anyhow!("no such directory: {dir}"))?;
         if !target.starts_with(&root) || !target.is_dir() {
             bail!("path must be a directory inside the workspace");
         }
@@ -90,7 +143,9 @@ impl Daemon {
         let base = {
             let store = self.store.lock().unwrap();
             let task = store.tasks()?.into_iter().find(|t| t.workspace_id == ws.id);
-            task.and_then(|t| t.start_snapshot).and_then(|id| store.snapshot(&id).ok().flatten()).map(|s| s.commit_sha)
+            task.and_then(|t| t.start_snapshot)
+                .and_then(|id| store.snapshot(&id).ok().flatten())
+                .map(|s| s.commit_sha)
         }
         .or_else(|| git::head(&root));
         let mut changed: HashMap<String, String> = HashMap::new();
@@ -110,11 +165,17 @@ impl Daemon {
         for p in changed.keys() {
             let mut cur = Path::new(p.as_str()).parent();
             while let Some(d) = cur.filter(|d| !d.as_os_str().is_empty()) {
-                *inside_counts.entry(d.to_string_lossy().to_string()).or_default() += 1;
+                *inside_counts
+                    .entry(d.to_string_lossy().to_string())
+                    .or_default() += 1;
                 cur = d.parent();
             }
         }
-        let prefix = target.strip_prefix(&root).unwrap_or(Path::new("")).to_string_lossy().to_string();
+        let prefix = target
+            .strip_prefix(&root)
+            .unwrap_or(Path::new(""))
+            .to_string_lossy()
+            .to_string();
         let mut dirs = Vec::new();
         let mut files = Vec::new();
         let mut total = 0usize;
@@ -125,13 +186,25 @@ impl Daemon {
                 continue;
             }
             total += 1;
-            let path = if prefix.is_empty() { name.clone() } else { format!("{prefix}/{name}") };
+            let path = if prefix.is_empty() {
+                name.clone()
+            } else {
+                format!("{prefix}/{name}")
+            };
             let ft = entry.file_type()?;
             let is_dir = ft.is_dir();
             let status = changed.get(&path).cloned();
-            let inside = if is_dir { inside_counts.get(&path).copied().unwrap_or(0) } else { 0 };
+            let inside = if is_dir {
+                inside_counts.get(&path).copied().unwrap_or(0)
+            } else {
+                0
+            };
             let item = json!({"name": name, "path": path, "dir": is_dir, "symlink": ft.is_symlink(), "status": status, "changes_inside": inside});
-            if is_dir { dirs.push(item) } else { files.push(item) }
+            if is_dir {
+                dirs.push(item)
+            } else {
+                files.push(item)
+            }
         }
         let key = |v: &Value| v["name"].as_str().unwrap_or_default().to_lowercase();
         dirs.sort_by_key(key);
@@ -146,6 +219,8 @@ impl Daemon {
         let truncated = entries.len() > MAX_ENTRIES;
         entries.truncate(MAX_ENTRIES);
         entries.extend(deleted);
-        Ok(json!({"workspace_id": ws.id, "root": ws.path, "dir": prefix, "base": base_label, "entries": entries, "total": total, "truncated": truncated, "changed_total": changed.len()}))
+        Ok(
+            json!({"workspace_id": ws.id, "root": ws.path, "dir": prefix, "base": base_label, "entries": entries, "total": total, "truncated": truncated, "changed_total": changed.len()}),
+        )
     }
 }

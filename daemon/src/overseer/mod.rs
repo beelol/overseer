@@ -118,7 +118,10 @@ impl Daemon {
         let token = uuid::Uuid::new_v4().simple().to_string();
         let sha = format!("{:x}", sha2::Sha256::digest(token.as_bytes()));
         let store = self.store.lock().unwrap();
-        store.conn.execute("INSERT INTO overseer_tokens(sha, run_id, role, created_ms) VALUES(?1, ?2, ?3, ?4)", rusqlite::params![sha, run_id, role, crate::daemon::now()])?;
+        store.conn.execute(
+            "INSERT INTO overseer_tokens(sha, run_id, role, created_ms) VALUES(?1, ?2, ?3, ?4)",
+            rusqlite::params![sha, run_id, role, crate::daemon::now()],
+        )?;
         Ok(json!({"token": token, "run_id": run_id, "role": role}))
     }
 
@@ -128,7 +131,11 @@ impl Daemon {
         let store = self.store.lock().unwrap();
         store
             .conn
-            .query_row("SELECT run_id, role FROM overseer_tokens WHERE sha=?1", [sha], |r| Ok((r.get(0)?, r.get(1)?)))
+            .query_row(
+                "SELECT run_id, role FROM overseer_tokens WHERE sha=?1",
+                [sha],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
             .optional()?
             .ok_or_else(|| anyhow::anyhow!("unknown token"))
     }
@@ -152,17 +159,36 @@ impl Daemon {
     }
 
     /// One tool call from a run. Every answer is bounded and redacted.
-    pub fn overseer_tool(self: &std::sync::Arc<Self>, token: &str, name: &str, arguments: &Value) -> Result<Value> {
+    pub fn overseer_tool(
+        self: &std::sync::Arc<Self>,
+        token: &str,
+        name: &str,
+        arguments: &Value,
+    ) -> Result<Value> {
         let (run_id, role) = self.token_holder(token)?;
-        if !self.tools_of_run(&run_id, &role).iter().any(|t| t["name"] == name) {
+        if !self
+            .tools_of_run(&run_id, &role)
+            .iter()
+            .any(|t| t["name"] == name)
+        {
             bail!("{role} runs have no tool {name}");
         }
         // A watcher reads only its subject.
         if role != "overseer" && watch::SUBJECT_READS.contains(&name) {
             let subject = self.watch_of_watcher(&run_id).map(|w| w.subject);
             if subject.as_deref() != arguments["id"].as_str() {
-                let why = format!("a watcher reads only its subject{}", subject.map(|s| format!(" ({s})")).unwrap_or_default());
-                self.emit(None, Some(&run_id), "overseer_tool_call", "daemon", "exact", json!({"role": role, "name": name, "refused": why}))?;
+                let why = format!(
+                    "a watcher reads only its subject{}",
+                    subject.map(|s| format!(" ({s})")).unwrap_or_default()
+                );
+                self.emit(
+                    None,
+                    Some(&run_id),
+                    "overseer_tool_call",
+                    "daemon",
+                    "exact",
+                    json!({"role": role, "name": name, "refused": why}),
+                )?;
                 return Ok(json!({"text": format!("refused: {why}"), "is_error": true}));
             }
         }
@@ -172,7 +198,12 @@ impl Daemon {
                 let id = arguments["id"].as_str().unwrap_or_default();
                 self.digest_text(id)?
             }
-            "check_in" => match self.record_check_in(arguments["agent"].as_str().unwrap_or(""), arguments["result"].as_str().unwrap_or(""), arguments["reason"].as_str().unwrap_or(""), arguments["left_out"].as_str().unwrap_or("")) {
+            "check_in" => match self.record_check_in(
+                arguments["agent"].as_str().unwrap_or(""),
+                arguments["result"].as_str().unwrap_or(""),
+                arguments["reason"].as_str().unwrap_or(""),
+                arguments["left_out"].as_str().unwrap_or(""),
+            ) {
                 Ok(_) => "Recorded.".to_string(),
                 Err(e) => return Ok(json!({"text": format!("refused: {e}"), "is_error": true})),
             },
@@ -193,41 +224,115 @@ impl Daemon {
                 Err(e) => return Ok(json!({"text": format!("refused: {e}"), "is_error": true})),
             },
             "rally" => {
-                let agents = arguments["agents"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect::<Vec<_>>());
+                let agents = arguments["agents"].as_array().map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_str().map(str::to_string))
+                        .collect::<Vec<_>>()
+                });
                 serde_json::to_string_pretty(&self.rally(arguments["repo"].as_str(), agents)?)?
             }
-            "answer" => match self.overseer_propose(&json!([{"action": "answer", "ask": arguments["ask"], "text": arguments["text"]}]), "tool") {
-                Ok(r) => format!("{} (proposal {})", r["result"].as_str().unwrap_or(""), r["proposal"].as_str().unwrap_or("")),
+            "answer" => match self.overseer_propose(
+                &json!([{"action": "answer", "ask": arguments["ask"], "text": arguments["text"]}]),
+                "tool",
+            ) {
+                Ok(r) => format!(
+                    "{} (proposal {})",
+                    r["result"].as_str().unwrap_or(""),
+                    r["proposal"].as_str().unwrap_or("")
+                ),
                 Err(e) => return Ok(json!({"text": format!("refused: {e}"), "is_error": true})),
             },
             "propose" => match self.overseer_propose(&arguments["actions"], "tool") {
-                Ok(r) => format!("{} (proposal {})", r["result"].as_str().unwrap_or(""), r["proposal"].as_str().unwrap_or("")),
+                Ok(r) => format!(
+                    "{} (proposal {})",
+                    r["result"].as_str().unwrap_or(""),
+                    r["proposal"].as_str().unwrap_or("")
+                ),
                 Err(e) => {
-                    self.emit(None, Some(&run_id), "overseer_tool_call", "daemon", "exact", json!({"role": role, "name": name, "refused": e.to_string()}))?;
+                    self.emit(
+                        None,
+                        Some(&run_id),
+                        "overseer_tool_call",
+                        "daemon",
+                        "exact",
+                        json!({"role": role, "name": name, "refused": e.to_string()}),
+                    )?;
                     return Ok(json!({"text": format!("refused: {e}"), "is_error": true}));
                 }
             },
-            "conversation" => self.conversation_text(arguments["id"].as_str().unwrap_or(""), arguments["after"].as_i64().unwrap_or(0), arguments["limit"].as_i64().unwrap_or(200))?,
+            "conversation" => self.conversation_text(
+                arguments["id"].as_str().unwrap_or(""),
+                arguments["after"].as_i64().unwrap_or(0),
+                arguments["limit"].as_i64().unwrap_or(200),
+            )?,
             "changes" => {
                 let run = self.run(arguments["id"].as_str().unwrap_or(""))?;
                 let c = self.workspace_changes(&run.workspace_id)?;
-                let names = c["names"].as_array().map(|a| a.iter().filter_map(|n| n.as_str()).collect::<Vec<_>>().join("\n")).unwrap_or_default();
-                format!("{} files changed, +{} −{}\n{}{}", c["files"], c["added"], c["removed"], names, if c["files"].as_u64().unwrap_or(0) > 20 { "\n… (the first 20 names)" } else { "" })
+                let names = c["names"]
+                    .as_array()
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|n| n.as_str())
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    })
+                    .unwrap_or_default();
+                format!(
+                    "{} files changed, +{} −{}\n{}{}",
+                    c["files"],
+                    c["added"],
+                    c["removed"],
+                    names,
+                    if c["files"].as_u64().unwrap_or(0) > 20 {
+                        "\n… (the first 20 names)"
+                    } else {
+                        ""
+                    }
+                )
             }
-            "diff" => self.file_diff_text(arguments["id"].as_str().unwrap_or(""), arguments["path"].as_str().unwrap_or(""))?,
-            "file" => self.file_text(arguments["id"].as_str().unwrap_or(""), arguments["path"].as_str().unwrap_or(""))?,
+            "diff" => self.file_diff_text(
+                arguments["id"].as_str().unwrap_or(""),
+                arguments["path"].as_str().unwrap_or(""),
+            )?,
+            "file" => self.file_text(
+                arguments["id"].as_str().unwrap_or(""),
+                arguments["path"].as_str().unwrap_or(""),
+            )?,
             "search" => {
                 let query = arguments["query"].as_str().unwrap_or("");
                 let found = self.search(query, 50)?;
                 let ids = found["task_ids"].as_array().cloned().unwrap_or_default();
                 let store = self.store.lock().unwrap();
                 let runs = store.runs()?;
-                let lines: Vec<String> = ids.iter().filter_map(|t| t.as_str()).filter_map(|t| runs.iter().find(|r| r.task_id == t && r.parent_run_id.is_none()).map(|r| format!("{} · {} · {}", r.id, crate::redact::redact(&r.title), r.status))).collect();
-                if lines.is_empty() { "No agent matches.".to_string() } else { lines.join("\n") }
+                let lines: Vec<String> = ids
+                    .iter()
+                    .filter_map(|t| t.as_str())
+                    .filter_map(|t| {
+                        runs.iter()
+                            .find(|r| r.task_id == t && r.parent_run_id.is_none())
+                            .map(|r| {
+                                format!(
+                                    "{} · {} · {}",
+                                    r.id,
+                                    crate::redact::redact(&r.title),
+                                    r.status
+                                )
+                            })
+                    })
+                    .collect();
+                if lines.is_empty() {
+                    "No agent matches.".to_string()
+                } else {
+                    lines.join("\n")
+                }
             }
             "usage" => {
                 let d = self.digest(arguments["id"].as_str().unwrap_or(""))?;
-                if d.usage.is_string() { d.usage.as_str().unwrap_or_default().to_string() } else { d.usage.to_string() }
+                if d.usage.is_string() {
+                    d.usage.as_str().unwrap_or_default().to_string()
+                } else {
+                    d.usage.to_string()
+                }
             }
             "conflicts" => {
                 let list = self.conflicts_list(None, false)?;
@@ -235,12 +340,42 @@ impl Daemon {
                 if items.is_empty() {
                     "No open conflicts.".to_string()
                 } else {
-                    items.iter().map(|c| format!("{} · {} · {} with {} · {}", c["id"].as_str().unwrap_or(""), c["kind"].as_str().unwrap_or(""), c["title_a"].as_str().unwrap_or("?"), c["title_b"].as_str().or(c["target"].as_str()).unwrap_or("?"), c["paths"].as_array().map(|p| p.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(", ")).unwrap_or_default())).collect::<Vec<_>>().join("\n")
+                    items
+                        .iter()
+                        .map(|c| {
+                            format!(
+                                "{} · {} · {} with {} · {}",
+                                c["id"].as_str().unwrap_or(""),
+                                c["kind"].as_str().unwrap_or(""),
+                                c["title_a"].as_str().unwrap_or("?"),
+                                c["title_b"]
+                                    .as_str()
+                                    .or(c["target"].as_str())
+                                    .unwrap_or("?"),
+                                c["paths"]
+                                    .as_array()
+                                    .map(|p| p
+                                        .iter()
+                                        .filter_map(|x| x.as_str())
+                                        .collect::<Vec<_>>()
+                                        .join(", "))
+                                    .unwrap_or_default()
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n")
                 }
             }
             _ => bail!("no tool {name}"),
         };
-        self.emit(None, Some(&run_id), "overseer_tool_call", "daemon", "exact", json!({"role": role, "name": name, "bytes": text.len()}))?;
+        self.emit(
+            None,
+            Some(&run_id),
+            "overseer_tool_call",
+            "daemon",
+            "exact",
+            json!({"role": role, "name": name, "bytes": text.len()}),
+        )?;
         Ok(json!({"text": bound(&crate::redact::redact(&text), 32 * 1024), "is_error": false}))
     }
 }
@@ -253,27 +388,94 @@ pub(crate) fn bound(s: &str, max: usize) -> String {
     while !s.is_char_boundary(end) {
         end -= 1;
     }
-    format!("{}\n[cut at {max} bytes; ask for a smaller range]", &s[..end])
+    format!(
+        "{}\n[cut at {max} bytes; ask for a smaller range]",
+        &s[..end]
+    )
 }
 
 impl Daemon {
     /// A run's conversation as text: messages and tool steps, oldest first, from `after`.
     pub(crate) fn conversation_text(&self, run_id: &str, after: i64, limit: i64) -> Result<String> {
         let run = self.run(run_id)?;
-        let events = self.store.lock().unwrap().events_after(after.max(0), Some(&run.id), limit.clamp(1, 1000))?;
+        let events = self.store.lock().unwrap().events_after(
+            after.max(0),
+            Some(&run.id),
+            limit.clamp(1, 1000),
+        )?;
         let mut lines = Vec::new();
         let mut last = after;
         for e in &events {
             last = e.seq;
             let p = &e.payload;
             let line = match e.kind.as_str() {
-                "turn_started" => Some(format!("[{}] {}", if p["turn"]["prompt"].as_str().unwrap_or("").starts_with(session::FROM_OVERSEER) { "overseer" } else { "owner" }, p["turn"]["prompt"].as_str().unwrap_or("").chars().take(400).collect::<String>())),
-                "output" => Some(format!("[{}] {}", p["role"].as_str().unwrap_or("agent"), p["text"].as_str().unwrap_or("").chars().take(600).collect::<String>())),
-                "tool" => Some(format!("[tool] {} {}", p["name"].as_str().unwrap_or(""), p["summary"].as_str().unwrap_or("").chars().take(200).collect::<String>())),
-                "file_activity" => Some(format!("[edit] {}", p["paths"].as_array().map(|a| a.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(", ")).unwrap_or_default())),
-                "permission" => Some(format!("[waiting for permission] {}", p["tool"].as_str().unwrap_or(""))),
-                "error" => Some(format!("[error {}] {}", p["class"].as_str().unwrap_or(""), p["message"].as_str().unwrap_or("").chars().take(300).collect::<String>())),
-                "turn_done" => Some(format!("[turn {}]", if p["ok"] == true { "done" } else { "failed" })),
+                "turn_started" => Some(format!(
+                    "[{}] {}",
+                    if p["turn"]["prompt"]
+                        .as_str()
+                        .unwrap_or("")
+                        .starts_with(session::FROM_OVERSEER)
+                    {
+                        "overseer"
+                    } else {
+                        "owner"
+                    },
+                    p["turn"]["prompt"]
+                        .as_str()
+                        .unwrap_or("")
+                        .chars()
+                        .take(400)
+                        .collect::<String>()
+                )),
+                "output" => Some(format!(
+                    "[{}] {}",
+                    p["role"].as_str().unwrap_or("agent"),
+                    p["text"]
+                        .as_str()
+                        .unwrap_or("")
+                        .chars()
+                        .take(600)
+                        .collect::<String>()
+                )),
+                "tool" => Some(format!(
+                    "[tool] {} {}",
+                    p["name"].as_str().unwrap_or(""),
+                    p["summary"]
+                        .as_str()
+                        .unwrap_or("")
+                        .chars()
+                        .take(200)
+                        .collect::<String>()
+                )),
+                "file_activity" => Some(format!(
+                    "[edit] {}",
+                    p["paths"]
+                        .as_array()
+                        .map(|a| a
+                            .iter()
+                            .filter_map(|x| x.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", "))
+                        .unwrap_or_default()
+                )),
+                "permission" => Some(format!(
+                    "[waiting for permission] {}",
+                    p["tool"].as_str().unwrap_or("")
+                )),
+                "error" => Some(format!(
+                    "[error {}] {}",
+                    p["class"].as_str().unwrap_or(""),
+                    p["message"]
+                        .as_str()
+                        .unwrap_or("")
+                        .chars()
+                        .take(300)
+                        .collect::<String>()
+                )),
+                "turn_done" => Some(format!(
+                    "[turn {}]",
+                    if p["ok"] == true { "done" } else { "failed" }
+                )),
                 _ => None,
             };
             if let Some(l) = line {
@@ -283,17 +485,32 @@ impl Daemon {
         if lines.is_empty() {
             return Ok(format!("Nothing after {after}."));
         }
-        lines.push(format!("(last sequence {last}; call again with after={last} for more)"));
+        lines.push(format!(
+            "(last sequence {last}; call again with after={last} for more)"
+        ));
         Ok(lines.join("\n"))
     }
 
     /// A path inside a run's worktree: relative, no `..`, and not escaping through a symlink.
-    fn inside_worktree(&self, run_id: &str, path: &str) -> Result<(std::path::PathBuf, std::path::PathBuf)> {
+    fn inside_worktree(
+        &self,
+        run_id: &str,
+        path: &str,
+    ) -> Result<(std::path::PathBuf, std::path::PathBuf)> {
         let run = self.run(run_id)?;
         let ws = self.workspace(&run.workspace_id)?;
-        let root = std::fs::canonicalize(&ws.path).map_err(|_| anyhow::anyhow!("the worktree is gone"))?;
+        let root =
+            std::fs::canonicalize(&ws.path).map_err(|_| anyhow::anyhow!("the worktree is gone"))?;
         let rel = std::path::Path::new(path);
-        if path.is_empty() || rel.is_absolute() || rel.components().any(|c| matches!(c, std::path::Component::ParentDir | std::path::Component::Prefix(_))) {
+        if path.is_empty()
+            || rel.is_absolute()
+            || rel.components().any(|c| {
+                matches!(
+                    c,
+                    std::path::Component::ParentDir | std::path::Component::Prefix(_)
+                )
+            })
+        {
             bail!("{path:?} is not a path inside the worktree");
         }
         let full = root.join(rel);
@@ -327,12 +544,29 @@ impl Daemon {
         let task = self.task(&run.task_id)?;
         let base = {
             let store = self.store.lock().unwrap();
-            task.start_snapshot.as_deref().and_then(|id| store.snapshot(id).ok().flatten()).map(|s| s.commit_sha)
+            task.start_snapshot
+                .as_deref()
+                .and_then(|id| store.snapshot(id).ok().flatten())
+                .map(|s| s.commit_sha)
         }
         .or_else(|| crate::git::head(&root))
         .ok_or_else(|| anyhow::anyhow!("no base to diff against"))?;
         let trees = crate::git::capture_trees(&root, &crate::paths::data_dir().join("tmp"))?;
-        let diff = crate::git::git(&root, &["diff", "--no-color", &base, &trees.worktree_tree, "--", path])?;
-        Ok(if diff.is_empty() { format!("{path} is unchanged against the task's base.") } else { diff })
+        let diff = crate::git::git(
+            &root,
+            &[
+                "diff",
+                "--no-color",
+                &base,
+                &trees.worktree_tree,
+                "--",
+                path,
+            ],
+        )?;
+        Ok(if diff.is_empty() {
+            format!("{path} is unchanged against the task's base.")
+        } else {
+            diff
+        })
     }
 }

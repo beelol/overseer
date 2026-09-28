@@ -320,7 +320,9 @@ pub fn preview(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
 /// A cue Voice Mode plays (the heard signal, a permission answered by voice), under Audio Mode's
 /// rules: only while Audio Mode is on, through the same lanes and the arbiter (AC-172).
 pub fn cue(d: &Arc<Daemon>, key: &str) {
-    let Some(key) = KEYS.iter().copied().find(|k| *k == key) else { return };
+    let Some(key) = KEYS.iter().copied().find(|k| *k == key) else {
+        return;
+    };
     match selection(d) {
         Ok(selected) => {
             let _ = enqueue(key, false, selected);
@@ -394,7 +396,15 @@ pub fn start(d: Arc<Daemon>) -> Result<()> {
                 Track::System => 2500,
                 Track::Commander => 3000,
             };
-            match tokio::task::spawn_blocking(move || if cue.preview || crate::voice::before_cue(cue.key, cue_ms) { play(cue.key, &cue.selection) } else { Ok(()) }).await {
+            match tokio::task::spawn_blocking(move || {
+                if cue.preview || crate::voice::before_cue(cue.key, cue_ms) {
+                    play(cue.key, &cue.selection)
+                } else {
+                    Ok(())
+                }
+            })
+            .await
+            {
                 Ok(Ok(())) => {}
                 Ok(Err(e)) => crate::log(&format!("audio playback failed: {e}")),
                 Err(e) => crate::log(&format!("audio worker ended: {e}")),
@@ -416,8 +426,11 @@ pub fn start(d: Arc<Daemon>) -> Result<()> {
             }
             // Overseer needing the owner (a proposal that waits, a conflict that needs a decision)
             // is one attention cue under the same one-per-need gate (AC-199, AC-143).
-            let needs_owner = (event.kind == "proposal" && event.payload["state"].as_str().unwrap_or("open") == "open")
-                || (event.kind == "conflict" && event.payload["needs_decision"] == true && event.payload["changed"] != true);
+            let needs_owner = (event.kind == "proposal"
+                && event.payload["state"].as_str().unwrap_or("open") == "open")
+                || (event.kind == "conflict"
+                    && event.payload["needs_decision"] == true
+                    && event.payload["changed"] != true);
             if needs_owner {
                 if burst.allow("agent_needs_attention", Instant::now()) {
                     match selection(&d) {
@@ -772,7 +785,10 @@ mod tests {
         use sha2::{Digest, Sha256};
         let manifest: Value = serde_json::from_str(MANIFEST).unwrap();
         let cues = manifest.as_array().unwrap();
-        let listed: Vec<&str> = cues.iter().map(|cue| cue["key"].as_str().unwrap()).collect();
+        let listed: Vec<&str> = cues
+            .iter()
+            .map(|cue| cue["key"].as_str().unwrap())
+            .collect();
         assert_eq!(listed, KEYS, "one entry per key, in the daemon's order");
         let mut total = 0;
         for cue in cues {
@@ -791,7 +807,10 @@ mod tests {
                 DEFAULT_KEYS.contains(&key),
                 "{key}: only the three core cues play by themselves"
             );
-            assert!(cue.get("wav").is_none(), "{key}: no WAV is part of the pack");
+            assert!(
+                cue.get("wav").is_none(),
+                "{key}: no WAV is part of the pack"
+            );
         }
         assert_eq!(total, 31_488, "the owner-approved pack");
     }

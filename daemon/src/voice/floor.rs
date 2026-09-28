@@ -21,9 +21,15 @@ pub struct Barge {
 
 /// Words that open a command.
 const COMMAND_VERBS: &[&str] = &[
-    "tell", "ask", "stop", "start", "hold", "release", "redirect", "cancel", "pause", "resume", "mute", "unmute", "allow", "deny", "merge", "open", "pin", "show",
-    "switch", "talk", "go", "have", "make", "let", "send", "give", "check", "run", "fix", "add", "write", "remove", "wait", "undo", "overseer",
+    "tell", "ask", "stop", "start", "hold", "release", "redirect", "cancel", "pause", "resume",
+    "mute", "unmute", "allow", "deny", "merge", "open", "pin", "show", "switch", "talk", "go",
+    "have", "make", "let", "send", "give", "check", "run", "fix", "add", "write", "remove", "wait",
+    "undo", "overseer",
 ];
+
+pub fn is_command_verb(w: &str) -> bool {
+    COMMAND_VERBS.contains(&w)
+}
 
 /// Whether words read as meant for Overseer, with no model (AC-164): they name Overseer or an
 /// agent, lead with a stop word or a command, or answer a question Overseer asked.
@@ -44,15 +50,56 @@ pub fn addressed(text: &str, agent_names: &[String], awaiting_answer: bool) -> b
     if words.iter().any(|w| w == "overseer") {
         return true;
     }
-    if COMMAND_VERBS.contains(&words[0].as_str()) || (words.len() > 1 && words[0] == "please" && COMMAND_VERBS.contains(&words[1].as_str())) {
+    if COMMAND_VERBS.contains(&words[0].as_str())
+        || (words.len() > 1 && words[0] == "please" && COMMAND_VERBS.contains(&words[1].as_str()))
+    {
         return true;
     }
     if words.len() > 1 && words[0] == "hold" && words[1] == "on" {
         return true;
     }
+    // A question about the agents or their work.
+    const QUESTION: &[&str] = &[
+        "what", "whats", "who", "whos", "how", "hows", "is", "are", "did", "has", "have", "any",
+        "where", "which", "why", "when",
+    ];
+    const ABOUT_WORK: &[&str] = &[
+        "agent",
+        "agents",
+        "everyone",
+        "everybody",
+        "anyone",
+        "anybody",
+        "running",
+        "working",
+        "waiting",
+        "stuck",
+        "done",
+        "finished",
+        "build",
+        "tests",
+        "test",
+        "branch",
+        "review",
+        "merge",
+        "status",
+        "progress",
+    ];
+    if QUESTION.contains(&words[0].as_str())
+        && words.iter().any(|w| ABOUT_WORK.contains(&w.as_str()))
+    {
+        return true;
+    }
     agent_names.iter().any(|name| {
-        let n: Vec<String> = name.to_lowercase().split_whitespace().map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_string()).filter(|w| w.len() >= 3).collect();
-        !n.is_empty() && (n.iter().all(|x| words.contains(x)) || n.first().is_some_and(|x| x.len() >= 5 && words.contains(x)))
+        let n: Vec<String> = name
+            .to_lowercase()
+            .split_whitespace()
+            .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+            .filter(|w| w.len() >= 3)
+            .collect();
+        !n.is_empty()
+            && (n.iter().all(|x| words.contains(x))
+                || n.first().is_some_and(|x| x.len() >= 5 && words.contains(x)))
     })
 }
 
@@ -71,7 +118,15 @@ impl Voice {
             let (still, heard, awaiting) = {
                 let st = v.st.lock().unwrap();
                 let still = st.gate && st.barge.as_ref().is_some_and(|b| b.utterance == utterance);
-                (still, if st.heard.is_empty() { first.clone() } else { st.heard.clone() }, st.awaiting_answer)
+                (
+                    still,
+                    if st.heard.is_empty() {
+                        first.clone()
+                    } else {
+                        st.heard.clone()
+                    },
+                    st.awaiting_answer,
+                )
             };
             if still && addressed(&heard, &v.agent_names(), awaiting) {
                 v.send(json!({"cmd": "stop", "at": "phrase"}));
@@ -125,14 +180,28 @@ mod tests {
     #[test]
     fn meant_for_overseer() {
         let names = vec!["Phone app".to_string(), "Continuity".to_string()];
-        assert!(addressed("Overseer, what is everyone doing?", &names, false));
-        assert!(addressed("tell Continuity to use the new format", &names, false));
+        assert!(addressed(
+            "Overseer, what is everyone doing?",
+            &names,
+            false
+        ));
+        assert!(addressed(
+            "tell Continuity to use the new format",
+            &names,
+            false
+        ));
         assert!(addressed("the phone app should wait", &names, false));
         assert!(addressed("continuity is done?", &names, false));
         assert!(addressed("hold on", &names, false));
         assert!(!addressed("I'll grab lunch at noon", &names, false));
         assert!(!addressed("yeah that meeting went long", &names, false));
-        assert!(addressed("yes", &names, true), "an answer to Overseer's question");
+        assert!(addressed("what is everyone doing", &names, false));
+        assert!(addressed("is anyone stuck?", &names, false));
+        assert!(!addressed("what time is it", &names, false));
+        assert!(
+            addressed("yes", &names, true),
+            "an answer to Overseer's question"
+        );
         assert!(!addressed("", &names, true));
     }
 }

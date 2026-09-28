@@ -52,7 +52,11 @@ struct State {
     used_ms: i64,
 }
 
-static STATE: Mutex<State> = Mutex::new(State { installing: None, last_error: None, used_ms: 0 });
+static STATE: Mutex<State> = Mutex::new(State {
+    installing: None,
+    last_error: None,
+    used_ms: 0,
+});
 
 fn state() -> std::sync::MutexGuard<'static, State> {
     STATE.lock().unwrap_or_else(|e| e.into_inner())
@@ -67,7 +71,10 @@ pub fn brew() -> Option<PathBuf> {
     if let Ok(v) = std::env::var("OVERSEER_TEST_BREW") {
         return Some(PathBuf::from(v)).filter(|p| p.is_file());
     }
-    ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"].iter().map(PathBuf::from).find(|p| p.is_file())
+    ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
+        .iter()
+        .map(PathBuf::from)
+        .find(|p| p.is_file())
 }
 
 pub fn method() -> &'static str {
@@ -86,26 +93,48 @@ pub fn method() -> &'static str {
 /// `OVERSEER_TEST_OLLAMA_ARCHIVE` names a local file taken instead (tests).
 fn download(d: &Daemon, to: &Path) -> Result<u64> {
     if let Some(fixture) = std::env::var_os("OVERSEER_TEST_OLLAMA_ARCHIVE") {
-        let bytes = std::fs::copy(&fixture, to).map_err(|e| anyhow!("the archive {} could not be read: {e}", Path::new(&fixture).display()))?;
-        emit(d, "ollama_install", json!({"step": "downloading", "bytes": bytes, "total": bytes, "source": "fixture"}));
+        let bytes = std::fs::copy(&fixture, to).map_err(|e| {
+            anyhow!(
+                "the archive {} could not be read: {e}",
+                Path::new(&fixture).display()
+            )
+        })?;
+        emit(
+            d,
+            "ollama_install",
+            json!({"step": "downloading", "bytes": bytes, "total": bytes, "source": "fixture"}),
+        );
         return Ok(bytes);
     }
     let url = ARCHIVE_URL;
     if !url.starts_with("https://") {
         bail!("Ollama is only downloaded over HTTPS");
     }
-    let agent = ureq::AgentBuilder::new().timeout_connect(Duration::from_secs(15)).timeout_read(Duration::from_secs(60)).redirects(8).build();
-    let response = agent.get(url).call().map_err(|e| anyhow!("Ollama could not be downloaded from {url}: {e}"))?;
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(Duration::from_secs(15))
+        .timeout_read(Duration::from_secs(60))
+        .redirects(8)
+        .build();
+    let response = agent
+        .get(url)
+        .call()
+        .map_err(|e| anyhow!("Ollama could not be downloaded from {url}: {e}"))?;
     let landed = response.get_url().to_string();
     if !landed.starts_with("https://") {
         bail!("the download of Ollama was sent to {landed}, which is not HTTPS");
     }
-    let total: Option<u64> = response.header("content-length").and_then(|v| v.parse().ok());
+    let total: Option<u64> = response
+        .header("content-length")
+        .and_then(|v| v.parse().ok());
     let mut reader = response.into_reader();
     let mut file = std::fs::File::create(to)?;
     let (mut bytes, mut told) = (0u64, Instant::now());
     let mut buffer = vec![0u8; 1 << 16];
-    emit(d, "ollama_install", json!({"step": "downloading", "bytes": 0, "total": total, "source": url}));
+    emit(
+        d,
+        "ollama_install",
+        json!({"step": "downloading", "bytes": 0, "total": total, "source": url}),
+    );
     loop {
         let n = reader.read(&mut buffer)?;
         if n == 0 {
@@ -115,20 +144,41 @@ fn download(d: &Daemon, to: &Path) -> Result<u64> {
         bytes += n as u64;
         if told.elapsed() > Duration::from_secs(2) {
             told = Instant::now();
-            state().installing = Some(json!({"step": "downloading", "bytes": bytes, "total": total}));
-            emit(d, "ollama_install", json!({"step": "downloading", "bytes": bytes, "total": total}));
+            state().installing =
+                Some(json!({"step": "downloading", "bytes": bytes, "total": total}));
+            emit(
+                d,
+                "ollama_install",
+                json!({"step": "downloading", "bytes": bytes, "total": total}),
+            );
         }
     }
     file.flush()?;
     if total.is_some_and(|t| t != bytes) {
-        bail!("the download of Ollama ended early ({bytes} of {} bytes)", total.unwrap_or(0));
+        bail!(
+            "the download of Ollama ended early ({bytes} of {} bytes)",
+            total.unwrap_or(0)
+        );
     }
     Ok(bytes)
 }
 
 fn run(program: &str, args: &[&str]) -> Result<(bool, String)> {
-    let out = std::process::Command::new(program).args(args).stdin(std::process::Stdio::null()).output().map_err(|e| anyhow!("{program} could not be run: {e}"))?;
-    Ok((out.status.success(), format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr)).trim().to_string()))
+    let out = std::process::Command::new(program)
+        .args(args)
+        .stdin(std::process::Stdio::null())
+        .output()
+        .map_err(|e| anyhow!("{program} could not be run: {e}"))?;
+    Ok((
+        out.status.success(),
+        format!(
+            "{}{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        )
+        .trim()
+        .to_string(),
+    ))
 }
 
 /// The code signature of `app` must be intact, made with Ollama's Developer ID, and accepted by
@@ -138,27 +188,51 @@ pub fn verify(app: &Path) -> Result<Value> {
         bail!("the archive is for macOS");
     }
     let path = app.to_string_lossy().to_string();
-    let (intact, said) = run("/usr/bin/codesign", &["--verify", "--deep", "--strict", "--verbose=2", &path])?;
+    let (intact, said) = run(
+        "/usr/bin/codesign",
+        &["--verify", "--deep", "--strict", "--verbose=2", &path],
+    )?;
     if !intact {
         bail!("its code signature does not verify ({})", last_line(&said));
     }
     // Apple's own form of "signed with a Developer ID of this team".
     let requirement = format!("=anchor apple generic and certificate leaf[subject.OU] = \"{TEAM_ID}\" and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists");
-    let (ours, said) = run("/usr/bin/codesign", &["--verify", "--deep", "--strict", "-R", &requirement, &path])?;
+    let (ours, said) = run(
+        "/usr/bin/codesign",
+        &["--verify", "--deep", "--strict", "-R", &requirement, &path],
+    )?;
     if !ours {
-        bail!("it is not signed with Ollama's Developer ID, team {TEAM_ID} ({})", last_line(&said));
+        bail!(
+            "it is not signed with Ollama's Developer ID, team {TEAM_ID} ({})",
+            last_line(&said)
+        );
     }
     let (_, described) = run("/usr/bin/codesign", &["-dv", "--verbose=2", &path])?;
-    let field = |name: &str| described.lines().find_map(|l| l.strip_prefix(name)).map(str::to_string);
-    let (accepted, assessed) = run("/usr/sbin/spctl", &["--assess", "--type", "execute", "-vv", &path])?;
+    let field = |name: &str| {
+        described
+            .lines()
+            .find_map(|l| l.strip_prefix(name))
+            .map(str::to_string)
+    };
+    let (accepted, assessed) = run(
+        "/usr/sbin/spctl",
+        &["--assess", "--type", "execute", "-vv", &path],
+    )?;
     if !accepted {
         bail!("Gatekeeper does not accept it ({})", last_line(&assessed));
     }
-    Ok(json!({"authority": field("Authority="), "team": field("TeamIdentifier="), "identifier": field("Identifier="), "gatekeeper": assessed.lines().find_map(|l| l.strip_prefix("source=")).unwrap_or("accepted")}))
+    Ok(
+        json!({"authority": field("Authority="), "team": field("TeamIdentifier="), "identifier": field("Identifier="), "gatekeeper": assessed.lines().find_map(|l| l.strip_prefix("source=")).unwrap_or("accepted")}),
+    )
 }
 
 fn last_line(text: &str) -> String {
-    text.lines().last().unwrap_or("no reason given").chars().take(200).collect()
+    text.lines()
+        .last()
+        .unwrap_or("no reason given")
+        .chars()
+        .take(200)
+        .collect()
 }
 
 /// Downloads, unpacks, verifies and only then keeps the application, in Overseer's own folder.
@@ -175,20 +249,38 @@ fn install_archive(d: &Daemon) -> Result<Value> {
     let result = (|| -> Result<Value> {
         let bytes = download(d, &archive)?;
         state().installing = Some(json!({"step": "verifying"}));
-        emit(d, "ollama_install", json!({"step": "verifying", "bytes": bytes}));
+        emit(
+            d,
+            "ollama_install",
+            json!({"step": "verifying", "bytes": bytes}),
+        );
         std::fs::create_dir_all(&staging)?;
-        let (unpacked, said) = run("/usr/bin/ditto", &["-x", "-k", &archive.to_string_lossy(), &staging.to_string_lossy()])?;
+        let (unpacked, said) = run(
+            "/usr/bin/ditto",
+            &[
+                "-x",
+                "-k",
+                &archive.to_string_lossy(),
+                &staging.to_string_lossy(),
+            ],
+        )?;
         let app = staging.join("Ollama.app");
         if !unpacked || !app.is_dir() {
-            bail!("the download is not an archive of Ollama.app ({})", last_line(&said));
+            bail!(
+                "the download is not an archive of Ollama.app ({})",
+                last_line(&said)
+            );
         }
-        let signature = verify(&app).map_err(|e| anyhow!("the downloaded Ollama was not opened: {e}"))?;
+        let signature =
+            verify(&app).map_err(|e| anyhow!("the downloaded Ollama was not opened: {e}"))?;
         if !app.join("Contents/Resources/ollama").is_file() {
             bail!("the downloaded Ollama has no `ollama` program inside");
         }
         let _ = std::fs::remove_dir_all(own_app());
         std::fs::rename(&app, own_app())?;
-        Ok(json!({"method": "archive", "bytes": bytes, "signature": signature, "program": own_program()}))
+        Ok(
+            json!({"method": "archive", "bytes": bytes, "signature": signature, "program": own_program()}),
+        )
     })();
     // Whatever happened, the download and the staging folder do not stay.
     clean(&archive, &staging);
@@ -196,13 +288,27 @@ fn install_archive(d: &Daemon) -> Result<Value> {
 }
 
 fn install_homebrew(d: &Daemon, brew: &Path) -> Result<Value> {
-    emit(d, "ollama_install", json!({"step": "homebrew", "command": "brew install --cask ollama"}));
+    emit(
+        d,
+        "ollama_install",
+        json!({"step": "homebrew", "command": "brew install --cask ollama"}),
+    );
     state().installing = Some(json!({"step": "homebrew"}));
-    let out = std::process::Command::new(brew).args(["install", "--cask", "ollama"]).env("HOMEBREW_NO_AUTO_UPDATE", "1").env("HOMEBREW_NO_ENV_HINTS", "1").stdin(std::process::Stdio::null()).output()?;
+    let out = std::process::Command::new(brew)
+        .args(["install", "--cask", "ollama"])
+        .env("HOMEBREW_NO_AUTO_UPDATE", "1")
+        .env("HOMEBREW_NO_ENV_HINTS", "1")
+        .stdin(std::process::Stdio::null())
+        .output()?;
     if !out.status.success() {
-        bail!("Homebrew did not install Ollama: {}", last_line(&String::from_utf8_lossy(&out.stderr)));
+        bail!(
+            "Homebrew did not install Ollama: {}",
+            last_line(&String::from_utf8_lossy(&out.stderr))
+        );
     }
-    let program = local::ollama_program().ok_or_else(|| anyhow!("Homebrew reported success, but Ollama is not where it is expected"))?;
+    let program = local::ollama_program().ok_or_else(|| {
+        anyhow!("Homebrew reported success, but Ollama is not where it is expected")
+    })?;
     Ok(json!({"method": "homebrew", "program": program}))
 }
 
@@ -230,7 +336,11 @@ pub fn install(d: &Daemon) -> Result<Value> {
         s.last_error = None;
     }
     let method = method();
-    emit(d, "ollama_install", json!({"step": "starting", "method": method}));
+    emit(
+        d,
+        "ollama_install",
+        json!({"step": "starting", "method": method}),
+    );
     let result = match brew() {
         Some(b) => install_homebrew(d, &b),
         None => install_archive(d),
@@ -240,14 +350,22 @@ pub fn install(d: &Daemon) -> Result<Value> {
     match result {
         Ok(v) => {
             drop(s);
-            emit(d, "ollama_install", json!({"step": "installed", "detail": v}));
+            emit(
+                d,
+                "ollama_install",
+                json!({"step": "installed", "detail": v}),
+            );
             crate::log(&format!("continuity: Ollama installed ({method})"));
             Ok(json!({"installed": true, "already": false, "detail": v}))
         }
         Err(e) => {
             s.last_error = Some(e.to_string());
             drop(s);
-            emit(d, "ollama_install", json!({"step": "failed", "method": method, "reason": e.to_string()}));
+            emit(
+                d,
+                "ollama_install",
+                json!({"step": "failed", "method": method, "reason": e.to_string()}),
+            );
             crate::log(&format!("continuity: Ollama was not installed: {e}"));
             Err(e)
         }
@@ -267,7 +385,9 @@ pub fn own_server(d: &Daemon) -> Option<Value> {
 }
 
 fn host() -> Result<String> {
-    Ok(local::ollama_url()?.trim_start_matches("http://").to_string())
+    Ok(local::ollama_url()?
+        .trim_start_matches("http://")
+        .to_string())
 }
 
 /// Starts `ollama serve` on the loopback address, unless something answers there already.
@@ -281,15 +401,25 @@ pub fn start(d: &Daemon) -> Result<Value> {
     let program = local::ollama_program().ok_or_else(|| anyhow!("Ollama is not installed"))?;
     let host = host()?;
     paths::ensure_private_dir(&own_dir())?;
-    let log = std::fs::OpenOptions::new().create(true).append(true).open(own_dir().join("serve.log"))?;
+    let log = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(own_dir().join("serve.log"))?;
     let mut command = std::process::Command::new(&program);
-    command.arg("serve").env("OLLAMA_HOST", &host).stdin(std::process::Stdio::null()).stdout(log.try_clone()?).stderr(log);
+    command
+        .arg("serve")
+        .env("OLLAMA_HOST", &host)
+        .stdin(std::process::Stdio::null())
+        .stdout(log.try_clone()?)
+        .stderr(log);
     {
         // Its own process group: a signal meant for the daemon is not one for the server.
         use std::os::unix::process::CommandExt;
         command.process_group(0);
     }
-    let mut child = command.spawn().map_err(|e| anyhow!("{} could not be started: {e}", program.display()))?;
+    let mut child = command
+        .spawn()
+        .map_err(|e| anyhow!("{} could not be started: {e}", program.display()))?;
     let pid = child.id();
     std::thread::spawn(move || {
         let _ = child.wait();
@@ -301,20 +431,36 @@ pub fn start(d: &Daemon) -> Result<Value> {
     // A first start answers late: Ollama looks for the machine's GPUs before it serves (19 s, live).
     while began.elapsed() < Duration::from_secs(90) {
         if local::get("/api/version", 1).is_ok() {
-            emit(d, "ollama_server", json!({"action": "started", "pid": pid, "program": program, "host": host, "after_ms": began.elapsed().as_millis() as u64}));
-            crate::log(&format!("continuity: started ollama serve on {host} (pid {pid})"));
-            return Ok(json!({"running": true, "started": true, "ours": true, "pid": pid, "host": host}));
+            emit(
+                d,
+                "ollama_server",
+                json!({"action": "started", "pid": pid, "program": program, "host": host, "after_ms": began.elapsed().as_millis() as u64}),
+            );
+            crate::log(&format!(
+                "continuity: started ollama serve on {host} (pid {pid})"
+            ));
+            return Ok(
+                json!({"running": true, "started": true, "ours": true, "pid": pid, "host": host}),
+            );
         }
         std::thread::sleep(Duration::from_millis(200));
     }
     let _ = stop(d, "it did not answer");
-    bail!("Ollama was started but did not answer on {host} within 90 s (see {})", own_dir().join("serve.log").display())
+    bail!(
+        "Ollama was started but did not answer on {host} within 90 s (see {})",
+        own_dir().join("serve.log").display()
+    )
 }
 
 /// Stops the server Overseer started. An Ollama that Overseer did not start is never touched.
 pub fn stop(d: &Daemon, why: &str) -> Result<bool> {
     let Some(server) = own_server(d) else {
-        let _ = d.store.lock().unwrap().conn.execute("DELETE FROM meta WHERE key=?1", [SERVER_KEY]);
+        let _ = d
+            .store
+            .lock()
+            .unwrap()
+            .conn
+            .execute("DELETE FROM meta WHERE key=?1", [SERVER_KEY]);
         return Ok(false);
     };
     let pid = server["pid"].as_i64().unwrap_or(0) as libc::pid_t;
@@ -326,21 +472,44 @@ pub fn stop(d: &Daemon, why: &str) -> Result<bool> {
     if unsafe { libc::kill(pid, 0) } == 0 {
         unsafe { libc::kill(pid, libc::SIGKILL) };
     }
-    d.store.lock().unwrap().conn.execute("DELETE FROM meta WHERE key=?1", [SERVER_KEY])?;
-    emit(d, "ollama_server", json!({"action": "stopped", "pid": pid, "why": why}));
-    crate::log(&format!("continuity: stopped ollama serve (pid {pid}): {why}"));
+    d.store
+        .lock()
+        .unwrap()
+        .conn
+        .execute("DELETE FROM meta WHERE key=?1", [SERVER_KEY])?;
+    emit(
+        d,
+        "ollama_server",
+        json!({"action": "stopped", "pid": pid, "why": why}),
+    );
+    crate::log(&format!(
+        "continuity: stopped ollama serve (pid {pid}): {why}"
+    ));
     Ok(true)
 }
 
 fn idle_ms() -> i64 {
-    std::env::var("OVERSEER_TEST_OLLAMA_IDLE_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(continuity::settings().ollama_idle_minutes as i64 * 60_000)
+    std::env::var("OVERSEER_TEST_OLLAMA_IDLE_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(continuity::settings().ollama_idle_minutes as i64 * 60_000)
 }
 
 /// Called at every check of the connection: the server Overseer started is stopped when no
 /// local work has needed it for the idle time.
 pub fn maintain(d: &Daemon) {
     let Some(server) = own_server(d) else { return };
-    let working = d.store.lock().unwrap().runs().map(|runs| runs.iter().any(|r| continuity::is_local(r) && crate::daemon::ACTIVE.contains(&r.status.as_str()))).unwrap_or(false);
+    let working = d
+        .store
+        .lock()
+        .unwrap()
+        .runs()
+        .map(|runs| {
+            runs.iter().any(|r| {
+                continuity::is_local(r) && crate::daemon::ACTIVE.contains(&r.status.as_str())
+            })
+        })
+        .unwrap_or(false);
     let mut s = state();
     if s.used_ms == 0 {
         s.used_ms = server["started_ms"].as_i64().unwrap_or_else(now);
@@ -372,7 +541,10 @@ pub fn ensure_running(d: &Arc<Daemon>) -> Result<()> {
         return start(d).map(|_| ());
     }
     if let Some(step) = state().installing.clone() {
-        bail!("Ollama is being installed ({}); the work goes on when it is ready", step["step"].as_str().unwrap_or("working"));
+        bail!(
+            "Ollama is being installed ({}); the work goes on when it is ready",
+            step["step"].as_str().unwrap_or("working")
+        );
     }
     if continuity::status().is_some_and(|s| s.state == Conn::Offline) {
         bail!("Ollama is not installed, and installing it needs a connection");
@@ -402,7 +574,10 @@ pub fn status(d: &Daemon) -> Value {
 }
 
 pub fn handles(method: &str) -> bool {
-    matches!(method, "ollama.status" | "ollama.install" | "ollama.start" | "ollama.stop")
+    matches!(
+        method,
+        "ollama.status" | "ollama.install" | "ollama.start" | "ollama.stop"
+    )
 }
 
 pub fn dispatch(d: &Arc<Daemon>, method: &str, _p: &Value) -> Result<Value> {
@@ -410,7 +585,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, _p: &Value) -> Result<Value> {
         "ollama.status" => status(d),
         "ollama.install" => install(d)?,
         "ollama.start" => start(d)?,
-        "ollama.stop" => json!({"stopped": stop(d, "asked by the user")?, "note": "only a server Overseer started is ever stopped"}),
+        "ollama.stop" => {
+            json!({"stopped": stop(d, "asked by the user")?, "note": "only a server Overseer started is ever stopped"})
+        }
         other => bail!("unknown method {other}"),
     })
 }
@@ -426,17 +603,29 @@ mod tests {
         let app = dir.path().join("Ollama.app");
         std::fs::create_dir_all(app.join("Contents/MacOS")).unwrap();
         std::fs::write(app.join("Contents/Info.plist"), "<?xml version=\"1.0\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>com.electron.ollama</string><key>CFBundleExecutable</key><string>Ollama</string></dict></plist>").unwrap();
-        std::fs::write(app.join("Contents/MacOS/Ollama"), "#!/bin/sh\necho not ollama\n").unwrap();
+        std::fs::write(
+            app.join("Contents/MacOS/Ollama"),
+            "#!/bin/sh\necho not ollama\n",
+        )
+        .unwrap();
         let refused = verify(&app).unwrap_err().to_string();
-        assert!(refused.starts_with("its code signature does not verify"), "{refused}");
+        assert!(
+            refused.starts_with("its code signature does not verify"),
+            "{refused}"
+        );
     }
 
     #[cfg(target_os = "macos")]
     #[test]
     fn a_program_signed_by_someone_else_is_refused() {
         // Signed by Apple, intact, and not Ollama's.
-        let refused = verify(Path::new("/System/Applications/Calculator.app")).unwrap_err().to_string();
-        assert!(refused.starts_with("it is not signed with Ollama's Developer ID"), "{refused}");
+        let refused = verify(Path::new("/System/Applications/Calculator.app"))
+            .unwrap_err()
+            .to_string();
+        assert!(
+            refused.starts_with("it is not signed with Ollama's Developer ID"),
+            "{refused}"
+        );
     }
 
     #[test]

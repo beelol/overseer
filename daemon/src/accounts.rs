@@ -42,8 +42,14 @@ pub fn providers() -> Value {
 }
 
 fn follows(p: &Profile) -> Option<&'static str> {
-    if !p.is_system { return None; }
-    Some(match p.harness.as_str() { "codex" => "the ChatGPT / Codex app login (~/.codex)", "claude" => "the Claude app login (~/.claude)", _ => "OpenCode's own configuration" })
+    if !p.is_system {
+        return None;
+    }
+    Some(match p.harness.as_str() {
+        "codex" => "the ChatGPT / Codex app login (~/.codex)",
+        "claude" => "the Claude app login (~/.claude)",
+        _ => "OpenCode's own configuration",
+    })
 }
 
 impl Daemon {
@@ -62,7 +68,9 @@ impl Daemon {
     }
 
     pub fn account_create(&self, provider: &str, name: &str) -> Result<Value> {
-        let harness = harness_for(provider).ok_or_else(|| anyhow!("{provider} has no account login Overseer can use (no API keys)"))?;
+        let harness = harness_for(provider).ok_or_else(|| {
+            anyhow!("{provider} has no account login Overseer can use (no API keys)")
+        })?;
         let profile = self.create_profile(name, harness)?;
         Ok(json!({"account": profile, "provider": provider}))
     }
@@ -73,11 +81,20 @@ impl Daemon {
         if profile.is_system {
             bail!("{} follows the desktop app's login; Overseer never removes or signs out desktop logins", profile.name);
         }
-        let busy = self.store.lock().unwrap().runs()?.into_iter().any(|r| r.profile_id.as_deref() == Some(id) && ACTIVE.contains(&r.status.as_str()));
+        let busy =
+            self.store.lock().unwrap().runs()?.into_iter().any(|r| {
+                r.profile_id.as_deref() == Some(id) && ACTIVE.contains(&r.status.as_str())
+            });
         if busy {
-            bail!("{} has active runs; stop them before removing the account", profile.name);
+            bail!(
+                "{} has active runs; stop them before removing the account",
+                profile.name
+            );
         }
-        let home = profile.home.clone().ok_or_else(|| anyhow!("account has no folder"))?;
+        let home = profile
+            .home
+            .clone()
+            .ok_or_else(|| anyhow!("account has no folder"))?;
         let home = std::path::PathBuf::from(home);
         let root = std::fs::canonicalize(paths::profiles_dir())?;
         let canon = std::fs::canonicalize(&home).unwrap_or(home.clone());
@@ -86,7 +103,14 @@ impl Daemon {
         }
         std::fs::remove_dir_all(&canon)?;
         self.store.lock().unwrap().delete_profile(id)?;
-        self.emit(None, None, "profile", "user", "exact", json!({"profile_id": id, "action": "removed", "at": now()}))?;
+        self.emit(
+            None,
+            None,
+            "profile",
+            "user",
+            "exact",
+            json!({"profile_id": id, "action": "removed", "at": now()}),
+        )?;
         Ok(json!({"removed": id}))
     }
 }

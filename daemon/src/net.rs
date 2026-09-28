@@ -42,9 +42,18 @@ pub struct Probe {
 impl Probe {
     fn fixture(v: &Value) -> Self {
         match v {
-            Value::Bool(true) => Self { ok: true, reason: "answered (fixture)".into() },
-            Value::String(reason) => Self { ok: false, reason: reason.clone() },
-            _ => Self { ok: false, reason: "connect".into() },
+            Value::Bool(true) => Self {
+                ok: true,
+                reason: "answered (fixture)".into(),
+            },
+            Value::String(reason) => Self {
+                ok: false,
+                reason: reason.clone(),
+            },
+            _ => Self {
+                ok: false,
+                reason: "connect".into(),
+            },
         }
     }
 }
@@ -85,7 +94,16 @@ pub struct Reading {
 }
 
 /// The hosts each provider's harness talks to. A provider is reachable when all of them answer.
-pub const PROVIDERS: &[(&str, &[&str])] = &[("openai", &["https://chatgpt.com/", "https://api.openai.com/"]), ("anthropic", &["https://api.anthropic.com/", "https://claude.ai/"])];
+pub const PROVIDERS: &[(&str, &[&str])] = &[
+    (
+        "openai",
+        &["https://chatgpt.com/", "https://api.openai.com/"],
+    ),
+    (
+        "anthropic",
+        &["https://api.anthropic.com/", "https://claude.ai/"],
+    ),
+];
 const BASELINE_NAME: &str = "https://www.google.com/generate_204";
 const BASELINE_IP: &str = "https://1.1.1.1/";
 
@@ -97,69 +115,149 @@ const BASELINE_IP: &str = "https://1.1.1.1/";
 pub fn read(probes: bool) -> Reading {
     let system = system();
     if !probes || system.state == SystemNet::NoNetwork {
-        return Reading { system, baseline: None, providers: BTreeMap::new() };
+        return Reading {
+            system,
+            baseline: None,
+            providers: BTreeMap::new(),
+        };
     }
     let (baseline, providers) = probe_round();
-    Reading { system, baseline, providers }
+    Reading {
+        system,
+        baseline,
+        providers,
+    }
 }
 
 fn fixture_file() -> Option<Value> {
     let path = std::env::var_os("OVERSEER_TEST_NET")?;
-    Some(std::fs::read_to_string(path).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or(Value::Null))
+    Some(
+        std::fs::read_to_string(path)
+            .ok()
+            .and_then(|t| serde_json::from_str(&t).ok())
+            .unwrap_or(Value::Null),
+    )
 }
 
 /// The baseline and every provider, probed in parallel.
 pub fn probe_round() -> (Option<Baseline>, BTreeMap<String, Probe>) {
     if let Some(v) = fixture_file() {
-        let baseline = v["baseline"].is_object().then(|| Baseline { by_name: Probe::fixture(&v["baseline"]["by_name"]), by_ip: Probe::fixture(&v["baseline"]["by_ip"]) });
-        let providers = v["providers"].as_object().map(|m| m.iter().map(|(k, p)| (k.clone(), Probe::fixture(p))).collect()).unwrap_or_default();
+        let baseline = v["baseline"].is_object().then(|| Baseline {
+            by_name: Probe::fixture(&v["baseline"]["by_name"]),
+            by_ip: Probe::fixture(&v["baseline"]["by_ip"]),
+        });
+        let providers = v["providers"]
+            .as_object()
+            .map(|m| {
+                m.iter()
+                    .map(|(k, p)| (k.clone(), Probe::fixture(p)))
+                    .collect()
+            })
+            .unwrap_or_default();
         return (baseline, providers);
     }
-    let mut urls: Vec<(String, &str)> = vec![("baseline:name".into(), BASELINE_NAME), ("baseline:ip".into(), BASELINE_IP)];
+    let mut urls: Vec<(String, &str)> = vec![
+        ("baseline:name".into(), BASELINE_NAME),
+        ("baseline:ip".into(), BASELINE_IP),
+    ];
     for (id, hosts) in PROVIDERS {
         for host in *hosts {
             urls.push((id.to_string(), host));
         }
     }
     let results: Vec<(String, Probe)> = std::thread::scope(|s| {
-        let handles: Vec<_> = urls.iter().map(|(key, url)| s.spawn(move || (key.clone(), probe(url)))).collect();
+        let handles: Vec<_> = urls
+            .iter()
+            .map(|(key, url)| s.spawn(move || (key.clone(), probe(url))))
+            .collect();
         handles.into_iter().filter_map(|h| h.join().ok()).collect()
     });
-    let find = |key: &str| results.iter().find(|(k, _)| k == key).map(|(_, p)| p.clone()).unwrap_or(Probe { ok: false, reason: "other".into() });
+    let find = |key: &str| {
+        results
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, p)| p.clone())
+            .unwrap_or(Probe {
+                ok: false,
+                reason: "other".into(),
+            })
+    };
     let mut providers = BTreeMap::new();
     for (id, _) in PROVIDERS {
         // All of a provider's hosts must answer; the first failure is the reason.
-        let all: Vec<&Probe> = results.iter().filter(|(k, _)| k == id).map(|(_, p)| p).collect();
-        let probe = all.iter().find(|p| !p.ok).map(|p| (*p).clone()).unwrap_or_else(|| all.first().map(|p| (*p).clone()).unwrap_or(Probe { ok: false, reason: "other".into() }));
+        let all: Vec<&Probe> = results
+            .iter()
+            .filter(|(k, _)| k == id)
+            .map(|(_, p)| p)
+            .collect();
+        let probe = all
+            .iter()
+            .find(|p| !p.ok)
+            .map(|p| (*p).clone())
+            .unwrap_or_else(|| {
+                all.first().map(|p| (*p).clone()).unwrap_or(Probe {
+                    ok: false,
+                    reason: "other".into(),
+                })
+            });
         providers.insert(id.to_string(), probe);
     }
-    (Some(Baseline { by_name: find("baseline:name"), by_ip: find("baseline:ip") }), providers)
+    (
+        Some(Baseline {
+            by_name: find("baseline:name"),
+            by_ip: find("baseline:ip"),
+        }),
+        providers,
+    )
 }
 
 /// A credential-free `HEAD`: no cookies, no authorization, no body. Redirects are not followed.
 pub fn probe(url: &str) -> Probe {
-    let agent = ureq::AgentBuilder::new().timeout_connect(Duration::from_secs(3)).timeout(Duration::from_secs(5)).redirects(0).user_agent("overseerd-probe").build();
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(Duration::from_secs(3))
+        .timeout(Duration::from_secs(5))
+        .redirects(0)
+        .user_agent("overseerd-probe")
+        .build();
     match agent.head(url).call() {
         Ok(r) => answered(r.status()),
         Err(ureq::Error::Status(code, _)) => answered(code),
-        Err(ureq::Error::Transport(t)) => Probe { ok: false, reason: classify_transport(t.kind(), &t.to_string()).into() },
+        Err(ureq::Error::Transport(t)) => Probe {
+            ok: false,
+            reason: classify_transport(t.kind(), &t.to_string()).into(),
+        },
     }
 }
 
 fn answered(status: u16) -> Probe {
-    Probe { ok: true, reason: format!("answered {status}") }
+    Probe {
+        ok: true,
+        reason: format!("answered {status}"),
+    }
 }
 
 /// The failure class of a transport error, from its kind and its text.
 pub fn classify_transport(kind: ureq::ErrorKind, text: &str) -> &'static str {
     let t = text.to_ascii_lowercase();
-    if t.contains("certificate") || t.contains("tls") || t.contains("handshake") || t.contains("unknownissuer") {
+    if t.contains("certificate")
+        || t.contains("tls")
+        || t.contains("handshake")
+        || t.contains("unknownissuer")
+    {
         "tls"
-    } else if kind == ureq::ErrorKind::Dns || t.contains("dns") || t.contains("failed to lookup") || t.contains("nodename nor servname") {
+    } else if kind == ureq::ErrorKind::Dns
+        || t.contains("dns")
+        || t.contains("failed to lookup")
+        || t.contains("nodename nor servname")
+    {
         "dns"
     } else if t.contains("timed out") || t.contains("timeout") {
         "timeout"
-    } else if kind == ureq::ErrorKind::ConnectionFailed || t.contains("connection refused") || t.contains("unreachable") || t.contains("network is down") {
+    } else if kind == ureq::ErrorKind::ConnectionFailed
+        || t.contains("connection refused")
+        || t.contains("unreachable")
+        || t.contains("network is down")
+    {
         "connect"
     } else {
         "other"
@@ -174,7 +272,10 @@ pub fn system() -> SystemAnswer {
             Some("none") => SystemNet::NoNetwork,
             _ => SystemNet::Unknown,
         };
-        return SystemAnswer { state, detail: format!("fixture: {}", v["system"].as_str().unwrap_or("unknown")) };
+        return SystemAnswer {
+            state,
+            detail: format!("fixture: {}", v["system"].as_str().unwrap_or("unknown")),
+        };
     }
     platform::system()
 }
@@ -186,7 +287,10 @@ mod platform {
 
     #[link(name = "SystemConfiguration", kind = "framework")]
     extern "C" {
-        fn SCNetworkReachabilityCreateWithAddress(allocator: *const c_void, address: *const libc::sockaddr) -> *const c_void;
+        fn SCNetworkReachabilityCreateWithAddress(
+            allocator: *const c_void,
+            address: *const libc::sockaddr,
+        ) -> *const c_void;
         fn SCNetworkReachabilityGetFlags(target: *const c_void, flags: *mut u32) -> u8;
     }
     #[link(name = "CoreFoundation", kind = "framework")]
@@ -219,7 +323,8 @@ mod platform {
         if flags & CONNECTION_REQUIRED == 0 {
             return true;
         }
-        flags & (CONNECTION_ON_TRAFFIC | CONNECTION_ON_DEMAND) != 0 && flags & INTERVENTION_REQUIRED == 0
+        flags & (CONNECTION_ON_TRAFFIC | CONNECTION_ON_DEMAND) != 0
+            && flags & INTERVENTION_REQUIRED == 0
     }
 
     /// Reachability of the default route, for IPv4 and IPv6 (the zero address of each family).
@@ -232,7 +337,11 @@ mod platform {
         v6.sin6_family = libc::AF_INET6 as u8;
         let f4 = flags_for(&v4 as *const _ as *const libc::sockaddr);
         let f6 = flags_for(&v6 as *const _ as *const libc::sockaddr);
-        let detail = format!("SystemConfiguration reachability: IPv4 {}, IPv6 {}", describe(f4), describe(f6));
+        let detail = format!(
+            "SystemConfiguration reachability: IPv4 {}, IPv6 {}",
+            describe(f4),
+            describe(f6)
+        );
         let state = match (f4, f6) {
             (None, None) => SystemNet::Unknown,
             (a, b) if a.is_some_and(connected) || b.is_some_and(connected) => SystemNet::Connected,
@@ -244,7 +353,14 @@ mod platform {
     fn describe(flags: Option<u32>) -> String {
         match flags {
             None => "unknown".into(),
-            Some(f) => format!("{} (flags 0x{f:08x})", if connected(f) { "reachable" } else { "not reachable" }),
+            Some(f) => format!(
+                "{} (flags 0x{f:08x})",
+                if connected(f) {
+                    "reachable"
+                } else {
+                    "not reachable"
+                }
+            ),
         }
     }
 }
@@ -254,17 +370,38 @@ mod platform {
     use super::{SystemAnswer, SystemNet};
 
     pub fn system() -> SystemAnswer {
-        if let Ok(out) = std::process::Command::new("nmcli").args(["-t", "-f", "CONNECTIVITY", "general"]).output() {
+        if let Ok(out) = std::process::Command::new("nmcli")
+            .args(["-t", "-f", "CONNECTIVITY", "general"])
+            .output()
+        {
             if out.status.success() {
                 let word = String::from_utf8_lossy(&out.stdout).trim().to_string();
                 if let Some(state) = super::parse_nmcli(&word) {
-                    return SystemAnswer { state, detail: format!("NetworkManager connectivity: {word}") };
+                    return SystemAnswer {
+                        state,
+                        detail: format!("NetworkManager connectivity: {word}"),
+                    };
                 }
             }
         }
-        let v4 = std::fs::read_to_string("/proc/net/route").map(|t| super::has_default_route(&t)).unwrap_or(false);
-        let v6 = std::fs::read_to_string("/proc/net/ipv6_route").map(|t| super::has_default_route_v6(&t)).unwrap_or(false);
-        SystemAnswer { state: if v4 || v6 { SystemNet::Connected } else { SystemNet::NoNetwork }, detail: format!("default route: IPv4 {}, IPv6 {}", if v4 { "yes" } else { "no" }, if v6 { "yes" } else { "no" }) }
+        let v4 = std::fs::read_to_string("/proc/net/route")
+            .map(|t| super::has_default_route(&t))
+            .unwrap_or(false);
+        let v6 = std::fs::read_to_string("/proc/net/ipv6_route")
+            .map(|t| super::has_default_route_v6(&t))
+            .unwrap_or(false);
+        SystemAnswer {
+            state: if v4 || v6 {
+                SystemNet::Connected
+            } else {
+                SystemNet::NoNetwork
+            },
+            detail: format!(
+                "default route: IPv4 {}, IPv6 {}",
+                if v4 { "yes" } else { "no" },
+                if v6 { "yes" } else { "no" }
+            ),
+        }
     }
 }
 
@@ -272,7 +409,10 @@ mod platform {
 mod platform {
     use super::{SystemAnswer, SystemNet};
     pub fn system() -> SystemAnswer {
-        SystemAnswer { state: SystemNet::Unknown, detail: "the system cannot be asked on this platform yet".into() }
+        SystemAnswer {
+            state: SystemNet::Unknown,
+            detail: "the system cannot be asked on this platform yet".into(),
+        }
     }
 }
 
@@ -292,7 +432,10 @@ pub fn parse_nmcli(word: &str) -> Option<SystemNet> {
 pub fn has_default_route(table: &str) -> bool {
     table.lines().skip(1).any(|l| {
         let f: Vec<&str> = l.split_whitespace().collect();
-        f.len() > 7 && f[1] == "00000000" && f[7] == "00000000" && u32::from_str_radix(f[3], 16).is_ok_and(|flags| flags & 0x1 != 0)
+        f.len() > 7
+            && f[1] == "00000000"
+            && f[7] == "00000000"
+            && u32::from_str_radix(f[3], 16).is_ok_and(|flags| flags & 0x1 != 0)
     })
 }
 
@@ -314,19 +457,56 @@ mod tests {
     fn transport_errors_are_classified() {
         use ureq::ErrorKind::*;
         assert_eq!(classify_transport(Dns, "Dns Failed: resolve dns name 'chatgpt.com:443': failed to lookup address information"), "dns");
-        assert_eq!(classify_transport(ConnectionFailed, "Connection Failed: Connect error: Connection refused (os error 61)"), "connect");
+        assert_eq!(
+            classify_transport(
+                ConnectionFailed,
+                "Connection Failed: Connect error: Connection refused (os error 61)"
+            ),
+            "connect"
+        );
         assert_eq!(classify_transport(ConnectionFailed, "Connection Failed: tls connection init failed: invalid peer certificate: UnknownIssuer"), "tls");
-        assert_eq!(classify_transport(Io, "Network Error: timed out reading response"), "timeout");
+        assert_eq!(
+            classify_transport(Io, "Network Error: timed out reading response"),
+            "timeout"
+        );
         assert_eq!(classify_transport(Io, "something else"), "other");
     }
 
     #[test]
     fn the_baseline_names_its_failure() {
-        let p = |ok: bool, reason: &str| Probe { ok, reason: reason.into() };
-        assert!(Baseline { by_name: p(true, "answered 204"), by_ip: p(false, "connect") }.ok());
-        assert_eq!(Baseline { by_name: p(false, "dns"), by_ip: p(true, "answered 301") }.failure(), "DNS is not answering");
-        assert_eq!(Baseline { by_name: p(false, "connect"), by_ip: p(false, "connect") }.failure(), "no route to the internet");
-        assert_eq!(Baseline { by_name: p(false, "tls"), by_ip: p(false, "tls") }.failure(), "captive portal");
+        let p = |ok: bool, reason: &str| Probe {
+            ok,
+            reason: reason.into(),
+        };
+        assert!(Baseline {
+            by_name: p(true, "answered 204"),
+            by_ip: p(false, "connect")
+        }
+        .ok());
+        assert_eq!(
+            Baseline {
+                by_name: p(false, "dns"),
+                by_ip: p(true, "answered 301")
+            }
+            .failure(),
+            "DNS is not answering"
+        );
+        assert_eq!(
+            Baseline {
+                by_name: p(false, "connect"),
+                by_ip: p(false, "connect")
+            }
+            .failure(),
+            "no route to the internet"
+        );
+        assert_eq!(
+            Baseline {
+                by_name: p(false, "tls"),
+                by_ip: p(false, "tls")
+            }
+            .failure(),
+            "captive portal"
+        );
     }
 
     #[test]
@@ -354,13 +534,25 @@ mod tests {
         let r = read(true);
         assert_eq!(r.system.state, SystemNet::Connected);
         assert!(r.baseline.as_ref().unwrap().ok());
-        assert_eq!(r.providers["openai"], Probe { ok: false, reason: "connect".into() });
+        assert_eq!(
+            r.providers["openai"],
+            Probe {
+                ok: false,
+                reason: "connect".into()
+            }
+        );
         assert!(r.providers["anthropic"].ok);
-        assert!(read(false).providers.is_empty(), "probes off: only the system is asked");
+        assert!(
+            read(false).providers.is_empty(),
+            "probes off: only the system is asked"
+        );
         std::fs::write(&f, r#"{"system": "none"}"#).unwrap();
         let r = read(true);
         assert_eq!(r.system.state, SystemNet::NoNetwork);
-        assert!(r.baseline.is_none(), "no probe is needed when the system says there is no network");
+        assert!(
+            r.baseline.is_none(),
+            "no probe is needed when the system says there is no network"
+        );
         std::env::remove_var("OVERSEER_TEST_NET");
     }
 
@@ -370,9 +562,18 @@ mod tests {
         use platform::connected;
         assert!(connected(0x2), "reachable");
         assert!(!connected(0x0), "not reachable");
-        assert!(!connected(0x2 | 0x4), "reachable only after the user sets up a connection");
-        assert!(connected(0x2 | 0x4 | 0x8), "a connection that comes up on traffic");
-        assert!(!connected(0x2 | 0x4 | 0x8 | 0x10), "needs the user's intervention");
+        assert!(
+            !connected(0x2 | 0x4),
+            "reachable only after the user sets up a connection"
+        );
+        assert!(
+            connected(0x2 | 0x4 | 0x8),
+            "a connection that comes up on traffic"
+        );
+        assert!(
+            !connected(0x2 | 0x4 | 0x8 | 0x10),
+            "needs the user's intervention"
+        );
         // The real system gives an answer, whichever it is, with the flags it was decided from.
         let answer = platform::system();
         assert_ne!(answer.state, SystemNet::Unknown, "{}", answer.detail);

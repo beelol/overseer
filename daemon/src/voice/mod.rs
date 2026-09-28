@@ -75,7 +75,10 @@ impl Default for Settings {
 fn meta(d: &Daemon, key: &str) -> Result<Option<String>> {
     use rusqlite::OptionalExtension;
     let store = d.store.lock().unwrap();
-    Ok(store.conn.query_row("SELECT value FROM meta WHERE key=?1", [key], |r| r.get(0)).optional()?)
+    Ok(store
+        .conn
+        .query_row("SELECT value FROM meta WHERE key=?1", [key], |r| r.get(0))
+        .optional()?)
 }
 
 fn set_meta(d: &Daemon, key: &str, value: &str) -> Result<()> {
@@ -98,7 +101,10 @@ pub fn settings(d: &Daemon) -> Result<Settings> {
     s.voice = meta(d, "voice.voice")?.unwrap_or(s.voice);
     s.rate = n(meta(d, "voice.rate")?, s.rate);
     s.permission_answers = b(meta(d, "voice.permission_answers")?, s.permission_answers);
-    s.new_agents_per_request = n(meta(d, "voice.new_agents_per_request")?, s.new_agents_per_request);
+    s.new_agents_per_request = n(
+        meta(d, "voice.new_agents_per_request")?,
+        s.new_agents_per_request,
+    );
     s.requests_per_hour = n(meta(d, "voice.requests_per_hour")?, s.requests_per_hour);
     s.keep_days = n(meta(d, "voice.keep_days")?, s.keep_days);
     s.model = meta(d, "voice.model")?.unwrap_or(s.model);
@@ -157,7 +163,18 @@ impl Voice {
 
     /// Agent names, for the recognizer's hint and the floor's judgement.
     pub fn agent_names(&self) -> Vec<String> {
-        self.d.roster().map(|r| r.into_iter().filter(|l| crate::daemon::ACTIVE.contains(&l.status.as_str()) || l.status == "completed").map(|l| l.title).collect()).unwrap_or_default()
+        self.d
+            .roster()
+            .map(|r| {
+                r.into_iter()
+                    .filter(|l| {
+                        crate::daemon::ACTIVE.contains(&l.status.as_str())
+                            || l.status == "completed"
+                    })
+                    .map(|l| l.title)
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     /// The state the mark shows (AC-177).
@@ -197,7 +214,9 @@ impl Voice {
             changed
         };
         if changed {
-            self.emit(json!({"kind": "state", "state": state, "reason": reason, "target": s.target}));
+            self.emit(
+                json!({"kind": "state", "state": state, "reason": reason, "target": s.target}),
+            );
         }
     }
 
@@ -230,7 +249,9 @@ impl Voice {
     }
 
     fn launch(self: &Arc<Self>, s: &Settings) -> Result<()> {
-        let path = listener_path().ok_or_else(|| anyhow!("the listener (overseer-listener) is not installed next to the daemon"))?;
+        let path = listener_path().ok_or_else(|| {
+            anyhow!("the listener (overseer-listener) is not installed next to the daemon")
+        })?;
         let mut args: Vec<String> = Vec::new();
         if simulated() {
             args.extend(["--input", "sim", "--script-live"].map(String::from));
@@ -239,7 +260,12 @@ impl Voice {
             if !model.exists() {
                 bail!("the speech model ({}) is not downloaded", s.model);
             }
-            args.extend(["--input".into(), "mic".into(), "--model".into(), model.display().to_string()]);
+            args.extend([
+                "--input".into(),
+                "mic".into(),
+                "--model".into(),
+                model.display().to_string(),
+            ]);
         }
         let names = self.agent_names().join(", ");
         if !names.is_empty() {
@@ -279,7 +305,12 @@ impl Voice {
     /// The listener ended. Unless it was asked to, it is restarted, at most three times in ten
     /// minutes; a fourth end leaves Voice Mode off with the reason (AC-175).
     fn on_exit(self: &Arc<Self>, which: &Arc<proc::Listener>, how: String) {
-        let ours = self.listener.lock().unwrap().as_ref().is_some_and(|l| Arc::ptr_eq(l, which));
+        let ours = self
+            .listener
+            .lock()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|l| Arc::ptr_eq(l, which));
         if !ours {
             return; // stopped on purpose
         }
@@ -292,7 +323,8 @@ impl Voice {
             st.speaking = false;
             st.pid = None;
             let now = Instant::now();
-            st.restarts.retain(|t| now.duration_since(*t) < Duration::from_secs(600));
+            st.restarts
+                .retain(|t| now.duration_since(*t) < Duration::from_secs(600));
             st.restarts.push(now);
             st.restarts.len() > 3
         };
@@ -301,7 +333,14 @@ impl Voice {
             let _ = set_meta(&self.d, "voice.enabled", "0");
             self.st.lock().unwrap().failed = Some(reason.clone());
             self.emit(json!({"kind": "state", "state": "off", "reason": reason}));
-            let _ = self.d.emit(None, None, "voice_settings", "voice", "exact", json!({"enabled": false, "reason": reason}));
+            let _ = self.d.emit(
+                None,
+                None,
+                "voice_settings",
+                "voice",
+                "exact",
+                json!({"enabled": false, "reason": reason}),
+            );
             self.st.lock().unwrap().last_state = "off".into();
             return;
         }
@@ -340,7 +379,11 @@ impl Voice {
                 {
                     let mut st = self.st.lock().unwrap();
                     st.heard.clear();
-                    if st.barge.as_ref().is_some_and(|b| Some(b.utterance) == e["id"].as_u64()) {
+                    if st
+                        .barge
+                        .as_ref()
+                        .is_some_and(|b| Some(b.utterance) == e["id"].as_u64())
+                    {
                         st.barge = None;
                     }
                 }
@@ -410,13 +453,23 @@ pub fn listener_path() -> Option<PathBuf> {
     }
     let exe = std::env::current_exe().ok()?;
     let dir = exe.parent()?;
-    [dir.join("Overseer Listener.app/Contents/MacOS/overseer-listener"), dir.join("overseer-listener")].into_iter().find(|p| p.exists())
+    [
+        dir.join("Overseer Listener.app/Contents/MacOS/overseer-listener"),
+        dir.join("overseer-listener"),
+    ]
+    .into_iter()
+    .find(|p| p.exists())
 }
 
 /// Starts the voice session with the daemon.
 pub fn start(d: Arc<Daemon>) {
     let (live, _) = broadcast::channel(1024);
-    let v = Arc::new(Voice { d, live, st: Mutex::new(Live::default()), listener: Mutex::new(None) });
+    let v = Arc::new(Voice {
+        d,
+        live,
+        st: Mutex::new(Live::default()),
+        listener: Mutex::new(None),
+    });
     if VOICE.set(v.clone()).is_err() {
         return;
     }
@@ -475,7 +528,9 @@ pub fn get(d: &Arc<Daemon>) -> Result<Value> {
 
 /// `voice.set`: changes settings, each checked; turning Voice Mode on starts the listener.
 pub fn set(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
-    let obj = p.as_object().ok_or_else(|| anyhow!("params must be an object"))?;
+    let obj = p
+        .as_object()
+        .ok_or_else(|| anyhow!("params must be an object"))?;
     if obj.is_empty() {
         bail!("say what to change");
     }
@@ -483,7 +538,15 @@ pub fn set(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let flag = |k: &str| -> Result<Option<String>> {
         match p.get(k) {
             None => Ok(None),
-            Some(v) => Ok(Some(if v.as_bool().ok_or_else(|| anyhow!("{k} must be true or false"))? { "1".into() } else { "0".into() })),
+            Some(v) => Ok(Some(
+                if v.as_bool()
+                    .ok_or_else(|| anyhow!("{k} must be true or false"))?
+                {
+                    "1".into()
+                } else {
+                    "0".into()
+                },
+            )),
         }
     };
     let choice = |k: &str, allowed: &[&str]| -> Result<Option<String>> {
@@ -502,7 +565,9 @@ pub fn set(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         match p.get(k) {
             None => Ok(None),
             Some(v) => {
-                let n = v.as_u64().ok_or_else(|| anyhow!("{k} must be a whole number"))?;
+                let n = v
+                    .as_u64()
+                    .ok_or_else(|| anyhow!("{k} must be a whole number"))?;
                 if n < lo || n > hi {
                     bail!("{k} must be from {lo} to {hi}");
                 }
@@ -510,7 +575,11 @@ pub fn set(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
             }
         }
     };
-    for (k, key) in [("enabled", "voice.enabled"), ("muted", "voice.muted"), ("permission_answers", "voice.permission_answers")] {
+    for (k, key) in [
+        ("enabled", "voice.enabled"),
+        ("muted", "voice.muted"),
+        ("permission_answers", "voice.permission_answers"),
+    ] {
         if let Some(v) = flag(k)? {
             changes.push((key, v));
         }
@@ -529,7 +598,12 @@ pub fn set(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     }
     for (k, key, lo, hi) in [
         ("settle_seconds", "voice.settle_seconds", 0, 10),
-        ("new_agents_per_request", "voice.new_agents_per_request", 0, 8),
+        (
+            "new_agents_per_request",
+            "voice.new_agents_per_request",
+            0,
+            8,
+        ),
         ("requests_per_hour", "voice.requests_per_hour", 10, 600),
         ("keep_days", "voice.keep_days", 1, 365),
     ] {
@@ -538,7 +612,9 @@ pub fn set(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         }
     }
     if let Some(v) = p.get("rate") {
-        let n = v.as_u64().ok_or_else(|| anyhow!("rate must be a whole number"))?;
+        let n = v
+            .as_u64()
+            .ok_or_else(|| anyhow!("rate must be a whole number"))?;
         if n != 0 && !(90..=360).contains(&n) {
             bail!("rate must be 0 (the voice's own) or from 90 to 360 words a minute");
         }
@@ -556,9 +632,14 @@ pub fn set(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         changes.push(("voice.target", request::check_target(d, t)?));
     }
     if changes.is_empty() {
-        bail!("nothing to change: unknown settings {:?}", obj.keys().collect::<Vec<_>>());
+        bail!(
+            "nothing to change: unknown settings {:?}",
+            obj.keys().collect::<Vec<_>>()
+        );
     }
-    let turning_on = changes.iter().any(|(k, v)| *k == "voice.enabled" && v == "1");
+    let turning_on = changes
+        .iter()
+        .any(|(k, v)| *k == "voice.enabled" && v == "1");
     if turning_on {
         if !cfg!(target_os = "macos") {
             bail!("Voice Mode is available on macOS only");
@@ -566,20 +647,42 @@ pub fn set(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         if listener_path().is_none() {
             bail!("the listener (overseer-listener) is not installed next to the daemon");
         }
-        let model = changes.iter().find(|(k, _)| *k == "voice.model").map(|(_, v)| v.clone()).unwrap_or(settings(d)?.model);
+        let model = changes
+            .iter()
+            .find(|(k, _)| *k == "voice.model")
+            .map(|(_, v)| v.clone())
+            .unwrap_or(settings(d)?.model);
         if !simulated() && !model::path(&model).exists() {
-            bail!("the speech model ({model}, {} MiB) is not downloaded: voice.download first", model::size(&model) / (1024 * 1024));
+            bail!(
+                "the speech model ({model}, {} MiB) is not downloaded: voice.download first",
+                model::size(&model) / (1024 * 1024)
+            );
         }
     }
-    let target_changed = changes.iter().find(|(k, _)| *k == "voice.target").map(|(_, v)| v.clone());
+    let target_changed = changes
+        .iter()
+        .find(|(k, _)| *k == "voice.target")
+        .map(|(_, v)| v.clone());
     for (k, v) in &changes {
         set_meta(d, k, v)?;
     }
     let v = get_voice()?;
-    let settings_changed: Vec<&str> = changes.iter().map(|(k, _)| k.trim_start_matches("voice.")).collect();
+    let settings_changed: Vec<&str> = changes
+        .iter()
+        .map(|(k, _)| k.trim_start_matches("voice."))
+        .collect();
     // Settings changes are ordinary events (no audio, no words).
-    let _ = d.emit(None, None, "voice_settings", "voice", "exact", json!({"changed": settings_changed}));
-    let restart = changes.iter().any(|(k, _)| matches!(*k, "voice.voice" | "voice.rate" | "voice.model"));
+    let _ = d.emit(
+        None,
+        None,
+        "voice_settings",
+        "voice",
+        "exact",
+        json!({"changed": settings_changed}),
+    );
+    let restart = changes
+        .iter()
+        .any(|(k, _)| matches!(*k, "voice.voice" | "voice.rate" | "voice.model"));
     if restart && v.running() {
         v.stop_listener();
     }
@@ -595,7 +698,11 @@ pub fn set(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
 
 /// `voice.say`: words as if heard (the words layer). The listener's utterances take the same path.
 pub fn say(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
-    let text = p["text"].as_str().ok_or_else(|| anyhow!("text is required"))?.trim().to_string();
+    let text = p["text"]
+        .as_str()
+        .ok_or_else(|| anyhow!("text is required"))?
+        .trim()
+        .to_string();
     let s = settings(d)?;
     if !s.enabled || s.muted {
         bail!("Voice Mode is not listening");
@@ -631,7 +738,9 @@ pub fn speak(_d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     if !simulated() {
         bail!("the simulated voice is off (start the daemon with OVERSEER_VOICE_SIMULATE=1)");
     }
-    let text = p["text"].as_str().ok_or_else(|| anyhow!("text is required"))?;
+    let text = p["text"]
+        .as_str()
+        .ok_or_else(|| anyhow!("text is required"))?;
     let v = get_voice()?;
     Ok(json!({"line": v.say_line(text)}))
 }
@@ -659,13 +768,21 @@ pub fn subscribe(id: Value, tx: tokio::sync::mpsc::Sender<Value>) {
     let mut rx = v.live.subscribe();
     let first = get(&v.d).unwrap_or(json!({}));
     tokio::spawn(async move {
-        if tx.send(json!({"id": id, "result": {"subscribed": true, "voice": first}})).await.is_err() {
+        if tx
+            .send(json!({"id": id, "result": {"subscribed": true, "voice": first}}))
+            .await
+            .is_err()
+        {
             return;
         }
         loop {
             match rx.recv().await {
                 Ok(m) => {
-                    if tx.send(json!({"method": "voice", "params": m})).await.is_err() {
+                    if tx
+                        .send(json!({"method": "voice", "params": m}))
+                        .await
+                        .is_err()
+                    {
                         break;
                     }
                 }

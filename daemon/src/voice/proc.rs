@@ -25,7 +25,11 @@ extern "C" {
 
 impl Listener {
     /// Starts the listener; returns it and its standard output.
-    pub fn spawn(path: &Path, args: &[String], env: &[(String, String)]) -> Result<(Listener, std::fs::File)> {
+    pub fn spawn(
+        path: &Path,
+        args: &[String],
+        env: &[(String, String)],
+    ) -> Result<(Listener, std::fs::File)> {
         let prog = CString::new(path.as_os_str().as_encoded_bytes())?;
         let mut argv: Vec<CString> = vec![prog.clone()];
         for a in args {
@@ -63,7 +67,13 @@ impl Listener {
             libc::posix_spawn_file_actions_adddup2(&mut actions, child_in[0], 0);
             libc::posix_spawn_file_actions_adddup2(&mut actions, child_out[1], 1);
             let devnull = CString::new("/dev/null").unwrap();
-            libc::posix_spawn_file_actions_addopen(&mut actions, 2, devnull.as_ptr(), libc::O_WRONLY, 0);
+            libc::posix_spawn_file_actions_addopen(
+                &mut actions,
+                2,
+                devnull.as_ptr(),
+                libc::O_WRONLY,
+                0,
+            );
             let mut attr: libc::posix_spawnattr_t = std::mem::zeroed();
             libc::posix_spawnattr_init(&mut attr);
             #[cfg(target_os = "macos")]
@@ -74,12 +84,22 @@ impl Listener {
                 let name = CString::new("responsibility_spawnattrs_setdisclaim").unwrap();
                 let f = libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr());
                 if !f.is_null() {
-                    let disclaim: extern "C" fn(*mut libc::posix_spawnattr_t, libc::c_int) -> libc::c_int = std::mem::transmute(f);
+                    let disclaim: extern "C" fn(
+                        *mut libc::posix_spawnattr_t,
+                        libc::c_int,
+                    ) -> libc::c_int = std::mem::transmute(f);
                     disclaim(&mut attr, 1);
                 }
             }
             let mut pid: libc::pid_t = 0;
-            let rc = libc::posix_spawn(&mut pid, prog.as_ptr(), &actions, &attr, argv_ptrs.as_ptr() as *const *mut libc::c_char, env_ptrs.as_ptr() as *const *mut libc::c_char);
+            let rc = libc::posix_spawn(
+                &mut pid,
+                prog.as_ptr(),
+                &actions,
+                &attr,
+                argv_ptrs.as_ptr() as *const *mut libc::c_char,
+                env_ptrs.as_ptr() as *const *mut libc::c_char,
+            );
             libc::posix_spawn_file_actions_destroy(&mut actions);
             libc::posix_spawnattr_destroy(&mut attr);
             libc::close(child_in[0]);
@@ -87,13 +107,22 @@ impl Listener {
             if rc != 0 {
                 libc::close(child_in[1]);
                 libc::close(child_out[0]);
-                return Err(anyhow!("could not start the listener: {}", std::io::Error::from_raw_os_error(rc)));
+                return Err(anyhow!(
+                    "could not start the listener: {}",
+                    std::io::Error::from_raw_os_error(rc)
+                ));
             }
             libc::fcntl(child_in[1], libc::F_SETFD, libc::FD_CLOEXEC);
             libc::fcntl(child_out[0], libc::F_SETFD, libc::FD_CLOEXEC);
             let stdin = std::fs::File::from_raw_fd(child_in[1]);
             let stdout = std::fs::File::from_raw_fd(child_out[0]);
-            Ok((Listener { pid, stdin: Mutex::new(stdin) }, stdout))
+            Ok((
+                Listener {
+                    pid,
+                    stdin: Mutex::new(stdin),
+                },
+                stdout,
+            ))
         }
     }
 

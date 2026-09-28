@@ -12,8 +12,16 @@ use std::sync::Arc;
 
 /// The models Voice Mode can use: name, size in bytes, SHA-256.
 const MODELS: &[(&str, u64, &str)] = &[
-    ("small.en", 487_614_201, "c6138d6d58ecc8322097e0f987c32f1be8bb0a18532a3f88f734d1bbf9c41e5d"),
-    ("base.en", 147_964_211, "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002"),
+    (
+        "small.en",
+        487_614_201,
+        "c6138d6d58ecc8322097e0f987c32f1be8bb0a18532a3f88f734d1bbf9c41e5d",
+    ),
+    (
+        "base.en",
+        147_964_211,
+        "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002",
+    ),
 ];
 pub const NAMES: &[&str] = &["small.en", "base.en"];
 
@@ -21,25 +29,44 @@ pub fn path(name: &str) -> PathBuf {
     if let Some(p) = std::env::var_os("OVERSEER_VOICE_MODEL") {
         return PathBuf::from(p);
     }
-    crate::paths::data_dir().join("voice").join("models").join(format!("ggml-{name}.bin"))
+    crate::paths::data_dir()
+        .join("voice")
+        .join("models")
+        .join(format!("ggml-{name}.bin"))
 }
 
 pub fn size(name: &str) -> u64 {
-    MODELS.iter().find(|m| m.0 == name).map(|m| m.1).unwrap_or(0)
+    MODELS
+        .iter()
+        .find(|m| m.0 == name)
+        .map(|m| m.1)
+        .unwrap_or(0)
 }
 
 /// Starts the download in the background; progress goes on the live channel.
 pub fn download(v: &Arc<Voice>, name: &str) -> Result<Value> {
-    let (_, bytes, sha) = *MODELS.iter().find(|m| m.0 == name).ok_or_else(|| anyhow!("unknown model {name}"))?;
+    let (_, bytes, sha) = *MODELS
+        .iter()
+        .find(|m| m.0 == name)
+        .ok_or_else(|| anyhow!("unknown model {name}"))?;
     let target = path(name);
     if target.exists() {
         return Ok(json!({"downloaded": true, "bytes": bytes}));
     }
-    if v.st.lock().unwrap().download.as_ref().is_some_and(|d| d["state"] == "downloading") {
+    if v.st
+        .lock()
+        .unwrap()
+        .download
+        .as_ref()
+        .is_some_and(|d| d["state"] == "downloading")
+    {
         return Ok(json!({"downloading": true}));
     }
-    let url = std::env::var("OVERSEER_VOICE_MODEL_URL").unwrap_or_else(|_| format!("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-{name}.bin"));
-    v.st.lock().unwrap().download = Some(json!({"state": "downloading", "received": 0, "bytes": bytes}));
+    let url = std::env::var("OVERSEER_VOICE_MODEL_URL").unwrap_or_else(|_| {
+        format!("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-{name}.bin")
+    });
+    v.st.lock().unwrap().download =
+        Some(json!({"state": "downloading", "received": 0, "bytes": bytes}));
     let v = v.clone();
     let name = name.to_string();
     std::thread::spawn(move || {
@@ -55,7 +82,9 @@ pub fn download(v: &Arc<Voice>, name: &str) -> Result<Value> {
 }
 
 fn fetch(v: &Arc<Voice>, url: &str, target: &PathBuf, bytes: u64, sha: &str) -> Result<()> {
-    let dir = target.parent().ok_or_else(|| anyhow!("no folder for the model"))?;
+    let dir = target
+        .parent()
+        .ok_or_else(|| anyhow!("no folder for the model"))?;
     crate::paths::ensure_private_dir(dir)?;
     let part = target.with_extension("part");
     let resp = ureq::get(url).call()?;
@@ -85,7 +114,11 @@ fn fetch(v: &Arc<Voice>, url: &str, target: &PathBuf, bytes: u64, sha: &str) -> 
         }
     }
     file.sync_all()?;
-    let got = hash.finalize().iter().map(|b| format!("{b:02x}")).collect::<String>();
+    let got = hash
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<String>();
     if received != bytes || got != sha {
         let _ = std::fs::remove_file(&part);
         bail!("the model did not match its checksum and was deleted");

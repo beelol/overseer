@@ -27,7 +27,9 @@ fn newest_rollout(codex_home: &Path) -> Option<PathBuf> {
     let mut stack = vec![codex_home.join("sessions")];
     let mut visited = 0;
     while let Some(dir) = stack.pop() {
-        let Ok(rd) = std::fs::read_dir(&dir) else { continue };
+        let Ok(rd) = std::fs::read_dir(&dir) else {
+            continue;
+        };
         for e in rd.flatten() {
             visited += 1;
             if visited > 20000 {
@@ -37,7 +39,11 @@ fn newest_rollout(codex_home: &Path) -> Option<PathBuf> {
             let Ok(meta) = e.metadata() else { continue };
             if meta.is_dir() {
                 stack.push(p);
-            } else if p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with("rollout-") && n.ends_with(".jsonl")) {
+            } else if p
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("rollout-") && n.ends_with(".jsonl"))
+            {
                 let m = meta.modified().ok()?;
                 if best.as_ref().map_or(true, |(t, _)| m > *t) {
                     best = Some((m, p));
@@ -52,7 +58,10 @@ fn newest_rollout(codex_home: &Path) -> Option<PathBuf> {
 pub fn codex_limits(codex_home: &Path) -> Option<Value> {
     let file = newest_rollout(codex_home)?;
     let text = std::fs::read_to_string(&file).ok()?;
-    let line = text.lines().rev().find(|l| l.contains("\"token_count\"") && l.contains("\"rate_limits\""))?;
+    let line = text
+        .lines()
+        .rev()
+        .find(|l| l.contains("\"token_count\"") && l.contains("\"rate_limits\""))?;
     let v: Value = serde_json::from_str(line).ok()?;
     let rl = &v["payload"]["rate_limits"];
     let mut windows = Vec::new();
@@ -62,9 +71,15 @@ pub fn codex_limits(codex_home: &Path) -> Option<Value> {
             windows.push(json!({"label": window_label(w["window_minutes"].as_i64().unwrap_or(0)), "used": pct / 100.0, "resets_at_ms": w["resets_at"].as_i64().map(|s| s * 1000)}));
         }
     }
-    let observed = std::fs::metadata(&file).ok().and_then(|m| m.modified().ok()).and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64);
-    Some(json!({"reported": true, "source": "Codex session log", "plan": rl["plan_type"], "windows": windows, "observed_ms": observed,
-        "limited": rl["rate_limit_reached_type"].is_string()}))
+    let observed = std::fs::metadata(&file)
+        .ok()
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as i64);
+    Some(
+        json!({"reported": true, "source": "Codex session log", "plan": rl["plan_type"], "windows": windows, "observed_ms": observed,
+        "limited": rl["rate_limit_reached_type"].is_string()}),
+    )
 }
 
 /// Normalizes a Claude `rate_limit_info` (as recorded by the adapter).
@@ -72,7 +87,12 @@ pub fn claude_limits(info: &Value, observed_ms: i64) -> Value {
     let mut windows = Vec::new();
     if let Some(map) = info["unifiedWindows"].as_object() {
         for (key, w) in map {
-            let label = match key.as_str() { "five_hour" => "5 hours".to_string(), "seven_day" => "week".to_string(), "seven_day_opus" => "week (Opus)".to_string(), k => k.replace('_', " ") };
+            let label = match key.as_str() {
+                "five_hour" => "5 hours".to_string(),
+                "seven_day" => "week".to_string(),
+                "seven_day_opus" => "week (Opus)".to_string(),
+                k => k.replace('_', " "),
+            };
             if let Some(u) = w["utilization"].as_f64() {
                 windows.push(json!({"label": label, "used": u, "resets_at_ms": w["resetsAt"].as_i64().map(|s| s * 1000)}));
             }
@@ -87,7 +107,10 @@ impl Daemon {
         let env = Self::profile_env(&profile);
         let usage = match profile.harness.as_str() {
             "codex" => {
-                let home = env.get("CODEX_HOME").map(PathBuf::from).or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".codex")));
+                let home = env
+                    .get("CODEX_HOME")
+                    .map(PathBuf::from)
+                    .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".codex")));
                 home.and_then(|h| codex_limits(&h))
             }
             "claude" => {
@@ -96,7 +119,11 @@ impl Daemon {
                     "SELECT e.payload, e.ts FROM events e JOIN runs r ON r.id = e.run_id WHERE r.profile_id = ?1 AND e.kind = 'usage' AND e.payload LIKE '%\"claude_rate_limit\"%' ORDER BY e.seq DESC LIMIT 1",
                     [id], |r| Ok((r.get(0)?, r.get(1)?)),
                 ).ok();
-                row.and_then(|(p, ts)| serde_json::from_str::<Value>(&p).ok().map(|v| claude_limits(&v["rate_limits"]["claude_rate_limit"], ts)))
+                row.and_then(|(p, ts)| {
+                    serde_json::from_str::<Value>(&p)
+                        .ok()
+                        .map(|v| claude_limits(&v["rate_limits"]["claude_rate_limit"], ts))
+                })
             }
             _ => None,
         };
@@ -130,7 +157,11 @@ mod tests {
         let info = json!({"status": "allowed", "unifiedWindows": {"five_hour": {"utilization": 0.1, "resetsAt": 1790429400}, "seven_day": {"utilization": 0.46, "resetsAt": 1790568000}}});
         let u = claude_limits(&info, 5);
         assert_eq!(u["windows"].as_array().unwrap().len(), 2);
-        assert!(u["windows"].as_array().unwrap().iter().any(|w| w["label"] == "week" && w["used"] == 0.46));
+        assert!(u["windows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|w| w["label"] == "week" && w["used"] == 0.46));
         assert_eq!(u["limited"], false);
     }
 }

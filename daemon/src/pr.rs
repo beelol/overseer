@@ -34,17 +34,36 @@ impl Daemon {
         }
         let (runs, task) = {
             let store = self.store.lock().unwrap();
-            let runs: Vec<_> = store.runs()?.into_iter().filter(|r| r.workspace_id == ws.id).collect();
-            let task = store.tasks()?.into_iter().find(|t| t.workspace_id == ws.id).ok_or_else(|| anyhow!("no task for this workspace"))?;
+            let runs: Vec<_> = store
+                .runs()?
+                .into_iter()
+                .filter(|r| r.workspace_id == ws.id)
+                .collect();
+            let task = store
+                .tasks()?
+                .into_iter()
+                .find(|t| t.workspace_id == ws.id)
+                .ok_or_else(|| anyhow!("no task for this workspace"))?;
             (runs, task)
         };
         if let Some(active) = runs.iter().find(|r| ACTIVE.contains(&r.status.as_str())) {
             return refuse(format!("The run is still {} — wait for it to finish or interrupt it before opening a pull request.", active.status.replace('_', " ")));
         }
         let path = Path::new(&ws.path);
-        let branch = ws.branch.clone().ok_or_else(|| anyhow!("worktree has no branch"))?;
-        let remotes: Vec<String> = git::git(path, &["remote"])?.lines().map(str::to_string).collect();
-        let Some(remote) = remotes.iter().find(|r| *r == "origin").or(remotes.first()).cloned() else {
+        let branch = ws
+            .branch
+            .clone()
+            .ok_or_else(|| anyhow!("worktree has no branch"))?;
+        let remotes: Vec<String> = git::git(path, &["remote"])?
+            .lines()
+            .map(str::to_string)
+            .collect();
+        let Some(remote) = remotes
+            .iter()
+            .find(|r| *r == "origin")
+            .or(remotes.first())
+            .cloned()
+        else {
             return refuse(format!("The repository {} has no Git remote. Add a GitHub remote (git remote add origin https://github.com/OWNER/REPO.git) to open pull requests.", task.repo_root));
         };
         // The configured URL (not `get-url`, which applies insteadOf rewrites).
@@ -52,23 +71,73 @@ impl Daemon {
         let Some((owner, repo)) = github_repo(&url) else {
             return refuse(format!("The remote {remote} ({url}) is not on GitHub; Open PR only supports github.com remotes."));
         };
-        let target = task.target_ref.clone().filter(|t| !t.is_empty() && !t.contains("..")).and_then(|t| {
-            let local = git::git(Path::new(&task.repo_root), &["show-ref", "--verify", "--quiet", &format!("refs/heads/{t}")]).is_ok();
-            local.then_some(t)
-        }).or_else(|| git::default_branch(Path::new(&task.repo_root)).map(|d| {
-            // A clone's default is the remote-tracking `origin/master`; GitHub wants the branch name.
-            d.strip_prefix(&format!("{remote}/")).or_else(|| d.strip_prefix("origin/")).unwrap_or(&d).to_string()
-        }))
-          .or_else(|| git::head_branch(Path::new(&task.repo_root)))
-          .ok_or_else(|| anyhow!("no target branch"))?;
+        let target = task
+            .target_ref
+            .clone()
+            .filter(|t| !t.is_empty() && !t.contains(".."))
+            .and_then(|t| {
+                let local = git::git(
+                    Path::new(&task.repo_root),
+                    &[
+                        "show-ref",
+                        "--verify",
+                        "--quiet",
+                        &format!("refs/heads/{t}"),
+                    ],
+                )
+                .is_ok();
+                local.then_some(t)
+            })
+            .or_else(|| {
+                git::default_branch(Path::new(&task.repo_root)).map(|d| {
+                    // A clone's default is the remote-tracking `origin/master`; GitHub wants the branch name.
+                    d.strip_prefix(&format!("{remote}/"))
+                        .or_else(|| d.strip_prefix("origin/"))
+                        .unwrap_or(&d)
+                        .to_string()
+                })
+            })
+            .or_else(|| git::head_branch(Path::new(&task.repo_root)))
+            .ok_or_else(|| anyhow!("no target branch"))?;
         // What to compare against locally: the branch if it exists here, else its remote-tracking ref.
-        let base_ref = if git::git(Path::new(&task.repo_root), &["show-ref", "--verify", "--quiet", &format!("refs/heads/{target}")]).is_ok() { target.clone() } else { format!("{remote}/{target}") };
+        let base_ref = if git::git(
+            Path::new(&task.repo_root),
+            &[
+                "show-ref",
+                "--verify",
+                "--quiet",
+                &format!("refs/heads/{target}"),
+            ],
+        )
+        .is_ok()
+        {
+            target.clone()
+        } else {
+            format!("{remote}/{target}")
+        };
         let st = git::status(path)?;
-        let uncommitted: Vec<String> = st.staged.iter().chain(st.unstaged.iter()).map(|c| c.path.clone()).chain(st.untracked.iter().cloned()).collect();
+        let uncommitted: Vec<String> = st
+            .staged
+            .iter()
+            .chain(st.unstaged.iter())
+            .map(|c| c.path.clone())
+            .chain(st.untracked.iter().cloned())
+            .collect();
         let base = git::merge_base(path, "HEAD", &base_ref);
-        let commits: Vec<String> = base.as_ref().map(|b| git::git(path, &["log", "--format=%s", &format!("{b}..HEAD")]).unwrap_or_default().lines().map(str::to_string).collect()).unwrap_or_default();
+        let commits: Vec<String> = base
+            .as_ref()
+            .map(|b| {
+                git::git(path, &["log", "--format=%s", &format!("{b}..HEAD")])
+                    .unwrap_or_default()
+                    .lines()
+                    .map(str::to_string)
+                    .collect()
+            })
+            .unwrap_or_default();
         if uncommitted.is_empty() && commits.is_empty() {
-            return refuse(format!("Nothing to propose: {branch} has no changes that are not already on {target}."));
+            return refuse(format!(
+                "Nothing to propose: {branch} has no changes that are not already on {target}."
+            ));
         }
         let root = runs.iter().find(|r| r.parent_run_id.is_none());
         Ok(json!({
@@ -83,16 +152,39 @@ impl Daemon {
     pub fn pr_prepare(&self, workspace_id: &str) -> Result<Value> {
         let plan = self.pr_plan(workspace_id)?;
         if plan["ok"] != true {
-            bail!("{}", plan["reason"].as_str().unwrap_or("cannot open a pull request"));
+            bail!(
+                "{}",
+                plan["reason"]
+                    .as_str()
+                    .unwrap_or("cannot open a pull request")
+            );
         }
         let ws = self.workspace(workspace_id)?;
         let path = Path::new(&ws.path);
-        let committed = crate::merge::commit_worktree(path, plan["title"].as_str().unwrap_or("Overseer run"))?;
+        let committed =
+            crate::merge::commit_worktree(path, plan["title"].as_str().unwrap_or("Overseer run"))?;
         let head = git::head(path).ok_or_else(|| anyhow!("no HEAD"))?;
         let base = git::merge_base(path, "HEAD", plan["base_ref"].as_str().unwrap_or("HEAD"));
-        let files: Vec<Value> = match &base { Some(b) => serde_json::to_value(git::diff_trees(path, b, &head)?)?.as_array().cloned().unwrap_or_default(), None => vec![] };
-        let commits: Vec<String> = base.as_ref().map(|b| git::git(path, &["log", "--format=%s", &format!("{b}..HEAD")]).unwrap_or_default().lines().map(str::to_string).collect()).unwrap_or_default();
-        Ok(json!({"plan": plan, "committed": committed, "head": head, "files": files, "commits": commits}))
+        let files: Vec<Value> = match &base {
+            Some(b) => serde_json::to_value(git::diff_trees(path, b, &head)?)?
+                .as_array()
+                .cloned()
+                .unwrap_or_default(),
+            None => vec![],
+        };
+        let commits: Vec<String> = base
+            .as_ref()
+            .map(|b| {
+                git::git(path, &["log", "--format=%s", &format!("{b}..HEAD")])
+                    .unwrap_or_default()
+                    .lines()
+                    .map(str::to_string)
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok(
+            json!({"plan": plan, "committed": committed, "head": head, "files": files, "commits": commits}),
+        )
     }
 
     /// Records the PR the extension created (URL and number only).
@@ -100,14 +192,32 @@ impl Daemon {
         let ws = self.workspace(workspace_id)?;
         let (task_id, run_id) = {
             let store = self.store.lock().unwrap();
-            let task = store.tasks()?.into_iter().find(|t| t.workspace_id == ws.id).map(|t| t.id);
-            let run = store.runs()?.into_iter().find(|r| r.workspace_id == ws.id && r.parent_run_id.is_none()).map(|r| r.id);
+            let task = store
+                .tasks()?
+                .into_iter()
+                .find(|t| t.workspace_id == ws.id)
+                .map(|t| t.id);
+            let run = store
+                .runs()?
+                .into_iter()
+                .find(|r| r.workspace_id == ws.id && r.parent_run_id.is_none())
+                .map(|r| r.id);
             (task, run)
         };
-        if !url.starts_with("https://") && !url.starts_with("http://127.0.0.1") && !url.starts_with("http://localhost") {
+        if !url.starts_with("https://")
+            && !url.starts_with("http://127.0.0.1")
+            && !url.starts_with("http://localhost")
+        {
             bail!("not a pull request URL");
         }
-        self.emit(task_id.as_deref(), run_id.as_deref(), "pull_request", "user", "exact", json!({"url": url, "number": number, "branch": ws.branch}))?;
+        self.emit(
+            task_id.as_deref(),
+            run_id.as_deref(),
+            "pull_request",
+            "user",
+            "exact",
+            json!({"url": url, "number": number, "branch": ws.branch}),
+        )?;
         Ok(json!({"recorded": true}))
     }
 }
@@ -118,10 +228,22 @@ mod tests {
     #[test]
     fn parses_github_remotes_only() {
         let ok = |u: &str| github_repo(u).map(|(o, r)| format!("{o}/{r}"));
-        assert_eq!(ok("https://github.com/beelol/overseer.git").as_deref(), Some("beelol/overseer"));
-        assert_eq!(ok("https://github.com/beelol/overseer").as_deref(), Some("beelol/overseer"));
-        assert_eq!(ok("git@github.com:beelol/overseer.git").as_deref(), Some("beelol/overseer"));
-        assert_eq!(ok("ssh://git@github.com/beelol/overseer.git").as_deref(), Some("beelol/overseer"));
+        assert_eq!(
+            ok("https://github.com/beelol/overseer.git").as_deref(),
+            Some("beelol/overseer")
+        );
+        assert_eq!(
+            ok("https://github.com/beelol/overseer").as_deref(),
+            Some("beelol/overseer")
+        );
+        assert_eq!(
+            ok("git@github.com:beelol/overseer.git").as_deref(),
+            Some("beelol/overseer")
+        );
+        assert_eq!(
+            ok("ssh://git@github.com/beelol/overseer.git").as_deref(),
+            Some("beelol/overseer")
+        );
         assert_eq!(ok("https://gitlab.com/a/b.git"), None);
         assert_eq!(ok("/tmp/bare.git"), None);
         assert_eq!(ok("https://github.com/only-owner"), None);

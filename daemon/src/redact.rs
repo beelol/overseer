@@ -45,8 +45,14 @@ mod tests {
 
     #[test]
     fn redacts_common_secrets() {
-        assert_eq!(redact("key sk-abcdefghijklmnopqrstuv end"), "key [redacted] end");
-        assert_eq!(redact(r#"{"access_token": "abc.def"}"#), r#"{"access_token": "[redacted]"}"#);
+        assert_eq!(
+            redact("key sk-abcdefghijklmnopqrstuv end"),
+            "key [redacted] end"
+        );
+        assert_eq!(
+            redact(r#"{"access_token": "abc.def"}"#),
+            r#"{"access_token": "[redacted]"}"#
+        );
         assert!(redact("Authorization: Bearer abcdefghijklmnopqrstuvwxyz").contains("[redacted]"));
         assert_eq!(redact("hello world"), "hello world");
     }

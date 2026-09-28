@@ -4,7 +4,9 @@
 use std::path::PathBuf;
 
 fn home() -> PathBuf {
-    std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("/"))
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/"))
 }
 
 /// Root for durable state (database, run directories, worktrees, profiles).
@@ -51,7 +53,9 @@ pub fn short_socket(name: &str) -> PathBuf {
 }
 
 pub fn socket_path() -> PathBuf {
-    std::env::var_os("OVERSEER_SOCKET").map(PathBuf::from).unwrap_or_else(|| short_socket("overseerd.sock"))
+    std::env::var_os("OVERSEER_SOCKET")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| short_socket("overseerd.sock"))
 }
 
 pub fn db_path() -> PathBuf {

@@ -121,19 +121,44 @@ impl Daemon {
             let store = self.store.lock().unwrap();
             let turns = store.turns(run_id)?;
             let events = store.events_after(0, Some(run_id), crate::store::EVENTS_PER_RUN)?;
-            let launch: Value = store.conn.query_row("SELECT launch FROM runs WHERE id=?1", [run_id], |r| r.get::<_, Option<String>>(0))?.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(Value::Null);
-            let account = run.profile_id.as_deref().and_then(|p| store.profile(p).ok().flatten()).map(|p| p.name);
+            let launch: Value = store
+                .conn
+                .query_row("SELECT launch FROM runs WHERE id=?1", [run_id], |r| {
+                    r.get::<_, Option<String>>(0)
+                })?
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or(Value::Null);
+            let account = run
+                .profile_id
+                .as_deref()
+                .and_then(|p| store.profile(p).ok().flatten())
+                .map(|p| p.name);
             (turns, events, launch, account)
         };
-        let opts = launch.get("generic").map(|g| g["opts"].clone()).unwrap_or_else(|| launch["opts"].clone());
+        let opts = launch
+            .get("generic")
+            .map(|g| g["opts"].clone())
+            .unwrap_or_else(|| launch["opts"].clone());
         // What was asked: the task and every later turn, each with the source that sent it.
         let mut asked: Vec<Asked> = Vec::new();
         if turns.is_empty() || run.parent_run_id.is_some() {
-            asked.push(Asked { source: "task".into(), text: head(&task.prompt, MESSAGE_CHARS) });
+            asked.push(Asked {
+                source: "task".into(),
+                text: head(&task.prompt, MESSAGE_CHARS),
+            });
         }
         for (i, t) in turns.iter().enumerate() {
-            let source = self.turn_source(&t.id).unwrap_or_else(|| if i == 0 { "task".into() } else { "owner".into() });
-            asked.push(Asked { source, text: head(&t.prompt, MESSAGE_CHARS) });
+            let source = self.turn_source(&t.id).unwrap_or_else(|| {
+                if i == 0 {
+                    "task".into()
+                } else {
+                    "owner".into()
+                }
+            });
+            asked.push(Asked {
+                source,
+                text: head(&t.prompt, MESSAGE_CHARS),
+            });
         }
         // From the events: the agent's last messages, the files it touched, what it used.
         let mut messages: Vec<String> = Vec::new();
@@ -162,7 +187,12 @@ impl Daemon {
                     }
                 }
                 // The latest usage the harness reported (rate-limit windows alone are not usage).
-                "usage" if e.payload.get("rate_limits").is_none() || e.payload.as_object().map(|o| o.len() > 1).unwrap_or(false) => usage = e.payload.clone(),
+                "usage"
+                    if e.payload.get("rate_limits").is_none()
+                        || e.payload.as_object().map(|o| o.len() > 1).unwrap_or(false) =>
+                {
+                    usage = e.payload.clone()
+                }
                 "check_in" => last_check_in = Some(e.payload.clone()),
                 _ => {}
             }
@@ -173,14 +203,43 @@ impl Daemon {
             }
         }
         let changed_total = changed.len();
-        let changed: Vec<ChangedFile> = changed.into_iter().take(FILES_LISTED).map(|(path, kind)| ChangedFile { path, kind }).collect();
-        let children: Vec<ChildLine> = self.descendants(run_id)?.into_iter().map(|c| ChildLine { id: c.id, title: c.title, status: c.status }).collect();
-        let waiting = if run.status == "waiting_for_user" { run.attention.clone().or_else(|| Some(json!({"kind": "question"}))) } else { None };
-        let since_ms = events.iter().rev().find(|e| e.kind == "status").map(|e| e.ts).unwrap_or(run.created_ms);
+        let changed: Vec<ChangedFile> = changed
+            .into_iter()
+            .take(FILES_LISTED)
+            .map(|(path, kind)| ChangedFile { path, kind })
+            .collect();
+        let children: Vec<ChildLine> = self
+            .descendants(run_id)?
+            .into_iter()
+            .map(|c| ChildLine {
+                id: c.id,
+                title: c.title,
+                status: c.status,
+            })
+            .collect();
+        let waiting = if run.status == "waiting_for_user" {
+            run.attention
+                .clone()
+                .or_else(|| Some(json!({"kind": "question"})))
+        } else {
+            None
+        };
+        let since_ms = events
+            .iter()
+            .rev()
+            .find(|e| e.kind == "status")
+            .map(|e| e.ts)
+            .unwrap_or(run.created_ms);
         let role = self.run_role(run_id);
         let (last_report, asks) = self.channel_summary(run_id);
         let redact = |s: &str| crate::redact::redact(s);
-        let asked: Vec<Asked> = asked.into_iter().map(|a| Asked { source: a.source, text: redact(&a.text) }).collect();
+        let asked: Vec<Asked> = asked
+            .into_iter()
+            .map(|a| Asked {
+                source: a.source,
+                text: redact(&a.text),
+            })
+            .collect();
         let messages: Vec<String> = messages.iter().map(|m| redact(m)).collect();
         Ok(Digest {
             id: run.id.clone(),
@@ -203,7 +262,11 @@ impl Daemon {
             changed_total,
             last_messages: messages,
             children,
-            usage: if usage.is_null() { json!("not reported") } else { usage },
+            usage: if usage.is_null() {
+                json!("not reported")
+            } else {
+                usage
+            },
             last_report,
             asks,
             last_check_in,
@@ -224,11 +287,30 @@ impl Daemon {
             format!("title: {}", d.title),
             format!("role: {}", d.role),
             format!("status: {} (since {})", d.status, ago(d.since_ms)),
-            format!("harness: {}{}{}", d.harness, d.account.as_ref().map(|a| format!(" · account {a}")).unwrap_or_default(), d.model.as_ref().map(|m| format!(" · model {m}")).unwrap_or_default()),
-            format!("repository: {} · branch {} · worktree {}", short_repo(&d.repository), d.branch.as_deref().unwrap_or("?"), d.worktree),
+            format!(
+                "harness: {}{}{}",
+                d.harness,
+                d.account
+                    .as_ref()
+                    .map(|a| format!(" · account {a}"))
+                    .unwrap_or_default(),
+                d.model
+                    .as_ref()
+                    .map(|m| format!(" · model {m}"))
+                    .unwrap_or_default()
+            ),
+            format!(
+                "repository: {} · branch {} · worktree {}",
+                short_repo(&d.repository),
+                d.branch.as_deref().unwrap_or("?"),
+                d.worktree
+            ),
         ];
         if let Some(w) = &d.waiting {
-            lines.push(format!("waiting for: {}", w["kind"].as_str().unwrap_or("the owner")));
+            lines.push(format!(
+                "waiting for: {}",
+                w["kind"].as_str().unwrap_or("the owner")
+            ));
         }
         lines.push("asked:".into());
         for a in &d.asked {
@@ -239,32 +321,94 @@ impl Daemon {
             lines.push(format!("- {} {}", c.kind, c.path));
         }
         if d.changed_total > d.changed.len() {
-            lines.push(format!("- … and {} more", d.changed_total - d.changed.len()));
+            lines.push(format!(
+                "- … and {} more",
+                d.changed_total - d.changed.len()
+            ));
         }
         lines.push("last messages:".into());
         for m in &d.last_messages {
             lines.push(format!("- {}", m.replace('\n', " ")));
         }
         if !d.children.is_empty() {
-            lines.push(format!("children: {}", d.children.iter().map(|c| format!("{} ({})", c.title, c.status)).collect::<Vec<_>>().join(", ")));
+            lines.push(format!(
+                "children: {}",
+                d.children
+                    .iter()
+                    .map(|c| format!("{} ({})", c.title, c.status))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
         }
-        lines.push(format!("usage: {}", if d.usage.is_string() { d.usage.as_str().unwrap_or_default().to_string() } else { d.usage.to_string() }));
+        lines.push(format!(
+            "usage: {}",
+            if d.usage.is_string() {
+                d.usage.as_str().unwrap_or_default().to_string()
+            } else {
+                d.usage.to_string()
+            }
+        ));
         if !d.area.is_empty() {
             lines.push(format!("area: {}", d.area.join(", ")));
         }
         if let Some(r) = &d.last_report {
-            lines.push(format!("report: {}{}{}", r["doing"].as_str().unwrap_or(""), r["needs"].as_str().filter(|s| !s.is_empty()).map(|n| format!(" · needs {n}")).unwrap_or_default(), r["blocked"].as_str().filter(|s| !s.is_empty()).map(|b| format!(" · blocked by {b}")).unwrap_or_default()));
+            lines.push(format!(
+                "report: {}{}{}",
+                r["doing"].as_str().unwrap_or(""),
+                r["needs"]
+                    .as_str()
+                    .filter(|s| !s.is_empty())
+                    .map(|n| format!(" · needs {n}"))
+                    .unwrap_or_default(),
+                r["blocked"]
+                    .as_str()
+                    .filter(|s| !s.is_empty())
+                    .map(|b| format!(" · blocked by {b}"))
+                    .unwrap_or_default()
+            ));
         }
         for a in &d.asks {
-            lines.push(format!("asked Overseer: {} → {}", a["question"].as_str().unwrap_or(""), a["answer"].as_str().unwrap_or("(no answer yet)")));
+            lines.push(format!(
+                "asked Overseer: {} → {}",
+                a["question"].as_str().unwrap_or(""),
+                a["answer"].as_str().unwrap_or("(no answer yet)")
+            ));
         }
         for w in &d.watches {
-            lines.push(if w["subject"] == d.id { format!("watched by {} ({}): {}", w["watcher_title"].as_str().unwrap_or("a watcher to come"), w["mode"].as_str().unwrap_or("watch"), w["brief"].as_str().unwrap_or("")) } else { format!("watching {}: {}", w["subject_title"].as_str().unwrap_or("?"), w["brief"].as_str().unwrap_or("")) });
+            lines.push(if w["subject"] == d.id {
+                format!(
+                    "watched by {} ({}): {}",
+                    w["watcher_title"].as_str().unwrap_or("a watcher to come"),
+                    w["mode"].as_str().unwrap_or("watch"),
+                    w["brief"].as_str().unwrap_or("")
+                )
+            } else {
+                format!(
+                    "watching {}: {}",
+                    w["subject_title"].as_str().unwrap_or("?"),
+                    w["brief"].as_str().unwrap_or("")
+                )
+            });
         }
         if !d.conflicts.is_empty() {
-            lines.push(format!("open conflicts: {}", d.conflicts.iter().map(|c| format!("{} with {} on {}", c["kind"].as_str().unwrap_or("?"), c["other_title"].as_str().unwrap_or("?"), c["paths"].as_array().map(|p| p.len()).unwrap_or(0))).collect::<Vec<_>>().join("; ")));
+            lines.push(format!(
+                "open conflicts: {}",
+                d.conflicts
+                    .iter()
+                    .map(|c| format!(
+                        "{} with {} on {}",
+                        c["kind"].as_str().unwrap_or("?"),
+                        c["other_title"].as_str().unwrap_or("?"),
+                        c["paths"].as_array().map(|p| p.len()).unwrap_or(0)
+                    ))
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            ));
         }
-        Ok(super::bound(&crate::redact::redact(&lines.join("\n")), DIGEST_BYTES))
+        Ok(super::bound(
+            &crate::redact::redact(&lines.join("\n")),
+            DIGEST_BYTES,
+        ))
     }
 
     /// One line per agent (top-level runs), newest first.
@@ -274,7 +418,10 @@ impl Daemon {
             (store.runs()?, store.tasks()?, store.workspaces()?)
         };
         let mut out = Vec::new();
-        for r in runs.iter().filter(|r| r.parent_run_id.is_none() && self.run_role(&r.id) != "overseer") {
+        for r in runs
+            .iter()
+            .filter(|r| r.parent_run_id.is_none() && self.run_role(&r.id) != "overseer")
+        {
             let task = tasks.iter().find(|t| t.id == r.task_id);
             let ws = workspaces.iter().find(|w| w.id == r.workspace_id);
             let changed_total = self.changed_total(&r.id);
@@ -287,12 +434,29 @@ impl Daemon {
                 repository: task.map(|t| short_repo(&t.repo_root)).unwrap_or_default(),
                 branch: ws.and_then(|w| w.branch.clone()),
                 changed_total,
-                waiting: if r.status == "waiting_for_user" { Some(r.attention.as_ref().and_then(|a| a["kind"].as_str()).unwrap_or("the owner").to_string()) } else { None },
+                waiting: if r.status == "waiting_for_user" {
+                    Some(
+                        r.attention
+                            .as_ref()
+                            .and_then(|a| a["kind"].as_str())
+                            .unwrap_or("the owner")
+                            .to_string(),
+                    )
+                } else {
+                    None
+                },
                 children: self.descendants(&r.id).map(|c| c.len()).unwrap_or(0),
                 open_conflicts: self.open_conflicts_of(&r.id).map(|c| c.len()).unwrap_or(0),
             });
         }
-        out.sort_by_key(|l| std::cmp::Reverse(runs.iter().find(|r| r.id == l.id).map(|r| r.created_ms).unwrap_or(0)));
+        out.sort_by_key(|l| {
+            std::cmp::Reverse(
+                runs.iter()
+                    .find(|r| r.id == l.id)
+                    .map(|r| r.created_ms)
+                    .unwrap_or(0),
+            )
+        });
         Ok(out)
     }
 
@@ -309,21 +473,42 @@ impl Daemon {
                 l.id,
                 l.title,
                 l.status,
-                l.waiting.as_ref().map(|w| format!(" ({w})")).unwrap_or_default(),
+                l.waiting
+                    .as_ref()
+                    .map(|w| format!(" ({w})"))
+                    .unwrap_or_default(),
                 l.harness,
                 l.repository,
-                l.branch.as_ref().map(|b| format!(" @{b}")).unwrap_or_default(),
+                l.branch
+                    .as_ref()
+                    .map(|b| format!(" @{b}"))
+                    .unwrap_or_default(),
                 l.changed_total,
-                if l.children > 0 { format!(" · {} children", l.children) } else { String::new() },
-                if l.open_conflicts > 0 { format!(" · {} open conflicts", l.open_conflicts) } else { String::new() }
+                if l.children > 0 {
+                    format!(" · {} children", l.children)
+                } else {
+                    String::new()
+                },
+                if l.open_conflicts > 0 {
+                    format!(" · {} open conflicts", l.open_conflicts)
+                } else {
+                    String::new()
+                }
             )
         };
         let mut shown: Vec<String> = Vec::new();
         let mut folded = 0usize;
         let mut size = 0usize;
         // Active agents first so the ones that matter are never the ones folded away.
-        let mut ordered: Vec<&RosterLine> = lines.iter().filter(|l| ACTIVE.contains(&l.status.as_str())).collect();
-        ordered.extend(lines.iter().filter(|l| !ACTIVE.contains(&l.status.as_str())));
+        let mut ordered: Vec<&RosterLine> = lines
+            .iter()
+            .filter(|l| ACTIVE.contains(&l.status.as_str()))
+            .collect();
+        ordered.extend(
+            lines
+                .iter()
+                .filter(|l| !ACTIVE.contains(&l.status.as_str())),
+        );
         for l in ordered {
             let line = render(l);
             if size + line.len() + 1 > ROSTER_BYTES - 64 {
@@ -334,13 +519,20 @@ impl Daemon {
             shown.push(line);
         }
         if folded > 0 {
-            shown.push(format!("… and {folded} more finished agents (ask for one by id)"));
+            shown.push(format!(
+                "… and {folded} more finished agents (ask for one by id)"
+            ));
         }
         Ok(crate::redact::redact(&shown.join("\n")))
     }
 
     fn changed_total(&self, run_id: &str) -> usize {
-        let events = self.store.lock().unwrap().events_after(0, Some(run_id), crate::store::EVENTS_PER_RUN).unwrap_or_default();
+        let events = self
+            .store
+            .lock()
+            .unwrap()
+            .events_after(0, Some(run_id), crate::store::EVENTS_PER_RUN)
+            .unwrap_or_default();
         let mut paths = std::collections::BTreeSet::new();
         for e in events.iter().filter(|e| e.kind == "file_activity") {
             for p in e.payload["paths"].as_array().cloned().unwrap_or_default() {
@@ -364,26 +556,61 @@ impl Daemon {
     fn turn_source(&self, turn_id: &str) -> Option<String> {
         use rusqlite::OptionalExtension;
         let store = self.store.lock().unwrap();
-        store.conn.query_row("SELECT source FROM turn_sources WHERE turn_id=?1", [turn_id], |r| r.get::<_, String>(0)).optional().ok().flatten()
+        store
+            .conn
+            .query_row(
+                "SELECT source FROM turn_sources WHERE turn_id=?1",
+                [turn_id],
+                |r| r.get::<_, String>(0),
+            )
+            .optional()
+            .ok()
+            .flatten()
     }
 
     pub fn run_role(&self, run_id: &str) -> String {
         use rusqlite::OptionalExtension;
         let store = self.store.lock().unwrap();
-        let role: Option<String> = store.conn.query_row("SELECT role FROM run_roles WHERE run_id=?1", [run_id], |r| r.get(0)).optional().ok().flatten();
+        let role: Option<String> = store
+            .conn
+            .query_row(
+                "SELECT role FROM run_roles WHERE run_id=?1",
+                [run_id],
+                |r| r.get(0),
+            )
+            .optional()
+            .ok()
+            .flatten();
         role.unwrap_or_else(|| {
-            let parent: Option<String> = store.conn.query_row("SELECT parent_run_id FROM runs WHERE id=?1", [run_id], |r| r.get(0)).ok().flatten();
-            if parent.is_some() { "child".into() } else { "agent".into() }
+            let parent: Option<String> = store
+                .conn
+                .query_row(
+                    "SELECT parent_run_id FROM runs WHERE id=?1",
+                    [run_id],
+                    |r| r.get(0),
+                )
+                .ok()
+                .flatten();
+            if parent.is_some() {
+                "child".into()
+            } else {
+                "agent".into()
+            }
         })
     }
 
     pub fn area_of(&self, run_id: &str) -> Vec<String> {
         let store = self.store.lock().unwrap();
-        let mut stmt = match store.conn.prepare("SELECT path FROM areas WHERE run_id=?1 ORDER BY path") {
+        let mut stmt = match store
+            .conn
+            .prepare("SELECT path FROM areas WHERE run_id=?1 ORDER BY path")
+        {
             Ok(s) => s,
             Err(_) => return Vec::new(),
         };
-        stmt.query_map([run_id], |r| r.get::<_, String>(0)).map(|rows| rows.flatten().collect()).unwrap_or_default()
+        stmt.query_map([run_id], |r| r.get::<_, String>(0))
+            .map(|rows| rows.flatten().collect())
+            .unwrap_or_default()
     }
 }
 
