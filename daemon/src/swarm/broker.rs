@@ -238,6 +238,44 @@ fn insert_message(
     Ok(json!({"message_id":id,"seq":seq,"phase":"queued","duplicate":false}))
 }
 
+/// Overseer's advisory to a swarm's director (Gate S, SWARM-60): an envelope in the director's
+/// durable inbox whose sender is `overseer`, carrying its source (the proposal) and who said yes.
+/// It is advice for the director's next turn, not a directive: it names no job or attempt and
+/// changes no assignment. The proposal id makes a replay one envelope.
+pub fn overseer_advisory(store: &mut Store, director_run: &str, text: &str, proposal: &str, by: &str)
+    -> Result<Option<Value>> {
+    let run: Option<String> = store.conn.query_row(
+        "SELECT run_id FROM swarm_director_owners WHERE overseer_run_id=?1",
+        params![director_run], |r| r.get(0)).optional()?;
+    let Some(run) = run else { return Ok(None) };
+    let text = crate::redact::redact(text.trim());
+    if text.is_empty() || text.len() > 4096 {
+        bail!("an advisory needs text of at most 4 KiB");
+    }
+    let current = get(store, &run)?;
+    if matches!(current["status"].as_str(), Some("stopped" | "completed" | "invalidated")) {
+        bail!("swarm run is terminal");
+    }
+    let message_id = format!("overseer-advisory-{proposal}");
+    let payload = json!({"source":"overseer","text":text,"proposal":proposal,"approved_by":by}).to_string();
+    let existing: Option<(i64, String, String)> = store.conn.query_row(
+        "SELECT seq,phase,payload FROM swarm_messages WHERE run_id=?1 AND message_id=?2",
+        params![run, message_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).optional()?;
+    if let Some((seq, phase, old)) = existing {
+        if old != payload {
+            bail!("message id reused with different content");
+        }
+        return Ok(Some(json!({"run_id":run,"message_id":message_id,"seq":seq,"phase":phase,"duplicate":true})));
+    }
+    let revision = current["revision"].as_i64().unwrap_or(0);
+    let now = crate::daemon::now();
+    store.conn.execute("INSERT INTO swarm_messages(run_id,message_id,job_id,attempt_id,sender,recipient,kind,revision,payload,phase,created_ms,updated_ms)
+        VALUES(?1,?2,NULL,NULL,'overseer','director','advisory',?3,?4,'queued',?5,?5)",
+        params![run, message_id, revision, payload, now])?;
+    let seq = store.conn.last_insert_rowid();
+    Ok(Some(json!({"run_id":run,"message_id":message_id,"seq":seq,"phase":"queued","duplicate":false})))
+}
+
 pub fn report(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
     let job = required(p, "job_id")?;

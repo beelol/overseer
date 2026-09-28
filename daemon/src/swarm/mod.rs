@@ -30,7 +30,7 @@ pub use admission::admit;
 pub use availability::observe as observe_availability;
 pub use benefit::preview as preview_benefit;
 pub use benefit::commit as commit_benefit;
-pub use broker::{ack, direct, messages, register, report};
+pub use broker::{ack, direct, messages, overseer_advisory, register, report};
 pub use completion::complete;
 pub use conflicts::{list as list_conflicts, open as open_conflict, resolve as resolve_conflict};
 pub use coverage::report as coverage_report;

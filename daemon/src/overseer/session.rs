@@ -567,6 +567,7 @@ impl Daemon {
                 if self.run_role(id) == "overseer" {
                     bail!("Overseer does not act on itself");
                 }
+                self.refuse_swarm_worker_steering(kind, a, id, &run.title)?;
                 let mut a = a.clone();
                 a["title"] = json!(run.title);
                 a["status_then"] = json!(run.status);
@@ -727,10 +728,60 @@ impl Daemon {
         Ok(())
     }
 
+    /// A Swarm is one agent to Overseer, its director (SWARM-60, Gate S): an action that would
+    /// steer one of its workers is refused, and the refusal names the director to send it to as
+    /// an advisory. Looking (a pin, a read-only watch) is not steering.
+    fn refuse_swarm_worker_steering(&self, kind: &str, a: &Value, run_id: &str, title: &str) -> Result<()> {
+        use rusqlite::OptionalExtension;
+        if kind == "pin" || (kind == "watch" && a["hold_on_stop"] != true) {
+            return Ok(());
+        }
+        let director: Option<(Option<String>, Option<String>)> = {
+            let store = self.store.lock().unwrap();
+            store.conn.query_row(
+                "SELECT o.overseer_run_id, r.title FROM swarm_worker_launches l
+                 LEFT JOIN swarm_director_owners o ON o.run_id=l.run_id
+                 LEFT JOIN runs r ON r.id=o.overseer_run_id
+                 WHERE l.overseer_run_id=?1", [run_id], |r| Ok((r.get(0)?, r.get(1)?))).optional()?
+        };
+        let Some((director_run, director_title)) = director else { return Ok(()) };
+        match (director_run, director_title) {
+            (Some(id), Some(dt)) => bail!("{title} is a Swarm worker; only its director assigns it. Send this to its director, {dt} ({id}), as an advisory instead"),
+            _ => bail!("{title} is a Swarm worker; only its director assigns it. Send this to its director as an advisory through the Swarm's controls instead"),
+        }
+    }
+
+    /// Overseer's message or redirect to a swarm's director enters the director's durable inbox
+    /// as an advisory with its source, rather than as an ordinary follow-up (a director takes no
+    /// follow-ups). `None` when the agent is not a swarm director.
+    fn swarm_director_advisory(self: &Arc<Self>, a: &Value, proposal: &str, by: &str) -> Result<Option<Value>> {
+        let agent = a["agent"].as_str().unwrap_or("");
+        let text = a["text"].as_str().unwrap_or("");
+        let sent = crate::swarm::overseer_advisory(&mut self.store.lock().unwrap(), agent, text, proposal, by)?;
+        if let Some(sent) = &sent {
+            let run = self.run(agent)?;
+            self.emit(Some(&run.task_id), Some(agent), "swarm_advisory", "overseer", "exact",
+                json!({"swarm_run_id": sent["run_id"], "message_id": sent["message_id"], "proposal": proposal, "by": by,
+                    "action": a["action"], "text": crate::redact::redact(text)}))?;
+        }
+        Ok(sent)
+    }
+
     /// One action, carried out through the daemon's own methods.
     fn perform(self: &Arc<Self>, a: &Value, proposal: &str, by: &str) -> Result<String> {
         let title = a["title"].as_str().unwrap_or("").to_string();
-        match a["action"].as_str().unwrap_or("") {
+        let kind = a["action"].as_str().unwrap_or("");
+        // A proposal made before its agent became a Swarm worker is refused the same way.
+        if let Some(agent) = a["agent"].as_str().filter(|_| kind != "start") {
+            self.refuse_swarm_worker_steering(kind, a, agent, &title)?;
+        }
+        match kind {
+            "message" | "redirect" if self.swarm_director_advisory(a, proposal, by)?.is_some() => {
+                let agent = a["agent"].as_str().unwrap_or("");
+                let text = a["text"].as_str().unwrap_or("").to_string();
+                self.dispatch_record(proposal, agent, kind, "advisory", &text, a["why"].as_str().unwrap_or("named"), "delivered")?;
+                Ok(format!("sent \"{text}\" to {title} as an advisory for its next turn"))
+            }
             "message" => {
                 let agent = a["agent"].as_str().unwrap_or("");
                 let text = a["text"].as_str().unwrap_or("").to_string();
