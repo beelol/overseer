@@ -1,7 +1,8 @@
 //! Native workers in an audit (the owner's decision 3 of 2026-09-28, Swarm
 //! RFC "S0 normal start"). In an audit (`source_change_permission: none`) a
 //! native Claude worker is admitted only in Claude's read-only permission
-//! mode (`--permission-mode plan`) with every write tool denied. After the
+//! mode (`--permission-mode plan`) with its file-editing tools denied (shell
+//! commands stay allowed). After the
 //! attempt the daemon checks that no source file in its workspace changed
 //! against the pinned revision: HEAD, `git status` (untracked files
 //! included) and every tracked file's content hash against the pinned tree.
@@ -22,8 +23,11 @@ use std::path::Path;
 pub const AUDIT_HARNESS: &str = "claude";
 /// Claude's read-only permission mode.
 pub const READ_ONLY_MODE: &str = "plan";
-/// Tools denied to a read-only audit worker besides native delegation.
-pub const WRITE_TOOLS: [&str; 5] = ["Edit", "Write", "MultiEdit", "NotebookEdit", "Bash"];
+/// Tools denied to a read-only audit worker besides native delegation: the
+/// file-editing tools. Shell commands stay allowed (the owner's answer of
+/// 2026-09-28); a command can still write, so the post-attempt source check
+/// is the guard.
+pub const WRITE_TOOLS: [&str; 4] = ["Edit", "Write", "MultiEdit", "NotebookEdit"];
 /// Changed paths listed in a report; the evidence ref holds all of them.
 const LISTED: usize = 50;
 

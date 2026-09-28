@@ -1090,7 +1090,7 @@ impl Daemon {
             "auto_parent_budget_ms":auto_parent_budget_ms,
             "swarm_worker": matches!(swarm_identity.as_ref(), Some(SwarmLaunchIdentity::Worker(_))),
             // A native Swarm worker in an audit: Claude's read-only mode with
-            // its write tools denied on every turn (Swarm decision 3, 2026-09-28).
+            // its file-editing tools denied on every turn (Swarm decision 3, 2026-09-28).
             "audit_read_only": matches!(swarm_identity.as_ref(), Some(SwarmLaunchIdentity::Worker(_)))
                 && p["audit_read_only"] == true,
             "resume_first_turn": matches!(swarm_identity.as_ref(), Some(SwarmLaunchIdentity::Worker(_)))

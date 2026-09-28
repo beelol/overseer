@@ -759,6 +759,11 @@ async function mcpClient() {
         fs.writeFileSync(path.join(process.cwd(), plan.write.path), plan.write.content);
         trace('wrote', { path: plan.write.path });
       }
+      if (plan.command) {
+        // A shell command, as Claude's Bash tool runs it in the worker's workspace.
+        const r = require('child_process').spawnSync('sh', ['-c', plan.command], { cwd: process.cwd() });
+        trace('ran', { command: plan.command, status: r.status });
+      }
       for (const probe of plan.probe || []) {
         const r = await call(probe.tool, probe.args || {});
         trace('probed', { tool: probe.tool, error: r.error, status: r.status });

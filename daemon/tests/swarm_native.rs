@@ -1216,8 +1216,9 @@ fn a_calibrated_director_books_its_account_with_its_own_draw() {
 /// mode with writes denied, and the daemon checks after each attempt that no
 /// source file in its workspace changed against the pinned revision. Worker
 /// `a` reads only: its check is clean and the director accepts it (not
-/// before the check). Worker `b` writes a file anyway (as if it slipped past
-/// its mode): its check finds the change, the director cannot accept it, the
+/// before the check), including a read-only shell command (`grep`); shell
+/// commands stay allowed. Worker `b` runs a shell command that writes a
+/// source file: its check finds the change, the director cannot accept it, the
 /// job is blocked `audit_source_changed`, the director's terminal message and
 /// an event on the worker's run (shown in Overseer's digest of it) report
 /// it, and the worktree and a pinned ref keep the evidence. A Codex route in
@@ -1250,8 +1251,11 @@ fn native_claude_workers_audit_read_only_and_a_source_change_fails_the_attempt()
     std::fs::write(&w.workers, json!({
         "trace":w.trace,"gate":worker_gate,
         "jobs":{
-            "a":{"evidence":[{"id":"a-proof","kind":"finding","content":"lookup scoped by tenant"}]},
-            "b":{"write":{"path":"src/roles.txt","content":"patched during an audit\n"},
+            // A read-only shell command, as Claude's Bash tool would run it.
+            "a":{"command":"grep -n a a.txt > /dev/null",
+                "evidence":[{"id":"a-proof","kind":"finding","content":"lookup scoped by tenant"}]},
+            // A shell command that writes a source file.
+            "b":{"command":"mkdir -p src && printf 'patched during an audit\\n' > src/roles.txt",
                 "evidence":[{"id":"b-proof","kind":"finding","content":"roles checked"}]}}}).to_string()).unwrap();
 
     let (run, director, _) = start(&w, "none", "audit-workers");
@@ -1268,9 +1272,10 @@ fn native_claude_workers_audit_read_only_and_a_source_change_fails_the_attempt()
         let started = wait_trace(&w, |t| t["step"] == "started" && t["role"] == "worker" && t["job"] == job, "worker start", 30);
         assert_eq!(started["permission_mode"], "plan", "Claude's read-only mode: {started}");
         let denied: Vec<String> = serde_json::from_value(started["denied"].clone()).unwrap();
-        for tool in ["Agent", "Task", "Edit", "Write", "MultiEdit", "NotebookEdit", "Bash"] {
+        for tool in ["Agent", "Task", "Edit", "Write", "MultiEdit", "NotebookEdit"] {
             assert!(denied.iter().any(|d| d == tool), "{tool} denied: {started}");
         }
+        assert!(!denied.iter().any(|d| d == "Bash"), "shell commands stay allowed: {started}");
     }
     // Auto's selector refused no Claude route for the audit; the Codex
     // account has no Swarm delivery path at all (admission would refuse it
@@ -1282,7 +1287,9 @@ fn native_claude_workers_audit_read_only_and_a_source_change_fails_the_attempt()
 
     std::fs::write(&worker_gate, "open").unwrap();
     std::fs::write(&w.gate, "open").unwrap();
-    wait_trace(&w, |t| t["step"] == "wrote" && t["job"] == "b", "b's write", 30);
+    let ran = |job: &str| wait_trace(&w, |t| t["step"] == "ran" && t["job"] == job, "the worker's command", 30);
+    assert_eq!(ran("a")["status"], 0, "grep ran");
+    assert_eq!(ran("b")["status"], 0, "the writing command ran");
     let decided = wait_trace(&w, step("decided", "director"), "the director's decisions", 90);
     assert_eq!(decided["accepted"], json!(["a"]), "{decided}");
     assert_eq!(decided["refused"], json!(["b"]), "{decided}");

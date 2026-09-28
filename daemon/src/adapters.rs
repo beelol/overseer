@@ -381,7 +381,7 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
             }
             if req.swarm_worker || req.swarm_tools.is_some() {
                 // A Swarm member in Claude's read-only mode (an audit worker)
-                // also has every write tool denied.
+                // also has its file-editing tools denied (shell commands stay).
                 let mut denied = vec!["Agent", "Task"];
                 if req.permission_mode == Some(crate::swarm::audit::READ_ONLY_MODE) {
                     denied.extend(crate::swarm::audit::WRITE_TOOLS);
@@ -1235,7 +1235,9 @@ mod turn_option_tests {
         request.permission_mode = Some("plan");
         let args = launch("claude", &request).unwrap().args;
         assert!(args.windows(2).any(|a| a == ["--permission-mode", "plan"]), "{args:?}");
-        assert!(args.windows(2).any(|a| a == ["--disallowedTools", "Agent,Task,Edit,Write,MultiEdit,NotebookEdit,Bash"]),
+        // Shell commands stay allowed (the owner's answer of 2026-09-28); the
+        // post-attempt source check is the guard against a command that writes.
+        assert!(args.windows(2).any(|a| a == ["--disallowedTools", "Agent,Task,Edit,Write,MultiEdit,NotebookEdit"]),
             "{args:?}");
         request.permission_mode = None;
         let args = launch("claude", &request).unwrap().args;

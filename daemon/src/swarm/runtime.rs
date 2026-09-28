@@ -413,7 +413,7 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
     }
     let program_override = if harness == "generic" { json!(program) } else { Value::Null };
     // A native worker in an audit runs in Claude's read-only mode with its
-    // write tools denied, on every turn (`audit_read_only`).
+    // file-editing tools denied, on every turn (`audit_read_only`).
     let audit_read_only = harness != "generic" && {
         let store = d.store.lock().unwrap();
         get(&store, run)?["source_change_permission"] == "none"
