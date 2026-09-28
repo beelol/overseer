@@ -916,9 +916,11 @@
         "fixtures/swarm/atlas-v1/acceptance.test.mjs",
         "fixtures/swarm/atlas-v1/probe.test.mjs",
         "daemon/tests/swarm_atlas.rs",
-        "docs/verification/swarm/S1.md"
+        "docs/verification/swarm/S1.md",
+        "daemon/tests/swarm_final_report.rs",
+        "daemon/tests/swarm_reproduction.rs"
       ],
-      "blocker": "Joined Express/PostgreSQL replay: four initial workers, D1 before J2's result, advisory only to J1/J4 with receipts, J4's overlap queued behind the in-flight turn and redirected in the next, no director turns while unchanged, slot refill, J7 reproduction, seven accepted checks; faults: missing/stale evidence, J7 contradiction resolved by J8, missing export queue blocked, source-text director command stays data. Open at fixture scope: the final report entries and coverage matrix as one artifact; a literal evidence-file removal. Needs D3: profile choice through Auto's route selection (native workers are refused in audits)."
+      "blocker": "Joined Express/PostgreSQL replay: four initial workers, D1 before J2's result, advisory only to J1/J4 with receipts, J4's overlap queued behind the in-flight turn and redirected in the next, no director turns while unchanged, slot refill, J7 reproduction, seven accepted checks; faults: missing/stale evidence, J7 contradiction resolved by J8, missing export queue blocked, source-text director command stays data. The final report entries and coverage matrix are one artifact (swarm.report.final, swarm_final_report.rs, scripted evidence). Open at fixture scope: a literal evidence-file removal. Needs D3: profile choice through Auto's route selection (native workers are refused in audits)."
     },
     "S2": {
       "status": "partial",
@@ -942,7 +944,7 @@
         "daemon/tests/swarm_scenarios.rs",
         "docs/verification/swarm/S3.md"
       ],
-      "blocker": "The versioned Catalog fixture now joins both a 24-module migration and a 24-to-12 scope change to isolated integration and combined backend checks. The narrowed branch preserves excluded routes and rejects completion with an unintegrated retained patch. Autonomous director adaptation, live user intake, conflict repair and qualified harness paths remain unverified."
+      "blocker": "The versioned Catalog fixture now joins both a 24-module migration and a 24-to-12 scope change to isolated integration and combined backend checks. The narrowed branch preserves excluded routes and rejects completion with an unintegrated retained patch. Patch variants (2026-09-28): a conflicting patch keeps its artifact; a worker's dependency upgrade or edit of a file another job owns cannot integrate until the director assigns it; combined-test failure blocks completion. Autonomous director adaptation, live user intake and qualified harness paths remain unverified."
     },
     "S4": {
       "status": "partial",
@@ -965,9 +967,10 @@
         "daemon/tests/swarm_availability.rs",
         "docs/verification/swarm/S5.md",
         "fixtures/swarm/atlas-v1/probe-shared.mjs",
-        "daemon/tests/swarm_gate_s.rs"
+        "daemon/tests/swarm_gate_s.rs",
+        "daemon/tests/swarm_claim_ledger.rs"
       ],
-      "blocker": "Atlas v1 joins fourteen named faults: J2 lost-result-receipt, director death after dispatch, held J4 redirect timeout, evidence-free J4 heartbeat through its deadline, invalid J8/J9/J99 dependencies rejected while valid J2 completes, two scripted clients sharing one mutable PostgreSQL schema before isolated retries, 2,000 duplicate progress messages during Stop, both scripted last-result/Stop orderings, full SQLite storage during an Atlas artifact write followed by recovery and replay, an injected external allowance reduction that holds J4 while J2 evidence survives, a blocked run deadline that requests a checkpoint and interrupts a held J4 probe, a run-specific worker ceiling reduction that drains two supervised backend probes, contradictory J2/J7 evidence resolved after one bounded J8 reproduction, and selected-account revocation that interrupts only its J4 worker while preserving J2's account-B evidence. Separate daemon fixtures cover SQLite-full result/dispatch failures, completed-run contamination and explicit unresolved conflict. Numeric allowance history is asserted in the joined Atlas status APIs and displayed by a separate packaged fixture; one joined UI recording remains absent. A full S1-sized ordered replay, live identity telemetry and provider communication remain unverified; automatic resource alias discovery is absent. 2026-09-28: Overseer redirect/hold of a worker refused and offered as a director advisory; Overseer cannot start a swarm and needs the owner's yes to raise its limit, even at Auto; Overseer's own run reachable at a full house (swarm_gate_s.rs). Open: ordinary agent and J2 on one claim ledger (SWARM-44/60, not built)."
+      "blocker": "Atlas v1 joins fourteen named faults: J2 lost-result-receipt, director death after dispatch, held J4 redirect timeout, evidence-free J4 heartbeat through its deadline, invalid J8/J9/J99 dependencies rejected while valid J2 completes, two scripted clients sharing one mutable PostgreSQL schema before isolated retries, 2,000 duplicate progress messages during Stop, both scripted last-result/Stop orderings, full SQLite storage during an Atlas artifact write followed by recovery and replay, an injected external allowance reduction that holds J4 while J2 evidence survives, a blocked run deadline that requests a checkpoint and interrupts a held J4 probe, a run-specific worker ceiling reduction that drains two supervised backend probes, contradictory J2/J7 evidence resolved after one bounded J8 reproduction, and selected-account revocation that interrupts only its J4 worker while preserving J2's account-B evidence. Separate daemon fixtures cover SQLite-full result/dispatch failures, completed-run contamination and explicit unresolved conflict. Numeric allowance history is asserted in the joined Atlas status APIs and displayed by a separate packaged fixture; one joined UI recording remains absent. A full S1-sized ordered replay, live identity telemetry and provider communication remain unverified; automatic resource alias discovery is absent. 2026-09-28: Overseer redirect/hold of a worker refused and offered as a director advisory; Overseer cannot start a swarm and needs the owner's yes to raise its limit, even at Auto; Overseer's own run reachable at a full house (swarm_gate_s.rs). Ordinary agent and J2 claiming one path: one daemon claim ledger admits one owner (swarm_claim_ledger.rs)."
     }
   }
 }
