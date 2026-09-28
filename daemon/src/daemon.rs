@@ -799,6 +799,9 @@ impl Daemon {
             // A booked start takes its app slot in the shared booking (Auto's one authority),
             // which refuses a full limit with `global_agent_limit`; it is not counted here too.
             None if p.get("shared_booking").is_some_and(|b| !b.is_null()) => None,
+            // Overseer's own coordinating run takes no app slot (Gate S, SWARM-07): a
+            // full house never locks the owner out of it. Its turns are still metered.
+            None if p["role"] == "overseer" => None,
             None => Some(self.reserve_agent_slot()?),
         };
         let title = p["title"].as_str().map(str::to_string).unwrap_or_else(|| prompt.chars().take(60).collect());
@@ -1850,7 +1853,9 @@ impl Daemon {
                 }
             }
         }
-        let mut resume_slot = if follow_up && !ACTIVE.contains(&run.status.as_str()) {
+        let coordinating = self.store.lock().unwrap().conn.query_row(
+            "SELECT 1 FROM run_roles WHERE run_id=?1 AND role='overseer'", [run_id], |_| Ok(())).is_ok();
+        let mut resume_slot = if follow_up && !ACTIVE.contains(&run.status.as_str()) && !coordinating {
             Some(self.reserve_agent_slot()?)
         } else {
             None

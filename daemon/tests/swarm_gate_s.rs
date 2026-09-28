@@ -241,3 +241,84 @@ fn overseer_controls_a_swarm_only_through_its_controls_and_confirms_what_commits
     assert_eq!(recorded, 5, "pause, resume, lower limit, requirements, stop");
     std::fs::write(&w.gate, "open").unwrap();
 }
+
+/// SWARM-07 with Gate S present: at `agents.max_active=3` a running category
+/// (its director and two admitted workers) fills every slot. An agent Overseer
+/// starts (the owner's yes given) is refused by the same count as a manual
+/// start, while Overseer's own coordinating run still answers the owner: it
+/// takes no slot (its turns are metered like any run's, AUTO-AC-32).
+#[test]
+fn a_full_house_refuses_overseer_started_agents_but_not_overseers_own_run() {
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("full-house"));
+    let mode_file = temp.path().join("mode");
+    std::fs::write(&mode_file, "overseer").unwrap();
+    let fixture = repo_root().join("fixtures/fake-harness/claude-fixture.js").display().to_string();
+    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", fixture.as_str()),
+        ("CLAUDE_FIXTURE_MODE_FILE", mode_file.to_str().unwrap()),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE")]);
+    d.call("agents.limit.set", json!({"max_active":3}));
+    let run = d.call("swarm.create", json!({"category":"Full house","objective":"Audit",
+        "allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap().to_string();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"j0","title":"First","acceptance":"evidence","deps":[]},
+        {"id":"j1","title":"Second","acceptance":"evidence","deps":[]}]}));
+    commit_beneficial_batch(&d, &id, &["j0".into(), "j1".into()]);
+    let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
+    for job in ["j0", "j1"] {
+        let admitted = d.call("swarm.admit", json!({"run_id":id,"generation":1,"revision":1,"job_id":job,
+            "target_id":"fixture-local","request_id":format!("house-{job}"),"now_ms":at,
+            "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+                "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["fixture-pool"],
+                    "capabilities":["code"],"health":"up","auth":"ok"}],
+                "pools":[{"id":"fixture-pool","windows":[{"id":"run","unit":"points","remaining_milli":100000,
+                    "protected_milli":0,"reserved_milli":0,"confidence":"exact","expires_ms":at+60000}]}]},
+            "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+        assert_eq!(admitted["status"], "admitted", "{admitted}");
+    }
+    let director = d.call("swarm.director.launch", json!({"run_id":id,"generation":1,"repo":checkout,
+        "program":"/bin/sleep","args":["60"],"prompt":"Direct","title":"Full house director"}));
+    assert_eq!(director["status"], "launched", "{director}");
+    assert_eq!(d.call("agents.limit.get", json!({}))["active"], 3);
+    // Overseer, with the owner's yes, tries to start a fourth agent: refused by the same count.
+    d.call("overseer.session", json!({}));
+    db(&d).execute("UPDATE overseer_sessions SET last_cause='owner'", []).unwrap();
+    let proposal = d.call("overseer.propose", json!({"actions":[{"action":"start","repo":checkout,
+        "harness":"claude","prompt":"review the audit","title":"overseer-reviewer"}],"source":"test"}));
+    let answered = d.call("overseer.answer", json!({"id":proposal["proposal"],"yes":true,"surface":"ctl","by":"owner"}));
+    assert!(answered["result"].as_str().unwrap().contains("agent limit"), "{answered}");
+    assert!(d.try_call("task.create", json!({"repo":checkout,"harness":"generic","workspace_mode":"worktree",
+        "program":"/bin/sleep","args":["5"],"prompt":"","title":"manual"})).unwrap_err().contains("agent limit"));
+    assert!(d.runs().iter().all(|r| r["title"] != "overseer-reviewer"), "no fourth agent started");
+    // Overseer's own run still answers the owner, without taking a slot.
+    d.call("overseer.send", json!({"text":"How is the audit going?","surface":"ctl","harness":"claude"}));
+    let until = std::time::Instant::now() + Duration::from_secs(30);
+    let finished = loop {
+        let s = d.call("overseer.session", json!({}));
+        let status = s["run_status"].as_str().unwrap_or("").to_string();
+        if !s["run_id"].is_null() && !["queued", "starting", "running", "waiting_for_user"].contains(&status.as_str()) {
+            break status;
+        }
+        assert!(std::time::Instant::now() < until, "Overseer did not answer: {s}");
+        std::thread::sleep(Duration::from_millis(100));
+    };
+    assert_eq!(finished, "completed", "Overseer's run answered at a full house");
+    assert_eq!(d.call("agents.limit.get", json!({}))["active"], 3, "and it took no slot");
+    // A second turn of the same run (a follow-up) is not refused either.
+    let answers = |d: &Daemon| d.call("overseer.session", json!({}))["messages"].as_array().unwrap().iter()
+        .filter(|m| m["source"] == "overseer").count();
+    let before = answers(&d);
+    d.call("overseer.send", json!({"text":"Anything blocked?","surface":"ctl","harness":"claude"}));
+    let until = std::time::Instant::now() + Duration::from_secs(30);
+    loop {
+        let s = d.call("overseer.session", json!({}));
+        if answers(&d) > before && s["run_status"] == "completed" { break; }
+        assert!(std::time::Instant::now() < until, "Overseer's follow-up did not run: {s}");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert_eq!(d.call("agents.limit.get", json!({}))["active"], 3);
+    d.call("swarm.stop", json!({"run_id":id}));
+    let director_run = director["overseer_run_id"].as_str().unwrap();
+    assert_ne!(d.wait_done(director_run, 15)["status"], "running");
+}
