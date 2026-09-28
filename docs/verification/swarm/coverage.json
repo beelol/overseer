@@ -103,7 +103,7 @@
       "blocker": "One app-slot count (account_booking::app_slots_in_use) is read in every admission transaction: ordinary starts and follow-ups (durable slot holds), Auto roots and children, booked starts and Swarm admission; a four-path race for the last slot admits exactly one and holds it across restart. Swarm account workers book the shared account windows; without fixture inputs they book on Auto's qualified upper draw (five isolated same-bucket runs, fixture meters only in tests, refused upper_draw_unknown before). Auto roots/children still hold unknown-draw claims, and linked profiles and live providers are unverified."
     },
     "SWARM-09": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_policy.rs",
         "daemon/tests/swarm_availability.rs",
@@ -111,9 +111,10 @@
         "daemon/tests/swarm_admission.rs",
         "docs/verification/swarm/milestone-7.md",
         "docs/verification/swarm/milestone-14.md",
-        "docs/verification/swarm/SWARM-09.md"
+        "docs/verification/swarm/SWARM-09.md",
+        "daemon/tests/swarm_native.rs"
       ],
-      "blocker": "Fixture targets sharing a pool share reservations across categories, and targets labeled as one account with no common pool fail closed. An explicit revoked auth status now blocks every target alias with that account ID and cancels admitted jobs on both routes while an independent account stays eligible. Live account identity discovery, cross-mode shared quota authority, and proof of independent real accounts remain unavailable."
+      "blocker": null
     },
     "SWARM-10": {
       "status": "verified",
