@@ -1309,6 +1309,10 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "profile.list" => json!(d.store.lock().unwrap().profiles()?),
         "swarm.create" => crate::swarm::create(&mut d.store.lock().unwrap(), p)?,
+        "swarm.start" => {
+            require_swarm_storage(d)?;
+            crate::swarm::start(d, p)?
+        }
         "swarm.director.owner.begin" => {
             fixture_only()?;
             crate::swarm::begin_director_owner(&mut d.store.lock().unwrap(), p)?

@@ -21,6 +21,7 @@ mod revision;
 mod runtime;
 mod scheduler;
 mod settings;
+mod start;
 pub mod schema;
 pub use artifacts::{confirm_exit, decide, put};
 pub use admission::admit;
@@ -56,6 +57,7 @@ pub use runtime::launch_director;
 pub use runtime::refresh_linked_director_owners;
 pub use runtime::interrupt_workers_with_fault;
 pub use scheduler::next as schedule_next;
+pub use start::start;
 
 use crate::store::Store;
 use anyhow::{anyhow, bail, Result};
@@ -368,6 +370,7 @@ pub fn get(store: &Store, id: &str) -> Result<Value> {
     run["completion"] = completion::get(store, id)?;
     run["partial_report"] = completion::partial_get(store, id)?;
     run["availability"] = availability::get(store, id)?;
+    run["start"] = start::confirmation(store, id)?;
     run["benefit"] = benefit::get_state(store, id, run["revision"].as_i64().unwrap_or(0))?;
     run["capacity"] = capacity_readout(store, id)?;
     let mut job_counts = BTreeMap::<String, i64>::new();

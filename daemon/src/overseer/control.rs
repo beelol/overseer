@@ -82,7 +82,7 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     ("auto.usage.list", "read"), ("auto.usage.work.list", "read"), ("auto.usage.thread.list", "read"),
     ("auto.usage.summary", "read"), ("auto.decision.replay", "read"), ("run.result", "read"),
     ("swarm.stop", STEER), ("swarm.pause", STEER), ("swarm.off", STEER),
-    ("swarm.create", CONFIRM), ("swarm.resume", CONFIRM), ("swarm.limit.set", CONFIRM), ("swarm.deadline.extend", CONFIRM),
+    ("swarm.create", CONFIRM), ("swarm.start", CONFIRM), ("swarm.resume", CONFIRM), ("swarm.limit.set", CONFIRM), ("swarm.deadline.extend", CONFIRM),
     ("swarm.targets.set", CONFIRM), ("auto.start", CONFIRM),
     ("swarm.director.owner.begin", NEVER), ("swarm.director.owner.renew", NEVER), ("swarm.director.owner.refresh_linked", NEVER),
     ("swarm.director.owner.expire_due", NEVER), ("swarm.director.launch", NEVER), ("swarm.storage.recover", NEVER),
