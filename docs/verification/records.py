@@ -2192,24 +2192,33 @@ rec(205, "Offline on a real Wi-Fi toggle (owner step)", "not started", date="—
     actual="Not started: split from AC-83 by the owner on 2026-09-27. The same check passes with the network simulated (AC-83); this criterion is macOS's own signal on a real toggle.", live="—",
     blocker="Owner, when no agents are in flight: run `node test/local/wifi-live.js`, switch Wi-Fi off when it asks and on again when it says Overseer is offline (about a minute). It writes `evidence/ac-205/`; then this record is updated.")
 
-rec(206, "One command gives a dev Overseer", "not started", date="—", commit="—",
+rec(212, "Production can never point at a dev version (stage 1)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
-    actual="Not started: added by the owner on 2026-09-27; being built on `claude/dev-instance`.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
-rec(207, "A dev instance never interferes with the running Overseer", "not started", date="—", commit="—",
+    actual="Not started: added by the owner on 2026-09-27; stage 1, being built on `claude/prod-guard`.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
+rec(213, "The production phone app never pairs with a dev instance (after pull request #10)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
-    actual="Not started: added by the owner on 2026-09-27; being built on `claude/dev-instance`.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
-rec(208, "The installed Overseer knows nothing of dev instances", "not started", date="—", commit="—",
+    actual="Not started: the phone app and the gateway are being finished in pull request #10 by another agent; this criterion starts after #10 is on main.", live="—", blocker="After PR #10: the phone app and the gateway must be on main first.")
+rec(206, "One command gives a dev Overseer (stage 2)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
-    actual="Not started: added by the owner on 2026-09-27; being built on `claude/dev-instance`.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
-rec(209, "VS Code and the TUI pointed at one instance", "not started", date="—", commit="—",
+    actual="Not started: added by the owner on 2026-09-27; stage 2, built on `claude/dev-instance` after stage 1 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
+rec(207, "A dev instance never interferes with the running Overseer (stage 2)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
-    actual="Not started: added by the owner on 2026-09-27; being built on `claude/dev-instance`.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
-rec(210, "The phone simulators pinned to a dev instance", "not started", date="—", commit="—",
+    actual="Not started: added by the owner on 2026-09-27; stage 2, built on `claude/dev-instance` after stage 1 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
+rec(208, "Production knows nothing of dev instances (stage 2)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
-    actual="Not started: added by the owner on 2026-09-27; being built on `claude/dev-instance`. The phone app's side waits for pull request #10 on main; `phone/` is not edited on `claude/dev-instance`.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
-rec(211, "Agents learn it from the repository, and leave nothing running", "not started", date="—", commit="—",
+    actual="Not started: added by the owner on 2026-09-27; stage 2, built on `claude/dev-instance` after stage 1 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
+rec(209, "VS Code and the TUI pointed at one instance (stage 2)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
-    actual="Not started: added by the owner on 2026-09-27; being built on `claude/dev-instance`.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
+    actual="Not started: added by the owner on 2026-09-27; stage 2, built on `claude/dev-instance` after stage 1 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
+rec(210, "The phone simulators pinned to a dev instance (after pull request #10)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
+    actual="Not started: the phone app and the gateway are being finished in pull request #10 by another agent; this criterion starts after #10 is on main.", live="—", blocker="After PR #10: the phone app and the gateway must be on main first.")
+rec(211, "Agents learn it from the repository, and leave nothing running (stage 2)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
+    actual="Not started: added by the owner on 2026-09-27; stage 2, built on `claude/dev-instance` after stage 1 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
+rec(214, "Deploy: the one path from dev to production (stage 3)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
+    actual="Not started: added by the owner on 2026-09-27; stage 3, built on `claude/deploy` after stage 2 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
 
 SHORT_BLOCKERS = {
     154: "verified",
@@ -2345,12 +2354,15 @@ SHORT_BLOCKERS = {
     201: "partial: the gate's tests and scenarios are in the suites and pass with the new behaviour off and on (pull request #14); the clean-clone run waits for the merge",
     202: "not started (Gate S, added by the owner on 2026-09-27)",
     204: "not started (Gate Q, added by the owner on 2026-09-27)",
+    212: "not started (Gate T, added by the owner on 2026-09-27)",
+    213: "not started: after PR #10 (the phone app and the gateway)",
     206: "not started (Gate T, added by the owner on 2026-09-27)",
     207: "not started (Gate T, added by the owner on 2026-09-27)",
     208: "not started (Gate T, added by the owner on 2026-09-27)",
     209: "not started (Gate T, added by the owner on 2026-09-27)",
-    210: "not started (Gate T, added by the owner on 2026-09-27)",
+    210: "not started: after PR #10 (the phone app and the gateway)",
     211: "not started (Gate T, added by the owner on 2026-09-27)",
+    214: "not started (Gate T, added by the owner on 2026-09-27)",
 }
 TOTAL = 53
 
