@@ -176,9 +176,9 @@ class Voice {
     <span class="voice-state" id="voice-state" role="status">Off</span>
     <button class="voice-target" id="voice-target" aria-label="Who you are talking to">Overseer</button>
     <span class="grow"></span>
-    <button id="voice-yes" hidden title="Yes to what Overseer read back (Voice Mode: Yes)">Yes</button>
-    <button id="voice-no" hidden title="No to what Overseer read back (Voice Mode: No)">No</button>
-    <button id="voice-cancel" hidden title="Cancel the open request (Voice Mode: Cancel the Request)">Cancel</button>
+    <button id="voice-yes" hidden title="Yes to what Overseer read back (⌥⌘⇧Y)">Yes</button>
+    <button id="voice-no" hidden title="No to what Overseer read back (⌥⌘⇧N)">No</button>
+    <button id="voice-cancel" hidden title="Cancel the open request (⌥⌘⇧.)">Cancel</button>
     <button id="voice-mute" aria-pressed="false" aria-label="Mute"><i class="codicon codicon-mic" aria-hidden="true"></i></button>
   </header>
   <section class="voice-stage">

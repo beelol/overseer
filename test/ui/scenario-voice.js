@@ -307,7 +307,7 @@ const { auditExpression } = require('./audit');
     const cancelId2 = s.ctl('voice.say', { text: 'Tell Continuity to pause for now.' }).request;
     await untilState(cancelId2, ['settling']);
     await cdp.focusWorkbench();
-    await cdp.key('.', { meta: true, alt: true });
+    await cdp.key('.', { meta: true, alt: true, shift: true });
     const cancelled = await untilState(cancelId2, ['cancelled'], 10000);
     check('the voice mark is on the targeted agent in the side bar and the grid while the request is open, and goes when it closes', settling === 'settling' && sideMarked && gridMarked && unmarked, { settling, sideMarked, gridMarked, unmarked });
     // Yes by keyboard: a plan that waits for a yes (archiving is a Confirm action).
@@ -317,7 +317,7 @@ const { auditExpression } = require('./audit');
     const yesShown = await view.waitFor(`!document.getElementById('voice-yes').hidden`, 8000).then(() => true, () => false);
     await s.screenshot('yes-waiting');
     await cdp.focusWorkbench();
-    await cdp.key('y', { meta: true, alt: true });
+    await cdp.key('y', { meta: true, alt: true, shift: true });
     const yesDone = await untilState(yesId, ['sent'], 15000);
     check('mute, cancel and yes by keyboard only', keyMuted && keyUnmuted && cancelled === 'cancelled' && waiting === 'waiting' && yesShown && yesDone === 'sent', { keyMuted, keyUnmuted, cancelled, waiting, yesShown, yesDone });
     s.ctl('voice.set', { settle_seconds: 2 });
