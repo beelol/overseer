@@ -147,12 +147,22 @@ impl Daemon {
     }
 
     pub fn overseer_tools(&self, token: &str) -> Result<Value> {
+        // A Swarm member's token (the proposed native path, `swarm.native_director`).
+        if let Some(holder) = crate::swarm::native::holder(&self.store.lock().unwrap(), token)? {
+            let role = match holder { crate::swarm::native::Holder::Director { .. } => crate::swarm::native::DIRECTOR_ROLE,
+                crate::swarm::native::Holder::Worker { .. } => crate::swarm::native::WORKER_ROLE };
+            return Ok(json!({"tools": crate::swarm::native::tool_list(role)}));
+        }
         let (run_id, role) = self.token_holder(token)?;
         Ok(json!({"tools": self.tools_of_run(&run_id, &role)}))
     }
 
     /// One tool call from a run. Every answer is bounded and redacted.
     pub fn overseer_tool(self: &std::sync::Arc<Self>, token: &str, name: &str, arguments: &Value) -> Result<Value> {
+        let swarm = crate::swarm::native::holder(&self.store.lock().unwrap(), token)?;
+        if let Some(holder) = swarm {
+            return crate::swarm::native::call(self, &holder, name, arguments);
+        }
         let (run_id, role) = self.token_holder(token)?;
         if !self.tools_of_run(&run_id, &role).iter().any(|t| t["name"] == name) {
             bail!("{role} runs have no tool {name}");

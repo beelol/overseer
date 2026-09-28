@@ -73,6 +73,18 @@ pub struct LaunchReq<'a> {
     /// Swarm workers must not start unaccounted native subagents. This is
     /// daemon-owned launch metadata, never a caller-supplied target capability.
     pub swarm_worker: bool,
+    /// The daemon's per-run Swarm tools over MCP (the proposed native
+    /// director and worker path, `swarm.native_director`): daemon-owned
+    /// launch metadata, like `swarm_worker`, never caller-supplied arguments.
+    pub swarm_tools: Option<SwarmTools<'a>>,
+}
+
+/// A Swarm member's MCP configuration (a private file in the run's folder
+/// naming `overseerd mcp` and the member's token) and the tools it may call.
+#[derive(Clone, Copy)]
+pub struct SwarmTools<'a> {
+    pub config: &'a Path,
+    pub allowed: &'a [String],
 }
 
 pub struct Launch {
@@ -279,6 +291,16 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
             bail!("Swarm worker native delegation is not controlled for {harness}");
         }
     }
+    if req.swarm_tools.is_some() {
+        // Only Claude Code has the MCP configuration, tool allow-list and
+        // delegation deny this path relies on (Gate S's spike, AC-180).
+        if harness != "claude" {
+            bail!("Swarm tools over MCP are not supported for {harness}");
+        }
+        if !req.extra_args.is_empty() {
+            bail!("a Swarm member cannot override its tools with extra arguments");
+        }
+    }
     let program = match req.program_override {
         Some(p) => PathBuf::from(p),
         None => resolve_program(harness).ok_or_else(|| anyhow::anyhow!("{harness} executable not found"))?,
@@ -357,8 +379,12 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
             if let Some(mode) = req.permission_mode {
                 args.extend(["--permission-mode".into(), mode.into()]);
             }
-            if req.swarm_worker {
+            if req.swarm_worker || req.swarm_tools.is_some() {
                 args.extend(["--disallowedTools".into(), "Agent,Task".into()]);
+            }
+            if let Some(tools) = req.swarm_tools {
+                args.extend(["--mcp-config".into(), tools.config.display().to_string(),
+                    "--strict-mcp-config".into(), "--allowedTools".into(), tools.allowed.join(",")]);
             }
             let content = if req.images.is_empty() {
                 json!(req.prompt)
@@ -1135,7 +1161,7 @@ mod tests {
                 cwd: Path::new("/tmp"), prompt: "work", model: Some("fixture-model"),
                 effort: Some("medium"), sandbox: Some("workspace-write"), profile_env: BTreeMap::new(),
                 resume_session: None, program_override: Some("/bin/true"),
-                args_override: None, extra_args: &[], permission_mode: None, images: &[], swarm_worker: false,
+                args_override: None, extra_args: &[], permission_mode: None, images: &[], swarm_worker: false, swarm_tools: None,
             }).unwrap();
             assert!(launch.args.iter().any(|arg| arg == expected), "{harness}: {:?}", launch.args);
             assert!(!launch.args.iter().any(|arg| arg.contains(";")));
@@ -1151,7 +1177,7 @@ mod tests {
                 cwd: Path::new("/tmp"), prompt: "inspect", model: Some("fixture-model"),
                 effort: Some("medium"), sandbox: Some("read-only"), profile_env: BTreeMap::new(),
                 resume_session: resume, program_override: Some("/bin/true"),
-                args_override: None, extra_args: &[], permission_mode: None, images: &[], swarm_worker: false,
+                args_override: None, extra_args: &[], permission_mode: None, images: &[], swarm_worker: false, swarm_tools: None,
             }).unwrap();
             let args = &launch.args;
             if resume.is_some() {
@@ -1169,7 +1195,7 @@ mod turn_option_tests {
 
     fn req<'a>(resume: Option<&'a str>, images: &'a [(String, PathBuf)]) -> LaunchReq<'a> {
         LaunchReq { cwd: Path::new("/tmp/w"), prompt: "do it", model: Some("gpt-5.6-luna"), sandbox: Some("workspace-write"), profile_env: BTreeMap::new(), resume_session: resume, program_override: Some("/bin/echo"),
-            args_override: None, extra_args: &[], effort: Some("high"), permission_mode: Some("read-only"), images, swarm_worker: false }
+            args_override: None, extra_args: &[], effort: Some("high"), permission_mode: Some("read-only"), images, swarm_worker: false, swarm_tools: None }
     }
 
     #[test]
@@ -1191,6 +1217,29 @@ mod turn_option_tests {
             assert!(launch(harness, &request).err().unwrap().to_string()
                 .contains("native delegation is not controlled"), "{harness}");
         }
+    }
+
+    #[test]
+    fn swarm_tools_give_claude_its_mcp_tools_and_deny_native_delegation() {
+        let config = PathBuf::from("/tmp/run/mcp-swarm.json");
+        let allowed = vec!["mcp__overseer__swarm_plan".to_string(), "mcp__overseer__swarm_dispatch".to_string()];
+        for session in [None, Some("session-1")] {
+            let mut request = req(session, &[]);
+            request.swarm_tools = Some(SwarmTools { config: &config, allowed: &allowed });
+            let args = launch("claude", &request).unwrap().args;
+            assert!(args.windows(2).any(|a| a == ["--disallowedTools", "Agent,Task"]), "{args:?}");
+            assert!(args.windows(2).any(|a| a == ["--mcp-config", "/tmp/run/mcp-swarm.json"]), "{args:?}");
+            assert!(args.iter().any(|a| a == "--strict-mcp-config"), "{args:?}");
+            assert!(args.windows(2).any(|a| a == ["--allowedTools", "mcp__overseer__swarm_plan,mcp__overseer__swarm_dispatch"]), "{args:?}");
+        }
+        let mut request = req(None, &[]);
+        request.swarm_tools = Some(SwarmTools { config: &config, allowed: &allowed });
+        for harness in ["codex", "codex-app", "opencode"] {
+            assert!(launch(harness, &request).err().unwrap().to_string().contains("not supported"), "{harness}");
+        }
+        let extra = ["--allowedTools".into(), "Agent".into()];
+        request.extra_args = &extra;
+        assert!(launch("claude", &request).err().unwrap().to_string().contains("cannot override its tools"));
     }
 
     #[test]

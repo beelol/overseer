@@ -239,7 +239,7 @@ impl SharedStart {
     /// qualified draw when one exists (handover step 4). Its app slot stays
     /// the start's own durable hold, so the booking takes none; any refusal
     /// falls back to the unbooked start, which keeps today's behavior.
-    fn automatic(store: &Store, p: &Value, harness: &str, profile_id: &str) -> Result<Self> {
+    fn automatic(store: &Store, p: &Value, harness: &str, profile_id: &str, task_class: &str) -> Result<Self> {
         use sha2::Digest;
         let id = format!("ordinary/{}", uuid::Uuid::new_v4().simple());
         Ok(Self {
@@ -250,7 +250,10 @@ impl SharedStart {
             account_generation: store.auto_account_generation(profile_id)?.unwrap_or(0).max(1),
             quota_event_seq: store.latest_auto_quota(profile_id)?.map_or(1, |q| q.event_seq),
             upper_draw_milli: None,
-            bucket: crate::upper_draw::DrawBucket::agent(harness, p["model"].as_str(), p["effort"].as_str()),
+            bucket: crate::upper_draw::DrawBucket {
+                task_class: task_class.into(),
+                ..crate::upper_draw::DrawBucket::agent(harness, p["model"].as_str(), p["effort"].as_str())
+            },
             consume_agent_slot: false,
             launch_hash: format!("{:x}", sha2::Sha256::digest(p.to_string().as_bytes())),
             id,
@@ -748,6 +751,11 @@ impl Daemon {
         if prompt.is_empty() && harness != "generic" {
             bail!("prompt is required");
         }
+        // The proposed native path (`swarm.native_director`, default off): a
+        // Claude director or worker gets the daemon's Swarm tools over MCP.
+        let native_member = swarm_identity.is_some() && harness == "claude"
+            && crate::swarm::native::enabled(&self.store.lock().unwrap())?;
+        let native_director = native_member && matches!(swarm_identity, Some(SwarmLaunchIdentity::Director(_)));
         let mut slot = match swarm_identity.as_ref() {
             Some(SwarmLaunchIdentity::Worker(_)) => None,
             Some(SwarmLaunchIdentity::Director(identity)) => {
@@ -865,14 +873,17 @@ impl Daemon {
             // An ordinary agent start (not Swarm, not an Auto parent, not the
             // daemon's own Overseer or watcher run) tries the one booking,
             // which itself counts live known-window bookings on the account.
-            let can_book = swarm_identity.is_none() && !auto_routing && harness != "generic"
+            // A native director books its account like an ordinary start,
+            // with its own class's draw (`swarm/director`).
+            let can_book = (swarm_identity.is_none() || native_director) && !auto_routing && harness != "generic"
                 && p.get("role").is_none_or(Value::is_null);
             if self.store.lock().unwrap().auto_claim_conflicts(profile_id, "", !can_book)? {
                 bail!("{MANUAL_POOL_CONFLICT}");
             }
             if can_book {
                 let store = self.store.lock().unwrap();
-                shared_start = Some(SharedStart::automatic(&store, p, harness, profile_id)?);
+                let class = if native_director { "swarm/director" } else { crate::upper_draw::AGENT_CLASS };
+                shared_start = Some(SharedStart::automatic(&store, p, harness, profile_id, class)?);
             }
         }
         let target_ref = p["target_ref"].as_str().filter(|s| !s.is_empty()).map(str::to_string);
@@ -1095,6 +1106,16 @@ impl Daemon {
             launch.stage = SharedLaunchStage::Bound;
         }
         let opts = TurnOpts { model: None, ..TurnOpts::from_params(p)? };
+        if native_member {
+            // The member's token goes only into its private MCP configuration.
+            let (token, role) = match swarm_identity.as_ref() {
+                Some(SwarmLaunchIdentity::Director(identity)) => (identity.token.as_str(), crate::swarm::native::DIRECTOR_ROLE),
+                Some(SwarmLaunchIdentity::Worker(identity)) => (identity.token.as_str(), crate::swarm::native::WORKER_ROLE),
+                None => unreachable!(),
+            };
+            let config = crate::swarm::native::write_config(&self.exe, &run.id, token)?;
+            generic["swarm_tools"] = crate::swarm::native::launch_meta(&config, role);
+        }
         {
             let store = self.store.lock().unwrap();
             store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1", rusqlite::params![run.id, generic.to_string()])?;
@@ -1937,7 +1958,13 @@ impl Daemon {
             extra_args.extend(self.guardrail_launch_args(run_id, &run.harness));
         }
         // The channel back to Overseer, on every turn of an agent that has one (AC-190).
-        extra_args.extend(self.channel_launch_args(run_id, &run.harness)?);
+        // A native Swarm member talks through its director instead (the Swarm/Auto contract).
+        let swarm_tools_config = generic_meta["swarm_tools"]["config"].as_str().map(PathBuf::from);
+        let swarm_tools_allowed = crate::swarm::native::allowed_tools(
+            generic_meta["swarm_tools"]["role"].as_str().unwrap_or_default());
+        if swarm_tools_config.is_none() {
+            extra_args.extend(self.channel_launch_args(run_id, &run.harness)?);
+        }
         let resume = if follow_up { run.native_id.clone() } else { None };
         if follow_up && resume.is_none() && run.harness != "generic" {
             bail!("no native session id was reported for this run, so it cannot be resumed");
@@ -1970,6 +1997,8 @@ impl Daemon {
                 permission_mode: mode.as_deref(),
                 images: &images,
                 swarm_worker: generic_meta["swarm_worker"] == true,
+                swarm_tools: swarm_tools_config.as_deref().map(|config| adapters::SwarmTools {
+                    config, allowed: &swarm_tools_allowed }),
             },
         )?;
         if generic_meta["auto_routing"] == true {
@@ -1998,8 +2027,12 @@ impl Daemon {
                 "-c".into(), "mcp_servers.overseer_auto.required=true".into()]);
         }
         if let Some(identity) = swarm_identity {
-            if std::env::var("OVERSEER_SWARM_FIXTURE_API").as_deref() != Ok("1")
-                || (run.harness != "generic" && !matches!(identity, SwarmLaunchIdentity::Worker(_))) {
+            // A native member (Claude with the daemon's Swarm tools) is the
+            // proposed path behind `swarm.native_director`; anything else is
+            // the fixture protocol.
+            let native = swarm_tools_config.is_some() && run.harness == "claude";
+            if !native && (std::env::var("OVERSEER_SWARM_FIXTURE_API").as_deref() != Ok("1")
+                || (run.harness != "generic" && !matches!(identity, SwarmLaunchIdentity::Worker(_)))) {
                 bail!("scripted Swarm identity requires a fixture worker or generic director");
             }
             // Synthetic provider streams exercise lifecycle parsing without giving a
@@ -3139,12 +3172,16 @@ impl Daemon {
         }
         let Ok(raw) = std::fs::read(&launch_path) else { return Ok(false) };
         let Ok(launch) = serde_json::from_slice::<LaunchFile>(&raw) else { return Ok(false) };
-        let Some(token) = launch.env.get("OVERSEER_SWARM_DIRECTOR_TOKEN") else { return Ok(false) };
+        // A native director carries its token only in its MCP configuration;
+        // the token's hash is then its whole identity.
+        let native = !launch.env.contains_key("OVERSEER_SWARM_DIRECTOR_TOKEN");
+        let Some(token) = launch.env.get("OVERSEER_SWARM_DIRECTOR_TOKEN").cloned()
+            .or_else(|| crate::swarm::native::config_token(&launch.args)) else { return Ok(false) };
         let generation_text = generation.to_string();
         use sha2::{Digest, Sha256};
         if format!("{:x}",Sha256::digest(token.as_bytes())) != digest
-            || launch.env.get("OVERSEER_SWARM_RUN_ID").map(String::as_str) != Some(swarm_run.as_str())
-            || launch.env.get("OVERSEER_SWARM_GENERATION").map(String::as_str) != Some(generation_text.as_str())
+            || (!native && launch.env.get("OVERSEER_SWARM_RUN_ID").map(String::as_str) != Some(swarm_run.as_str()))
+            || (!native && launch.env.get("OVERSEER_SWARM_GENERATION").map(String::as_str) != Some(generation_text.as_str()))
             || launch.cwd != self.workspace(&run.workspace_id)?.path {
             return Ok(false);
         }
@@ -3207,14 +3244,16 @@ impl Daemon {
         }
         let Ok(raw) = std::fs::read(&launch_path) else { return Ok(false) };
         let Ok(launch) = serde_json::from_slice::<LaunchFile>(&raw) else { return Ok(false) };
-        let Some(token) = launch.env.get("OVERSEER_SWARM_TOKEN") else { return Ok(false) };
+        let native = !launch.env.contains_key("OVERSEER_SWARM_TOKEN");
+        let Some(token) = launch.env.get("OVERSEER_SWARM_TOKEN").cloned()
+            .or_else(|| crate::swarm::native::config_token(&launch.args)) else { return Ok(false) };
         let revision_text = revision.to_string();
         use sha2::{Digest, Sha256};
         if format!("{:x}",Sha256::digest(token.as_bytes())) != digest
-            || launch.env.get("OVERSEER_SWARM_RUN_ID").map(String::as_str) != Some(swarm_run.as_str())
+            || (!native && (launch.env.get("OVERSEER_SWARM_RUN_ID").map(String::as_str) != Some(swarm_run.as_str())
             || launch.env.get("OVERSEER_SWARM_JOB_ID").map(String::as_str) != Some(job.as_str())
             || launch.env.get("OVERSEER_SWARM_ATTEMPT_ID").map(String::as_str) != Some(attempt.as_str())
-            || launch.env.get("OVERSEER_SWARM_REVISION").map(String::as_str) != Some(revision_text.as_str())
+            || launch.env.get("OVERSEER_SWARM_REVISION").map(String::as_str) != Some(revision_text.as_str())))
             || launch.cwd != self.workspace(&run.workspace_id)?.path {
             return Ok(false);
         }

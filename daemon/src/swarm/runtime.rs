@@ -108,6 +108,47 @@ pub fn launch_director(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     Ok(json!({"status":"launched","overseer_run_id":process}))
 }
 
+/// The proposed native director (`swarm.native_director`): Claude Code on an
+/// approved Claude account, through the same owner identity, slot hold and
+/// one launch path as the scripted director. Its Swarm tools, its denied
+/// native delegation and its `swarm/director` booking come from that path.
+pub fn launch_native_director(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
+    let _serial = d.swarm_launch_lock.lock().unwrap();
+    if d.swarm_storage_blocked.load(Ordering::SeqCst) {
+        bail!("swarm storage is blocked; recover write capacity before launching new work");
+    }
+    let run = required(p,"run_id")?;
+    let generation = p["generation"].as_i64().ok_or_else(|| anyhow!("missing generation"))?;
+    let repo = required(p,"repo")?;
+    let profile = required(p,"profile_id")?;
+    let prompt = required(p,"prompt")?;
+    let title = required(p,"title")?;
+    if prompt.is_empty() || prompt.len()>16_000 || title.is_empty() || title.len()>200 {
+        bail!("invalid native director launch");
+    }
+    if !super::native::enabled(&d.store.lock().unwrap())? {
+        bail!("the native director is off (swarm.native_director)");
+    }
+    crate::git::toplevel(std::path::Path::new(repo))?;
+    let source_commit=super::require_repository_scope(&d.store.lock().unwrap(), run, repo)?;
+    let owner = super::owner::begin(&mut d.store.lock().unwrap(),
+        &json!({"run_id":run,"generation":generation,"supervised_launch":true}))?;
+    let token = owner["owner_token"].as_str().unwrap();
+    let task = d.create_task_for_swarm_director(&json!({
+        "repo":repo,"harness":"claude","profile_id":profile,"workspace_mode":"worktree",
+        "target_ref":source_commit,"prompt":prompt,"title":title,
+    }), &SwarmDirectorIdentity { run_id:run.to_string(),generation,token:token.to_string() })?;
+    let process = task["run"]["id"].as_str()
+        .ok_or_else(|| anyhow!("director run was not recorded"))?;
+    if !task["launch_error"].is_null() {
+        let status = if task["launch_uncertain"] == true { "launch_uncertain" }
+            else { "launch_failed" };
+        return Ok(json!({"status":status,"overseer_run_id":process,
+            "error":task["launch_error"]}));
+    }
+    Ok(json!({"status":"launched","overseer_run_id":process}))
+}
+
 fn sample_interval(state: &str) -> i64 {
     if state == "suspect" { SUSPECT_RETRY_MS } else { SAMPLE_INTERVAL_MS }
 }

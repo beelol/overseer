@@ -14,6 +14,12 @@
 //   native-quota-block-invalid: a malformed follow-up cannot clear a scoped rejection
 //   overseer:    answers as Talk to Overseer (AC-107) from the agents' state in the prompt: a summary
 //                for "what is everyone doing?", and for "tell <agent> to <task>" a proposal block
+//   swarm:       a Swarm member on the proposed native path (swarm.native_director): with the
+//                director's tools it follows CLAUDE_FIXTURE_SWARM_SCRIPT, with a worker's tools
+//                CLAUDE_FIXTURE_SWARM_WORKERS; every step goes through the daemon's MCP tools and is
+//                written to the script's trace file. Scripted choices, not model reasoning.
+// `--version` prints CLAUDE_FIXTURE_VERSION as Claude Code does when it is set; `--help` lists the
+// flags the daemon's director qualification looks for unless CLAUDE_FIXTURE_HELP=bare.
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
@@ -36,7 +42,18 @@ if (process.argv.includes('auth') && process.argv.includes('status')) {
     email, orgId: 'fixture-org', subscriptionType: 'fixture' }));
   process.exit(0);
 }
-if (!process.argv.includes('-p')) { console.log('claude-fixture 0.0.0 (synthetic)'); process.exit(0); }
+if (process.argv.includes('--help')) {
+  const flags = process.env.CLAUDE_FIXTURE_HELP === 'bare' ? ['-p, --print', '--output-format <format>']
+    : ['-p, --print', '--output-format <format>', '--input-format <format>', '--mcp-config <configs...>',
+      '--strict-mcp-config', '--allowedTools <tools...>', '--disallowedTools <tools...>',
+      '--permission-prompt-tool <tool>', '--model <model>'];
+  console.log('Usage: claude [options] [prompt]\n\nOptions:\n' + flags.map(f => '  ' + f).join('\n'));
+  process.exit(0);
+}
+if (!process.argv.includes('-p')) {
+  console.log(process.env.CLAUDE_FIXTURE_VERSION ? `${process.env.CLAUDE_FIXTURE_VERSION} (Claude Code)` : 'claude-fixture 0.0.0 (synthetic)');
+  process.exit(0);
+}
 // CLAUDE_FIXTURE_MODE_FILE lets one test session give each task its own mode (read at start).
 const modeFile = process.env.CLAUDE_FIXTURE_MODE_FILE;
 // Overseer's own run is the one whose prompt carries the agents' state: it is always Overseer,
@@ -561,6 +578,133 @@ async function mcpClient() {
     const reply = `finding: ${finding.result} (${outcome})`;
     assistant([{ type: 'text', text: reply }]);
     result(false, reply);
+    if (mcp) mcp.close();
+  } else if (mode === 'swarm') {
+    const mcp = await mcpClient();
+    let n = 0;
+    const call = async (name, args) => {
+      const id = `toolu_mcp_${++n}`;
+      assistant([{ type: 'tool_use', id, name: `mcp__overseer__${name}`, input: args }]);
+      out({ type: 'control_request', request_id: `req-mcp-${n}`, request: { subtype: 'can_use_tool', tool_name: `mcp__overseer__${name}`, input: args } });
+      const reply = await next(m => m.type === 'control_response' && m.response?.request_id === `req-mcp-${n}`);
+      if (reply.response.response.behavior !== 'allow') throw new Error('tool refused');
+      let r;
+      for (let tries = 0; ; tries++) {
+        // The shim reaches the daemon per call; while the daemon restarts a call fails and is retried.
+        r = await mcp.call(name, args);
+        const text = r.content.map(c => c.text || '').join('');
+        if (!(r.isError && /cannot reach overseerd/.test(text)) || tries > 150) break;
+        await sleep(200);
+      }
+      user([{ type: 'tool_result', tool_use_id: id, content: r.content, is_error: !!r.isError }]);
+      const text = r.content.map(c => c.text || '').join('');
+      if (r.isError) return { error: text };
+      try { return JSON.parse(text); } catch { return { text }; }
+    };
+    // The member's own token, read from its MCP configuration only to show it is not in the prompt.
+    const ownToken = () => { const at = process.argv.indexOf('--mcp-config'); return JSON.parse(fs.readFileSync(process.argv[at + 1], 'utf8')).mcpServers.overseer.env.OVERSEER_MCP_TOKEN; };
+    const waitFile = async (file, ms) => { const end = Date.now() + ms; while (!fs.existsSync(file)) { if (Date.now() > end) throw new Error('timed out waiting for ' + file); await sleep(50); } };
+    if (!mcp || !mcp.tools.length) {
+      assistant([{ type: 'text', text: 'no swarm tools' }]);
+      result(false, 'no swarm tools');
+    } else if (mcp.tools.includes('swarm_plan')) {
+      const script = JSON.parse(fs.readFileSync(process.env.CLAUDE_FIXTURE_SWARM_SCRIPT, 'utf8'));
+      const trace = (step, fields = {}) => fs.appendFileSync(script.trace, JSON.stringify({ step, role: 'director', ...fields }) + '\n');
+      trace('started', { tools: mcp.tools, delegation_denied: process.argv.join(' ').includes('--disallowedTools Agent,Task'), token_in_prompt: firstText.includes(ownToken()) });
+      const planned = await call('swarm_plan', { jobs: script.jobs, estimate: script.estimate });
+      if (planned.error) throw new Error('plan: ' + planned.error);
+      trace('planned', { revision: planned.revision, benefit: planned.benefit });
+      for (const offer of script.offers || []) {
+        const r = await call('swarm_dispatch', { job_id: offer.job, target: offer.target, brief: offer.brief || `Job ${offer.job}: ${offer.job}` });
+        trace('offered', { job: offer.job, target: offer.target, status: r.status, reason: r.reason, error: r.error });
+      }
+      const accepted = {};
+      for (const job of script.dispatch) {
+        const args = { job_id: job.job, target: job.target, brief: job.brief || `Job ${job.job}: ${job.job}` };
+        if (job.model) args.model = job.model;
+        const r = await call('swarm_dispatch', args);
+        trace('launched', { job: job.job, target: job.target, status: r.status, reason: r.reason, error: r.error, attempt: r.attempt_id, worker: r.worker_run_id, shared_booking: r.shared_booking });
+        if (r.status !== 'launched') throw new Error('dispatch ' + job.job + ': ' + JSON.stringify(r));
+      }
+      trace('dispatched', { active: (await call('swarm_status', {})).app_slots_in_use });
+      if (script.gate) await waitFile(script.gate, 120000);
+      const routed = new Set();
+      const deadline = Date.now() + 90000;
+      let done = false;
+      while (Date.now() < deadline && !done) {
+        const inbox = await call('swarm_inbox', {});
+        for (const m of inbox.messages || []) {
+          const route = (script.route || {})[m.message_id];
+          if (route && !routed.has(m.message_id)) {
+            const sent = await call('swarm_message', { job_id: route.job, type: 'advisory', message_id: route.message_id, payload: route.payload });
+            routed.add(m.message_id);
+            trace('routed', { message: m.message_id, to: route.job, error: sent.error });
+          }
+          if (m.type === 'question') {
+            const sent = await call('swarm_message', { job_id: m.job_id, attempt_id: m.attempt_id, type: 'advisory', payload: { answer: script.answer || 'yes' } });
+            trace('answered', { job: m.job_id, question: m.payload.question, error: sent.error });
+          }
+          if (m.type === 'result' && !accepted[m.job_id]) {
+            const evidence = m.payload.artifact_ids;
+            const decision = await call('swarm_decide', { job_id: m.job_id, decision: 'accept', evidence });
+            if (decision.error || decision.status !== 'accepted') throw new Error('decide ' + m.job_id + ': ' + JSON.stringify(decision));
+            accepted[m.job_id] = evidence;
+            trace('accepted', { job: m.job_id, evidence, from: m.attempt_id });
+          }
+        }
+        const state = await call('swarm_status', {});
+        if (Object.keys(accepted).length === script.dispatch.length && state.registered_attempts === 0 && inbox.status === 'idle') {
+          const checks = script.dispatch.map(j => ({ job_id: j.job, outcome: 'passed', evidence: accepted[j.job] }));
+          const completed = await call('swarm_complete', { summary: script.complete.summary, verification: script.complete.verification, checks });
+          trace('completed', { status: completed.status, error: completed.error });
+          done = true;
+        } else await sleep(150);
+      }
+      if (!done) throw new Error('director timed out: ' + JSON.stringify(Object.keys(accepted)));
+      assistant([{ type: 'text', text: 'Swarm complete.' }]);
+      result(false, 'Swarm complete.');
+    } else {
+      const script = JSON.parse(fs.readFileSync(process.env.CLAUDE_FIXTURE_SWARM_WORKERS, 'utf8'));
+      const job = (/Job ([A-Za-z0-9_-]+):/.exec(firstText) || [])[1];
+      const plan = script.jobs[job];
+      const trace = (step, fields = {}) => fs.appendFileSync(script.trace, JSON.stringify({ step, role: 'worker', job, ...fields }) + '\n');
+      trace('started', { tools: mcp.tools, delegation_denied: process.argv.join(' ').includes('--disallowedTools Agent,Task'), token_in_prompt: firstText.includes(ownToken()) });
+      if (script.gate) await waitFile(script.gate, 120000);
+      for (const probe of plan.probe || []) {
+        const r = await call(probe.tool, probe.args || {});
+        trace('probed', { tool: probe.tool, error: r.error, status: r.status });
+      }
+      await call('swarm_progress', { text: `working on ${job}` });
+      if (plan.discovery) {
+        const r = await call('swarm_discovery', plan.discovery);
+        trace('discovered', { message: plan.discovery.message_id, error: r.error });
+      }
+      const awaitMessage = async pred => {
+        const end = Date.now() + 60000;
+        while (Date.now() < end) {
+          const inbox = await call('swarm_inbox', {});
+          const found = (inbox.messages || []).find(pred);
+          if (found) return found;
+          await sleep(150);
+        }
+        throw new Error('no director message for ' + job);
+      };
+      if (plan.ask) {
+        await call('swarm_ask', { question: plan.ask });
+        const answer = await awaitMessage(m => m.payload && m.payload.answer);
+        const applied = await call('swarm_applied', { message_id: answer.message_id });
+        trace('answer', { answer: answer.payload.answer, applied: applied.phase, error: applied.error });
+      }
+      if (plan.wait_for) {
+        const got = await awaitMessage(m => m.message_id === plan.wait_for);
+        const applied = await call('swarm_applied', { message_id: got.message_id });
+        trace('received', { message: got.message_id, applied: applied.phase, error: applied.error });
+      }
+      const submitted = await call('swarm_result', { summary: plan.summary || `${job} done`, evidence: plan.evidence, ...(plan.audit_outcome ? { audit_outcome: plan.audit_outcome } : {}) });
+      trace('submitted', { artifact_ids: submitted.artifact_ids, error: submitted.error });
+      assistant([{ type: 'text', text: `submitted ${job}` }]);
+      result(false, `submitted ${job}`);
+    }
     if (mcp) mcp.close();
   } else if (mode === 'circles') {
     // The same command failing three times in a row (a free check of AC-189).

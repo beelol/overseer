@@ -36,6 +36,13 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           readback TEXT NOT NULL,
           confirmed_ms INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS swarm_native_batches(
+          run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          generation INTEGER NOT NULL,
+          turn_id TEXT NOT NULL,
+          turn_token TEXT NOT NULL,
+          claimed_ms INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS swarm_create_requests(
           request_scope TEXT NOT NULL,
           request_id TEXT NOT NULL,

@@ -22,6 +22,7 @@ mod runtime;
 mod scheduler;
 mod settings;
 mod start;
+pub mod native;
 pub mod schema;
 pub use artifacts::{confirm_exit, decide, put};
 pub use admission::admit;

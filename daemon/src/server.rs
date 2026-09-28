@@ -1313,6 +1313,8 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             require_swarm_storage(d)?;
             crate::swarm::start(d, p)?
         }
+        "swarm.native_director.get" => crate::swarm::native::setting(&d.store.lock().unwrap())?,
+        "swarm.native_director.set" => crate::swarm::native::set_setting(&d.store.lock().unwrap(), p)?,
         "swarm.director.owner.begin" => {
             fixture_only()?;
             crate::swarm::begin_director_owner(&mut d.store.lock().unwrap(), p)?
