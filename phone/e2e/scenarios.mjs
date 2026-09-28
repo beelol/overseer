@@ -959,6 +959,9 @@ export const scenarios = [
         }
       }
       clear();
+      // The gateway's own account of the session meanwhile: how often it was closed on a bad frame.
+      const gatewayLog = fs.readFileSync(path.join(c.lab.info().home, 'overseerd.log'), 'utf8');
+      c.log.say(`  the gateway's log: ${(gatewayLog.match(/connected from/g) ?? []).length} connections, ${(gatewayLog.match(/did not decrypt/g) ?? []).length} closed for a frame that did not decrypt`);
       c.log.say(`  taps by adb: ${Object.entries(tally).map(([w, t]) => `${w} ms after: ${t.marked} marked, ${t.lost} lost`).join('; ')}`);
       return tally;
     },
@@ -1041,6 +1044,9 @@ export const scenarios = [
         }
       }
       clear();
+      // The gateway's own account of the session meanwhile: how often it was closed on a bad frame.
+      const gatewayLog = fs.readFileSync(path.join(c.lab.info().home, 'overseerd.log'), 'utf8');
+      c.log.say(`  the gateway's log: ${(gatewayLog.match(/connected from/g) ?? []).length} connections, ${(gatewayLog.match(/did not decrypt/g) ?? []).length} closed for a frame that did not decrypt`);
       c.log.say(`  opened and tapped by adb: ${Object.entries(tally).map(([w, t]) => `${w} ms after: ${t.marked} marked, ${t.lost} lost`).join('; ')}`);
       return tally;
     },
