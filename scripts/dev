@@ -73,7 +73,8 @@ USAGE
       instance (overseer.daemonPath, overseer.daemonSocket, overseer.devInstance) and opens
       VS Code. The status bar reads "Overseer dev-NAME" and the title starts with [dev-NAME].
       A pinned window never starts a daemon or connects anywhere else. --inspect adds
-      --remote-debugging-port=0 (for UI scenarios).
+      --remote-debugging-port=0 (for UI scenarios); on macOS it also opens the window behind
+      your apps without taking focus (OVERSEER_UI_FOREGROUND=1 brings it to the front).
   scripts/dev tui    --name NAME [--dry-run]  the instance's TUI; refuses a stopped instance
   scripts/dev phone  --name NAME --platform ios|android
       After pull request #10 (the phone app and its gateway): the simulator app pinned to
@@ -466,11 +467,18 @@ async function code(o) {
   fs.writeFileSync(file, JSON.stringify(settings, null, 2) + '\n');
   fs.rmSync(path.join(i.profile, 'DevToolsActivePort'), { force: true });
   const folder = o._[1] ? real(o._[1]) : null;
-  const log = fs.openSync(path.join(i.dir, 'vscode/code.log'), 'a');
-  const child = cp.spawn(CODE, ['--new-window', '--user-data-dir', i.profile, '--extensions-dir', i.extensions, '--skip-welcome', '--skip-release-notes', ...(o['--inspect'] ? ['--remote-debugging-port=0'] : []), ...(folder ? [folder] : [])],
-    { env: clientEnv(i), detached: true, stdio: ['ignore', log, log] });
-  child.unref();
-  fs.closeSync(log);
+  const codeArgs = ['--new-window', '--user-data-dir', i.profile, '--extensions-dir', i.extensions, '--skip-welcome', '--skip-release-notes', ...(o['--inspect'] ? ['--remote-debugging-port=0'] : []), ...(folder ? [folder] : [])];
+  const quiet = require(path.join(__dirname, '../test/ui/quiet-launch'));
+  if (o['--inspect'] && quiet.wanted(CODE)) {
+    // A UI scenario's window (--inspect) opens behind the owner's apps on macOS and never takes focus.
+    const q = quiet.launchQuiet({ code: CODE, args: codeArgs, env: clientEnv(i), root: path.join(i.dir, 'vscode'), note: msg => process.stderr.write(msg + '\n') });
+    await q.detachAfterFirstWindow();
+  } else {
+    const log = fs.openSync(path.join(i.dir, 'vscode/code.log'), 'a');
+    const child = cp.spawn(CODE, codeArgs, { env: clientEnv(i), detached: true, stdio: ['ignore', log, log] });
+    child.unref();
+    fs.closeSync(log);
+  }
   const meta = readMeta(i);
   meta.code = { profile: i.profile, extensions: i.extensions, vsix, opened: new Date().toISOString(), folder };
   writeMeta(i, meta);
