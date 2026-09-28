@@ -1,6 +1,6 @@
 # SWARM-08 — shared admission with ordinary runs
 
-Status: partial. Revision: `d9fee5f`.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. First revision: `d9fee5f`.
 
 Input: a real local `/bin/sleep` task occupies an ordinary Overseer run while a fixture Swarm has a two-agent global limit (director plus one possible worker). Both use the same daemon and SQLite store. The Swarm target's quota snapshot is otherwise eligible.
 
@@ -47,3 +47,15 @@ runs it is refused `upper_draw_unknown` with its sample count
 Still partial: the samples in that test are Claude fixture runs with readings written as the
 fixture helper does (Claude has no between-run reading yet), Auto roots and children still hold
 unknown-draw claims, and live providers are untested.
+
+## Verified at fixture scope (2026-09-28)
+
+| Clause | Test |
+| --- | --- |
+| Concurrent Swarm and non-Swarm launches against one nearly depleted pool cannot both reserve the last capacity | `calibrated_auto_units_and_a_swarm_worker_race_for_the_last_window` (`daemon/src/upper_draw.rs`): two Auto children and a Swarm worker, each on its own SQLite connection, race for account room that fits one draw; exactly one books, the Auto losers are refused `unaffordable`, the Swarm loser `shared_pool_headroom`, and nothing the losers tried is left behind. The last app slot, the other scarce capacity: `ordinary_auto_swarm_and_booked_starts_race_for_the_last_slot_and_one_wins` (`shared_launch.rs`, four callers, one winner, held across a restart) |
+| Repeat across two tasks and two profiles known to share a subscription | `a_second_profile_of_the_same_subscription_races_for_the_same_last_window` (new; passed on first run and in two reruns): the Auto units (one task) book through profile A while the Swarm worker (a second task, the swarm) books through profile B with the same recorded account fingerprint; still exactly one books. `swarm_worker_admission_books_the_shared_account_and_binds_its_run` shows an ordinary booked start on the same account seeing the Swarm worker's draws (`shared_pool_headroom`) |
+| Atomic admission | the booking commits the account claim, window draw, app slot and workspace writer in one transaction (`booked_start_counts_its_slot_once_and_releases_holds_when_the_run_ends`, `crash_before_the_effects_claim_releases_and_after_it_keeps_the_writer_without_retry`); Swarm admission books inside its own immediate transaction |
+
+Rerun serially on 2026-09-28: `upper_draw` unit tests 11, `shared_launch` 7.
+
+Boundary: draws are fixture or calibrated fixture values; live provider readings and Auto roots booking per-window draws (they still hold unknown-draw claims) are outside this fixture proof.

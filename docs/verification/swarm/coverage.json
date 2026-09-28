@@ -90,7 +90,7 @@
       "blocker": "The app setting is the total-agent ceiling; fixtures cover manual reservations, native-child exclusion, lower-limit drain, a supervised director plus 32 live workers at a 33-slot cap, a supervised director plus two live workers at a three-slot cap with confirmed-exit reuse, director-first dispatch into the remaining slot at a two-agent cap, and a one-slot scripted director completing its own metered job without a worker launch. Stop interrupts an active one-slot director; confirmed death outside Stop now reconciles unsubmitted self-work, preserves submitted evidence for replacement review, and blocks unknown effects. Separate reviewer/watch and Overseer-started admission, coordinating-run allowance accounting, and live-harness qualification remain unverified."
     },
     "SWARM-08": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_admission.rs",
         "docs/verification/swarm/milestone-7.md",
@@ -100,7 +100,7 @@
         "daemon/src/account_booking.rs",
         "daemon/src/upper_draw.rs"
       ],
-      "blocker": "One app-slot count (account_booking::app_slots_in_use) is read in every admission transaction: ordinary starts and follow-ups (durable slot holds), Auto roots and children, booked starts and Swarm admission; a four-path race for the last slot admits exactly one and holds it across restart. Swarm account workers book the shared account windows; without fixture inputs they book on Auto's qualified upper draw (five isolated same-bucket runs, fixture meters only in tests, refused upper_draw_unknown before). Auto roots/children still hold unknown-draw claims, and linked profiles and live providers are unverified."
+      "blocker": null
     },
     "SWARM-09": {
       "status": "verified",

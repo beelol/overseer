@@ -1427,6 +1427,74 @@ mod tests {
         assert_eq!(launch_intents, auto_won as i64);
     }
 
+    /// SWARM-08: the same last-window race when the Swarm worker books through a
+    /// second profile of the same subscription (its recorded account fingerprint
+    /// is the first profile's). The two profiles are one pool: exactly one of the
+    /// two Auto units (task one) and the Swarm worker (task two) books, and the
+    /// losers are refused, not given a second allowance.
+    #[test]
+    fn a_second_profile_of_the_same_subscription_races_for_the_same_last_window() {
+        use crate::account_booking::{AccountBookingRequest, BookingDecision, BookingDraw};
+        use std::sync::{Arc, Barrier};
+        const SECOND: &str = "codex-b";
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("race.sqlite");
+        let pool = format!("account/{}", "a".repeat(64));
+        {
+            let f = Fixture::open(&db);
+            f.store.record_auto_account_identity(SECOND, &"a".repeat(64)).unwrap();
+            f.store.set_auto_mode_enabled(true).unwrap();
+            for n in 0..5 {
+                f.auto_sample(&format!("sol-{n}"), n * 20, "browser_check");
+            }
+            f.observe_at(PROFILE, crate::daemon::now(), [95.0, 2.0], "pro");
+            f.observe_at(SECOND, crate::daemon::now(), [95.0, 2.0], "pro");
+            f.run_full("parent", Some(PROFILE), "codex-app", "gpt-6-astra", Some("high"), "0.155",
+                -100, Some(-99), "completed");
+        }
+        let barrier = Arc::new(Barrier::new(3));
+        let handles: Vec<_> = (0..3).map(|path| {
+            let (db, pool, barrier) = (db.clone(), pool.clone(), barrier.clone());
+            std::thread::spawn(move || -> (String, bool, String) {
+                let store = Store::open(&db).unwrap();
+                let parent = store.run("parent").unwrap().unwrap();
+                let trace = serde_json::json!({"selected_route":{"harness":"codex-app",
+                    "profile_id":PROFILE,"model":"gpt-6-sol","effort":"medium"},
+                    "selection_input":{"work":{"task_class":"browser_check"}}});
+                let cited = store.latest_auto_quota(SECOND).unwrap().unwrap().event_seq;
+                barrier.wait();
+                if path < 2 {
+                    let unit = format!("auto-{path}");
+                    match store.insert_auto_selected_decision(&unit, &parent, "hash",
+                        "codex-a/gpt-6-sol/medium", &pool, Some(1), 300_000, &trace) {
+                        Ok(Some(_)) => (unit, true, String::new()),
+                        Ok(None) => (unit, false, "pool_conflict".into()),
+                        Err(error) => (unit, false, if error.downcast_ref::<crate::daemon::AutoDrawExceedsAllowance>()
+                            .is_some() { "unaffordable".into() } else { error.to_string() }),
+                    }
+                } else {
+                    match store.book_shared_account(&AccountBookingRequest {
+                        id:"swarm/second-profile", request_hash:"swarm/second-profile", caller:"swarm",
+                        route_id:"codex-app/gpt-6-sol/medium", profile_id:SECOND,
+                        quota_profile_id:SECOND, account_generation:1, quota_event_seq:cited,
+                        now_ms:crate::daemon::now(), draw:BookingDraw::Fixture(&[3_000, 1_000]),
+                        allocation_remaining_milli:None }).unwrap() {
+                        BookingDecision::Booked => ("swarm".into(), true, String::new()),
+                        BookingDecision::Blocked(reason) => ("swarm".into(), false, reason.into()),
+                        BookingDecision::Replayed => ("swarm".into(), false, "replayed".into()),
+                    }
+                }
+            })
+        }).collect();
+        let outcomes: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+        assert_eq!(outcomes.iter().filter(|(_, won, _)| *won).count(), 1, "{outcomes:?}");
+        for (who, won, why) in &outcomes {
+            if *won { continue; }
+            let expected = if who == "swarm" { "shared_pool_headroom" } else { "unaffordable" };
+            assert_eq!(why, expected, "{outcomes:?}");
+        }
+    }
+
     /// Claude Code's native `rate_limit_event`s arrive only during a run's
     /// own turns: the first after its first model response, the last before
     /// its result. Recorded through the real parser, six serial Claude runs
