@@ -70,7 +70,7 @@
           "allow_ollama_install": false,
           "enabled": true,
           "show": false,
-          "shown_ms": 1790520884040
+          "shown_ms": 1790549462289
         }
       }
     },
@@ -183,7 +183,7 @@
       "detail": [
         "Local model qwen3-coder:30b at a 64k context · 23.7 GiB, already loaded.",
         "This agent continues the work of another.Open the first agent",
-        "Continued from \"Rename the helpers\" after the connection was lost at 07:54."
+        "Continued from \"Rename the helpers\" after the connection was lost at 15:51."
       ]
     },
     {
@@ -209,6 +209,7 @@
       "ok": true,
       "detail": {
         "told": [
+          "The connection was lost; the agent keeps trying to reconnect. · 1 attempts",
           "The work continues in another agent.Open it",
           "Transitioning to qwen3-coder:30b (local, Ollama) because you've disconnected. Work continues in the same worktree."
         ],
@@ -229,7 +230,10 @@
         ],
         "status": "Waiting for a connection",
         "footer": [],
-        "errors": 1
+        "errors": {
+          "red": 0,
+          "quiet": 1
+        }
       }
     },
     {
@@ -265,12 +269,12 @@
       "ok": true,
       "detail": {
         "taken": {
-          "at_ms": 1790520912207,
+          "at_ms": 1790549499897,
           "offered_ms": null,
-          "predecessor": "r-d741cd226e6f",
+          "predecessor": "r-5d2507d1081d",
           "reason": "user",
           "stay": false,
-          "successor": "r-19b83560718f"
+          "successor": "r-145216d01a19"
         },
         "takenDone": "completed",
         "shownNext": true
@@ -300,11 +304,11 @@
       "ok": true,
       "detail": {
         "backDone": "completed",
-        "session": "fixture-thread-4881",
+        "session": "fixture-thread-12512",
         "args": [
           "exec",
           "resume",
-          "fixture-thread-4881"
+          "fixture-thread-12512"
         ]
       }
     },
@@ -318,7 +322,7 @@
       "ok": true,
       "detail": {
         "chat": {
-          "chars": 740,
+          "chars": 604,
           "longRuns": [],
           "overflow": 0,
           "unnamed": 0
@@ -337,7 +341,7 @@
       "ok": true,
       "detail": {
         "chat": {
-          "chars": 740,
+          "chars": 604,
           "longRuns": [],
           "overflow": 0,
           "unnamed": 0
@@ -361,7 +365,7 @@
   ],
   "textBudget": {
     "chat": {
-      "chars": 740,
+      "chars": 604,
       "longRuns": [],
       "overflow": 0,
       "unnamed": 0

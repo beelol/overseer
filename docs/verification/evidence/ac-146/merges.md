@@ -1,5 +1,12 @@
 # AC-146: merges
 
+## Pull request #15 (Continuity follow-up), 2026-09-28
+
+- **Finished:** marked ready by the Continuity agent.
+- **Throwaway copy:** main merged in without conflicts.
+- **Tests:** `scripts/test-all --jobs=2`: 50 of 52. The review scenario and Gate S's ac192, ac193 and ac200 passed alone (and pass on main).
+- **Merged:** squash, `f2161079`. Its records were on the branch: AC-97 verified with the owner's screenshots, AC-83 partial.
+
 ## Pull request #14 (Overseer itself, Gate S), 2026-09-27
 
 - **Finished:** marked ready. The monitor's first run found nine UI scenarios failing that pass on main; the agent fixed them (`3650000e`) and then handed the pull request to the monitor.
