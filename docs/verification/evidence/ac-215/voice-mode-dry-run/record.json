@@ -1,0 +1,273 @@
+{
+  "check": "voice-mode",
+  "file": "docs/owner-checks/voice-mode.json (a copy with owner_logins off)",
+  "title": "Voice Mode: the owner's checks",
+  "gate": "R",
+  "criteria": [
+    "AC-162",
+    "AC-163",
+    "AC-164",
+    "AC-176",
+    "AC-177"
+  ],
+  "ref": "main",
+  "commit": "f6b6a0534a85",
+  "repo": "/tmp/ovs-gv-xts2/check-voice-mode/src",
+  "instance": "dev-check-voice-mode",
+  "started": "2026-09-28T15:01:58.859Z",
+  "step": 8,
+  "answers": [
+    {
+      "id": "1",
+      "title": "In a dev daemon",
+      "criteria": [],
+      "status": "recorded",
+      "text": "Agent verification run (no owner): the dev window opened, titled [dev-check-voice-mode] scratch, with the Overseer view and the two stand-in agents (one waiting for Write). Built from main f6b6a0534a85, which does not yet have stage 2's status-bar label, so the bar read 'Overseer 1 active'. The owner's VS Code was not touched.",
+      "time": "2026-09-28T15:03:40.872Z"
+    },
+    {
+      "id": "2",
+      "title": "Turn it on",
+      "criteria": [
+        "AC-163"
+      ],
+      "status": "skipped",
+      "text": "not run: agent verification of the runner, not the owner's check",
+      "time": "2026-09-28T15:03:40.897Z"
+    },
+    {
+      "id": "3",
+      "title": "Mute",
+      "criteria": [
+        "AC-163"
+      ],
+      "status": "skipped",
+      "text": "not run: agent verification of the runner, not the owner's check",
+      "time": "2026-09-28T15:03:40.923Z"
+    },
+    {
+      "id": "4",
+      "title": "The mark",
+      "criteria": [
+        "AC-177"
+      ],
+      "status": "skipped",
+      "text": "not run: agent verification of the runner, not the owner's check",
+      "time": "2026-09-28T15:03:40.947Z"
+    },
+    {
+      "id": "5",
+      "title": "A quiet room",
+      "criteria": [
+        "AC-164"
+      ],
+      "status": "skipped",
+      "text": "not run: agent verification of the runner, not the owner's check",
+      "time": "2026-09-28T15:03:40.971Z"
+    },
+    {
+      "id": "6",
+      "title": "Echo on speakers",
+      "criteria": [
+        "AC-162"
+      ],
+      "status": "skipped",
+      "text": "not run: agent verification of the runner, not the owner's check",
+      "time": "2026-09-28T15:03:40.994Z"
+    },
+    {
+      "id": "7",
+      "title": "VS Code closed",
+      "criteria": [
+        "AC-163"
+      ],
+      "status": "skipped",
+      "text": "not run: agent verification of the runner, not the owner's check",
+      "time": "2026-09-28T15:03:41.019Z"
+    },
+    {
+      "id": "8",
+      "title": "The session",
+      "criteria": [
+        "AC-176"
+      ],
+      "status": "skipped",
+      "text": "not run: agent verification of the runner, not the owner's check",
+      "time": "2026-09-28T15:03:41.042Z"
+    }
+  ],
+  "prepared": {
+    "scratch": "/tmp/ovs-gv-xts2/check-voice-mode/scratch",
+    "agents": [
+      {
+        "title": "Tidy the README",
+        "run": "r-2bf36b100730"
+      },
+      {
+        "title": "Add a changelog entry",
+        "run": "r-e884e19df6cb"
+      }
+    ],
+    "vscode": "/tmp/ovs-gv-xts2/check-voice-mode/vscode/profile",
+    "command": "Overseer: Open Overseer View"
+  },
+  "finished": "2026-09-28T15:03:41.066Z",
+  "steps": [
+    {
+      "id": "1",
+      "criteria": [],
+      "title": "In a dev daemon",
+      "do": "Nothing to do: the runner started a dev daemon and an isolated dev VS Code built from main, beside your installed Overseer, and opened the Overseer view with two fixture agents in a scratch repository.",
+      "watch": "The window's title starts with [dev-check-voice-mode] and its status bar reads \"Overseer dev-check-voice-mode\". Your own VS Code is unchanged.",
+      "record": "Is the dev window open as described, and your own VS Code untouched?",
+      "answer": {
+        "id": "1",
+        "title": "In a dev daemon",
+        "criteria": [],
+        "status": "recorded",
+        "text": "Agent verification run (no owner): the dev window opened, titled [dev-check-voice-mode] scratch, with the Overseer view and the two stand-in agents (one waiting for Write). Built from main f6b6a0534a85, which does not yet have stage 2's status-bar label, so the bar read 'Overseer 1 active'. The owner's VS Code was not touched.",
+        "time": "2026-09-28T15:03:40.872Z"
+      }
+    },
+    {
+      "id": "2",
+      "criteria": [
+        "AC-163"
+      ],
+      "title": "Turn it on",
+      "do": "In the dev window press ⌘⌥⇧V (Overseer: Voice Mode: Turn On or Off). Accept the speech model download (small.en, 465 MiB, once). When macOS asks for the microphone, read the prompt, then Allow.",
+      "watch": "The prompt must name Overseer Listener.",
+      "record": "What did the microphone prompt say, and did Voice Mode turn on?",
+      "answer": {
+        "id": "2",
+        "title": "Turn it on",
+        "criteria": [
+          "AC-163"
+        ],
+        "status": "skipped",
+        "text": "not run: agent verification of the runner, not the owner's check",
+        "time": "2026-09-28T15:03:40.897Z"
+      }
+    },
+    {
+      "id": "3",
+      "criteria": [
+        "AC-163"
+      ],
+      "title": "Mute",
+      "do": "Press ⌘⌥⇧M, watch the menu bar, then press ⌘⌥⇧M again to unmute.",
+      "watch": "The orange microphone dot in the menu bar goes off within a second of muting.",
+      "record": "Did the dot go off within a second, and come back on unmute?",
+      "answer": {
+        "id": "3",
+        "title": "Mute",
+        "criteria": [
+          "AC-163"
+        ],
+        "status": "skipped",
+        "text": "not run: agent verification of the runner, not the owner's check",
+        "time": "2026-09-28T15:03:40.923Z"
+      }
+    },
+    {
+      "id": "4",
+      "criteria": [
+        "AC-177"
+      ],
+      "title": "The mark",
+      "do": "Press ⌘⌥V to show the voice view. Talk normally for a bit; then tap the desk, type and cough without talking.",
+      "watch": "The star grows and swings with your voice, and stays at rest for the taps, typing and cough.",
+      "record": "How did the star move with your voice, and did it stay at rest for the other sounds?",
+      "answer": {
+        "id": "4",
+        "title": "The mark",
+        "criteria": [
+          "AC-177"
+        ],
+        "status": "skipped",
+        "text": "not run: agent verification of the runner, not the owner's check",
+        "time": "2026-09-28T15:03:40.947Z"
+      }
+    },
+    {
+      "id": "5",
+      "criteria": [
+        "AC-164"
+      ],
+      "title": "A quiet room",
+      "do": "Ten minutes of ordinary work (typing, moving, a video playing) with Voice Mode on, without talking to Overseer.",
+      "watch": "No request is made and nothing interrupts you.",
+      "record": "Over the ten minutes, was there any request or interruption?",
+      "answer": {
+        "id": "5",
+        "title": "A quiet room",
+        "criteria": [
+          "AC-164"
+        ],
+        "status": "skipped",
+        "text": "not run: agent verification of the runner, not the owner's check",
+        "time": "2026-09-28T15:03:40.971Z"
+      }
+    },
+    {
+      "id": "6",
+      "criteria": [
+        "AC-162"
+      ],
+      "title": "Echo on speakers",
+      "do": "On speakers, not headphones, say \"what's running?\". While Overseer answers, say \"Overseer, stop\".",
+      "watch": "Overseer answers aloud and its own voice does not come back as a request; it stops at the end of the phrase after \"Overseer, stop\".",
+      "record": "Did it answer aloud without hearing itself, and stop at the end of the phrase?",
+      "answer": {
+        "id": "6",
+        "title": "Echo on speakers",
+        "criteria": [
+          "AC-162"
+        ],
+        "status": "skipped",
+        "text": "not run: agent verification of the runner, not the owner's check",
+        "time": "2026-09-28T15:03:40.994Z"
+      }
+    },
+    {
+      "id": "7",
+      "criteria": [
+        "AC-163"
+      ],
+      "title": "VS Code closed",
+      "do": "Quit the dev VS Code window (⌘Q in it; not your own VS Code) and say \"Overseer, what's running?\".",
+      "watch": "It answers aloud with VS Code closed.",
+      "record": "Did it answer aloud with the dev VS Code closed?",
+      "answer": {
+        "id": "7",
+        "title": "VS Code closed",
+        "criteria": [
+          "AC-163"
+        ],
+        "status": "skipped",
+        "text": "not run: agent verification of the runner, not the owner's check",
+        "time": "2026-09-28T15:03:41.019Z"
+      }
+    },
+    {
+      "id": "8",
+      "criteria": [
+        "AC-176"
+      ],
+      "title": "The session",
+      "do": "Real work by voice for a while.",
+      "watch": "What worked, what did not, the friction points.",
+      "record": "The date, what worked, what did not, and the friction points.",
+      "answer": {
+        "id": "8",
+        "title": "The session",
+        "criteria": [
+          "AC-176"
+        ],
+        "status": "skipped",
+        "text": "not run: agent verification of the runner, not the owner's check",
+        "time": "2026-09-28T15:03:41.042Z"
+      }
+    }
+  ]
+}
