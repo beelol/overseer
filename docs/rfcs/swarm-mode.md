@@ -1,8 +1,9 @@
 # RFC: category-directed adaptive Swarm mode
 
-Status: approved RFC with a fixture-only implementation in draft PR #3. SWARM-38
-is verified as a documentation criterion; the other SWARM criteria remain partial
-or unverified. Live behavior is not certified.
+Status: approved RFC with a fixture-only implementation, continued on `claude/auto-swarm`.
+41 of 64 SWARM criteria are verified at fixture scope (SWARM-38 as a documentation
+criterion); the rest are partial or unverified, and what each needs is in
+[open-criteria.md](../verification/swarm/open-criteria.md). Live behavior is not certified.
 Date: 2026-09-25
 Scope: product behavior, integration boundaries, and acceptance criteria only.
 Revision: director-led many-worker scope, continuous coordination, usable defaults, and

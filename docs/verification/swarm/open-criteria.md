@@ -90,3 +90,29 @@ Scenarios:
 Counts (60): (a) 43 — SWARM-02, 03, 04, 05, 06, 07, 08, 09, 14, 15, 16, 19, 20, 21, 24, 29, 30, 32, 33, 34, 35, 36, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 53, 54, 55, 57, 58, 59, 60, 61, 62. (b) 5 — SWARM-13, 17, 25, 26, 31. (c) 8 — SWARM-01, 27, 28, 39, 52, 56, 63, 64 (SWARM-64 through S0; its S1–S5 part is (a)). (d) 4 — SWARM-18, 22, 23, 37.
 
 Order of work for (a): the S1–S5 replays first (they carry the most criteria), then the criteria they cover, then the rest. Progress is recorded in each criterion's file and in `coverage.json`; this table is updated when a class changes.
+
+## Results on 2026-09-28 (end of this session)
+
+Verified at fixture scope in this session (37): SWARM-02, 03, 04, 05, 06, 07, 08, 09, 14, 15, 16, 19, 20, 21, 29, 30, 32, 33, 34, 36, 41, 42, 43, 46, 47, 48, 49, 50, 51, 53, 54, 55, 57, 58, 59, 61, 62. With SWARM-10, 11, 12 and 38 the ledger has **41 of 64 verified**, 21 partial and 2 unverified. SWARM-20 and SWARM-61 re-open for their phone clause when Gate N's gateway lands. Criteria verified through Auto's route selection (SWARM-02, 04, 06, 15, 43) ran the proposed native path with `swarm.native_director` switched on inside the test only; the default stays off.
+
+Bugs found and fixed, each with a regression test:
+
+| Commit | Bug | Regression |
+| --- | --- | --- |
+| `866b0a58` | Overseer could hold, stop, redirect or message a Swarm worker behind its director | `overseer_actions_aimed_at_a_swarm_worker_are_refused_and_offered_to_the_director` |
+| `362248b7` | Two coordination turns in a row (route a discovery, resolve an overlap) stalled the run as `director_no_progress` | `coordination_turns_that_direct_workers_are_progress_but_empty_turns_are_not` |
+| `a3d20e7a` | A discovery retracted to some recipients could still be relied on by the others (acceptance and completion) | `a_withdrawn_discovery_must_be_retracted_to_every_prior_recipient` |
+| `a38613c4` | Overseer's own run was refused at a full house (its start and follow-ups reserved an app slot) | `a_full_house_refuses_overseer_started_agents_but_not_overseers_own_run` |
+
+Features added to meet a Verify clause: the owner's requirement change as a recorded plan revision (`690bcff2`, SWARM-21) and the native director's `swarm_revise` (`5e0be398`); Overseer's `swarm` action over the swarm's own controls (`57618bc3`, SWARM-20); `swarm.route.replay` (`e224dc2f`, SWARM-04).
+
+Class changes found while working:
+
+- SWARM-24 and SWARM-40 move from (a) to **(b) + (c, D4)**: everything else in them is covered, but the director's own turns are not metered against the run's allocation, because its `swarm/director` draw is unqualified (a live calibration on the owner's Claude account and the owner's decision on Claude draw calibration).
+- S1, S2 and S4's route choice moves to **(c, D3)**: Auto's route selection admits only native workers, and native workers are refused in audit runs until D3 is decided. Their other fixture gaps stay (a).
+
+Still (a), each needing a build rather than a test: SWARM-35 (reuse of a related worker session), SWARM-44 and SWARM-60 (one claim ledger and one broker shared with ordinary agents: Gate S's `areas`/`agent_messages` and Swarm's tables; Gate S's RFC says whichever lands second adopts the first one's tables), SWARM-45 (director-created budgeted reproducers, dedupe of repeated reproducers, finding merge). S1's final report artifact and coverage matrix, S2's route inputs and report artifact, S3's conflicting-patch and dependency-upgrade variants, and S5's ordinary-agent claim fault are the scenario-level (a) gaps.
+
+Remaining by class (23): (b) SWARM-13, 17, 25, 26, 31; (c) SWARM-01, 27, 28, 39, 56, 63, 64 (D1; SWARM-63 also D2/D3; SWARM-64 through S0), SWARM-52 (D3, and per-harness enforcement live), SWARM-24 and 40 (D4, live calibration); (d) SWARM-18, 22, 23, 37; (a, build) SWARM-35, 44, 45, 60.
+
+Packaged VS Code scenarios owed later (d): unsaved editor buffers against a Swarm writer (SWARM-18); close and reopen VS Code around launch, acknowledgement and result receipt (SWARM-22); the full status matrix with measured usage (SWARM-23); the 100-job/32-worker view with account usage (SWARM-37); and, once D1 is decided, the normal launch surface for SWARM-01, 27, 28, 39, 56.
