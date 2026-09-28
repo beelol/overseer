@@ -29,17 +29,17 @@
       "name": "hearing: the star grows with the voice and swings with its syllables",
       "ok": true,
       "detail": {
-        "frames": 342,
-        "max": 1.805097644581534,
-        "min": 1.4210269168893654
+        "frames": 341,
+        "max": 1.8093715101641976,
+        "min": 1.436326747997423
       }
     },
     {
       "name": "levels arrive at least every 100 ms while the owner speaks (25 a second)",
       "ok": true,
       "detail": {
-        "jumps": 75,
-        "spacing": 43.700000047683716
+        "jumps": 74,
+        "spacing": 43
       }
     },
     {
@@ -48,16 +48,16 @@
       "detail": {
         "lag": 40,
         "r": 0.9,
-        "frames": 342,
-        "levels": 75
+        "frames": 341,
+        "levels": 74
       }
     },
     {
       "name": "speaking: rings of light cross the core and the star stays under 1.3x",
       "ok": true,
       "detail": {
-        "scale": 1.2127707646481432,
-        "glow": 0.426759231900185,
+        "scale": 1.2922794786821679,
+        "glow": 0.5179086041208923,
         "rings": 1,
         "still": false,
         "meter": null,
@@ -68,8 +68,8 @@
       "name": "thinking: the star turns, 12% larger",
       "ok": true,
       "detail": {
-        "scale": 1.122975353255049,
-        "glow": 0.18401643823971978,
+        "scale": 1.147851824379607,
+        "glow": 0.2286794263082505,
         "rings": 0,
         "still": false,
         "meter": null,
@@ -89,8 +89,8 @@
       "name": "muted: the mark is still with the mute sign, and no listener runs",
       "ok": true,
       "detail": {
-        "scale": 1.0003509425358368,
-        "glow": 0.18040942559227244,
+        "scale": 1.0004290022722273,
+        "glow": 0.18050049099964696,
         "rings": 0,
         "still": true,
         "meter": null,
@@ -105,10 +105,10 @@
       "name": "beside a streaming chat, the animation keeps up at 60 frames a second: work per frame p95 under 16 ms, and frames arrive at the display's rate",
       "ok": true,
       "detail": {
-        "n": 455,
+        "n": 454,
         "work_p95": 0.19999992847442627,
         "interval_median": 8.30000000000291,
-        "interval_p95": 9.900000000008731,
+        "interval_p95": 9.10000000000582,
         "dropped": 0,
         "groups": 2
       }
@@ -118,19 +118,19 @@
       "ok": true,
       "detail": {
         "visibility": "visible",
-        "f1": 11858,
-        "f2": 11858
+        "f1": 11679,
+        "f2": 11679
       }
     },
     {
       "name": "reduced motion: a still mark and a level meter",
       "ok": true,
       "detail": {
-        "scale": 1.675115137211426,
-        "glow": 0.8163868649907204,
+        "scale": 1.676120859909245,
+        "glow": 0.8158034574155235,
         "rings": 0,
         "still": true,
-        "meter": 0.7942531026016776,
+        "meter": 0.7954363057755823,
         "state": "hearing"
       }
     },
@@ -232,47 +232,47 @@
         "chats": [
           {
             "tag": "overseer",
-            "id": "r-6bf9740d5b84",
+            "id": "r-999e3627f84f",
             "shows": true
           },
           {
             "tag": "overseer",
-            "id": "r-972a0860714f",
+            "id": "r-6beecb748bfa",
             "shows": true
           },
           {
             "tag": "overseer",
-            "id": "r-7ed03e785dce",
+            "id": "r-2b89e9f3ca64",
             "shows": true
           },
           {
             "tag": "dark",
-            "id": "r-6bf9740d5b84",
+            "id": "r-999e3627f84f",
             "shows": true
           },
           {
             "tag": "dark",
-            "id": "r-972a0860714f",
+            "id": "r-6beecb748bfa",
             "shows": true
           },
           {
             "tag": "dark",
-            "id": "r-7ed03e785dce",
+            "id": "r-2b89e9f3ca64",
             "shows": true
           },
           {
             "tag": "light",
-            "id": "r-6bf9740d5b84",
+            "id": "r-999e3627f84f",
             "shows": true
           },
           {
             "tag": "light",
-            "id": "r-972a0860714f",
+            "id": "r-6beecb748bfa",
             "shows": true
           },
           {
             "tag": "light",
-            "id": "r-7ed03e785dce",
+            "id": "r-2b89e9f3ca64",
             "shows": true
           }
         ]

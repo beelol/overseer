@@ -30,8 +30,8 @@
       "name": "the first file edit brings the review forward within 500 ms: review on the left (about two thirds) on the changed file, chat on the right",
       "ok": true,
       "detail": {
-        "lag": 361,
-        "waitedMs": 2,
+        "lag": 369,
+        "waitedMs": 9,
         "layout": [
           {
             "share": 0.66,
@@ -50,6 +50,8 @@
         ],
         "reviewFiles": [
           "perm.txt",
+          "+1",
+          "−0",
           "A"
         ]
       }

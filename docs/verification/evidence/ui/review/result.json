@@ -3,7 +3,7 @@
     {
       "name": "selecting run A opens A worktree review (outside the open folder)",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-VlRI5I/overseer-home/worktrees/repoA-c12897f6/a-seq"
+      "detail": "/private/tmp/ovs-ui-V08gK7/overseer-home/worktrees/repoA-c3c13f34/a-seq"
     },
     {
       "name": "selecting an existing run does not turn Follow on",
@@ -18,8 +18,7 @@
         "Following: a.txt:60 (agent tool input (tool-input))",
         "Following agent edits (agent tool input (tool-input))",
         "Following: b.txt:240 (agent tool input (tool-input))",
-        "Following agent edits (agent tool input (tool-input))",
-        "Following: a.txt:150 (agent tool input (tool-input))"
+        "Following agent edits (agent tool input (tool-input))"
       ]
     },
     {
@@ -30,7 +29,7 @@
     {
       "name": "selecting run B shows B worktree",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-VlRI5I/overseer-home/worktrees/repoB-6a5cf2eb/b-seq"
+      "detail": "/private/tmp/ovs-ui-V08gK7/overseer-home/worktrees/repoB-a1279858/b-seq"
     },
     {
       "name": "agent switch does not inherit Follow",
@@ -53,26 +52,26 @@
       "name": "ordinary changes refresh within 2 s",
       "ok": true,
       "detail": {
-        "write new file": 414,
-        "atomic replace": 520,
-        "staging (review Staged scope)": 228,
-        "rename": 444,
-        "delete": 516,
-        "branch change": 542,
-        "missed watcher event (excluded folder)": 879
+        "write new file": 415,
+        "atomic replace": 572,
+        "staging (review Staged scope)": 277,
+        "rename": 708,
+        "delete": 772,
+        "branch change": 799,
+        "missed watcher event (excluded folder)": 626
       }
     },
     {
       "name": "missed watcher event reconciled within 5 s",
       "ok": true,
-      "detail": 879
+      "detail": 626
     },
     {
       "name": "navigator selection preserved across live refreshes",
       "ok": true,
       "detail": {
-        "selectedBefore": "a.txtM",
-        "selectedAfter": "a.txtM"
+        "selectedBefore": "a.txt+2−2M",
+        "selectedAfter": "a.txt+2−2M"
       }
     },
     {
@@ -136,7 +135,7 @@
     {
       "name": "current checkout review is the repository itself",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-VlRI5I/repoA"
+      "detail": "/private/tmp/ovs-ui-V08gK7/repoA"
     },
     {
       "name": "filesystem-only harness shows the Follow limitation",
@@ -187,12 +186,12 @@
     }
   ],
   "timings": {
-    "write new file": 414,
-    "atomic replace": 520,
-    "staging (review Staged scope)": 228,
-    "rename": 444,
-    "delete": 516,
-    "branch change": 542,
-    "missed watcher event (excluded folder)": 879
+    "write new file": 415,
+    "atomic replace": 572,
+    "staging (review Staged scope)": 277,
+    "rename": 708,
+    "delete": 772,
+    "branch change": 799,
+    "missed watcher event (excluded folder)": 626
   }
 }

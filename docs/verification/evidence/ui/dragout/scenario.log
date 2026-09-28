@@ -1,6 +1,6 @@
-[2026-09-27T00:45:02.818Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-27T00:45:12.738Z] screenshot docs/verification/evidence/ui/dragout/01-dragged-into-editor.png
-[2026-09-27T00:45:12.739Z] PASS dragging an agent from the side bar into the editor area opens its chat there {"dragTypes":["codeeditors","application/vnd.code.uri-list","resourceurls","text/uri-list","application/vnd.code.tree.overseer.agents"],"opened":true,"tabs":["Drag me"]}
-[2026-09-27T00:45:15.733Z] PASS Open to the Side (context menu) opens the agent's chat beside
-[2026-09-27T00:45:20.929Z] screenshot docs/verification/evidence/ui/dragout/02-pinned-in-grid.png
-[2026-09-27T00:45:20.929Z] PASS Pin to Grid (row action) puts the agent on the grid
+[2026-09-28T16:23:57.563Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-28T16:24:08.574Z] screenshot docs/verification/evidence/ui/dragout/01-dragged-into-editor.png
+[2026-09-28T16:24:08.575Z] PASS dragging an agent from the side bar into the editor area opens its chat there {"dragTypes":["codeeditors","application/vnd.code.uri-list","resourceurls","text/uri-list","application/vnd.code.tree.overseer.agents"],"opened":true,"tabs":["Drag me"]}
+[2026-09-28T16:24:11.563Z] PASS Open to the Side (context menu) opens the agent's chat beside
+[2026-09-28T16:24:16.788Z] screenshot docs/verification/evidence/ui/dragout/02-pinned-in-grid.png
+[2026-09-28T16:24:16.788Z] PASS Pin to Grid (row action) puts the agent on the grid
