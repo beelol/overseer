@@ -130,7 +130,7 @@ The four class (a) items that needed a build are built and verified at fixture s
 
 Scenario gaps closed at fixture scope: S1's final report entries and coverage matrix as one artifact (`swarm.report.final`, `97215b95`); S3's conflicting-patch and shared-dependency-upgrade variants, with integration refusing shared changes the director has not assigned (`ddcf409f`); S5's ordinary agent and J2 claiming one path (`d428889c`). S1 keeps its literal evidence-file removal open, and its route choice waits on D3.
 
-Gate S's area changed in these commits, each saying so: the agent channel's claim, `agent.area` and a resolved conflict's `assign` ask the claim ledger; the channel marks broker phases and bounds bodies; a watcher's finding about a Swarm worker is forwarded to the director and checks in on the director; new methods are classified. `daemon/tests/overseer.rs` passed (24) after each Gate S change.
+Gate S's area changed in these commits, each saying so: the agent channel's claim, `agent.area` and a resolved conflict's `assign` ask the claim ledger; the channel marks broker phases and bounds bodies; a watcher's finding about a Swarm worker is forwarded to the director and checks in on the director; new methods are classified. The whole of `daemon/tests/overseer.rs` passed (24) after the ledger and broker changes (one timing test, `ac189`, failed once under load and passed alone); the later commits only added method classes, which its `ac185` test checks and passed.
 
 Unchanged: the fixture gates, `swarm.native_director` (off), and the pending owner decisions D1, D3 and D4.
 
