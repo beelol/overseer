@@ -635,3 +635,37 @@ Prior art for governance, and the idea taken from each:
 - **Repository team files:** later, not in the first version.
 - **Installing on its own:** by default, Overseer notices that a plugin would help (or that the owner asked for one) and asks first ("Install caveman? It will …"), like Codex asks; the owner says yes. A setting may later allow automatic installs.
 - **Name: mods** (chosen 2026-09-27 over loadouts, rigs, traits, kits and lenses). The feature is "mods": install a mod, enable it for all agents, a repository, a group, one agent or Overseer's own session. Where this document says "plugin", read "mod"; the criteria use "mod".
+
+## The chosen approach (agreed with the owner, 2026-09-27)
+
+This supersedes the options above where they differ; the criteria will follow it.
+
+**What a mod is.** A folder with a `mod.toml` manifest and its contents: text (rules, skills, an output style), tools (MCP servers), programs it depends on with the hooks that call them (RTK is one), limits and harness options, and where it applies. For example:
+
+```toml
+name = "rtk"
+source = "github:rtk-ai/rtk"          # where it came from
+homepage = "https://…"                # found by Overseer; its icon shows on the mod's card
+[program]
+build = "cargo install --root ."      # installed inside the mod's own folder
+[hook]
+on = "command-output"
+run = "bin/rtk filter"                # a separate process, never inside the daemon
+[permissions]
+network = false
+files = "the run's worktree, read only"
+```
+
+**Each piece has a kind** (text, tool, hook, program, limit, harness option), and Overseer translates each kind for each harness at launch. RTK, for example: when it is on for a repository or an agent, that run's launch puts the mod's own `rtk` on the run's path and adds a command hook to the run's own settings (a per-run settings file for Claude Code, the equivalents for Codex and OpenCode), so every shell command the agent runs goes through `rtk`. Nothing changes for other agents or the owner's own terminal. A piece a harness cannot take is shown on the mod card ("not applied on OpenCode: no command hook"), never silently dropped.
+
+**Code runs at arm's length.** A mod may bring a program in any language (Rust, JavaScript, Python, a binary). It runs as its own process with the permissions its manifest declares, installed into the mod's own folder, and it is built there when it comes as source. Nothing a mod brings is loaded into the daemon itself: no in-process plugin interface, because the daemon holds the owner's accounts and logins. Deleting a mod removes everything it installed.
+
+**Overseer makes the mods.** The owner does not write manifests. They say what they want ("make my agents use fewer tokens", "install caveman"). Overseer recognises what they mean and finds it itself: the project's real home (repository or site), its icon for the mod's card, and how it installs (an Agent Skill, an MCP server, a Claude Code plugin, a package), or it writes rules from the sentence. It writes the manifest and shows what it will install, run and change, and where. It installs on the owner's yes, isolated, and enables it where they said. There is no registry for now; one may come later.
+
+**Each mod keeps its story.** Who asked and their words, when, what Overseer found and why it chose that source, the commands it ran, what it installed where, and every change since (enabled here, updated, removed). The mod's card shows it.
+
+**Safety tiers.** Text-only mods (caveman, rule sets) are low friction. Tools (MCP servers) are asked about. Programs and hooks are asked about, isolated, and limited to their declared permissions. Code inside the daemon: never.
+
+**Managing mods.** Mods are managed two ways, with the same result:
+- **A Mods list** in VS Code (and in the terminal UI, and read-only on the phone). Each mod is a card with its icon, name, source link, where it is enabled, what it installed, its permissions, its version and its story. It can enable or disable a mod per place (all agents, a repository, a group, one agent, Overseer's own session), update it, or remove it.
+- **By asking Overseer**, in the conversation or by voice: "what mods does this agent have?", "turn caveman off for this repo", "remove RTK", "make a mod that keeps answers under 200 words". These are daemon methods through Gate S's session, classed like its other actions: reading is a Look, enabling or disabling a text mod is a Steer, and installing, updating a program, or removing is a Confirm (asks the owner).
