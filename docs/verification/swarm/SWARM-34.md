@@ -1,6 +1,6 @@
 # SWARM-34 — bounded worker and director context
 
-Status: partial. Fixture-only implementation at `641a9f0`, expanded at `046dc2a6`; no live harness qualification.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. Fixture implementation at `641a9f0`, expanded at `046dc2a6`.
 
 Input: a 100-job category plan with 97 independent jobs and a parent with two dependent jobs. The parent produces an 80,000-byte UTF-8 artifact. One child is admitted to the same target as the parent; the other is admitted to a different target. The test requests a 4,096-byte director page and worker brief, then reads the artifact in chunks.
 
@@ -15,3 +15,16 @@ Expanded brief at `046dc2a6`: the 100-job fixture now gives one child a planned 
 Paged references at `cec9c84`: a local job produces 64 evidence artifacts, exceeding a 2,048-byte brief. Before the change, `swarm.worker.brief` failed on the full reference list. It now returns a `next_artifact_cursor` when another page is needed; authenticated requests with that cursor retrieve all 64 references in order within the byte limit, including after daemon restart. The last artifact remains retrievable by its separate chunked context call; an incorrect attempt token is rejected. Reproduce with `cargo test --offline -p overseerd --test swarm_context worker_artifact_references_page_without_losing_retrievable_evidence -- --test-threads=1` and `cargo test --offline -p overseerd --test swarm_context --test swarm_checkpoint --test swarm_runtime --test swarm_dispatch_incident -- --test-threads=1`: 20 passed, 1 opt-in Dispatch fixture ignored in the affected suites. The black-box tests need local Unix-socket permission, so these commands ran outside the filesystem sandbox. `git diff --check` passed.
 
 Remaining: this is a fixture protocol, not a live director or native harness path. Destination-specific grants and revocation exist in daemon fixtures, but cross-harness credential-safe delivery has not been qualified. The brief reports the planned resource claims and admission-time allocation; observed resource use, changing account allowance and actual token cost are not reflected in a live model context. Context requests go through the daemon rather than a live director decision. A single reference too large to fit the brief still errors explicitly. SWARM-34 stays unchecked.
+
+## Verified at fixture scope (2026-09-28)
+
+| Clause | What `daemon/tests/swarm_context.rs` shows |
+| --- | --- |
+| Worker briefs and director summaries for a 100-job fixture obey configured bounds | `hundred_job_summary_and_scoped_large_artifact_context`: with a 4,096-byte bound the director summary counts all 100 jobs and pages the rest by cursor; each worker brief stays within 4,096 bytes; the launch prompt has a 32 KiB ceiling and required context errors rather than being silently cut |
+| They carry relevant artifact references, not peer transcripts | the child's brief holds its acceptance check, planned resource, target and budget, and one reference to its accepted parent artifact; no other job's text (`Independent 42`) and not the 80,000-byte artifact body; the saved worker prompt holds the reference, not the body |
+| Context requests recover omitted detail, subject to destination permissions | `worker_artifact_references_page_without_losing_retrievable_evidence`: 64 references beyond a 2,048-byte brief come back page by page with the attempt's token, also after a restart; cross-target, wrong-token and ungranted requests fail, a destination-specific grant opens retrieval, and revocation closes it (`revoked_artifact_stops_dependent_delivery_and_worker_but_not_unrelated_work`) |
+| Large artifacts remain retrievable | the 80,000-byte artifact is read in bounded chunks to its end |
+
+`swarm_context` passed 7 tests serially on 2026-09-28.
+
+Boundary: token cost in a live model's context and delivery through a real harness are not measured; bounds here are bytes.

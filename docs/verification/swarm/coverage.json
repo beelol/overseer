@@ -416,12 +416,12 @@
       "blocker": null
     },
     "SWARM-34": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_context.rs",
         "docs/verification/swarm/SWARM-34.md"
       ],
-      "blocker": "A 100-job fixture proves bounded director pages and worker briefs attached to scripted launch, including planned resources, target constraints, durable allocation/reserve and audit scope. Accepted-dependency references, destination-specific grants/revocation, chunked content retrieval and cursor-paged reference retrieval pass locally. Live harness delivery and credential-safe grants, observed resource/allowance updates, token accounting and on-demand director mediation remain unverified."
+      "blocker": null
     },
     "SWARM-35": {
       "status": "partial",
