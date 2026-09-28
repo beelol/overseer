@@ -620,7 +620,12 @@ pub fn book_shared_account_in_tx(
               AND t.status='running' AND t.ended_ms IS NULL))
            -- A bound run's draw is already committed in its windows.
            AND NOT EXISTS(SELECT 1 FROM shared_booking_intents b
-              WHERE b.run_id=r.id AND b.settled_ms IS NULL))",
+              WHERE b.run_id=r.id AND b.settled_ms IS NULL)
+           -- So is an Auto root's or child's, booked under its work unit.
+           AND NOT EXISTS(SELECT 1 FROM shared_booking_intents b
+              WHERE b.caller='auto' AND b.settled_ms IS NULL AND b.work_unit_id IN (
+                  SELECT work_unit_id FROM auto_root_intents WHERE run_id=r.id
+                  UNION SELECT work_unit_id FROM managed_work_units WHERE child_run_id=r.id)))",
         [&fingerprint], |row| row.get(0))?;
     if manual_run {
         return Ok(BookingDecision::Blocked("account_pool_busy"));

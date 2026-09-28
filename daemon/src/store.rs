@@ -1155,7 +1155,12 @@ impl Store {
             || self.auto_root_intent(work_unit_id)?.is_some() {
             return Err(anyhow!("automatic work-unit identity was already used"));
         }
-        if self.auto_pool_claimed(pool_id)? { return Ok(None); }
+        // The account: known windows when the qualified draw exists (the
+        // booking counts every other claim, booking and run on the account),
+        // otherwise the whole-account unknown-draw claim.
+        let windowed = self.book_auto_account_in_tx(work_unit_id, route_id, pool_id,
+            account_generation, decision)?;
+        if !windowed && self.auto_pool_claimed(pool_id)? { return Ok(None); }
         if self.shared_writer_hold(&workspace.path, None, None)?.is_some() { return Ok(None); }
         let writer: bool = self.conn.query_row(
             "SELECT EXISTS(SELECT 1 FROM runs r JOIN workspaces w ON w.id=r.workspace_id
@@ -1177,11 +1182,13 @@ impl Store {
                 route_id, account_generation, task.id, run.id, workspace.id,
                 crate::daemon::now()],
         )?;
-        self.conn.execute(
-            "INSERT INTO auto_pool_claims(work_unit_id,pool_id,account_generation,state,created_ms)
-                VALUES(?1,?2,?3,'active',?4)",
-            params![work_unit_id, pool_id, account_generation, crate::daemon::now()],
-        )?;
+        if !windowed {
+            self.conn.execute(
+                "INSERT INTO auto_pool_claims(work_unit_id,pool_id,account_generation,state,created_ms)
+                    VALUES(?1,?2,?3,'active',?4)",
+                params![work_unit_id, pool_id, account_generation, crate::daemon::now()],
+            )?;
+        }
         let event = self.insert_event(crate::daemon::now(), Some(&task.id), Some(&run.id),
             "auto_decision", "daemon", "exact", decision)?;
         self.conn.execute("UPDATE auto_root_intents SET decision_event_seq=?2
@@ -1241,7 +1248,9 @@ impl Store {
                 return Err(anyhow!("parent Auto budget is exhausted"));
             }
         }
-        if self.auto_pool_claimed_for_child(pool_id, &parent.id, account_generation)? {
+        let windowed = self.book_auto_account_in_tx(work_unit_id, route_id, pool_id,
+            account_generation, payload)?;
+        if !windowed && self.auto_pool_claimed_for_child(pool_id, &parent.id, account_generation)? {
             return Ok(None);
         }
         // The child is a separate process: it takes its own app slot, counted
@@ -1249,11 +1258,13 @@ impl Store {
         self.require_app_slot()?;
         self.insert_auto_launch_intent(work_unit_id, &parent.id, requirements_hash,
             route_id, account_generation, execution_budget_ms)?;
-        self.conn.execute(
-            "INSERT INTO auto_pool_claims(work_unit_id,pool_id,account_generation,state,created_ms)
-             VALUES(?1,?2,?3,'active',?4)",
-            params![work_unit_id, pool_id, account_generation, crate::daemon::now()],
-        )?;
+        if !windowed {
+            self.conn.execute(
+                "INSERT INTO auto_pool_claims(work_unit_id,pool_id,account_generation,state,created_ms)
+                 VALUES(?1,?2,?3,'active',?4)",
+                params![work_unit_id, pool_id, account_generation, crate::daemon::now()],
+            )?;
+        }
         let event = self.insert_event(crate::daemon::now(), Some(&parent.task_id), Some(&parent.id),
             "auto_decision", "daemon", "exact", payload)?;
         self.conn.execute("UPDATE auto_launch_intents SET decision_event_seq=?2 WHERE work_unit_id=?1",
@@ -1262,13 +1273,55 @@ impl Store {
         Ok(Some(event))
     }
 
+    /// Handover step 4 for Auto: a root or child whose bucket (the selected
+    /// route's harness, model and effort, class `auto/<task class>`) has a
+    /// qualified upper draw books its account windows through the one
+    /// booking, inside the caller's admission transaction, instead of holding
+    /// the whole account with an unknown-draw claim. False (nothing written
+    /// that the caller keeps) when there is no qualified draw or the booking
+    /// refuses; the caller then takes its existing unknown-draw path.
+    fn book_auto_account_in_tx(&self, work_unit_id: &str, route_id: &str, pool_id: &str,
+        account_generation: Option<i64>, trace: &Value) -> Result<bool> {
+        let (Some(_), Some(generation)) = (pool_id.strip_prefix("account/"), account_generation) else {
+            return Ok(false);
+        };
+        let route = &trace["selected_route"];
+        let (Some(profile_id), Some(harness)) = (route["profile_id"].as_str(), route["harness"].as_str()) else {
+            return Ok(false);
+        };
+        if self.auto_account_pool_id(profile_id)?.as_deref() != Some(pool_id) {
+            return Ok(false);
+        }
+        let Some(latest) = self.latest_auto_quota(profile_id)? else { return Ok(false) };
+        let bucket = crate::upper_draw::DrawBucket {
+            harness: harness.into(),
+            model: route["model"].as_str().unwrap_or_default().into(),
+            effort: route["effort"].as_str().unwrap_or_default().into(),
+            task_class: format!("auto/{}", trace["selection_input"]["work"]["task_class"]
+                .as_str().unwrap_or("unclassified")),
+        };
+        let request = crate::account_booking::AccountBookingRequest {
+            id: work_unit_id, request_hash: work_unit_id, caller: "auto", route_id,
+            profile_id, quota_profile_id: profile_id, account_generation: generation,
+            quota_event_seq: latest.event_seq, now_ms: crate::daemon::now(),
+            draw: crate::account_booking::BookingDraw::Qualified(&bucket),
+            allocation_remaining_milli: None,
+        };
+        Ok(crate::account_booking::book_shared_account_in_tx(&self.conn, &request)?
+            == crate::account_booking::BookingDecision::Booked)
+    }
+
     /// An unknown subscription draw occupies its shared pool until a child
     /// settles. A paused intent without a child remains effects-uncertain and
     /// cannot be released merely because this daemon restarted.
     pub fn auto_pool_claimed(&self, pool_id: &str) -> Result<bool> {
+        // A settled booking's draw is retained only until a later reading
+        // counts it: no process, so no occupant.
         let claimed = self.conn.query_row(
-            "SELECT EXISTS(SELECT 1 FROM auto_pool_claims WHERE (pool_id=?1 OR pool_id='legacy/unresolved')
-                AND state IN ('active','uncertain'))",
+            "SELECT EXISTS(SELECT 1 FROM auto_pool_claims c WHERE (c.pool_id=?1 OR c.pool_id='legacy/unresolved')
+                AND c.state IN ('active','uncertain')
+                AND NOT EXISTS(SELECT 1 FROM shared_booking_intents b
+                    WHERE b.work_unit_id=c.work_unit_id AND b.settled_ms IS NOT NULL))",
             [pool_id], |row| row.get(0))?;
         Ok(claimed || self.active_run_on_known_account_pool(pool_id, None, None)?)
     }
@@ -1332,6 +1385,8 @@ impl Store {
                 LEFT JOIN runs r ON r.id=i.run_id
                 WHERE (c.pool_id=?1 OR c.pool_id='legacy/unresolved')
                   AND c.state IN ('active','uncertain')
+                  AND NOT EXISTS(SELECT 1 FROM shared_booking_intents b
+                    WHERE b.work_unit_id=c.work_unit_id AND b.settled_ms IS NOT NULL)
                   AND NOT (c.pool_id=?1 AND c.state='active'
                     AND c.account_generation IS ?3 AND COALESCE(i.run_id,'')=?2
                     AND COALESCE(r.status,'')='running' AND r.ended_ms IS NULL
@@ -1343,16 +1398,37 @@ impl Store {
     /// Called in the terminal run transaction. Unknown or still-running
     /// children retain their claim; only a confirmed settled child releases it.
     pub fn release_settled_auto_pool_claim(&self, child_run_id: &str) -> Result<()> {
-        self.conn.execute(
-            "UPDATE auto_pool_claims SET state='released',released_ms=?2
-             WHERE work_unit_id IN (SELECT m.work_unit_id FROM managed_work_units m
+        const SETTLED: &str = "SELECT m.work_unit_id FROM managed_work_units m
                  JOIN runs r ON r.id=m.child_run_id WHERE m.child_run_id=?1
                  AND r.status IN ('completed','failed','interrupted') AND r.ended_ms IS NOT NULL
                  UNION SELECT i.work_unit_id FROM auto_root_intents i
                  JOIN runs r ON r.id=i.run_id WHERE i.run_id=?1
-                 AND r.status IN ('completed','failed','interrupted') AND r.ended_ms IS NOT NULL)
-               AND state IN ('active','uncertain')",
+                 AND r.status IN ('completed','failed','interrupted') AND r.ended_ms IS NOT NULL";
+        // A known-window booking keeps its draw committed until a reading
+        // taken after settlement includes it (as every shared booking does).
+        self.conn.execute(
+            &format!("UPDATE shared_booking_intents SET settled_ms=?2,outcome='settled',updated_ms=?2
+             WHERE caller='auto' AND settled_ms IS NULL AND work_unit_id IN ({SETTLED})"),
             params![child_run_id, crate::daemon::now()],
+        )?;
+        self.conn.execute(
+            &format!("UPDATE auto_pool_claims SET state='released',released_ms=?2
+             WHERE work_unit_id IN ({SETTLED})
+               AND state IN ('active','uncertain')
+               AND NOT EXISTS(SELECT 1 FROM shared_booking_intents b
+                   WHERE b.work_unit_id=auto_pool_claims.work_unit_id)"),
+            params![child_run_id, crate::daemon::now()],
+        )?;
+        Ok(())
+    }
+
+    /// No model process ran for an Auto unit's known-window booking: its
+    /// commitment goes with its claim.
+    fn release_unstarted_auto_booking(&self, work_unit_id: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE shared_booking_intents SET phase='released',settled_ms=?2,outcome='not_started',updated_ms=?2
+             WHERE work_unit_id=?1 AND caller='auto' AND settled_ms IS NULL",
+            params![work_unit_id, crate::daemon::now()],
         )?;
         Ok(())
     }
@@ -1362,14 +1438,17 @@ impl Store {
     /// launch intent and any uncertain Git resource remain untouched. A child
     /// row, even with no observed process, keeps its claim until settlement.
     pub fn release_unstarted_auto_pool_claim(&self, work_unit_id: &str) -> Result<bool> {
-        Ok(self.conn.execute(
+        let released = self.conn.execute(
             "UPDATE auto_pool_claims SET state='released',released_ms=?2
              WHERE work_unit_id=?1 AND state IN ('active','uncertain')
                AND NOT EXISTS(SELECT 1 FROM managed_work_units m WHERE m.work_unit_id=?1)
                AND NOT EXISTS(SELECT 1 FROM auto_root_intents i WHERE i.work_unit_id=?1)
-               AND NOT EXISTS(SELECT 1 FROM shared_booking_intents i WHERE i.work_unit_id=?1)",
+               AND NOT EXISTS(SELECT 1 FROM shared_booking_intents i
+                   WHERE i.work_unit_id=?1 AND i.caller<>'auto')",
             params![work_unit_id, crate::daemon::now()],
-        )? == 1)
+        )? == 1;
+        if released { self.release_unstarted_auto_booking(work_unit_id)?; }
+        Ok(released)
     }
 
     /// A stopped root launch with no supervisor path cannot have started a
@@ -1377,20 +1456,23 @@ impl Store {
     /// rejected cmd.spawn and the launch code cleared its recorded path.
     /// Its Git resource may still need inspection.
     pub fn release_unstarted_auto_root_pool_claim(&self, work_unit_id: &str) -> Result<bool> {
-        Ok(self.conn.execute(
+        let released = self.conn.execute(
             "UPDATE auto_pool_claims SET state='released',released_ms=?2
              WHERE work_unit_id=?1 AND state IN ('active','uncertain')
                AND EXISTS(SELECT 1 FROM auto_root_intents i JOIN runs r ON r.id=i.run_id
                    WHERE i.work_unit_id=?1 AND r.run_dir IS NULL)",
             params![work_unit_id, crate::daemon::now()],
-        )? == 1)
+        )? == 1;
+        if released { self.release_unstarted_auto_booking(work_unit_id)?; }
+        Ok(released)
     }
 
     /// Startup reconciliation runs after the old daemon's workers are gone.
     /// A persisted intent with no child may own an uncertain Git worktree,
     /// but it cannot have spent model allowance through this launch path.
     pub fn release_stale_unstarted_auto_pool_claims(&self) -> Result<usize> {
-        Ok(self.conn.execute(
+        let now = crate::daemon::now();
+        let released = self.conn.execute(
             "UPDATE auto_pool_claims SET state='released',released_ms=?1
              WHERE state IN ('active','uncertain')
                AND NOT EXISTS(SELECT 1 FROM managed_work_units m
@@ -1398,9 +1480,17 @@ impl Store {
                AND NOT EXISTS(SELECT 1 FROM auto_root_intents i
                    WHERE i.work_unit_id=auto_pool_claims.work_unit_id)
                AND NOT EXISTS(SELECT 1 FROM shared_booking_intents i
-                   WHERE i.work_unit_id=auto_pool_claims.work_unit_id)",
-            [crate::daemon::now()],
-        )?)
+                   WHERE i.work_unit_id=auto_pool_claims.work_unit_id AND i.caller<>'auto')",
+            [now],
+        )?;
+        // An unstarted Auto child's known-window booking goes with its claim.
+        self.conn.execute(
+            "UPDATE shared_booking_intents SET phase='released',settled_ms=?1,outcome='not_started',updated_ms=?1
+             WHERE caller='auto' AND settled_ms IS NULL AND EXISTS(SELECT 1 FROM auto_pool_claims c
+                 WHERE c.work_unit_id=shared_booking_intents.work_unit_id AND c.state='released')",
+            [now],
+        )?;
+        Ok(released)
     }
 
     pub fn set_auto_launch_intent_phase(&self, id: &str, phase: &str) -> Result<()> {

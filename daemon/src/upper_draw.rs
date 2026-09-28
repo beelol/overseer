@@ -621,7 +621,10 @@ mod tests {
 
         /// A structured observation through the real recording path.
         fn observe_on(&self, profile: &str, minutes: i64, used: [f64; 2], plan: &str) -> i64 {
-            let at = self.at(minutes);
+            self.observe_at(profile, self.at(minutes), used, plan)
+        }
+
+        fn observe_at(&self, profile: &str, at: i64, used: [f64; 2], plan: &str) -> i64 {
             let snapshot = QuotaSnapshot {
                 ordinary_usage_allowed: Some(true),
                 observed_ms: at,
@@ -704,6 +707,23 @@ mod tests {
             self.observe(start, used);
             self.run(id, start + 1, start + 5);
             self.observe(start + 7, [used[0] + moved[0], used[1] + moved[1]]);
+        }
+
+        /// One isolated Auto root of `class`, recorded as Auto records it
+        /// (a root intent and its decision event).
+        fn auto_sample(&self, id: &str, start: i64, class: &str) {
+            self.observe(start, [10.0, 1.0]);
+            self.run(id, start + 1, start + 5);
+            let event = self.store.insert_event(self.at(start + 1), Some(&format!("t-{id}")), Some(id),
+                "auto_decision", "daemon", "exact",
+                &serde_json::json!({"selection_input":{"work":{"task_class":class}}})).unwrap();
+            self.store.conn.execute(
+                "INSERT INTO auto_root_intents(work_unit_id,requirements_hash,repo_root,workspace_mode,
+                 route_id,account_generation,phase,task_id,run_id,workspace_id,created_ms,decision_event_seq)
+                 VALUES('unit-'||?1,?2,'/repo','worktree','codex-app/gpt-6-sol/medium',1,'queued',
+                 't-'||?1,?1,'w-'||?1,?3,?4)",
+                params![id, "h".repeat(64), self.at(start + 1), event.seq]).unwrap();
+            self.observe(start + 7, [11.0, 1.0]);
         }
 
         fn draw(&self, bucket: &DrawBucket) -> UpperDraw {
@@ -1010,5 +1030,116 @@ mod tests {
         f.store.release_shared_booking_pre_effect("warm").unwrap();
         assert_eq!(book("fixture", newer, BookingDraw::Fixture(&[1_000, 1_000])), BookingDecision::Booked);
         assert_eq!(f.store.shared_booking_draw("fixture").unwrap(), Some((Some("fixture".into()), None)));
+    }
+
+    #[test]
+    fn an_auto_root_books_known_windows_once_its_class_is_calibrated() {
+        use crate::account_booking::{AccountBookingRequest, BookingDecision, BookingDraw};
+        use crate::store::{Run, Task, Workspace};
+        let f = Fixture::new();
+        f.store.set_auto_mode_enabled(true).unwrap();
+        let pool = format!("account/{}", "a".repeat(64));
+        for n in 0..5 {
+            f.auto_sample(&format!("auto-{n}"), n * 20, "browser_check");
+        }
+        f.observe(1200, [20.0, 2.0]);
+        let at = f.at(1200);
+        let admit = |id: &str, class: &str| -> bool {
+            let workspace = Workspace { id:format!("w-{id}"), path:format!("/repo/{id}"),
+                repo_root:"/repo".into(), common_dir:"/repo/.git".into(), kind:"worktree".into(),
+                branch:Some(format!("codex/{id}")), owner_run_id:None,
+                initial_dirty:serde_json::json!({"clean":true}), created_ms:at, removed_ms:None };
+            let task = Task { id:format!("t-{id}"), title:"root".into(), prompt:"prompt".into(),
+                repo_root:"/repo".into(), target_ref:None, workspace_id:workspace.id.clone(),
+                start_snapshot:None, fork_commit:None, fork_provenance:None, created_ms:at, archived_ms:None };
+            let run = Run { id:id.into(), task_id:task.id.clone(), parent_run_id:None,
+                harness:"codex-app".into(), harness_version:Some("0.155".into()),
+                profile_id:Some(PROFILE.into()), model:Some("gpt-6-sol".into()),
+                effort:Some("medium".into()), workspace_id:workspace.id.clone(), native_id:None,
+                status:"queued".into(), exit_reason:None, created_ms:at, ended_ms:None,
+                title:"root".into(), relation_source:None, relation_confidence:None,
+                capabilities:serde_json::json!({}), process_generation:0, attention:None };
+            let trace = serde_json::json!({"selected_route":{"harness":"codex-app","profile_id":PROFILE,
+                "model":"gpt-6-sol","effort":"medium"},"selection_input":{"work":{"task_class":class}}});
+            f.store.insert_auto_root_selected(&format!("unit-{id}"), &"h".repeat(64),
+                "codex-app/gpt-6-sol/medium", &pool, Some(1), &workspace, &task, &run,
+                &serde_json::json!({"generic":{}}), &trace).unwrap().is_some()
+        };
+        let book = |id: &str| {
+            let cited = f.store.latest_auto_quota(PROFILE).unwrap().unwrap().event_seq;
+            f.store.book_shared_account(&AccountBookingRequest {
+                id, request_hash: id, caller: "swarm", route_id: "claude/sonnet",
+                profile_id: PROFILE, quota_profile_id: PROFILE, account_generation: 1,
+                quota_event_seq: cited, now_ms: crate::daemon::now(),
+                draw: BookingDraw::Fixture(&[1_000, 1_000]), allocation_remaining_milli: None,
+            }).unwrap()
+        };
+        let finish = |id: &str| {
+            f.store.conn.execute("UPDATE runs SET status='completed',ended_ms=?2 WHERE id=?1",
+                params![id, crate::daemon::now()]).unwrap();
+            f.store.release_settled_auto_pool_claim(id).unwrap();
+        };
+        let claim = |unit: &str| -> String {
+            f.store.conn.query_row("SELECT state FROM auto_pool_claims WHERE work_unit_id=?1",
+                [unit], |row| row.get(0)).unwrap()
+        };
+
+        // An uncalibrated class keeps the whole-account unknown-draw claim,
+        // which leaves no room for a known-window booking beside it.
+        assert!(admit("root-cold", "diagnosis"));
+        assert!(f.store.shared_booking_draw("unit-root-cold").unwrap().is_none());
+        assert_eq!(book("swarm/beside-cold"), BookingDecision::Blocked("account_pool_busy"));
+        finish("root-cold");
+        assert_eq!(claim("unit-root-cold"), "released");
+
+        // A calibrated class books its windows; a Swarm worker shares the
+        // account beside the queued root.
+        assert!(admit("root-warm", "browser_check"));
+        let (source, provenance) = f.store.shared_booking_draw("unit-root-warm").unwrap().unwrap();
+        assert_eq!(source.as_deref(), Some("qualified"));
+        let provenance = provenance.unwrap();
+        assert_eq!(provenance.bucket.task_class, "auto/browser_check");
+        assert_eq!(provenance.sample_count, 5);
+        assert_eq!(book("swarm/beside-warm"), BookingDecision::Booked);
+        // Another Auto root on the same account books beside it too.
+        assert!(admit("root-second", "browser_check"));
+        // Settled: the draw stays committed until a later reading, then goes.
+        finish("root-warm");
+        assert_eq!(claim("unit-root-warm"), "active", "retained until a reading includes it");
+        f.store.conn.execute("UPDATE runs SET status='completed',ended_ms=?1 WHERE id='root-second'",
+            [crate::daemon::now()]).unwrap();
+        f.store.conn.execute("UPDATE auto_pool_claims SET state='released' WHERE work_unit_id IN
+            ('unit-root-second','swarm/beside-warm')", []).unwrap();
+        assert!(!f.store.auto_pool_claimed(&pool).unwrap(),
+            "a settled booking's retained draw is no occupant for Auto admission");
+        f.store.conn.execute("UPDATE runs SET status='queued',ended_ms=NULL WHERE id='root-second'", []).unwrap();
+        f.store.conn.execute("UPDATE auto_pool_claims SET state='active' WHERE work_unit_id IN
+            ('unit-root-second','swarm/beside-warm')", []).unwrap();
+        let settled: Option<String> = f.store.conn.query_row(
+            "SELECT outcome FROM shared_booking_intents WHERE work_unit_id='unit-root-warm'",
+            [], |row| row.get(0)).unwrap();
+        assert_eq!(settled.as_deref(), Some("settled"));
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        f.observe_at(PROFILE, crate::daemon::now(), [21.0, 2.0], "pro");
+        assert_eq!(claim("unit-root-warm"), "released");
+        assert_eq!(claim("unit-root-second"), "active", "an unsettled root keeps its windows");
+
+        // A child of a calibrated class books its own windows; if it never
+        // starts, its booking goes with its claim.
+        f.store.conn.execute("UPDATE runs SET status='running',process_generation=1 WHERE id='root-second'",
+            []).unwrap();
+        let parent = f.store.run("root-second").unwrap().unwrap();
+        let trace = serde_json::json!({"selected_route":{"harness":"codex-app","profile_id":PROFILE,
+            "model":"gpt-6-sol","effort":"medium"},"selection_input":{"work":{"task_class":"browser_check"}}});
+        assert!(f.store.insert_auto_selected_decision("unit-child", &parent, "hash",
+            "codex-app/gpt-6-sol/medium", &pool, Some(1), 300_000, &trace).unwrap().is_some());
+        assert_eq!(f.store.shared_booking_draw("unit-child").unwrap().unwrap().0.as_deref(),
+            Some("qualified"));
+        assert!(f.store.release_unstarted_auto_pool_claim("unit-child").unwrap());
+        let outcome: Option<String> = f.store.conn.query_row(
+            "SELECT outcome FROM shared_booking_intents WHERE work_unit_id='unit-child'",
+            [], |row| row.get(0)).unwrap();
+        assert_eq!(outcome.as_deref(), Some("not_started"));
+        assert_eq!(claim("unit-child"), "released");
     }
 }
