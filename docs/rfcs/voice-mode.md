@@ -209,7 +209,7 @@ None of these starts a request, lowers or stops Overseer's speech, or moves the 
 | --- | --- |
 | makes a noise, coughs, types | keeps talking at full voice |
 | says one word or a backchannel | keeps talking |
-| says two or more words (recognized, not a backchannel) | lowers its voice within 150 ms of the second word and keeps listening (revised by the spike: 0.3 to 0.7 s after the owner starts, since lowering needs recognized words) |
+| says two or more words (recognized, not a backchannel) | lowers its voice within 150 ms of the second word and keeps listening (revised by the spike: within 0.35 s of the second word, about 0.6 to 1 s after the owner starts, since lowering needs recognized words) |
 | is still speaking 0.7 s later, and the words are meant for Overseer | stops at the end of its phrase |
 | is still speaking, and the words are not meant for Overseer | returns to full voice and finishes |
 | says "stop", "wait" or "hold on" | stops within 300 ms |
@@ -725,9 +725,10 @@ mark averaged 0.44 while speaking.
    line ("Telling Phone…") is spoken when the proposal comes, and "Sent." from the daemon's own
    records. The holding line moves from 2.5 s to 8 s ("Still working on it.", once): at 2.5 s it
    would follow "On it." every time.
-3. **Lowering needs words**, so it comes 0.3 to 0.7 s after the owner starts over Overseer (words
-   are asked for every 0.3 s while it speaks), not 150 ms after the second word. Stop words still
-   stop it within 300 ms of the words.
+3. **Lowering needs words**, so it comes within 0.35 s of the owner's second word (words are asked
+   for every 0.3 s while Overseer speaks), about 0.6 to 1 s after the owner starts, not 150 ms after
+   the second word; the listener's test measures 240 ms. Stop words still stop it within 300 ms of
+   the words.
 4. **The gate opens within 300 ms for 9 in 10, 450 ms at most.**
 5. **Overseer's voice is made in memory** with macOS's speech synthesizer writing into callbacks,
    not with `say` into a file, so no audio is written at all, the owner's or Overseer's. `say` is
