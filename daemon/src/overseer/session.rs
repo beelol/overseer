@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 pub const LEVELS: &[&str] = &["ask_first", "steer", "auto"];
 /// Actions Overseer may ask for today; watch arrives with its step.
-pub const ACTIONS: &[&str] = &["message", "stop", "start", "pin", "hold", "release", "guardrail", "redirect", "archive", "cadence", "answer", "report", "area", "share", "withdraw", "watch"];
+pub const ACTIONS: &[&str] = &["message", "stop", "start", "pin", "hold", "release", "guardrail", "redirect", "archive", "cadence", "answer", "report", "area", "share", "withdraw", "watch", "swarm"];
 /// The settle window in which what the owner asked for can still be cancelled (AC-170's).
 pub const SETTLE_MS: i64 = 2000;
 const TURN_BYTES: usize = 32 * 1024;
@@ -412,6 +412,11 @@ impl Daemon {
         let who = |id: &str| self.run(id).map(|r| r.title).unwrap_or_else(|_| id.to_string());
         match a["action"].as_str().unwrap_or("") {
             "message" => format!("Send {}: “{}”", who(a["agent"].as_str().unwrap_or("?")), a["text"].as_str().unwrap_or("")),
+            "swarm" => match a["op"].as_str().unwrap_or("") {
+                "limit" => format!("Set the {} swarm's worker limit to {}", a["swarm"].as_str().unwrap_or("?"), a["max_workers"]),
+                "requirements" => format!("Change the {} swarm's requirements: “{}”", a["swarm"].as_str().unwrap_or("?"), a["text"].as_str().unwrap_or("")),
+                op => format!("{} the {} swarm", match op { "pause" => "Pause", "resume" => "Resume", "stop" => "Stop", "off" => "Turn Swarm off for", other => other }, a["swarm"].as_str().unwrap_or("?")),
+            },
             "stop" => format!("Stop {}", who(a["agent"].as_str().unwrap_or("?"))),
             "pin" => format!("Pin {} to the grid", who(a["agent"].as_str().unwrap_or("?"))),
             "start" => format!("Start “{}” in {}", a["title"].as_str().or(a["prompt"].as_str()).unwrap_or("an agent"), a["repo"].as_str().unwrap_or("?")),
@@ -506,9 +511,15 @@ impl Daemon {
             if !ACTIONS.contains(&kind) {
                 bail!("{kind:?} is not an action Overseer has; the actions are {}", ACTIONS.join(", "));
             }
-            let class = super::control::action_class(kind).unwrap_or(super::control::NEVER);
+            let mut class = super::control::action_class(kind).unwrap_or(super::control::NEVER);
             if class == super::control::NEVER {
                 bail!("{kind} is not from the conversation");
+            }
+            // A swarm is controlled only through its own controls; what reduces work
+            // is Steer, what commits more (resume, a higher limit, changed
+            // requirements) is Confirm at every level (Gate S, SWARM-20).
+            if kind == "swarm" {
+                class = self.swarm_action_class(a)?;
             }
             if class == super::control::CONFIRM && !owner_asked {
                 bail!("{kind} happens only when the owner asks for it; this turn was started by {cause}");
@@ -558,6 +569,13 @@ impl Daemon {
                 _ => {}
             }
             let a = &a;
+            if kind == "swarm" {
+                let mut a = a.clone();
+                a["class"] = json!(class);
+                a["title"] = json!(format!("the {} swarm", a["swarm"].as_str().unwrap_or("?")));
+                checked.push(a);
+                continue;
+            }
             if kind != "start" {
                 let id = a["agent"].as_str().ok_or_else(|| anyhow!("{kind} needs an agent id"))?;
                 let run = self.run(id).map_err(|_| anyhow!("no agent {id}"))?;
@@ -594,7 +612,10 @@ impl Daemon {
                 bail!("the owner denied {tool} {detail} to {title}; Overseer does not have another agent do it");
             }
         }
-        let confirm = checked.iter().any(|a| super::control::action_class(a["action"].as_str().unwrap_or("")) == Some(super::control::CONFIRM) || a["class"] == super::control::CONFIRM);
+        let confirm = checked.iter().any(|a| match a["class"].as_str() {
+            Some(class) => class == super::control::CONFIRM,
+            None => super::control::action_class(a["action"].as_str().unwrap_or("")) == Some(super::control::CONFIRM),
+        });
         // At Ask first everything waits for a yes. At Steer and Auto what the owner asked for goes
         // out after the settle window; what Overseer starts by itself goes at once when the level
         // allows it (quiet actions at Steer, every Steer action at Auto), else it is a proposal.
@@ -751,6 +772,50 @@ impl Daemon {
         }
     }
 
+    /// The class of one Overseer swarm action: pausing, stopping, turning Swarm off and
+    /// lowering the worker limit reduce work (Steer); resuming, raising the limit and
+    /// changing the requirements commit more (Confirm). Starting a swarm is not an
+    /// Overseer action at all: the owner starts one from its read-back.
+    fn swarm_action_class(&self, a: &Value) -> Result<&'static str> {
+        let run = a["swarm"].as_str().filter(|s| !s.is_empty()).ok_or_else(|| anyhow!("swarm needs the swarm run id (swarm)"))?;
+        let current = crate::swarm::get(&self.store.lock().unwrap(), run)?;
+        Ok(match a["op"].as_str().unwrap_or("") {
+            "pause" | "stop" | "off" => super::control::STEER,
+            "resume" | "requirements" => super::control::CONFIRM,
+            "limit" => {
+                let wanted = a["max_workers"].as_i64().ok_or_else(|| anyhow!("a swarm limit needs max_workers"))?;
+                let now = current["policy"]["effective"]["max_workers"].as_i64().unwrap_or(0);
+                if wanted > now { super::control::CONFIRM } else { super::control::STEER }
+            }
+            "start" => bail!("Overseer does not start a swarm; the owner starts one from its read-back"),
+            other => bail!("swarm op {other:?} is not one of pause, resume, stop, off, limit, requirements"),
+        })
+    }
+
+    /// One swarm action, through the same daemon method the owner's controls use.
+    fn swarm_perform(self: &Arc<Self>, a: &Value, proposal: &str, by: &str) -> Result<String> {
+        let run = a["swarm"].as_str().unwrap_or("").to_string();
+        let current = crate::swarm::get(&self.store.lock().unwrap(), &run)?;
+        let versioned = json!({"run_id":run,"generation":current["generation"],"revision":current["revision"]});
+        let op = a["op"].as_str().unwrap_or("");
+        let (method, params) = match op {
+            "pause" => ("swarm.pause", versioned),
+            "resume" => ("swarm.resume", versioned),
+            "off" => ("swarm.off", versioned),
+            "stop" => ("swarm.stop", json!({"run_id":run})),
+            "limit" => ("swarm.limit.set", json!({"run_id":run,"request_id":format!("overseer-{proposal}"),
+                "expected_limit_revision":current["limit_revision"],"max_workers":a["max_workers"]})),
+            "requirements" => ("swarm.requirements.change", json!({"run_id":run,
+                "request_id":format!("overseer-{proposal}"),"text":a["text"]})),
+            other => bail!("no swarm op {other}"),
+        };
+        let result = crate::server::dispatch(self, method, &params)?;
+        self.emit(None, None, "overseer_action", "overseer", "exact",
+            json!({"action":"swarm","op":op,"swarm_run_id":run,"proposal":proposal,"by":by}))?;
+        self.dispatch_record(proposal, &run, "swarm", op, a["text"].as_str().unwrap_or(""), a["why"].as_str().unwrap_or("named"), "sent")?;
+        Ok(format!("{op} on the {run} swarm ({})", result["status"].as_str().unwrap_or("done")))
+    }
+
     /// Overseer's message or redirect to a swarm's director enters the director's durable inbox
     /// as an advisory with its source, rather than as an ordinary follow-up (a director takes no
     /// follow-ups). `None` when the agent is not a swarm director.
@@ -772,7 +837,7 @@ impl Daemon {
         let title = a["title"].as_str().unwrap_or("").to_string();
         let kind = a["action"].as_str().unwrap_or("");
         // A proposal made before its agent became a Swarm worker is refused the same way.
-        if let Some(agent) = a["agent"].as_str().filter(|_| kind != "start") {
+        if let Some(agent) = a["agent"].as_str().filter(|_| kind != "start" && kind != "swarm") {
             self.refuse_swarm_worker_steering(kind, a, agent, &title)?;
         }
         match kind {
@@ -856,6 +921,7 @@ impl Daemon {
                 Ok(format!("set {title}'s area to {}", r["area"].as_array().map(|p| p.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(", ")).unwrap_or_default()))
             }
             "share" => self.share_perform(a, proposal, by),
+            "swarm" => self.swarm_perform(a, proposal, by),
             "watch" => {
                 let mut p = a.clone();
                 p["subject"] = a["agent"].clone();

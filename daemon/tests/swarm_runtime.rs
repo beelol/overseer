@@ -1937,3 +1937,58 @@ time.sleep(0.5)
     }
     d.call("swarm.stop", json!({"run_id":id,"generation":1,"revision":1}));
 }
+
+/// SWARM-20: Stop reaches a worker's descendants. The supervised worker
+/// starts a child process of its own; Stop interrupts the worker's whole
+/// process group, so the child exits with it, and the queued job is
+/// cancelled without an attempt.
+#[test]
+fn stop_reaches_a_workers_descendant_processes() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("descendant-source"));
+    let run = d.call("swarm.create", json!({"category":"Descendant stop","objective":"Inspect backend",
+        "allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap().to_string();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]},
+        {"id":"queued","title":"Queued","acceptance":"evidence","deps":["inspect"]}]}));
+    let at = now();
+    let admitted = d.call("swarm.admit", json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"inspect","target_id":"fixture-local","request_id":"descendant-worker","now_ms":at,
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["fixture-pool"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"fixture-pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(admitted["status"], "admitted", "{admitted}");
+    let child_pid_file = temp.path().join("child.pid");
+    let launched = d.call("swarm.worker.launch", json!({"run_id":id,"job_id":"inspect",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],"repo":checkout,
+        "program":"/usr/bin/python3","args":["-c",
+            format!("import pathlib,subprocess,time;c=subprocess.Popen(['/bin/sleep','120']);pathlib.Path({:?}).write_text(str(c.pid));time.sleep(120)",
+                child_pid_file.to_string_lossy())],
+        "prompt":"Inspect","title":"Worker with a child"}));
+    let worker = launched["overseer_run_id"].as_str().unwrap().to_string();
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while !child_pid_file.exists() {
+        assert!(std::time::Instant::now() < until, "the worker did not start its child");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    let child: i64 = std::fs::read_to_string(&child_pid_file).unwrap().trim().parse().unwrap();
+    assert!(pid_alive(child));
+    d.call("swarm.stop", json!({"run_id":id,"generation":1,"revision":1}));
+    assert_ne!(d.wait_done(&worker, 15)["status"], "completed");
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while pid_alive(child) {
+        assert!(std::time::Instant::now() < until, "the worker's child survived Stop");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    let jobs = d.call("swarm.jobs", json!({"id":id}));
+    let queued = jobs["jobs"].as_array().unwrap().iter().find(|j| j["id"] == "queued").unwrap().clone();
+    assert_eq!(queued["status"], "cancelled");
+    assert_eq!(queued["attempt_count"], 0);
+}

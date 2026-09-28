@@ -169,3 +169,75 @@ fn overseer_actions_aimed_at_a_swarm_worker_are_refused_and_offered_to_the_direc
     assert_eq!(finished["status"], "completed", "{finished}");
     assert_eq!(w.d.call("swarm.get", json!({"id":run}))["status"], "completed");
 }
+
+/// SWARM-20 and S5's "Overseer asks to raise this one's active limit while on
+/// Auto": Overseer controls a swarm only through the swarm's own controls,
+/// with the same daemon methods as the owner. At the Auto level a pause that
+/// Overseer starts by itself happens at once; resume, a raised worker limit and
+/// changed requirements are refused unless the owner asked, and when the owner
+/// asks they wait for the owner's yes. A lowered limit and Stop are Steer.
+/// Starting a swarm is not an Overseer action. Each carried-out action is
+/// recorded with its proposal and who said yes.
+#[test]
+fn overseer_controls_a_swarm_only_through_its_controls_and_confirms_what_commits_more() {
+    let w = world();
+    let (run, director, _worker) = running_swarm(&w);
+    w.d.call("overseer.session", json!({}));
+    w.d.call("overseer.level", json!({"level":"auto"}));
+    let cause = |who: &str| db(&w.d).execute("UPDATE overseer_sessions SET last_cause=?1", [who]).unwrap();
+    let propose = |action: Value| w.d.try_call("overseer.propose", json!({"actions":[action],"source":"test"}));
+    let status = || w.d.call("swarm.get", json!({"id":run}))["status"].as_str().unwrap().to_string();
+    let ceiling = w.d.call("swarm.get", json!({"id":run}))["policy"]["effective"]["max_workers"].as_i64().unwrap();
+    // Overseer by itself, at Auto: pausing reduces work and happens at once.
+    cause("check_in");
+    let paused = propose(json!({"action":"swarm","swarm":run,"op":"pause"})).unwrap();
+    assert_eq!(paused["done"], true, "{paused}");
+    assert_eq!(status(), "paused");
+    // What commits more is refused unless the owner asked.
+    for action in [json!({"action":"swarm","swarm":run,"op":"resume"}),
+        json!({"action":"swarm","swarm":run,"op":"limit","max_workers":ceiling + 1}),
+        json!({"action":"swarm","swarm":run,"op":"requirements","text":"also audit exports"})] {
+        let err = propose(action.clone()).unwrap_err();
+        assert!(err.contains("only when the owner asks"), "{action}: {err}");
+    }
+    assert!(propose(json!({"action":"swarm","swarm":run,"op":"start"})).unwrap_err().contains("does not start a swarm"));
+    assert_eq!(status(), "paused");
+    // The owner asks: still a read-back that waits for the owner's yes, even at Auto.
+    cause("owner");
+    let resume = propose(json!({"action":"swarm","swarm":run,"op":"resume"})).unwrap();
+    assert_eq!((resume["done"].as_bool(), resume["state"].as_str()), (Some(false), Some("open")), "{resume}");
+    assert_eq!(status(), "paused", "nothing happens before the yes");
+    let yes = w.d.call("overseer.answer", json!({"id":resume["proposal"],"yes":true,"surface":"ctl","by":"owner"}));
+    assert_eq!(yes["state"], "yes", "{yes}");
+    assert_eq!(status(), "running");
+    let before = w.d.call("swarm.get", json!({"id":run}))["policy"]["effective"]["max_workers"].as_i64().unwrap();
+    let raise = propose(json!({"action":"swarm","swarm":run,"op":"limit","max_workers":before + 2})).unwrap();
+    assert_eq!(raise["state"], "open", "raising the limit waits for a yes: {raise}");
+    assert_eq!(w.d.call("swarm.get", json!({"id":run}))["policy"]["effective"]["max_workers"], before);
+    w.d.call("overseer.answer", json!({"id":raise["proposal"],"yes":false,"surface":"ctl","by":"owner"}));
+    assert_eq!(w.d.call("swarm.get", json!({"id":run}))["policy"]["effective"]["max_workers"], before, "a no changes nothing");
+    // Lowering the limit reduces work: Steer.
+    cause("check_in");
+    let lower = propose(json!({"action":"swarm","swarm":run,"op":"limit","max_workers":2})).unwrap();
+    assert_eq!(lower["done"], true, "{lower}");
+    assert_eq!(w.d.call("swarm.get", json!({"id":run}))["policy"]["effective"]["max_workers"], 2);
+    // The owner's changed requirements through Overseer: recorded after the yes.
+    cause("owner");
+    let change = propose(json!({"action":"swarm","swarm":run,"op":"requirements","text":"Also check the exports route"})).unwrap();
+    let yes = w.d.call("overseer.answer", json!({"id":change["proposal"],"yes":true,"surface":"ctl","by":"owner"}));
+    assert_eq!(yes["state"], "yes", "{yes}");
+    let recorded = w.d.call("swarm.get", json!({"id":run}))["requirement_changes"][0].clone();
+    assert_eq!(recorded["request_id"], format!("overseer-{}", change["proposal"].as_str().unwrap()), "{recorded}");
+    assert_eq!(w.d.call("swarm.get", json!({"id":run}))["generation"], 1, "the director generation is unchanged");
+    // Stop through Overseer uses the owner's Stop: the director is interrupted.
+    cause("check_in");
+    let stop = propose(json!({"action":"swarm","swarm":run,"op":"stop"})).unwrap();
+    assert_eq!(stop["done"], true, "{stop}");
+    assert!(matches!(status().as_str(), "stopping" | "stopped"));
+    assert_ne!(w.d.wait_done(&director, 30)["status"], "running");
+    // Every carried-out swarm action is recorded with its proposal.
+    let recorded: i64 = db(&w.d).query_row("SELECT COUNT(*) FROM dispatches WHERE action='swarm' AND run_id=?1",
+        [&run], |r| r.get(0)).unwrap();
+    assert_eq!(recorded, 5, "pause, resume, lower limit, requirements, stop");
+    std::fs::write(&w.gate, "open").unwrap();
+}
