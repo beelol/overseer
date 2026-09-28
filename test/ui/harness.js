@@ -157,7 +157,11 @@ class Session {
   async quit() {
     // Close VS Code the way a user does (Cmd+Q); fall back to SIGTERM.
     // In a background launch the app is never active, so its Quit menu shortcut cannot fire: quit through the app.
-    if (this.quiet) await this.quiet.quit();
+    if (this.quiet) {
+      const events = await this.quiet.activations();
+      this.note('background window: main-process events', events);
+      await this.quiet.quit();
+    }
     else { try { await this.cdp?.focusWorkbench(); await this.cdp?.key('q', { meta: true }); } catch {} }
     for (let i = 0; i < 30; i++) {
       await delay(500);

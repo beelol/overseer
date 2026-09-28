@@ -8,7 +8,8 @@
 //     app.focus() do nothing;
 //   - sets a conditional breakpoint on VS Code's `new electron.BrowserWindow(options)` that turns
 //     options.show off, then shows the new window inactive once Electron has created it.
-// The window is visible and fully rendered, it is just never the active app. Keyboard and focus
+// The window is fully rendered but transparent and click-through, so it neither covers the owner's
+// apps nor catches their clicks, and it is never the active app. Keyboard and focus
 // inside the page come from CDP (cdp.js enables focus emulation on every target).
 //
 // OVERSEER_UI_FOREGROUND=1 keeps the old foreground launch (for watching a run); other platforms
@@ -37,8 +38,27 @@ const PATCH = `(() => {
     proto.focus = function () { if (!this.isVisible()) this.showInactive(); };
   }
   app.focus = () => {};
+  // What made the app active, if anything did: read back by activations().
+  const t0 = Date.now(), seen = globalThis.__overseerActivations = [];
+  const log = (what, extra) => seen.push({ ms: Date.now() - t0, what, ...extra });
+  app.on('did-become-active', () => log('app became active'));
+  app.on('browser-window-focus', () => log('window focused'));
+  app.on('web-contents-created', (_e, wc) => {
+    const proto = Object.getPrototypeOf(wc);
+    if (proto.__overseerWrapped) return;
+    proto.__overseerWrapped = true;
+    const focus = proto.focus;
+    proto.focus = function () { log('webContents.focus()', { stack: new Error().stack.split(String.fromCharCode(10)).slice(2, 6).map(l => l.trim()) }); return focus.apply(this, arguments); };
+  });
   globalThis.__overseerQuietShow = 0;
   app.on('browser-window-created', (_event, win) => {
+    log('window created', { show: globalThis.__overseerQuietShow > 0 });
+    // An inactive window still sits on top of the owner's apps, where a click meant for them would
+    // activate VS Code. Invisible and click-through, it covers nothing; CDP input and screenshots go
+    // to the page itself, so the scenarios do not notice.
+    win.setOpacity(0);
+    win.setIgnoreMouseEvents(true);
+    win.once('show', () => log('window shown'));
     if (globalThis.__overseerQuietShow > 0) {
       globalThis.__overseerQuietShow--;
       setImmediate(() => { if (!win.isDestroyed() && !win.isVisible()) win.showInactive(); });
@@ -48,7 +68,7 @@ const PATCH = `(() => {
 })()`;
 
 /**
- * Starts VS Code in the background. Returns { ready, quit, close }: `ready` resolves once the main process
+ * Starts VS Code in the background. Returns { ready, quit, detachAfterFirstWindow, close }: `ready` resolves once the main process
  * is patched and running (it never rejects: on any failure the app is let run as it would anyway),
  * `quit` quits the app as its Quit menu item does, `close` drops the inspector connection.
  */
@@ -112,12 +132,28 @@ function launchQuiet({ code, args, env, root, note }) {
   // The breakpoint lives as long as this connection, so it stays open until the window quits.
   return {
     ready,
+    /** Everything that made the app active or focused a window since launch (empty when all went well). */
+    activations: async () => {
+      await ready;
+      const r = call && await call('Runtime.evaluate', { expression: `JSON.stringify(globalThis.__overseerActivations || [])`, includeCommandLineAPI: true, returnByValue: true }).catch(() => null);
+      try { return JSON.parse(r?.result?.value || '[]'); } catch { return []; }
+    },
     // Cmd+Q is a menu shortcut of the active app, so it does nothing here: quit the way the menu does.
     // The inspector is then dropped: a process started with --inspect-brk waits for its debugger to
     // disconnect before it exits.
     quit: async () => {
       await ready;
       if (call) await call('Runtime.evaluate', { expression: `require('electron').app.quit()`, includeCommandLineAPI: true }).catch(() => {});
+      try { socket?.close(); } catch {}
+    },
+    // For a launcher that exits (scripts/dev): waits until the first window exists, then lets go.
+    // The patched show/focus stay; only windows opened after that may come to the front.
+    detachAfterFirstWindow: async (ms = 90000) => {
+      await ready;
+      for (const end = Date.now() + ms; call && Date.now() < end; await delay(250)) {
+        const r = await call('Runtime.evaluate', { expression: `require('electron').BrowserWindow.getAllWindows().some(w => w.isVisible())`, includeCommandLineAPI: true, returnByValue: true }).catch(() => null);
+        if (r?.result?.value) break;
+      }
       try { socket?.close(); } catch {}
     },
     close: () => { try { socket?.close(); } catch {} },
