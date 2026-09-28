@@ -16,7 +16,7 @@
         "docs/verification/swarm/SWARM-01.md",
         "docs/verification/swarm/S0.md"
       ],
-      "blocker": "four_way_launch_matrix_auto_manual_by_swarm_on_off runs all four combinations on one daemon on fixtures (product path, Swarm fixture API off) and records launch path, booking and slots: ordinary unbooked 1 slot; Auto root with Auto's unknown-draw claim 1 slot; Swarm with Auto Mode off and on identical (Claude director unbooked plus two booked native workers, 3 slots); Swarm off creates no Swarm run or worker. Swarm on outside fixtures needs swarm.native_director, which is off until the owner decides; no Swarm route is chosen by Auto's selector; the full suite was not run and nothing ran live."
+      "blocker": "four_way_launch_matrix_auto_manual_by_swarm_on_off runs all four combinations on one daemon on fixtures (product path, Swarm fixture API off) and records launch path, booking and slots: ordinary unbooked 1 slot; Auto root with Auto's unknown-draw claim 1 slot; Swarm with Auto Mode off and on identical (Claude director unbooked plus two booked native workers, 3 slots); Swarm off creates no Swarm run or worker. Swarm on outside fixtures uses swarm.native_director, on by default since the owner's decision of 2026-09-28 (e7e9e18c), with only the synthetic Claude fixture as director; no Swarm route is chosen by Auto's selector; the full suite was not run and nothing ran live."
     },
     "SWARM-02": {
       "status": "verified",
@@ -217,7 +217,7 @@
         "daemon/src/adapters.rs",
         "docs/verification/swarm/SWARM-17.md"
       ],
-      "blocker": "Fixture admission rejects worker transports without a daemon-owned native-delegation restriction, and synthetic Claude launches carry Agent/Task denial. Claude is additionally held for audit-only runs because that denial supplies no source-write boundary. No version-pinned live attempted-spawn proof, qualified Auto target identity, or normal launch path exists; the fake Claude stream can ignore the flag. Behind the undecided swarm.native_director switch the proposed Claude director is also launched with Agent/Task denied and a daemon version and flag check; still argument-level on the synthetic fixture."
+      "blocker": "Fixture admission rejects worker transports without a daemon-owned native-delegation restriction, and synthetic Claude launches carry Agent/Task denial. In audit-only runs Claude now works in its read-only mode with its write tools denied and a post-attempt source check (0f38f758, the owner's decision 3). No version-pinned live attempted-spawn proof, qualified Auto target identity, or normal launch path exists; the fake Claude stream can ignore the flag. With swarm.native_director (on by default since 2026-09-28) the Claude director is also launched with Agent/Task denied and a daemon version and flag check; still argument-level on the synthetic fixture."
     },
     "SWARM-18": {
       "status": "partial",
@@ -339,7 +339,7 @@
         "daemon/src/swarm/route.rs",
         "daemon/tests/swarm_gate_s.rs"
       ],
-      "blocker": "Covered at fixture scope except metering: the native director runs unbooked (its swarm/director draw is not qualified), so its turns are not metered to the run's allocation, with or without Gate S's 100-turn cap. Needs a qualified director draw (live calibration on the owner's Claude account; RFC note D4)."
+      "blocker": "Covered at fixture scope except metering: the native director's swarm/director draw is now qualified at fixture scope from its neighbour-bracketed runs and books its account (e7e9e18c), but that booking is an ordinary account booking, not counted against the run's category allocation, so its turns are not metered to the run's allocation, with or without Gate S's 100-turn cap. Needs the director's booking counted in the category allocation, and live calibration on the owner's personal Claude account."
     },
     "SWARM-25": {
       "status": "unverified",
@@ -517,7 +517,7 @@
         "docs/verification/swarm/milestone-7.md",
         "docs/verification/swarm/SWARM-40.md"
       ],
-      "blocker": "Covered at fixture scope except planning: in a run with workers the native director's own turns run unbooked (its swarm/director draw is not qualified), so they are not metered against the run's allocation. Needs a qualified swarm/director draw (live calibration on the owner's Claude account; RFC note D4)."
+      "blocker": "Covered at fixture scope except planning: in a run with workers the native director's own turns run unbooked (its swarm/director draw is not qualified), so they are not metered against the run's allocation. Needs the director's booking counted in the category allocation, and live calibration on the owner's personal Claude account."
     },
     "SWARM-41": {
       "status": "verified",
@@ -691,7 +691,7 @@
         "daemon/src/swarm/integration.rs",
         "docs/verification/swarm/SWARM-52.md"
       ],
-      "blocker": "The fixture integration API defaults runs to no source-change permission, retains it over restart, and requires an explicit isolated-write grant. Native targets without a qualified audit source-write boundary are now held before quota reservation and rechecked at process launch, including an old pending admission. Generic fixture workers still have writable worktrees; no qualified audit-only native harness sandbox, live-service mutation boundary, joined S1/S2/S4 audit replay or normal-launch permission path exists."
+      "blocker": "The fixture integration API defaults runs to no source-change permission, retains it over restart, and requires an explicit isolated-write grant. Native targets without a qualified audit source-write boundary are now held before quota reservation and rechecked at process launch, including an old pending admission. Generic fixture workers still have writable worktrees; no qualified audit-only native harness sandbox, live-service mutation boundary, joined S1/S2/S4 audit replay or normal-launch permission path exists. Since 0f38f758 (the owner's decision 3) a native Claude worker joins an audit in Claude's read-only mode with Edit/Write/MultiEdit/NotebookEdit/Bash denied, and the daemon's post-attempt check (HEAD, git status with untracked files, tracked-file hashes against the pinned revision) fails, reports and keeps evidence of any change (native_claude_workers_audit_read_only_and_a_source_change_fails_the_attempt); the check covers the worker's workspace only and no live Claude has run in that mode."
     },
     "SWARM-53": {
       "status": "verified",
@@ -907,7 +907,7 @@
         "test/unit/swarm-start.js",
         "docs/verification/swarm/S0.md"
       ],
-      "blocker": "swarm.start gives one read-back (pool, readings and allocation, ceiling, deadline, director) and commits on one yes; a scripted director launched through the one launch path plans, dispatches three supervised fixture workers through Swarm admission, routes a discovery, accepts evidence and completes, also across a SIGKILL restart. Behind swarm.native_director (off by default; the owner's decision is pending) the same S0 runs end to end and across a restart with a daemon-qualified Claude director using Swarm tools over MCP, and native Claude workers report through their own attempt tokens in an isolated run; all of it on the synthetic Claude fixture, not a model. With the switch off, outside fixtures the start is blocked no_qualified_director; an audit still refuses native workers before booking, so no account is booked in S0; the director's swarm/director draw is never qualified; the VS Code command has not run in a real window and nothing ran live."
+      "blocker": "swarm.start gives one read-back (pool, readings and allocation, ceiling, deadline, director) and commits on one yes; a scripted director launched through the one launch path plans, dispatches three supervised fixture workers through Swarm admission, routes a discovery, accepts evidence and completes, also across a SIGKILL restart. With swarm.native_director (on by default since the owner's decision of 2026-09-28) the same S0 runs end to end and across a restart with a daemon-qualified Claude director using Swarm tools over MCP, and native Claude workers report through their own attempt tokens in an isolated run; all of it on the synthetic Claude fixture, not a model. With the switch off, outside fixtures the start is blocked no_qualified_director; native Claude workers may now join an audit read-only with a post-attempt source check, but in S0's fixtures the only Claude account is the uncalibrated director's, so no account is booked in S0; the director's swarm/director draw is qualified and books only in its own test; the VS Code command has not run in a real window and nothing ran live."
     },
     "S1": {
       "status": "partial",
@@ -920,7 +920,7 @@
         "daemon/tests/swarm_final_report.rs",
         "daemon/tests/swarm_reproduction.rs"
       ],
-      "blocker": "Joined Express/PostgreSQL replay: four initial workers, D1 before J2's result, advisory only to J1/J4 with receipts, J4's overlap queued behind the in-flight turn and redirected in the next, no director turns while unchanged, slot refill, J7 reproduction, seven accepted checks; faults: missing/stale evidence, J7 contradiction resolved by J8, missing export queue blocked, source-text director command stays data. The final report entries and coverage matrix are one artifact (swarm.report.final, swarm_final_report.rs, scripted evidence). Open at fixture scope: a literal evidence-file removal. Needs D3: profile choice through Auto's route selection (native workers are refused in audits)."
+      "blocker": "Joined Express/PostgreSQL replay: four initial workers, D1 before J2's result, advisory only to J1/J4 with receipts, J4's overlap queued behind the in-flight turn and redirected in the next, no director turns while unchanged, slot refill, J7 reproduction, seven accepted checks; faults: missing/stale evidence, J7 contradiction resolved by J8, missing export queue blocked, source-text director command stays data. The final report entries and coverage matrix are one artifact (swarm.report.final, swarm_final_report.rs, scripted evidence). Open at fixture scope: a literal evidence-file removal. D3 is decided and built (native Claude audit workers, read-only with a source check); S1 has not been replayed with native workers routed by Auto's selection."
     },
     "S2": {
       "status": "partial",

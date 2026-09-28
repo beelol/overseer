@@ -1,6 +1,6 @@
 # SWARM-52 — audit-only source and service scope
 
-Status: partial. Implementation revision: `eec9894`. Fixture authority only; no enabled provider-harness path is qualified for read-only execution.
+Status: partial. Implementation revisions: `eec9894`; native Claude audit workers `0f38f758` (2026-09-28). Fixture authority only; Claude's read-only audit path is built and checked on the synthetic fixture, not live.
 
 Input: an audit-only run is created without a source-change grant, then a director plan tries to include `source_change_permission: isolated`. A worker supplies a valid patch artifact, the daemon restarts, and the director calls `swarm.integrate`. A separate Catalog S3 run explicitly uses `source_change_permission: isolated` before its 26 accepted patch commits. An invalid `current_checkout` permission is also attempted.
 
@@ -37,3 +37,15 @@ native read-only path. Generic fixture processes can still edit their isolated
 worktrees, and source/service mutation enforcement, real read-only harness
 sandboxing, joined S1/S2/S4 audit replay and normal-launch permissions remain
 open. SWARM-52 stays partial.
+
+## Native Claude workers in audits (2026-09-28, `0f38f758`)
+
+The owner's decision 3: a native Claude worker may take part in an audit in Claude's read-only permission mode with writes denied, and the daemon checks after the attempt that no source file changed; any change fails the attempt and is reported.
+
+- **Enforcement recorded per harness.** Claude: `--permission-mode plan` on every turn (a turn asking for another mode is refused) and `--disallowedTools Agent,Task,Edit,Write,MultiEdit,NotebookEdit,Bash`, then the daemon's post-attempt check. Generic fixture processes: isolated test inputs, unchanged. Codex, the Codex app-server and OpenCode: no controlled Swarm worker path (`uncontrolled_native_delegation`), and the audit gate would refuse them next (`audit_source_boundary_unqualified`).
+- **The check** (`daemon/src/swarm/audit.rs`): HEAD against the pinned revision, `git status --untracked-files=all` (ignored files are not source), and every tracked file's content hash against the pinned tree, so `skip-worktree`/`assume-unchanged` cannot hide an edit. It runs once, after the worker's process and native descendants are gone, and is recorded in `swarm_audit_checks`. A check that cannot be made fails closed.
+- **A failed check:** the director cannot accept the attempt (accepting waits for the check), the job is blocked `audit_source_changed`, the director's terminal message carries the check, an event `swarm_audit_source_changed` on the worker's run appears in Overseer's digest of it, and the worktree plus `refs/overseer/audit/<attempt>` keep the evidence.
+
+Tests (`--test-threads=1`): protocol `native_claude_workers_audit_read_only_and_a_source_change_fails_the_attempt` (`daemon/tests/swarm_native.rs`; red before the change: `no_eligible_route`, every Claude route refused `audit_source_boundary_unqualified`). On the product path with the synthetic Claude director and workers, two audit jobs go to Claude workers in `plan` mode with the seven tools denied; worker `a` reads only, its check is clean, and its acceptance is recorded after the check; worker `b` writes `src/roles.txt` directly (as if past its mode), its check lists the file, the director's accept is refused `audit_source_changed`, the job is `blocked`/`audit_source_changed`, the terminal message and Overseer's digest report it, the worktree keeps the file and the evidence ref shows its content. Unit `swarm::audit::tests::the_source_check_finds_every_kind_of_change_against_the_pinned_revision` (clean; ignored output; changed, added, deleted, committed and `skip-worktree`-hidden changes), `only_claude_has_a_qualified_audit_boundary`, `adapters::…::a_read_only_swarm_worker_has_its_write_tools_denied`. `swarm_admission::audit_admits_claude_read_only_and_holds_every_other_native_worker` and `swarm_runtime::previously_admitted_native_worker_launches_read_only_after_audit_scope_is_restored` replace the two tests that asserted the old refusal for Claude.
+
+Still open: the check sees the worker's workspace only, not writes to another checkout, the machine or a live service (no live-service mutation boundary exists); no live Claude has run in `plan` mode under Swarm, so that its read-only mode holds for a real model is unverified; S1/S2/S4 have not been replayed with native audit workers. SWARM-52 stays partial.
