@@ -386,6 +386,12 @@ The daemon already records every Claude Code `rate_limit_event` as a structured 
 - **Freshness.** A reading expires after 60 seconds, so even a calibrated Claude bucket could book only within a minute of the account's last run.
 - **No other source found.** The installed CLI (2.1.246) offers `auth status --json` (identity and `subscriptionType`, no usage) and no usage command; the status line receives `rate_limits` only in interactive sessions after a response; `/usage` is interactive. The account's local files were not read (credentials are out of bounds), and no paid probe was made. Tests: `claude_in_run_readings_cannot_bracket_their_own_run` (`daemon/src/upper_draw.rs`) and `claude_readings_arrive_inside_runs_and_cannot_price_a_booking` (`daemon/tests/claude_readings.rs`).
 
+**The owner's decisions (2026-09-28, asked inline):**
+1. **Plan source: yes.** The `subscriptionType` from the identity read (`claude auth status --json`, local, no model turn) stands for the plan of Claude readings until the next identity read; a changed value is a new plan.
+2. **Allowance: yes.** An `allowed` or `allowed_warning` event counts as an explicit allowance for its freshness period, as Codex's `ordinaryUsageAllowed` does.
+3. **Bracketing: (b), neighbour readings.** A run may be bracketed by the previous run's last reading and the next run's first, provided those two runs are the only other work on the account in between. The movement can include the neighbours' tail and head, which only enlarges a sample.
+4. **Freshness: longer, with booked draws.** A Claude reading may back a booking for up to 15 minutes, combined with every draw committed on the account since that reading.
+
 What the owner would need to decide before Claude buckets can calibrate:
 
 1. **Plan source.** May the `subscriptionType` from the identity read (`claude auth status --json`, already run) stand for the plan of Claude readings until the next identity read, with a changed value treated as a new plan? Without a plan source no Claude sample is comparable.
