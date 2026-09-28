@@ -81,19 +81,22 @@ fn admit(
 }
 
 #[test]
-fn audit_only_run_holds_native_worker_without_source_write_enforcement() {
+fn audit_admits_claude_read_only_and_holds_every_other_native_worker() {
     let d = Daemon::start(&[("OVERSEER_SHARED_BOOKING_FIXTURE_API","1")]);
     let at = now();
     let snapshot = json!({"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
         "targets":[{"id":"claude-a","harness":"claude","profile_id":"approved-a",
             "model":"test-model","account_id":"account-a","pool_ids":["pool-a"],
+            "capabilities":["code"],"health":"up","auth":"ok"},
+            {"id":"codex-a","harness":"codex","profile_id":"approved-codex",
+            "model":"test-model","account_id":"account-c","pool_ids":["pool-a"],
             "capabilities":["code"],"health":"up","auth":"ok"}],
         "pools":[{"id":"pool-a","windows":[{"id":"week","unit":"points",
             "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
             "confidence":"exact","expires_ms":at+60000}]}]});
     let create = |category: &str, permission: &str| d.call("swarm.create", json!({
         "category":category,"objective":"Audit a local backend",
-        "allowed_targets":["claude-a"],"source_change_permission":permission}));
+        "allowed_targets":["claude-a","codex-a"],"source_change_permission":permission}));
     let audit = create("Audit scope", "none");
     let write = create("Granted source change", "isolated");
     for run in [&audit, &write] {
@@ -102,16 +105,22 @@ fn audit_only_run_holds_native_worker_without_source_write_enforcement() {
                 "deps":[]}]}));
     }
     let booking = fixture_account_booking(&d, "approved-a", "approved-account", 0.0, 1000);
-    let request = |run: &Value, request_id: &str| json!({"shared_booking":booking,
+    let request = |run: &Value, request_id: &str, target: &str| json!({"shared_booking":booking,
         "run_id":run["id"],"generation":1,"revision":1,"job_id":"j1",
-        "target_id":"claude-a","request_id":request_id,"snapshot":snapshot,
+        "target_id":target,"request_id":request_id,"snapshot":snapshot,
         "now_ms":at,"required_capabilities":["code"],
         "estimate_milli":{"points":1000},"purpose":"worker"});
-    let denied = d.call("swarm.admit", request(&audit,"audit-native"));
+    // In an audit only Claude, in its read-only mode with the post-attempt
+    // source check, is admitted (the owner's decision 3 of 2026-09-28).
+    // (Codex has no controlled Swarm worker path at all, which refuses it
+    // first; the audit gate would refuse it next: `swarm::audit` tests.)
+    let denied = d.call("swarm.admit", request(&audit,"audit-codex","codex-a"));
     assert_eq!(denied["status"], "blocked", "{denied}");
-    assert_eq!(denied["reason"], "audit_source_boundary_unqualified");
+    assert_eq!(denied["reason"], "uncontrolled_native_delegation");
     assert_eq!(d.call("swarm.jobs",json!({"id":audit["id"]}))["jobs"][0]["status"], "ready");
-    let granted = d.call("swarm.admit", request(&write,"write-native"));
+    let audited = d.call("swarm.admit", request(&audit,"audit-native","claude-a"));
+    assert_eq!(audited["status"], "admitted", "{audited}");
+    let granted = d.call("swarm.admit", request(&write,"write-native","claude-a"));
     assert_eq!(granted["status"], "admitted", "{granted}");
 }
 

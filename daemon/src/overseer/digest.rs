@@ -49,6 +49,9 @@ pub struct Digest {
     pub guardrails: Vec<Value>,
     pub watches: Vec<Value>,
     pub conflicts: Vec<Value>,
+    /// A Swarm audit worker whose source check found a change (Swarm decision 3).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub audit_boundary: Option<Value>,
     pub updated_ms: i64,
 }
 
@@ -140,6 +143,7 @@ impl Daemon {
         let mut changed: BTreeMap<String, String> = BTreeMap::new();
         let mut usage = Value::Null;
         let mut last_check_in = None;
+        let mut audit_boundary = None;
         let mut updated_ms = run.created_ms;
         for e in &events {
             updated_ms = updated_ms.max(e.ts);
@@ -153,6 +157,7 @@ impl Daemon {
                         }
                     }
                 }
+                "swarm_audit_source_changed" => audit_boundary = Some(e.payload["check"].clone()),
                 "file_activity" => {
                     let kind = e.payload["kind"].as_str().unwrap_or("edit").to_string();
                     for p in e.payload["paths"].as_array().cloned().unwrap_or_default() {
@@ -212,6 +217,7 @@ impl Daemon {
             guardrails: Vec::new(),
             watches: self.watches_of(run_id),
             conflicts: self.open_conflicts_of(run_id).unwrap_or_default(),
+            audit_boundary,
             updated_ms,
         })
     }
@@ -263,6 +269,10 @@ impl Daemon {
         }
         if !d.conflicts.is_empty() {
             lines.push(format!("open conflicts: {}", d.conflicts.iter().map(|c| format!("{} with {} on {}", c["kind"].as_str().unwrap_or("?"), c["other_title"].as_str().unwrap_or("?"), c["paths"].as_array().map(|p| p.len()).unwrap_or(0))).collect::<Vec<_>>().join("; ")));
+        }
+        if let Some(check) = &d.audit_boundary {
+            lines.push(format!("audit boundary: source changed ({} files) in a read-only Swarm audit; the attempt failed; evidence {}",
+                check["changed_count"], check["evidence_ref"].as_str().unwrap_or("not pinned")));
         }
         Ok(super::bound(&crate::redact::redact(&lines.join("\n")), DIGEST_BYTES))
     }

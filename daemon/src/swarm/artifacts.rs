@@ -123,6 +123,15 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
         attempt_id = Some(attempt);
     }
     let attempt = attempt_id.ok_or_else(|| anyhow!("missing attempt"))?;
+    // A native worker in an audit is accepted only after the daemon's check
+    // that it changed no source file (Swarm decision 3, 2026-09-28).
+    if decision == "accept" && super::audit::needs_check(&store.conn, run, &attempt)? {
+        match super::audit::outcome(&store.conn, &attempt)?.as_deref() {
+            Some("clean") => {}
+            None => bail!("audit_source_check_pending: the worker's source check runs after it exits; decide again then"),
+            Some(other) => bail!("audit_source_changed: the audit worker's source check is {other}; its attempt failed and cannot be accepted"),
+        }
+    }
     let mut stmt = store.conn.prepare(
         "SELECT seq,payload FROM swarm_messages WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3 AND kind IN ('result','submit') AND revision=?4"
     )?;

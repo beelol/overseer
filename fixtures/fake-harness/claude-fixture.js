@@ -693,6 +693,8 @@ async function mcpClient() {
       trace('dispatched', { active: (await call('swarm_status', {})).app_slots_in_use });
       if (script.gate) await waitFile(script.gate, 120000);
       const routed = new Set();
+      const refused = {};
+      const pendingResults = {};
       const deadline = Date.now() + 90000;
       let done = false;
       while (Date.now() < deadline && !done) {
@@ -708,16 +710,30 @@ async function mcpClient() {
             const sent = await call('swarm_message', { job_id: m.job_id, attempt_id: m.attempt_id, type: 'advisory', payload: { answer: script.answer || 'yes' } });
             trace('answered', { job: m.job_id, question: m.payload.question, error: sent.error });
           }
-          if (m.type === 'result' && !accepted[m.job_id]) {
-            const evidence = m.payload.artifact_ids;
-            const decision = await call('swarm_decide', { job_id: m.job_id, decision: 'accept', evidence });
-            if (decision.error || decision.status !== 'accepted') throw new Error('decide ' + m.job_id + ': ' + JSON.stringify(decision));
-            accepted[m.job_id] = evidence;
-            trace('accepted', { job: m.job_id, evidence, from: m.attempt_id });
+          if (m.type === 'result' && !accepted[m.job_id] && !refused[m.job_id]) pendingResults[m.job_id] = m;
+        }
+        for (const m of Object.values(pendingResults)) {
+          const evidence = m.payload.artifact_ids;
+          const decision = await call('swarm_decide', { job_id: m.job_id, decision: 'accept', evidence });
+          // An audit worker's result waits for the daemon's source check after it exits.
+          if (decision.error && /audit_source_check_pending/.test(decision.error)) { trace('pending', { job: m.job_id }); continue; }
+          delete pendingResults[m.job_id];
+          if (decision.error && /audit_source_changed/.test(decision.error)) {
+            refused[m.job_id] = true;
+            trace('refused', { job: m.job_id, error: decision.error, from: m.attempt_id });
+            continue;
           }
+          if (decision.error || decision.status !== 'accepted') throw new Error('decide ' + m.job_id + ': ' + JSON.stringify(decision));
+          accepted[m.job_id] = evidence;
+          trace('accepted', { job: m.job_id, evidence, from: m.attempt_id });
         }
         const state = await call('swarm_status', {});
-        if (Object.keys(accepted).length === script.dispatch.length && state.registered_attempts === 0 && inbox.status === 'idle') {
+        if (!script.complete && Object.keys(accepted).length + Object.keys(refused).length === script.dispatch.length
+            && state.registered_attempts === 0) {
+          // Without a completion in the script the director only decides.
+          trace('decided', { accepted: Object.keys(accepted), refused: Object.keys(refused) });
+          done = true;
+        } else if (Object.keys(accepted).length === script.dispatch.length && state.registered_attempts === 0 && inbox.status === 'idle') {
           const checks = script.dispatch.map(j => ({ job_id: j.job, outcome: 'passed', evidence: accepted[j.job] }));
           const completed = await call('swarm_complete', { summary: script.complete.summary, verification: script.complete.verification, checks });
           trace('completed', { status: completed.status, error: completed.error });
@@ -732,8 +748,17 @@ async function mcpClient() {
       const job = (/Job ([A-Za-z0-9_-]+):/.exec(firstText) || [])[1];
       const plan = script.jobs[job];
       const trace = (step, fields = {}) => fs.appendFileSync(script.trace, JSON.stringify({ step, role: 'worker', job, ...fields }) + '\n');
-      trace('started', { tools: mcp.tools, delegation_denied: process.argv.join(' ').includes('--disallowedTools Agent,Task'), token_in_prompt: firstText.includes(ownToken()) });
+      const argv = process.argv.join(' ');
+      trace('started', { tools: mcp.tools, delegation_denied: argv.includes('--disallowedTools Agent,Task'), token_in_prompt: firstText.includes(ownToken()),
+        permission_mode: (/--permission-mode (\S+)/.exec(argv) || [])[1] || null,
+        denied: ((/--disallowedTools (\S+)/.exec(argv) || [])[1] || '').split(',') });
       if (script.gate) await waitFile(script.gate, 120000);
+      if (plan.write) {
+        // A worker that writes source directly (as if it slipped past its permission mode).
+        fs.mkdirSync(path.dirname(path.join(process.cwd(), plan.write.path)), { recursive: true });
+        fs.writeFileSync(path.join(process.cwd(), plan.write.path), plan.write.content);
+        trace('wrote', { path: plan.write.path });
+      }
       for (const probe of plan.probe || []) {
         const r = await call(probe.tool, probe.args || {});
         trace('probed', { tool: probe.tool, error: r.error, status: r.status });

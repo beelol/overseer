@@ -1,4 +1,5 @@
 mod artifacts;
+pub mod audit;
 mod admission;
 mod availability;
 mod benefit;

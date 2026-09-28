@@ -351,7 +351,8 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
         }
         // Recheck the stored authority at process creation. An attempt admitted
         // before this gate existed may still be pending after daemon restart.
-        if current["source_change_permission"] == "none" && harness != "generic" {
+        if current["source_change_permission"] == "none" && harness != "generic"
+            && !super::audit::qualified(harness) {
             bail!("audit source boundary is unqualified for native worker {harness}");
         }
         let admitted_route: Option<(Option<String>,Option<String>,Option<String>,Option<String>)> = store.conn.query_row(
@@ -411,6 +412,12 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
         assigned_route = (profile_id, model, effort);
     }
     let program_override = if harness == "generic" { json!(program) } else { Value::Null };
+    // A native worker in an audit runs in Claude's read-only mode with its
+    // write tools denied, on every turn (`audit_read_only`).
+    let audit_read_only = harness != "generic" && {
+        let store = d.store.lock().unwrap();
+        get(&store, run)?["source_change_permission"] == "none"
+    };
     let task = d.create_task_for_swarm(
         &json!({
             "repo":repo,"harness":harness,"workspace_mode":"worktree",
@@ -418,6 +425,8 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
             "profile_id":assigned_route.0,"model":assigned_route.1,"effort":assigned_route.2,
             "program":program_override,"args":args,"prompt":assigned_prompt,"title":title,
             "resume_native_id":reused.as_ref().map(|(_, native)| native.clone()),
+            "audit_read_only":audit_read_only,
+            "permission_mode":if audit_read_only { json!(super::audit::READ_ONLY_MODE) } else { Value::Null },
         }),
         &SwarmWorkerIdentity {
             run_id: run.to_string(),
@@ -725,8 +734,18 @@ pub fn reconcile_worker(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
             "overseer_run_id":overseer_run_id,"unconfirmed_descendants":unconfirmed_descendants}));
     }
     let message_id = format!("terminal-{attempt}");
-    let payload = json!({"overseer_run_id":overseer_run_id,"run_status":worker_status,
+    let mut payload = json!({"overseer_run_id":overseer_run_id,"run_status":worker_status,
         "native_descendant_failures":failed_descendants});
+    // A native worker in an audit: no source file may have changed (Swarm
+    // decision 3, 2026-09-28). Checked once, after the process and its
+    // descendants are gone; the director hears the result here.
+    let audit = if super::audit::needs_check(&store.conn, run, attempt)? {
+        Some(super::audit::check_attempt(&store.conn, run, job, attempt, &overseer_run_id,
+            crate::daemon::now())?)
+    } else { None };
+    if let Some(report) = &audit {
+        payload["audit_source_check"] = report.clone();
+    }
     let previous: Option<String> = store
         .conn
         .query_row(
@@ -748,6 +767,23 @@ pub fn reconcile_worker(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         )?;
     }
     super::artifacts::confirm_exit(&mut store, p)?;
+    let failed_audit = audit.as_ref().filter(|report| report["outcome"] != "clean");
+    if let Some(report) = failed_audit {
+        // The attempt failed: its job is blocked for the director and the owner.
+        let reason = if report["outcome"] == "changed" { "audit_source_changed" }
+            else { "audit_source_check_unavailable" };
+        store.conn.execute("UPDATE swarm_jobs SET status='blocked',stop_reason=?3,updated_ms=?4
+            WHERE run_id=?1 AND id=?2 AND status<>'accepted'",
+            params![run, job, reason, crate::daemon::now()])?;
+    }
+    let task: Option<String> = store.conn.query_row("SELECT task_id FROM runs WHERE id=?1",
+        [&overseer_run_id], |row| row.get(0)).optional()?;
+    drop(store);
+    if let (Some(report), None) = (failed_audit, &previous) {
+        // Overseer sees it on the worker's own run (its digest shows it).
+        d.emit(task.as_deref(), Some(&overseer_run_id), "swarm_audit_source_changed", "daemon", "exact",
+            json!({"swarm_run_id":run,"job_id":job,"attempt_id":attempt,"check":report}))?;
+    }
     Ok(
         json!({"status":"terminal","overseer_run_id":overseer_run_id,
         "worker_status":worker_status,"duplicate":previous.is_some()}),

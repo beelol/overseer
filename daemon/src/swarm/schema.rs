@@ -404,6 +404,17 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           created_ms INTEGER NOT NULL,
           completed_ms INTEGER
         );
+        CREATE TABLE IF NOT EXISTS swarm_audit_checks(
+          attempt_id TEXT PRIMARY KEY,
+          run_id TEXT NOT NULL,
+          job_id TEXT NOT NULL,
+          worker_run_id TEXT NOT NULL,
+          pinned TEXT NOT NULL,
+          outcome TEXT NOT NULL CHECK(outcome IN ('clean','changed','unavailable')),
+          changes TEXT NOT NULL,
+          evidence_ref TEXT,
+          checked_ms INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS swarm_director_owners(
           run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id) ON DELETE CASCADE,
           generation INTEGER NOT NULL,

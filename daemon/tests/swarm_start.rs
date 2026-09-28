@@ -117,9 +117,12 @@ fn assert_s0_outcome(w: &World, run: &str) {
         "a manual swarm stays within its approved pool: {offers:?}");
     let offered = &offers[1];
     assert_eq!(offered["target"], "system-claude");
+    // A Claude worker may join an audit read-only (the owner's decision 3 of
+    // 2026-09-28), so the audit boundary no longer refuses it; this account
+    // has no qualified draw, so the booking refuses it before any effect.
     assert_eq!((offered["status"].as_str(), offered["reason"].as_str()),
-        (Some("blocked"), Some("audit_source_boundary_unqualified")),
-        "an audit run refuses a native worker before any booking: {offered}");
+        (Some("blocked"), Some("upper_draw_unknown")),
+        "an unpriced account is refused before any booking: {offered}");
     let booked: i64 = db(d).query_row("SELECT COUNT(*) FROM shared_booking_intents WHERE caller='swarm'",
         [], |r| r.get(0)).unwrap();
     assert_eq!(booked, 0, "no account was booked");

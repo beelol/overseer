@@ -208,17 +208,19 @@ fn assert_s0_outcome(w: &World, run: &str) {
     let offers: Vec<Value> = trace(&w.trace).into_iter().filter(|t| t["step"] == "offered").collect();
     assert_eq!((offers[0]["target"].as_str(), offers[0]["status"].as_str(), offers[0]["reason"].as_str()),
         (Some("unapproved-local"), Some("blocked"), Some("not_allowed")), "{offers:?}");
-    // The director names no account: Auto's selector finds none eligible in
-    // an audit, where no native worker has an audit-only source boundary.
+    // The director names no account: Auto's selector finds none eligible.
+    // A Claude worker may join an audit read-only (the owner's decision 3 of
+    // 2026-09-28), but the only Claude account is the one the uncalibrated
+    // director runs on unbooked, so it is busy.
     assert_eq!((offers[1]["status"].as_str(), offers[1]["reason"].as_str()),
         (Some("blocked"), Some("no_eligible_route")), "{offers:?}");
     let excluded = offers[1]["decision"]["exclusions"].as_array().unwrap();
     assert_eq!(excluded.len(), 2, "system-claude's two priors: {offers:?}");
-    assert!(excluded.iter().all(|e| e["reason"] == "audit_source_boundary_unqualified"
+    assert!(excluded.iter().all(|e| e["reason"] == "account_pool_busy"
         && e["route_id"].as_str().unwrap().starts_with("system-claude/")), "{offers:?}");
     let booked: i64 = db(d).query_row("SELECT COUNT(*) FROM shared_booking_intents WHERE caller='swarm'",
         [], |r| r.get(0)).unwrap();
-    assert_eq!(booked, 0, "no worker account was booked in an audit");
+    assert_eq!(booked, 0, "no worker account was booked");
     let db = db(d);
     let seq = |id: &str| -> i64 { db.query_row("SELECT seq FROM swarm_messages WHERE run_id=?1 AND message_id=?2",
         [run, id], |r| r.get(0)).unwrap() };
@@ -1207,4 +1209,131 @@ fn a_calibrated_director_books_its_account_with_its_own_draw() {
     assert_eq!(bound, 1, "booked beside the director");
     w.d.wait_done(&beside, 30);
     end_run(&w.d, &director);
+}
+
+/// The owner's decision 3 (2026-09-28): native Claude workers take part in an
+/// audit (`source_change_permission: none`) in Claude's read-only permission
+/// mode with writes denied, and the daemon checks after each attempt that no
+/// source file in its workspace changed against the pinned revision. Worker
+/// `a` reads only: its check is clean and the director accepts it (not
+/// before the check). Worker `b` writes a file anyway (as if it slipped past
+/// its mode): its check finds the change, the director cannot accept it, the
+/// job is blocked `audit_source_changed`, the director's terminal message and
+/// an event on the worker's run (shown in Overseer's digest of it) report
+/// it, and the worktree and a pinned ref keep the evidence. A Codex route in
+/// the same audit is still refused `audit_source_boundary_unqualified`.
+#[test]
+fn native_claude_workers_audit_read_only_and_a_source_change_fails_the_attempt() {
+    let draws = tmp();
+    let draw_file = draws.path().join("draws.json");
+    let codex = repo_root().join("fixtures/fake-harness/codex-app-fixture.js").display().to_string();
+    let w = world(&[("OVERSEER_SWARM_FIXTURE_API", "0"), ("OVERSEER_SHARED_BOOKING_FIXTURE_API", "1"),
+        ("OVERSEER_SWARM_FIXTURE_DRAW", draw_file.to_str().unwrap()), ("OVERSEER_CODEX_PATH", codex.as_str())]);
+    let workers_profile = w.d.call("profile.create", json!({"name":"workers","harness":"claude"}))["id"]
+        .as_str().unwrap().to_string();
+    let codex_profile = w.d.call("profile.create", json!({"name":"codex-workers","harness":"codex"}))["id"]
+        .as_str().unwrap().to_string();
+    let booking = fixture_account_booking(&w.d, &workers_profile, "worker-account", 0.0, 3_000);
+    let codex_booking = fixture_account_booking(&w.d, &codex_profile, "codex-account", 0.0, 3_000);
+    std::fs::write(&draw_file, json!({workers_profile.clone(): booking, codex_profile.clone(): codex_booking})
+        .to_string()).unwrap();
+    w.d.call("agents.limit.set", json!({"max_active":5}));
+    w.d.call("swarm.policy.set", json!({"scope":"application",
+        "allowed_targets":["system-claude", workers_profile, codex_profile]}));
+    let worker_gate = w.dir.path().join("worker-gate");
+    std::fs::write(&w.script, json!({
+        "trace":w.trace,"gate":w.gate,
+        "jobs":[{"id":"a","title":"Tenant lookup audit","acceptance":"evidence","deps":[]},
+            {"id":"b","title":"Role check audit","acceptance":"evidence","deps":[]}],
+        "estimate":benefit(&["a","b"]),
+        "dispatch":[{"job":"a"},{"job":"b"}]}).to_string()).unwrap();
+    std::fs::write(&w.workers, json!({
+        "trace":w.trace,"gate":worker_gate,
+        "jobs":{
+            "a":{"evidence":[{"id":"a-proof","kind":"finding","content":"lookup scoped by tenant"}]},
+            "b":{"write":{"path":"src/roles.txt","content":"patched during an audit\n"},
+                "evidence":[{"id":"b-proof","kind":"finding","content":"roles checked"}]}}}).to_string()).unwrap();
+
+    let (run, director, _) = start(&w, "none", "audit-workers");
+    let dispatched = wait_trace(&w, step("dispatched", "director"), "dispatch", 60);
+    assert_eq!(dispatched["active"], 3, "the director and two audit workers: {dispatched}");
+    let launched: Vec<Value> = trace(&w.trace).into_iter().filter(|t| t["step"] == "launched").collect();
+    let worker = |job: &str| launched.iter().find(|t| t["job"] == job).unwrap().clone();
+    let (a, b) = (worker("a"), worker("b"));
+    let (a_run, b_run) = (a["worker"].as_str().unwrap().to_string(), b["worker"].as_str().unwrap().to_string());
+    let b_attempt = b["attempt"].as_str().unwrap().to_string();
+    for job in ["a", "b"] {
+        let route = &worker(job)["route"];
+        assert_eq!(route["profile_id"], workers_profile.as_str(), "a Claude route in the audit: {route}");
+        let started = wait_trace(&w, |t| t["step"] == "started" && t["role"] == "worker" && t["job"] == job, "worker start", 30);
+        assert_eq!(started["permission_mode"], "plan", "Claude's read-only mode: {started}");
+        let denied: Vec<String> = serde_json::from_value(started["denied"].clone()).unwrap();
+        for tool in ["Agent", "Task", "Edit", "Write", "MultiEdit", "NotebookEdit", "Bash"] {
+            assert!(denied.iter().any(|d| d == tool), "{tool} denied: {started}");
+        }
+    }
+    // Auto's selector refused no Claude route for the audit; the Codex
+    // account has no Swarm delivery path at all (admission would refuse it
+    // `audit_source_boundary_unqualified` in an audit: swarm_admission.rs).
+    let decisions = route_decisions(&w.d, &run, "a");
+    let reasons = exclusion_reasons(&decisions[0]);
+    assert!(reasons.values().all(|r| r != "audit_source_boundary_unqualified"), "{reasons:?}");
+    assert_eq!(reasons.get(&codex_profile).map(String::as_str), Some("swarm_worker_launch_unsupported"), "{reasons:?}");
+
+    std::fs::write(&worker_gate, "open").unwrap();
+    std::fs::write(&w.gate, "open").unwrap();
+    wait_trace(&w, |t| t["step"] == "wrote" && t["job"] == "b", "b's write", 30);
+    let decided = wait_trace(&w, step("decided", "director"), "the director's decisions", 90);
+    assert_eq!(decided["accepted"], json!(["a"]), "{decided}");
+    assert_eq!(decided["refused"], json!(["b"]), "{decided}");
+    let refused = wait_trace(&w, |t| t["step"] == "refused" && t["job"] == "b", "b refused", 5);
+    assert!(refused["error"].as_str().unwrap().contains("audit_source_changed"), "{refused}");
+
+    let db = db(&w.d);
+    let check = |attempt_run: &str| -> (String, Value, Option<String>) {
+        db.query_row("SELECT outcome,changes,evidence_ref FROM swarm_audit_checks WHERE worker_run_id=?1",
+            [attempt_run], |r| Ok((r.get(0)?, serde_json::from_str(&r.get::<_, String>(1)?).unwrap(), r.get(2)?))).unwrap()
+    };
+    let (a_outcome, a_changes, a_ref) = check(&a_run);
+    assert_eq!((a_outcome.as_str(), a_changes, a_ref), ("clean", json!([]), None));
+    let (checked, decided_at): (i64, i64) = db.query_row(
+        "SELECT c.checked_ms,d.created_ms FROM swarm_audit_checks c JOIN swarm_decisions d
+         ON d.attempt_id=c.attempt_id AND d.decision='accept' WHERE c.worker_run_id=?1", [&a_run],
+        |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+    assert!(decided_at >= checked, "a is accepted only after its check: {checked} <= {decided_at}");
+    let (b_outcome, b_changes, b_ref) = check(&b_run);
+    assert_eq!(b_outcome, "changed");
+    assert!(b_changes.as_array().unwrap().iter().any(|c| c["path"] == "src/roles.txt"), "{b_changes}");
+    let (job_status, stop_reason): (String, Option<String>) = db.query_row(
+        "SELECT status,stop_reason FROM swarm_jobs WHERE run_id=?1 AND id='b'", [&run], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+    assert_eq!((job_status.as_str(), stop_reason.as_deref()), ("blocked", Some("audit_source_changed")));
+    let accepted_b: i64 = db.query_row("SELECT COUNT(*) FROM swarm_decisions WHERE run_id=?1 AND job_id='b' AND decision='accept'",
+        [&run], |r| r.get(0)).unwrap();
+    assert_eq!(accepted_b, 0);
+    // Reported to the director (its terminal message) and to Overseer.
+    let terminal: String = db.query_row("SELECT payload FROM swarm_messages WHERE run_id=?1 AND message_id=?2",
+        rusqlite::params![run, format!("terminal-{b_attempt}")], |r| r.get(0)).unwrap();
+    let terminal: Value = serde_json::from_str(&terminal).unwrap();
+    assert_eq!(terminal["audit_source_check"]["outcome"], "changed", "{terminal}");
+    let events = w.d.events(&b_run);
+    assert!(events.iter().any(|e| e["kind"] == "swarm_audit_source_changed"), "an event on the worker's run");
+    let digest = w.d.call("agent.digest", json!({"run_id":b_run}));
+    assert!(digest.to_string().contains("audit boundary"), "Overseer's view of the worker: {digest}");
+    // Kept as evidence: the worktree as the worker left it and a pinned tree.
+    let (path, repo): (String, String) = db.query_row("SELECT w.path,w.repo_root FROM runs r JOIN workspaces w ON w.id=r.workspace_id
+        WHERE r.id=?1", [&b_run], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+    assert!(Path::new(&path).join("src/roles.txt").exists(), "the worktree is kept");
+    let evidence = b_ref.expect("an evidence ref");
+    let shown = std::process::Command::new("git").args(["-C", &repo, "show", &format!("{evidence}:src/roles.txt")])
+        .output().unwrap();
+    assert_eq!(String::from_utf8_lossy(&shown.stdout), "patched during an audit\n");
+    // The director only decided (no completion): stop the run to release its slot.
+    w.d.wait_done(&director, 30);
+    let revision = w.d.call("swarm.get", json!({"id":run}))["revision"].clone();
+    w.d.call("swarm.stop", json!({"run_id":run,"generation":1,"revision":revision}));
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while active(&w.d) != 0 {
+        assert!(Instant::now() < deadline, "slots still held after the audit run stopped");
+        std::thread::sleep(Duration::from_millis(50));
+    }
 }

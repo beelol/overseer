@@ -291,10 +291,12 @@ fn admit_inner(
     ) {
         return Ok(blocked("uncontrolled_native_delegation"));
     }
-    // Fixture processes are isolated test inputs. No native Swarm execution
-    // path has yet proved an audit-only source-write boundary, even when it can
-    // disable native subagents. Do not reserve quota for one in an audit run.
+    // Fixture processes are isolated test inputs. In an audit only a native
+    // harness with a qualified read-only boundary is admitted (Claude in its
+    // read-only mode, checked after the attempt); do not reserve quota for
+    // any other.
     if current["source_change_permission"] == "none" && candidate["harness"] != "generic"
+        && !super::audit::qualified(candidate["harness"].as_str().unwrap_or(""))
     {
         return Ok(blocked("audit_source_boundary_unqualified"));
     }

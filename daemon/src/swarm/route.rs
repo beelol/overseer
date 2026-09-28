@@ -241,11 +241,12 @@ pub fn select(
     let mut exclusions = pre_exclusions;
     let mut candidates = Vec::new();
     let mut after_failure = Vec::new();
-    // No native worker has proved an audit-only source boundary (admission
-    // refuses it too); in an audit every account route is out.
+    // In an audit only a harness with a qualified read-only boundary may
+    // work (Claude in its read-only mode, checked after each attempt: the
+    // owner's decision 3 of 2026-09-28); admission refuses the rest too.
     let audit = current["source_change_permission"] == "none";
     for route in &routes {
-        if audit {
+        if audit && !super::audit::qualified(&route.harness) {
             exclusions.push(Exclusion { route_id: route.id.clone(), reason: "audit_source_boundary_unqualified".into() });
             continue;
         }

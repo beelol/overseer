@@ -380,7 +380,13 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
                 args.extend(["--permission-mode".into(), mode.into()]);
             }
             if req.swarm_worker || req.swarm_tools.is_some() {
-                args.extend(["--disallowedTools".into(), "Agent,Task".into()]);
+                // A Swarm member in Claude's read-only mode (an audit worker)
+                // also has every write tool denied.
+                let mut denied = vec!["Agent", "Task"];
+                if req.permission_mode == Some(crate::swarm::audit::READ_ONLY_MODE) {
+                    denied.extend(crate::swarm::audit::WRITE_TOOLS);
+                }
+                args.extend(["--disallowedTools".into(), denied.join(",")]);
             }
             if let Some(tools) = req.swarm_tools {
                 args.extend(["--mcp-config".into(), tools.config.display().to_string(),
@@ -1217,6 +1223,23 @@ mod turn_option_tests {
             assert!(launch(harness, &request).err().unwrap().to_string()
                 .contains("native delegation is not controlled"), "{harness}");
         }
+    }
+
+    #[test]
+    fn a_read_only_swarm_worker_has_its_write_tools_denied() {
+        let config = PathBuf::from("/tmp/run/mcp-swarm.json");
+        let allowed = vec!["mcp__overseer__swarm_result".to_string()];
+        let mut request = req(None, &[]);
+        request.swarm_worker = true;
+        request.swarm_tools = Some(SwarmTools { config: &config, allowed: &allowed });
+        request.permission_mode = Some("plan");
+        let args = launch("claude", &request).unwrap().args;
+        assert!(args.windows(2).any(|a| a == ["--permission-mode", "plan"]), "{args:?}");
+        assert!(args.windows(2).any(|a| a == ["--disallowedTools", "Agent,Task,Edit,Write,MultiEdit,NotebookEdit,Bash"]),
+            "{args:?}");
+        request.permission_mode = None;
+        let args = launch("claude", &request).unwrap().args;
+        assert!(args.windows(2).any(|a| a == ["--disallowedTools", "Agent,Task"]), "{args:?}");
     }
 
     #[test]

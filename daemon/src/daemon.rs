@@ -1089,6 +1089,10 @@ impl Daemon {
             "auto_routing":auto_routing,"auto_allowed_profiles":auto_allowed_profiles,
             "auto_parent_budget_ms":auto_parent_budget_ms,
             "swarm_worker": matches!(swarm_identity.as_ref(), Some(SwarmLaunchIdentity::Worker(_))),
+            // A native Swarm worker in an audit: Claude's read-only mode with
+            // its write tools denied on every turn (Swarm decision 3, 2026-09-28).
+            "audit_read_only": matches!(swarm_identity.as_ref(), Some(SwarmLaunchIdentity::Worker(_)))
+                && p["audit_read_only"] == true,
             "resume_first_turn": matches!(swarm_identity.as_ref(), Some(SwarmLaunchIdentity::Worker(_)))
                 && p["resume_native_id"].as_str().is_some_and(|s| !s.is_empty())});
         // Capture this parent's own route metadata before its app-server turn
@@ -1890,6 +1894,12 @@ impl Daemon {
         // Turn options: this turn's choices, else the run's last ones (a model change sticks).
         let effort = opts.effort.clone().or_else(|| generic_meta["opts"]["effort"].as_str().map(str::to_string));
         let mode = opts.mode.clone().or_else(|| generic_meta["opts"]["mode"].as_str().map(str::to_string));
+        let mode = if generic_meta["audit_read_only"] == true {
+            if mode.as_deref().is_some_and(|m| m != crate::swarm::audit::READ_ONLY_MODE) {
+                bail!("an audit worker stays in Claude's read-only permission mode");
+            }
+            Some(crate::swarm::audit::READ_ONLY_MODE.to_string())
+        } else { mode };
         adapters::check_turn_options(&run.harness, effort.as_deref(), mode.as_deref(), opts.images.len())?;
         let saved_sandbox = generic_meta["sandbox"].as_str().unwrap_or("workspace-write");
         if !matches!(saved_sandbox, "read-only" | "workspace-write") {

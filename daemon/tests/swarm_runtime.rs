@@ -319,8 +319,12 @@ fn admitted_target_harness_cannot_be_changed_at_worker_launch() {
     assert_eq!(d.call("swarm.jobs",json!({"id":id}))["jobs"][0]["status"],"reserved");
 }
 
+/// A Claude worker admitted before the run's scope was restored to an audit
+/// launches read-only: Claude's read-only mode with its write tools denied,
+/// checked after the attempt (the owner's decision 3 of 2026-09-28). The
+/// launch path rechecks the stored scope; before that decision it refused.
 #[test]
-fn previously_admitted_native_worker_cannot_launch_after_audit_scope_is_restored() {
+fn previously_admitted_native_worker_launches_read_only_after_audit_scope_is_restored() {
     let d = Daemon::start(&[("OVERSEER_SHARED_BOOKING_FIXTURE_API","1")]);
     let temp = tmp();
     let checkout = repo(&temp.path().join("legacy-audit-source"));
@@ -348,14 +352,20 @@ fn previously_admitted_native_worker_cannot_launch_after_audit_scope_is_restored
     assert_eq!(admitted["status"],"admitted","{admitted}");
     let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
     db.execute("UPDATE swarm_runs SET source_change_permission='none' WHERE id=?1",[id]).unwrap();
-    let error = d.try_call("swarm.worker.launch",json!({"run_id":id,"job_id":"inspect",
+    let launched = d.try_call("swarm.worker.launch",json!({"run_id":id,"job_id":"inspect",
         "attempt_id":admitted["attempt_id"],"token":admitted["token"],
         "repo":checkout,"harness":"claude","args":[],
-        "prompt":"Inspect","title":"Unsafe old reservation"})).unwrap_err();
-    assert!(error.contains("audit source boundary"),"{error}");
-    let count: i64 = db.query_row("SELECT COUNT(*) FROM swarm_worker_launches WHERE attempt_id=?1",
-        [admitted["attempt_id"].as_str().unwrap()],|r|r.get(0)).unwrap();
-    assert_eq!(count,0,"unsafe launch must not write an intent");
+        "prompt":"Inspect","title":"Old reservation, now an audit"}));
+    // The harness is not installed in tests: the launch itself may fail, but
+    // never on the audit boundary, and the run it made is read-only.
+    if let Err(error) = &launched {
+        assert!(!error.contains("audit source boundary"), "{error}");
+    }
+    let launch: String = db.query_row("SELECT r.launch FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id
+        WHERE l.attempt_id=?1",[admitted["attempt_id"].as_str().unwrap()],|r|r.get(0)).unwrap();
+    let launch: serde_json::Value = serde_json::from_str(&launch).unwrap();
+    let meta = launch.get("generic").unwrap_or(&launch);
+    assert_eq!(meta["audit_read_only"], true, "{launch}");
 }
 
 #[test]
