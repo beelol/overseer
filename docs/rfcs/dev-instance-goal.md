@@ -22,3 +22,7 @@ DONE WHEN:
 - your final report lists the criteria, the PRs, the tests run, and the exact deploy command for the owner.
 
 Message me (SendMessage to "main") each time a PR is marked ready, so I can merge it before you start the next stage on top of main.
+
+---
+
+Additions from the owner (2026-09-27), after the goal above was set: the feature is called **the dev daemons feature** (developer versions of Overseer that collide neither with each other nor with the installed production extension); and **guided owner tests** (AC-215) are a stage of their own between the dev daemons tooling and the deploy, so there are four pull requests: production guard, dev daemons tooling, guided tests, deploy.
