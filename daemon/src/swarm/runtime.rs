@@ -108,10 +108,13 @@ pub fn launch_director(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     Ok(json!({"status":"launched","overseer_run_id":process}))
 }
 
-/// The proposed native director (`swarm.native_director`): Claude Code on an
+/// The native director (`swarm.native_director`): Claude Code on an
 /// approved Claude account, through the same owner identity, slot hold and
 /// one launch path as the scripted director. Its Swarm tools, its denied
 /// native delegation and its `swarm/director` booking come from that path.
+/// Before it starts, the account's identity is read (local, no model turn)
+/// so its booking cites the current account and plan; a failed read leaves
+/// the recorded identity, and the booking refuses what it cannot prove.
 pub fn launch_native_director(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let _serial = d.swarm_launch_lock.lock().unwrap();
     if d.swarm_storage_blocked.load(Ordering::SeqCst) {
@@ -131,13 +134,24 @@ pub fn launch_native_director(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     }
     crate::git::toplevel(std::path::Path::new(repo))?;
     let source_commit=super::require_repository_scope(&d.store.lock().unwrap(), run, repo)?;
+    if let (Some(program), Ok(account)) = (crate::adapters::resolve_program("claude"), d.profile(profile)) {
+        if let Ok(auth) = crate::auto_collect::claude_auth_status(&program,
+            &crate::daemon::Daemon::profile_env(&account), std::time::Duration::from_secs(5), crate::daemon::now()) {
+            d.store.lock().unwrap().record_claude_identity(profile, &auth)?;
+        }
+    }
     let owner = super::owner::begin(&mut d.store.lock().unwrap(),
         &json!({"run_id":run,"generation":generation,"supervised_launch":true}))?;
     let token = owner["owner_token"].as_str().unwrap();
-    let task = d.create_task_for_swarm_director(&json!({
+    let mut launch = json!({
         "repo":repo,"harness":"claude","profile_id":profile,"workspace_mode":"worktree",
         "target_ref":source_commit,"prompt":prompt,"title":title,
-    }), &SwarmDirectorIdentity { run_id:run.to_string(),generation,token:token.to_string() })?;
+    });
+    for key in ["model", "effort"] {
+        if let Some(value) = p[key].as_str() { launch[key] = json!(value); }
+    }
+    let task = d.create_task_for_swarm_director(&launch,
+        &SwarmDirectorIdentity { run_id:run.to_string(),generation,token:token.to_string() })?;
     let process = task["run"]["id"].as_str()
         .ok_or_else(|| anyhow!("director run was not recorded"))?;
     if !task["launch_error"].is_null() {

@@ -1,5 +1,6 @@
 //! The proposed native director and worker path, behind the daemon setting
-//! `swarm.native_director` (default off; the owner's decision is pending).
+//! `swarm.native_director` (on by default since the owner's decision of
+//! 2026-09-28; the owner can turn it off, never Overseer's conversation).
 //! The director is the synthetic Claude fixture (`claude-fixture.js`, mode
 //! `swarm`) launched through the one launch path with the director's Swarm
 //! tools over MCP (Gate S's `overseerd mcp` shim); native workers are the
@@ -266,7 +267,7 @@ fn s0_native_director_runs_end_to_end_with_the_gate_on() {
     let r = &back["readback"];
     assert_eq!(r["director"], json!({"state":"qualified","kind":"claude_mcp","harness":"claude",
         "version":"2.1.246 (Claude Code)","profile_id":"system-claude","setting":"swarm.native_director",
-        "draw_class":"swarm/director"}), "{r}");
+        "model":"sonnet","effort":"medium","draw_class":"swarm/director"}), "{r}");
     assert_eq!(r["summary"], "Auto · up to 4 workers · 60 min", "{r}");
     let (run, director, _) = start(&w, "none", "s0-native");
     assert_native_director(&w, &director);
@@ -287,19 +288,25 @@ fn s0_native_director_runs_end_to_end_with_the_gate_on() {
     assert!(calls >= 10, "every director step was a tool call: {calls}");
 }
 
-/// The gate: off by default and pending the owner's decision. Off, a start
-/// outside the fixture API is blocked `no_qualified_director` even with a
-/// qualifiable Claude installed; on, the same start reads back the Claude
-/// director; off again, blocked again. The daemon's qualification refuses an
-/// older version, a build without the flags, a missing harness and a pool
-/// without a Claude account.
+/// The switch: on by default since the owner's decision of 2026-09-28, so a
+/// start outside the fixture API reads back the qualified Claude director on
+/// the recommended default route (sonnet, medium). The owner can turn it off
+/// (then a start is blocked `no_qualified_director` and no Swarm run can be
+/// created) and on again; Overseer's conversation can read it but never set
+/// it. The daemon's qualification refuses an older version, a build without
+/// the flags, a missing harness and a pool without a Claude account.
 #[test]
-fn gate_off_blocks_no_qualified_director_and_qualification_is_checked() {
+fn native_director_is_on_by_default_and_the_owner_can_turn_it_off() {
     let w = world(&[("OVERSEER_SWARM_FIXTURE_API", "0")]);
     w.d.call("swarm.policy.set", json!({"scope":"application","allowed_targets":["system-claude"]}));
     let setting = w.d.call("swarm.native_director.get", json!({}));
     assert_eq!((setting["enabled"].as_bool(), setting["default"].as_bool(), setting["decision"].as_str()),
-        (Some(false), Some(false), Some("pending")), "{setting}");
+        (Some(true), Some(true), Some("made")), "{setting}");
+    let on = w.d.call("swarm.start", start_params(&w, "none"));
+    assert_eq!(on["readback"]["director"], json!({"state":"qualified","kind":"claude_mcp","harness":"claude",
+        "version":"2.1.246 (Claude Code)","profile_id":"system-claude","setting":"swarm.native_director",
+        "model":"sonnet","effort":"medium","draw_class":"swarm/director"}), "{on}");
+    w.d.call("swarm.native_director.set", json!({"enabled":false}));
     let blocked = || {
         let back = w.d.call("swarm.start", start_params(&w, "none"));
         assert_eq!(back["readback"]["director"], json!({"state":"blocked","reason":"no_qualified_director"}), "{back}");
@@ -815,7 +822,12 @@ fn auto_selects_each_jobs_route_within_the_approved_pool() {
         for model in ["sonnet/medium", "opus/high"] {
             assert_eq!(reasons[&format!("{}/{model}", ids["full"])], "estimated_draw_exceeds_allowance", "{trace}");
             assert_eq!(reasons[&format!("{}/{model}", ids["unread"])], "unresolved_quota_pool_identity", "{trace}");
-            assert_eq!(reasons[&format!("system-claude/{model}")], "unresolved_quota_pool_identity", "{trace}");
+            // The director's launch read its account's identity, and the
+            // uncalibrated director runs unbooked on it: the account is busy.
+            let fit = trace["fit"].as_array().unwrap().iter()
+                .find(|f| f["route_id"] == format!("system-claude/{model}")).unwrap();
+            assert_eq!(fit["reason"], "account_pool_busy", "{trace}");
+            assert!(reasons.contains_key(&format!("system-claude/{model}")), "{trace}");
         }
     }
     assert_eq!(da["decision"]["selected"], format!("{first}/sonnet/medium"));
@@ -1104,4 +1116,95 @@ fn unselected_accounts_are_never_candidates_for_work_or_fallback() {
     assert!(candidates.iter().all(|p| *p == "system-claude"), "only approved accounts are candidates: {candidates:?}");
     assert!(admitted_routes(&only.w.d, &run2, "y").is_empty());
     std::fs::write(&only.worker_gate, "open").unwrap();
+}
+
+/// The director's own qualified draw (class `swarm/director`) with the
+/// Claude calibration of 2026-09-28, on the product path with the switch at
+/// its default (on). The identity read records the plan; seven serial Claude
+/// runs on the account (sonnet, medium: the director's route) leave five
+/// neighbour-bracketed samples; they are recorded as director runs of
+/// earlier Swarm runs (the class is the only seeded fact; readings, runs and
+/// bracketing are real). The confirmed start's director then books its
+/// account on that draw instead of running unbooked, and a booked start on
+/// the same account is no longer refused `account_pool_busy` while it runs.
+#[test]
+fn a_calibrated_director_books_its_account_with_its_own_draw() {
+    let dir = tmp();
+    let meter = dir.path().join("meter.json");
+    let plan = dir.path().join("plan.txt");
+    std::fs::write(&plan, "max").unwrap();
+    let resets_at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() + 3 * 3600;
+    std::fs::write(&meter, json!({"used":0.10,"weekly":0.05,"resets_at":resets_at,
+        "first":0.003,"last":0.008,"step":0.01}).to_string()).unwrap();
+    let passthrough = "CLAUDE_FIXTURE_MODE,CLAUDE_FIXTURE_VERSION,CLAUDE_FIXTURE_HELP,CLAUDE_FIXTURE_SWARM_SCRIPT,\
+        CLAUDE_FIXTURE_SWARM_WORKERS,CLAUDE_FIXTURE_METER_FILE,CLAUDE_FIXTURE_PLAN_FILE";
+    let (meter_path, plan_path) = (meter.display().to_string(), plan.display().to_string());
+    let w = world_in(dir, &[("OVERSEER_SWARM_FIXTURE_API", "0"), ("OVERSEER_SHARED_BOOKING_FIXTURE_API", "1"),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", passthrough), ("CLAUDE_FIXTURE_METER_FILE", meter_path.as_str()),
+        ("CLAUDE_FIXTURE_PLAN_FILE", plan_path.as_str()), ("OVERSEER_TEST_DRAW_SETTLE_MS", "300")]);
+    let identity = w.d.call("auto.quota.refresh", json!({"profile_id":"system-claude"}));
+    assert_eq!(identity["plan"], "max", "{identity}");
+    let mut earlier = Vec::new();
+    for n in 0..7 {
+        let run = w.d.call("task.create", json!({"repo":w.checkout,"harness":"claude","profile_id":"system-claude",
+            "model":"sonnet","effort":"medium","prompt":format!("earlier {n}"),"title":format!("earlier {n}")}))
+            ["run"]["id"].as_str().unwrap().to_string();
+        assert_eq!(w.d.wait_done(&run, 30)["status"], "completed");
+        std::thread::sleep(Duration::from_millis(400));
+        earlier.push(run);
+    }
+    {
+        // The seeded fact: these were the directors of seven earlier Swarm
+        // runs (their run rows are not needed for the class, so the seeding
+        // connection does not enforce the reference).
+        let db = db(&w.d);
+        db.execute_batch("PRAGMA foreign_keys=OFF").unwrap();
+        for (n, run) in earlier.iter().enumerate() {
+            db.execute("INSERT INTO swarm_director_owners(run_id,generation,token_sha256,status,created_ms,
+                renewed_ms,lease_expires_ms,overseer_run_id,supervised_launch,launch_phase)
+                VALUES(?1,1,?2,'released',0,0,0,?3,1,'linked')",
+                rusqlite::params![format!("earlier-swarm-{n}"), format!("{n:064}"), run]).unwrap();
+        }
+    }
+    w.d.call("agents.limit.set", json!({"max_active":5}));
+    w.d.call("swarm.policy.set", json!({"scope":"application","allowed_targets":["system-claude"]}));
+    std::fs::write(&w.script, json!({"trace":w.trace,"gate":w.gate,
+        "jobs":[{"id":"a","title":"Tenant lookup","acceptance":"evidence","deps":[]}],
+        "estimate":benefit(&["a"]),"dispatch":[],
+        "complete":{"summary":"none","verification":"none"}}).to_string()).unwrap();
+    let (_run, director, back) = start(&w, "isolated", "calibrated-director");
+    assert_eq!((back["readback"]["director"]["model"].as_str(), back["readback"]["director"]["effort"].as_str()),
+        (Some("sonnet"), Some("medium")), "{back}");
+    assert_native_director(&w, &director);
+    let (source, provenance): (String, String) = db(&w.d).query_row(
+        "SELECT draw_source,draw_provenance FROM shared_booking_intents WHERE run_id=?1", [&director],
+        |r| Ok((r.get(0)?, r.get(1)?))).expect("the director booked its account");
+    assert_eq!(source, "qualified");
+    let provenance: Value = serde_json::from_str(&provenance).unwrap();
+    assert_eq!((provenance["bucket"]["task_class"].as_str(), provenance["bucket"]["model"].as_str(),
+        provenance["sample_count"].as_i64(), provenance["plan_type"].as_str()),
+        (Some("swarm/director"), Some("sonnet"), Some(5), Some("max")), "{provenance}");
+    let launch = launch_file(&w.d, &director);
+    let args: Vec<String> = serde_json::from_value(launch["args"].clone()).unwrap();
+    assert!(args.windows(2).any(|a| a == ["--model", "sonnet"]) && args.windows(2).any(|a| a == ["--effort", "medium"]),
+        "{args:?}");
+    wait_trace(&w, step("dispatched", "director"), "the director's plan", 30);
+
+    // The booked director's draw is committed, so the account is not busy
+    // for another booked start (the finding of the default-off build).
+    let db = db(&w.d);
+    let (seq, generation): (i64, i64) = db.query_row(
+        "SELECT o.event_seq,a.generation FROM auto_quota_observations o JOIN auto_account_identity a
+         ON a.profile_id=o.pool_id WHERE o.pool_id='system-claude' ORDER BY o.observed_ms DESC,o.event_seq DESC LIMIT 1",
+        [], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+    let beside = w.d.call("task.create", json!({"repo":w.checkout,"harness":"claude","profile_id":"system-claude",
+        "model":"sonnet","effort":"medium","prompt":"beside","title":"beside",
+        "shared_booking":{"work_unit_id":"beside-director","account_generation":generation,
+            "quota_event_seq":seq,"upper_draw_milli":[1_000, 1_000]}}));
+    let beside = beside["run"]["id"].as_str().unwrap().to_string();
+    let bound: i64 = db.query_row("SELECT COUNT(*) FROM shared_booking_intents WHERE run_id=?1", [&beside],
+        |r| r.get(0)).unwrap();
+    assert_eq!(bound, 1, "booked beside the director");
+    w.d.wait_done(&beside, 30);
+    end_run(&w.d, &director);
 }

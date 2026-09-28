@@ -307,16 +307,18 @@ fn s0_variants_ask_once_fall_back_or_block_without_committing() {
     wait_completed(&w, &run, started["director"]["overseer_run_id"].as_str().unwrap());
 
     // No qualified director: the read-back says so and the yes is refused.
+    // The native director is on by default, and a pool with no Claude account
+    // has none to run it on.
     let plain = world(false, &[]);
     plain.d.call("swarm.policy.set", json!({"scope":"application","allowed_targets":["fixture-local"]}));
     let back = plain.d.call("swarm.start", start_params(&plain));
-    assert_eq!(back["readback"]["director"], json!({"state":"blocked","reason":"no_qualified_director"}));
+    assert_eq!(back["readback"]["director"], json!({"state":"blocked","reason":"no_director_account"}));
     assert_eq!(back["readback"]["summary"], "Blocked · no qualified director · 60 min");
     let mut confirm = start_params(&plain);
     confirm["request_id"] = json!("blocked");
     confirm["confirm_readback_sha256"] = back["readback_sha256"].clone();
     let blocked = plain.d.call("swarm.start", confirm);
-    assert_eq!((blocked["status"].as_str(), blocked["reason"].as_str()), (Some("blocked"), Some("no_qualified_director")));
+    assert_eq!((blocked["status"].as_str(), blocked["reason"].as_str()), (Some("blocked"), Some("no_director_account")));
     assert_eq!(plain.d.call("swarm.list", json!({}))["runs"], json!([]), "no weaker substitute runs");
     assert_eq!(plain.d.call("agents.limit.get", json!({}))["active"], 0);
 }

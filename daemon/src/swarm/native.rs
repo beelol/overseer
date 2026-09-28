@@ -1,16 +1,19 @@
-//! The proposed native director and worker path (S0 decisions 1 and 2 in
-//! the Swarm RFC), behind the daemon setting `swarm.native_director`. The
-//! owner's decision is pending, so the setting defaults to off and nothing
-//! here runs until it is turned on: with it off, a start outside the fixture
-//! API stays blocked `no_qualified_director` and no Swarm token opens an MCP
-//! tool, exactly as before.
+//! The native director and worker path (S0 decisions 1 and 2 in the Swarm
+//! RFC), behind the daemon setting `swarm.native_director`. The owner decided
+//! both as proposed on 2026-09-28, so the setting is on unless the owner
+//! turns it off (`swarm.native_director.set`, never from Overseer's
+//! conversation). Off, a start outside the fixture API is blocked
+//! `no_qualified_director` and no Swarm token opens an MCP tool.
 //!
 //! With it on:
-//! - **Director.** Claude Code, launched through the one launch path on an
-//!   approved Claude account, qualified by a daemon check of the harness
+//! - **Director.** Claude Code on Claude's recommended default prior route
+//!   (sonnet, medium), launched through the one launch path on an approved
+//!   Claude account, qualified by a daemon check of the account, the harness
 //!   (installed), its version (at least the live-verified 2.1.246) and its
-//!   tool support (`--help` lists the MCP, allow-list and deny flags). It gets
-//!   the director's Swarm tools over MCP (Gate S's `overseerd mcp` shim), its
+//!   tool support (`--help` lists the MCP, allow-list and deny flags). Its
+//!   launch reads the account's identity (local, no model turn), so the
+//!   account and plan its readings stand for are current. It gets the
+//!   director's Swarm tools over MCP (Gate S's `overseerd mcp` shim), its
 //!   native `Agent`/`Task` denied, and books its account with the
 //!   `swarm/director` draw when that draw is qualified (otherwise it runs
 //!   unbooked, as an ordinary start does).
@@ -51,17 +54,28 @@ fn hash(token: &str) -> String {
     format!("{:x}", Sha256::digest(token.as_bytes()))
 }
 
-/// The gate. Off unless the owner turned it on.
+/// The switch. On unless the owner turned it off (the owner's decision of
+/// 2026-09-28).
 pub fn enabled(store: &Store) -> Result<bool> {
     let value: Option<String> = store.conn.query_row(
         "SELECT value FROM meta WHERE key=?1", [SETTING], |row| row.get(0)).optional()?;
-    Ok(value.as_deref() == Some("on"))
+    Ok(value.as_deref() != Some("off"))
 }
 
 pub fn setting(store: &Store) -> Result<Value> {
-    Ok(json!({"setting":SETTING,"enabled":enabled(store)?,"default":false,
-        "decision":"pending",
-        "note":"The proposed Claude director and native worker tools; the owner's decision is pending, so it stays off unless turned on."}))
+    Ok(json!({"setting":SETTING,"enabled":enabled(store)?,"default":true,
+        "decision":"made",
+        "note":"The Claude director and native worker tools, as the owner decided on 2026-09-28; the owner can turn them off."}))
+}
+
+/// The director's model and effort: Claude's recommended default prior
+/// route (`auto_route::claude_prior_routes`), so its runs form one bucket
+/// and its own draw (`swarm/director`) can be qualified.
+pub fn director_route() -> (String, String) {
+    crate::auto_route::claude_prior_routes(None, "director", crate::daemon::now()).into_iter()
+        .find(|route| route.recommended_default)
+        .map(|route| (route.model, route.effort))
+        .unwrap_or_else(|| ("sonnet".into(), "medium".into()))
 }
 
 pub fn set_setting(store: &Store, p: &Value) -> Result<Value> {
@@ -79,6 +93,8 @@ pub fn set_setting(store: &Store, p: &Value) -> Result<Value> {
 pub struct QualifiedDirector {
     pub version: String,
     pub profile_id: String,
+    pub model: String,
+    pub effort: String,
 }
 
 fn semver(text: &str) -> Option<(u64, u64, u64)> {
@@ -114,6 +130,8 @@ fn help_text(program: &Path) -> Option<String> {
 /// least the verified version, the flags this path needs, and an approved
 /// Claude account in the category's pool to run on.
 pub fn qualify_director(claude_profile: Option<String>) -> std::result::Result<QualifiedDirector, &'static str> {
+    // The account first: without one no harness is run.
+    let profile_id = claude_profile.ok_or("no_director_account")?;
     let program = crate::adapters::resolve_program("claude").ok_or("director_harness_missing")?;
     let version = crate::adapters::version_of(&program).ok_or("director_version_unknown")?;
     match semver(&version) {
@@ -124,8 +142,8 @@ pub fn qualify_director(claude_profile: Option<String>) -> std::result::Result<Q
     if !REQUIRED_FLAGS.iter().all(|flag| help.contains(flag)) {
         return Err("director_tools_unqualified");
     }
-    let profile_id = claude_profile.ok_or("no_director_account")?;
-    Ok(QualifiedDirector { version, profile_id })
+    let (model, effort) = director_route();
+    Ok(QualifiedDirector { version, profile_id, model, effort })
 }
 
 /// The first approved target that is a Claude account profile: the director
@@ -691,6 +709,29 @@ pub fn launch_meta(config: &Path, role: &str) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
+
+    /// The owner's switch: on unless the owner turned it off, and never
+    /// settable from Overseer's conversation (its method class is `never`).
+    #[test]
+    fn the_switch_is_on_by_default_and_owner_only() {
+        let store = Store::open(Path::new(":memory:")).unwrap();
+        assert!(enabled(&store).unwrap(), "on by default (the owner's decision of 2026-09-28)");
+        assert_eq!(setting(&store).unwrap()["default"], true);
+        set_setting(&store, &json!({"enabled":false})).unwrap();
+        assert!(!enabled(&store).unwrap());
+        set_setting(&store, &json!({"enabled":true})).unwrap();
+        assert!(enabled(&store).unwrap());
+        assert_eq!(crate::overseer::control::method_class("swarm.native_director.set"), Some("never"));
+        assert_eq!(crate::overseer::control::method_class("swarm.native_director.get"), Some("read"));
+    }
+
+    /// The director runs on Claude's recommended default prior route, so its
+    /// own draw (class `swarm/director`) has a complete bucket.
+    #[test]
+    fn the_director_route_is_the_recommended_claude_default() {
+        assert_eq!(director_route(), ("sonnet".to_string(), "medium".to_string()));
+    }
 
     #[test]
     fn director_version_check_reads_claude_code_versions() {

@@ -779,7 +779,7 @@ impl Daemon {
         if prompt.is_empty() && harness != "generic" {
             bail!("prompt is required");
         }
-        // The proposed native path (`swarm.native_director`, default off): a
+        // The native path (`swarm.native_director`, on by default): a
         // Claude director or worker gets the daemon's Swarm tools over MCP.
         let native_member = swarm_identity.is_some() && harness == "claude"
             && crate::swarm::native::enabled(&self.store.lock().unwrap())?;

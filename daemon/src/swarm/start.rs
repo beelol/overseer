@@ -8,14 +8,14 @@
 //! run). No per-worker question or settings form is part of it.
 //!
 //! Director choice: a director needs daemon-issued Swarm tools and enforced
-//! descendant control. With the daemon setting `swarm.native_director` off
-//! (the default; the owner's decision is pending), outside the fixture API
-//! the start is visibly blocked (`no_qualified_director`) and no weaker
-//! substitute runs; under `OVERSEER_SWARM_FIXTURE_API=1` a scripted director
-//! named by `OVERSEER_SWARM_FIXTURE_DIRECTOR` is the qualified one. With it
-//! on, the proposed Claude director is the only candidate: qualified by the
-//! daemon's check of harness, version and tool support (`native.rs`), on an
-//! approved Claude account, or blocked with the reason it failed.
+//! descendant control. With the daemon setting `swarm.native_director` on
+//! (the default since the owner's decision of 2026-09-28) the Claude director
+//! is the candidate: qualified by the daemon's check of account, harness,
+//! version and tool support (`native.rs`), or blocked with the reason it
+//! failed. With it off, the start is visibly blocked
+//! (`no_qualified_director`) and no weaker substitute runs. Only under
+//! `OVERSEER_SWARM_FIXTURE_API=1` does a scripted director named by
+//! `OVERSEER_SWARM_FIXTURE_DIRECTOR` take the director's place (tests).
 
 use super::{native, required, runtime, settings};
 use crate::daemon::Daemon;
@@ -155,8 +155,12 @@ fn prepare(d: &Arc<Daemon>, p: &Value) -> Result<Prepared> {
     let fanout = if targets.is_empty() { "none" }
         else if accounts.iter().any(|a| a["quota"] == "measured" || a["quota"] == "fixture") { "bounded" }
         else { "serial" };
-    let director = if native_on { native::qualify_director(claude_profile).map(Director::Native) }
-        else { director_choice() };
+    // A configured scripted director exists only under the fixture API.
+    let director = match director_choice() {
+        Ok(scripted) => Ok(scripted),
+        Err(_) if native_on => native::qualify_director(claude_profile).map(Director::Native),
+        Err(reason) => Err(reason),
+    };
     let minutes = deadline_ms / 60_000;
     let summary = match (fanout, &director) {
         (_, Err(_)) => format!("Blocked · no qualified director · {minutes} min"),
@@ -180,7 +184,7 @@ fn prepare(d: &Arc<Daemon>, p: &Value) -> Result<Prepared> {
             Ok(Director::Scripted { .. }) => json!({"state":"qualified","kind":"fixture_scripted","harness":"generic"}),
             Ok(Director::Native(q)) => json!({"state":"qualified","kind":"claude_mcp","harness":"claude",
                 "version":q.version,"profile_id":q.profile_id,"setting":native::SETTING,
-                "draw_class":"swarm/director"}),
+                "model":q.model,"effort":q.effort,"draw_class":"swarm/director"}),
             Err(reason) => json!({"state":"blocked","reason":reason}),
         },
         "policy_sources":policy["sources"],
@@ -262,7 +266,8 @@ pub fn start(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         (None, Ok(Director::Native(q))) => {
             let repo = &prepared.repositories[0];
             runtime::launch_native_director(d, &json!({"run_id":id,"generation":1,"repo":repo,
-                "profile_id":q.profile_id,"prompt":director_prompt(&prepared.readback),
+                "profile_id":q.profile_id,"model":q.model,"effort":q.effort,
+                "prompt":director_prompt(&prepared.readback),
                 "title":format!("{} director", prepared.readback["category"].as_str().unwrap_or("Swarm"))}))?
         }
         (None, Ok(Director::Scripted { program, args: script_args })) => {

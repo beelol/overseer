@@ -30,7 +30,9 @@ fn planned(d: &Daemon) -> (String, String, String) {
 fn unfinished_runtime_transitions_are_disabled_without_fixture_opt_in() {
     let d=Daemon::start(&[("OVERSEER_SWARM_FIXTURE_API","0")]);
     let create=json!({"category":"Safe default","objective":"Audit","allowed_targets":["system-codex"]});
-    // No Swarm run exists outside the fixture API while its setting is off (AC-204).
+    // No Swarm run exists outside the fixture API while the owner has its
+    // setting off (it is on by default since the owner's decision of 2026-09-28).
+    d.call("swarm.native_director.set",json!({"enabled":false}));
     assert!(d.try_call("swarm.create",create.clone()).unwrap_err().contains("swarm.native_director"));
     d.call("swarm.native_director.set",json!({"enabled":true}));
     let run=d.call("swarm.create",create);
