@@ -320,7 +320,7 @@ These are implementation requirements, not claims about this documentation revis
 
 ### Fallback and continuity
 
-- [ ] **AUTO-AC-19 — Pre-effect fallback.** Confirmed safe launch failure selects another eligible route. **Verify:** preferred route rejects before work; eligible alternate runs; an OpenCode route on the same failed upstream does not evade its exclusion.
+- [x] **AUTO-AC-19 — Pre-effect fallback.** Confirmed safe launch failure selects another eligible route. **Verify:** preferred route rejects before work; eligible alternate runs; an OpenCode route on the same failed upstream does not evade its exclusion.
 - [x] **AUTO-AC-20 — Bounded retries and stable dispatch.** Failures and reevaluation do not oscillate or multiply execution. **Verify:** exercise Retry-After, 60-second transient default, three failure attempts, shared recovery checks, and no interruption merely on recovery; next-unit selection still evaluates recovered routes.
 - [ ] **AUTO-AC-21 — Safe handoff.** Automatic continuation preserves work and transfers only at a confirmed checkpoint. **Verify:** controlled real harness processes fail after a file edit, settle, and continue in a new linked run with the same file/snapshot history and one writer; handoff includes goal, corrections, progress, tests, and limitations.
 - [x] **AUTO-AC-22 — Uncertain effects stop.** Unknown process/tool/external-action outcome cannot trigger replay. **Verify:** lost connection after a mock external side effect, live child process, pending approval, and unconfirmed supervisor stop all pause without a duplicate command or second writer.
