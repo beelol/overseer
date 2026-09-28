@@ -1311,6 +1311,36 @@ impl Store {
             == crate::account_booking::BookingDecision::Booked)
     }
 
+    /// For selection: an Auto route whose pool is held only by known-window
+    /// bookings (no unknown-draw claim, no unbooked run) may still be chosen
+    /// when its own bucket has a qualified draw on a fresh reading; admission
+    /// then books its windows beside them, or pauses if they no longer fit.
+    pub fn auto_pool_open_to_known_windows(&self, route: &crate::auto_select::Route,
+        task_class: Option<&str>, now_ms: i64) -> Result<bool> {
+        let Some(fingerprint) = route.pool_id.strip_prefix("account/") else { return Ok(false) };
+        if self.auto_account_pool_id(&route.profile_id)?.as_deref() != Some(route.pool_id.as_str()) {
+            return Ok(false);
+        }
+        let whole_pool: bool = self.conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM auto_pool_claims c
+                WHERE (c.pool_id=?1 OR c.pool_id='legacy/unresolved') AND c.state IN ('active','uncertain')
+                AND NOT EXISTS(SELECT 1 FROM shared_booking_intents b WHERE b.work_unit_id=c.work_unit_id))",
+            [&route.pool_id], |row| row.get(0))?;
+        if whole_pool || crate::account_booking::unbooked_run_on_account(&self.conn, fingerprint)? {
+            return Ok(false);
+        }
+        let Some(latest) = self.latest_auto_quota(&route.profile_id)? else { return Ok(false) };
+        if latest.snapshot.needs_refresh(now_ms) {
+            return Ok(false);
+        }
+        let bucket = crate::upper_draw::DrawBucket {
+            harness: route.harness.clone(), model: route.model.clone(), effort: route.effort.clone(),
+            task_class: format!("auto/{}", task_class.unwrap_or("unclassified")),
+        };
+        Ok(matches!(crate::upper_draw::qualified_upper_draw_in_tx(&self.conn, &route.profile_id,
+            latest.event_seq, &bucket, now_ms)?, crate::upper_draw::UpperDraw::Qualified { .. }))
+    }
+
     /// An unknown subscription draw occupies its shared pool until a child
     /// settles. A paused intent without a child remains effects-uncertain and
     /// cannot be released merely because this daemon restarted.

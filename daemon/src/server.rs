@@ -1106,7 +1106,11 @@ fn auto_root_preview(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     }
     {
         let store = d.store.lock().unwrap();
-        for route in &mut routes { route.in_flight_pool_claim = store.auto_pool_claimed(&route.pool_id)?; }
+        let now_ms = crate::daemon::now();
+        for route in &mut routes {
+            route.in_flight_pool_claim = store.auto_pool_claimed(&route.pool_id)?
+                && !store.auto_pool_open_to_known_windows(route, work.task_class.as_deref(), now_ms)?;
+        }
     }
     let fit_now_ms = crate::daemon::now();
     let (fit_inputs, fit_evidence) = if d.learning_is_paused() {
@@ -2123,9 +2127,11 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 // two clients collecting concurrently cannot both admit.
                 {
                     let store = d.store.lock().unwrap();
+                    let now_ms = crate::daemon::now();
                     for route in &mut routes {
                         route.in_flight_pool_claim = store.auto_pool_claimed_for_child(
-                            &route.pool_id, &parent.id, account_generations.get(&route.profile_id).copied())?;
+                            &route.pool_id, &parent.id, account_generations.get(&route.profile_id).copied())?
+                            && !store.auto_pool_open_to_known_windows(route, task_class.as_deref(), now_ms)?;
                     }
                 }
                 let work = WorkUnit { id:work_unit_id.into(), min_tier, required_tools:required_tools.clone(),

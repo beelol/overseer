@@ -459,6 +459,26 @@ fn valid_label(label: &str, max: usize) -> bool {
     !label.is_empty() && label.len() <= max && !label.chars().any(char::is_control)
 }
 
+/// A run on this account that may be drawing with no known-window booking:
+/// an ordinary unbooked run, or an Auto unit on an unknown-draw claim. Its
+/// draw is unknown, so no known-window booking can share the account.
+pub fn unbooked_run_on_account(conn: &Connection, fingerprint: &str) -> Result<bool> {
+    Ok(conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM runs r JOIN auto_account_identity a ON a.profile_id=r.profile_id
+         WHERE a.fingerprint=?1 AND (r.status IN ('queued','starting','running','waiting_for_user')
+           OR EXISTS(SELECT 1 FROM turns t WHERE t.run_id=r.id
+              AND t.status='running' AND t.ended_ms IS NULL))
+           -- A bound run's draw is already committed in its windows.
+           AND NOT EXISTS(SELECT 1 FROM shared_booking_intents b
+              WHERE b.run_id=r.id AND b.settled_ms IS NULL)
+           -- So is an Auto root's or child's, booked under its work unit.
+           AND NOT EXISTS(SELECT 1 FROM shared_booking_intents b
+              WHERE b.caller='auto' AND b.settled_ms IS NULL AND b.work_unit_id IN (
+                  SELECT work_unit_id FROM auto_root_intents WHERE run_id=r.id
+                  UNION SELECT work_unit_id FROM managed_work_units WHERE child_run_id=r.id)))",
+        [fingerprint], |row| row.get(0))?)
+}
+
 /// Called inside the *caller's* IMMEDIATE SQLite transaction. This is the
 /// integration seam for Swarm's existing admission transaction. The same
 /// auto_pool_claims row is the account booking for all caller types; no
@@ -613,21 +633,7 @@ pub fn book_shared_account_in_tx(
     if legacy_claim {
         return Ok(BookingDecision::Blocked("account_pool_busy"));
     }
-    let manual_run: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM runs r JOIN auto_account_identity a ON a.profile_id=r.profile_id
-         WHERE a.fingerprint=?1 AND (r.status IN ('queued','starting','running','waiting_for_user')
-           OR EXISTS(SELECT 1 FROM turns t WHERE t.run_id=r.id
-              AND t.status='running' AND t.ended_ms IS NULL))
-           -- A bound run's draw is already committed in its windows.
-           AND NOT EXISTS(SELECT 1 FROM shared_booking_intents b
-              WHERE b.run_id=r.id AND b.settled_ms IS NULL)
-           -- So is an Auto root's or child's, booked under its work unit.
-           AND NOT EXISTS(SELECT 1 FROM shared_booking_intents b
-              WHERE b.caller='auto' AND b.settled_ms IS NULL AND b.work_unit_id IN (
-                  SELECT work_unit_id FROM auto_root_intents WHERE run_id=r.id
-                  UNION SELECT work_unit_id FROM managed_work_units WHERE child_run_id=r.id)))",
-        [&fingerprint], |row| row.get(0))?;
-    if manual_run {
+    if unbooked_run_on_account(conn, &fingerprint)? {
         return Ok(BookingDecision::Blocked("account_pool_busy"));
     }
     let mut windows = Vec::with_capacity(quota.windows.len());

@@ -1084,11 +1084,26 @@ mod tests {
                 [unit], |row| row.get(0)).unwrap()
         };
 
+        let route = {
+            use crate::auto_select::{Allowance, CapabilityTier, Fit, Health, Route, Sandbox};
+            Route { id:"codex-app/gpt-6-sol/medium".into(), harness:"codex-app".into(),
+                provider:"openai".into(), endpoint:"codex".into(), profile_id:PROFILE.into(),
+                pool_id:pool.clone(), model:"gpt-6-sol".into(), resolved_model_version:None,
+                effort:"medium".into(), tier:CapabilityTier::General, tools:Default::default(),
+                context_limit:None, supports_approvals:true, sandbox:Sandbox::WorkspaceWrite,
+                supported_sandboxes:None, recommended_default:true,
+                quota:Allowance::ObservedNonExhausted, quota_blocks:Vec::new(), fit:Fit::Unknown,
+                health:Health::Healthy, unresolved_quota_pool_identity:false,
+                in_flight_pool_claim:false }
+        };
+        let open = |class: &str| f.store
+            .auto_pool_open_to_known_windows(&route, Some(class), crate::daemon::now()).unwrap();
         // An uncalibrated class keeps the whole-account unknown-draw claim,
         // which leaves no room for a known-window booking beside it.
         assert!(admit("root-cold", "diagnosis"));
         assert!(f.store.shared_booking_draw("unit-root-cold").unwrap().is_none());
         assert_eq!(book("swarm/beside-cold"), BookingDecision::Blocked("account_pool_busy"));
+        assert!(!open("browser_check"), "an unknown-draw claim holds the whole account for selection");
         finish("root-cold");
         assert_eq!(claim("unit-root-cold"), "released");
 
@@ -1101,6 +1116,11 @@ mod tests {
         assert_eq!(provenance.bucket.task_class, "auto/browser_check");
         assert_eq!(provenance.sample_count, 5);
         assert_eq!(book("swarm/beside-warm"), BookingDecision::Booked);
+        // Selection: the pool is taken, but only by known windows, so a
+        // calibrated class may still choose it; an uncalibrated one may not.
+        assert!(f.store.auto_pool_claimed(&pool).unwrap());
+        assert!(open("browser_check"));
+        assert!(!open("diagnosis"));
         // Another Auto root on the same account books beside it too.
         assert!(admit("root-second", "browser_check"));
         // Settled: the draw stays committed until a later reading, then goes.
