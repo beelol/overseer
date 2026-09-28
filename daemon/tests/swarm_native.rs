@@ -946,3 +946,28 @@ fn a_harness_without_a_swarm_delivery_path_is_excluded_before_launch() {
     assert_eq!(codex, 0);
     std::fs::write(&t.worker_gate, "open").unwrap();
 }
+
+/// SWARM-21 on the proposed native path: the owner's changed requirements hold
+/// the native director's dispatches (`requirements_pending`) until it revises
+/// the plan through its own `swarm_revise` tool, naming the request; the
+/// revision is recorded against the request and dispatch resumes.
+#[test]
+fn a_native_director_applies_the_owners_requirement_change_by_revising() {
+    let t = driven(&["alpha"], &[("alpha", 0.0)], &["system-claude", "alpha"], &["a", "b"], &["a"]);
+    let w = &t.w;
+    let (run, director, _) = start(w, "isolated", "native-requirements");
+    wait_trace(w, step("dispatched", "director"), "plan", 60);
+    w.d.call("swarm.requirements.change", json!({"run_id":run,"request_id":"owner-drop-b",
+        "text":"Drop job b; only job a is needed"}));
+    let held = dispatch_job(&w.d, &director, json!({"job_id":"a","brief":"Job a: a"}));
+    assert_eq!((held["status"].as_str(), held["reason"].as_str()), (Some("blocked"), Some("requirements_pending")), "{held}");
+    let revised = director_tool(&w.d, &director, "swarm_revise", json!({"reason":"The owner dropped b",
+        "jobs":[{"id":"a","title":"Job a","acceptance":"evidence","deps":[]}],"requirements":["owner-drop-b"]}));
+    assert_eq!(revised["is_error"], false, "{revised}");
+    let state = w.d.call("swarm.get", json!({"id":run}));
+    assert_eq!(state["requirement_changes"][0]["applied_revision"], 2, "{state}");
+    assert_eq!(w.d.call("swarm.jobs", json!({"id":run,"status":"superseded"}))["jobs"].as_array().unwrap().len(), 1);
+    let a = dispatch_job(&w.d, &director, json!({"job_id":"a","brief":"Job a: a"}));
+    assert_ne!(a["reason"], "requirements_pending", "{a}");
+    std::fs::write(&t.worker_gate, "open").unwrap();
+}
