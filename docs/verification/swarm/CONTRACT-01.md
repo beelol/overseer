@@ -121,9 +121,13 @@ Still open, so this stays unchecked:
   `qualified_draw_prices_a_booked_start_after_five_isolated_runs`); before that
   they are refused `upper_draw_unknown`. Its readings in those tests are fixture
   meters, and no live window delta has been attributed.
-- Auto roots and children still hold unknown-draw account claims rather than
-  per-window bookings, so the account-window race is shown for booked ordinary and
-  Swarm callers, not for Auto (Auto competes for the app slot only).
+- Auto roots and children book per-window through the same booking only once
+  their class is calibrated (`acf51787`, `27d7318c`); the store-level test
+  `an_auto_root_books_known_windows_once_its_class_is_calibrated` shows a Swarm
+  booking beside a calibrated Auto root and refused beside an uncalibrated one.
+  Uncalibrated Auto units, which is all of them on a real account today, still
+  hold unknown-draw claims, and no daemon race of a calibrated Auto unit against a
+  Swarm worker for the last window has been run.
 - The writer race: a Swarm worker gets a new worktree, so it books no writer, and
   no Swarm caller competes for an existing checkout yet.
 - A changed account generation between route and launch is refused by the booking
