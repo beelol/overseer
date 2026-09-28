@@ -19,6 +19,10 @@ pub const ACTIONS: &[&str] = &["message", "stop", "start", "pin", "hold", "relea
 pub const SETTLE_MS: i64 = 2000;
 const TURN_BYTES: usize = 32 * 1024;
 pub const FROM_OVERSEER: &str = "From Overseer: ";
+/// Held from "is Overseer busy?" to its turn starting, so two turns never start at once (an
+/// owner's message, a check-in and the queued messages at a turn's end come from different
+/// threads; Voice Mode's requests make that common).
+pub(crate) static TURN_START: std::sync::Mutex<()> = std::sync::Mutex::new(());
 pub const OPEN: &str = "<overseer-state>";
 pub const CLOSE: &str = "</overseer-state>";
 
@@ -321,6 +325,8 @@ impl Daemon {
         let sid = session["id"].as_str().unwrap().to_string();
         let msg = self.append_message(&sid, "owner", Some(surface), text, None)?;
         let harness = harness.filter(|h| !h.is_empty()).map(str::to_string).or_else(|| session["harness"].as_str().map(str::to_string)).unwrap_or_else(|| "claude".into());
+        let _one_at_a_time = TURN_START.lock().unwrap_or_else(|e| e.into_inner());
+        let session = self.overseer_session()?;
         let run_id = session["run_id"].as_str().map(str::to_string);
         let busy = run_id.as_deref().and_then(|r| self.run(r).ok()).map(|r| ACTIVE.contains(&r.status.as_str())).unwrap_or(false);
         if busy {
@@ -388,6 +394,11 @@ impl Daemon {
             return Ok(());
         }
         let sid = session["id"].as_str().unwrap().to_string();
+        let _one_at_a_time = TURN_START.lock().unwrap_or_else(|e| e.into_inner());
+        // Another turn may have started meanwhile; the queue waits for its end.
+        if self.run(run_id).map(|r| ACTIVE.contains(&r.status.as_str())).unwrap_or(false) {
+            return Ok(());
+        }
         let pending: Vec<(i64, String)> = {
             let store = self.store.lock().unwrap();
             let mut stmt = store.conn.prepare("SELECT rowid, text FROM overseer_pending WHERE session_id=?1 ORDER BY rowid")?;

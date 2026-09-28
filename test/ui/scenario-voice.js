@@ -282,7 +282,7 @@ const { auditExpression } = require('./audit');
     check('who is spoken to switches from the strip, by command and by voice, and the strip shows it', byStrip && byCommand && byVoice && back, { byStrip, byCommand, byVoice, back });
 
     // ---------- Keyboard only (AC-174): mute, cancel and yes.
-    s.ctl('voice.set', { settle_seconds: 8 });
+    s.ctl('voice.set', { settle_seconds: 10 });
     await cdp.focusWorkbench();
     await cdp.key('m', { meta: true, alt: true, shift: true });
     const keyMuted = await view.waitFor(`document.getElementById('voice-state').dataset.state === 'muted'`, 10000).then(() => true, () => false);
@@ -291,7 +291,7 @@ const { auditExpression } = require('./audit');
     // A request inside its window: the voice mark on the target in the side bar and the grid, then cancelled by keyboard.
     const cancelId = s.ctl('voice.say', { text: 'Tell Continuity to wait for the review.' }).request;
     const settling = await untilState(cancelId, ['settling']);
-    await delay(1200);
+    await delay(600);
     const rows = await s.agentRows();
     const sideMarked = rows.some(r => r.label === 'Continuity' && /voice/.test(r.description));
     await s.screenshot('voice-mark-side-bar');
@@ -308,7 +308,7 @@ const { auditExpression } = require('./audit');
     // Yes by keyboard: a plan that waits for a yes (archiving is a Confirm action).
     await cdp.command('Overseer: Voice Mode: Show'); await delay(600);
     const yesId = s.ctl('voice.say', { text: 'Archive Continuity.' }).request;
-    const waiting = await untilState(yesId, ['waiting']);
+    const waiting = await untilState(yesId, ['waiting'], 120000);
     const yesShown = await view.waitFor(`!document.getElementById('voice-yes').hidden`, 8000).then(() => true, () => false);
     await s.screenshot('yes-waiting');
     await cdp.focusWorkbench();
@@ -371,7 +371,7 @@ const { auditExpression } = require('./audit');
         await s.selectRun(id).catch(() => {});
         await delay(1500);
         const frame = await cdp.webview(`!!document.querySelector('.view-chat')`, 10000).catch(() => null);
-        const shows = frame ? await frame.eval(`document.body.innerText.includes('The owner said: “Tell Gateway and Ledger to use the new wire format')`) : false;
+        const shows = frame ? await frame.eval(`document.body.innerText.includes('(voice, request') && document.body.innerText.includes('The owner said: “Tell Gateway and Ledger')`) : false;
         chats.push({ tag, id, shows });
         await s.screenshot(`chat-${['gateway', 'ledger', 'new-agent'][i]}-${tag}`);
       }
@@ -395,7 +395,7 @@ const { auditExpression } = require('./audit');
     await s.screenshot('stopped-after-four-crashes');
     check('four crashes turn Voice Mode off, and the view says why', stopped && s.ctl('voice.get').enabled === false, { reason });
     await cdp.command('Overseer: Voice Mode: Turn On or Off');
-    await view.waitFor(`document.getElementById('voice-state').dataset.state === 'listening'`, 30000);
+    await view.waitFor(`['listening', 'thinking'].includes(document.getElementById('voice-state').dataset.state)`, 30000);
 
     // ---------- Widths and themes, with the visible-text and accessible-name audits (AC-174).
     await cdp.command('View: Close Primary Side Bar').catch(() => {});

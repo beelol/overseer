@@ -287,6 +287,18 @@ fn ac175_a_dying_listener_never_touches_an_agent_and_four_deaths_turn_voice_off(
         g["reason"].as_str().unwrap_or("").contains("four times"),
         "{g}"
     );
+    // The owner turns it on again: it listens, and the crash count has started over.
+    env.d.call("voice.set", json!({"enabled": true}));
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        let g = env.d.call("voice.get", json!({}));
+        if g["state"] == "listening" {
+            assert_eq!(g["listener"]["restarts"], 0, "{g}");
+            break;
+        }
+        assert!(Instant::now() < deadline, "listening again: {g}");
+        std::thread::sleep(Duration::from_millis(100));
+    }
 }
 
 // ---------------------------------------------------------------------- AC-164, AC-177
