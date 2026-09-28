@@ -564,6 +564,9 @@ impl Store {
             // v21: the run a claimed launch became, and how its holds settled.
             ("run_id", "TEXT"), ("bound_ms", "INTEGER"),
             ("settled_ms", "INTEGER"), ("outcome", "TEXT"),
+            // v22: where the booked upper draw came from (`fixture` or
+            // `qualified`) and, when qualified, its samples and bucket.
+            ("draw_source", "TEXT"), ("draw_provenance", "TEXT"),
         ] {
             let present = self.conn.prepare("SELECT 1 FROM pragma_table_info('shared_booking_intents') WHERE name=?1")?
                 .exists([column])?;
@@ -574,7 +577,9 @@ impl Store {
         self.conn.execute_batch("CREATE INDEX IF NOT EXISTS shared_booking_writer
             ON shared_booking_intents(workspace_path,writer_held);
             CREATE UNIQUE INDEX IF NOT EXISTS shared_booking_run
-            ON shared_booking_intents(run_id) WHERE run_id IS NOT NULL;")?;
+            ON shared_booking_intents(run_id) WHERE run_id IS NOT NULL;
+            CREATE INDEX IF NOT EXISTS auto_quota_pool_observed
+            ON auto_quota_observations(pool_id,observed_ms);")?;
         let has_measurement_effort: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('auto_measurements') WHERE name='effort'")?.exists([])?;
         if !has_measurement_effort {
             self.conn.execute_batch("ALTER TABLE auto_measurements ADD COLUMN effort TEXT;")?;

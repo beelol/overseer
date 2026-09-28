@@ -7,9 +7,19 @@ use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBe
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 
-/// The caller supplies a qualified upper draw in thousandths of a percentage
-/// point for every binding window in the cited structured provider observation.
-/// A token count or estimated credit amount is not a valid upper draw here.
+/// Where a booking's upper draw comes from. It is in thousandths of a
+/// reported percentage point for every window of the cited structured
+/// observation; a token count or estimated credit amount is never one.
+#[derive(Clone, Copy)]
+pub enum BookingDraw<'a> {
+    /// Supplied by a fixture caller (behind `OVERSEER_SHARED_BOOKING_FIXTURE_API`).
+    Fixture(&'a [i64]),
+    /// Computed in the booking's own transaction from the account's recorded
+    /// observations around isolated runs of this bucket
+    /// (`upper_draw::qualified_upper_draw_in_tx`); unknown refuses the booking.
+    Qualified(&'a crate::upper_draw::DrawBucket),
+}
+
 pub struct AccountBookingRequest<'a> {
     pub id: &'a str,
     pub request_hash: &'a str,
@@ -20,7 +30,7 @@ pub struct AccountBookingRequest<'a> {
     pub account_generation: i64,
     pub quota_event_seq: i64,
     pub now_ms: i64,
-    pub upper_draw_milli: &'a [i64],
+    pub draw: BookingDraw<'a>,
     pub allocation_remaining_milli: Option<&'a [i64]>,
 }
 
@@ -473,19 +483,35 @@ pub fn book_shared_account_in_tx(
     {
         return Err(anyhow!("invalid shared booking identity"));
     }
+    // A fixture draw is caller input and binds the booking. A qualified draw
+    // and the observation it cites are derived when the booking is made, so
+    // a replay of the same request binds to its bucket, not to a newer
+    // reading that the replay happens to see.
     let request_hash = format!(
         "{:x}",
-        Sha256::digest(serde_json::to_vec(&(
-            req.request_hash,
-            req.caller,
-            req.route_id,
-            req.profile_id,
-            req.quota_profile_id,
-            req.account_generation,
-            req.quota_event_seq,
-            req.upper_draw_milli,
-            req.allocation_remaining_milli
-        ))?)
+        Sha256::digest(match req.draw {
+            BookingDraw::Fixture(upper_draw_milli) => serde_json::to_vec(&(
+                req.request_hash,
+                req.caller,
+                req.route_id,
+                req.profile_id,
+                req.quota_profile_id,
+                req.account_generation,
+                req.quota_event_seq,
+                upper_draw_milli,
+                req.allocation_remaining_milli
+            ))?,
+            BookingDraw::Qualified(bucket) => serde_json::to_vec(&(
+                req.request_hash,
+                req.caller,
+                req.route_id,
+                req.profile_id,
+                req.quota_profile_id,
+                req.account_generation,
+                "qualified",
+                bucket
+            ))?,
+        })
     );
     let previous: Option<String> = conn
         .query_row(
@@ -547,9 +573,31 @@ pub fn book_shared_account_in_tx(
     if quota.ordinary_usage_allowed != Some(true) {
         return Ok(BookingDecision::Blocked("account_exhausted"));
     }
+    let (upper_draw_milli, draw_source, draw_provenance) = match req.draw {
+        BookingDraw::Fixture(draws) => (draws.to_vec(), "fixture", None),
+        BookingDraw::Qualified(bucket) => match crate::upper_draw::qualified_upper_draw_in_tx(
+            conn,
+            req.quota_profile_id,
+            req.quota_event_seq,
+            bucket,
+            req.now_ms,
+        )? {
+            crate::upper_draw::UpperDraw::Qualified {
+                upper_draw_milli,
+                provenance,
+            } => (
+                upper_draw_milli,
+                "qualified",
+                Some(serde_json::to_string(&provenance)?),
+            ),
+            crate::upper_draw::UpperDraw::Unknown { .. } => {
+                return Ok(BookingDecision::Blocked("upper_draw_unknown"))
+            }
+        },
+    };
     if quota.windows.is_empty()
         || quota.windows.len() > 32
-        || req.upper_draw_milli.len() != quota.windows.len()
+        || upper_draw_milli.len() != quota.windows.len()
         || req
             .allocation_remaining_milli
             .is_some_and(|a| a.len() != quota.windows.len())
@@ -584,7 +632,7 @@ pub fn book_shared_account_in_tx(
         if !seen.insert(key.clone()) {
             return Ok(BookingDecision::Blocked("duplicate_window"));
         }
-        let amount = req.upper_draw_milli[n];
+        let amount = upper_draw_milli[n];
         if !(1..=100_000).contains(&amount)
             || !window.used_percent.is_finite()
             || !(0.0..=100.0).contains(&window.used_percent)
@@ -612,8 +660,9 @@ pub fn book_shared_account_in_tx(
     }
     conn.execute(
         "INSERT INTO shared_booking_intents(work_unit_id,request_hash,caller,route_id,
-        profile_id,quota_profile_id,account_generation,quota_event_seq,phase,created_ms,updated_ms)
-        VALUES(?1,?2,?3,?4,?5,?6,?7,?8,'booked',?9,?9)",
+        profile_id,quota_profile_id,account_generation,quota_event_seq,phase,created_ms,updated_ms,
+        draw_source,draw_provenance)
+        VALUES(?1,?2,?3,?4,?5,?6,?7,?8,'booked',?9,?9,?10,?11)",
         params![
             req.id,
             request_hash,
@@ -623,7 +672,9 @@ pub fn book_shared_account_in_tx(
             req.quota_profile_id,
             req.account_generation,
             req.quota_event_seq,
-            req.now_ms
+            req.now_ms,
+            draw_source,
+            draw_provenance
         ],
     )?;
     conn.execute(
@@ -966,6 +1017,32 @@ impl Store {
         launch_intent(&self.conn, id)
     }
 
+    /// Where a booking's upper draw came from (`fixture` or `qualified`,
+    /// None for a booking made before this was recorded) and, when
+    /// qualified, its provenance: bucket, samples and their observations.
+    pub fn shared_booking_draw(
+        &self,
+        id: &str,
+    ) -> Result<Option<(Option<String>, Option<crate::upper_draw::DrawProvenance>)>> {
+        let row: Option<(Option<String>, Option<String>)> = self
+            .conn
+            .query_row(
+                "SELECT draw_source,draw_provenance FROM shared_booking_intents WHERE work_unit_id=?1",
+                [id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        row.map(|(source, provenance)| {
+            Ok((
+                source,
+                provenance
+                    .map(|encoded| serde_json::from_str(&encoded))
+                    .transpose()?,
+            ))
+        })
+        .transpose()
+    }
+
     /// True while a run is the unsettled result of a shared launch booking:
     /// its admission was that booking, and its supervisor must be recorded
     /// before spawn so recovery can tell an unstarted run from a lost one.
@@ -1168,7 +1245,7 @@ mod tests {
             account_generation: 1,
             quota_event_seq: first_observation,
             now_ms: 2000,
-            upper_draw_milli: &[4_000, 4_000],
+            draw: BookingDraw::Fixture(&[4_000, 4_000]),
             allocation_remaining_milli: None,
         };
         assert!(
@@ -1201,7 +1278,7 @@ mod tests {
             account_generation: 1,
             quota_event_seq: alias_observation,
             now_ms: 2000,
-            upper_draw_milli: &[5_000, 5_000],
+            draw: BookingDraw::Fixture(&[5_000, 5_000]),
             allocation_remaining_milli: None,
         };
         assert_eq!(
@@ -1248,7 +1325,7 @@ mod tests {
                         account_generation: 1,
                         quota_event_seq: event,
                         now_ms: 2000,
-                        upper_draw_milli: &[6_000, 6_000],
+                        draw: BookingDraw::Fixture(&[6_000, 6_000]),
                         allocation_remaining_milli: None,
                     };
                     barrier.wait();
@@ -1307,7 +1384,7 @@ mod tests {
             account_generation: 1,
             quota_event_seq: event,
             now_ms: 2000,
-            upper_draw_milli: &[4_000, 4_000],
+            draw: BookingDraw::Fixture(&[4_000, 4_000]),
             allocation_remaining_milli: None,
         };
         let stale_generation = AccountBookingRequest {
@@ -1391,7 +1468,7 @@ mod tests {
             account_generation: 1,
             quota_event_seq: first_event,
             now_ms: 2000,
-            upper_draw_milli: &[4_000, 4_000],
+            draw: BookingDraw::Fixture(&[4_000, 4_000]),
             allocation_remaining_milli: None,
         };
         let first = LaunchBookingRequest {
@@ -1473,7 +1550,7 @@ mod tests {
             account_generation: 1,
             quota_event_seq: event,
             now_ms: 2000,
-            upper_draw_milli: draw,
+            draw: BookingDraw::Fixture(draw),
             allocation_remaining_milli: None,
         }
     }
@@ -1709,7 +1786,7 @@ mod tests {
             request_hash: "launch/next",
             quota_event_seq: fresh,
             now_ms: 5000,
-            upper_draw_milli: &[4_000, 4_000],
+            draw: BookingDraw::Fixture(&[4_000, 4_000]),
             ..after
         };
         assert_eq!(

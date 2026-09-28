@@ -759,3 +759,207 @@ fn swarm_worker_admission_books_the_shared_account_and_binds_its_run() {
             "quota_event_seq":booking["quota_event_seq"],"upper_draw_milli":[92_001, 92_001]}}));
     assert!(ordinary.as_ref().unwrap_err().contains("shared_pool_headroom"), "{ordinary:?}");
 }
+
+/// The qualified upper draw on the product path, with no fixture draw (the
+/// fixture booking API is off). Five ordinary Codex runs, each alone on its
+/// account between two structured readings taken through `auto.quota.refresh`
+/// (the fixture meter moves one point per run), price the next booked start
+/// of the same harness, model and effort. Before the fifth, a booked start
+/// is refused `upper_draw_unknown`. The settle wait is shortened for the
+/// test only; no draw value is supplied by the test.
+#[test]
+fn qualified_draw_prices_a_booked_start_after_five_isolated_runs() {
+    let r = tmp();
+    let checkout = repo(&r.path().join("repo"));
+    let accounts = r.path().join("account-ids");
+    let meters = r.path().join("quota-modes");
+    std::fs::create_dir_all(&accounts).unwrap();
+    std::fs::create_dir_all(&meters).unwrap();
+    let codex = fixture("fake-harness/codex-app-fixture.js");
+    let d = Daemon::start(&[
+        ("OVERSEER_CODEX_PATH", codex.as_str()),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH",
+            "FIXTURE_MODE,FIXTURE_ACCOUNT_IDS_DIR,FIXTURE_QUOTA_MODES_DIR,FIXTURE_TURN_DELAY_MS"),
+        ("FIXTURE_MODE", "managed-models"),
+        ("FIXTURE_ACCOUNT_IDS_DIR", accounts.to_str().unwrap()),
+        ("FIXTURE_QUOTA_MODES_DIR", meters.to_str().unwrap()),
+        ("FIXTURE_TURN_DELAY_MS", "50"),
+        ("OVERSEER_TEST_DRAW_SETTLE_MS", "300"),
+    ]);
+    let profile = d.call("profile.create", json!({"name":"solo","harness":"codex"}))["id"]
+        .as_str().unwrap().to_string();
+    std::fs::write(accounts.join(&profile), "account-solo").unwrap();
+    let meter = |used: f64| std::fs::write(meters.join(&profile), format!("{used}")).unwrap();
+    let mut used = 30.0;
+    meter(used);
+    refresh(&d, &profile);
+    let booked_start = |d: &Daemon, work_unit: &str| d.try_call("task.create", json!({
+        "repo":checkout,"harness":"codex-app","profile_id":profile,"model":"gpt-6-sol",
+        "effort":"medium","prompt":"priced","title":work_unit,
+        "shared_booking":{"work_unit_id":work_unit,"draw":"qualified"}}));
+    let fixture_draw = d.try_call("task.create", json!({"repo":checkout,"harness":"codex-app",
+        "profile_id":profile,"model":"gpt-6-sol","effort":"medium","prompt":"x","title":"fixture",
+        "shared_booking":{"work_unit_id":"fixture-draw","account_generation":1,
+            "quota_event_seq":1,"upper_draw_milli":[1000]}}));
+    assert!(fixture_draw.unwrap_err().contains("not available"), "the fixture draw stays gated");
+
+    // One isolated ordinary run: a reading, the run alone on the account,
+    // the meter moves one point, a settled reading.
+    let mut runs = Vec::new();
+    let mut sample = |n: usize| {
+        let run = d.call("task.create", json!({"repo":checkout,"harness":"codex-app",
+            "profile_id":profile,"model":"gpt-6-sol","effort":"medium",
+            "prompt":format!("sample {n}"),"title":format!("sample {n}")}))["run"]["id"]
+            .as_str().unwrap().to_string();
+        d.wait_status(&run, |status| !HOLDING.contains(&status), 30);
+        used += 1.0;
+        meter(used);
+        std::thread::sleep(Duration::from_millis(400));
+        refresh(&d, &profile);
+        runs.push(run);
+    };
+    for n in 0..4 {
+        sample(n);
+    }
+    let cold = booked_start(&d, "cold-start");
+    assert!(cold.as_ref().unwrap_err().contains("upper_draw_unknown"), "{cold:?}");
+    sample(4);
+
+    let start = booked_start(&d, "priced-start").expect("a booked start on the qualified draw");
+    let run = start["run"]["id"].as_str().unwrap().to_string();
+    let (source, provenance, amounts) = booking_draw(&d, "priced-start");
+    assert_eq!(source, "qualified");
+    assert_eq!(amounts, vec![3_000], "one visible point plus two readings' error, in thousandths");
+    assert_eq!(provenance["sample_count"], 5, "{provenance}");
+    assert_eq!(provenance["bucket"], json!({"harness":"codex-app","model":"gpt-6-sol",
+        "effort":"medium","task_class":"agent"}));
+    let mut sampled: Vec<String> = provenance["samples"].as_array().unwrap().iter()
+        .map(|s| s["run_id"].as_str().unwrap().to_string()).collect();
+    sampled.sort();
+    runs.sort();
+    assert_eq!(sampled, runs, "every sample is one of the isolated runs");
+    assert!(provenance["samples"].as_array().unwrap().iter()
+        .all(|s| s["before_seq"].as_i64() < s["after_seq"].as_i64()));
+    d.wait_status(&run, |status| !HOLDING.contains(&status), 30);
+    assert_eq!(intent(&d, "priced-start").4.as_deref(), Some("settled"));
+}
+
+/// (draw_source, provenance, per-window amounts) of a booking.
+fn booking_draw(d: &Daemon, work_unit: &str) -> (String, Value, Vec<i64>) {
+    let db = db(d);
+    let (source, provenance): (String, String) = db.query_row(
+        "SELECT draw_source,draw_provenance FROM shared_booking_intents WHERE work_unit_id=?1",
+        [work_unit], |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
+    let mut stmt = db.prepare("SELECT amount_milli FROM shared_booking_windows WHERE work_unit_id=?1
+        ORDER BY window_key").unwrap();
+    let amounts = stmt.query_map([work_unit], |row| row.get(0)).unwrap().map(Result::unwrap).collect();
+    (source, serde_json::from_str(&provenance).unwrap(), amounts)
+}
+
+/// A structured reading of a Claude profile's account (Claude has no
+/// metadata read to call, so the test records it as the fixture helper
+/// does): two windows with fixed resets, in the fixture plan.
+fn claude_reading(d: &Daemon, profile: &str, used: [f64; 2], resets: i64) -> i64 {
+    let db = db(d);
+    let now = now_ms();
+    let windows: Vec<Value> = [("five_hour", 300), ("weekly", 10_080)].into_iter().zip(used)
+        .map(|((name, minutes), used)| json!({"pool_id":profile,"bucket_id":name,"window":name,
+            "model":null,"model_family":null,"plan_type":"fixture","used_percent":used,
+            "reset_ms":resets + minutes,"duration_mins":minutes,
+            "observed_ms":now,"expires_ms":now + 600_000})).collect();
+    let snapshot = json!({"ordinary_usage_allowed":true,"observed_ms":now,"expires_ms":now + 600_000,
+        "windows":windows});
+    db.execute("INSERT INTO events(ts,task_id,run_id,kind,source,confidence,payload)
+        VALUES(?1,NULL,NULL,'quota','fixture','reported','{}')", [now]).unwrap();
+    let seq = db.last_insert_rowid();
+    db.execute("INSERT INTO auto_quota_observations(event_seq,pool_id,source,observed_ms,snapshot)
+        VALUES(?1,?2,'fixture/structured',?3,?4)",
+        rusqlite::params![seq, profile, now, snapshot.to_string()]).unwrap();
+    seq
+}
+
+/// A Swarm account worker (Claude, the harness Swarm can launch) is priced
+/// by the qualified draw, with no fixture draw: refused `upper_draw_unknown`
+/// with its sample count while four isolated Claude runs exist, admitted
+/// once a fifth does, its booking carrying the provenance; the worker then
+/// launches and binds its run to that booking.
+#[test]
+fn qualified_draw_admits_a_swarm_worker_after_five_isolated_runs() {
+    let claude = fixture("fake-harness/claude-fixture.js");
+    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", claude.as_str()),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"), ("FIXTURE_MODE", "echo"),
+        ("OVERSEER_TEST_DRAW_SETTLE_MS", "300")]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("qualified-workers"));
+    // The account identity as the fixture helper records it; its readings
+    // below keep one reset, so the meter's movement is comparable.
+    fixture_account_booking(&d, "system-claude", "swarm-account", 10.0, 1);
+    let resets = now_ms() + 3_600_000;
+    let mut used = [10.0, 2.0];
+    claude_reading(&d, "system-claude", used, resets);
+    let mut runs = Vec::new();
+    let mut sample = |n: usize| {
+        let run = d.call("task.create", json!({"repo":checkout,"harness":"claude",
+            "profile_id":"system-claude","model":"sonnet","effort":"medium",
+            "prompt":format!("sample {n}"),"title":format!("sample {n}")}))["run"]["id"]
+            .as_str().unwrap().to_string();
+        d.wait_status(&run, |status| !HOLDING.contains(&status), 30);
+        used[0] += 1.5;
+        std::thread::sleep(Duration::from_millis(400));
+        claude_reading(&d, "system-claude", used, resets);
+        runs.push(run);
+    };
+    for n in 0..4 {
+        sample(n);
+    }
+    let swarm = d.call("swarm.create", json!({"category":"Qualified workers","objective":"Inspect",
+        "allowed_targets":["claude-a"],"source_change_permission":"isolated"}));
+    let id = swarm["id"].as_str().unwrap().to_string();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"j0","title":"First","acceptance":"evidence","deps":[]},
+        {"id":"j1","title":"Second","acceptance":"evidence","deps":[]}]}));
+    commit_beneficial_batch(&d, &id, &["j0".into(), "j1".into()]);
+    let admit = |d: &Daemon, request: &str| {
+        let at = now_ms();
+        d.call("swarm.admit", json!({"run_id":id,"generation":1,"revision":1,"job_id":"j0",
+            "target_id":"claude-a","request_id":request,"now_ms":at,"required_capabilities":["code"],
+            "estimate_milli":{"points":100},"purpose":"worker",
+            "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+120000,
+                "targets":[{"id":"claude-a","harness":"claude","profile_id":"system-claude",
+                    "model":"sonnet","effort":"medium","account_id":"swarm-account","pool_ids":["pool"],
+                    "capabilities":["code"],"health":"up","auth":"ok"}],
+                "pools":[{"id":"pool","windows":[{"id":"run","unit":"points","remaining_milli":1000000,
+                    "protected_milli":0,"reserved_milli":0,"confidence":"exact","expires_ms":at+120000}]}]}}))
+    };
+    let refused = admit(&d, "cold");
+    assert_eq!(refused["reason"], "upper_draw_unknown", "{refused}");
+    assert_eq!(refused["draw"]["samples"], 4, "{refused}");
+    assert_eq!(refused["draw"]["min_samples"], 5, "{refused}");
+
+    sample(4);
+    let admitted = admit(&d, "warm");
+    assert_eq!(admitted["status"], "admitted", "{admitted}");
+    let booking = admitted["shared_booking"].as_str().unwrap().to_string();
+    let (source, provenance, _) = booking_draw(&d, &booking);
+    assert_eq!(source, "qualified");
+    assert_eq!(provenance["sample_count"], 5, "{provenance}");
+    // 1.5 visible points in the five-hour window and none in the weekly
+    // one, each plus two readings' error.
+    let windows: Vec<(String, i64)> = provenance["windows"].as_array().unwrap().iter()
+        .map(|w| (w["window"].as_str().unwrap().to_string(), w["upper_milli"].as_i64().unwrap()))
+        .collect();
+    assert_eq!(windows, vec![("five_hour".to_string(), 3_500), ("weekly".to_string(), 2_000)]);
+    let mut sampled: Vec<String> = provenance["samples"].as_array().unwrap().iter()
+        .map(|s| s["run_id"].as_str().unwrap().to_string()).collect();
+    sampled.sort();
+    runs.sort();
+    assert_eq!(sampled, runs);
+
+    let launched = d.call("swarm.worker.launch", json!({"run_id":id,"job_id":"j0",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],"repo":checkout,
+        "harness":"claude","args":[],"prompt":"Inspect","title":"Qualified worker"}));
+    assert_eq!(launched["status"], "launched", "{launched}");
+    let worker = launched["overseer_run_id"].as_str().unwrap().to_string();
+    assert_eq!(intent(&d, &booking).0.as_deref(), Some(worker.as_str()), "bound to its booking");
+    d.wait_status(&worker, |status| !HOLDING.contains(&status), 30);
+}

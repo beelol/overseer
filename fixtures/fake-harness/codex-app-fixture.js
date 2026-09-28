@@ -135,7 +135,9 @@ rl.on('line', line => {
         process.env.FIXTURE_ACCOUNT_ID_FILE ? fs.readFileSync(process.env.FIXTURE_ACCOUNT_ID_FILE, 'utf8').trim() : 'private-account-id');
     const quotaMode = profileValue(process.env.FIXTURE_QUOTA_MODES_DIR,
       process.env.FIXTURE_QUOTA_MODE_FILE ? fs.readFileSync(process.env.FIXTURE_QUOTA_MODE_FILE, 'utf8').trim() : '');
-    const quotaUsed = quotaMode === 'exhausted' ? 100 : 35;
+    // A numeric mode is the reported percentage used (a moving meter).
+    const quotaUsed = quotaMode === 'exhausted' ? 100
+      : /^\d+(\.\d+)?$/.test(quotaMode) ? Number(quotaMode) : 35;
     const planType = process.env.FIXTURE_PLAN_TYPE_FILE
       ? fs.readFileSync(process.env.FIXTURE_PLAN_TYPE_FILE, 'utf8').trim() : 'pro';
     mark('metadata_started');

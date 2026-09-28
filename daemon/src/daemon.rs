@@ -159,9 +159,13 @@ impl TurnOpts {
     }
 }
 
-/// A caller-qualified shared launch booking for an ordinary start. Only a
-/// fixture caller may supply one until upper draws can be qualified; the
-/// in-process Swarm caller will use the same booking functions directly.
+/// A shared launch booking for an ordinary start. A fixture caller may
+/// supply its upper draw, account generation and cited observation (behind
+/// `OVERSEER_SHARED_BOOKING_FIXTURE_API`). Any caller may instead ask for
+/// the qualified draw (`"draw":"qualified"`): the daemon cites the account's
+/// latest observation and current identity, and the booking computes the
+/// draw from isolated runs of the same harness, model and effort, refusing
+/// `upper_draw_unknown` until enough exist.
 struct SharedStart {
     id: String,
     request_hash: String,
@@ -170,34 +174,56 @@ struct SharedStart {
     quota_profile_id: String,
     account_generation: i64,
     quota_event_seq: i64,
-    upper_draw_milli: Vec<i64>,
+    /// None: the qualified draw for `bucket`.
+    upper_draw_milli: Option<Vec<i64>>,
+    bucket: crate::upper_draw::DrawBucket,
     consume_agent_slot: bool,
     launch_hash: String,
 }
 
 impl SharedStart {
-    fn from_params(booking: &Value, p: &Value, harness: &str, profile_id: &str) -> Result<Self> {
-        if std::env::var("OVERSEER_SHARED_BOOKING_FIXTURE_API").as_deref() != Ok("1") {
-            bail!("shared launch booking is not available to this caller");
-        }
+    fn from_params(store: &Store, booking: &Value, p: &Value, harness: &str, profile_id: &str) -> Result<Self> {
         let text = |key: &str| booking[key].as_str().filter(|value| !value.is_empty()).map(str::to_string);
         let id = text("work_unit_id").ok_or_else(|| anyhow!("shared booking needs a work_unit_id"))?;
-        let upper_draw_milli = booking["upper_draw_milli"].as_array()
-            .filter(|draws| !draws.is_empty() && draws.len() <= 32)
-            .and_then(|draws| draws.iter().map(Value::as_i64).collect::<Option<Vec<_>>>())
-            .ok_or_else(|| anyhow!("shared booking needs an upper draw for every window"))?;
+        let qualified = match booking.get("draw") {
+            None | Some(Value::Null) => false,
+            Some(Value::String(draw)) if draw == "qualified" => true,
+            Some(_) => bail!("shared booking draw must be \"qualified\""),
+        };
+        let quota_profile_id = text("quota_profile_id").unwrap_or_else(|| profile_id.to_string());
+        let (upper_draw_milli, account_generation, quota_event_seq) = if qualified {
+            if booking.get("upper_draw_milli").is_some() {
+                bail!("a qualified shared booking cannot also carry an upper draw");
+            }
+            // Cite what the daemon has recorded; the booking revalidates both
+            // in its transaction. Missing evidence is refused there.
+            (None, store.auto_account_generation(&quota_profile_id)?.unwrap_or(0).max(1),
+                store.latest_auto_quota(&quota_profile_id)?.map_or(1, |q| q.event_seq))
+        } else {
+            if std::env::var("OVERSEER_SHARED_BOOKING_FIXTURE_API").as_deref() != Ok("1") {
+                bail!("shared launch booking is not available to this caller");
+            }
+            let draws = booking["upper_draw_milli"].as_array()
+                .filter(|draws| !draws.is_empty() && draws.len() <= 32)
+                .and_then(|draws| draws.iter().map(Value::as_i64).collect::<Option<Vec<_>>>())
+                .ok_or_else(|| anyhow!("shared booking needs an upper draw for every window"))?;
+            (Some(draws),
+                booking["account_generation"].as_i64()
+                    .ok_or_else(|| anyhow!("shared booking needs the account generation"))?,
+                booking["quota_event_seq"].as_i64()
+                    .ok_or_else(|| anyhow!("shared booking needs the cited quota observation"))?)
+        };
         use sha2::Digest;
         Ok(Self {
             request_hash: text("request_hash").unwrap_or_else(|| id.clone()),
             route_id: text("route_id").unwrap_or_else(||
                 format!("{harness}/{}", p["model"].as_str().unwrap_or("default"))),
             profile_id: profile_id.to_string(),
-            quota_profile_id: text("quota_profile_id").unwrap_or_else(|| profile_id.to_string()),
-            account_generation: booking["account_generation"].as_i64()
-                .ok_or_else(|| anyhow!("shared booking needs the account generation"))?,
-            quota_event_seq: booking["quota_event_seq"].as_i64()
-                .ok_or_else(|| anyhow!("shared booking needs the cited quota observation"))?,
+            quota_profile_id,
+            account_generation,
+            quota_event_seq,
             upper_draw_milli,
+            bucket: crate::upper_draw::DrawBucket::agent(harness, p["model"].as_str(), p["effort"].as_str()),
             consume_agent_slot: booking["consume_agent_slot"].as_bool().unwrap_or(true),
             // Every launch input is bound to the intent: a replay with any
             // changed field is refused rather than treated as the same start.
@@ -786,7 +812,8 @@ impl Daemon {
                 }
                 let profile = profile.as_ref()
                     .ok_or_else(|| anyhow!("a shared launch booking needs an account profile"))?;
-                Some(SharedStart::from_params(booking, p, harness, &profile.id)?)
+                let store = self.store.lock().unwrap();
+                Some(SharedStart::from_params(&store, booking, p, harness, &profile.id)?)
             }
         };
         // A booked Swarm worker: its admission booked the account windows and
@@ -825,7 +852,11 @@ impl Daemon {
                 quota_profile_id: &start.quota_profile_id,
                 account_generation: start.account_generation,
                 quota_event_seq: start.quota_event_seq, now_ms: now(),
-                upper_draw_milli: &start.upper_draw_milli, allocation_remaining_milli: None,
+                draw: match &start.upper_draw_milli {
+                    Some(draws) => crate::account_booking::BookingDraw::Fixture(draws),
+                    None => crate::account_booking::BookingDraw::Qualified(&start.bucket),
+                },
+                allocation_remaining_milli: None,
             };
             let decision = self.store.lock().unwrap().book_shared_launch(
                 &crate::account_booking::LaunchBookingRequest {

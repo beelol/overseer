@@ -497,10 +497,6 @@ fn admit_inner(
     // fixture policy, reserved in swarm_reservations as before.
     let account_target = !director_self && candidate["harness"] != "generic";
     let booking_input = if account_target { shared_booking_input(p)? } else { None };
-    if account_target && booking_input.is_none() {
-        // No code yet produces a qualified per-window upper draw.
-        return Ok(blocked("upper_draw_unknown"));
-    }
     let empty = Vec::new();
     let windows = if account_target { &empty } else {
         freeze_pool_caps(&tx,run,&p["snapshot"],&current["allowed_targets"],effective,now)?;
@@ -656,16 +652,44 @@ fn admit_inner(
     let attempt_id = format!("att-{}", &uuid::Uuid::new_v4().simple().to_string()[..16]);
     let token = uuid::Uuid::new_v4().simple().to_string();
     let mut booked_windows = Vec::new();
-    if let Some(input) = &booking_input {
+    if account_target {
         let profile = candidate["profile_id"].as_str()
             .ok_or_else(|| anyhow!("account target has no profile"))?;
-        let quota_profile = input.quota_profile_id.as_deref().unwrap_or(profile);
+        // The worker's upper draw: a fixture caller's, or the qualified draw
+        // learned from this account's observations around isolated runs of
+        // the same harness, model and effort (`upper_draw`). The qualified
+        // draw cites the account's latest observation and current identity.
+        let bucket = crate::upper_draw::DrawBucket::agent(
+            candidate["harness"].as_str().unwrap_or_default(),
+            candidate["model"].as_str(), candidate["effort"].as_str());
+        let (quota_profile, account_generation, quota_event_seq, draw) = match &booking_input {
+            Some(input) => (input.quota_profile_id.as_deref().unwrap_or(profile),
+                input.account_generation, input.quota_event_seq,
+                crate::account_booking::BookingDraw::Fixture(&input.upper_draw_milli)),
+            None => {
+                let generation: Option<i64> = tx.query_row(
+                    "SELECT generation FROM auto_account_identity WHERE profile_id=?1",
+                    [profile], |r| r.get(0)).optional()?;
+                let latest: Option<i64> = tx.query_row(
+                    "SELECT event_seq FROM auto_quota_observations WHERE pool_id=?1
+                     ORDER BY observed_ms DESC,event_seq DESC LIMIT 1",
+                    [profile], |r| r.get(0)).optional()?;
+                let (Some(generation), Some(latest)) = (generation, latest) else {
+                    return Ok(blocked("upper_draw_unknown"));
+                };
+                (profile, generation, latest, crate::account_booking::BookingDraw::Qualified(&bucket))
+            }
+        };
         // Swarm's category allocation and finishing reserve, in the cited
         // observation's windows, in thousandths of a reported percentage
         // point. Nothing is converted from tokens, credits or fixture units.
-        let cited = crate::account_booking::cited_windows_in_tx(&tx, quota_profile, input.quota_event_seq)?;
+        let cited = crate::account_booking::cited_windows_in_tx(&tx, quota_profile, quota_event_seq)?;
+        let draw_windows = match draw {
+            crate::account_booking::BookingDraw::Fixture(draws) => Some(draws.len()),
+            crate::account_booking::BookingDraw::Qualified(_) => cited.as_ref().map(Vec::len),
+        };
         let allocation = match &cited {
-            Some(windows) if windows.len() == input.upper_draw_milli.len() =>
+            Some(windows) if Some(windows.len()) == draw_windows =>
                 Some(category_allocation(&tx, run, windows, effective, budget_role == "finishing")?),
             _ => None,
         };
@@ -675,9 +699,7 @@ fn admit_inner(
         let account = crate::account_booking::AccountBookingRequest {
             id: &booking_id, request_hash: &request_hash, caller: "swarm",
             route_id: target, profile_id: profile, quota_profile_id: quota_profile,
-            account_generation: input.account_generation,
-            quota_event_seq: input.quota_event_seq, now_ms,
-            upper_draw_milli: &input.upper_draw_milli,
+            account_generation, quota_event_seq, now_ms, draw,
             allocation_remaining_milli: remaining.as_deref(),
         };
         let decision = crate::account_booking::book_shared_launch_in_tx(&tx,
@@ -687,6 +709,13 @@ fn admit_inner(
             })?;
         match decision {
             crate::account_booking::LaunchBookingDecision::Booked(_) => {}
+            crate::account_booking::LaunchBookingDecision::Blocked("upper_draw_unknown")
+                if booking_input.is_none() => {
+                // Show why: too few attributable samples, or no identity.
+                let summary = crate::upper_draw::qualified_upper_draw_in_tx(
+                    &tx, quota_profile, quota_event_seq, &bucket, now_ms)?.summary();
+                return Ok(json!({"status":"blocked","reason":"upper_draw_unknown","draw":summary}));
+            }
             crate::account_booking::LaunchBookingDecision::Blocked(reason) => return Ok(blocked(reason)),
             crate::account_booking::LaunchBookingDecision::Replayed(_) =>
                 bail!("a new Swarm attempt cannot replay an earlier booking"),
@@ -759,14 +788,14 @@ fn admit_inner(
         "executor":if director_self { "director" } else { "worker" },
         "allocation_milli":chosen.first().map(|w|w.3).or(booked_windows.first().map(|w|w.cap)),
         "reservation_windows":chosen.len(),
-        "shared_booking":booking_input.as_ref().map(|_|
+        "shared_booking":account_target.then(||
             crate::account_booking::swarm_attempt_booking_id(&attempt_id)),
         "booked_windows":booked_windows.len()}),
     )
 }
 
-/// The caller-supplied booking inputs for an account target. Until code can
-/// qualify a per-window upper draw, only a fixture caller may supply one.
+/// The caller-supplied booking inputs for an account target: a fixture
+/// draw. Without them the booking uses the qualified draw (`upper_draw`).
 struct SharedBookingInput {
     account_generation: i64,
     quota_event_seq: i64,
