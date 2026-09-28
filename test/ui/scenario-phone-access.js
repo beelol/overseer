@@ -19,6 +19,12 @@
 // The Copy button is not pressed: it would replace what the owner has on the clipboard.
 // Accounts come from the SYNTHETIC account CLI (fixtures/fake-harness/account-cli.js) with an
 // empty desktop home, so no real login is read or shown.
+// This scenario turns phone access on and off itself and checks it starts off: the suite-wide
+// OVERSEER_TEST_PHONE_ACCESS=on (which turns it on before every other scenario) does not apply here.
+if (process.env.OVERSEER_TEST_PHONE_ACCESS === 'on') {
+  console.log('note: this scenario switches phone access itself; the suite-wide setting on does not apply');
+  delete process.env.OVERSEER_TEST_PHONE_ACCESS;
+}
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
