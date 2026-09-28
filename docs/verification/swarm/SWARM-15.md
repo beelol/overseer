@@ -1,6 +1,6 @@
 # SWARM-15 — bounded routing failure retries
 
-Status: partial. Revision: `ca52007`. Support level: fixture-only scripted local workers; the target IDs and availability snapshots are injected, not live Auto Mode routes.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section.
 
 Input: a one-job backend category permits two fixture targets backed by different accounts. The first target admits an attempt whose supervised worker fails to start its missing executable. The daemon observes its terminal state. The same logical job is admitted on the second target, where the same launch failure occurs. Each terminal receipt is replayed. A plan revision then changes the job title. A separate replay records an unknown external effect before its worker fails.
 
@@ -44,3 +44,15 @@ and `cargo test -p overseerd --offline --test swarm_availability -q` (12 passed)
 This is a daemon-level no-churn guarantee, not proof that a live director harness cannot
 make its own unrecorded model call. The criterion remains partial until the supervised
 director and joined Auto route are replayed through an unchanged waiting period.
+
+## Verified at fixture scope (2026-09-28)
+
+| Clause | Test |
+| --- | --- |
+| Repeated routing failures across targets give at most two execution attempts per logical job | `one_job_falls_back_once_then_stops_and_an_uncertain_effect_pauses` (`daemon/tests/swarm_native.rs`, Auto's route selection on the proposed native path, switched on in the test only): the first failure moves the job to another eligible account, the second exhausts it, a third dispatch is refused `attempt_limit` before any route selection, also after a daemon restart; `two_failed_launch_routes_exhaust_one_logical_jobs_attempts` (`swarm_routing.rs`, fixture routes) |
+| Replanning cannot reset the attempt budget | the same native test, extended in this session: after the two failures the director revises the job (a narrower acceptance check) through its `swarm_revise` tool; the job stays `failed` with two attempts and dispatch is still refused `attempt_limit` with no new route decision; `exhausted_integrated_patch_stays_incomplete_after_late_conflict`; S3's contract repair uses attempt 2 of the same job (`catalog_s3_twenty_four_patches_need_a_combined_cursor_check`); a superseded job id cannot be reused (`two_semantically_invalid_repair_turns_stall_after_restart`) |
+| An unchanged waiting state produces no repeated planning calls | `unchanged_waiting_route_does_not_create_director_turns_until_recovery` (a blocked route polled repeatedly and across a restart creates no director turn and no wake until recovery); the joined S1 replay (`atlas_s1_backend_evidence_flows_through_swarm_review`): an unchanged run polled over 30 s of fixture time stays at two director turns |
+
+Rerun serially on 2026-09-28: `swarm_native` (one_job_falls_back), `swarm_routing` 2, `swarm_availability` 12, the S1 replay.
+
+Boundary: a live director's own polling habits are not measured; the daemon starts no director turn on an unchanged state.

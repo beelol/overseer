@@ -895,6 +895,15 @@ fn one_job_falls_back_once_then_stops_and_an_uncertain_effect_pauses() {
     let refused = dispatch_job(&t.w.d, &director, json!({"job_id":"x","brief":"Job x: x"}));
     assert_eq!((refused["status"].as_str(), refused["reason"].as_str()), (Some("blocked"), Some("attempt_limit")), "{refused}");
     assert_eq!(route_decisions(&t.w.d, &run, "x").len(), 2, "no selection for a job out of attempts");
+    // Replanning the same logical job cannot reset its attempts (SWARM-15).
+    let revised = director_tool(&t.w.d, &director, "swarm_revise", json!({"reason":"retry x with a narrower check",
+        "jobs":[{"id":"x","title":"Job x","acceptance":"narrower evidence","deps":[]},
+            {"id":"y","title":"Job y","acceptance":"evidence","deps":[]}]}));
+    assert_eq!(revised["is_error"], false, "{revised}");
+    assert_eq!(job_state(&t.w.d, "x"), ("failed".into(), 2), "a revision keeps the spent attempts");
+    let replanned = dispatch_job(&t.w.d, &director, json!({"job_id":"x","brief":"Job x: x"}));
+    assert_eq!(replanned["reason"], "attempt_limit", "{replanned}");
+    assert_eq!(route_decisions(&t.w.d, &run, "x").len(), 2);
 
     // An uncertain effect on y (recorded by its first attempt) pauses it.
     let one = dispatch_job(&t.w.d, &director, json!({"job_id":"y","brief":"Job y: y"}));

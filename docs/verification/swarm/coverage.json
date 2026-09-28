@@ -169,7 +169,7 @@
       "blocker": "Fixture health scopes now exclude endpoint aliases, account-auth aliases and every route needing a failed local harness; exact zero quota has a separate reason and a healthy OpenCode endpoint still admits work. Auto Mode live observations, model-window exclusions, actual harness failure/reconnect and active-process reconciliation remain unverified."
     },
     "SWARM-15": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_routing.rs",
         "daemon/src/swarm/artifacts.rs",
@@ -178,9 +178,11 @@
         "daemon/tests/swarm_director_process.rs",
         "docs/verification/swarm/main-reconciliation-2026-09-27.md",
         "daemon/tests/swarm_integration.rs",
-        "daemon/tests/swarm_availability.rs"
+        "daemon/tests/swarm_availability.rs",
+        "daemon/tests/swarm_native.rs",
+        "daemon/tests/swarm_atlas.rs"
       ],
-      "blocker": "Two-attempt cap across routes/revisions and daemon-level blocked-route polling without director turns pass local fixtures. A supervised director must still prove no unrecorded model calls while unchanged, and joined Auto routing/other live failures remain unverified."
+      "blocker": null
     },
     "SWARM-16": {
       "status": "partial",
