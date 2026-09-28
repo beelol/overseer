@@ -42,6 +42,23 @@ ChatGPT A); see [AC-60](verification/AC-60.md).
 Unsupported options are refused by the daemon with the reason, and the composer hides them for
 that harness. Images are stored in the run's folder (mode 0600), at most 4 per message, 5 MB each.
 
+## Voice Mode delivery (AC-167)
+
+How a spoken request reaches an agent in each of the three deliveries. Voice Mode uses Gate S's
+queue and redirect (AC-188), so the harness column is the same path the chat's steering uses.
+"Fixture" means the daemon's Voice Mode tests (`daemon/tests/voice.rs`) with the Claude fixture;
+"shared path" means the same daemon code, exercised for that harness by Gate S's tests and not
+separately by Voice Mode's.
+
+| Delivery | Claude Code | Codex (exec) | Codex (app-server) | OpenCode | OpenCode (server) | Generic |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Add**: waits for the end of the running turn; several additions become one message in the order spoken | ✅ queued, then the next turn (fixture: `ac167_additions_wait_and_arrive_as_one_message_a_redirect_stops_the_turn`) | ✅ shared path | ✅ shared path | ✅ shared path | ✅ shared path | a line to its input at once (the program reads it when it can; fixture) |
+| **Redirect**: the turn stops and the next starts with the message | ✅ control_request interrupt, then the queued message (fixture, same test) | ✅ SIGINT, then `exec resume` (shared path) | ✅ `turn/interrupt` (shared path) | ✅ SIGINT, then `--session` (shared path) | ✅ abort, then the prompt (shared path) | SIGINT; the message waits for the end of the turn |
+| **Stop**: at once, no message and no settle window | ✅ within 1 s (fixture: `ac167_stop_by_voice_interrupts_within_a_second`) | ✅ SIGINT (shared path) | ✅ `turn/interrupt` (shared path) | ✅ SIGINT (shared path) | ✅ abort (shared path) | ✅ SIGINT (fixture: built-in phrases) |
+
+An idle or waiting agent gets its message at once. The owner's setting (`voice.delivery`) can force
+*always add* or *always redirect* (fixture: `ac167_ac168_delivery_setting_and_new_agent_limits`).
+
 ## Environment and account rules enforced by the daemon
 
 - Harness processes get an allow-listed environment (HOME, USER, PATH, locale, TMPDIR, XDG

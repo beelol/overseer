@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key><string>com.beelol.overseer.listener</string>
+  <key>CFBundleName</key><string>Overseer</string>
+  <key>CFBundleDisplayName</key><string>Overseer</string>
+  <key>CFBundleExecutable</key><string>overseer-listener</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>LSMinimumSystemVersion</key><string>12.0</string>
+  <key>LSUIElement</key><true/>
+  <key>NSMicrophoneUsageDescription</key><string>Overseer listens so you can talk to it and your agents in Voice Mode. What you say is turned into words on this Mac; no sound is kept or sent anywhere.</string>
+  <key>NSHumanReadableCopyright</key><string>Overseer (MIT)</string>
+</dict>
+</plist>

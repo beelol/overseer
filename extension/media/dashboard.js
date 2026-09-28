@@ -75,6 +75,7 @@
       case 'changes': if (m.runId === selected) chat.changes(m.changes); break;
       case 'composerData': composer.data(m.data); break;
       case 'overseer': home.session(m.session); break;
+      case 'voice': home.voice(m.voice); grid.voiceTargets(m.targets || []); break;
       case 'overseerNotice': if (m.id) home.proposalStatus(m.id, m.message); else composer.notice({ message: m.message }); break;
       case 'askOverseer': setMode('composer'); composer.askOverseer(m.text || ''); break;
       case 'mentionFiles': if (m.scope === 'composer') composer.mentionFiles(m); else chat.mentionFiles(m); break;
