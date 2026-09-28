@@ -1,0 +1,8 @@
+$ node test/deploy/run.js   (commit beca0317)
+ok   deploy A: builds it in its own clone, installs it, starts the daemon, records it (24s)
+ok   with a run active and --no-wait it stops, says how many, and changes nothing (21s)
+ok   while a run is active it waits without restarting; when the run ends it installs B and restarts once (13s)
+ok   --rollback brings A back; data and logins intact; --status shows it (1s)
+ok   it refuses to run unattended without --yes (0s)
+ok   nothing is left running (0s)
+6 of 6 passed
