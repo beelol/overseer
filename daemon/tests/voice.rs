@@ -2620,20 +2620,27 @@ fn ac169_two_agents_in_flight_and_a_new_one_get_the_card_s_text_byte_for_byte() 
     for row in &rows {
         let run = row["run_id"].as_str().unwrap();
         let message = row["message"].as_str().unwrap();
-        let got: Vec<String> = if row["action"] == "start" {
-            // Its first turn: Gate S's briefing, then Overseer's message.
-            let prompt = env.d.call("run.turns", json!({"run_id": run}))[0]["prompt"]
-                .as_str()
-                .unwrap()
-                .to_string();
-            vec![prompt.rsplit("From Overseer: ").next().unwrap().to_string()]
-        } else {
-            env.d
-                .events(run)
-                .iter()
-                .filter(|e| e["kind"] == "queued" && e["source"] == "overseer")
-                .filter_map(|e| e["payload"]["text"].as_str().map(String::from))
-                .collect()
+        // "Sent" is the daemon's record; the agent's own event can land a moment later under load.
+        let deadline = Instant::now() + Duration::from_secs(15);
+        let got: Vec<String> = loop {
+            let got: Vec<String> = if row["action"] == "start" {
+                // Its first turn: Gate S's briefing, then Overseer's message.
+                env.d.call("run.turns", json!({"run_id": run}))[0]["prompt"]
+                    .as_str()
+                    .map(|p| vec![p.rsplit("From Overseer: ").next().unwrap().to_string()])
+                    .unwrap_or_default()
+            } else {
+                env.d
+                    .events(run)
+                    .iter()
+                    .filter(|e| e["kind"] == "queued" && e["source"] == "overseer")
+                    .filter_map(|e| e["payload"]["text"].as_str().map(String::from))
+                    .collect()
+            };
+            if !got.is_empty() || Instant::now() > deadline {
+                break got;
+            }
+            std::thread::sleep(Duration::from_millis(200));
         };
         assert_eq!(got.len(), 1, "{run}: {got:?}");
         assert_eq!(
