@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **135 / 204** · **43** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-64, AC-66, AC-83, AC-114, AC-115, AC-117, AC-120, AC-121, AC-122, AC-124, AC-125, AC-126, AC-128, AC-129, AC-130, AC-131, AC-132, AC-133, AC-135, AC-136, AC-137, AC-141, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-165, AC-166, AC-167, AC-168, AC-169, AC-170, AC-171, AC-172, AC-173, AC-174, AC-175, AC-176, AC-177, AC-178, AC-179, AC-182, AC-183, AC-185, AC-186, AC-187, AC-188, AC-189, AC-190, AC-191, AC-192, AC-193, AC-194, AC-195, AC-196, AC-197, AC-198, AC-199, AC-200, AC-201, AC-202, AC-204. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+criteria: **136 / 205** · **42** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-121, AC-122, AC-124, AC-125, AC-126, AC-128, AC-129, AC-130, AC-131, AC-132, AC-133, AC-135, AC-136, AC-137, AC-141, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-165, AC-166, AC-167, AC-168, AC-169, AC-170, AC-171, AC-172, AC-173, AC-174, AC-175, AC-176, AC-177, AC-178, AC-179, AC-182, AC-183, AC-185, AC-186, AC-187, AC-188, AC-189, AC-190, AC-191, AC-192, AC-193, AC-194, AC-195, AC-196, AC-197, AC-198, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), Voice Mode (Gate R, AC-162 to AC-177, added by the owner on 2026-09-27: a voice to talk to constantly that redirects every agent from context, answers quickly and shows every word it sent, with audio collected on the Rust side and the animated mark in the middle moving with the voice; [design](docs/rfcs/voice-mode.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -115,7 +115,7 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-80** Remembered place — [evidence](docs/verification/AC-80.md)
 - [x] **AC-81** Gate J still holds — [evidence](docs/verification/AC-81.md)
 - [x] **AC-82** Gate K design review (owner-confirmed) — [evidence](docs/verification/AC-82.md)
-- [ ] **AC-83** Offline is not an outage — ◐ partial: the daemon keeps one connection state decided from the system's own answer, the probes and the agents' errors, with every change an event; a provider outage gives degraded naming the provider, a failing baseline or the system's no-network gives offline, and a 429 or a usage limit leaves it online; on this machine the system's answer, both baseline probes and both providers are read live; the status bar and the side bar show each state in the packaged extension / deferred: macOS itself reporting a real Wi-Fi toggle (the system's own answer, which is simulated everywhere else); the owner will switch Wi-Fi off and on when no agents are in flight — [evidence](docs/verification/AC-83.md)
+- [x] **AC-83** Offline is not an outage — [evidence](docs/verification/AC-83.md)
 - [x] **AC-84** Fail over to the best working provider — [evidence](docs/verification/AC-84.md)
 - [x] **AC-85** Local inventory read from the machine — [evidence](docs/verification/AC-85.md)
 - [x] **AC-86** Memory budget and fit — [evidence](docs/verification/AC-86.md)
@@ -237,6 +237,7 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-202** Orchestration session (owner-confirmed) — not started (Gate S, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-202.md)
 - [x] **AC-203** Stalled work is taken over, and handed back — [evidence](docs/verification/AC-203.md)
 - [ ] **AC-204** Finished slices merge; the rest becomes criteria — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-204.md)
+- [ ] **AC-205** Offline on a real Wi-Fi toggle (owner step) — not started — [evidence](docs/verification/AC-205.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -398,7 +399,6 @@ the owner action or decision each one needs.
 - [ ] [AC-53](docs/verification/AC-53.md) (Fixed Claude accounts): Needs a second Claude account (the owner has one today); not to be tested yet (owner, 2026-09-25). Next: check whether Claude keeps a separate Keychain entry per CLAUDE_CONFIG_DIR, otherwise add Overseer-managed Claude credentials (docs/rfcs/claude-credentials.md); then Add Account → Anthropic → Sign In with it, Sign Out and Sign In again while a Claude run on the desktop login keeps working; confirm both identities and the macOS Keychain entries stay separate.
 - [ ] [AC-64](docs/verification/AC-64.md) (Default-to-Overseer session (owner-confirmed)): Owner action after the design review (AC-66): work for an hour using only Overseer for Claude Code and Codex; log friction.
 - [ ] [AC-66](docs/verification/AC-66.md) (Design review against references (owner-confirmed)): Waiting for the owner's marks. Next: read the marks from the page, change each marked item, republish the page and ask for confirmation.
-- [ ] [AC-83](docs/verification/AC-83.md) (Offline is not an outage): Owner, when no agents are in flight: run `node test/local/wifi-live.js`, switch Wi-Fi off when it asks and on again when it says Overseer is offline (about a minute). It writes `evidence/ac-83/`; then this record is updated.
 - [ ] [AC-114](docs/verification/AC-114.md) (Gate K in the owner's VS Code (owner-confirmed)): Not started (Gate K follow-up from the owner's marks on 2026-09-26).
 - [ ] [AC-115](docs/verification/AC-115.md) (Feasibility and reuse before lock-in): not blocked
 - [ ] [AC-117](docs/verification/AC-117.md) (Pairing needs the Mac): not blocked
@@ -463,6 +463,7 @@ the owner action or decision each one needs.
 - [ ] [AC-201](docs/verification/AC-201.md) (Regression coverage): The clean-clone run at the merge.
 - [ ] [AC-202](docs/verification/AC-202.md) (Orchestration session (owner-confirmed)): Not started (Gate S, added by the owner on 2026-09-27).
 - [ ] [AC-204](docs/verification/AC-204.md) (Finished slices merge; the rest becomes criteria): Not started (Gate Q, added by the owner on 2026-09-27).
+- [ ] [AC-205](docs/verification/AC-205.md) (Offline on a real Wi-Fi toggle (owner step)): Owner, when no agents are in flight: run `node test/local/wifi-live.js`, switch Wi-Fi off when it asks and on again when it says Overseer is offline (about a minute). It writes `evidence/ac-205/`; then this record is updated.
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.

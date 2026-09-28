@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// LIVE check of AC-83 that only the owner can run: Wi-Fi off and on again while a real `overseerd`
+// LIVE check of AC-205 (split from AC-83) that only the owner can run: Wi-Fi off and on again while a real `overseerd`
 // (its own OVERSEER_HOME, the real network, the real system answer and probes) watches. The
 // script never changes the network itself; it reads Wi-Fi power with `networksetup
 // -getairportpower` and the daemon's connection events, and measures the gap between them.
@@ -12,7 +12,7 @@
 //                                           (the script flips it; the probes are real, Wi-Fi is not
 //                                           touched): checks the script
 //
-// Writes docs/verification/evidence/ac-83/wifi.txt and wifi-events.jsonl (the rehearsal writes to
+// Writes docs/verification/evidence/ac-205/wifi.txt and wifi-events.jsonl (the rehearsal writes to
 // its temporary folder). Nothing of the user's is written; the daemon is stopped at the end.
 'use strict';
 const fs = require('fs');
@@ -25,7 +25,7 @@ const bin = process.env.OVERSEERD || path.join(root, 'target/debug/overseerd');
 const rehearse = process.argv.includes('rehearse');
 const watch = process.argv.includes('watch');
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ovs-wifi-'));
-const out = rehearse ? path.join(home, 'evidence') : path.join(root, 'docs/verification/evidence/ac-83');
+const out = rehearse ? path.join(home, 'evidence') : path.join(root, 'docs/verification/evidence/ac-205');
 const PATIENCE = Number(process.env.WIFI_PATIENCE_MIN || (watch ? 720 : 10)) * 60 * 1000;
 // Wi-Fi power is read once a second while waiting, so a measured gap may be up to this much short.
 const POLL = 1000;
