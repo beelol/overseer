@@ -1,0 +1,18 @@
+{
+  "ios": {
+    "at": "2026-09-28T11:26:19.080Z",
+    "agents.interactive.p95": 228.8,
+    "agents.interactive.p50": 220.1,
+    "door.opening.p50": 1009.2,
+    "javascript.loaded.p50": 27.2,
+    "door.dropped.share": 0
+  },
+  "android": {
+    "at": "2026-09-28T12:07:42.178Z",
+    "agents.interactive.p95": 318.5,
+    "agents.interactive.p50": 284.9,
+    "door.opening.p50": 1027.5,
+    "javascript.loaded.p50": 58,
+    "door.dropped.share": 0
+  }
+}
