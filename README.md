@@ -16,14 +16,15 @@ which is out of scope for now. The full list is under [Acceptance criteria](#acc
 Only the owner can do these (AC-160). Each is one step; the criterion it unblocks is in brackets. The everything goal (`docs/goals/everything.md`) keeps this list current.
 
 - Try the Gate K build in your own VS Code [AC-114].
-- Let the GitHub CLI push workflow files: `gh auth refresh -s workflow` (the checks for every pull request are written and waiting) [AC-148].
 - Say whether the Gate J design review still needs marks or the Gate K review replaces it [AC-66].
 - Work an hour using only Overseer [AC-64].
 - Mark the phone's door and motion on the [review page](https://claude.ai/artifact/FzD5ido4NdwX3annWoY9Uq): *Right* or *Needs work* for each [AC-136, AC-137].
+- When the live multi-account tests are ready (an agent will ask): sign your second Claude account (work) and your two OpenAI accounts into Overseer's Accounts view, one profile each [AC-53, Auto and Swarm accounts].
+- Decide seven Auto and Swarm questions (defaults are proposed; nothing live runs until you answer). For Claude calibration: whether `subscriptionType` stands for the plan, whether an `allowed` reading counts as an explicit allowance, strict run isolation or neighbouring readings, how fresh a reading must be. For a real Swarm: what qualifies a director (proposed: Claude with the daemon's Swarm tools, native Agent denied), how native workers report (proposed: the same tools), whether native workers may run in audit runs. In the Auto and Swarm RFCs on `claude/auto-swarm` [AUTO-AC-17, SWARM-01, S0].
 - Start Voice Mode: paste the goal in [voice-mode-goal.md](docs/rfcs/voice-mode-goal.md) into `/goal`. It builds everything it can with a simulated voice first, on top of Gate S's pull request #14, then sends you one list of live checks [Gate R, AC-162 to AC-177].
 - Later, when no agent is running: turn Wi-Fi off and on while `node test/local/wifi-live.js` runs; it tells you when [AC-205].
 - Run *Overseer: Test Notification* in VS Code, allow notifications when macOS asks, and screenshot the banner and the helper (Overseer Notifier) in Finder [AC-179].
-- Later: a second Claude account [AC-53]; a Linux machine [AC-41]; the owner-confirmed session of the phone app when its agent finishes [AC-133].
+- Later: a Linux machine [AC-41]; the owner-confirmed session of the phone app when its agent finishes [AC-133].
 
 ## Acceptance criteria
 
