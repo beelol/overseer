@@ -390,9 +390,29 @@ pub fn start(d: Arc<Daemon>) -> Result<()> {
             if !runtime.enabled.load(Ordering::Relaxed) {
                 continue;
             }
+            // Overseer needing the owner (a proposal that waits, a conflict that needs a decision)
+            // is one attention cue under the same one-per-need gate (AC-199, AC-143).
+            let needs_owner = (event.kind == "proposal" && event.payload["state"].as_str().unwrap_or("open") == "open")
+                || (event.kind == "conflict" && event.payload["needs_decision"] == true && event.payload["changed"] != true);
+            if needs_owner {
+                if burst.allow("agent_needs_attention", Instant::now()) {
+                    match selection(&d) {
+                        Ok(config) => {
+                            let _ = enqueue("agent_needs_attention", false, config);
+                        }
+                        Err(e) => crate::log(&format!("audio selection failed: {e}")),
+                    }
+                }
+                continue;
+            }
             let Some(run_id) = event.run_id.as_deref() else {
                 continue;
             };
+            // Overseer's own run and watchers make no sound (their wakes, check-ins and findings
+            // of fine are the daemon's business, not the owner's).
+            if matches!(d.run_role(run_id).as_str(), "overseer" | "watcher") {
+                continue;
+            }
             let is_root = d
                 .store
                 .lock()

@@ -21,6 +21,7 @@
     else if (m.type === 'raw') chat.raw(m.raw);
     else if (m.type === 'changes') chat.changes(m.changes);
     else if (m.type === 'mentionFiles') chat.mentionFiles(m);
+    else if (m.type === 'proposalStatus') chat.proposalStatus(m.id, m.text);
   });
   vscode.postMessage({ type: 'ready' });
 })();

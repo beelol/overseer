@@ -89,6 +89,37 @@ pub struct State {
     pub workspaces: Vec<Workspace>,
     #[serde(default)]
     pub profiles: Vec<Profile>,
+    /// Held, watched, watching, in conflict, per top-level run (Gate S, AC-199).
+    #[serde(default)]
+    pub oversight: Value,
+    /// Overseer's own summary: the level, what waits for the owner.
+    #[serde(default)]
+    pub overseer: Value,
+}
+
+impl State {
+    /// The oversight marks of a run, as short words: held, watched, watching, N conflicts.
+    pub fn marks(&self, run_id: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        // Shown once the owner has spoken to Overseer (its run exists), like the other surfaces.
+        if self.overseer["run_id"].is_null() {
+            return out;
+        }
+        let o = &self.oversight[run_id];
+        if o["held"] == true {
+            out.push("⏸ held".to_string());
+        }
+        if o["watched"] == true {
+            out.push("◉ watched".to_string());
+        }
+        if o["watching"].as_array().map(|w| !w.is_empty()).unwrap_or(false) {
+            out.push("◉ watching".to_string());
+        }
+        if let Some(n) = o["conflicts"].as_i64().filter(|n| *n > 0) {
+            out.push(format!("⚠ {n} conflict{}", if n == 1 { "" } else { "s" }));
+        }
+        out
+    }
 }
 
 impl State {

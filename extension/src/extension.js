@@ -96,6 +96,12 @@ async function activate(context) {
   function attention() {
     const archived = new Set(archivedTasks());
     const out = [];
+    // Overseer needs the owner (AC-199): proposals waiting for a yes, conflicts needing a decision.
+    const ov = model.state.overseer || {};
+    if (ov.run_id && (ov.open_proposals || ov.conflicts_needing_decision)) {
+      const parts = [ov.open_proposals && `${ov.open_proposals} proposal${ov.open_proposals === 1 ? '' : 's'}`, ov.conflicts_needing_decision && `${ov.conflicts_needing_decision} conflict${ov.conflicts_needing_decision === 1 ? '' : 's'}`].filter(Boolean);
+      out.push({ run_id: 'overseer', overseer: true, rank: 0, label: 'Decide', detail: `Overseer: ${parts.join(', ')} waiting for you` });
+    }
     // Only the 40 most recently finished runs are checked for unreviewed changes (large histories stay fast).
     const recent = new Set((model.state.runs || []).filter(r => !r.parent_run_id && r.status === 'completed').sort((a, b) => (b.ended_ms || b.created_ms) - (a.ended_ms || a.created_ms)).slice(0, 40).map(r => r.id));
     for (const r of (model.state.runs || []).filter(r => !r.parent_run_id)) {
