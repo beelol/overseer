@@ -116,3 +116,22 @@ Still (a), each needing a build rather than a test: SWARM-35 (reuse of a related
 Remaining by class (23): (b) SWARM-13, 17, 25, 26, 31; (c) SWARM-01, 27, 28, 39, 56, 63, 64 (D1; SWARM-63 also D2/D3; SWARM-64 through S0), SWARM-52 (D3, and per-harness enforcement live), SWARM-24 and 40 (D4, live calibration); (d) SWARM-18, 22, 23, 37; (a, build) SWARM-35, 44, 45, 60.
 
 Packaged VS Code scenarios owed later (d): unsaved editor buffers against a Swarm writer (SWARM-18); close and reopen VS Code around launch, acknowledgement and result receipt (SWARM-22); the full status matrix with measured usage (SWARM-23); the 100-job/32-worker view with account usage (SWARM-37); and, once D1 is decided, the normal launch surface for SWARM-01, 27, 28, 39, 56.
+
+## Results on 2026-09-28 (second session)
+
+The four class (a) items that needed a build are built and verified at fixture scope, which leaves no class (a) criterion: **45 of 64 verified**, 17 partial and 2 unverified.
+
+| Criterion | Built | Record |
+| --- | --- | --- |
+| SWARM-44 | One daemon claim ledger (`daemon/src/claims.rs`): Swarm jobs' claims and ordinary agents' areas (Gate S's `areas`) are checked in one store transaction by every writer, so a path has at most one exclusive owner; refusals are recorded once and told to the director's inbox and Overseer's conversation; `claims.ledger` | [SWARM-44](SWARM-44.md) (`d428889c`) |
+| SWARM-60 | One durable broker ledger (`daemon/src/broker.rs`, `broker_envelopes`) over Swarm's envelopes and ordinary agents' reports, asks and claims, with stable ids and separate delivery and application; Gate S's channel bounded at 32 KiB; a watcher's finding about a worker goes on to the director as a sourced advisory | [SWARM-60](SWARM-60.md) (`5ce8565e`) |
+| SWARM-45 | Findings with per-endpoint evidence, merging, budgeted independent reproducers (one per finding and per discovery), confirmation only by accepted reproduction | [SWARM-45](SWARM-45.md) (`60ddd55a`) |
+| SWARM-35 | Reuse of a valid related worker session at launch (same run, exited, same job or a dependency, not rejected or stale, same route, continued once); a fresh job carries only its brief | [SWARM-35](SWARM-35.md) (`83aaa7bf`) |
+
+Scenario gaps closed at fixture scope: S1's final report entries and coverage matrix as one artifact (`swarm.report.final`, `97215b95`); S3's conflicting-patch and shared-dependency-upgrade variants, with integration refusing shared changes the director has not assigned (`ddcf409f`); S5's ordinary agent and J2 claiming one path (`d428889c`). S1 keeps its literal evidence-file removal open, and its route choice waits on D3.
+
+Gate S's area changed in these commits, each saying so: the agent channel's claim, `agent.area` and a resolved conflict's `assign` ask the claim ledger; the channel marks broker phases and bounds bodies; a watcher's finding about a Swarm worker is forwarded to the director and checks in on the director; new methods are classified. `daemon/tests/overseer.rs` passed (24) after each Gate S change.
+
+Unchanged: the fixture gates, `swarm.native_director` (off), and the pending owner decisions D1, D3 and D4.
+
+Remaining by class (19): (b) SWARM-13, 17, 25, 26, 31; (c) SWARM-01, 27, 28, 39, 56, 63, 64 (D1; SWARM-63 also D2/D3; SWARM-64 through S0), SWARM-52 (D3, and per-harness enforcement live), SWARM-24 and 40 (D4, live calibration); (d) SWARM-18, 22, 23, 37.
