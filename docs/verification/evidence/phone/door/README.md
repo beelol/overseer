@@ -1,11 +1,25 @@
-# The door, as recorded so far
+# The door, recorded
 
-Recordings of the iOS simulator (iPhone 17 Pro, iOS 26.5) in debug builds, read frame by frame with ffmpeg (`fps=30` or `fps=20`, tiled):
+Release builds from a clean clone of the branch (commit 62d8fc0), on the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35, without a window), recorded by `phone/e2e/door.mjs` on 2026-09-27. The door opens in about 1 s: the owner found the first 600 ms too fast, and AC-136 on `main` says 1,000 ms within 60 ms.
 
-- `ios-debug-light-opening-frames.png`: the first door, light theme, 15 frames a second from 5.3 s after launch: the closed door, then the diagonal split with the mark splitting, the pairing screen underneath.
-- `ios-debug-dark-lit-and-app.png`: dark theme, 30 frames a second: the door with its gradient, seam light and plating lines lit, then the agents list. In this recording the opening itself was not drawn on screen: the first screen mounted at the same moment and held the animation back. The door now waits for the first screen to settle.
-- `ios-debug-dark-opening-frames.png`: dark theme after that change, 30 frames a second: the lit door, then the split (the light along the seam, the plating lines travelling with the halves), then the agents list.
-- The app's own record of one launch (debug build, dark): door shown 1,337 ms after the process started, first screen interactive 1,355 ms, opening 629 ms with 36 frames and 0 dropped, longest frame 16.7 ms; after the wait for the first screen: door shown 1,945 ms, opening started 2,063 ms, opening 634 ms, 36 frames, 0 dropped.
-- `ios-release-settings-dark.png`, `android-debug-agents-light.png`: two screens from the same evening.
+For each platform:
 
-`phone/e2e/door.mjs` records both simulators in release builds (dark, light, Reduce Motion, return from the background) and writes the contact sheets and timings here. It has not run yet: the simulators were taken by the takeover branch's runs.
+- `<platform>-cold-start-dark.mp4`, `-light.mp4`: a cold start in each theme, from the home screen to the agents list.
+- `<platform>-cold-start-reduce-motion.mp4`: a cold start with Reduce Motion on (iOS's setting; on Android the animation scales at 0). The door fades instead of splitting.
+- `<platform>-return-from-background.mp4`: back from the home screen; the app is not launched again and no door shows.
+- `<platform>-<recording>-frames.png`: every frame at 30 a second from the launch, four seconds, left to right. The recorder keeps a frame only when the screen changes, so it holds fewer frames than the display drew; the app's own count is in the timings.
+- `<platform>-<recording>-opening.png`: the frame most unlike both the closed door and the list, mid-opening (mid-fade with Reduce Motion), at full width.
+- `<platform>-timings.txt`: the app's own record of each launch: the marks, the opening's length, the frames it drew and dropped on the UI thread, and the longest frame.
+
+What the recordings show, as the app timed them:
+
+| Recording | iOS simulator | Android emulator |
+|---|---|---|
+| Dark | 1,022 ms, 61 frames, 0 dropped | 1,058 ms, 57 frames, 4 dropped |
+| Light | 1,011 ms, 59 frames, 0 dropped | 1,074 ms, 54 frames, 7 dropped |
+| Reduce Motion | a 209 ms fade, 12 frames, 0 dropped | a 240 ms fade, 10 frames, 2 dropped |
+| Back from the background | no launch, no door | no launch, no door |
+
+The emulator drew these while recording its own screen and while the Mac started the suites; its 20 measured launches are in `e2e/measure-android.log`. The display budget is the iPhone's (AC-135).
+
+Earlier: `ios-debug-light-opening-frames.png` and `ios-debug-dark-opening-frames.png` are the first recordings, of debug builds, from before the door waited for the first screen to settle.

@@ -46,8 +46,9 @@ const FROM_LAUNCH = (file) => ['-ss', String(LEAD_S), '-i', file];
 /**
  * The index, in frames at 30 a second from the launch, of the door mid-opening (mid-fade with
  * Reduce Motion), or null when the recorder kept no frame of it. The recorder repeats a frame
- * until the screen changes: the closed door is the longest still stretch, the list the longest
- * still stretch after it, and the opening the frames between them. The pick differs most from both.
+ * until the screen changes: the closed door is the longest still stretch before the last, the
+ * list the first lasting stretch after it, and the opening the frames between them. The pick
+ * differs most from both.
  */
 function midOpening(file) {
   const W = 40;
@@ -68,8 +69,10 @@ function midOpening(file) {
     else stretches.push({ start: i, end: i });
   }
   const longest = (list) => [...list].sort((a, b) => b.end - b.start - (a.end - a.start))[0];
-  const door = longest(stretches);
-  const list = door && longest(stretches.filter((t) => t.start > door.end));
+  // The recording ends on the list, however long it lasted; the closed door is the longest
+  // stretch before that, and the list first holds still for a sixth of a second after it.
+  const door = longest(stretches.slice(0, -1));
+  const list = door && (stretches.find((t) => t.start > door.end && t.end - t.start >= 5) ?? stretches.at(-1));
   if (!door || !list || list.start - door.end < 2) return null;
   let best = { index: null, score: 0 };
   for (let i = door.end + 1; i < list.start; i += 1) {
