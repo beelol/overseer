@@ -20,6 +20,7 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
     crate::audio::start(daemon.clone())?;
     crate::overseer::conflicts::start(daemon.clone());
     crate::overseer::session::start(daemon.clone());
+    crate::voice::start(daemon.clone());
     let path = paths::socket_path();
     if let Some(dir) = path.parent() {
         paths::ensure_private_dir(dir)?;
@@ -118,6 +119,11 @@ async fn connection_loop(
         }
         if method == "events.subscribe" {
             subscribe(daemon.clone(), id, params, tx.clone());
+            continue;
+        }
+        if method == "voice.subscribe" {
+            // Voice Mode's live channel: state, levels, words in progress. Never stored.
+            crate::voice::subscribe(id, tx.clone());
             continue;
         }
         if method == "hello" && (params["client"] == "vscode" || params["client"] == "tui") && !*ui {
@@ -223,6 +229,17 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "audio.preview" => crate::audio::preview(d, p)?,
         "audio.import_commander" => crate::audio::import_commander(d, p)?,
         "audio.voices" => crate::audio::voices()?,
+        "voice.get" => crate::voice::get(d)?,
+        "voice.set" => crate::voice::set(d, p)?,
+        "voice.say" => crate::voice::say(d, p)?,
+        "voice.simulate" => crate::voice::simulate(d, p)?,
+        "voice.speak" => crate::voice::speak(d, p)?,
+        "voice.focus" => crate::voice::focus(d, p)?,
+        "voice.download" => crate::voice::download(d, p)?,
+        "voice.requests" => crate::voice::request::list(d, p)?,
+        "voice.cancel" => crate::voice::request::cancel(d, p)?,
+        "voice.read_back" => crate::voice::request::read_back(d, p)?,
+        "voice.answer" => crate::voice::request::answer(d, p)?,
         "harness.list" => {
             let list: Vec<Value> = ["codex", "codex-app", "claude", "opencode", "opencode-serve", "generic"]
                 .iter()

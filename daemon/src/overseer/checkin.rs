@@ -251,6 +251,7 @@ impl Daemon {
             self.store.lock().unwrap().conn.execute("DELETE FROM check_in_queue", [])?;
             return Ok(());
         }
+        let _one_at_a_time = super::session::TURN_START.lock().unwrap_or_else(|e| e.into_inner());
         let busy = session["run_id"].as_str().and_then(|r| self.run(r).ok()).map(|r| ACTIVE.contains(&r.status.as_str())).unwrap_or(false);
         if busy {
             return Ok(());

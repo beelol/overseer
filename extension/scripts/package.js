@@ -18,6 +18,7 @@ const required = JSON.parse(fs.readFileSync(path.join(toolRoot, 'package.json'),
 if (installed.version !== required) { console.error(`Expected vsce ${required}; run npm ci --prefix extension/tooling/vsce --ignore-scripts.`); process.exit(1); }
 run(process.execPath, [path.join(root, 'branch-diff/scripts/build-review.js')], root);
 run(process.execPath, [path.join(root, 'notifier/build.js')], root);
+run(process.execPath, [path.join(root, 'listener/build.js')], root); // Voice Mode's listener (Gate R)
 run('cargo', ['build', '--release', '-p', 'overseerd'], repo);
 fs.mkdirSync(path.join(root, 'bin'), { recursive: true });
 const target = path.join(root, 'bin', `overseerd-${process.platform}-${process.arch}`);
