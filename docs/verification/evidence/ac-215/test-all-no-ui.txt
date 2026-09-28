@@ -1,0 +1,8 @@
+▶ Rust (cargo test --workspace) … FAILED (1134s) 392 passed, 1 failed
+▶ Unit (test/unit) … ok (13s) 9 of 9 passed
+▶ Check (extension sources) … ok (1s)
+▶ Links (README and ledger) … ok (0s) 759 links checked in 219 files; 0 broken
+▶ Dev daemons (test/dev) … ok (76s) 11 of 11 passed
+▶ Guided owner tests (test/dev/guided.js) … ok (2s) 7 of 7 passed
+5 of 6 passed; failed: Rust (cargo test --workspace)
+EXIT 1

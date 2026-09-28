@@ -1,0 +1,9 @@
+$ node test/dev/guided.js   (commit 83e49b01)
+ok   every owner-check file is valid and names existing criteria
+ok   voice-mode.json has the Voice Mode RFC's eight steps, with the same criteria
+ok   the fixture check: --start builds its dev daemon, a scratch repository and a fixture agent, and prints step 1
+ok   --record, --skip and --status walk the steps one at a time
+ok   --finish writes one evidence record with every answer and criterion, and cleans up
+ok   without a terminal and without a step flag it explains how an agent runs it
+ok   AGENTS.md tells agents to use it whenever the owner asks for an owner check
+7 of 7 passed

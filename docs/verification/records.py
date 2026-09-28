@@ -2292,9 +2292,17 @@ rec(211, "Agents learn it from the repository, and leave nothing running (stage 
 - After each test and the scenario, `pgrep` finds no process with the dev root path and the dev roots are gone. The scenario closes its VS Code and runs `clean --all`, then checks again.""",
     evidence="[stage 2 evidence](evidence/ac-206/README.md), [dev tests](evidence/ac-206/dev-tests.txt), [test-all](evidence/ac-206/test-all-jobs2.txt)",
     live="Fixture harnesses; no paid turns. The owner's daemon, VS Code, data and logins were never involved (temporary HOME and dev roots).")
-rec(215, "Guided owner tests in a dev daemon (stage 3)", "not started", date="—", commit="—",
+rec(215, "Guided owner tests in a dev daemon (stage 3)", "verified", commit="83e49b01 (branch claude/guided-tests, pull request #22)", date="2026-09-28",
+    steps="""1. `node test/dev/guided.js` (in `scripts/test-all`), with a temporary HOME and dev root: validates every `docs/owner-checks/*.json` against the RFC's criteria and `voice-mode.json` against the Voice Mode RFC's steps. It runs a fixture check through `--start --no-build`, `--record`, `--skip`, `--status`, `--record` and `--finish --evidence`, then checks the no-terminal message and AGENTS.md.
+2. The Voice Mode check's real preparation, once, by the agent: `scripts/dev test voice-mode --start` (a copy with the owner's logins off), a CDP read of the window, `--record` for step 1, `--skip` for 2 to 8, `--finish`.""",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md#stage-3--guided-owner-tests-ac-215).",
-    actual="Not started: added by the owner on 2026-09-27; stage 3, built on `claude/guided-tests` after stage 2 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
+    actual="""- **Data:** the owner-check files are valid, name criteria that exist, and each step's criteria belong to the check. `voice-mode.json` has the RFC's eight steps with the same criteria (AC-163, AC-163, AC-177, AC-164, AC-162, AC-163, AC-176).
+- **Runner:** `--start` built the fixture check's dev daemon (`dev-check-fixture`) with a scratch repository and a fixture agent working in it, and printed "Step 1 of 3: Look (AC-215)". A second start is refused. `--record` and `--skip` advance one step at a time and `--status` repeats the current one; once every step is recorded, a further `--record` is refused. `--finish` wrote `record.json` (every step with its status, text and criteria, the commit and the instance) and `record.md`, then removed the dev daemon's folder, leaving no process. Without a terminal and a step flag it says how an agent runs it.
+- **A real check:** Voice Mode's preparation built main into a dev daemon and opened the dev VS Code on the Overseer view with its stand-in agents, titled `[dev-check-voice-mode] scratch` ([screenshot](evidence/ac-215/voice-mode-step1.png), [record](evidence/ac-215/voice-mode-dry-run/record.md)). The owner's VS Code was untouched, and `--finish` cleaned up.
+- **AGENTS.md** tells agents to run `scripts/dev test <check>` whenever the owner asks for an owner check.""",
+    evidence="[evidence](evidence/ac-215/README.md), [guided test](evidence/ac-215/guided-test.txt), pull request #22",
+    live="Fixture harnesses; the Voice Mode dry run used no login and no paid turn. The owner's own run of the Voice Mode check is Gate R's (AC-162 to AC-164, AC-176, AC-177).",
+    limits="Voice Mode's is the only owner check so far; other gates add theirs as data.")
 rec(214, "Deploy: the one path from dev to production (stage 4)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate T) and [the side RFC](../rfcs/dev-instance.md).",
     actual="Not started: added by the owner on 2026-09-27; stage 4, built on `claude/deploy` after stage 3 merges.", live="—", blocker="Not started (Gate T, added by the owner on 2026-09-27).")
@@ -2442,7 +2450,7 @@ SHORT_BLOCKERS = {
     210: "not started: after PR #10 (the phone app and the gateway)",
     211: "verified",
     214: "not started (Gate T, added by the owner on 2026-09-27)",
-    215: "not started (Gate T, added by the owner on 2026-09-27)",
+    215: "verified",
 }
 TOTAL = 53
 
