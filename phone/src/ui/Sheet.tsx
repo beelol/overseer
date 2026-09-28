@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { Modal, Pressable, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,10 +28,12 @@ export interface SheetProps {
   readonly title?: string;
   readonly message?: string;
   readonly children: ReactNode;
+  /** Called once the sheet is gone from the screen (iOS says so when its modal is dismissed). */
+  readonly onDismissed?: () => void;
 }
 
 /** A sheet from the bottom, within reach of a thumb: a menu, a choice, a question asked once. */
-export function Sheet({ testID, open, onClose, title, message, children }: SheetProps) {
+export function Sheet({ testID, open, onClose, title, message, children, onDismissed }: SheetProps) {
   const styles = useStyles();
   const theme = useTheme();
   const motion = useMotion();
@@ -47,7 +49,7 @@ export function Sheet({ testID, open, onClose, title, message, children }: Sheet
   const sheet = useAnimatedStyle(() => ({ opacity: Math.min(1, shown.value * 2), transform: [{ translateY: (1 - shown.value) * distance }] }));
   const scrim = useAnimatedStyle(() => ({ opacity: shown.value }));
   return (
-    <Modal visible={open} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent supportedOrientations={['portrait', 'landscape']}>
+    <Modal visible={open} transparent animationType="none" onRequestClose={onClose} {...(onDismissed ? { onDismiss: onDismissed } : {})} statusBarTranslucent supportedOrientations={['portrait', 'landscape']}>
       <View style={styles.fill} accessibilityViewIsModal>
         <Animated.View style={[styles.scrim, scrim]}>
           <Pressable testID={`${testID}.close`} accessibilityLabel="Dismiss" accessibilityRole="button" style={styles.fill} onPress={onClose} />
@@ -80,6 +82,11 @@ export interface MenuItem {
   readonly icon?: IconName;
   /** True for what cannot be undone. */
   readonly danger?: boolean;
+  /**
+   * True for an item that shows a screen of the system (the photo picker, the camera): it runs
+   * once the sheet is gone, since closing the sheet's modal would take that screen down with it.
+   */
+  readonly afterClose?: boolean;
   readonly onPress: () => void;
 }
 
@@ -89,8 +96,22 @@ export interface MenuProps extends Omit<SheetProps, 'children'> {
 
 /** A sheet of actions. Choosing one closes it. Test ids are `<sheet>.<item id>`. */
 export function Menu({ items, ...sheet }: MenuProps) {
+  const theme = useTheme();
+  const pending = useRef<(() => void) | null>(null);
+  const runPending = useCallback(() => {
+    const run = pending.current;
+    pending.current = null;
+    run?.();
+  }, []);
+  // Where the platform does not say the modal is gone, a sheet's time to open is ample for it to close.
+  const { open } = sheet;
+  useEffect(() => {
+    if (open || pending.current === null) return;
+    const timer = setTimeout(runPending, theme.phone.motion.sheet.open);
+    return () => clearTimeout(timer);
+  }, [open, runPending, theme]);
   return (
-    <Sheet {...sheet}>
+    <Sheet {...sheet} onDismissed={runPending}>
       {items.map((item, index) => (
         <Row
           key={item.id}
@@ -102,6 +123,11 @@ export function Menu({ items, ...sheet }: MenuProps) {
           divided={index > 0}
           right={<View />}
           onPress={() => {
+            if (item.afterClose) {
+              pending.current = item.onPress;
+              sheet.onClose();
+              return;
+            }
             sheet.onClose();
             item.onPress();
           }}

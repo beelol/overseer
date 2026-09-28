@@ -7,6 +7,7 @@ import { ConversationScreen } from '@/screens/ConversationScreen';
 import { rowId } from '@/screens/conversation/ids';
 import { after, answerHistory, frames, idsOf, keepOutbox, patience, measured, recording, rootOf, wordsOf, type Recording } from '@/screens/conversation/testing';
 import { createTestApp, makeEvent, type TestApp } from '@/testing';
+import { phone } from '@/theme/tokens.generated';
 import { router } from '@/testing/router';
 
 jest.mock('expo-router', () => require('@/testing/router').mockRouter());
@@ -339,6 +340,8 @@ describe('an image', () => {
     await fireEvent.press(screen.getByTestId('agent.composer.attach'));
     await act(async () => undefined);
     await fireEvent.press(screen.getByTestId('agent.composer.attach.library'));
+    // The picker is a screen of the system: it opens once the sheet is gone.
+    await act(() => new Promise((resolve) => setTimeout(resolve, phone.motion.sheet.open + 20)));
     await frames();
   };
 

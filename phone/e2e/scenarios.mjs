@@ -242,6 +242,44 @@ export const scenarios = [
     },
   },
   {
+    name: 'image',
+    criteria: ['AC-125'],
+    says: "an image chosen in the system's photo picker reaches the Claude fixture as an image block",
+    async run(c) {
+      const id = c.runs.showcase;
+      await c.until('the agent being idle', () => !ACTIVE.includes(run(c, id).status));
+      c.lab.mode('echo');
+      c.dev.addPhoto(path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'docs', 'design', 'brand', 'overseer-app-icon.png'));
+      const message = `what is in this picture ${Date.now() % 100000}`;
+      await c.flow('send-image', { RUN: id, MESSAGE: message });
+      await c.until('the message reaching the agent', () => c.lab.call('run.turns', { run_id: id }).some((t) => t.prompt === message), 60_000);
+      // What the daemon wrote to the fixture's input for that turn: the image as a content block.
+      const workspace = c.lab.call('state').workspaces.find((w) => w.id === run(c, id).workspace_id);
+      const log = path.join(c.lab.info().home, 'stdin', `${path.basename(workspace.path)}.log`);
+      const block = await c.until('the image block in what the fixture read', () => {
+        if (!fs.existsSync(log)) return null;
+        for (const line of fs.readFileSync(log, 'utf8').split('\n').filter(Boolean)) {
+          let parsed;
+          try {
+            parsed = JSON.parse(line);
+          } catch {
+            continue;
+          }
+          const content = parsed?.message?.content;
+          if (!Array.isArray(content) || !content.some((b) => b?.type === 'text' && String(b.text).includes(message))) continue;
+          const image = content.find((b) => b?.type === 'image');
+          if (image) return image;
+        }
+        return null;
+      }, 30_000);
+      const bytes = Buffer.from(block.source?.data ?? '', 'base64');
+      expect(block.source?.type === 'base64' && block.source?.media_type === 'image/jpeg', `the image block is ${JSON.stringify({ ...block, source: { ...block.source, data: undefined } })}`);
+      expect(bytes[0] === 0xff && bytes[1] === 0xd8, 'the image block does not hold a JPEG');
+      c.log.say(`  the fixture read an image block: image/jpeg, ${bytes.length} bytes, with the message's text`);
+      return { mime: block.source.media_type, bytes: bytes.length };
+    },
+  },
+  {
     name: 'review',
     criteria: ['AC-126'],
     says: "an agent's changed files, a file's hunks, and a hunk marked reviewed",

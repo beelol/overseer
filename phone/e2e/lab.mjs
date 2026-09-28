@@ -91,8 +91,10 @@ function envFor(home) {
     OVERSEER_CLAUDE_PATH: FIXTURE,
     OVERSEER_CODEX_PATH: '/nonexistent/harness-disabled-in-tests',
     OVERSEER_OPENCODE_PATH: '/nonexistent/harness-disabled-in-tests',
-    OVERSEER_HARNESS_ENV_PASSTHROUGH: 'CLAUDE_FIXTURE_MODE_FILE,FIXTURE_SLOW_MS',
+    OVERSEER_HARNESS_ENV_PASSTHROUGH: 'CLAUDE_FIXTURE_MODE_FILE,FIXTURE_SLOW_MS,FIXTURE_STDIN_LOG_DIR',
     CLAUDE_FIXTURE_MODE_FILE: path.join(home, 'fixture-mode'),
+    // Every line the daemon sends a fixture agent, by worktree: what a message from the phone became.
+    FIXTURE_STDIN_LOG_DIR: path.join(home, 'stdin'),
     FIXTURE_SLOW_MS: process.env.FIXTURE_SLOW_MS || '400',
   };
 }
@@ -122,6 +124,7 @@ async function start(args) {
   await until('the daemon', () => call(socket, 'hello'));
   const status = await call(socket, 'gateway.enable', { port });
   if (status.enabled !== true) throw new Error('phone access did not turn on');
+  fs.mkdirSync(path.join(home, 'stdin'), { recursive: true });
   const repo = makeRepo(home);
   const state = { home, socket, port, repo, pid: child.pid, code: null, runs: {} };
 

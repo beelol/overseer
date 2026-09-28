@@ -155,8 +155,8 @@ export const Composer = memo(function Composer({ runId, header, model, choices, 
 
   const attachItems = useMemo<readonly MenuItem[]>(
     () => [
-      { id: 'library', label: WORDS.chooseImage, icon: 'file-media', onPress: () => void attach('library') },
-      ...(hasCamera ? [{ id: 'camera', label: WORDS.takePhoto, detail: WORDS.takePhotoDetail, icon: 'device-camera', onPress: () => void attach('camera') } satisfies MenuItem] : []),
+      { id: 'library', label: WORDS.chooseImage, icon: 'file-media', afterClose: true, onPress: () => void attach('library') },
+      ...(hasCamera ? [{ id: 'camera', label: WORDS.takePhoto, detail: WORDS.takePhotoDetail, icon: 'device-camera', afterClose: true, onPress: () => void attach('camera') } satisfies MenuItem] : []),
     ],
     [attach, hasCamera],
   );

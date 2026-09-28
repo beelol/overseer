@@ -68,6 +68,8 @@ function ios() {
       simctl('spawn', udid, 'notifyutil', '-p', 'com.apple.BiometricKit.enrollmentChanged');
     },
     unlockMatch: () => void simctl('spawn', udid, 'notifyutil', '-p', 'com.apple.BiometricKit_Sim.pearl.match'),
+    /** A photo in the simulator's library, for the photo picker. */
+    addPhoto: (file) => void simctl('addmedia', udid, file),
     /** Everything the app keeps on disk, copied to `dest`: more than a backup of the app carries. */
     appFiles: (dest) => void execFileSync('cp', ['-R', `${simctl('get_app_container', udid, BUNDLE, 'data')}/.`, dest]),
     /** The app's items in this simulator's keychain: their access group and accessibility class. */
@@ -142,6 +144,11 @@ function android() {
     // typed by the flow into the system's prompt, and cleared afterwards.
     unlockSetUp: () => void shell(`locksettings set-pin ${PIN}`),
     unlockMatch: () => undefined,
+    /** A photo in the emulator's library, for the photo picker. */
+    addPhoto: (file) => {
+      adb('-s', serial, 'push', file, '/sdcard/Pictures/overseer-photo.png');
+      shell('am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Pictures/overseer-photo.png');
+    },
     /** Everything the app keeps on disk, copied to `dest` as root: more than a backup of the app carries. */
     appFiles: (dest) => {
       const tar = execFileSync(ADB, ['-s', serial, 'exec-out', `tar -C /data/data/${BUNDLE} -cf - .`], { maxBuffer: 512 * 1024 * 1024 });
