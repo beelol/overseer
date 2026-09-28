@@ -52,13 +52,13 @@
       "blocker": "A copied durable database replays the same Swarm job admission and blocked reason, and renaming only a provider label does not change eligibility for a fixture-supplied target. Auto Mode live target ranking and one shared ordinary/Auto/Swarm allowance transaction are not yet integrated, so whole-route replay remains unverified."
     },
     "SWARM-05": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_benefit.rs",
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/SWARM-05.md"
       ],
-      "blocker": "Fixture benefit decisions account for two worker waves when three jobs share two app slots, choose serial when the extra wave removes the gain, and refill completed slots. Current occupancy from other tasks, actual native usage and phase costs, undeclared-resource independence, live calibrated estimates and shared Auto Mode quota input remain absent."
+      "blocker": null
     },
     "SWARM-06": {
       "status": "verified",
