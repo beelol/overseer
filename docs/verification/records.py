@@ -2181,6 +2181,14 @@ rec(201, "Regression coverage", "partial", commit="d09978a (branch claude/orches
 rec(202, "Orchestration session (owner-confirmed)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate S).",
     actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(203, "Stalled work is taken over, and handed back", "verified", commit="6abf8d71", date="2026-09-27", harness="none (repository and pull-request records)",
+    steps="Gate N: the phone agent had no commit for 3+ hours after the push request on pull request #10; the monitor said so on the pull request, branched `claude/phone-takeover` from its pushed head `bb6ffad`, merged main, fixed and pushed; when the agent resumed it merged that branch (`c22ce427`) and the tracker handed Gate N back (`a7791fdd`). Auto and Swarm: the owner stopped both agents on 2026-09-27; the monitor branched `claude/auto-swarm` from Auto's pushed head `e77245c1`, kept Auto's uncommitted wrapper as a patch, applied it, formatted it and ran its tests (4 booking tests, 207 daemon unit tests) before committing `6abf8d71`; both handoffs are summarised in the RFCs' handover sections and the tracker names the new owner.",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Both takeovers followed the rule: no push to another agent's branch, uncommitted work kept and tested before use, the tracker current, and one hand-back when the agent resumed.",
+    evidence="[takeovers](evidence/ac-203/takeovers.md), [Auto RFC handover](../rfcs/auto-mode.md#handover-and-build-order-2026-09-27), [Swarm RFC handover](../rfcs/swarm-mode.md#handover-and-build-order-2026-09-27), [tracker](tracker.md)", live="—")
+rec(204, "Finished slices merge; the rest becomes criteria", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started: the first slice is expected to be the shared account booking from the Auto and Swarm work.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
 
 SHORT_BLOCKERS = {
     154: "verified",
@@ -2315,6 +2323,7 @@ SHORT_BLOCKERS = {
     200: "partial: the fixtures pass and the review is written (pull request #14); a second reviewer is the owner's call",
     201: "partial: the gate's tests and scenarios are in the suites and pass with the new behaviour off and on (pull request #14); the clean-clone run waits for the merge",
     202: "not started (Gate S, added by the owner on 2026-09-27)",
+    204: "not started (Gate Q, added by the owner on 2026-09-27)",
 }
 TOTAL = 53
 
