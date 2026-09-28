@@ -78,3 +78,13 @@ Still partial: the draws in these tests are fixture draws on fixture readings (n
 route candidates come from recorded identity and readings, not a fresh metadata read at dispatch
 (the booking rechecks the generation); only Claude workers exist; Gate S's turn-cap replay with an
 approved Swarm director is not implemented.
+
+## Status on 2026-09-28 (`claude/auto-swarm`)
+
+Still partial, now for one reason that fixtures cannot close. Covered at fixture scope this session:
+
+- One admission authority for ordinary, Overseer-started and Swarm work: `ordinary_auto_swarm_and_booked_starts_race_for_the_last_slot_and_one_wins`, `calibrated_auto_units_and_a_swarm_worker_race_for_the_last_window`, `a_second_profile_of_the_same_subscription_races_for_the_same_last_window` (see [SWARM-08](SWARM-08.md)); an agent Overseer starts is refused by the same count (`a_full_house_refuses_overseer_started_agents_but_not_overseers_own_run`, see [SWARM-07](SWARM-07.md)).
+- Changed eligibility between routing and launch: the booking rechecks the account generation and the category allocation in its own transaction; route decisions replay from their recorded input (`each_route_decision_replays_to_the_same_route_and_reason`, see [SWARM-04](SWARM-04.md)); a newer observation fences an older admission snapshot (`newer_allowance_observation_fences_stale_admission_snapshot`); an expired snapshot is refused (`startup_does_not_launch_an_admitted_worker_from_an_expired_snapshot`).
+- Gate S cannot bypass the transaction: Overseer acts on a swarm only through the swarm's controls (`overseer_controls_a_swarm_only_through_its_controls_and_confirms_what_commits_more`) and cannot steer a worker (`overseer_actions_aimed_at_a_swarm_worker_are_refused_and_offered_to_the_director`).
+
+The gap: "its turns are metered to that allocation". The proposed native director runs unbooked because its `swarm/director` upper draw is not qualified (a Claude account cannot calibrate its draw from product readings today), so its turns are not metered against the run's allocation, with or without Gate S's 100-turn cap. Closing it needs a qualified director draw: a live calibration on the owner's Claude account and the owner's decision on how Claude draws are calibrated (the RFC's D4 note). Class: (b) and (c, D4). The turn-cap replay itself (director continuing while Overseer is capped) is fixture-provable once the metering exists.

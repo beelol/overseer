@@ -336,9 +336,10 @@
         "docs/verification/swarm/CONTRACT-05.md",
         "daemon/src/upper_draw.rs",
         "daemon/tests/swarm_native.rs",
-        "daemon/src/swarm/route.rs"
+        "daemon/src/swarm/route.rs",
+        "daemon/tests/swarm_gate_s.rs"
       ],
-      "blocker": "Auto's selector now chooses each job's route within the approved pool (daemon/src/swarm/route.rs): Auto's eligibility, the booking's fit against account headroom and the category's remaining allocation, and Auto's task-aware ranking; the director states requirements only and a named account is refused. Admission books through Auto's shared booking with the category allocation and the qualified or fixture draw. Still partial: the tests' draws and readings are fixture values, route candidates come from recorded identity and readings (no fresh metadata read at dispatch), only Claude workers exist, and Gate S's turn cap has not been replayed alongside an approved Swarm director."
+      "blocker": "Covered at fixture scope except metering: the native director runs unbooked (its swarm/director draw is not qualified), so its turns are not metered to the run's allocation, with or without Gate S's 100-turn cap. Needs a qualified director draw (live calibration on the owner's Claude account; RFC note D4)."
     },
     "SWARM-25": {
       "status": "unverified",
@@ -802,9 +803,11 @@
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
         "docs/verification/swarm/milestone-1.md",
-        "docs/verification/swarm/SWARM-60.md"
+        "docs/verification/swarm/SWARM-60.md",
+        "daemon/tests/swarm_gate_s.rs",
+        "daemon/src/overseer/session.rs"
       ],
-      "blocker": "Worker discoveries reach a durable director inbox and fixture director advisories reach only selected peers with applied receipts. Worker-inbox reads now require the recipient's attempt token, so a peer cannot read a targeted directive using its attempt ID alone. Live peer delivery, automatic relevance selection and artifact permissions are not implemented."
+      "blocker": "Overseer's worker-directed actions are refused and its advice reaches the director's inbox as an advisory (866b0a58). Not built: one broker and one claim ledger shared by ordinary agents (Gate S agent_messages/areas) and Swarm; no joined watcher-finding test."
     },
     "SWARM-61": {
       "status": "verified",
