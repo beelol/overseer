@@ -872,9 +872,19 @@ fn qualified_draw_prices_a_booked_start_after_five_isolated_runs() {
     assert_eq!(amounts, vec![3_000]);
     assert_eq!(provenance["bucket"]["task_class"], "agent");
     assert_eq!(active_slots(&d), 1, "its slot is the start's own, not a second one");
+    // Two booked ordinary starts share the account while it has headroom.
+    let second = plain(&d, "medium", "alongside");
+    let (second_unit, _, _) = bound(&d, &second).expect("a second start books beside the first");
     d.wait_status(&automatic, |status| !HOLDING.contains(&status), 30);
+    d.wait_status(&second, |status| !HOLDING.contains(&status), 30);
     assert_eq!(intent(&d, &work_unit).4.as_deref(), Some("settled"));
+    assert_eq!(intent(&d, &second_unit).4.as_deref(), Some("settled"));
     assert_eq!(active_slots(&d), 0);
+    // Their draws stay committed until a later reading, but a settled booking
+    // has no process and never refuses the next ordinary start.
+    let after = plain(&d, "high", "after");
+    assert_eq!(bound(&d, &after), None);
+    d.wait_status(&after, |status| !HOLDING.contains(&status), 30);
 }
 
 /// (draw_source, provenance, per-window amounts) of a booking.

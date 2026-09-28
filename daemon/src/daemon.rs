@@ -861,16 +861,18 @@ impl Daemon {
             (Some(profile), None, None) => Some(profile.id.clone()),
             _ => None,
         };
-        if let Some(profile_id) = unbooked_profile {
-            if self.store.lock().unwrap().auto_claim_conflicts_with_run(&profile_id, "")? {
+        if let Some(profile_id) = &unbooked_profile {
+            // An ordinary agent start (not Swarm, not an Auto parent, not the
+            // daemon's own Overseer or watcher run) tries the one booking,
+            // which itself counts live known-window bookings on the account.
+            let can_book = swarm_identity.is_none() && !auto_routing && harness != "generic"
+                && p.get("role").is_none_or(Value::is_null);
+            if self.store.lock().unwrap().auto_claim_conflicts(profile_id, "", !can_book)? {
                 bail!("{MANUAL_POOL_CONFLICT}");
             }
-            // An ordinary agent start (not Swarm, not an Auto parent, not the
-            // daemon's own Overseer or watcher run) tries the one booking.
-            if swarm_identity.is_none() && !auto_routing && harness != "generic"
-                && p.get("role").is_none_or(Value::is_null) {
+            if can_book {
                 let store = self.store.lock().unwrap();
-                shared_start = Some(SharedStart::automatic(&store, p, harness, &profile_id)?);
+                shared_start = Some(SharedStart::automatic(&store, p, harness, profile_id)?);
             }
         }
         let target_ref = p["target_ref"].as_str().filter(|s| !s.is_empty()).map(str::to_string);
@@ -919,7 +921,13 @@ impl Daemon {
             }
         }
         if shared_start.as_ref().is_some_and(|start| start.automatic) && unbound_launch.is_none() {
+            // Unbooked, as before: a live booking on the account refuses it.
             shared_start = None;
+            if let Some(profile_id) = &unbooked_profile {
+                if self.store.lock().unwrap().auto_claim_conflicts_with_run(profile_id, "")? {
+                    bail!("{MANUAL_POOL_CONFLICT}");
+                }
+            }
         }
         let (ws, fork_commit, fork_prov) = match mode {
             "worktree" => {

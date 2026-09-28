@@ -1277,6 +1277,15 @@ impl Store {
     /// an Auto launch. A selected Auto root owns its own claim, and a parent
     /// may coordinate the child it explicitly admitted under its budget.
     pub fn auto_claim_conflicts_with_run(&self, profile_id: &str, run_id: &str) -> Result<bool> {
+        self.auto_claim_conflicts(profile_id, run_id, true)
+    }
+
+    /// As `auto_claim_conflicts_with_run`. A settled shared booking whose
+    /// commitment is only retained until the next reading has no process and
+    /// never conflicts. With `include_bookings` false, live known-window
+    /// bookings are left to the caller's own booking, which counts them.
+    pub fn auto_claim_conflicts(&self, profile_id: &str, run_id: &str,
+        include_bookings: bool) -> Result<bool> {
         // A run bound to an unsettled shared launch was admitted by that
         // booking; its own and other known-window claims are already counted.
         if self.shared_launch_bound_unsettled(run_id)? { return Ok(false); }
@@ -1288,8 +1297,10 @@ impl Store {
                   AND NOT EXISTS(SELECT 1 FROM auto_root_intents i
                     WHERE i.work_unit_id=c.work_unit_id AND i.run_id=?2)
                   AND NOT EXISTS(SELECT 1 FROM auto_launch_intents i
-                    WHERE i.work_unit_id=c.work_unit_id AND i.parent_run_id=?2))",
-            params![pool_id, run_id], |row| row.get(0))?)
+                    WHERE i.work_unit_id=c.work_unit_id AND i.parent_run_id=?2)
+                  AND NOT EXISTS(SELECT 1 FROM shared_booking_intents b
+                    WHERE b.work_unit_id=c.work_unit_id AND (b.settled_ms IS NOT NULL OR ?3=0)))",
+            params![pool_id, run_id, include_bookings], |row| row.get(0))?)
     }
 
     /// Recognize active manual or automatic runs on another profile with a
