@@ -179,6 +179,9 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
         if unapplied_directive {
             bail!("unapplied directive blocks acceptance");
         }
+        if broker::withdrawn_discovery_unretracted(&store.conn, run, &attempt)? {
+            bail!("a withdrawn discovery has not been retracted to this attempt");
+        }
         let unresolved_conflict: bool = store.conn.prepare(
             "SELECT 1 FROM swarm_conflicts WHERE run_id=?1 AND status!='resolved'
              AND (left_job_id=?2 OR right_job_id=?2)",

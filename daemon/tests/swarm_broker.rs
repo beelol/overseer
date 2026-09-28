@@ -1010,3 +1010,85 @@ fn duplicated_delayed_and_reordered_messages_have_one_effect_each() {
         ('unknown-1','forged-1','cross-1','stale-gen')", [], |r| r.get(0)).unwrap();
     assert_eq!(n, 0);
 }
+
+/// SWARM-46 (S1's D1 retraction): once the director withdraws a discovery,
+/// every attempt that was told of it must apply the correction before its
+/// work counts. D1 was routed to J1 and J4. The director retracts D1 to J4
+/// only: J1 cannot be accepted (the omission is caught, not silently used)
+/// until the retraction also reaches J1 and J1 applies it. An accepted J6
+/// that was told of D1 before the retraction blocks completion the same way.
+/// J3, never told of D1, is unaffected.
+#[test]
+fn a_withdrawn_discovery_must_be_retracted_to_every_prior_recipient() {
+    let d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Retraction","objective":"Audit tenant isolation",
+        "allowed_targets":["fixture"]}));
+    let id = run["id"].as_str().unwrap().to_string();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"j1","title":"Projects","acceptance":"evidence","deps":[]},
+        {"id":"j2","title":"Tasks","acceptance":"evidence","deps":[]},
+        {"id":"j3","title":"Membership","acceptance":"evidence","deps":[]},
+        {"id":"j4","title":"Attachments","acceptance":"evidence","deps":[]},
+        {"id":"j6","title":"Tokens","acceptance":"evidence","deps":[]}]}));
+    let mut attempts = std::collections::BTreeMap::new();
+    for job in ["j1","j2","j3","j4","j6"] {
+        attempts.insert(job, d.call("swarm.attempt.register", json!({"run_id":id,"generation":1,"revision":1,"job_id":job})));
+    }
+    let a = |job: &str| attempts[job].clone();
+    d.call("swarm.report", json!({"run_id":id,"job_id":"j2","attempt_id":a("j2")["id"],"token":a("j2")["token"],
+        "message_id":"D1","type":"discovery","revision":1,"payload":{"symbol":"TaskRepository.findById"}}));
+    let direct = |job: &str, message: &str, kind: &str| d.call("swarm.direct", json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":job,"attempt_id":a(job)["id"],"message_id":message,"type":kind,
+        "payload":{"discovery_id":"D1","note":"see the shared task lookup"}}));
+    let ack = |job: &str, message: &str, phase: &str| d.call("swarm.ack", json!({"run_id":id,"message_id":message,
+        "recipient":a(job)["id"],"token":a(job)["token"],"phase":phase,"revision":1}));
+    let finish = |job: &str| {
+        d.call("swarm.artifact.put", json!({"run_id":id,"job_id":job,"attempt_id":a(job)["id"],"token":a(job)["token"],
+            "artifact_id":format!("{job}-proof"),"source_revision":1,"kind":"finding","content":format!("{job} checked")}));
+        d.call("swarm.report", json!({"run_id":id,"job_id":job,"attempt_id":a(job)["id"],"token":a(job)["token"],
+            "message_id":format!("{job}-result"),"type":"result","revision":1,"payload":{"artifact_ids":[format!("{job}-proof")]}}));
+    };
+    let accept = |job: &str| d.try_call("swarm.decide", json!({"run_id":id,"generation":1,"revision":1,"job_id":job,
+        "decision":"accept","evidence":[format!("{job}-proof")]}));
+    for job in ["j1","j4","j6"] {
+        direct(job, &format!("D1-to-{job}"), "advisory");
+        ack(job, &format!("D1-to-{job}"), "delivered");
+        ack(job, &format!("D1-to-{job}"), "applied");
+    }
+    // J6 is accepted while D1 still stands.
+    finish("j6");
+    assert_eq!(accept("j6").unwrap()["status"], "accepted");
+    // The director withdraws D1, but tells only J4.
+    direct("j4", "retract-D1-j4", "retract");
+    ack("j4", "retract-D1-j4", "delivered");
+    ack("j4", "retract-D1-j4", "applied");
+    finish("j1");
+    let silent = accept("j1").unwrap_err();
+    assert!(silent.contains("withdrawn discovery"), "J1 would silently use D1: {silent}");
+    direct("j1", "retract-D1-j1", "retract");
+    ack("j1", "retract-D1-j1", "delivered");
+    assert!(accept("j1").unwrap_err().contains("unapplied directive"));
+    ack("j1", "retract-D1-j1", "applied");
+    assert_eq!(accept("j1").unwrap()["status"], "accepted");
+    for job in ["j2","j3","j4"] { finish(job); assert_eq!(accept(job).unwrap()["status"], "accepted", "{job}"); }
+    for (job, attempt) in &attempts {
+        d.call("swarm.attempt.confirm_exit", json!({"run_id":id,"generation":1,"revision":1,
+            "job_id":job,"attempt_id":attempt["id"]}));
+    }
+    let inbox = d.call("swarm.messages", json!({"run_id":id,"recipient":"director"}));
+    for m in inbox["messages"].as_array().unwrap() {
+        d.call("swarm.ack", json!({"run_id":id,"message_id":m["message_id"],"recipient":"director",
+            "generation":1,"revision":m["revision"],"phase":"applied"}));
+    }
+    // Attempts registered directly (no admission) leave the run in `planning`;
+    // completion needs `running`, as in the integration fixtures.
+    rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap()
+        .execute("UPDATE swarm_runs SET status='running' WHERE id=?1", [&id]).unwrap();
+    let checks: Vec<serde_json::Value> = ["j1","j2","j3","j4","j6"].iter()
+        .map(|j| json!({"job_id":j,"outcome":"passed","evidence":[format!("{j}-proof")]})).collect();
+    let complete = |request: &str| d.try_call("swarm.complete", json!({"run_id":id,"generation":1,"revision":1,
+        "request_id":request,"summary":"audit","verification":"fixture checks","checks":checks}));
+    let blocked = complete("complete-1").unwrap_err();
+    assert!(blocked.contains("withdrawn discovery"), "J6 was accepted on D1 and never told: {blocked}");
+    assert_ne!(d.call("swarm.get", json!({"id":id}))["status"], "completed");
+}

@@ -30,6 +30,24 @@ pub(super) fn check_attempt(
     Ok(revision)
 }
 
+/// Whether this attempt was told of a discovery the director has since withdrawn
+/// (a retraction naming the same `discovery_id` went to anyone) and has not itself
+/// applied a retraction of it. Its work may rest on the withdrawn conclusion, so it
+/// cannot be accepted or counted toward completion (SWARM-46).
+pub(super) fn withdrawn_discovery_unretracted(conn: &rusqlite::Connection, run: &str, attempt: &str) -> Result<bool> {
+    Ok(conn.prepare(
+        "SELECT 1 FROM swarm_messages adv
+         WHERE adv.run_id=?1 AND adv.recipient=?2 AND adv.sender='director' AND adv.kind='advisory'
+           AND json_extract(adv.payload,'$.discovery_id') IS NOT NULL
+           AND EXISTS (SELECT 1 FROM swarm_messages r WHERE r.run_id=adv.run_id
+               AND r.sender='director' AND r.kind='retract'
+               AND json_extract(r.payload,'$.discovery_id')=json_extract(adv.payload,'$.discovery_id'))
+           AND NOT EXISTS (SELECT 1 FROM swarm_messages own WHERE own.run_id=adv.run_id
+               AND own.recipient=?2 AND own.sender='director' AND own.kind='retract' AND own.phase='applied'
+               AND json_extract(own.payload,'$.discovery_id')=json_extract(adv.payload,'$.discovery_id'))",
+    )?.exists(params![run, attempt])?)
+}
+
 pub fn register(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
     super::owner::require(store,run,p)?;

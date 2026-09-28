@@ -215,6 +215,9 @@ pub fn complete(store: &mut Store, p: &Value) -> Result<Value> {
         if unapplied_directive {
             bail!("unapplied directive blocks completion");
         }
+        if super::broker::withdrawn_discovery_unretracted(&tx, run, &attempt)? {
+            bail!("accepted work rests on a withdrawn discovery that was not retracted to it");
+        }
         let mut results = tx.prepare(
             "SELECT payload FROM swarm_messages WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3 AND revision=?4 AND kind='result'",
         )?;
