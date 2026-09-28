@@ -29,13 +29,25 @@ concurrency:
 
 jobs:
   testflight:
-    runs-on: macos-15
+    # The app's Swift packages need Swift 6.2 (Xcode 26 or later); macos-15's default Xcode 16.4
+    # has Swift 6.1 and fails to resolve them.
+    runs-on: macos-26
     timeout-minutes: 60
     defaults:
       run:
         working-directory: phone
     steps:
       - uses: actions/checkout@v4
+
+      - name: Select Xcode 26 or later
+        run: |
+          xcode=$(ls -d /Applications/Xcode_2[6-9]*.app 2>/dev/null | grep -v -i beta | sort -V | tail -1)
+          if [ -z "$xcode" ]; then
+            echo "::error::No Xcode 26 or later on this runner (the app needs Swift 6.2). Installed: $(ls -d /Applications/Xcode*.app | tr '\n' ' ')"
+            exit 1
+          fi
+          sudo xcode-select -s "$xcode/Contents/Developer"
+          xcodebuild -version
 
       - name: Check required secrets
         env:
