@@ -301,6 +301,10 @@ fn t19_a_new_waiting_agent_rings_and_shows_in_the_window_title() {
     assert_eq!(tui.app.window_title(), "Overseer · 1 needs you · 2 active");
     let s = tui.screen();
     assert!(s.contains("◆ Asks permission needs you — press w"), "{s}");
+    // Its events arrived before the TUI knew its workspace; once it does, the paths shorten.
+    tui.until(10, |a| a.feeds.get(&asks).is_some_and(|f| f.root.is_some() && f.items().any(|i| i.text.contains("perm.txt")) && !f.items().any(|i| i.text.contains("/worktrees/"))));
+    let s = tui.screen();
+    assert!(s.contains("perm.txt") && !s.contains("worktrees/") && !s.contains("/private/var/"), "{s}");
     tui.key(KeyCode::Char('w'));
     assert_eq!(tui.app.focus.as_deref(), Some(asks.as_str()));
 
