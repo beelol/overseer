@@ -1,0 +1,405 @@
+{
+  "checks": [
+    {
+      "name": "a large diff is shared as a patch file and as a branch and commit",
+      "ok": true,
+      "detail": {
+        "branch": "overseer/share/sh-6ac6cb12c638",
+        "bytes": 106082,
+        "commit": "9bb9e1e1f2abe820d2ffa1a5d10a3284b97e67f4",
+        "file": "/private/tmp/ovs-ui-1IhI94/overseer-home/runs/r-9c52162e358f/shares/sh-6ac6cb12c638.patch",
+        "from": "r-c7347aa33e16",
+        "id": "sh-6ac6cb12c638",
+        "inline_bytes": 8086,
+        "kind": "diff",
+        "proposal": "p-5d581c41bfd4",
+        "source": "from Big change (diff)",
+        "to": "r-9c52162e358f",
+        "ts": 1790604502556,
+        "withdrawn_ms": null
+      }
+    },
+    {
+      "name": "the share's card has a row for the agent with its delivery, state and times",
+      "ok": true,
+      "detail": [
+        {
+          "action": "share",
+          "answered_ms": 1790604502626,
+          "delivered_ms": 1790604502556,
+          "delivery": "add",
+          "held_ms": 1790604502556,
+          "id": "d-d820401a4dca",
+          "message": "from Big change (diff): 106082 bytes",
+          "picked_ms": null,
+          "run_id": "r-9c52162e358f",
+          "sent_ms": 1790604502556,
+          "state": "answered",
+          "title": "Reader",
+          "turn_id": null,
+          "why": "named"
+        }
+      ]
+    },
+    {
+      "name": "the daemon's one state says held, watched and watching",
+      "ok": true,
+      "detail": {
+        "sessions": {
+          "area": [],
+          "conflicts": 0,
+          "held": true,
+          "hold_reason": "wait for the review",
+          "needs_decision": false,
+          "role": "agent",
+          "watched": false,
+          "watchers": [],
+          "watching": []
+        },
+        "build": {
+          "area": [],
+          "conflicts": 0,
+          "held": false,
+          "hold_reason": null,
+          "needs_decision": false,
+          "role": "agent",
+          "watched": true,
+          "watchers": [
+            "r-db4bb0ee958a"
+          ],
+          "watching": []
+        },
+        "reviewer": {
+          "area": [],
+          "conflicts": 0,
+          "held": false,
+          "hold_reason": null,
+          "needs_decision": false,
+          "role": "agent",
+          "watched": false,
+          "watchers": [],
+          "watching": [
+            "r-0e614d7681e2"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Overseer: the side bar marks the held, the watched and the watching agent, and lists no run of Overseer's own",
+      "ok": true,
+      "detail": [
+        [
+          "Needs you",
+          "2"
+        ],
+        [
+          "Overseer",
+          "Decide"
+        ],
+        [
+          "Big change",
+          "Review"
+        ],
+        [
+          "oversight-repo",
+          "2"
+        ],
+        [
+          "Sessions",
+          "⏸ held"
+        ],
+        [
+          "Docs build",
+          "◉ watched"
+        ],
+        [
+          "Reader",
+          "now"
+        ],
+        [
+          "Big change",
+          "now"
+        ],
+        [
+          "Reviewer",
+          "now · ◉ watching"
+        ]
+      ]
+    },
+    {
+      "name": "Overseer: the held agent's chat says it is held and why",
+      "ok": true
+    },
+    {
+      "name": "Overseer: the grid's tiles show held and watched",
+      "ok": true,
+      "detail": [
+        {
+          "title": "Docs build",
+          "held": false,
+          "watched": true,
+          "marks": "watched"
+        },
+        {
+          "title": "Sessions",
+          "held": true,
+          "watched": false,
+          "marks": "held"
+        }
+      ]
+    },
+    {
+      "name": "Overseer: the watcher's chat shows the watch and its finding",
+      "ok": true,
+      "detail": [
+        "Watched: the tests stay in place",
+        "Reviewer: concern — it sounds unsure about the tests"
+      ]
+    },
+    {
+      "name": "Overseer: the receiving agent's chat shows the share and its withdrawal",
+      "ok": true,
+      "detail": [
+        "Overseer shared from Big change (diff)",
+        "A share was withdrawn"
+      ]
+    },
+    {
+      "name": "Overseer: home shows the watch, the finding, the withdrawal and the share's card with its row",
+      "ok": true,
+      "detail": {
+        "kinds": [
+          "started",
+          "started",
+          "started",
+          "watch",
+          "finding",
+          "started",
+          "started",
+          "withdrawn"
+        ],
+        "rows": [
+          "Reader named · add answered 07:08:22 AM"
+        ]
+      }
+    },
+    {
+      "name": "Overseer Dark: the side bar marks the held, the watched and the watching agent, and lists no run of Overseer's own",
+      "ok": true,
+      "detail": [
+        [
+          "Needs you",
+          "2"
+        ],
+        [
+          "Overseer",
+          "Decide"
+        ],
+        [
+          "Big change",
+          "Review"
+        ],
+        [
+          "oversight-repo",
+          "2"
+        ],
+        [
+          "Sessions",
+          "⏸ held"
+        ],
+        [
+          "Docs build",
+          "◉ watched"
+        ],
+        [
+          "Reader",
+          "now"
+        ],
+        [
+          "Big change",
+          "now"
+        ],
+        [
+          "Reviewer",
+          "now · ◉ watching"
+        ]
+      ]
+    },
+    {
+      "name": "Overseer Dark: the held agent's chat says it is held and why",
+      "ok": true
+    },
+    {
+      "name": "Overseer Dark: the grid's tiles show held and watched",
+      "ok": true,
+      "detail": [
+        {
+          "title": "Docs build",
+          "held": false,
+          "watched": true,
+          "marks": "watched"
+        },
+        {
+          "title": "Sessions",
+          "held": true,
+          "watched": false,
+          "marks": "held"
+        }
+      ]
+    },
+    {
+      "name": "Overseer Dark: the watcher's chat shows the watch and its finding",
+      "ok": true,
+      "detail": [
+        "Watched: the tests stay in place",
+        "Reviewer: concern — it sounds unsure about the tests"
+      ]
+    },
+    {
+      "name": "Overseer Dark: the receiving agent's chat shows the share and its withdrawal",
+      "ok": true,
+      "detail": [
+        "Overseer shared from Big change (diff)",
+        "A share was withdrawn"
+      ]
+    },
+    {
+      "name": "Overseer Dark: home shows the watch, the finding, the withdrawal and the share's card with its row",
+      "ok": true,
+      "detail": {
+        "kinds": [
+          "started",
+          "started",
+          "started",
+          "watch",
+          "finding",
+          "started",
+          "started",
+          "withdrawn"
+        ],
+        "rows": [
+          "Reader named · add answered 07:08:22 AM"
+        ]
+      }
+    },
+    {
+      "name": "Overseer Light: the side bar marks the held, the watched and the watching agent, and lists no run of Overseer's own",
+      "ok": true,
+      "detail": [
+        [
+          "Needs you",
+          "2"
+        ],
+        [
+          "Overseer",
+          "Decide"
+        ],
+        [
+          "Big change",
+          "Review"
+        ],
+        [
+          "oversight-repo",
+          "2"
+        ],
+        [
+          "Sessions",
+          "⏸ held"
+        ],
+        [
+          "Docs build",
+          "◉ watched"
+        ],
+        [
+          "Reader",
+          "now"
+        ],
+        [
+          "Big change",
+          "now"
+        ],
+        [
+          "Reviewer",
+          "now · ◉ watching"
+        ]
+      ]
+    },
+    {
+      "name": "Overseer Light: the held agent's chat says it is held and why",
+      "ok": true
+    },
+    {
+      "name": "Overseer Light: the grid's tiles show held and watched",
+      "ok": true,
+      "detail": [
+        {
+          "title": "Docs build",
+          "held": false,
+          "watched": true,
+          "marks": "watched"
+        },
+        {
+          "title": "Sessions",
+          "held": true,
+          "watched": false,
+          "marks": "held"
+        }
+      ]
+    },
+    {
+      "name": "Overseer Light: the watcher's chat shows the watch and its finding",
+      "ok": true,
+      "detail": [
+        "Watched: the tests stay in place",
+        "Reviewer: concern — it sounds unsure about the tests"
+      ]
+    },
+    {
+      "name": "Overseer Light: the receiving agent's chat shows the share and its withdrawal",
+      "ok": true,
+      "detail": [
+        "Overseer shared from Big change (diff)",
+        "A share was withdrawn"
+      ]
+    },
+    {
+      "name": "Overseer Light: home shows the watch, the finding, the withdrawal and the share's card with its row",
+      "ok": true,
+      "detail": {
+        "kinds": [
+          "started",
+          "started",
+          "started",
+          "watch",
+          "finding",
+          "started",
+          "started",
+          "withdrawn"
+        ],
+        "rows": [
+          "Reader named · add answered 07:08:22 AM"
+        ]
+      }
+    }
+  ],
+  "screenshots": [
+    "held-chat-overseer",
+    "grid-overseer",
+    "watched-chat-overseer",
+    "watcher-chat-overseer",
+    "share-chat-overseer",
+    "home-cards-overseer",
+    "held-chat-overseer-dark",
+    "grid-overseer-dark",
+    "watched-chat-overseer-dark",
+    "watcher-chat-overseer-dark",
+    "share-chat-overseer-dark",
+    "home-cards-overseer-dark",
+    "held-chat-overseer-light",
+    "grid-overseer-light",
+    "watched-chat-overseer-light",
+    "watcher-chat-overseer-light",
+    "share-chat-overseer-light",
+    "home-cards-overseer-light"
+  ]
+}

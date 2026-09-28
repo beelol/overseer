@@ -184,10 +184,20 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     // overflow, no unbroken run over 80 characters, every icon-only control named, and home's text
     // at least 40% under the baseline's new-agent view (1,037 characters).
     await goHome(); await delay(800);
+    // The theme through the user's settings (VS Code applies it at once; the picker's filter can
+    // fall through to the Marketplace); light or dark is read back from the workbench.
+    const setTheme = async theme => {
+      const bg = `getComputedStyle(document.querySelector('.part.activitybar') || document.body).backgroundColor`;
+      const before = await cdp.evalWorkbench(bg);
+      s.settings({ 'workbench.colorTheme': theme, 'overseer.followNewRuns': false });
+      const want = /Light/.test(theme) ? 'vs' : 'vs-dark';
+      await cdp.waitFor(`(() => { const w = document.querySelector('.monaco-workbench'); return !!w && w.classList.contains(${JSON.stringify(want)}) && ${bg} !== ${JSON.stringify(before)}; })()`, 20000, 'theme ' + theme);
+      await delay(1500);
+    };
     const setWidth = async w => { await cdp.call('Emulation.setDeviceMetricsOverride', { width: w, height: 900, deviceScaleFactor: 0, mobile: false }, cdp.workbench); await delay(1500); };
     result.textBudget = {};
     for (const theme of ['Overseer', 'Overseer Dark', 'Overseer Light']) {
-      if (theme !== 'Overseer') { await cdp.command('Preferences: Color Theme'); await delay(800); await cdp.type(theme); await delay(600); await cdp.key('Enter'); await delay(1500); }
+      if (theme !== 'Overseer') await setTheme(theme);
       for (const w of [1280, 900]) {
         await setWidth(w);
         const a = await home.eval(auditExpression({ root: 'body' }));

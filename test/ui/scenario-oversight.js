@@ -68,7 +68,16 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const state = s.ctl('state');
     check('the daemon\'s one state says held, watched and watching', state.oversight[sessions]?.held && state.oversight[build]?.watched && (state.oversight[reviewer]?.watching || []).includes(build), { sessions: state.oversight[sessions], build: state.oversight[build], reviewer: state.oversight[reviewer] });
 
-    const setTheme = async theme => { await cdp.command('Preferences: Color Theme'); await delay(800); await cdp.type(theme); await delay(600); await cdp.key('Enter'); await delay(1500); };
+    // The theme through the user's settings (VS Code applies it at once; the picker's filter can
+    // fall through to the Marketplace); the change is read back from the workbench.
+    const setTheme = async theme => {
+      const bg = `getComputedStyle(document.querySelector('.part.activitybar') || document.body).backgroundColor`;
+      const before = await cdp.evalWorkbench(bg);
+      s.settings({ 'workbench.colorTheme': theme, 'overseer.followNewRuns': false });
+      const want = /Light/.test(theme) ? 'vs' : 'vs-dark';
+      await cdp.waitFor(`(() => { const w = document.querySelector('.monaco-workbench'); return !!w && w.classList.contains(${JSON.stringify(want)}) && ${bg} !== ${JSON.stringify(before)}; })()`, 20000, 'theme ' + theme);
+      await delay(1500);
+    };
     for (const theme of ['Overseer', 'Overseer Dark', 'Overseer Light']) {
       if (theme !== 'Overseer') await setTheme(theme);
       const t = theme.toLowerCase().replace(/\s+/g, '-');
@@ -76,7 +85,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
       await s.openOverseerView(); await delay(1200);
       const rows = await s.agentRows();
       const desc = title => (rows.find(r => r.label === title) || {}).description || '';
-      check(`${theme}: the side bar marks the held, the watched and the watching agent`, /held/.test(desc('Sessions')) && /watched/.test(desc('Docs build')) && /watching/.test(desc('Reviewer')), rows.map(r => [r.label, r.description]));
+      check(`${theme}: the side bar marks the held, the watched and the watching agent, and lists no run of Overseer's own`, /held/.test(desc('Sessions')) && /watched/.test(desc('Docs build')) && /watching/.test(desc('Reviewer')) && !rows.some(r => r.label === 'Talk to Overseer'), rows.map(r => [r.label, r.description]));
       // The held agent's chat.
       await s.selectAgent('Sessions', { settle: 2000 });
       let view = await s.editorView(`[...document.querySelectorAll('#conv .sys.oversight')].some(e => /Held by Overseer/.test(e.textContent))`);
