@@ -95,31 +95,33 @@ export function Door({ ready, onShown, onOpened }: DoorProps) {
   const calm = useSharedValue(0);
   const waited = useSharedValue(0);
   const period = useSharedValue(0);
+  const startedAt = useSharedValue(0); // the frame the opening started on, UI thread's clock
   const timing = motion.reduced ? motion.timing(tokens.fade) : { duration: tokens.open, easing: motion.ease };
   const longest = tokens.fade;
 
   const finish = useCallback(() => {
-    // The opening, as the UI thread drew it: how long it took and every frame it missed.
-    perf.end('door.opening');
+    // The opening, as the UI thread drew it: from the frame it started on to its last frame, and
+    // every frame it missed. Timed there, not by the app's logic, which may hear of either late.
     const drawn = frames.stop();
+    const { last } = frames.span();
+    perf.record('door.opening', last - startedAt.get());
     perf.record('door.frames', drawn.frames);
     perf.record('door.dropped', drawn.dropped);
     perf.record('door.longestFrame', drawn.longest);
-    // The opening as the display showed it: from its first frame to its last, on the UI thread.
-    const { first, last } = frames.span();
-    perf.record('door.moving', last - first);
     // Where in the opening each late frame came, and how late: what held the UI thread then.
     frames.stalls().forEach((stall, i) => {
       perf.record(`door.stall.${i + 1}.at`, stall.at);
       perf.record(`door.stall.${i + 1}.ms`, stall.ms);
     });
     onOpened();
-  }, [frames, onOpened]);
+  }, [frames, onOpened, startedAt]);
 
   const began = useCallback(
-    (wait: number) => {
-      perf.mark('door.opening');
-      perf.begin('door.opening');
+    (at: number, wait: number) => {
+      // When it started on the display. Frame times share the clock of `performance.now()`;
+      // should a platform's not, the moment the app's logic heard of it stands in.
+      const now = performance.now();
+      perf.markAt('door.opening', Math.abs(now - at) < 1_000 ? at : now);
       perf.record('door.waited', wait);
       haptics.play('impact');
     },
@@ -147,9 +149,10 @@ export function Door({ ready, onShown, onOpened }: DoorProps) {
     calm.value = between <= period.value * 1.5 ? calm.value + 1 : 0;
     if (calm.value < 3 && waited.value < longest) return;
     armed.value = false;
+    startedAt.set(info.timestamp);
     counting.set(true);
     open.value = withTiming(1, timing, done);
-    runOnJS(began)(Math.round(waited.value));
+    runOnJS(began)(info.timestamp, Math.round(waited.value));
   }, false);
 
   useEffect(() => {

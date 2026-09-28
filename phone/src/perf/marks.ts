@@ -49,6 +49,16 @@ export class Perf {
     this.changed();
   }
 
+  /**
+   * A moment that happened at `at`, on the clock of `now` (the UI thread's frame times share it),
+   * rather than when the app's logic hears of it. Only the first of a name is kept.
+   */
+  markAt(name: string, at: number): void {
+    if (this.marks.has(name)) return;
+    this.marks.set(name, at - this.origin());
+    this.changed();
+  }
+
   /** The start of something timed. A second `begin` of the same name starts it again. */
   begin(name: string): void {
     this.open.set(name, this.now());
