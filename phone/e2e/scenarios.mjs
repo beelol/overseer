@@ -933,12 +933,14 @@ export const scenarios = [
       const y = Math.round((Number(bounds[2]) + Number(bounds[4])) / 2);
       c.log.say(`  Accept is at ${x}, ${y}`);
       const tally = {};
+      const tries = Number(process.env.OVERSEER_TAP_TRIES) || 12;
       for (const wait of [0, 1200, 3000]) {
         tally[wait] = { marked: 0, lost: 0 };
-        for (let i = 1; i <= 12; i += 1) {
+        for (let i = 1; i <= tries; i += 1) {
           clear();
           await c.flow('open-file', { RUN: found.run, FILE: found.file });
           if (wait > 0) await c.sleep(wait);
+          const cursor = c.lab.call('state').cursor;
           execFileSync(adb, ['-s', c.dev.id, 'shell', 'input', 'tap', String(x), String(y)]);
           let landed = false;
           const until = Date.now() + 5000;
@@ -949,12 +951,97 @@ export const scenarios = [
             }
             await c.sleep(200);
           }
+          // What the phone asked of the Mac: accept, unaccept (the button showed a remembered mark) or nothing.
+          const sent = c.lab.call('events.list', { after: cursor, limit: 500 }).events.filter((e) => e.kind === 'remote_command' && String(e.payload.method).startsWith('review.')).map((e) => e.payload.method);
           tally[wait][landed ? 'marked' : 'lost'] += 1;
-          c.log.say(`  a tap ${wait} ms after the hunks showed, try ${i}: ${landed ? 'marked' : 'LOST'}`);
+          tally[wait].sent = [...(tally[wait].sent ?? []), sent.join('+') || 'nothing'];
+          c.log.say(`  a tap ${wait} ms after the hunks showed, try ${i}: ${landed ? 'marked' : 'LOST'}; the phone sent ${sent.join(', ') || 'nothing'}`);
         }
       }
       clear();
       c.log.say(`  taps by adb: ${Object.entries(tally).map(([w, t]) => `${w} ms after: ${t.marked} marked, ${t.lost} lost`).join('; ')}`);
+      return tally;
+    },
+  },
+  {
+    // The same question with no Maestro between the opening and the tap: adb opens the file from the
+    // changes list and taps Accept a set time later. Run only when named (`--only pair,tap-open`).
+    name: 'tap-open',
+    optIn: true,
+    criteria: ['AC-126'],
+    says: 'experiment: the file opened by adb from the changes list, Accept tapped by adb 300, 600, 1000 and 2000 ms later: is any tap lost?',
+    platforms: ['android'],
+    skipped: 'an experiment for the Android emulator',
+    async run(c) {
+      const state = c.lab.call('state');
+      let found = null;
+      for (const r of state.runs.filter((x) => !x.parent_run_id)) {
+        const changes = c.lab.call('workspace.changes', { workspace_id: r.workspace_id });
+        if (changes.files > 0) {
+          found = { run: r.id, file: changes.names[0] };
+          break;
+        }
+      }
+      expect(found, 'no fixture agent has changed a file');
+      const adb = (...args) => execFileSync(path.join(process.env.ANDROID_HOME || '/opt/homebrew/share/android-commandlinetools', 'platform-tools', 'adb'), ['-s', c.dev.id, ...args]);
+      const tap = ([x, y]) => adb('shell', 'input', 'tap', String(x), String(y));
+      const where = (id) => {
+        const tree = execFileSync('maestro', ['--udid', c.dev.id, 'hierarchy'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: { ...process.env, MAESTRO_CLI_NO_ANALYTICS: '1' } });
+        const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const m = tree.match(new RegExp(`"resource-id"\\s*:\\s*"${escaped}"[\\s\\S]*?"bounds"\\s*:\\s*"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"`));
+        expect(m, `${id} was not found on the screen`);
+        return [Math.round((Number(m[1]) + Number(m[3])) / 2), Math.round((Number(m[2]) + Number(m[4])) / 2)];
+      };
+      const marked = () => c.lab.call('review.marks', { run_id: found.run }).keys.length;
+      const clear = () => {
+        for (const key of c.lab.call('review.marks', { run_id: found.run }).keys) c.lab.call('review.unaccept', { run_id: found.run, key });
+      };
+      clear();
+      await c.flow('open-changes', { RUN: found.run, FILE: found.file });
+      await c.sleep(3000);
+      const row = where(`changes.row.${found.file}`);
+      tap(row);
+      await c.sleep(3000);
+      const accept = where('file.hunk.accept');
+      adb('shell', 'input', 'keyevent', '4');
+      await c.sleep(2000);
+      c.log.say(`  the row is at ${row.join(', ')}, Accept at ${accept.join(', ')}`);
+      const shots = path.join(c.out, c.platform, 'tap-open');
+      fs.mkdirSync(shots, { recursive: true });
+      const tally = {};
+      for (const wait of [300, 600, 1000, 2000]) {
+        tally[wait] = { marked: 0, lost: 0 };
+        for (let i = 1; i <= 10; i += 1) {
+          clear();
+          await c.sleep(1500);
+          const cursor = c.lab.call('state').cursor;
+          tap(row);
+          await c.sleep(wait);
+          tap(accept);
+          // What the screen showed just after the tap, for a tap that is lost.
+          const shot = adb('exec-out', 'screencap', '-p');
+          let landed = false;
+          const until = Date.now() + 5000;
+          while (Date.now() < until) {
+            if (marked() > 0) {
+              landed = true;
+              break;
+            }
+            await c.sleep(200);
+          }
+          // What the phone asked of the Mac after the tap: accept, unaccept (the button still showed a
+          // remembered mark) or nothing (the tap never reached the button).
+          const sent = c.lab.call('events.list', { after: cursor, limit: 500 }).events.filter((e) => e.kind === 'remote_command' && String(e.payload.method).startsWith('review.')).map((e) => e.payload.method);
+          if (!landed) fs.writeFileSync(path.join(shots, `lost-${wait}ms-${i}.png`), shot);
+          tally[wait][landed ? 'marked' : 'lost'] += 1;
+          tally[wait].sent = [...(tally[wait].sent ?? []), sent.join('+') || 'nothing'];
+          c.log.say(`  opened by adb, Accept tapped ${wait} ms later, try ${i}: ${landed ? 'marked' : 'LOST'}; the phone sent ${sent.join(', ') || 'nothing'}`);
+          adb('shell', 'input', 'keyevent', '4');
+          await c.sleep(1500);
+        }
+      }
+      clear();
+      c.log.say(`  opened and tapped by adb: ${Object.entries(tally).map(([w, t]) => `${w} ms after: ${t.marked} marked, ${t.lost} lost`).join('; ')}`);
       return tally;
     },
   },
