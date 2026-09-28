@@ -421,11 +421,21 @@ pub fn worker_brief(store: &Store, p: &Value) -> Result<Value> {
     let claims: Value = serde_json::from_str(&claims)?;
     let attempt = required(p, "attempt_id")?;
     let mut budget_stmt = store.conn.prepare(
+        // A fixture (generic) worker's budget is its Swarm reservation; an
+        // account worker's is its shared booking's windows, in thousandths of
+        // a reported percentage point, against the category's allocation.
         "SELECT r.pool_id,r.window_id,r.unit,a.allocation_milli,a.reserve_milli,
                 r.amount_milli,r.status
          FROM swarm_reservations r JOIN swarm_allocations a
            ON a.run_id=r.run_id AND a.pool_id=r.pool_id AND a.window_id=r.window_id
-         WHERE r.run_id=?1 AND r.attempt_id=?2 ORDER BY r.pool_id,r.window_id"
+         WHERE r.run_id=?1 AND r.attempt_id=?2
+         UNION ALL
+         SELECT w.pool_id,w.window_key,a.unit,a.allocation_milli,a.reserve_milli,w.amount_milli,
+                CASE c.state WHEN 'released' THEN 'reconciled' ELSE c.state END
+         FROM shared_booking_windows w JOIN auto_pool_claims c ON c.work_unit_id=w.work_unit_id
+         JOIN swarm_allocations a ON a.run_id=?1 AND a.pool_id=w.pool_id AND a.window_id=w.window_key
+         WHERE w.work_unit_id='swarm/'||?2
+         ORDER BY 1,2"
     )?;
     let budget = budget_stmt.query_map(params![run,attempt], |r| {
         Ok(json!({"pool_id":r.get::<_,String>(0)?,"window_id":r.get::<_,String>(1)?,

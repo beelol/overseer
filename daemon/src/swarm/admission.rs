@@ -87,10 +87,10 @@ pub(super) struct ScheduledCommit<'a> {
     pub category_key: &'a str,
 }
 
-pub fn admit(store: &mut Store, p: &Value, pending_slots: i64) -> Result<Value> {
+pub fn admit(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p,"run_id")?;
     super::owner::require(store,run,p)?;
-    let result=admit_inner(store, p, None, pending_slots)?;
+    let result=admit_inner(store, p, None)?;
     record_observation(store,p,&result);
     Ok(result)
 }
@@ -99,9 +99,8 @@ pub(super) fn admit_scheduled(
     store: &mut Store,
     p: &Value,
     commit: ScheduledCommit<'_>,
-    pending_slots: i64,
 ) -> Result<Value> {
-    let result=admit_inner(store, p, Some(commit), pending_slots)?;
+    let result=admit_inner(store, p, Some(commit))?;
     record_observation(store,p,&result);
     Ok(result)
 }
@@ -110,10 +109,7 @@ fn admit_inner(
     store: &mut Store,
     p: &Value,
     scheduled: Option<ScheduledCommit<'_>>,
-    pending_slots: i64,
 ) -> Result<Value> {
-    let app_active = store.active_agent_count()?;
-    let app_limit = store.agent_limit()?;
     let run = required(p, "run_id")?;
     let job = required(p, "job_id")?;
     let target = required(p, "target_id")?;
@@ -207,7 +203,9 @@ fn admit_inner(
         }
         return Ok(blocked("run_deadline"));
     }
-    let tx = store.conn.transaction()?;
+    // IMMEDIATE: the app-slot count and the shared booking are read and
+    // written under one write lock, so no other admission can interleave.
+    let tx = store.conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
     let replay: Option<(String, String)> = tx
         .query_row(
             "SELECT request_sha256,attempt_id FROM swarm_admissions WHERE run_id=?1 AND request_id=?2",
@@ -451,8 +449,15 @@ fn admit_inner(
     let new_director = if current["status"] == "planning" && !active_director_process {
         1
     } else { 0 };
+    // The one app-slot count (`account_booking::app_slots_in_use`), read in
+    // this admission transaction: ordinary, Auto, booked and Swarm starts all
+    // consult it, and in-flight ordinary starts hold durable rows in it.
+    let now_ms = crate::daemon::now();
+    crate::account_booking::release_orphaned_swarm_bookings_in_tx(&tx, now_ms)?;
+    let app_active = crate::account_booking::app_slots_in_use(&tx)?;
+    let app_limit = crate::account_booking::app_slot_limit(&tx)?;
     let director_process_id = if director_self {
-        if app_limit != 1 || app_active != 1 || pending_slots != 0 {
+        if app_limit != 1 || app_active != 1 {
             return Ok(blocked("director_self_requires_one_slot"));
         }
         let linked: Option<(String,String)> = tx.query_row(
@@ -467,7 +472,7 @@ fn admit_inner(
             return Ok(blocked("director_route_not_linked"));
         }
         linked.map(|(id,_)|id)
-    } else if app_active + pending_slots + new_director >= app_limit {
+    } else if app_active + new_director >= app_limit {
         return Ok(blocked("global_agent_limit"));
     } else { None };
     let growth: Option<(i64, i64)> = tx
@@ -485,13 +490,28 @@ fn admit_inner(
     if count >= effective["growth_per_wave"].as_i64().unwrap_or(4) {
         return Ok(blocked("growth_wave_full"));
     }
-    freeze_pool_caps(&tx,run,&p["snapshot"],&current["allowed_targets"],effective,now)?;
-    let windows = candidate["windows"]
-        .as_array()
-        .ok_or_else(|| anyhow!("qualified target has no quota windows"))?;
-    if windows.is_empty() {
-        return Ok(blocked("unknown_quota"));
+    // An account target (a native harness on a profile) draws account
+    // allowance: the shared booking is its only account decision, and Swarm
+    // keeps its category allocation in the booking's own windows below. A
+    // generic fixture target draws no account: its snapshot pools are
+    // fixture policy, reserved in swarm_reservations as before.
+    let account_target = !director_self && candidate["harness"] != "generic";
+    let booking_input = if account_target { shared_booking_input(p)? } else { None };
+    if account_target && booking_input.is_none() {
+        // No code yet produces a qualified per-window upper draw.
+        return Ok(blocked("upper_draw_unknown"));
     }
+    let empty = Vec::new();
+    let windows = if account_target { &empty } else {
+        freeze_pool_caps(&tx,run,&p["snapshot"],&current["allowed_targets"],effective,now)?;
+        let windows = candidate["windows"]
+            .as_array()
+            .ok_or_else(|| anyhow!("qualified target has no quota windows"))?;
+        if windows.is_empty() {
+            return Ok(blocked("unknown_quota"));
+        }
+        windows
+    };
     let mut chosen = Vec::new();
     for window in windows {
         let pool = window["pool_id"]
@@ -635,6 +655,44 @@ fn admit_inner(
     }
     let attempt_id = format!("att-{}", &uuid::Uuid::new_v4().simple().to_string()[..16]);
     let token = uuid::Uuid::new_v4().simple().to_string();
+    let mut booked_windows = Vec::new();
+    if let Some(input) = &booking_input {
+        let profile = candidate["profile_id"].as_str()
+            .ok_or_else(|| anyhow!("account target has no profile"))?;
+        let quota_profile = input.quota_profile_id.as_deref().unwrap_or(profile);
+        // Swarm's category allocation and finishing reserve, in the cited
+        // observation's windows, in thousandths of a reported percentage
+        // point. Nothing is converted from tokens, credits or fixture units.
+        let cited = crate::account_booking::cited_windows_in_tx(&tx, quota_profile, input.quota_event_seq)?;
+        let allocation = match &cited {
+            Some(windows) if windows.len() == input.upper_draw_milli.len() =>
+                Some(category_allocation(&tx, run, windows, effective, budget_role == "finishing")?),
+            _ => None,
+        };
+        let booking_id = crate::account_booking::swarm_attempt_booking_id(&attempt_id);
+        let remaining: Option<Vec<i64>> = allocation.as_ref()
+            .map(|windows| windows.iter().map(|w| w.remaining).collect());
+        let account = crate::account_booking::AccountBookingRequest {
+            id: &booking_id, request_hash: &request_hash, caller: "swarm",
+            route_id: target, profile_id: profile, quota_profile_id: quota_profile,
+            account_generation: input.account_generation,
+            quota_event_seq: input.quota_event_seq, now_ms,
+            upper_draw_milli: &input.upper_draw_milli,
+            allocation_remaining_milli: remaining.as_deref(),
+        };
+        let decision = crate::account_booking::book_shared_launch_in_tx(&tx,
+            &crate::account_booking::LaunchBookingRequest {
+                account: &account, workspace_path: None, consume_agent_slot: true,
+                launch_hash: &request_hash,
+            })?;
+        match decision {
+            crate::account_booking::LaunchBookingDecision::Booked(_) => {}
+            crate::account_booking::LaunchBookingDecision::Blocked(reason) => return Ok(blocked(reason)),
+            crate::account_booking::LaunchBookingDecision::Replayed(_) =>
+                bail!("a new Swarm attempt cannot replay an earlier booking"),
+        }
+        booked_windows = allocation.unwrap_or_default();
+    }
     tx.execute("INSERT INTO swarm_attempts(id,run_id,job_id,revision,token_sha256,status,executor,executor_run_id,created_ms) VALUES(?1,?2,?3,?4,?5,'registered',?6,?7,?8)",
         params![attempt_id,run,job,job_revision,hash(&token),
             if director_self { "director" } else { "worker" },director_process_id,now])?;
@@ -651,6 +709,12 @@ fn admit_inner(
              mode=excluded.mode,status='active',revision=excluded.revision,updated_ms=excluded.updated_ms",
             params![resource, run, job, mode, job_revision, now],
         )?;
+    }
+    for window in &booked_windows {
+        tx.execute("INSERT OR IGNORE INTO swarm_pool_caps(run_id,pool_id,window_id,unit,allocation_milli,created_ms)
+            VALUES(?1,?2,?3,'percent_milli',?4,?5)",params![run,window.pool,window.key,window.cap,now])?;
+        tx.execute("INSERT OR IGNORE INTO swarm_allocations(run_id,pool_id,window_id,unit,allocation_milli,reserve_milli,created_ms)
+            VALUES(?1,?2,?3,'percent_milli',?4,?5,?6)",params![run,window.pool,window.key,window.cap,window.reserve,now])?;
     }
     for (pool, window_id, unit, allocation, reserve, estimate) in &chosen {
         tx.execute("INSERT OR IGNORE INTO swarm_pool_caps(run_id,pool_id,window_id,unit,allocation_milli,created_ms)
@@ -693,6 +757,101 @@ fn admit_inner(
     Ok(
         json!({"status":"admitted","attempt_id":attempt_id,"token":token,"target_id":target,
         "executor":if director_self { "director" } else { "worker" },
-        "allocation_milli":chosen.first().map(|w|w.3),"reservation_windows":chosen.len()}),
+        "allocation_milli":chosen.first().map(|w|w.3).or(booked_windows.first().map(|w|w.cap)),
+        "reservation_windows":chosen.len(),
+        "shared_booking":booking_input.as_ref().map(|_|
+            crate::account_booking::swarm_attempt_booking_id(&attempt_id)),
+        "booked_windows":booked_windows.len()}),
     )
+}
+
+/// The caller-supplied booking inputs for an account target. Until code can
+/// qualify a per-window upper draw, only a fixture caller may supply one.
+struct SharedBookingInput {
+    account_generation: i64,
+    quota_event_seq: i64,
+    quota_profile_id: Option<String>,
+    upper_draw_milli: Vec<i64>,
+}
+
+fn shared_booking_input(p: &Value) -> Result<Option<SharedBookingInput>> {
+    let booking = match p.get("shared_booking") {
+        None | Some(Value::Null) => return Ok(None),
+        Some(booking) => booking,
+    };
+    if std::env::var("OVERSEER_SHARED_BOOKING_FIXTURE_API").as_deref() != Ok("1") {
+        bail!("shared launch booking is not available to this caller");
+    }
+    let upper_draw_milli = booking["upper_draw_milli"].as_array()
+        .filter(|draws| !draws.is_empty() && draws.len() <= 32)
+        .and_then(|draws| draws.iter().map(Value::as_i64).collect::<Option<Vec<_>>>())
+        .ok_or_else(|| anyhow!("shared booking needs an upper draw for every window"))?;
+    Ok(Some(SharedBookingInput {
+        account_generation: booking["account_generation"].as_i64()
+            .ok_or_else(|| anyhow!("shared booking needs the account generation"))?,
+        quota_event_seq: booking["quota_event_seq"].as_i64()
+            .ok_or_else(|| anyhow!("shared booking needs the cited quota observation"))?,
+        quota_profile_id: booking["quota_profile_id"].as_str().map(str::to_string),
+        upper_draw_milli,
+    }))
+}
+
+struct BookedWindow {
+    pool: String,
+    key: String,
+    cap: i64,
+    reserve: i64,
+    remaining: i64,
+}
+
+/// This category's remaining allocation in each cited account window. The
+/// cap is frozen at the category's first booking in a window (a share of the
+/// reported remaining allowance) and never grows; a window with a new key
+/// (a reset) starts from the tighter of its fresh share and the category's
+/// earlier caps in the same account pool. The category's own active and
+/// uncertain bookings count against it, and a booking in a window that is
+/// no longer reported (from before a reset) counts against every current
+/// window. A non-finishing job also leaves the finishing reserve.
+fn category_allocation(
+    conn: &rusqlite::Connection,
+    run: &str,
+    windows: &[(String, String, i64)],
+    effective: &Value,
+    finishing: bool,
+) -> Result<Vec<BookedWindow>> {
+    let percent = effective["run_allocation_percent"].as_i64().unwrap_or(10);
+    let reserve_percent = effective["finishing_reserve_percent"].as_i64().unwrap_or(20);
+    let keys: Vec<&str> = windows.iter().map(|(_, key, _)| key.as_str()).collect();
+    let keys_json = serde_json::to_string(&keys)?;
+    let mut result = Vec::with_capacity(windows.len());
+    for (pool, key, remaining) in windows {
+        let frozen: Option<i64> = conn.query_row(
+            "SELECT allocation_milli FROM swarm_pool_caps
+             WHERE run_id=?1 AND pool_id=?2 AND window_id=?3 AND unit='percent_milli'",
+            params![run, pool, key], |row| row.get(0)).optional()?;
+        let cap = match frozen {
+            Some(cap) => cap,
+            None => {
+                let fresh = remaining.max(&0).saturating_mul(percent) / 100;
+                let prior: Option<i64> = conn.query_row(
+                    "SELECT MIN(allocation_milli) FROM swarm_pool_caps
+                     WHERE run_id=?1 AND pool_id=?2 AND unit='percent_milli'",
+                    params![run, pool], |row| row.get(0))?;
+                prior.map_or(fresh, |prior| prior.min(fresh))
+            }
+        };
+        let own: i64 = conn.query_row(
+            "SELECT COALESCE(SUM(w.amount_milli),0) FROM shared_booking_windows w
+             JOIN auto_pool_claims c ON c.work_unit_id=w.work_unit_id
+             JOIN swarm_attempts a ON 'swarm/'||a.id=w.work_unit_id
+             WHERE a.run_id=?1 AND w.pool_id=?2 AND c.state IN ('active','uncertain')
+               AND (w.window_key=?3 OR w.window_key NOT IN (SELECT value FROM json_each(?4)))",
+            params![run, pool, key, keys_json], |row| row.get(0))?;
+        let reserve = if finishing { 0 } else { cap.saturating_mul(reserve_percent) / 100 };
+        result.push(BookedWindow {
+            pool: pool.clone(), key: key.clone(), cap, reserve,
+            remaining: cap.saturating_sub(own).saturating_sub(reserve).max(0),
+        });
+    }
+    Ok(result)
 }

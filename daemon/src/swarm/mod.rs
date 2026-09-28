@@ -467,6 +467,11 @@ fn capacity_readout(store: &Store, id: &str) -> Result<Value> {
            COALESCE((SELECT SUM(r.amount_milli) FROM swarm_reservations r
                      WHERE r.run_id=a.run_id AND r.pool_id=a.pool_id
                        AND r.window_id=a.window_id AND r.status IN ('active','uncertain')),0)
+           + COALESCE((SELECT SUM(w.amount_milli) FROM shared_booking_windows w
+                     JOIN auto_pool_claims c ON c.work_unit_id=w.work_unit_id
+                     JOIN swarm_attempts t ON 'swarm/'||t.id=w.work_unit_id
+                     WHERE t.run_id=a.run_id AND w.pool_id=a.pool_id
+                       AND w.window_key=a.window_id AND c.state IN ('active','uncertain')),0)
          FROM swarm_allocations a WHERE a.run_id=?1
          ORDER BY a.pool_id,a.window_id LIMIT 33",
     )?;

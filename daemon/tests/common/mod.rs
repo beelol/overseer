@@ -316,3 +316,35 @@ pub fn launch_info(d: &Daemon, run: &str) -> (Value, PathBuf) {
     };
     (shim, last)
 }
+
+/// A fixture account for `profile`, written as Auto's own collector stores
+/// one: an account identity (generation 1, fingerprint derived from
+/// `account`) and one structured quota observation with a five-hour and a
+/// weekly window, `used_percent` reported used in each. Returns the
+/// `shared_booking` inputs a fixture caller cites, drawing `draw`
+/// thousandths of a reported percentage point in each window. No provider is
+/// asked and no allowance is spent; the daemon needs
+/// OVERSEER_SHARED_BOOKING_FIXTURE_API=1 to accept the inputs.
+pub fn fixture_account_booking(d: &Daemon, profile: &str, account: &str, used_percent: f64, draw: i64) -> Value {
+    use sha2::{Digest, Sha256};
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.busy_timeout(Duration::from_secs(10)).unwrap();
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
+    let fingerprint = format!("{:x}", Sha256::digest(account.as_bytes()));
+    db.execute("INSERT INTO auto_account_identity(profile_id,fingerprint,generation,observed_ms)
+        VALUES(?1,?2,1,?3) ON CONFLICT(profile_id) DO UPDATE SET fingerprint=excluded.fingerprint",
+        rusqlite::params![profile, fingerprint, now]).unwrap();
+    let window = |name: &str, minutes: i64| json!({"pool_id":profile,"bucket_id":name,"window":name,
+        "model":null,"model_family":null,"plan_type":"fixture","used_percent":used_percent,
+        "reset_ms":now + minutes * 60_000,"duration_mins":minutes,
+        "observed_ms":now,"expires_ms":now + 600_000});
+    let snapshot = json!({"ordinary_usage_allowed":true,"observed_ms":now,"expires_ms":now + 600_000,
+        "windows":[window("five_hour", 300), window("weekly", 10_080)]});
+    db.execute("INSERT INTO events(ts,task_id,run_id,kind,source,confidence,payload)
+        VALUES(?1,NULL,NULL,'quota_observed','fixture','exact','{}')", [now]).unwrap();
+    let seq = db.last_insert_rowid();
+    db.execute("INSERT INTO auto_quota_observations(event_seq,pool_id,source,observed_ms,snapshot)
+        VALUES(?1,?2,'fixture/structured',?3,?4)",
+        rusqlite::params![seq, profile, now, snapshot.to_string()]).unwrap();
+    json!({"account_generation":1,"quota_event_seq":seq,"upper_draw_milli":[draw, draw]})
+}

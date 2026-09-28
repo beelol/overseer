@@ -39,33 +39,33 @@ impl std::fmt::Display for AgentLimitError {
 
 impl std::error::Error for AgentLimitError {}
 
+/// A durable app-slot hold (`app_slot_holds`) for a start whose run row does
+/// not exist yet. The hold is one occupant in the one app-slot count
+/// (`account_booking::app_slots_in_use`); it is deleted in the commit that
+/// inserts the run, or when the start stops first.
 struct AgentSlotReservation<'a> {
     daemon: &'a Daemon,
-    pending: bool,
+    hold: Option<String>,
 }
 
 impl AgentSlotReservation<'_> {
-    fn insert_task_and_run(&mut self, task: &Task, run: &Run,
-        director: Option<DirectorOwnerLink<'_>>) -> Result<()> {
-        let mut pending = self.daemon.pending_agent_slots.lock().unwrap();
-        self.daemon.store.lock().unwrap().insert_task_and_run(task, run, None, director)?;
-        *pending -= 1;
-        self.pending = false;
-        Ok(())
+    /// The run is inserted: its row now holds the slot.
+    fn consumed(&mut self) {
+        self.hold = None;
     }
 
     fn release_after_start(&mut self) {
-        let mut pending = self.daemon.pending_agent_slots.lock().unwrap();
-        *pending -= 1;
-        self.pending = false;
+        if let Some(hold) = self.hold.take() {
+            if let Err(error) = self.daemon.store.lock().unwrap().release_app_slot_hold(&hold) {
+                crate::log(&format!("app slot hold {hold} was not released: {error}"));
+            }
+        }
     }
 }
 
 impl Drop for AgentSlotReservation<'_> {
     fn drop(&mut self) {
-        if self.pending {
-            *self.daemon.pending_agent_slots.lock().unwrap() -= 1;
-        }
+        self.release_after_start();
     }
 }
 
@@ -219,6 +219,9 @@ struct UnboundSharedLaunch {
     daemon: Arc<Daemon>,
     id: String,
     stage: SharedLaunchStage,
+    /// A Swarm worker's booking belongs to its durable admitted attempt, not
+    /// to this request: stopping before the effects claim keeps it booked.
+    keep_booked: bool,
 }
 
 impl UnboundSharedLaunch {
@@ -238,6 +241,7 @@ impl Drop for UnboundSharedLaunch {
     fn drop(&mut self) {
         let store = self.daemon.store.lock().unwrap();
         let released = match self.stage {
+            SharedLaunchStage::Booked if self.keep_booked => return,
             SharedLaunchStage::Booked => store.release_shared_booking_pre_effect(&self.id),
             SharedLaunchStage::Claimed => store.release_unbound_shared_launch(&self.id),
             SharedLaunchStage::Bound => return,
@@ -262,9 +266,6 @@ pub struct Daemon {
     profile_gates: Mutex<BTreeMap<String, Arc<Mutex<()>>>>,
     workspace_gates: Mutex<BTreeMap<String, Arc<Mutex<()>>>>,
     work_unit_gates: Mutex<BTreeMap<String, std::sync::Weak<Mutex<()>>>>,
-    /// Manual starts reserve capacity before workspace preparation. Admission
-    /// reads this under the same lock, closing the gap before the queued row.
-    pub(crate) pending_agent_slots: Mutex<i64>,
     pub events: broadcast::Sender<Event>,
     tails: Mutex<HashSet<String>>,
     pub(crate) swarm_launch_lock: Mutex<()>,
@@ -328,15 +329,12 @@ enum SwarmLaunchIdentity<'a> {
 
 impl Daemon {
     fn reserve_agent_slot(&self) -> Result<AgentSlotReservation<'_>> {
-        let mut pending = self.pending_agent_slots.lock().unwrap();
         let store = self.store.lock().unwrap();
-        let active = store.active_agent_count()? + *pending;
-        let limit = store.agent_limit()?;
-        if active >= limit {
-            return Err(AgentLimitError { active, limit, running_agents: store.active_agents()? }.into());
+        match store.hold_app_slot("start")? {
+            Ok(hold) => Ok(AgentSlotReservation { daemon: self, hold: Some(hold) }),
+            Err((active, limit)) =>
+                Err(AgentLimitError { active, limit, running_agents: store.active_agents()? }.into()),
         }
-        *pending += 1;
-        Ok(AgentSlotReservation { daemon: self, pending: true })
     }
 
     pub fn open() -> Result<Arc<Self>> {
@@ -347,7 +345,7 @@ impl Daemon {
         let learning_paused = !store.learning_persistent;
         let (tx, _) = broadcast::channel(4096);
         let exe = std::env::current_exe()?;
-        let daemon = Arc::new(Self { store: Mutex::new(store), pending_agent_slots: Mutex::new(0), profile_gates: Mutex::new(BTreeMap::new()), workspace_gates: Mutex::new(BTreeMap::new()), work_unit_gates: Mutex::new(BTreeMap::new()), events: tx, tails: Mutex::new(HashSet::new()), swarm_launch_lock: Mutex::new(()), swarm_integration_lock: Mutex::new(()), swarm_storage_blocked: std::sync::atomic::AtomicBool::new(false), exe, started_ms: now(), learning_paused: std::sync::atomic::AtomicBool::new(learning_paused),
+        let daemon = Arc::new(Self { store: Mutex::new(store), profile_gates: Mutex::new(BTreeMap::new()), workspace_gates: Mutex::new(BTreeMap::new()), work_unit_gates: Mutex::new(BTreeMap::new()), events: tx, tails: Mutex::new(HashSet::new()), swarm_launch_lock: Mutex::new(()), swarm_integration_lock: Mutex::new(()), swarm_storage_blocked: std::sync::atomic::AtomicBool::new(false), exe, started_ms: now(), learning_paused: std::sync::atomic::AtomicBool::new(learning_paused),
             learning_usage_paused: std::sync::atomic::AtomicBool::new(false), learning_work_paused: std::sync::atomic::AtomicBool::new(false),
             learning_thread_paused: std::sync::atomic::AtomicBool::new(false), learning_account_paused: std::sync::atomic::AtomicBool::new(false),
             learning_maintenance_paused: std::sync::atomic::AtomicBool::new(false),
@@ -791,7 +789,22 @@ impl Daemon {
                 Some(SharedStart::from_params(booking, p, harness, &profile.id)?)
             }
         };
-        if let (Some(profile), None) = (&profile, &shared_start) {
+        // A booked Swarm worker: its admission booked the account windows and
+        // the app slot (`swarm/<attempt>`); this launch claims the booking's
+        // effects before the first Git effect and binds the run to it.
+        let swarm_booking = match swarm_identity.as_ref() {
+            Some(SwarmLaunchIdentity::Worker(identity)) => {
+                let id = crate::account_booking::swarm_attempt_booking_id(&identity.attempt_id);
+                match self.store.lock().unwrap().shared_launch_intent(&id)? {
+                    None => None,
+                    Some(intent) if intent.phase == "booked" && intent.effects_claimed_ms.is_none() => Some(id),
+                    Some(intent) => bail!("Swarm worker booking {id} is not launchable ({}); it needs reconciliation",
+                        intent.outcome.unwrap_or(intent.phase)),
+                }
+            }
+            _ => None,
+        };
+        if let (Some(profile), None, None) = (&profile, &shared_start, &swarm_booking) {
             if self.store.lock().unwrap().auto_claim_conflicts_with_run(&profile.id, "")? {
                 bail!("{MANUAL_POOL_CONFLICT}");
             }
@@ -802,7 +815,8 @@ impl Daemon {
                 bail!("target ref {t} does not exist");
             }
         }
-        let mut unbound_launch = None;
+        let mut unbound_launch = swarm_booking.as_ref().map(|id| UnboundSharedLaunch {
+            daemon: self.clone(), id: id.clone(), stage: SharedLaunchStage::Booked, keep_booked: true });
         if let Some(start) = &shared_start {
             let workspace_path = (mode == "current").then(|| repo.display().to_string());
             let account = crate::account_booking::AccountBookingRequest {
@@ -826,7 +840,7 @@ impl Daemon {
                 crate::account_booking::LaunchBookingDecision::Booked(_) => {}
             }
             unbound_launch = Some(UnboundSharedLaunch { daemon: self.clone(), id: start.id.clone(),
-                stage: SharedLaunchStage::Booked });
+                stage: SharedLaunchStage::Booked, keep_booked: false });
             shared_launch_test_crash("after_book");
         }
         let (ws, fork_commit, fork_prov) = match mode {
@@ -978,17 +992,14 @@ impl Daemon {
             };
             let attempt = match swarm_identity.as_ref() {
                 Some(SwarmLaunchIdentity::Worker(identity)) => Some(identity.attempt_id.as_str()), _ => None };
-            let bind = shared_start.as_ref().map(|start| (start.id.as_str(), now()));
-            match (&mut slot, bind) {
-                (Some(reservation), None) => reservation.insert_task_and_run(&task, &run, director)?,
-                (slot, bind) => {
-                    // A booked start already holds its slot in the shared booking: the pending
-                    // app slot is given back, and the run is bound in the same commit, so the
-                    // booking becomes this run's occupancy without counting it twice.
-                    if let Some(reservation) = slot { reservation.release_after_start(); }
-                    self.store.lock().unwrap().insert_task_and_run_bound(&task, &run, attempt, director, bind)?;
-                }
-            }
+            // A booked start (ordinary or Swarm worker) holds its slot in the shared booking,
+            // and its run is bound in the same commit, so the booking becomes the run's
+            // occupancy. An unbooked start's durable slot hold is deleted in that commit.
+            let bind = shared_start.as_ref().map(|start| start.id.as_str())
+                .or(swarm_booking.as_deref()).map(|id| (id, now()));
+            let hold = slot.as_ref().and_then(|reservation| reservation.hold.clone());
+            self.store.lock().unwrap().insert_task_and_run_holding(&task, &run, attempt, director, bind, hold.as_deref())?;
+            if let Some(reservation) = slot.as_mut() { reservation.consumed(); }
             // A run of the daemon's own (Overseer, a watcher) carries its role from the start.
             if let Some(role) = p["role"].as_str().filter(|r| ["overseer", "watcher"].contains(r)) {
                 self.store.lock().unwrap().conn.execute("INSERT OR REPLACE INTO run_roles(run_id, role) VALUES(?1, ?2)", rusqlite::params![run.id, role])?;
@@ -1015,7 +1026,8 @@ impl Daemon {
             // consume an active slot forever (nor keep a booked start's holds until
             // a restart). A process with a recorded run directory is left to normal
             // exit/recovery reconciliation.
-            let settle = current.status == "queued" || (shared_start.is_some() && ACTIVE.contains(&current.status.as_str()));
+            let settle = current.status == "queued"
+                || ((shared_start.is_some() || swarm_booking.is_some()) && ACTIVE.contains(&current.status.as_str()));
             if !launch_uncertain && settle
                 && self.store.lock().unwrap().run_process(&run.id)?.is_none()
             {

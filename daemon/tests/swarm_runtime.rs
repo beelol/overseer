@@ -281,7 +281,7 @@ fn uncontrolled_native_delegation_blocks_admission_before_reserving_or_launching
 
 #[test]
 fn admitted_target_harness_cannot_be_changed_at_worker_launch() {
-    let d = Daemon::start(&[]);
+    let d = Daemon::start(&[("OVERSEER_SHARED_BOOKING_FIXTURE_API","1")]);
     let temp = tmp();
     let checkout = repo(&temp.path().join("route-binding-source"));
     let run = d.call("swarm.create", json!({"category":"Route binding",
@@ -292,7 +292,10 @@ fn admitted_target_harness_cannot_be_changed_at_worker_launch() {
         {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]}
     ]}));
     let at = now();
-    let admitted = d.call("swarm.admit",json!({"run_id":id,"generation":1,"revision":1,
+    // A native (account) target books its account windows and app slot in
+    // the shared booking; the fixture observation stands in for Auto's feed.
+    let booking = fixture_account_booking(&d, "system-claude", "fixture-claude-account", 0.0, 1000);
+    let admitted = d.call("swarm.admit",json!({"shared_booking":booking,"run_id":id,"generation":1,"revision":1,
         "job_id":"inspect","target_id":"fixture-claude","request_id":"route-binding",
         "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
             "targets":[{"id":"fixture-claude","harness":"claude",
@@ -318,7 +321,7 @@ fn admitted_target_harness_cannot_be_changed_at_worker_launch() {
 
 #[test]
 fn previously_admitted_native_worker_cannot_launch_after_audit_scope_is_restored() {
-    let d = Daemon::start(&[]);
+    let d = Daemon::start(&[("OVERSEER_SHARED_BOOKING_FIXTURE_API","1")]);
     let temp = tmp();
     let checkout = repo(&temp.path().join("legacy-audit-source"));
     let run = d.call("swarm.create", json!({"category":"Legacy audit admission",
@@ -329,7 +332,10 @@ fn previously_admitted_native_worker_cannot_launch_after_audit_scope_is_restored
         {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]}
     ]}));
     let at = now();
-    let admitted = d.call("swarm.admit",json!({"run_id":id,"generation":1,"revision":1,
+    // A native (account) target books its account windows and app slot in
+    // the shared booking; the fixture observation stands in for Auto's feed.
+    let booking = fixture_account_booking(&d, "system-claude", "fixture-claude-account", 0.0, 1000);
+    let admitted = d.call("swarm.admit",json!({"shared_booking":booking,"run_id":id,"generation":1,"revision":1,
         "job_id":"inspect","target_id":"fixture-claude","request_id":"old-admission",
         "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
             "targets":[{"id":"fixture-claude","harness":"claude",
@@ -356,7 +362,8 @@ fn previously_admitted_native_worker_cannot_launch_after_audit_scope_is_restored
 fn admitted_profile_model_and_effort_cannot_be_changed_at_worker_launch() {
     let fixture_path = repo_root().join("fixtures/fake-harness/claude-fixture.js")
         .display().to_string();
-    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture_path)]);
+    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture_path),
+        ("OVERSEER_SHARED_BOOKING_FIXTURE_API","1")]);
     let temp = tmp();
     let checkout = repo(&temp.path().join("route-options-source"));
     let run = d.call("swarm.create", json!({"category":"Route options",
@@ -367,7 +374,10 @@ fn admitted_profile_model_and_effort_cannot_be_changed_at_worker_launch() {
         {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]}
     ]}));
     let at = now();
-    let admitted = d.call("swarm.admit",json!({"run_id":id,"generation":1,"revision":1,
+    // A native (account) target books its account windows and app slot in
+    // the shared booking; the fixture observation stands in for Auto's feed.
+    let booking = fixture_account_booking(&d, "system-claude", "fixture-claude-account", 0.0, 1000);
+    let admitted = d.call("swarm.admit",json!({"shared_booking":booking,"run_id":id,"generation":1,"revision":1,
         "job_id":"inspect","target_id":"claude-sonnet","request_id":"route-options",
         "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
             "targets":[{"id":"claude-sonnet","harness":"claude","profile_id":"system-claude",
@@ -1357,7 +1367,7 @@ fn synthetic_claude_background_child_does_not_finish_swarm_attempt_at_launch_stu
         .display().to_string();
     let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture_path),
         ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
-        ("FIXTURE_MODE", "background")]);
+        ("FIXTURE_MODE", "background"), ("OVERSEER_SHARED_BOOKING_FIXTURE_API","1")]);
     let temp = tmp();
     let checkout = repo(&temp.path().join("claude-background-source"));
     let run = d.call("swarm.create",json!({"category":"Synthetic child ordering",
@@ -1368,7 +1378,10 @@ fn synthetic_claude_background_child_does_not_finish_swarm_attempt_at_launch_stu
         {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]}
     ]}));
     let at = now();
-    let admitted = d.call("swarm.admit",json!({"run_id":id,"generation":1,"revision":1,
+    // A native (account) target books its account windows and app slot in
+    // the shared booking; the fixture observation stands in for Auto's feed.
+    let booking = fixture_account_booking(&d, "system-claude", "fixture-claude-account", 0.0, 1000);
+    let admitted = d.call("swarm.admit",json!({"shared_booking":booking,"run_id":id,"generation":1,"revision":1,
         "job_id":"inspect","target_id":"fixture-claude","request_id":"recorded-claude-child",
         "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
             "targets":[{"id":"fixture-claude","harness":"claude",

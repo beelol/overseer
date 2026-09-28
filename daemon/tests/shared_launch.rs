@@ -519,3 +519,243 @@ fn crash_before_the_effects_claim_releases_and_after_it_keeps_the_writer_without
         "the account itself was released: separate work still runs"
     );
 }
+
+// ---------------------------------------------------------------- one app-slot authority
+
+/// One request on its own socket connection; returns the raw reply
+/// (`result` or `error`), so a refusal can be read without panicking.
+fn raw_call(home: &Path, method: &str, params: Value) -> Value {
+    use std::io::{BufRead, BufReader, Write};
+    let socket = std::process::Command::new(BIN).arg("socket-path")
+        .env("OVERSEER_HOME", home).output().unwrap();
+    let path = String::from_utf8(socket.stdout).unwrap();
+    let mut conn = std::os::unix::net::UnixStream::connect(path.trim()).unwrap();
+    conn.set_read_timeout(Some(Duration::from_secs(120))).unwrap();
+    conn.write_all(format!("{}\n", json!({"id":1,"method":method,"params":params})).as_bytes()).unwrap();
+    let mut line = String::new();
+    BufReader::new(conn).read_line(&mut line).unwrap();
+    serde_json::from_str(&line).unwrap()
+}
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64
+}
+
+fn fixture_local_snapshot(at: i64) -> Value {
+    json!({"version":1,"observed_ms":at-1000,"expires_ms":at+120000,
+        "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["pool"],
+            "capabilities":["code"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pool","windows":[{"id":"run","unit":"points","remaining_milli":1000000,
+            "protected_milli":0,"reserved_milli":0,"confidence":"exact","expires_ms":at+120000}]}]})
+}
+
+fn active_slots(d: &Daemon) -> i64 {
+    d.call("agents.limit.get", json!({}))["active"].as_i64().unwrap()
+}
+
+const HOLDING: &[&str] = &["queued","starting","running","waiting_for_user",
+    "waiting_for_connection","waiting_for_memory","unknown","disconnected"];
+
+/// Handover step 3: one app-slot authority. An ordinary start, an Auto root,
+/// a Swarm worker admission and a booked start race for the last slot of
+/// `agents.max_active`: exactly one wins and every other path is refused for
+/// the agent limit. After a daemon restart the winner still holds its slot
+/// while its process or attempt lives, and it is released exactly once.
+#[test]
+fn ordinary_auto_swarm_and_booked_starts_race_for_the_last_slot_and_one_wins() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mut d = start_daemon(r.path(), &[]);
+    let (booked_profile, booked_seq) = account(&d, r.path(), "booked");
+    // A running category: its director slot and one admitted worker attempt.
+    let swarm = d.call("swarm.create", json!({"category":"Slot race","objective":"Race for the last slot",
+        "allowed_targets":["fixture-local"]}));
+    let swarm_id = swarm["id"].as_str().unwrap().to_string();
+    d.call("swarm.plan", json!({"id":swarm_id,"generation":1,"revision":0,"jobs":[
+        {"id":"j0","title":"First","acceptance":"evidence","deps":[]},
+        {"id":"j1","title":"Second","acceptance":"evidence","deps":[]}]}));
+    commit_beneficial_batch(&d, &swarm_id, &["j0".into(), "j1".into()]);
+    let at = now_ms();
+    let admit = |job: &str, request: &str| json!({"run_id":swarm_id,"generation":1,"revision":1,
+        "job_id":job,"target_id":"fixture-local","request_id":request,"snapshot":fixture_local_snapshot(at),
+        "now_ms":at,"required_capabilities":["code"],"estimate_milli":{"points":1000},"purpose":"worker"});
+    assert_eq!(d.call("swarm.admit", admit("j0", "race-j0"))["status"], "admitted");
+    d.call("agents.limit.set", json!({"max_active":3}));
+    assert_eq!(active_slots(&d), 2, "the category's director and its worker attempt");
+
+    let requests = vec![
+        ("ordinary", "task.create", json!({"repo":repo,"harness":"generic","workspace_mode":"worktree",
+            "program":"/bin/sleep","args":["60"],"prompt":"","title":"ordinary racer"})),
+        ("auto", "auto.start", json!({"work_unit_id":"race-root","repo":repo,"workspace_mode":"worktree",
+            "prompt":"hold parent","title":"auto racer","allowed_profiles":["system-codex"],
+            "min_tier":"general","required_tools":[],"sandbox":"read_only"})),
+        ("swarm", "swarm.admit", admit("j1", "race-j1")),
+        ("booked", "task.create", booked(&repo, &booked_profile, "race-booked", booked_seq, 10_000, "hold parent")),
+    ];
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(requests.len()));
+    let replies: Vec<(&str, Value)> = requests.into_iter().map(|(kind, method, params)| {
+        let home = d.home.path().to_path_buf();
+        let barrier = barrier.clone();
+        (kind, std::thread::spawn(move || { barrier.wait(); raw_call(&home, method, params) }))
+    }).collect::<Vec<_>>().into_iter().map(|(kind, h)| (kind, h.join().unwrap())).collect();
+    let won = |kind: &str, reply: &Value| match kind {
+        "swarm" => reply["result"]["status"] == "admitted",
+        _ => reply["result"]["run"]["id"].is_string() && reply["result"]["launch_error"].is_null(),
+    };
+    let winners: Vec<&(&str, Value)> = replies.iter().filter(|(kind, reply)| won(kind, reply)).collect();
+    assert_eq!(winners.len(), 1, "exactly one path takes the last slot: {replies:?}");
+    for (kind, reply) in &replies {
+        if won(kind, reply) { continue; }
+        let text = reply.to_string();
+        assert!(reply["error"]["code"] == "agent_limit" || text.contains("global_agent_limit"),
+            "{kind} was refused for the agent limit, not something else: {reply}");
+    }
+    assert_eq!(active_slots(&d), 3);
+    let (winner, reply) = (winners[0].0, winners[0].1.clone());
+    eprintln!("race winner: {winner}");
+    let winner_run = reply["result"]["run"]["id"].as_str().map(str::to_string);
+
+    d.kill9();
+    d.spawn();
+    let holding = match &winner_run {
+        Some(run) => HOLDING.contains(&d.run(run)["status"].as_str().unwrap()),
+        None => true, // a Swarm attempt is durable until its job settles
+    };
+    assert_eq!(active_slots(&d), 2 + holding as i64, "{winner} after restart: {reply}");
+    if holding {
+        let late = raw_call(d.home.path(), "task.create", json!({"repo":repo,"harness":"generic",
+            "workspace_mode":"worktree","program":"/bin/sleep","args":["1"],"prompt":"","title":"late"}));
+        assert_eq!(late["error"]["code"], "agent_limit", "{winner} still holds the last slot: {late}");
+    }
+    if let Some(run) = winner_run {
+        if HOLDING.contains(&d.run(&run)["status"].as_str().unwrap()) {
+            let _ = d.try_call("run.interrupt", json!({"run_id":run}));
+        }
+        d.wait_status(&run, |status| !HOLDING.contains(&status), 30);
+        assert_eq!(active_slots(&d), 2, "{winner}'s slot is released exactly once");
+        let next = run_id(&d.call("task.create", json!({"repo":repo,"harness":"generic",
+            "workspace_mode":"worktree","program":"/bin/sleep","args":["30"],"prompt":"","title":"next"})));
+        assert_eq!(active_slots(&d), 3);
+        d.call("run.interrupt", json!({"run_id":next}));
+        d.wait_status(&next, |status| !HOLDING.contains(&status), 30);
+    }
+}
+
+/// Handover step 3: Swarm admits an account (native) worker through the one
+/// shared booking. The booking holds the worker's app slot (the attempt is
+/// not counted again), draws the account windows in thousandths of a
+/// reported percentage point, and is limited by the category's remaining
+/// allocation in those same windows. The booking survives a restart with its
+/// registered attempt; the worker's launch claims its effects before the
+/// worktree and binds the run in the run's own commit; the run's end settles
+/// it. The account headroom is shared with an ordinary booked start.
+#[test]
+fn swarm_worker_admission_books_the_shared_account_and_binds_its_run() {
+    let fixture = repo_root().join("fixtures/fake-harness/claude-fixture.js").display().to_string();
+    let mut d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"), ("FIXTURE_MODE", "echo"),
+        ("OVERSEER_SHARED_BOOKING_FIXTURE_API", "1")]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("booked-workers"));
+    let swarm = d.call("swarm.create", json!({"category":"Booked workers","objective":"Inspect backend",
+        "allowed_targets":["claude-a"],"source_change_permission":"isolated"}));
+    let id = swarm["id"].as_str().unwrap().to_string();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"j0","title":"First","acceptance":"evidence","deps":[]},
+        {"id":"j1","title":"Second","acceptance":"evidence","deps":[]}]}));
+    commit_beneficial_batch(&d, &id, &["j0".into(), "j1".into()]);
+    // A fresh fixture observation: 0% used, so each window reports 100,000
+    // thousandths of a point remaining; the category's allocation is 10% of
+    // it (10,000) and its finishing reserve 20% of that (2,000).
+    let booking = fixture_account_booking(&d, "system-claude", "swarm-account", 0.0, 5_000);
+    let at = now_ms();
+    let admit = |d: &Daemon, job: &str, request: &str, booking: Option<Value>| {
+        let mut p = json!({"run_id":id,"generation":1,"revision":1,"job_id":job,"target_id":"claude-a",
+            "request_id":request,"now_ms":at,"required_capabilities":["code"],
+            "estimate_milli":{"points":100},"purpose":"worker",
+            "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+120000,
+                "targets":[{"id":"claude-a","harness":"claude","profile_id":"system-claude","model":"sonnet",
+                    "account_id":"swarm-account","pool_ids":["pool"],"capabilities":["code"],
+                    "health":"up","auth":"ok"}],
+                "pools":[{"id":"pool","windows":[{"id":"run","unit":"points","remaining_milli":1000000,
+                    "protected_milli":0,"reserved_milli":0,"confidence":"exact","expires_ms":at+120000}]}]}});
+        if let Some(booking) = booking { p["shared_booking"] = booking; }
+        d.call("swarm.admit", p)
+    };
+    let first = admit(&d, "j0", "booked-j0", Some(booking.clone()));
+    assert_eq!(first["status"], "admitted", "{first}");
+    let attempt = first["attempt_id"].as_str().unwrap().to_string();
+    let booking_id = format!("swarm/{attempt}");
+    assert_eq!(first["shared_booking"], booking_id.as_str());
+    assert_eq!(first["booked_windows"], 2);
+    assert_eq!(first["allocation_milli"], 10_000);
+    let row = |d: &Daemon, key: &str| -> (String, String, bool, Option<String>, Option<i64>) {
+        db(d).query_row("SELECT caller,phase,slot_held,run_id,effects_claimed_ms FROM shared_booking_intents
+            WHERE work_unit_id=?1", [key], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))).unwrap()
+    };
+    assert_eq!(row(&d, &booking_id), ("swarm".into(), "booked".into(), true, None, None));
+    let draws: Vec<i64> = {
+        let db = db(&d);
+        let mut stmt = db.prepare("SELECT amount_milli FROM shared_booking_windows WHERE work_unit_id=?1").unwrap();
+        let rows = stmt.query_map([&booking_id], |r| r.get(0)).unwrap().map(Result::unwrap).collect();
+        rows
+    };
+    assert_eq!(draws, vec![5_000, 5_000], "thousandths of a reported percentage point, per window");
+    let swarm_reservations: i64 = db(&d).query_row("SELECT COUNT(*) FROM swarm_reservations WHERE attempt_id=?1",
+        [&attempt], |r| r.get(0)).unwrap();
+    assert_eq!(swarm_reservations, 0, "swarm_reservations is no account authority for a booked worker");
+    assert_eq!(active_slots(&d), 2, "the director slot and the booking; the attempt is not counted twice");
+
+    // No qualified upper draw, no account worker.
+    let unbooked = admit(&d, "j1", "unbooked-j1", None);
+    assert_eq!(unbooked["reason"], "upper_draw_unknown", "{unbooked}");
+    // The category's remaining allocation limits the booking:
+    // 10,000 - 5,000 booked - 2,000 finishing reserve = 3,000.
+    let mut over = booking.clone();
+    over["upper_draw_milli"] = json!([3_001, 3_001]);
+    let over = admit(&d, "j1", "over-j1", Some(over));
+    assert_eq!(over["reason"], "allocation_exhausted", "{over}");
+    let mut fits = booking.clone();
+    fits["upper_draw_milli"] = json!([3_000, 3_000]);
+    let second = admit(&d, "j1", "fits-j1", Some(fits));
+    assert_eq!(second["status"], "admitted", "{second}");
+    let second_booking = format!("swarm/{}", second["attempt_id"].as_str().unwrap());
+    assert_eq!(active_slots(&d), 3);
+
+    // A restart keeps a registered attempt's booking (its dispatch can still
+    // launch it) and holds the same slots.
+    d.kill9();
+    d.spawn();
+    assert_eq!(row(&d, &booking_id).1, "booked");
+    assert_eq!(row(&d, &second_booking).1, "booked");
+    assert_eq!(active_slots(&d), 3);
+
+    let launched = d.call("swarm.worker.launch", json!({"run_id":id,"job_id":"j0","attempt_id":attempt,
+        "token":first["token"],"repo":checkout,"harness":"claude","args":[],
+        "prompt":"Inspect","title":"Booked worker"}));
+    assert_eq!(launched["status"], "launched", "{launched}");
+    let worker = launched["overseer_run_id"].as_str().unwrap().to_string();
+    let (_, phase, slot, bound, claimed) = row(&d, &booking_id);
+    assert_eq!((phase.as_str(), slot, bound.as_deref()), ("uncertain", true, Some(worker.as_str())),
+        "effects claimed before the worktree, the run bound in its own commit");
+    assert!(claimed.is_some());
+    assert_eq!(active_slots(&d), 3, "the bound worker run is its booking's slot, not another");
+    d.wait_status(&worker, |status| !HOLDING.contains(&status), 30);
+    let settled: (bool, Option<String>) = db(&d).query_row(
+        "SELECT slot_held,outcome FROM shared_booking_intents WHERE work_unit_id=?1", [&booking_id],
+        |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+    assert_eq!(settled, (false, Some("settled".into())), "the run's end settles its holds");
+    // The ended worker's attempt holds one slot until Swarm settles it (by
+    // then possibly already); never a second one beside its booking.
+    let registered: bool = db(&d).query_row("SELECT status='registered' FROM swarm_attempts WHERE id=?1",
+        [&attempt], |r| r.get(0)).unwrap();
+    assert_eq!(active_slots(&d), 2 + registered as i64, "the attempt is counted once, not beside its booking");
+
+    // The account headroom is one authority: an ordinary booked start on the
+    // same account sees the Swarm draws (5,000 retained, 3,000 booked).
+    let ordinary = d.try_call("task.create", json!({"repo":checkout,"harness":"claude",
+        "profile_id":"system-claude","model":"sonnet","prompt":"x","title":"too big",
+        "shared_booking":{"work_unit_id":"ordinary-too-big","account_generation":1,
+            "quota_event_seq":booking["quota_event_seq"],"upper_draw_milli":[92_001, 92_001]}}));
+    assert!(ordinary.as_ref().unwrap_err().contains("shared_pool_headroom"), "{ordinary:?}");
+}

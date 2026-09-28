@@ -87,6 +87,199 @@ fn unbound_run_sql(alias: &str) -> String {
     )
 }
 
+/// The app-wide agent ceiling (`agents.max_active`, default 9).
+pub fn app_slot_limit(conn: &Connection) -> Result<i64> {
+    let setting: Option<String> = conn
+        .query_row(
+            "SELECT value FROM meta WHERE key='agents.max_active'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    match setting {
+        None => Ok(9),
+        Some(value) => value
+            .parse::<i64>()
+            .ok()
+            .filter(|n| (1..=256).contains(n))
+            .ok_or_else(|| anyhow!("invalid app agent limit")),
+    }
+}
+
+/// The work unit id of the shared booking that holds a Swarm worker
+/// attempt's account commitment and app slot.
+pub fn swarm_attempt_booking_id(attempt_id: &str) -> String {
+    format!("swarm/{attempt_id}")
+}
+
+/// The one count of app slots in use, consulted by every admission path
+/// (ordinary starts and follow-ups, Auto roots and children, Swarm directors
+/// and workers, booked starts) inside its own admission transaction. Each
+/// occupant is counted exactly once, by the first rule that holds it:
+///
+/// 1. a durable slot hold taken before an ordinary start's or a follow-up's
+///    run row exists (`app_slot_holds`, deleted in the commit that inserts
+///    the run, and cleared at startup: the old daemon's requests are gone);
+/// 2. a shared booking that holds a slot (`slot_held`), bound or not, until
+///    its run is confirmed to have no process;
+/// 3. an Auto child admitted but not yet recorded as a managed child;
+/// 4. a registered Swarm worker attempt whose booking does not hold a slot
+///    (an unbooked fixture worker, or a booking already settled);
+/// 5. an active Swarm category's director slot;
+/// 6. any other top-level or managed-delegation run that may still own a
+///    process (including `unknown`/`disconnected`), except Overseer's own
+///    coordinating run, which by the Swarm/Auto contract holds no slot.
+///
+/// A director run bound to a booking that took no slot
+/// (`consume_agent_slot: false`) is counted by rule 5 while its category is
+/// active and by rule 6 while it is still planning, never twice.
+pub fn app_slots_in_use(conn: &Connection) -> Result<i64> {
+    let held = held_intent_sql("b");
+    let swarm_held = held_intent_sql("sb");
+    Ok(conn.query_row(
+        &format!(
+            "SELECT
+            (SELECT COUNT(*) FROM app_slot_holds)
+          + (SELECT COUNT(*) FROM shared_booking_intents b WHERE b.slot_held=1 AND {held})
+          + (SELECT COUNT(*) FROM auto_launch_intents i
+               JOIN auto_pool_claims c ON c.work_unit_id=i.work_unit_id
+               WHERE c.state IN ('active','uncertain')
+               AND NOT EXISTS(SELECT 1 FROM managed_work_units m WHERE m.work_unit_id=i.work_unit_id))
+          + (SELECT COUNT(*) FROM swarm_attempts a
+               WHERE a.status='registered' AND a.executor='worker'
+               AND NOT EXISTS(SELECT 1 FROM shared_booking_intents sb
+                   WHERE sb.work_unit_id='swarm/'||a.id AND sb.slot_held=1 AND {swarm_held}))
+          + (SELECT COUNT(*) FROM swarm_runs WHERE status IN ('running','paused','stalled','stopping'))
+          + (SELECT COUNT(*) FROM runs r
+               WHERE (r.parent_run_id IS NULL OR r.relation_source='managed-delegation')
+               AND (r.status IN ({HOLDING_STATUSES})
+                   OR EXISTS(SELECT 1 FROM turns t WHERE t.run_id=r.id
+                       AND t.status='running' AND t.ended_ms IS NULL))
+               AND NOT EXISTS(SELECT 1 FROM shared_booking_intents bb WHERE bb.run_id=r.id
+                   AND ((bb.settled_ms IS NULL AND bb.slot_held=1)
+                     OR (bb.settled_ms IS NOT NULL AND r.status IN ('disconnected','unknown'))))
+               AND NOT EXISTS(SELECT 1 FROM run_roles rr WHERE rr.run_id=r.id AND rr.role='overseer')
+               AND NOT EXISTS(SELECT 1 FROM swarm_worker_launches l
+                   JOIN swarm_attempts wa ON wa.id=l.attempt_id
+                   WHERE l.overseer_run_id=r.id AND wa.status='registered')
+               AND NOT EXISTS(SELECT 1 FROM swarm_director_owners o
+                   JOIN swarm_runs s ON s.id=o.run_id
+                   WHERE o.overseer_run_id=r.id
+                   AND s.status IN ('running','paused','stalled','stopping')))"
+        ),
+        [],
+        |row| row.get(0),
+    )?)
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum SlotHold {
+    Held,
+    Full { active: i64, limit: i64 },
+}
+
+/// Take a durable app-slot hold for an admission whose run row does not
+/// exist yet (an ordinary start before its workspace is prepared, a
+/// follow-up that reactivates an ended run). Call inside an IMMEDIATE
+/// transaction; the hold is deleted in the commit that inserts the run.
+pub fn hold_app_slot_in_tx(conn: &Connection, id: &str, kind: &str, now_ms: i64) -> Result<SlotHold> {
+    if conn.is_autocommit() {
+        return Err(anyhow!("an app slot hold requires an admission transaction"));
+    }
+    let active = app_slots_in_use(conn)?;
+    let limit = app_slot_limit(conn)?;
+    if active >= limit {
+        return Ok(SlotHold::Full { active, limit });
+    }
+    conn.execute(
+        "INSERT INTO app_slot_holds(id,kind,created_ms) VALUES(?1,?2,?3)",
+        params![id, kind, now_ms],
+    )?;
+    Ok(SlotHold::Held)
+}
+
+/// A booked Swarm worker whose attempt is no longer registered (cancelled,
+/// failed or finished before its launch claimed effects) never requested an
+/// effect: release its booking with its slot and account commitment. Called
+/// in the admission and startup transactions, so a Swarm attempt and its
+/// booking never disagree for longer than one admission.
+pub fn release_orphaned_swarm_bookings_in_tx(conn: &Connection, now_ms: i64) -> Result<usize> {
+    let orphaned: Vec<String> = {
+        let mut stmt = conn.prepare(
+            "SELECT b.work_unit_id FROM shared_booking_intents b
+            WHERE b.caller='swarm' AND b.phase='booked' AND b.effects_claimed_ms IS NULL
+              AND b.launch_hash IS NOT NULL
+              AND NOT EXISTS(SELECT 1 FROM swarm_attempts a
+                  WHERE 'swarm/'||a.id=b.work_unit_id AND a.status='registered')
+            ORDER BY b.work_unit_id",
+        )?;
+        let rows = stmt.query_map([], |row| row.get(0))?;
+        rows.collect::<rusqlite::Result<_>>()?
+    };
+    for id in &orphaned {
+        conn.execute(
+            "UPDATE shared_booking_intents SET phase='released',slot_held=0,writer_held=0,
+            outcome='released_unclaimed',updated_ms=?2 WHERE work_unit_id=?1",
+            params![id, now_ms],
+        )?;
+        conn.execute(
+            "UPDATE auto_pool_claims SET state='released',released_ms=?2
+            WHERE work_unit_id=?1 AND state IN ('active','uncertain')",
+            params![id, now_ms],
+        )?;
+    }
+    Ok(orphaned.len())
+}
+
+/// One window of the structured observation a booking must cite: its pool,
+/// its window key and its reported remaining allowance in thousandths of a
+/// percentage point. None when the cited observation is not the latest for
+/// that profile's account (the booking would refuse it anyway).
+pub fn cited_windows_in_tx(
+    conn: &Connection,
+    quota_profile_id: &str,
+    quota_event_seq: i64,
+) -> Result<Option<Vec<(String, String, i64)>>> {
+    let fingerprint: Option<String> = conn
+        .query_row(
+            "SELECT fingerprint FROM auto_account_identity WHERE profile_id=?1",
+            [quota_profile_id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let Some(fingerprint) = fingerprint else {
+        return Ok(None);
+    };
+    let observation: Option<(i64, String)> = conn
+        .query_row(
+            "SELECT event_seq,snapshot FROM auto_quota_observations WHERE pool_id=?1
+         ORDER BY observed_ms DESC,event_seq DESC LIMIT 1",
+            [quota_profile_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+    let Some((event_seq, encoded)) = observation else {
+        return Ok(None);
+    };
+    if event_seq != quota_event_seq {
+        return Ok(None);
+    }
+    let quota: QuotaSnapshot = serde_json::from_str(&encoded)?;
+    let pool = format!("account/{fingerprint}");
+    let mut windows = Vec::with_capacity(quota.windows.len());
+    for window in &quota.windows {
+        if !window.used_percent.is_finite() || !(0.0..=100.0).contains(&window.used_percent) {
+            return Ok(None);
+        }
+        windows.push((
+            pool.clone(),
+            window_key(window)?,
+            ((100.0 - window.used_percent) * 1000.0).floor() as i64,
+        ));
+    }
+    Ok(Some(windows))
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum LaunchBookingDecision {
     Booked(SharedLaunchIntent),
@@ -211,52 +404,8 @@ pub fn book_shared_launch_in_tx(
             return Ok(LaunchBookingDecision::Blocked("workspace_writer_busy"));
         }
     }
-    if req.consume_agent_slot {
-        let setting: Option<String> = conn
-            .query_row(
-                "SELECT value FROM meta WHERE key='agents.max_active'",
-                [],
-                |row| row.get(0),
-            )
-            .optional()?;
-        let limit = match setting {
-            None => 9,
-            Some(value) => value
-                .parse::<i64>()
-                .ok()
-                .filter(|n| (1..=256).contains(n))
-                .ok_or_else(|| anyhow!("invalid app agent limit"))?,
-        };
-        // A bound run is counted once, through its intent's slot hold.
-        let active: i64 = conn.query_row(
-            &format!(
-                "SELECT COUNT(*) FROM runs r
-            WHERE (r.parent_run_id IS NULL OR r.relation_source='managed-delegation')
-            AND (r.status IN ({HOLDING_STATUSES})
-                OR EXISTS(SELECT 1 FROM turns t WHERE t.run_id=r.id
-                    AND t.status='running' AND t.ended_ms IS NULL)) AND {}",
-                unbound_run_sql("r")
-            ),
-            [],
-            |row| row.get(0),
-        )?;
-        let held: i64 = conn.query_row(
-            &format!(
-                "SELECT COUNT(*) FROM shared_booking_intents b
-            WHERE b.slot_held=1 AND {}",
-                held_intent_sql("b")
-            ),
-            [],
-            |row| row.get(0),
-        )?;
-        let pending_auto: i64 = conn.query_row("SELECT COUNT(*) FROM auto_launch_intents i
-            JOIN auto_pool_claims c ON c.work_unit_id=i.work_unit_id
-            WHERE c.state IN ('active','uncertain')
-              AND NOT EXISTS(SELECT 1 FROM managed_work_units m WHERE m.work_unit_id=i.work_unit_id)",
-            [], |row| row.get(0))?;
-        if active.saturating_add(held).saturating_add(pending_auto) >= limit {
-            return Ok(LaunchBookingDecision::Blocked("global_agent_limit"));
-        }
+    if req.consume_agent_slot && app_slots_in_use(conn)? >= app_slot_limit(conn)? {
+        return Ok(LaunchBookingDecision::Blocked("global_agent_limit"));
     }
     match book_shared_account_in_tx(conn, req.account)? {
         BookingDecision::Blocked(reason) => return Ok(LaunchBookingDecision::Blocked(reason)),
@@ -874,10 +1023,18 @@ impl Store {
         let now = crate::daemon::now();
         let tx = Transaction::new_unchecked(&self.conn, TransactionBehavior::Immediate)?;
         let mut report = Vec::new();
+        // The daemon's own launch requests are gone: their slot holds go.
+        tx.execute("DELETE FROM app_slot_holds", [])?;
+        release_orphaned_swarm_bookings_in_tx(&tx, now)?;
+        // A booked Swarm worker belongs to its durable, still registered
+        // attempt, which dispatch recovery launches again: it keeps its
+        // booking. Every other unclaimed booking had only a request.
         let unclaimed: Vec<String> = {
             let mut stmt = tx.prepare(
                 "SELECT work_unit_id FROM shared_booking_intents
                 WHERE phase='booked' AND launch_hash IS NOT NULL AND effects_claimed_ms IS NULL
+                  AND NOT (caller='swarm' AND EXISTS(SELECT 1 FROM swarm_attempts a
+                      WHERE 'swarm/'||a.id=work_unit_id AND a.status='registered'))
                 ORDER BY work_unit_id",
             )?;
             let rows = stmt.query_map([], |row| row.get(0))?;
@@ -1880,5 +2037,191 @@ mod tests {
             )
             .unwrap();
         assert_eq!(claimed_once, 1);
+    }
+
+    fn swarm_run(store: &Store, id: &str, status: &str) {
+        store.conn.execute(
+            "INSERT INTO swarm_runs(id,category,category_key,objective,status,generation,revision,
+            allowed_targets,policy,created_ms,updated_ms) VALUES(?1,?1,?1,'objective',?2,1,1,'[]','{}',0,0)",
+            params![id, status]).unwrap();
+        store.conn.execute(
+            "INSERT INTO swarm_jobs(run_id,id,plan_revision,title,acceptance,deps,status,created_ms,updated_ms)
+            VALUES(?1,'j',1,'job','evidence','[]','reserved',0,0)", [id]).unwrap();
+    }
+
+    fn swarm_attempt(store: &Store, run: &str, attempt: &str) {
+        store.conn.execute(
+            "INSERT INTO swarm_attempts(id,run_id,job_id,revision,token_sha256,status,executor,created_ms)
+            VALUES(?1,?2,'j',1,'hash','registered','worker',0)", params![attempt, run]).unwrap();
+    }
+
+    #[test]
+    fn one_count_takes_each_occupant_once_and_a_director_booking_takes_no_second_slot() {
+        let store = Store::open(Path::new(":memory:")).unwrap();
+        identities(&store, &[("first", 'a'), ("second", 'b')]);
+        let first = observed(&store, "first", [10.0, 10.0]);
+        let second = observed(&store, "second", [10.0, 10.0]);
+        let count = || app_slots_in_use(&store.conn).unwrap();
+        assert_eq!(count(), 0);
+
+        // An ordinary start's durable hold, before its run row exists.
+        let hold = store.hold_app_slot("start").unwrap().unwrap();
+        assert_eq!(count(), 1);
+        // A booked start, not yet bound.
+        let booked = account("launch/ordinary", "first", first, &[1_000, 1_000]);
+        assert!(matches!(store.book_shared_launch(&launch(&booked, "/repo/ordinary")).unwrap(),
+            LaunchBookingDecision::Booked(_)));
+        assert_eq!(count(), 2);
+        // Overseer's own coordinating run holds no slot (Swarm/Auto contract).
+        queued_run(&store, "r-overseer", "overseer-profile", "/repo/overseer");
+        store.conn.execute("INSERT INTO run_roles(run_id,role) VALUES('r-overseer','overseer')", []).unwrap();
+        assert_eq!(count(), 2);
+        // An active category: its director slot, and an unbooked (fixture) worker attempt.
+        swarm_run(&store, "s-active", "running");
+        swarm_attempt(&store, "s-active", "att-fixture");
+        assert_eq!(count(), 4);
+        // A booked Swarm worker attempt is counted through its booking only.
+        swarm_attempt(&store, "s-active", "att-booked");
+        let worker_id = swarm_attempt_booking_id("att-booked");
+        let worker = AccountBookingRequest { caller: "swarm", ..account(&worker_id, "first", first, &[1_000, 1_000]) };
+        let worker_launch = LaunchBookingRequest { account: &worker, workspace_path: None,
+            consume_agent_slot: true, launch_hash: &worker_id };
+        assert!(matches!(store.book_shared_launch(&worker_launch).unwrap(), LaunchBookingDecision::Booked(_)));
+        assert_eq!(count(), 5, "a booked worker attempt is one slot, not two");
+
+        // A director in a planning category, bound to a booking that took no
+        // slot: its run is the one occupant while planning, and the category's
+        // director slot is the one occupant once the category runs.
+        swarm_run(&store, "s-plan", "planning");
+        let director = account("director/s-plan", "second", second, &[1_000, 1_000]);
+        let director_launch = LaunchBookingRequest { account: &director, workspace_path: None,
+            consume_agent_slot: false, launch_hash: "director/s-plan" };
+        match store.book_shared_launch(&director_launch).unwrap() {
+            LaunchBookingDecision::Booked(intent) => assert!(!intent.slot_held),
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(count(), 5, "a booking without a slot takes none");
+        queued_run(&store, "r-director", "second", "/repo/director");
+        store.conn.execute(
+            "INSERT INTO swarm_director_owners(run_id,generation,token_sha256,status,created_ms,renewed_ms,
+            lease_expires_ms,overseer_run_id,supervised_launch,launch_phase)
+            VALUES('s-plan',1,'hash','active',0,0,999999999999,'r-director',1,'linked')", []).unwrap();
+        assert!(store.claim_shared_launch_effects("director/s-plan").unwrap());
+        bind(&store, "director/s-plan", "r-director").unwrap();
+        assert_eq!(count(), 6, "the planning director's run is counted once");
+        store.conn.execute("UPDATE swarm_runs SET status='running' WHERE id='s-plan'", []).unwrap();
+        assert_eq!(count(), 6, "a running category's director slot replaces its run, not adds to it");
+
+        // Releasing the ordinary hold gives back exactly one slot.
+        store.release_app_slot_hold(&hold).unwrap();
+        assert_eq!(count(), 5);
+        // A cancelled attempt's unlaunched booking is released with it.
+        store.conn.execute("UPDATE swarm_attempts SET status='cancelled' WHERE id='att-booked'", []).unwrap();
+        assert_eq!(count(), 5, "the booking still holds until reconciled");
+        let tx = Transaction::new_unchecked(&store.conn, TransactionBehavior::Immediate).unwrap();
+        assert_eq!(release_orphaned_swarm_bookings_in_tx(&tx, 3_000).unwrap(), 1);
+        tx.commit().unwrap();
+        assert_eq!(count(), 4);
+        assert_eq!(claim_state(&store, &worker_id), "released");
+    }
+
+    #[test]
+    fn four_admission_paths_race_for_the_last_slot_and_exactly_one_wins() {
+        use std::sync::{Arc, Barrier};
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("slots.sqlite");
+        {
+            let store = Store::open(&db).unwrap();
+            identities(&store, &[("first", 'a'), ("second", 'b')]);
+            observed(&store, "first", [10.0, 10.0]);
+            store.set_auto_mode_enabled(true).unwrap();
+            // Two slots: an active category holds one; one is left.
+            agent_limit(&store, 2);
+            swarm_run(&store, "s-active", "running");
+            store.conn.execute_batch("INSERT INTO workspaces(id,path,repo_root,common_dir,kind,initial_dirty,created_ms)
+                VALUES('w-parent','/repo/parent','/repo','/repo','current','{}',0);
+                INSERT INTO tasks(id,title,prompt,repo_root,workspace_id,created_ms)
+                VALUES('t-parent','parent','prompt','/repo','w-parent',0);
+                INSERT INTO runs(id,task_id,harness,workspace_id,status,created_ms,title,capabilities)
+                VALUES('parent','t-parent','codex-app','w-parent','completed',0,'parent','{}');").unwrap();
+            assert_eq!(app_slots_in_use(&store.conn).unwrap(), 1);
+        }
+        let event: i64 = Store::open(&db).unwrap().conn.query_row(
+            "SELECT MAX(event_seq) FROM auto_quota_observations WHERE pool_id='first'", [], |r| r.get(0)).unwrap();
+        let barrier = Arc::new(Barrier::new(4));
+        let handles: Vec<_> = (0..4).map(|path| {
+            let db = db.clone();
+            let barrier = barrier.clone();
+            std::thread::spawn(move || -> (&'static str, bool, String) {
+                let store = Store::open(&db).unwrap();
+                barrier.wait();
+                match path {
+                    0 => match store.hold_app_slot("start").unwrap() {
+                        Ok(_) => ("ordinary", true, String::new()),
+                        Err((active, limit)) => ("ordinary", false, format!("limit {active}/{limit}")),
+                    },
+                    1 => {
+                        let request = account("launch/booked", "first", event, &[1_000, 1_000]);
+                        match store.book_shared_launch(&launch(&request, "/repo/booked")).unwrap() {
+                            LaunchBookingDecision::Booked(_) => ("booked", true, String::new()),
+                            other => ("booked", false, format!("{other:?}")),
+                        }
+                    }
+                    2 => {
+                        let parent = store.run("parent").unwrap().unwrap();
+                        match store.insert_auto_selected_decision("child-1", &parent, "hash", "route",
+                            "account/other-child", None, 300_000, &serde_json::json!({})) {
+                            Ok(Some(_)) => ("auto_child", true, String::new()),
+                            Ok(None) => ("auto_child", false, "pool".into()),
+                            Err(error) => ("auto_child", false, error.to_string()),
+                        }
+                    }
+                    _ => {
+                        let (ws, task, run) = auto_root_rows();
+                        match store.insert_auto_root_selected("root-1", &"h".repeat(64), "route",
+                            "account/other-root", None, &ws, &task, &run, &serde_json::json!({}),
+                            &serde_json::json!({})) {
+                            Ok(Some(_)) => ("auto_root", true, String::new()),
+                            Ok(None) => ("auto_root", false, "pool".into()),
+                            Err(error) => ("auto_root", false, error.to_string()),
+                        }
+                    }
+                }
+            })
+        }).collect();
+        let results: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+        let winners: Vec<_> = results.iter().filter(|(_, won, _)| *won).collect();
+        assert_eq!(winners.len(), 1, "exactly one path takes the last slot: {results:?}");
+        for (path, won, why) in &results {
+            if !won {
+                assert!(why.contains("limit") || why.contains("global_agent_limit"),
+                    "{path} was refused for the agent limit, not something else: {why}");
+            }
+        }
+        // The winner's slot is durable: a fresh connection sees the limit
+        // reached, and a late ordinary start and booked start are refused.
+        let store = Store::open(&db).unwrap();
+        assert_eq!(app_slots_in_use(&store.conn).unwrap(), 2, "{results:?}");
+        assert!(store.hold_app_slot("start").unwrap().is_err());
+        let late = account("launch/late", "first", event, &[1_000, 1_000]);
+        assert_eq!(store.book_shared_launch(&launch(&late, "/repo/late")).unwrap(),
+            LaunchBookingDecision::Blocked("global_agent_limit"));
+    }
+
+    fn auto_root_rows() -> (crate::store::Workspace, crate::store::Task, crate::store::Run) {
+        let ws = crate::store::Workspace { id: "w-root".into(), path: "/repo/root".into(),
+            repo_root: "/repo".into(), common_dir: "/repo/.git".into(), kind: "worktree".into(),
+            branch: Some("root".into()), owner_run_id: None, initial_dirty: serde_json::json!({}),
+            created_ms: 0, removed_ms: None };
+        let task = crate::store::Task { id: "t-root".into(), title: "root".into(), prompt: "prompt".into(),
+            repo_root: "/repo".into(), target_ref: None, workspace_id: "w-root".into(), start_snapshot: None,
+            fork_commit: None, fork_provenance: None, created_ms: 0, archived_ms: None };
+        let run = crate::store::Run { id: "r-root".into(), task_id: "t-root".into(), parent_run_id: None,
+            harness: "codex-app".into(), harness_version: None, profile_id: Some("second".into()),
+            model: Some("model".into()), effort: None, workspace_id: "w-root".into(), native_id: None,
+            status: "queued".into(), exit_reason: None, created_ms: 0, ended_ms: None, title: "root".into(),
+            relation_source: None, relation_confidence: None, capabilities: serde_json::json!({}),
+            process_generation: 0, attention: None };
+        (ws, task, run)
     }
 }

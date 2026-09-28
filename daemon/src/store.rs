@@ -14,8 +14,9 @@ use std::path::Path;
 /// existence-checked migrations. 21 was used twice (their union, and Auto's
 /// shared launch binding on its own branch); 22 is both together. 23 adds
 /// main's Gate S (Overseer itself) tables, which main created without
-/// bumping its own label; every one is `CREATE TABLE IF NOT EXISTS`.
-pub const SCHEMA_VERSION: i64 = 23;
+/// bumping its own label; every one is `CREATE TABLE IF NOT EXISTS`. 24
+/// adds `app_slot_holds`, the durable form of an in-flight start's slot.
+pub const SCHEMA_VERSION: i64 = 24;
 /// Retained normalized events per run before older ones are pruned (with a marker).
 pub const EVENTS_PER_RUN: i64 = 5000;
 
@@ -182,10 +183,7 @@ impl Store {
     }
 
     pub fn agent_limit(&self) -> Result<i64> {
-        let value: Option<String> = self.conn.query_row(
-            "SELECT value FROM meta WHERE key='agents.max_active'", [], |row| row.get(0)
-        ).optional()?;
-        Ok(value.and_then(|v| v.parse().ok()).unwrap_or(9))
+        crate::account_booking::app_slot_limit(&self.conn)
     }
 
     pub fn set_agent_limit(&self, limit: i64) -> Result<()> {
@@ -199,32 +197,39 @@ impl Store {
         Ok(())
     }
 
-    /// App slots: one per active top-level run, one per registered Swarm worker
-    /// attempt, and one per active director. A director-executed serial attempt
-    /// shares the director's slot; native children share their parent's slot.
+    /// App slots in use: the one count every admission path consults
+    /// (`account_booking::app_slots_in_use`, which says what holds a slot).
     pub fn active_agent_count(&self) -> Result<i64> {
-        Ok(self.conn.query_row(
-            "SELECT
-              (SELECT COUNT(*) FROM runs r WHERE r.parent_run_id IS NULL
-               AND r.status IN ('queued','starting','running','waiting_for_user')
-               AND NOT EXISTS (SELECT 1 FROM swarm_worker_launches l
-                 JOIN swarm_attempts a ON a.id=l.attempt_id
-                 WHERE l.overseer_run_id=r.id AND a.status='registered')
-               AND NOT EXISTS (SELECT 1 FROM swarm_director_owners o
-                 JOIN swarm_runs s ON s.id=o.run_id
-                 WHERE o.overseer_run_id=r.id AND s.status IN ('running','paused','stalled','stopping')))
-              + (SELECT COUNT(*) FROM swarm_attempts WHERE status='registered' AND executor='worker')
-              + (SELECT COUNT(*) FROM swarm_runs
-                 WHERE status IN ('running','paused','stalled','stopping'))",
-            [], |row| row.get(0)
-        )?)
+        crate::account_booking::app_slots_in_use(&self.conn)
     }
 
+    /// Take a durable app-slot hold for a start whose run row does not exist
+    /// yet. Err((active, limit)) when the app-wide limit is reached.
+    pub fn hold_app_slot(&self, kind: &str) -> Result<std::result::Result<String, (i64, i64)>> {
+        let id = format!("slot-{}", uuid::Uuid::new_v4().simple());
+        let tx = rusqlite::Transaction::new_unchecked(&self.conn, rusqlite::TransactionBehavior::Immediate)?;
+        let held = crate::account_booking::hold_app_slot_in_tx(&tx, &id, kind, crate::daemon::now())?;
+        tx.commit()?;
+        Ok(match held {
+            crate::account_booking::SlotHold::Held => Ok(id),
+            crate::account_booking::SlotHold::Full { active, limit } => Err((active, limit)),
+        })
+    }
+
+    pub fn release_app_slot_hold(&self, id: &str) -> Result<()> {
+        self.conn.execute("DELETE FROM app_slot_holds WHERE id=?1", [id])?;
+        Ok(())
+    }
+
+    /// What holds the app slots, for the limit message. The count itself is
+    /// `account_booking::app_slots_in_use`; this lists its main occupants.
     pub fn active_agents(&self) -> Result<Vec<Value>> {
         let mut stmt = self.conn.prepare(
             "SELECT r.id,r.title,r.status,'run' FROM runs r
-             WHERE r.parent_run_id IS NULL
-             AND r.status IN ('queued','starting','running','waiting_for_user')
+             WHERE (r.parent_run_id IS NULL OR r.relation_source='managed-delegation')
+             AND r.status IN ('queued','starting','running','waiting_for_user',
+                 'waiting_for_connection','waiting_for_memory','unknown','disconnected')
+             AND NOT EXISTS (SELECT 1 FROM run_roles rr WHERE rr.run_id=r.id AND rr.role='overseer')
              AND NOT EXISTS (SELECT 1 FROM swarm_worker_launches l
                JOIN swarm_attempts a ON a.id=l.attempt_id
                WHERE l.overseer_run_id=r.id AND a.status='registered')
@@ -234,7 +239,10 @@ impl Store {
              UNION ALL SELECT id,job_id,status,'swarm_worker' FROM swarm_attempts
                WHERE status='registered' AND executor='worker'
              UNION ALL SELECT id,category,status,'swarm_director' FROM swarm_runs
-               WHERE status IN ('running','paused','stalled','stopping')"
+               WHERE status IN ('running','paused','stalled','stopping')
+             UNION ALL SELECT work_unit_id,route_id,phase,'booked_launch' FROM shared_booking_intents
+               WHERE slot_held=1 AND run_id IS NULL AND settled_ms IS NULL
+             UNION ALL SELECT id,kind,'starting','starting' FROM app_slot_holds"
         )?;
         let agents = stmt.query_map([], |row| {
             Ok(serde_json::json!({"id":row.get::<_,String>(0)?,
@@ -435,6 +443,8 @@ impl Store {
               PRIMARY KEY(work_unit_id,pool_id,window_key));
             CREATE INDEX IF NOT EXISTS shared_booking_windows_pool
               ON shared_booking_windows(pool_id,window_key);
+            CREATE TABLE IF NOT EXISTS app_slot_holds(
+              id TEXT PRIMARY KEY, kind TEXT NOT NULL, created_ms INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS overseer_tokens(
               sha TEXT PRIMARY KEY, run_id TEXT NOT NULL, role TEXT NOT NULL, created_ms INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS conflicts(
@@ -915,6 +925,15 @@ impl Store {
     /// the same commit, so its held slot and writer become the run's occupancy.
     pub fn insert_task_and_run_bound(&self, t: &Task, r: &Run, attempt_id: Option<&str>,
         director: Option<DirectorOwnerLink<'_>>, shared_launch: Option<(&str, i64)>) -> Result<()> {
+        self.insert_task_and_run_holding(t, r, attempt_id, director, shared_launch, None)
+    }
+
+    /// As `insert_task_and_run_bound`; a durable app-slot hold taken for this
+    /// start is deleted in the same commit, so the run replaces the hold in
+    /// the one app-slot count without a moment counted twice or not at all.
+    pub fn insert_task_and_run_holding(&self, t: &Task, r: &Run, attempt_id: Option<&str>,
+        director: Option<DirectorOwnerLink<'_>>, shared_launch: Option<(&str, i64)>,
+        slot_hold: Option<&str>) -> Result<()> {
         if attempt_id.is_some() && director.is_some() {
             bail!("a run cannot be both a swarm worker and director");
         }
@@ -947,6 +966,11 @@ impl Store {
         tx.execute("UPDATE workspaces SET owner_run_id=?2 WHERE id=?1",params![r.workspace_id,r.id])?;
         if let Some((launch, at)) = shared_launch {
             crate::account_booking::bind_shared_launch_run_in_tx(&tx, launch, &r.id, at)?;
+        }
+        if let Some(hold) = slot_hold {
+            if tx.execute("DELETE FROM app_slot_holds WHERE id=?1", [hold])? != 1 {
+                bail!("the start's app slot hold is missing");
+            }
         }
         tx.commit()?;
         Ok(())
@@ -1117,10 +1141,11 @@ impl Store {
             || task.repo_root != workspace.repo_root || task.prompt.is_empty() {
             return Err(anyhow!("automatic root execution rows are inconsistent"));
         }
-        let tx = self.conn.unchecked_transaction()?;
+        let tx = rusqlite::Transaction::new_unchecked(&self.conn, rusqlite::TransactionBehavior::Immediate)?;
         if !self.auto_mode_enabled()? {
             return Err(anyhow!("Auto Mode was disabled before root admission"));
         }
+        self.require_app_slot()?;
         if self.auto_launch_intent(work_unit_id)?.is_some()
             || self.auto_root_intent(work_unit_id)?.is_some() {
             return Err(anyhow!("automatic work-unit identity was already used"));
@@ -1169,6 +1194,19 @@ impl Store {
         Ok(())
     }
 
+    /// Refuse an admission when the one app-slot count is at the limit.
+    /// Call inside the admission's own transaction.
+    fn require_app_slot(&self) -> Result<()> {
+        let active = crate::account_booking::app_slots_in_use(&self.conn)?;
+        let limit = crate::account_booking::app_slot_limit(&self.conn)?;
+        if active >= limit {
+            return Err(crate::daemon::AgentLimitError {
+                active, limit, running_agents: self.active_agents()?,
+            }.into());
+        }
+        Ok(())
+    }
+
     pub fn insert_auto_selected_decision(&self, work_unit_id: &str, parent: &Run,
         requirements_hash: &str, route_id: &str, pool_id: &str,
         account_generation: Option<i64>, execution_budget_ms: u64,
@@ -1176,7 +1214,7 @@ impl Store {
         if pool_id.is_empty() || pool_id.len() > 256 {
             return Err(anyhow!("automatic quota pool identity is invalid"));
         }
-        let tx = self.conn.unchecked_transaction()?;
+        let tx = rusqlite::Transaction::new_unchecked(&self.conn, rusqlite::TransactionBehavior::Immediate)?;
         let launch: Option<String> = self.conn.query_row(
             "SELECT launch FROM runs WHERE id=?1", [&parent.id], |row| row.get(0))?;
         let launch: Value = launch.as_deref().and_then(|text| serde_json::from_str(text).ok())
@@ -1201,6 +1239,9 @@ impl Store {
         if self.auto_pool_claimed_for_child(pool_id, &parent.id, account_generation)? {
             return Ok(None);
         }
+        // The child is a separate process: it takes its own app slot, counted
+        // as a pending Auto child until its managed run is recorded.
+        self.require_app_slot()?;
         self.insert_auto_launch_intent(work_unit_id, &parent.id, requirements_hash,
             route_id, account_generation, execution_budget_ms)?;
         self.conn.execute(

@@ -1500,15 +1500,13 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             fixture_only()?;
             let _serial = d.swarm_launch_lock.lock().unwrap();
             require_swarm_storage(d)?;
-            let pending = d.pending_agent_slots.lock().unwrap();
-            crate::swarm::admit(&mut d.store.lock().unwrap(), p, *pending)?
+            crate::swarm::admit(&mut d.store.lock().unwrap(), p)?
         }
         "swarm.schedule.next" => {
             fixture_only()?;
             let _serial = d.swarm_launch_lock.lock().unwrap();
             require_swarm_storage(d)?;
-            let pending = d.pending_agent_slots.lock().unwrap();
-            crate::swarm::schedule_next(&mut d.store.lock().unwrap(), p, *pending)?
+            crate::swarm::schedule_next(&mut d.store.lock().unwrap(), p)?
         }
         "swarm.dispatch.next" => {
             fixture_only()?;
@@ -1607,16 +1605,14 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "profile.create" => json!(d.create_profile(s(p, "name")?, s(p, "harness")?)?),
         "agents.limit.get" => {
-            let pending = d.pending_agent_slots.lock().unwrap();
             let store = d.store.lock().unwrap();
-            json!({"max_active": store.agent_limit()?, "active": store.active_agent_count()? + *pending})
+            json!({"max_active": store.agent_limit()?, "active": store.active_agent_count()?})
         }
         "agents.limit.set" => {
             let limit = p["max_active"].as_i64().ok_or_else(|| anyhow!("max_active must be an integer"))?;
-            let pending = d.pending_agent_slots.lock().unwrap();
             let store = d.store.lock().unwrap();
             store.set_agent_limit(limit)?;
-            json!({"max_active": store.agent_limit()?, "active": store.active_agent_count()? + *pending})
+            json!({"max_active": store.agent_limit()?, "active": store.active_agent_count()?})
         }
         "profile.rename" => {
             let name = s(p, "name")?.trim();

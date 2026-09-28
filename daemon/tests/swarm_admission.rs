@@ -82,7 +82,7 @@ fn admit(
 
 #[test]
 fn audit_only_run_holds_native_worker_without_source_write_enforcement() {
-    let d = Daemon::start(&[]);
+    let d = Daemon::start(&[("OVERSEER_SHARED_BOOKING_FIXTURE_API","1")]);
     let at = now();
     let snapshot = json!({"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
         "targets":[{"id":"claude-a","harness":"claude","profile_id":"approved-a",
@@ -101,7 +101,8 @@ fn audit_only_run_holds_native_worker_without_source_write_enforcement() {
             "jobs":[{"id":"j1","title":"Inspect backend","acceptance":"Evidence",
                 "deps":[]}]}));
     }
-    let request = |run: &Value, request_id: &str| json!({
+    let booking = fixture_account_booking(&d, "approved-a", "approved-account", 0.0, 1000);
+    let request = |run: &Value, request_id: &str| json!({"shared_booking":booking,
         "run_id":run["id"],"generation":1,"revision":1,"job_id":"j1",
         "target_id":"claude-a","request_id":request_id,"snapshot":snapshot,
         "now_ms":at,"required_capabilities":["code"],
