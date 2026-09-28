@@ -1,0 +1,12 @@
+# The live agent's answer, as the phone shows it.
+appId: ${APP}
+---
+- extendedWaitUntil:
+    visible:
+      id: "agent.screen"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: "(?is).*\\bok\\b.*"
+    timeout: 30000
+- takeScreenshot: live-${HARNESS}-answer

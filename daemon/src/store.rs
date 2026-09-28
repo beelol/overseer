@@ -239,6 +239,11 @@ impl Store {
         if !has_archived {
             self.conn.execute_batch("ALTER TABLE tasks ADD COLUMN archived_ms INTEGER;")?;
         }
+        // Who answered each permission request first (several surfaces can answer at once).
+        self.conn.execute_batch("CREATE TABLE IF NOT EXISTS permission_answers(run_id TEXT NOT NULL, request_id TEXT NOT NULL, allow INTEGER NOT NULL, by TEXT NOT NULL, ts INTEGER NOT NULL, PRIMARY KEY(run_id, request_id));")?;
+        crate::review::migrate(&self.conn)?;
+        // Gate N: paired devices and the outcomes of their requests.
+        crate::gateway::devices::migrate(&self.conn)?;
         self.conn.execute("INSERT OR IGNORE INTO meta(key, value) VALUES('schema_version', ?1)", params![SCHEMA_VERSION.to_string()])?;
         Ok(())
     }
@@ -435,6 +440,36 @@ impl Store {
         Ok(())
     }
 
+    /// Takes a run's pending request when it is the one named, and records who answered and how.
+    /// The caller holds the store's lock, so of several answers to one request exactly one gets
+    /// `Some`, and every later one can read the first from `permission_answer`.
+    pub fn claim_run_attention(&self, id: &str, request_id: &str, allow: bool, by: &str, ts: i64) -> Result<Option<Value>> {
+        let current: Option<String> = self.conn.query_row("SELECT attention FROM runs WHERE id=?1", params![id], |r| r.get(0)).optional()?.flatten();
+        let Some(attention) = current.and_then(|t| serde_json::from_str::<Value>(&t).ok()) else { return Ok(None) };
+        if attention["request_id"].as_str() != Some(request_id) {
+            return Ok(None);
+        }
+        self.conn.execute("UPDATE runs SET attention=NULL WHERE id=?1", params![id])?;
+        self.conn.execute("INSERT OR REPLACE INTO permission_answers(run_id, request_id, allow, by, ts) VALUES(?1, ?2, ?3, ?4, ?5)", params![id, request_id, allow, by, ts])?;
+        Ok(Some(attention))
+    }
+
+    /// Puts a claimed request back: nothing reached the harness.
+    pub fn unclaim_run_attention(&self, id: &str, request_id: &str, attention: &Value) -> Result<()> {
+        self.conn.execute("DELETE FROM permission_answers WHERE run_id=?1 AND request_id=?2", params![id, request_id])?;
+        self.set_run_attention(id, Some(attention))
+    }
+
+    /// The first answer given to a permission request: `{"allow", "by", "ts"}`.
+    pub fn permission_answer(&self, run: &str, request_id: &str) -> Result<Option<Value>> {
+        Ok(self
+            .conn
+            .query_row("SELECT allow, by, ts FROM permission_answers WHERE run_id=?1 AND request_id=?2", params![run, request_id], |r| {
+                Ok(serde_json::json!({"allow": r.get::<_, bool>(0)?, "by": r.get::<_, String>(1)?, "ts": r.get::<_, i64>(2)?}))
+            })
+            .optional()?)
+    }
+
     pub fn set_run_process(&self, id: &str, run_dir: &str, generation: i64, launch: &Value) -> Result<()> {
         self.conn.execute(
             "UPDATE runs SET run_dir=?2, process_generation=?3, segment=0, seg_offset=0, launch=?4 WHERE id=?1",
@@ -604,6 +639,19 @@ impl Store {
             }
         }
         Ok(out)
+    }
+
+    /// True when events after `cursor` were pruned (of `run`, or of any run).
+    pub fn pruned_after(&self, cursor: i64, run: Option<&str>) -> Result<bool> {
+        let mut stmt = self.conn.prepare("SELECT payload FROM events WHERE kind='retention' AND (?1 IS NULL OR run_id=?1)")?;
+        let rows = stmt.query_map(params![run], |r| r.get::<_, String>(0))?;
+        for payload in rows {
+            let payload: Value = serde_json::from_str(&payload?).unwrap_or(Value::Null);
+            if payload["events_truncated_through_seq"].as_i64().is_some_and(|through| through > cursor) {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     pub fn max_seq(&self) -> Result<i64> {

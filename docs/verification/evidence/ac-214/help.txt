@@ -1,0 +1,36 @@
+scripts/deploy: install a build of main as the owner's Overseer (production). Gate T, AC-214.
+
+Deploy is the only path from dev to production: a pull request is merged to main, then this
+builds main and installs it. It is run by the owner, or by an agent only when the owner asked
+for it in that conversation. It asks before changing anything (--yes answers for you).
+
+USAGE
+  scripts/deploy [--yes] [--ref REF] [--no-fetch] [--repo PATH] [--vsix FILE]
+                 [--wait MINUTES | --no-wait] [--poll SECONDS]
+  scripts/deploy --rollback [--yes] [--wait MINUTES | --no-wait]
+  scripts/deploy --status [--json]
+  scripts/deploy --help
+
+WHAT IT DOES
+  1. Build: fetches origin/main in the checkout (--repo, default the one this script is in;
+     --no-fetch skips it; --ref picks another ref or commit) and builds it in its own clone
+     under ~/Library/Caches/overseer-deploy (never in your checkout): the VSIX with the
+     release daemon, stamped with the commit, and the notifier. --vsix FILE deploys a VSIX
+     that is already built instead.
+  2. Waits for quiet: the production daemon is restarted only when no runs are active. With
+     runs active it checks every --poll seconds (30) for up to --wait minutes (60), or with
+     --no-wait stops at once, changes nothing and says how many runs are active.
+  3. Installs: the extension into your VS Code (code --install-extension --force), the
+     notifier registered with macOS, then the daemon stopped (daemon.shutdown) and the new one
+     started once. Open VS Code windows reconnect; reload them to use the new extension.
+  4. Records: each deploy (commit, time, the VSIX kept) in the data folder's deploys/:
+     ~/Library/Application Support/Overseer/deploys/history.json
+  Your data (agents, history, settings) and logins are never touched.
+
+  --rollback   deploys the previous recorded version the same way (it waits for quiet too).
+  --status     what is deployed, what is installed, and what the running daemon reports.
+
+FOR TESTS ONLY (a temporary production)
+  --user-data-dir DIR --extensions-dir DIR   install into that VS Code profile, not yours
+  --skip-notifier-registration               do not register the notifier with macOS
+  HOME decides the production data folder and socket.

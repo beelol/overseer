@@ -1,0 +1,150 @@
+# Every screen, as it looks now: for the screenshots in both themes and at both text sizes.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- takeScreenshot: agents
+- scrollUntilVisible:
+    element:
+      id: "agents.row.${SHOWCASE}"
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "agents.row.${SHOWCASE}"
+    direction: DOWN
+    timeout: 20000
+# Tapped again when nothing changed: on a loaded machine the simulator can drop the touch of a
+# cold start's first tap (the screen stayed on the list for 30 s in one run).
+- runFlow:
+    file: open-agent.yaml
+    env:
+      RUN: ${SHOWCASE}
+- extendedWaitUntil:
+    visible:
+      id: "agent.list"
+    timeout: 30000
+- takeScreenshot: conversation
+- tapOn:
+    id: "agent.changes"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "changes.comparison"
+    timeout: 30000
+# Everything the agent changed since its task started, whatever its latest run did.
+- tapOn:
+    id: "changes.comparison"
+    retryTapIfNoChange: true
+- tapOn:
+    id: "changes.comparison.menu.task_start"
+- extendedWaitUntil:
+    visible:
+      id: "changes.row.${FILE}"
+    timeout: 30000
+- takeScreenshot: changes
+- tapOn:
+    id: "changes.row.${FILE}"
+- extendedWaitUntil:
+    visible:
+      id: "file.list"
+    timeout: 30000
+- takeScreenshot: file
+- tapOn:
+    id: "file.back"
+- extendedWaitUntil:
+    visible:
+      id: "changes.screen"
+    timeout: 10000
+- tapOn:
+    id: "changes.back"
+- extendedWaitUntil:
+    visible:
+      id: "agent.list"
+    timeout: 10000
+- tapOn:
+    id: "agent.more"
+    retryTapIfNoChange: true
+- tapOn:
+    id: "agent.more.merge"
+- extendedWaitUntil:
+    visible:
+      id: "merge.screen"
+    timeout: 30000
+- takeScreenshot: merge-back
+- tapOn:
+    id: "merge.back"
+- extendedWaitUntil:
+    visible:
+      id: "agent.list"
+    timeout: 10000
+- tapOn:
+    id: "agent.more"
+    retryTapIfNoChange: true
+- tapOn:
+    id: "agent.more.pr"
+- extendedWaitUntil:
+    visible:
+      id: "pr.screen"
+    timeout: 30000
+- takeScreenshot: pull-request
+- tapOn:
+    id: "pr.back"
+- extendedWaitUntil:
+    visible:
+      id: "agent.list"
+    timeout: 10000
+- tapOn:
+    id: "agent.back"
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 10000
+- tapOn:
+    id: "agents.new"
+- extendedWaitUntil:
+    visible:
+      id: "new.task"
+    timeout: 30000
+- takeScreenshot: new-agent
+- tapOn:
+    id: "new.back"
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 10000
+- tapOn:
+    id: "agents.menu"
+    retryTapIfNoChange: true
+- takeScreenshot: agents-menu
+- tapOn:
+    id: "agents.menu.accounts"
+- extendedWaitUntil:
+    visible:
+      id: "accounts.screen"
+    timeout: 30000
+- takeScreenshot: accounts
+- tapOn:
+    id: "accounts.back"
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 10000
+- tapOn:
+    id: "agents.menu"
+    retryTapIfNoChange: true
+- tapOn:
+    id: "agents.menu.settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings.screen"
+    timeout: 30000
+- takeScreenshot: settings
+- tapOn:
+    id: "settings.back"

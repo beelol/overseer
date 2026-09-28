@@ -1,0 +1,50 @@
+# A hunk rejected from the phone: asked once, then the lines are back as they were.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- runFlow:
+    file: open-agent.yaml
+- extendedWaitUntil:
+    visible:
+      id: "agent.changes"
+    timeout: 30000
+- tapOn:
+    id: "agent.changes"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "changes.comparison"
+    timeout: 30000
+# Everything the agent changed since its task started, whatever its latest run did.
+- tapOn:
+    id: "changes.comparison"
+    retryTapIfNoChange: true
+- tapOn:
+    id: "changes.comparison.menu.task_start"
+- extendedWaitUntil:
+    visible:
+      id: "changes.row.${FILE}"
+    timeout: 30000
+- tapOn:
+    id: "changes.row.${FILE}"
+- extendedWaitUntil:
+    visible:
+      id: "file.hunk.reject"
+    timeout: 30000
+- tapOn:
+    id: "file.hunk.reject"
+    index: 0
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "file.reject.confirm"
+    timeout: 20000
+- takeScreenshot: reject-asks-once
+- tapOn:
+    id: "file.reject.confirm"
+    retryTapIfNoChange: true

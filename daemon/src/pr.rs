@@ -22,6 +22,18 @@ pub fn github_repo(url: &str) -> Option<(String, String)> {
     (!owner.is_empty() && !repo.is_empty() && !repo.contains('/')).then_some((owner, repo))
 }
 
+/// A remote's address without a user name or token written into it.
+pub fn without_userinfo(url: &str) -> String {
+    match url.split_once("://") {
+        Some((scheme, rest)) => {
+            let (authority, path) = rest.split_once('/').map(|(a, p)| (a, format!("/{p}"))).unwrap_or((rest, String::new()));
+            let host = authority.rsplit_once('@').map(|(_, h)| h).unwrap_or(authority);
+            format!("{scheme}://{host}{path}")
+        }
+        None => url.to_string(),
+    }
+}
+
 impl Daemon {
     pub fn pr_plan(&self, workspace_id: &str) -> Result<Value> {
         let ws = self.workspace(workspace_id)?;
@@ -50,7 +62,7 @@ impl Daemon {
         // The configured URL (not `get-url`, which applies insteadOf rewrites).
         let url = git::git(path, &["config", "--get", &format!("remote.{remote}.url")])?;
         let Some((owner, repo)) = github_repo(&url) else {
-            return refuse(format!("The remote {remote} ({url}) is not on GitHub; Open PR only supports github.com remotes."));
+            return refuse(format!("The remote {remote} ({}) is not on GitHub; Open PR only supports github.com remotes.", without_userinfo(&url)));
         };
         let target = task.target_ref.clone().filter(|t| !t.is_empty() && !t.contains("..")).and_then(|t| {
             let local = git::git(Path::new(&task.repo_root), &["show-ref", "--verify", "--quiet", &format!("refs/heads/{t}")]).is_ok();
@@ -74,7 +86,7 @@ impl Daemon {
         Ok(json!({
             "ok": true, "workspace": ws, "run_id": root.map(|r| r.id.clone()), "title": root.map(|r| r.title.clone()).unwrap_or_else(|| task.title.clone()),
             "prompt": task.prompt, "harness": root.map(|r| r.harness.clone()), "model": root.and_then(|r| r.model.clone()),
-            "remote": remote, "remote_url": url, "owner": owner, "repo": repo, "branch": branch, "target": target, "base_ref": base_ref,
+            "remote": remote, "remote_url": without_userinfo(&url), "owner": owner, "repo": repo, "branch": branch, "target": target, "base_ref": base_ref,
             "uncommitted": uncommitted, "commits": commits,
         }))
     }
@@ -95,6 +107,50 @@ impl Daemon {
         Ok(json!({"plan": plan, "committed": committed, "head": head, "files": files, "commits": commits}))
     }
 
+    /// Opens the pull request from the daemon (Gate N): commits, pushes the branch with the
+    /// owner's own Git credentials and creates it with their GitHub CLI. The daemon starts `git`
+    /// and `gh`; it reads no token, and none is sent to the phone that asked. Reuses an open
+    /// pull request for the branch. Nothing is merged.
+    pub fn pr_open(&self, workspace_id: &str, p: &Value) -> Result<Value> {
+        let prepared = self.pr_prepare(workspace_id)?;
+        let plan = &prepared["plan"];
+        let text = |k: &str| plan[k].as_str().unwrap_or_default().to_string();
+        let ws = self.workspace(workspace_id)?;
+        let (remote, branch, target, repo) = (text("remote"), text("branch"), text("target"), format!("{}/{}", text("owner"), text("repo")));
+        let title: String = p["title"].as_str().map(str::trim).filter(|t| !t.is_empty()).map(str::to_string).unwrap_or_else(|| text("title")).chars().take(200).collect();
+        let body = match p["body"].as_str().filter(|b| !b.trim().is_empty()) {
+            Some(b) => b.chars().take(20_000).collect::<String>(),
+            None => pr_body(&prepared),
+        };
+        let push = std::process::Command::new("git").args(["-C", &ws.path, "push", "--no-verify", &remote, &format!("HEAD:refs/heads/{branch}")]).env("GIT_TERMINAL_PROMPT", "0").output()?;
+        if !push.status.success() {
+            bail!("git push failed: {}", crate::redact::redact(String::from_utf8_lossy(&push.stderr).trim()));
+        }
+        let gh = std::env::var("OVERSEER_GH").unwrap_or_else(|_| "gh".into());
+        let mut args = vec!["pr", "create", "--repo", &repo, "--head", &branch, "--base", &target, "--title", &title, "--body", &body];
+        if p["draft"].as_bool() == Some(true) {
+            args.push("--draft");
+        }
+        let created = std::process::Command::new(&gh).args(&args).current_dir(&ws.path).output().map_err(|e| {
+            crate::server::ProtoError::new("mac_setup", format!("The GitHub CLI (gh) was not found on the Mac ({e}). Install it and run gh auth login there, or open the pull request in VS Code."))
+        })?;
+        let out = String::from_utf8_lossy(&created.stdout).to_string();
+        let err = String::from_utf8_lossy(&created.stderr).to_string();
+        let (url, reused) = if created.status.success() {
+            (out.lines().rev().find(|l| l.starts_with("https://")).map(str::to_string), false)
+        } else if err.contains("already exists") {
+            (err.lines().chain(out.lines()).find_map(|l| l.split_whitespace().find(|w| w.starts_with("https://")).map(str::to_string)), true)
+        } else if err.contains("gh auth login") || err.contains("not logged") {
+            return Err(crate::server::ProtoError::new("mac_setup", "The GitHub CLI on the Mac is not signed in. Run gh auth login there.").into());
+        } else {
+            bail!("gh pr create failed: {}", crate::redact::redact(err.trim()));
+        };
+        let url = url.ok_or_else(|| anyhow!("gh did not report the pull request's address"))?;
+        let number = url.rsplit('/').next().and_then(|n| n.parse::<i64>().ok()).unwrap_or(0);
+        self.pr_opened(workspace_id, &url, number)?;
+        Ok(json!({"url": url, "number": number, "reused": reused, "branch": branch, "target": target, "repo": repo, "committed": prepared["committed"], "head": prepared["head"]}))
+    }
+
     /// Records the PR the extension created (URL and number only).
     pub fn pr_opened(&self, workspace_id: &str, url: &str, number: i64) -> Result<Value> {
         let ws = self.workspace(workspace_id)?;
@@ -112,6 +168,41 @@ impl Daemon {
     }
 }
 
+/// What a pull request says when the owner wrote nothing: the task, the commits and the files.
+fn pr_body(prepared: &Value) -> String {
+    let plan = &prepared["plan"];
+    let mut out = String::new();
+    let prompt = plan["prompt"].as_str().unwrap_or_default().trim();
+    if !prompt.is_empty() {
+        out.push_str("**Task**\n\n");
+        for line in prompt.lines().take(40) {
+            out.push_str(&format!("> {line}\n"));
+        }
+        out.push('\n');
+    }
+    if let Some(h) = plan["harness"].as_str() {
+        out.push_str(&format!("Agent: {h}{}\n\n", plan["model"].as_str().map(|m| format!(" ({m})")).unwrap_or_default()));
+    }
+    let commits = prepared["commits"].as_array().cloned().unwrap_or_default();
+    if !commits.is_empty() {
+        out.push_str(&format!("**Commits** ({})\n\n", commits.len()));
+        for c in commits.iter().take(50) {
+            out.push_str(&format!("- {}\n", c.as_str().unwrap_or_default()));
+        }
+        out.push('\n');
+    }
+    let files = prepared["files"].as_array().cloned().unwrap_or_default();
+    if !files.is_empty() {
+        out.push_str(&format!("**Files changed** ({})\n\n", files.len()));
+        for f in files.iter().take(50) {
+            out.push_str(&format!("- `{}` {}\n", f["status"].as_str().unwrap_or("M"), f["path"].as_str().unwrap_or_default()));
+        }
+        out.push('\n');
+    }
+    out.push_str("_Review before merging. Overseer never merges automatically._");
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::github_repo;
@@ -125,5 +216,11 @@ mod tests {
         assert_eq!(ok("https://gitlab.com/a/b.git"), None);
         assert_eq!(ok("/tmp/bare.git"), None);
         assert_eq!(ok("https://github.com/only-owner"), None);
+        use super::without_userinfo;
+        assert_eq!(without_userinfo("https://user:ghp_secret@github.com/o/r.git"), "https://github.com/o/r.git");
+        assert_eq!(without_userinfo("https://github.com/o/r.git"), "https://github.com/o/r.git");
+        assert_eq!(without_userinfo("ssh://git@github.com/o/r.git"), "ssh://github.com/o/r.git");
+        assert_eq!(without_userinfo("git@github.com:o/r.git"), "git@github.com:o/r.git");
+        assert_eq!(without_userinfo("https://tok@example.com"), "https://example.com");
     }
 }

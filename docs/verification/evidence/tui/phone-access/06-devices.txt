@@ -1,0 +1,40 @@
+ ◆ Overseer  page 1/1 · 0 agents                                                                   phone access on · 2 phones · ● connected 
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                    ╭ devices ─────────────────────────────────────────────────────────────────────────────────────────╮                    
+                    │                                                                                                  │                    
+                    │  phone access on · port 58432 · notifications on                                                 │                    
+                    │                                                                                                  │                    
+                    │  › Pixel 9                         Android   ● connected           Full control  127.0.0.1       │                    
+                    │    Bilal's iPhone                  iPhone    ● connected           Full control  127.0.0.1       │                    
+                    │                                                                                                  │                    
+                    │                                                                                                  │                    
+                    ╰──────────────────────────────────────── switched on this Mac only · p pairs a phone · esc closes ╯                    
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+ p pair a phone   j/k select   s scope   x revoke   N notifications   O on/off   esc close                                                  

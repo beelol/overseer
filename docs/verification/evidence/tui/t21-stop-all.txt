@@ -1,5 +1,5 @@
- ◆ Overseer  page 1/1 · 2 agents · ● 2 active                                                                                                       ● connected 
-┏ 1 ● Long job two ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 0s ┓╭ 2 ● Long job one ────────────────────────────────────────────── generic · 1s ╮
+ ◆ Overseer  page 1/1 · 2 agents · ● 2 active                                                                                    phone access off · ● connected 
+┏ 1 ● Long job two ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 1s ┓╭ 2 ● Long job one ────────────────────────────────────────────── generic · 2s ╮
 ┃ two                                                                          ┃│ one                                                                          │
 ┃                                                                              ┃│                                                                              │
 ┃                                                                              ┃│                                                                              │

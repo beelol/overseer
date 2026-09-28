@@ -61,36 +61,12 @@
       "detail": []
     },
     {
-      "name": "chat: at least 40% less visible text than today's UI (2795 → 1050)",
+      "name": "chat: at least 40% less visible text than today's UI (2795 → 988)",
       "ok": true,
       "detail": {
         "before": 2795,
-        "after": 1050,
-        "reduction": "62%"
-      }
-    },
-    {
-      "name": "files: no horizontal overflow at 1280/900 px in every theme",
-      "ok": true,
-      "detail": 0
-    },
-    {
-      "name": "files: no unbroken text run over 80 characters outside code",
-      "ok": true,
-      "detail": []
-    },
-    {
-      "name": "files: every icon-only control has a name and a tooltip",
-      "ok": true,
-      "detail": []
-    },
-    {
-      "name": "files: at least 40% less visible text than today's UI (127 → 59)",
-      "ok": true,
-      "detail": {
-        "before": 127,
-        "after": 59,
-        "reduction": "54%"
+        "after": 988,
+        "reduction": "65%"
       }
     },
     {
@@ -109,12 +85,12 @@
       "detail": []
     },
     {
-      "name": "review: at least 40% less visible text than today's UI (350 → 150)",
+      "name": "review: at least 40% less visible text than today's UI (350 → 158)",
       "ok": true,
       "detail": {
         "before": 350,
-        "after": 150,
-        "reduction": "57%"
+        "after": 158,
+        "reduction": "55%"
       }
     },
     {
@@ -148,12 +124,12 @@
       "detail": []
     },
     {
-      "name": "new-agent: at least 40% less visible text than today's UI (1037 → 107)",
+      "name": "new-agent: at least 40% less visible text than today's UI (1037 → 129)",
       "ok": true,
       "detail": {
         "before": 1037,
-        "after": 107,
-        "reduction": "90%"
+        "after": 129,
+        "reduction": "88%"
       }
     },
     {
@@ -172,12 +148,12 @@
       "detail": []
     },
     {
-      "name": "accounts: at least 40% less visible text than today's UI (381 → 149)",
+      "name": "accounts: at least 40% less visible text than today's UI (381 → 119)",
       "ok": true,
       "detail": {
         "before": 381,
-        "after": 149,
-        "reduction": "61%"
+        "after": 119,
+        "reduction": "69%"
       }
     },
     {
@@ -186,30 +162,21 @@
       "detail": 225
     },
     {
-      "name": "chat: no more visible text than Gate J (1063 → 1050)",
+      "name": "chat: no more visible text than Gate J (1063 → 988)",
       "ok": true,
       "detail": {
         "view": "chat",
         "gatej": 1063,
-        "gatek": 1050
+        "gatek": 988
       }
     },
     {
-      "name": "files: no more visible text than Gate J (59 → 59)",
-      "ok": true,
-      "detail": {
-        "view": "files",
-        "gatej": 59,
-        "gatek": 59
-      }
-    },
-    {
-      "name": "review: no more visible text than Gate J (175 → 150)",
+      "name": "review: no more visible text than Gate J (175 → 158)",
       "ok": true,
       "detail": {
         "view": "review",
         "gatej": 175,
-        "gatek": 150
+        "gatek": 158
       }
     },
     {
@@ -222,28 +189,28 @@
       }
     },
     {
-      "name": "new-agent: no more visible text than Gate J (133 → 107)",
+      "name": "new-agent: no more visible text than Gate J (133 → 129)",
       "ok": true,
       "detail": {
         "view": "new-agent",
         "gatej": 133,
-        "gatek": 107
+        "gatek": 129
       }
     },
     {
-      "name": "accounts: no more visible text than Gate J (189 → 149)",
+      "name": "accounts: no more visible text than Gate J (189 → 119)",
       "ok": true,
       "detail": {
         "view": "accounts",
         "gatej": 189,
-        "gatek": 149
+        "gatek": 119
       }
     }
   ],
   "views": {
     "dashboard": {
       "Overseer Dark@1280": {
-        "chars": 1109,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
@@ -251,7 +218,7 @@
         "width": 313
       },
       "Overseer Dark@900": {
-        "chars": 1109,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
@@ -259,7 +226,7 @@
         "width": 220
       },
       "Overseer Light@1280": {
-        "chars": 1109,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
@@ -267,7 +234,7 @@
         "width": 313
       },
       "Overseer Light@900": {
-        "chars": 1109,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
@@ -275,7 +242,7 @@
         "width": 220
       },
       "Default Dark Modern@1280": {
-        "chars": 1109,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
@@ -283,7 +250,7 @@
         "width": 313
       },
       "Default Dark Modern@900": {
-        "chars": 1109,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
@@ -291,7 +258,7 @@
         "width": 220
       },
       "Overseer@1280": {
-        "chars": 1109,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
@@ -299,7 +266,7 @@
         "width": 313
       },
       "Overseer@900": {
-        "chars": 1109,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
@@ -375,7 +342,7 @@
     },
     "chat": {
       "Overseer Dark@1280": {
-        "chars": 1050,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
@@ -383,7 +350,7 @@
         "width": 313
       },
       "Overseer Dark@900": {
-        "chars": 1050,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
@@ -391,7 +358,7 @@
         "width": 220
       },
       "Overseer Light@1280": {
-        "chars": 1050,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
@@ -399,7 +366,7 @@
         "width": 313
       },
       "Overseer Light@900": {
-        "chars": 1050,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
@@ -407,7 +374,7 @@
         "width": 220
       },
       "Default Dark Modern@1280": {
-        "chars": 1050,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
@@ -415,7 +382,7 @@
         "width": 313
       },
       "Default Dark Modern@900": {
-        "chars": 1050,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
@@ -423,7 +390,7 @@
         "width": 220
       },
       "Overseer@1280": {
-        "chars": 1050,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
@@ -431,143 +398,77 @@
         "width": 313
       },
       "Overseer@900": {
-        "chars": 1050,
+        "chars": 988,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
         "sample": "Refresh sessions once | Your login | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | session-refresh-c",
-        "width": 220
-      }
-    },
-    "files": {
-      "Overseer Dark@1280": {
-        "chars": 59,
-        "longRuns": [],
-        "overflow": [],
-        "unnamed": [],
-        "sample": "refresh-sessions-once | 2 changed | src | 1 | a.txt | b.txt | c.txt | README.md | M",
-        "width": 313
-      },
-      "Overseer Dark@900": {
-        "chars": 59,
-        "longRuns": [],
-        "overflow": [],
-        "unnamed": [],
-        "sample": "refresh-sessions-once | 2 changed | src | 1 | a.txt | b.txt | c.txt | README.md | M",
-        "width": 220
-      },
-      "Overseer Light@1280": {
-        "chars": 59,
-        "longRuns": [],
-        "overflow": [],
-        "unnamed": [],
-        "sample": "refresh-sessions-once | 2 changed | src | 1 | a.txt | b.txt | c.txt | README.md | M",
-        "width": 313
-      },
-      "Overseer Light@900": {
-        "chars": 59,
-        "longRuns": [],
-        "overflow": [],
-        "unnamed": [],
-        "sample": "refresh-sessions-once | 2 changed | src | 1 | a.txt | b.txt | c.txt | README.md | M",
-        "width": 220
-      },
-      "Default Dark Modern@1280": {
-        "chars": 59,
-        "longRuns": [],
-        "overflow": [],
-        "unnamed": [],
-        "sample": "refresh-sessions-once | 2 changed | src | 1 | a.txt | b.txt | c.txt | README.md | M",
-        "width": 313
-      },
-      "Default Dark Modern@900": {
-        "chars": 59,
-        "longRuns": [],
-        "overflow": [],
-        "unnamed": [],
-        "sample": "refresh-sessions-once | 2 changed | src | 1 | a.txt | b.txt | c.txt | README.md | M",
-        "width": 220
-      },
-      "Overseer@1280": {
-        "chars": 59,
-        "longRuns": [],
-        "overflow": [],
-        "unnamed": [],
-        "sample": "refresh-sessions-once | 2 changed | src | 1 | a.txt | b.txt | c.txt | README.md | M",
-        "width": 313
-      },
-      "Overseer@900": {
-        "chars": 59,
-        "longRuns": [],
-        "overflow": [],
-        "unnamed": [],
-        "sample": "refresh-sessions-once | 2 changed | src | 1 | a.txt | b.txt | c.txt | README.md | M",
         "width": 220
       }
     },
     "review": {
       "Overseer Dark@1280": {
-        "chars": 150,
+        "chars": 158,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "Refresh sessions once | src | auth | session-refresh-coordinator.ts | A | README.md | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
+        "sample": "Refresh sessions once | src | auth | session-refresh-coordinator.ts | +8 | −0 | A | README.md | +4 | −0 | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
         "width": 609
       },
       "Overseer Dark@900": {
-        "chars": 129,
+        "chars": 158,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "src | auth | session-refresh-coordinator.ts | A | README.md | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
+        "sample": "Refresh sessions once | src | auth | session-refresh-coordinator.ts | +8 | −0 | A | README.md | +4 | −0 | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
         "width": 322
       },
       "Overseer Light@1280": {
-        "chars": 150,
+        "chars": 158,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "Refresh sessions once | src | auth | session-refresh-coordinator.ts | A | README.md | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
+        "sample": "Refresh sessions once | src | auth | session-refresh-coordinator.ts | +8 | −0 | A | README.md | +4 | −0 | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
         "width": 609
       },
       "Overseer Light@900": {
-        "chars": 129,
+        "chars": 158,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "src | auth | session-refresh-coordinator.ts | A | README.md | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
+        "sample": "Refresh sessions once | src | auth | session-refresh-coordinator.ts | +8 | −0 | A | README.md | +4 | −0 | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
         "width": 322
       },
       "Default Dark Modern@1280": {
-        "chars": 150,
+        "chars": 158,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "Refresh sessions once | src | auth | session-refresh-coordinator.ts | A | README.md | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
+        "sample": "Refresh sessions once | src | auth | session-refresh-coordinator.ts | +8 | −0 | A | README.md | +4 | −0 | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
         "width": 609
       },
       "Default Dark Modern@900": {
-        "chars": 129,
+        "chars": 158,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "src | auth | session-refresh-coordinator.ts | A | README.md | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
+        "sample": "Refresh sessions once | src | auth | session-refresh-coordinator.ts | +8 | −0 | A | README.md | +4 | −0 | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
         "width": 322
       },
       "Overseer@1280": {
-        "chars": 150,
+        "chars": 158,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "Refresh sessions once | src | auth | session-refresh-coordinator.ts | A | README.md | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
+        "sample": "Refresh sessions once | src | auth | session-refresh-coordinator.ts | +8 | −0 | A | README.md | +4 | −0 | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
         "width": 609
       },
       "Overseer@900": {
-        "chars": 129,
+        "chars": 158,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "src | auth | session-refresh-coordinator.ts | A | README.md | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
+        "sample": "Refresh sessions once | src | auth | session-refresh-coordinator.ts | +8 | −0 | A | README.md | +4 | −0 | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
         "width": 322
       }
     },
@@ -639,140 +540,140 @@
     },
     "new-agent": {
       "Overseer Dark@1280": {
-        "chars": 107,
+        "chars": 129,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
+        "sample": "What's next? | Continuity is on | Got it | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
         "width": 922
       },
       "Overseer Dark@900": {
-        "chars": 107,
+        "chars": 129,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
+        "sample": "What's next? | Continuity is on | Got it | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
         "width": 542
       },
       "Overseer Light@1280": {
-        "chars": 107,
+        "chars": 129,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
+        "sample": "What's next? | Continuity is on | Got it | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
         "width": 922
       },
       "Overseer Light@900": {
-        "chars": 107,
+        "chars": 129,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
+        "sample": "What's next? | Continuity is on | Got it | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
         "width": 542
       },
       "Default Dark Modern@1280": {
-        "chars": 107,
+        "chars": 129,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
+        "sample": "What's next? | Continuity is on | Got it | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
         "width": 922
       },
       "Default Dark Modern@900": {
-        "chars": 107,
+        "chars": 129,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
+        "sample": "What's next? | Continuity is on | Got it | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
         "width": 542
       },
       "Overseer@1280": {
-        "chars": 107,
+        "chars": 129,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
+        "sample": "What's next? | Continuity is on | Got it | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
         "width": 922
       },
       "Overseer@900": {
-        "chars": 107,
+        "chars": 129,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
+        "sample": "What's next? | Continuity is on | Got it | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
         "width": 542
       }
     },
     "accounts": {
       "Overseer Dark@1280": {
-        "chars": 149,
+        "chars": 119,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "Accounts | ChatGPT | Your login | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | Your login | max · cc6d9661 · desktop | OpenCode | Your login | signed out · desktop",
+        "sample": "Accounts | ChatGPT | Your login | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | Your login | max · cc6d9661 · desktop | OpenCode",
         "width": 1280
       },
       "Overseer Dark@900": {
-        "chars": 149,
+        "chars": 119,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "Accounts | ChatGPT | Your login | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | Your login | max · cc6d9661 · desktop | OpenCode | Your login | signed out · desktop",
+        "sample": "Accounts | ChatGPT | Your login | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | Your login | max · cc6d9661 · desktop | OpenCode",
         "width": 900
       },
       "Overseer Light@1280": {
-        "chars": 149,
+        "chars": 119,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "Accounts | ChatGPT | Your login | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | Your login | max · cc6d9661 · desktop | OpenCode | Your login | signed out · desktop",
+        "sample": "Accounts | ChatGPT | Your login | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | Your login | max · cc6d9661 · desktop | OpenCode",
         "width": 1280
       },
       "Overseer Light@900": {
-        "chars": 149,
+        "chars": 119,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "Accounts | ChatGPT | Your login | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | Your login | max · cc6d9661 · desktop | OpenCode | Your login | signed out · desktop",
+        "sample": "Accounts | ChatGPT | Your login | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | Your login | max · cc6d9661 · desktop | OpenCode",
         "width": 900
       },
       "Default Dark Modern@1280": {
-        "chars": 149,
+        "chars": 119,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "Accounts | ChatGPT | Your login | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | Your login | max · cc6d9661 · desktop | OpenCode | Your login | signed out · desktop",
+        "sample": "Accounts | ChatGPT | Your login | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | Your login | max · cc6d9661 · desktop | OpenCode",
         "width": 1280
       },
       "Default Dark Modern@900": {
-        "chars": 149,
+        "chars": 119,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "Accounts | ChatGPT | Your login | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | Your login | max · cc6d9661 · desktop | OpenCode | Your login | signed out · desktop",
+        "sample": "Accounts | ChatGPT | Your login | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | Your login | max · cc6d9661 · desktop | OpenCode",
         "width": 900
       },
       "Overseer@1280": {
-        "chars": 149,
+        "chars": 119,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "Accounts | ChatGPT | Your login | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | Your login | max · cc6d9661 · desktop | OpenCode | Your login | signed out · desktop",
+        "sample": "Accounts | ChatGPT | Your login | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | Your login | max · cc6d9661 · desktop | OpenCode",
         "width": 1280
       },
       "Overseer@900": {
-        "chars": 149,
+        "chars": 119,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "Accounts | ChatGPT | Your login | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | Your login | max · cc6d9661 · desktop | OpenCode | Your login | signed out · desktop",
+        "sample": "Accounts | ChatGPT | Your login | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | Your login | max · cc6d9661 · desktop | OpenCode",
         "width": 900
       }
     }
   },
   "summary": {
     "dashboard": {
-      "chars": 1109,
+      "chars": 988,
       "longRuns": [],
       "overflow": 0,
       "unnamed": []
@@ -784,19 +685,13 @@
       "unnamed": []
     },
     "chat": {
-      "chars": 1050,
-      "longRuns": [],
-      "overflow": 0,
-      "unnamed": []
-    },
-    "files": {
-      "chars": 59,
+      "chars": 988,
       "longRuns": [],
       "overflow": 0,
       "unnamed": []
     },
     "review": {
-      "chars": 150,
+      "chars": 158,
       "longRuns": [],
       "overflow": 0,
       "unnamed": []
@@ -808,13 +703,13 @@
       "unnamed": []
     },
     "new-agent": {
-      "chars": 107,
+      "chars": 129,
       "longRuns": [],
       "overflow": 0,
       "unnamed": []
     },
     "accounts": {
-      "chars": 149,
+      "chars": 119,
       "longRuns": [],
       "overflow": 0,
       "unnamed": []

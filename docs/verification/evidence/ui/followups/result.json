@@ -28,15 +28,15 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-v2cZ4f/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-8SkA0o/followups-repo\nOn main"
             },
             {
               "chip": "agent",
-              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nYour login: signed in · pro\nUsage: not reported by this harness"
+              "tooltip": "A local model through Ollama and OpenCode.\nNo account, no network, no cost.\nOllama is running"
             },
             {
               "chip": "model",
-              "tooltip": "The harness default model"
+              "tooltip": "qwen3-coder:30b at a 64k context: the best verified model that fits the memory free now"
             },
             {
               "chip": "mode",
@@ -59,15 +59,15 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-v2cZ4f/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-8SkA0o/followups-repo\nOn main"
             },
             {
               "chip": "agent",
-              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nYour login: signed in · pro\nUsage: not reported by this harness"
+              "tooltip": "A local model through Ollama and OpenCode.\nNo account, no network, no cost.\nOllama is running"
             },
             {
               "chip": "model",
-              "tooltip": "The harness default model"
+              "tooltip": "qwen3-coder:30b at a 64k context: the best verified model that fits the memory free now"
             },
             {
               "chip": "mode",
@@ -90,11 +90,19 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-v2cZ4f/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-8SkA0o/followups-repo\nOn main"
             },
             {
               "chip": "agent",
-              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nYour login: signed in · pro\nUsage: not reported by this harness"
+              "tooltip": "A local model through Ollama and OpenCode.\nNo account, no network, no cost.\nOllama is running"
+            },
+            {
+              "chip": "model",
+              "tooltip": "qwen3-coder:30b at a 64k context: the best verified model that fits the memory free now"
+            },
+            {
+              "chip": "mode",
+              "tooltip": "A new branch and worktree; your checkout is untouched"
             }
           ],
           "overflow": 0,
@@ -110,7 +118,16 @@
             "left": 0,
             "right": 0
           },
-          "clipped": [],
+          "clipped": [
+            {
+              "chip": "repo",
+              "tooltip": "/private/tmp/ovs-ui-8SkA0o/followups-repo\nOn main"
+            },
+            {
+              "chip": "model",
+              "tooltip": "qwen3-coder:30b at a 64k context: the best verified model that fits the memory free now"
+            }
+          ],
           "overflow": 0,
           "docOverflow": false
         }
@@ -130,15 +147,15 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-v2cZ4f/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-8SkA0o/followups-repo\nOn main"
             },
             {
               "chip": "agent",
-              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nYour login: signed in · pro\nUsage: not reported by this harness"
+              "tooltip": "A local model through Ollama and OpenCode.\nNo account, no network, no cost.\nOllama is running"
             },
             {
               "chip": "model",
-              "tooltip": "The harness default model"
+              "tooltip": "qwen3-coder:30b at a 64k context: the best verified model that fits the memory free now"
             },
             {
               "chip": "mode",
@@ -156,15 +173,15 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-v2cZ4f/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-8SkA0o/followups-repo\nOn main"
             },
             {
               "chip": "agent",
-              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nYour login: signed in · pro\nUsage: not reported by this harness"
+              "tooltip": "A local model through Ollama and OpenCode.\nNo account, no network, no cost.\nOllama is running"
             },
             {
               "chip": "model",
-              "tooltip": "The harness default model"
+              "tooltip": "qwen3-coder:30b at a 64k context: the best verified model that fits the memory free now"
             },
             {
               "chip": "mode",
@@ -182,11 +199,19 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-v2cZ4f/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-8SkA0o/followups-repo\nOn main"
             },
             {
               "chip": "agent",
-              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nYour login: signed in · pro\nUsage: not reported by this harness"
+              "tooltip": "A local model through Ollama and OpenCode.\nNo account, no network, no cost.\nOllama is running"
+            },
+            {
+              "chip": "model",
+              "tooltip": "qwen3-coder:30b at a 64k context: the best verified model that fits the memory free now"
+            },
+            {
+              "chip": "mode",
+              "tooltip": "A new branch and worktree; your checkout is untouched"
             }
           ]
         },
@@ -197,7 +222,16 @@
             "left": 0,
             "right": 0
           },
-          "clipped": []
+          "clipped": [
+            {
+              "chip": "repo",
+              "tooltip": "/private/tmp/ovs-ui-8SkA0o/followups-repo\nOn main"
+            },
+            {
+              "chip": "model",
+              "tooltip": "qwen3-coder:30b at a 64k context: the best verified model that fits the memory free now"
+            }
+          ]
         }
       ]
     },
@@ -206,12 +240,23 @@
       "ok": true,
       "detail": {
         "chatHeader": "Your login\n·\nname-check",
-        "agentChip": "Codex · Your login",
+        "agentChip": "Local model",
         "agentMenu": [
-          "Your login pro",
-          "Your login max",
+          "Your login offline",
+          "Your login offline",
           "Your login signed out",
-          "Run a program"
+          "Run a program",
+          "Best fit · qwen3-coder:30b 64k",
+          "qwen3-coder:30b fits at 64k",
+          "qwen3.5:35b-a3b-q4_K_M fits at 64k · unverified",
+          "qwen3.5:35b fits at 64k · unverified",
+          "qwen2.5-coder:32b fits at 32k · failed its check",
+          "qwen2.5-coder:14b fits at 32k · failed its check",
+          "qwen2.5-coder:7b fits at 32k · failed its check",
+          "qwen2.5-coder:3b fits at 32k · failed its check",
+          "qwen2.5-coder:1.5b fits at 32k · failed its check",
+          "qwen2.5:0.5b fits at 32k · unverified",
+          "qwen3.5:122b too big · 77.2 GiB of 40.9 GiB · unverified"
         ],
         "accounts": [
           "ChatGPT",
@@ -236,7 +281,7 @@
           "border": "1px",
           "height": 26
         },
-        "ms": 33,
+        "ms": 32,
         "shown": [
           "followups-repo",
           "Beta docs"
@@ -244,7 +289,8 @@
         "panes": [
           "Search",
           "Agents",
-          "Accounts"
+          "Accounts",
+          "Devices"
         ]
       }
     },

@@ -1,0 +1,40 @@
+$ OVERSEER_TEST_PHONE_ACCESS=on cargo test --workspace --no-fail-fast   (2026-09-26 22:49:02, commit 24f40b1)
+     Running unittests src/lib.rs (target/debug/deps/overseer_tui-666e2b1c0a9cb307)
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/main.rs (target/debug/deps/overseer_tui-5b0a961a1786e69d)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/control.rs (target/debug/deps/control-230a0b6f9365a35b)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.82s
+     Running tests/interact.rs (target/debug/deps/interact-0ab19d74ce2b3739)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.53s
+     Running tests/live.rs (target/debug/deps/live-ec8d98c01b533e42)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.98s
+     Running tests/live_harness.rs (target/debug/deps/live_harness-608b6fadbbe92849)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/look.rs (target/debug/deps/look-a927a6ab7d4f81c8)
+test t10_nine_busy_agents_stay_responsive ... FAILED
+failures:
+failures:
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.91s
+error: test failed, to rerun pass `-p overseer-tui --test look`
+     Running tests/phone.rs (target/debug/deps/phone-793c035ad4d594ef)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.33s
+     Running tests/qr.rs (target/debug/deps/qr-3bb0c9b443301885)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.07s
+     Running unittests src/main.rs (target/debug/deps/overseerd-4e212365df3579c2)
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.11s
+     Running tests/gateway.rs (target/debug/deps/gateway-6d63c21a4a09163c)
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 244.87s
+     Running tests/phone_methods.rs (target/debug/deps/phone_methods-b2ce6e6ca2bbd71d)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 53.69s
+     Running tests/protocol.rs (target/debug/deps/protocol-daada755d9dc8d41)
+test ac51_worktree_tree_lists_one_directory_marks_changes_and_stays_inside ... FAILED
+failures:
+failures:
+test result: FAILED. 53 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.77s
+error: test failed, to rerun pass `-p overseerd --test protocol`
+     Running tests/protocol_shapes.rs (target/debug/deps/protocol_shapes-a72607bb107872e3)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.11s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+error: 2 targets failed:
+exit: 101

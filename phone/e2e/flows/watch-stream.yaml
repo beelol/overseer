@@ -1,0 +1,15 @@
+# An agent's conversation is open while it writes: every line that arrives is timed by the app.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- runFlow: open-agent.yaml
+- extendedWaitUntil:
+    visible:
+      id: "agent.list"
+    timeout: 30000
+- takeScreenshot: stream-watched

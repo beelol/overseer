@@ -1,0 +1,45 @@
+# An agent's changes in a large repository: the list, flung up and down, its frames counted by the app.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- runFlow: open-agent.yaml
+- extendedWaitUntil:
+    visible:
+      id: "agent.changes"
+    timeout: 30000
+- tapOn:
+    id: "agent.changes"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "changes.list"
+    timeout: 60000
+- extendedWaitUntil:
+    visible:
+      id: "changes.row.${FIRST}"
+    timeout: 60000
+- takeScreenshot: big-repo-listed
+- repeat:
+    times: 6
+    commands:
+      - swipe:
+          start: "50%, 80%"
+          end: "50%, 25%"
+          duration: 250
+      - waitForAnimationToEnd:
+          timeout: 3000
+- repeat:
+    times: 3
+    commands:
+      - swipe:
+          start: "50%, 25%"
+          end: "50%, 80%"
+          duration: 250
+      - waitForAnimationToEnd:
+          timeout: 3000
+- takeScreenshot: big-repo-scrolled

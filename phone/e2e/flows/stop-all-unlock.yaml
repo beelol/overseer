@@ -1,0 +1,41 @@
+# Stop all agents with the unlock before changes on: asked once, then the device's unlock.
+appId: ${APP}
+---
+# On Android an agent that needs the owner shows the app's own banner over the header, its close
+# button where the menu is. The scenario has just made such an agent: the banner is put away first,
+# as the owner would, so the tap reaches the menu.
+- extendedWaitUntil:
+    visible:
+      id: "notification.banner.dismiss"
+    timeout: 4000
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: "notification.banner.dismiss"
+    commands:
+      - tapOn:
+          id: "notification.banner.dismiss"
+      - extendedWaitUntil:
+          notVisible:
+            id: "notification.banner"
+          timeout: 5000
+- tapOn:
+    id: "agents.menu"
+    retryTapIfNoChange: true
+# Offered once the phone knows an agent is going: the news may still be on its way.
+- extendedWaitUntil:
+    visible:
+      id: "agents.menu.stop"
+    timeout: 20000
+- tapOn:
+    id: "agents.menu.stop"
+- extendedWaitUntil:
+    visible:
+      id: "agents.stop.confirm"
+    timeout: 10000
+- tapOn:
+    id: "agents.stop.confirm"
+    retryTapIfNoChange: true
+- runFlow:
+    file: unlock-prompt.yaml

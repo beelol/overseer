@@ -1,0 +1,33 @@
+# Merge back with nothing in the way; completed from the phone, asked once.
+appId: ${APP}
+---
+- runFlow: open-agent-menu.yaml
+- tapOn:
+    id: "agent.more.merge"
+- extendedWaitUntil:
+    visible:
+      id: "merge.prepare"
+    timeout: 30000
+- tapOn:
+    id: "merge.prepare"
+- extendedWaitUntil:
+    visible:
+      id: "merge.complete"
+    timeout: 60000
+- tapOn:
+    id: "merge.complete"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "merge.ask.confirm"
+    timeout: 15000
+- assertVisible:
+    text: "Merge .* into main in shop\\?"
+- takeScreenshot: merge-complete-asks-once
+- tapOn:
+    id: "merge.ask.confirm"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "merge.done"
+    timeout: 60000

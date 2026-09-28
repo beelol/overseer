@@ -1,0 +1,22 @@
+$ OVERSEER_TEST_PHONE_ACCESS=off, each alone, one at a time   (2026-09-28 03:59:06, commit d98e367a)
+▶ Rust ac189_overseer_keeps_agents_on_task … ok (109s, load 6.21 15.84 14.22 )
+▶ Rust ac190_briefing_and_channel … ok (18s, load 5.64 15.24 14.03 )
+▶ Rust ac185_actions_have_classes_and_cards … ok (4s, load 5.51 15.05 13.97 )
+▶ UI arrangement … ok (38s, load 5.41 13.81 13.57 )
+▶ UI accounts … ok (61s, load 9.96 13.39 13.41 )
+▶ UI center … ok (49s, load 11.18 13.14 13.31 )
+▶ UI composer … ok (50s, load 8.11 11.99 12.88 )
+▶ UI audit … ok (106s, load 6.20 10.21 12.08 )
+▶ UI grid … ok (39s, load 6.18 9.70 11.80 )
+▶ UI review-width … ok (27s, load 6.04 9.38 11.63 )
+▶ UI theme … ok (73s, load 7.81 9.15 11.35 )
+done (04:08:40)
+$ OVERSEER_TEST_PHONE_ACCESS=on, each alone, one at a time   (2026-09-28 04:08:40, commit d98e367a)
+▶ UI continuity … FAILED (73s, load 11.10 9.76 11.39 )
+    [2026-09-28T11:09:04.823Z] FAIL the successor is the task's agent; its chat says where it continues from ["The connection was lost; the agent keeps trying to reconnect. · 1 attempts","The work continues in another agent.Open it","Transitioning to qwen3-coder:30b (local, Ollama) because you've discon
+▶ UI main … ok (63s, load 13.60 10.49 11.53 )
+▶ UI phone-access … ok (130s, load 8.48 9.71 11.08 )
+done (04:13:06)
+$ continuity after b6148c21 (it waits for the side bar to fold before selecting), alone   (2026-09-28 04:17:28)
+▶ UI continuity, phone access on … ok
+▶ UI continuity, phone access off … ok

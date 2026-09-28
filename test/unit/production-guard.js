@@ -106,7 +106,7 @@ const runs = bin => { try { return fs.readFileSync(path.join(path.dirname(bin), 
     const said = [];
     const c = new DaemonClient(bin, () => {}, { production: true, env: process.env });
     c.on('refused', m => said.push(m));
-    await assert.rejects(c.start(), /The installed Overseer refuses to use dev instance dev-q/);
+    await assert.rejects(c.start(), /The installed Overseer refuses to use dev daemon dev-q/);
     await delay(1500);
     assert.strictEqual(odd.connections, 1, 'no retry into the dev daemon');
     assert.strictEqual(c.connected, false);

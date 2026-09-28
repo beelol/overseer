@@ -30,8 +30,8 @@
       "name": "⌥⌘J goes to the next agent that needs you; ⌥⌘Y allows and ⌥⌘⌫ denies its request",
       "ok": true,
       "detail": {
-        "first": "r-cb25d1fd4da4",
-        "second": "r-e22a5fef2f2e",
+        "first": "r-1e2b2af70669",
+        "second": "r-174b06bb96a8",
         "firstDone": "completed",
         "secondDone": "completed",
         "denied": true
@@ -42,9 +42,9 @@
       "ok": true,
       "detail": {
         "visited": [
-          "r-a5455e71104b",
-          "r-cb25d1fd4da4",
-          "r-64a2550a603f"
+          "r-ecc1adbf8701",
+          "r-1e2b2af70669",
+          "r-1104bf4bc343"
         ],
         "left": []
       }
@@ -53,7 +53,7 @@
       "name": "⌥⌘A switches agents from a searchable quick pick and ⌥⌘. stops the selected agent",
       "ok": true,
       "detail": {
-        "switched": "r-b464b5ed6227",
+        "switched": "r-5da34302d2d7",
         "stopped": "interrupted"
       }
     },
@@ -61,8 +61,8 @@
       "name": "⌥⌘N starts a new agent from the composer without the mouse; it becomes the selected agent",
       "ok": true,
       "detail": {
-        "created": "r-020b6ee1abce",
-        "nowSelected": "r-020b6ee1abce"
+        "created": "r-3e6f0fbae49c",
+        "nowSelected": "r-3e6f0fbae49c"
       }
     },
     {
@@ -85,7 +85,7 @@
       "name": "every control in the dashboard has a screen-reader label",
       "ok": true,
       "detail": {
-        "checked": 36,
+        "checked": 46,
         "bad": []
       }
     }

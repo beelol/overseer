@@ -6,7 +6,8 @@ USAGE:
 OPTIONS:
     --daemon PATH   overseerd binary (default: $OVERSEERD, next to this binary, $PATH, or the one
                     bundled with the Overseer VS Code extension)
-    --home DIR      Overseer data directory (sets OVERSEER_HOME; default: the same as VS Code)
+    --home DIR      Overseer data directory (default: the same as VS Code; the installed TUI
+                    ignores OVERSEER_HOME and OVERSEER_SOCKET in its environment)
     --no-mouse      Leave the mouse to the terminal (text selection) instead of clicking tiles
     --no-bell       No terminal bell when an agent starts waiting for you
     -h, --help      Show this help
@@ -23,6 +24,7 @@ KEYS:
     X               stop all agents and the daemon (r starts it again)
     v               changes (files, diffs)     M     merge back (asks each step)
     /               search agents              A     accounts and sign-in
+    O               phone access on / off      D     devices: pair a phone, revoke, scope
     S               Audio Mode, track, preview  e     in zoom: expand tool calls
     f               filter all/active/needs you ?     all keys
     q               quit (agents keep running)

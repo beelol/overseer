@@ -320,7 +320,9 @@ mod tests {
             .unwrap()
             .filter_map(|e| e.ok().map(|e| e.file_name()))
             .collect();
-        let audio = super::speak("On it. Telling Phone to wait.", None, None).unwrap();
+        // The speech service can time out on a busy Mac; callers try once more, and so does this test.
+        let line = "On it. Telling Phone to wait.";
+        let audio = super::speak(line, None, None).or_else(|_| super::speak(line, None, None)).unwrap();
         assert!(audio.len() > 16_000, "{} samples", audio.len());
         assert!(audio.iter().any(|s| s.abs() > 0.05), "it has sound");
         let after: Vec<_> = std::fs::read_dir(std::env::temp_dir())

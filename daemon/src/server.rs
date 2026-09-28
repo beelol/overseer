@@ -14,7 +14,64 @@ use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::mpsc;
 
 pub const PROTOCOL_VERSION: i64 = 1;
+/// The commit a packaged build was made from (`extension/scripts/package.js` sets it; AC-214).
+pub const BUILD: Option<&str> = option_env!("OVERSEER_BUILD_COMMIT");
 pub const MAX_REQUEST_BYTES: u64 = 1024 * 1024;
+
+/// An error with its own protocol code (and data), for refusals a client acts on.
+/// Anything else is reported as `failed` with its message.
+#[derive(Debug)]
+pub struct ProtoError {
+    pub code: &'static str,
+    pub message: String,
+    pub data: Value,
+}
+
+impl ProtoError {
+    pub fn new(code: &'static str, message: impl Into<String>) -> Self {
+        Self { code, message: message.into(), data: Value::Null }
+    }
+
+    pub fn with_data(mut self, data: Value) -> Self {
+        self.data = data;
+        self
+    }
+}
+
+impl std::fmt::Display for ProtoError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for ProtoError {}
+
+/// The error object of a reply.
+pub fn error_value(e: &anyhow::Error) -> Value {
+    match e.downcast_ref::<ProtoError>() {
+        Some(p) if p.data.is_null() => json!({"code": p.code, "message": p.message}),
+        Some(p) => json!({"code": p.code, "message": p.message, "data": p.data}),
+        None => json!({"code": "failed", "message": e.to_string()}),
+    }
+}
+
+thread_local! {
+    /// Who is acting on this thread while a request runs: `None` is the local user, otherwise a
+    /// device (`phone:<name>`). Events a user causes carry it as their source.
+    static ACTOR: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Runs `f` as `actor`. Requests run to completion on one blocking thread, so a thread-local is enough.
+pub fn with_actor<T>(actor: Option<String>, f: impl FnOnce() -> T) -> T {
+    ACTOR.with(|a| *a.borrow_mut() = actor);
+    let out = f();
+    ACTOR.with(|a| *a.borrow_mut() = None);
+    out
+}
+
+pub fn actor() -> Option<String> {
+    ACTOR.with(|a| a.borrow().clone())
+}
 
 pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
     crate::audio::start(daemon.clone())?;
@@ -37,6 +94,7 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
     }
     crate::log(&format!("listening on {}", path.display()));
+    crate::gateway::start(&daemon);
     let uid = unsafe { libc::getuid() };
     // Test-only: pretend the owner is another uid. It can only reject more peers (a peer must
     // still be this process's own uid), so it lets a test observe a "foreign" connection being
@@ -74,7 +132,10 @@ async fn connection(daemon: Arc<Daemon>, stream: UnixStream) -> Result<()> {
     let mut reader = BufReader::new(read);
     let mut buf = Vec::new();
     let mut ui = false;
-    let result = connection_loop(&daemon, &mut reader, &mut buf, &tx, &mut ui).await;
+    static CONNECTIONS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    let connection_id = CONNECTIONS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let result = connection_loop(&daemon, &mut reader, &mut buf, &tx, &mut ui, connection_id).await;
+    daemon.gateway.focus.lock().unwrap().remove(&connection_id);
     if ui {
         daemon.ui_disconnected();
     }
@@ -89,6 +150,7 @@ async fn connection_loop(
     buf: &mut Vec<u8>,
     tx: &mpsc::Sender<Value>,
     ui: &mut bool,
+    connection_id: u64,
 ) -> Result<()> {
     loop {
         buf.clear();
@@ -121,6 +183,18 @@ async fn connection_loop(
             subscribe(daemon.clone(), id, params, tx.clone());
             continue;
         }
+        if method == "ui.focus" {
+            // Which agent this window is looking at, so a phone is not notified about it (AC-129).
+            {
+                let mut focus = daemon.gateway.focus.lock().unwrap();
+                match params["run_id"].as_str().filter(|_| params["focused"].as_bool() != Some(false)) {
+                    Some(run) => focus.insert(connection_id, run.to_string()),
+                    None => focus.remove(&connection_id),
+                };
+            }
+            let _ = tx.send(json!({"id": id, "result": {"ok": true}})).await;
+            continue;
+        }
         if method == "voice.subscribe" {
             // Voice Mode's live channel: state, levels, words in progress. Never stored.
             crate::voice::subscribe(id, tx.clone());
@@ -143,7 +217,7 @@ async fn connection_loop(
             };
             let reply = match result {
                 Ok(Ok(v)) => json!({"id": id, "result": v}),
-                Ok(Err(e)) => json!({"id": id, "error": {"code": "failed", "message": e.to_string()}}),
+                Ok(Err(e)) => json!({"id": id, "error": error_value(&e)}),
                 Err(e) => json!({"id": id, "error": {"code": "internal", "message": e.to_string()}}),
             };
             let _ = tx.send(reply).await;
@@ -160,16 +234,26 @@ async fn connection_loop(
 /// Replay retained events after the client's cursor, then stream live events.
 /// Subscribing to the broadcast before replaying avoids a gap; live events at or
 /// below the replayed cursor are dropped so nothing is delivered twice.
-fn subscribe(daemon: Arc<Daemon>, id: Value, params: Value, tx: mpsc::Sender<Value>) {
+pub(crate) fn subscribe(daemon: Arc<Daemon>, id: Value, params: Value, tx: mpsc::Sender<Value>) {
     let mut live = daemon.events.subscribe();
     tokio::spawn(async move {
         let mut cursor = params["after"].as_i64().unwrap_or(0);
         let run_filter = params["run_id"].as_str().map(str::to_string);
-        let oldest = {
+        // History is gone when the log no longer reaches back to the cursor, or when a run's older
+        // events after the cursor were pruned (each pruning leaves a retention marker).
+        let newest = daemon.store.lock().unwrap().max_seq().unwrap_or(0);
+        let beyond = cursor > newest;
+        let gap = beyond || cursor > 0 && {
             let store = daemon.store.lock().unwrap();
-            store.conn.query_row("SELECT MIN(seq) FROM events", [], |r| r.get::<_, Option<i64>>(0)).ok().flatten()
+            let oldest = store.conn.query_row("SELECT MIN(seq) FROM events", [], |r| r.get::<_, Option<i64>>(0)).ok().flatten();
+            matches!(oldest, Some(o) if o > cursor + 1) || store.pruned_after(cursor, run_filter.as_deref()).unwrap_or(false)
         };
-        let gap = matches!(oldest, Some(o) if o > cursor + 1 && cursor > 0);
+        if beyond {
+            // The client's cursor is past the end of the log: the log started again (another
+            // data folder, a restored backup). Without this nothing would reach the client until
+            // the new log grew past its old cursor. It reloads state; events go on from here.
+            cursor = newest;
+        }
         if tx.send(json!({"id": id, "result": {"subscribed": true, "after": cursor, "history_truncated": gap}})).await.is_err() {
             return;
         }
@@ -222,7 +306,7 @@ fn s<'a>(p: &'a Value, key: &str) -> Result<&'a str> {
 
 pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     Ok(match method {
-        "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path(), "instance": paths::instance()}),
+        "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path(), "instance": paths::instance(), "build": BUILD}),
         "state" => d.state_for(p["include_hidden"].as_bool().unwrap_or(false))?,
         "audio.get" => crate::audio::get(d)?,
         "audio.set" => crate::audio::set(d, p)?,
@@ -418,8 +502,20 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let n = d.ui_clients.load(std::sync::atomic::Ordering::SeqCst);
             json!({"vscode": n, "ui": n})
         }
+        "workspace.file" => d.workspace_file(s(p, "workspace_id")?, s(p, "path")?, p["base"].as_str())?,
+        "workspace.hunks" => d.workspace_hunks(s(p, "workspace_id")?, s(p, "path")?, s(p, "base")?, p["run_id"].as_str())?,
+        "review.marks" => d.review_marks(s(p, "run_id")?)?,
+        "review.accept" => d.review_accept(s(p, "run_id")?, p)?,
+        "review.unaccept" => d.review_unaccept(s(p, "run_id")?, s(p, "key")?)?,
+        "review.import" => d.review_import(s(p, "run_id")?, &p["marks"])?,
+        "review.reject" => d.review_reject(s(p, "workspace_id")?, p)?,
+        "workspace.pr_open" => d.pr_open(s(p, "workspace_id")?, p)?,
+        "profile.device_login" => d.device_login(s(p, "id")?)?,
+        "repo.known" => d.known_repos()?,
+        "runs.stop_all" => d.stop_all_runs()?,
+        m if m.starts_with("gateway.") => crate::gateway::local::dispatch(d, m, p)?,
         // Continuity (Gate L): connection state, settings, local inventory, pick and guard.
         m if crate::continuity::handles(m) => crate::continuity::dispatch(d, m, p)?,
-        other => return Err(anyhow!("unknown method {other}")),
+        other => return Err(ProtoError::new("unknown_method", format!("unknown method {other}")).into()),
     })
 }

@@ -5,8 +5,8 @@
       "ok": true,
       "detail": {
         "needsIdx": 0,
-        "webIdx": 4,
-        "apiIdx": 7,
+        "webIdx": 10,
+        "apiIdx": 4,
         "needsItems": [
           "Add a changelog entry",
           "Migration dry-run"
@@ -72,7 +72,7 @@
     },
     {
       "name": "Needs-you rows carry the provider mark too (Claude logo, program codicon) with the reason as text",
-      "ok": true,
+      "ok": false,
       "detail": [
         {
           "label": "Add a changelog entry",
@@ -93,6 +93,27 @@
           "logo": "claudecode-dark",
           "codicon": "",
           "description": "Review",
+          "badge": "✓"
+        },
+        {
+          "label": "Watch the build",
+          "logo": "",
+          "codicon": "terminal",
+          "description": "",
+          "badge": "●"
+        },
+        {
+          "label": "Migration dry-run",
+          "logo": "",
+          "codicon": "terminal",
+          "description": "now",
+          "badge": "✕"
+        },
+        {
+          "label": "Split the payment service",
+          "logo": "claudecode-dark",
+          "codicon": "",
+          "description": "now",
           "badge": "✓"
         }
       ]
@@ -157,24 +178,24 @@
           {
             "name": "Stop",
             "x": 279.5625,
-            "y": 429
+            "y": 363
           },
           {
             "name": "Pin to Grid",
             "x": 299.5625,
-            "y": 429
+            "y": 363
           }
         ],
         "onDone": [
           {
             "name": "Archive (⌘Backspace)",
             "x": 280.078125,
-            "y": 385
+            "y": 517
           },
           {
             "name": "Pin to Grid",
             "x": 300.078125,
-            "y": 385
+            "y": 517
           }
         ]
       }

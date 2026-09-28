@@ -9,7 +9,7 @@
           900,
           {
             "ok": true,
-            "height": 47
+            "height": 48
           }
         ],
         [
@@ -17,7 +17,7 @@
           1280,
           {
             "ok": true,
-            "height": 47
+            "height": 48
           }
         ],
         [
@@ -25,7 +25,7 @@
           1600,
           {
             "ok": true,
-            "height": 47
+            "height": 48
           }
         ],
         [
@@ -33,7 +33,7 @@
           900,
           {
             "ok": true,
-            "height": 47
+            "height": 48
           }
         ],
         [
@@ -41,7 +41,7 @@
           1280,
           {
             "ok": true,
-            "height": 47
+            "height": 48
           }
         ],
         [
@@ -49,7 +49,7 @@
           1600,
           {
             "ok": true,
-            "height": 47
+            "height": 48
           }
         ]
       ]
@@ -176,23 +176,23 @@
       "width": 322,
       "toolbar": {
         "ok": true,
-        "height": 47
+        "height": 48
       },
       "headers": [
         {
           "file": "a.txt",
           "ok": true,
-          "height": 42
+          "height": 40
         },
         {
           "file": "b.txt",
           "ok": true,
-          "height": 42
+          "height": 40
         },
         {
           "file": "big.txt",
           "ok": true,
-          "height": 42
+          "height": 40
         }
       ],
       "overlaps": [],
@@ -209,23 +209,23 @@
       "width": 609,
       "toolbar": {
         "ok": true,
-        "height": 47
+        "height": 48
       },
       "headers": [
         {
           "file": "a.txt",
           "ok": true,
-          "height": 42
+          "height": 40
         },
         {
           "file": "b.txt",
           "ok": true,
-          "height": 42
+          "height": 40
         },
         {
           "file": "big.txt",
           "ok": true,
-          "height": 42
+          "height": 40
         }
       ],
       "overlaps": [],
@@ -242,23 +242,23 @@
       "width": 820,
       "toolbar": {
         "ok": true,
-        "height": 47
+        "height": 48
       },
       "headers": [
         {
           "file": "a.txt",
           "ok": true,
-          "height": 42
+          "height": 40
         },
         {
           "file": "b.txt",
           "ok": true,
-          "height": 42
+          "height": 40
         },
         {
           "file": "big.txt",
           "ok": true,
-          "height": 42
+          "height": 40
         }
       ],
       "overlaps": [],
@@ -275,23 +275,23 @@
       "width": 322,
       "toolbar": {
         "ok": true,
-        "height": 47
+        "height": 48
       },
       "headers": [
         {
           "file": "a.txt",
           "ok": true,
-          "height": 42
+          "height": 40
         },
         {
           "file": "b.txt",
           "ok": true,
-          "height": 42
+          "height": 40
         },
         {
           "file": "big.txt",
           "ok": true,
-          "height": 42
+          "height": 40
         }
       ],
       "overlaps": [],
@@ -308,23 +308,23 @@
       "width": 609,
       "toolbar": {
         "ok": true,
-        "height": 47
+        "height": 48
       },
       "headers": [
         {
           "file": "a.txt",
           "ok": true,
-          "height": 42
+          "height": 40
         },
         {
           "file": "b.txt",
           "ok": true,
-          "height": 42
+          "height": 40
         },
         {
           "file": "big.txt",
           "ok": true,
-          "height": 42
+          "height": 40
         }
       ],
       "overlaps": [],
@@ -341,23 +341,23 @@
       "width": 820,
       "toolbar": {
         "ok": true,
-        "height": 47
+        "height": 48
       },
       "headers": [
         {
           "file": "a.txt",
           "ok": true,
-          "height": 42
+          "height": 40
         },
         {
           "file": "b.txt",
           "ok": true,
-          "height": 42
+          "height": 40
         },
         {
           "file": "big.txt",
           "ok": true,
-          "height": 42
+          "height": 40
         }
       ],
       "overlaps": [],

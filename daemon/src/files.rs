@@ -78,12 +78,12 @@ impl Daemon {
             bail!("this workspace was removed");
         }
         let rel = Path::new(dir.trim_start_matches("./"));
-        if rel.is_absolute() || rel.components().any(|c| matches!(c, Component::ParentDir | Component::RootDir | Component::Prefix(_))) || rel.components().any(|c| c.as_os_str() == ".git") {
+        if rel.is_absolute() || rel.components().any(|c| matches!(c, Component::ParentDir | Component::RootDir | Component::Prefix(_))) || rel.components().any(|c| crate::review::is_git_name(c.as_os_str())) {
             bail!("path must be inside the workspace");
         }
         let root = std::fs::canonicalize(&ws.path)?;
         let target = std::fs::canonicalize(root.join(rel)).map_err(|_| anyhow!("no such directory: {dir}"))?;
-        if !target.starts_with(&root) || !target.is_dir() {
+        if !target.starts_with(&root) || !target.is_dir() || target.strip_prefix(&root).is_ok_and(|rest| rest.components().any(|c| crate::review::is_git_name(c.as_os_str()))) {
             bail!("path must be a directory inside the workspace");
         }
         // Changes since the task started (task-start snapshot), falling back to HEAD.
@@ -121,7 +121,7 @@ impl Daemon {
         for entry in std::fs::read_dir(&target)? {
             let entry = entry?;
             let name = entry.file_name().to_string_lossy().to_string();
-            if name == ".git" {
+            if crate::review::is_git_name(entry.file_name().as_os_str()) {
                 continue;
             }
             total += 1;

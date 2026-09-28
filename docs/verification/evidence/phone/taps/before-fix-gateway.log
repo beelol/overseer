@@ -1,0 +1,23 @@
+# The gateway lines of the lab daemon's log (overseerd.log) during the tap-open experiment on the
+# Android emulator, before bb7c284b, as read with grep while the lab ran (line numbers of the log;
+# the lab removed its folder when it stopped). Times are milliseconds since 1970; the address the
+# emulator connects from is left out.
+5:1790592028515 [79561] gateway: "Lab android" connected from <the Mac, as the emulator reaches it>
+6:1790592028541 [79561] gateway: "Lab android" disconnected (closed by the device)
+7:1790592029546 [79561] gateway: "Lab android" connected from <the Mac, as the emulator reaches it>
+8:1790592040964 [79561] gateway: "Lab android" disconnected (the connection was lost)
+9:1790592041949 [79561] gateway: "Lab android" connected from <the Mac, as the emulator reaches it>
+10:1790592061991 [79561] gateway: "Lab android" disconnected (a frame that did not decrypt)
+11:1790592062997 [79561] gateway: "Lab android" connected from <the Mac, as the emulator reaches it>
+12:1790592083045 [79561] gateway: "Lab android" disconnected (a frame that did not decrypt)
+13:1790592084049 [79561] gateway: "Lab android" connected from <the Mac, as the emulator reaches it>
+14:1790592104080 [79561] gateway: "Lab android" disconnected (a frame that did not decrypt)
+15:1790592105088 [79561] gateway: "Lab android" connected from <the Mac, as the emulator reaches it>
+16:1790592125126 [79561] gateway: "Lab android" disconnected (a frame that did not decrypt)
+17:1790592126131 [79561] gateway: "Lab android" connected from <the Mac, as the emulator reaches it>
+18:1790592146160 [79561] gateway: "Lab android" disconnected (a frame that did not decrypt)
+19:1790592147164 [79561] gateway: "Lab android" connected from <the Mac, as the emulator reaches it>
+20:1790592167195 [79561] gateway: "Lab android" disconnected (a frame that did not decrypt)
+21:1790592168199 [79561] gateway: "Lab android" connected from <the Mac, as the emulator reaches it>
+22:1790592188244 [79561] gateway: "Lab android" disconnected (a frame that did not decrypt)
+23:1790592189252 [79561] gateway: "Lab android" connected from <the Mac, as the emulator reaches it>

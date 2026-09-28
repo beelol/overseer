@@ -1,0 +1,27 @@
+{
+  "at": "2026-09-27T22:18:14.227Z",
+  "seededSlow": 0,
+  "ok": true,
+  "platforms": {
+    "android": [
+      {
+        "name": "pair",
+        "criteria": [
+          "AC-117",
+          "AC-118",
+          "AC-141"
+        ],
+        "ok": true,
+        "seconds": 46.2
+      },
+      {
+        "name": "restart",
+        "criteria": [
+          "AC-141"
+        ],
+        "ok": true,
+        "seconds": 95.6
+      }
+    ]
+  }
+}

@@ -4,6 +4,8 @@
 //   Unit      node test/unit/run.js (extension unit tests)
 //   Check     npm run check --prefix extension (syntax of the extension's sources)
 //   Links     scripts/check-links (every relative link in the README and the ledger, AC-153)
+//   Dev       test/dev/run.js (dev daemons through scripts/dev beside a temporary production, Gate T)
+//   Deploy    test/deploy/run.js (scripts/deploy onto a temporary production, AC-214)
 //   UI        the packaged-VSIX fixture scenarios in test/ui (built VSIX, isolated VS Code profiles)
 // Flags: --no-ui (skip UI), --only=a,b (UI scenarios by name), --live (also the LIVE scenarios, which
 // spend paid turns within the budget in AGENTS.md), --perf (also the ten-minute AC-35 load test),
@@ -78,6 +80,12 @@ run('Rust (cargo test --workspace)', 'cargo', ['test', '--workspace'], {
 run('Unit (test/unit)', 'node', ['test/unit/run.js'], { summary: out => (out.match(/(\d+) of (\d+) passed/) || [''])[0] });
 run('Check (extension sources)', 'npm', ['run', '--silent', 'check', '--prefix', 'extension']);
 run('Links (README and ledger)', 'node', ['scripts/check-links'], { summary: out => (out.match(/(\d+) links checked.*?(\d+) broken/) || [''])[0] });
+// Dev daemons beside a temporary "production" (Gate T): scripts/dev with a temporary HOME and dev root.
+run('Dev daemons (test/dev)', 'node', ['test/dev/run.js'], { summary: out => (out.match(/(\d+) of (\d+) passed/) || [''])[0] });
+// Guided owner tests (AC-215): every owner-check file, and a fixture check run step by step.
+run('Guided owner tests (test/dev/guided.js)', 'node', ['test/dev/guided.js'], { summary: out => (out.match(/(\d+) of (\d+) passed/) || [''])[0] });
+// Deploy onto a temporary production (AC-214): builds two commits in its own clone, installs into a temporary VS Code profile.
+run('Deploy (test/deploy)', 'node', ['test/deploy/run.js'], { summary: out => (out.match(/(\d+) of (\d+) passed/) || [''])[0] });
 
 // UI: every fixture scenario (LIVE ones and perf only when asked).
 if (!flag('--no-ui')) {

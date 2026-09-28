@@ -12,7 +12,7 @@ const { EventEmitter } = require('events');
 // with OVERSEER_INSTANCE=dev-<name> and reports it in `hello`, and dev binaries carry this file.
 const DEV_MARKER = 'overseer-dev-instance';
 // Variables that point a daemon at another instance: production ignores them (a terminal where a
-// dev instance was set up, or a launcher, can leak them into VS Code's environment).
+// dev daemon was set up, or a launcher, can leak them into VS Code's environment).
 const LEAKY = ['OVERSEER_HOME', 'OVERSEER_SOCKET', 'OVERSEER_INSTANCE'];
 
 const real = p => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
@@ -24,7 +24,7 @@ function isProductionInstall(extensionPath, home = os.homedir()) {
   return ['.vscode', '.vscode-insiders'].some(d => real(path.join(home, d, 'extensions')) === parent);
 }
 
-/** The dev instance a binary is marked with (the file next to it), or null. */
+/** The dev daemon a binary is marked with (the file next to it), or null. */
 function devMarker(binary) {
   try { return fs.readFileSync(path.join(path.dirname(binary), DEV_MARKER), 'utf8').trim() || 'dev'; } catch { return null; }
 }
@@ -37,7 +37,8 @@ function productionEnv(env = process.env) {
 }
 
 class DaemonClient extends EventEmitter {
-  /** opts.production: the installed extension (see isProductionInstall); opts.env: the base environment. */
+  /** opts.production: the installed extension (see isProductionInstall); opts.env: the base environment;
+   *  opts.pin: { socket, instance } from a dev profile's settings (never honoured in production, AC-209). */
   constructor(binary, log, opts = {}) {
     super();
     this.binary = binary;
@@ -45,6 +46,7 @@ class DaemonClient extends EventEmitter {
     this.production = !!opts.production;
     this.env = this.production ? productionEnv(opts.env || process.env) : (opts.env || process.env);
     this.refusal = null;
+    this.pin = !this.production && opts.pin && opts.pin.socket ? { socket: opts.pin.socket, instance: opts.pin.instance || '' } : null;
     this.nextId = 1;
     this.pending = new Map();
     this.cursor = 0;
@@ -52,16 +54,24 @@ class DaemonClient extends EventEmitter {
     this.disposed = false;
     this.buffer = '';
     this.seen = new Set();
+    this.live = false;
   }
 
   /** Production never starts or asks a daemon binary marked dev. */
   checkBinary() {
     if (!this.production) return;
     const marker = devMarker(this.binary);
-    if (marker) throw new Error(`Refusing ${this.binary}: it is a dev build (${marker}). The installed Overseer only runs its own daemon; clear overseer.daemonPath, and use scripts/dev code for dev instances.`);
+    if (marker) throw new Error(`Refusing ${this.binary}: it is a dev build (${marker}). The installed Overseer only runs its own daemon; clear overseer.daemonPath, and use scripts/dev code for dev daemons.`);
+  }
+
+  /** Said when a pinned dev daemon is not running: it is never started or replaced from here. */
+  notRunning() {
+    const name = (this.pin.instance || '').replace(/^dev-/, '') || '<name>';
+    return `Dev daemon ${this.pin.instance || '(unnamed)'} is not running (socket ${this.pin.socket}). Start it with scripts/dev up --name ${name}.`;
   }
 
   socketPath() {
+    if (this.pin) return this.pin.socket;
     if (!this._socket) {
       this.checkBinary();
       this._socket = execFileSync(this.binary, ['socket-path'], { encoding: 'utf8', env: this.env }).trim();
@@ -74,14 +84,24 @@ class DaemonClient extends EventEmitter {
     for (let attempt = 0; attempt < 50 && !this.disposed; attempt++) {
       try { await this.connect(); return; } catch (error) {
         if (this.refusal) throw error;
-        if (attempt === 0) this.spawnDaemon();
+        if (this.pin) {
+          if (attempt >= 9) { this.say(this.notRunning()); throw new Error(this.notRunning()); }
+        } else if (attempt === 0) this.spawnDaemon();
         await new Promise(r => setTimeout(r, 200));
       }
     }
     throw new Error('Could not connect to overseerd.');
   }
 
+  /** A pinned instance that is down is said once per outage ('unreachable'). */
+  say(message) {
+    if (this.unreachableSaid) return;
+    this.unreachableSaid = true;
+    this.emit('unreachable', message);
+  }
+
   spawnDaemon() {
+    if (this.pin) throw new Error(this.notRunning());
     if (!fs.existsSync(this.binary)) throw new Error(`overseerd not found at ${this.binary}`);
     this.checkBinary();
     this.log(`starting daemon ${this.binary}`);
@@ -97,8 +117,10 @@ class DaemonClient extends EventEmitter {
       socket.setEncoding('utf8');
       socket.on('connect', () => {
         opened = true; this.socket = socket; this.buffer = '';
+        // Until the replay of missed events ends, events are history, not news.
+        this.live = false;
         // Identify as a VS Code window: the daemon notifies when the last one closes while agents run.
-        // Its answer says which daemon this is: production refuses a dev instance (AC-212).
+        // Its answer says which daemon this is: production refuses a dev daemon (AC-212).
         this.request('hello', { client: 'vscode' }).then(hello => {
           const refusal = this.refuse(hello || {});
           if (refusal) {
@@ -106,7 +128,7 @@ class DaemonClient extends EventEmitter {
             this.emit('refused', refusal);
             socket.destroy(); reject(new Error(refusal)); return;
           }
-          ready = true; this.connected = true;
+          ready = true; this.connected = true; this.unreachableSaid = false;
           this.log('connected to daemon');
           this.emit('connected');
           this.request('events.subscribe', { after: this.cursor }).catch(e => this.log('subscribe failed: ' + e.message));
@@ -131,7 +153,8 @@ class DaemonClient extends EventEmitter {
         this.pending.clear();
         this.emit('disconnected');
         // A deliberate "Stop Agents and Daemon" (from any window) must not respawn the daemon.
-        if (this.stopped) { this.emit('stopped'); return; }
+        // A pinned dev window keeps waiting for its instance (it never starts one).
+        if (this.stopped && !this.pin) { this.emit('stopped'); return; }
         if (!this.disposed) this.reconnectLater();
       });
     });
@@ -139,7 +162,8 @@ class DaemonClient extends EventEmitter {
 
   /** Why this daemon must not be used, or null. */
   refuse(hello) {
-    if (this.production && hello.instance) return `The installed Overseer refuses to use dev instance ${hello.instance} (socket ${this.socketPath()}). Dev instances are for dev VS Code profiles (scripts/dev code); production uses only the standard daemon.`;
+    if (this.pin && hello.instance !== this.pin.instance) return `Pinned to dev daemon ${this.pin.instance}, but the daemon at ${this.pin.socket} is ${hello.instance ? 'dev daemon ' + hello.instance : 'not a dev daemon'}; refusing it.`;
+    if (this.production && hello.instance) return `The installed Overseer refuses to use dev daemon ${hello.instance} (socket ${this.socketPath()}). Dev daemons are for dev VS Code profiles (scripts/dev code); production uses only the standard daemon.`;
     return null;
   }
 
@@ -148,7 +172,8 @@ class DaemonClient extends EventEmitter {
     clearTimeout(this.retry);
     this.retry = setTimeout(async () => {
       try { await this.connect(); } catch {
-        try { this.spawnDaemon(); } catch (e) { this.log(e.message); }
+        if (this.refusal) return;
+        try { this.spawnDaemon(); } catch (e) { this.log(e.message); if (this.pin) this.say(e.message); }
         this.reconnectLater();
       }
     }, 1000);
@@ -172,12 +197,13 @@ class DaemonClient extends EventEmitter {
         this.log('event stream lagged; resubscribing from cursor ' + this.cursor);
         this.request('events.subscribe', { after: this.cursor }).catch(() => {});
       } else if (msg.method === 'replayed') {
+        this.live = true;
         this.emit('replayed', msg.params);
       } else if (msg.method === 'voice') {
         this.emit('voice', msg.params);
       } else if (msg.id !== undefined && this.pending.has(msg.id)) {
         const { resolve, reject } = this.pending.get(msg.id); this.pending.delete(msg.id);
-        if (msg.error) reject(new Error(msg.error.message || msg.error.code)); else resolve(msg.result);
+        if (msg.error) reject(Object.assign(new Error(msg.error.message || msg.error.code), { code: msg.error.code, data: msg.error.data })); else resolve(msg.result);
       }
     }
   }

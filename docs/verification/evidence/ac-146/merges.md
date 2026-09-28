@@ -1,5 +1,33 @@
 # AC-146: merges
 
+## Pull request #25 (UI scenarios never take focus), 2026-09-28
+
+- **Why:** the owner could not work while scenario windows kept coming to the front; UI runs were paused on every branch until this merged.
+- **Finished:** marked ready by its agent (head `96944787`). On macOS the harness starts VS Code paused under its inspector, shows windows without activating the app, keeps them transparent and click-through, and quits through `app.quit()`. `OVERSEER_UI_FOREGROUND=1` gives the old launch. Also touches `scripts/dev code --inspect` (Gate T).
+- **Tests:** the agent's two full `scripts/test-all --jobs=3` runs: 54 of 56 (both misses pass alone), then 48 of 56 at load 39 to 49 (each timing miss passes alone or misses the same way on main's foreground launch). Across 15,218 frontmost-app samples at 50 ms in the second run, no scenario window was in front. On the merge with main (`pm-wt`): unit 9 of 9, check, links, VSIX, and UI keyboard passed.
+- **Merged:** squash, `72e79ac0`.
+
+## Pull requests #22 and #23 (guided owner tests and deploy, Gate T stages 3 and 4), 2026-09-28
+
+- **Finished:** both marked ready by the dev daemons agent; AC-215 and AC-214 verified on main (`dea2bff9`). #23 was stacked on #22.
+- **Throwaway copy:** #23 (which contains #22) with current main merged in, without conflicts. After #22's squash, #23 conflicted only in `scripts/test-all` (its deploy step; kept).
+- **Tests:** the agent's `scripts/test-all --jobs=3` on stage 4 gave 56 of 58: memspeech's `speak()` timeout got the retry its callers use (b70cea70), and UI sidebar waits for its rerun after the focus fix (the owner asked for no VS Code test windows until then). On the merge: unit 9 of 9, links, `test/dev/run.js` 11 of 11, `test/dev/guided.js` 7 of 7, `dev_instance` 6 of 6, `test/deploy/run.js` 6 of 6. Found while checking: `scripts/deploy` failed when `CARGO_TARGET_DIR` was set (the binary was built outside its clone); fixed in the merge (`3e0463d2`), and deploy then passed 6 of 6 with it set.
+- **Merged:** #22 squash `e66df29a`, #23 squash `48200ea6`.
+
+## Pull request #21 (the dev daemons feature, Gate T stage 2), 2026-09-28
+
+- **Finished:** marked ready by the dev daemons agent (head `0fef4d33`, main merged in with Voice Mode's `voice.subscribe` kept); AC-206 to AC-209 and AC-211 verified on main (`f6b6a053`).
+- **Throwaway copy:** main (with #10) merged in without conflicts (`84d420c8`).
+- **Tests:** `scripts/test-all --jobs=3`: 56 of 56 passed (Rust, unit, check, links, VSIX and every UI fixture scenario, audit included).
+- **Merged:** squash, `76d4ae85`. Stages 3 (guided owner tests, AC-215) and 4 (deploy, AC-214) follow as their own pull requests.
+
+## Pull request #10 (phone remote, Gate N), 2026-09-28
+
+- **Finished:** marked ready by the phone agent (head `1488b4be`), with main merged in at `295f97f2` (Voice Mode and the production guard: conflicts in `server.rs`, `daemon-client.js`, `extension.js` and `Cargo.lock` kept both sides; Voice Mode's methods are Mac-only for phones). Its own records on main (`420853a4`): 15 verified, 7 partial, AC-128 and AC-133 not started.
+- **Throwaway copy:** current main merged in without conflicts (`efbddb96`; main had gained only docs).
+- **Tests:** `scripts/test-all --jobs=3` at load 8 to 10. The first run: Rust 392 passed and `protocol`'s ac45 failed (a 600 ms notice; it passes alone, 4 of 4), and the VSIX step failed from the copy's setup (no `target/`). The second: Rust 444 passed, 0 failed; unit 8 of 8; check; links; VSIX; 49 of 50 UI scenarios. `audit` fails on review's text budget (175 → 178) exactly as on main; it is not this branch's (recorded as its own row).
+- **Merged:** squash, `b95aedfa`. The TestFlight workflow started on the merge (run 36442588449).
+
 ## Pull request #19 (production guard, Gate T stage 1), 2026-09-28
 
 - **Finished:** marked ready by the dev daemons agent; AC-212 verified on main (`5b994d28`).

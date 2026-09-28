@@ -1,0 +1,12 @@
+android cold-start-dark: android-cold-start-dark.mp4
+  marks: {"screen.agents.shown":442.20583499991335,"door.shown":442.3782099999953,"screen.agents.interactive":559.491709999973,"door.opening":587.0995020000264,"door.opened":1647.8537520000245}
+  door: {"opening":{"count":1,"p50":1057.9,"p95":1057.9,"max":1057.9225419999566},"frames":{"count":1,"p50":57,"p95":57,"max":57},"dropped":{"count":1,"p50":4,"p95":4,"max":4},"longestFrame":{"count":1,"p50":50,"p95":50,"max":50}}
+android cold-start-light: android-cold-start-light.mp4
+  marks: {"screen.agents.shown":549.9501310000196,"door.shown":550.1149220000952,"screen.agents.interactive":593.0712560000829,"door.opening":602.5692980000749,"door.opened":1679.9829649999738}
+  door: {"opening":{"count":1,"p50":1074.3,"p95":1074.3,"max":1074.321208999958},"frames":{"count":1,"p50":54,"p95":54,"max":54},"dropped":{"count":1,"p50":7,"p95":7,"max":7},"longestFrame":{"count":1,"p50":100,"p95":100,"max":100}}
+android return-from-background: android-return-from-background.mp4 (no new launch: the app was not started again)
+  marks: {}
+  door: {}
+android cold-start-reduce-motion: android-cold-start-reduce-motion.mp4
+  marks: {"screen.agents.shown":461.2527640000917,"door.shown":461.41347300005145,"screen.agents.interactive":511.8309730000328,"door.opening":524.6055560000241,"door.opened":765.9972649998963}
+  door: {"opening":{"count":1,"p50":239.8,"p95":239.8,"max":239.79295899998397},"frames":{"count":1,"p50":10,"p95":10,"max":10},"dropped":{"count":1,"p50":2,"p95":2,"max":2},"longestFrame":{"count":1,"p50":50,"p95":50,"max":50}}

@@ -1,0 +1,17 @@
+# An agent's conversation with its menu open. Used by scenarios that go on from it.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- runFlow: open-agent.yaml
+- extendedWaitUntil:
+    visible:
+      id: "agent.more"
+    timeout: 30000
+- tapOn:
+    id: "agent.more"
+    retryTapIfNoChange: true
