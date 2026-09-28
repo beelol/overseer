@@ -81,6 +81,8 @@ run('Check (extension sources)', 'npm', ['run', '--silent', 'check', '--prefix',
 run('Links (README and ledger)', 'node', ['scripts/check-links'], { summary: out => (out.match(/(\d+) links checked.*?(\d+) broken/) || [''])[0] });
 // Dev daemons beside a temporary "production" (Gate T): scripts/dev with a temporary HOME and dev root.
 run('Dev daemons (test/dev)', 'node', ['test/dev/run.js'], { summary: out => (out.match(/(\d+) of (\d+) passed/) || [''])[0] });
+// Guided owner tests (AC-215): every owner-check file, and a fixture check run step by step.
+run('Guided owner tests (test/dev/guided.js)', 'node', ['test/dev/guided.js'], { summary: out => (out.match(/(\d+) of (\d+) passed/) || [''])[0] });
 
 // UI: every fixture scenario (LIVE ones and perf only when asked).
 if (!flag('--no-ui')) {

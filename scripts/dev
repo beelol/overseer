@@ -27,12 +27,15 @@ const COMMANDS = {
   tui: "run the instance's own TUI against it",
   phone: 'the phone simulators pinned to the instance (after pull request #10)',
   clean: 'down, then remove the instance folder (--all: every instance)',
+  test: "run a gate's owner check, guided, in a dev daemon (docs/owner-checks)",
   help: 'this text',
 };
 const FLAGS = {
   '--name': 'value', '--repo': 'value', '--release': 'bool', '--no-build': 'bool', '--restart': 'bool',
   '--owner-logins': 'bool', '--mdns': 'bool', '--json': 'bool', '--keep-clients': 'bool', '--follow': 'bool',
   '-f': 'bool', '--vsix': 'value', '--inspect': 'bool', '--dry-run': 'bool', '--platform': 'value', '--all': 'bool',
+  '--list': 'bool', '--start': 'bool', '--record': 'value', '--skip': 'value', '--finish': 'bool', '--ref': 'value',
+  '--no-fetch': 'bool', '--file': 'value', '--evidence': 'value', '--status': 'bool',
   '--help': 'bool', '-h': 'bool',
 };
 
@@ -76,6 +79,20 @@ USAGE
       After pull request #10 (the phone app and its gateway): the simulator app pinned to
       the instance. Until then it prints the address to type in the app.
   scripts/dev clean  --name NAME | --all      down, then delete the instance folder(s)
+  scripts/dev test   --list                   the owner checks gates list (docs/owner-checks/*.json)
+  scripts/dev test   CHECK --start [--ref REF] [--no-fetch] [--repo PATH] [--no-build]
+                     CHECK --record "WHAT THE OWNER SAID OR SAW" | --skip "WHY"
+                     CHECK --status | --finish [--evidence DIR]
+      Guided owner tests (AC-215). When the owner asks for an owner check ("let's start the
+      voice mode test"), run it with this. --start builds the check's branch (its "ref", or
+      --ref; --repo uses a checkout as it is) into a dev daemon named check-CHECK, prepares
+      what the check needs (a scratch repository, fixture agents, an isolated dev VS Code on
+      the right view) and prints step 1. Tell the owner the step, then --record their answer
+      or what they saw (or --skip with the reason): the next step is printed. --finish writes
+      the evidence (record.md and record.json under
+      docs/verification/evidence/owner-checks/CHECK/<date>/, or --evidence DIR) and cleans the
+      dev daemon up. In a terminal, "scripts/dev test CHECK" walks through it by itself.
+      --file PATH runs a check file from elsewhere (tests).
   scripts/dev help | --help | -h
 
 WHERE THINGS ARE
@@ -306,7 +323,8 @@ async function stopDaemon(i, method) {
   return true;
 }
 
-function print(obj, json, text) { console.log(json ? JSON.stringify(obj, null, 2) : text); }
+let QUIET = false; // guided tests call up and code themselves and print their own summary
+function print(obj, json, text) { if (!QUIET) console.log(json ? JSON.stringify(obj, null, 2) : text); }
 
 function describe(st, i) {
   const lines = [
@@ -444,7 +462,7 @@ async function code(o) {
     'workbench.startupEditor': 'none', 'workbench.tips.enabled': false, 'security.workspace.trust.enabled': false, 'window.restoreWindows': 'none',
     'window.title': `[${i.id}] \${rootName}\${separator}\${activeEditorShort}`,
     'overseer.daemonPath': i.daemon, 'overseer.daemonSocket': i.socket, 'overseer.devInstance': i.id,
-  });
+  }, o.__settings || {});
   fs.writeFileSync(file, JSON.stringify(settings, null, 2) + '\n');
   fs.rmSync(path.join(i.profile, 'DevToolsActivePort'), { force: true });
   const folder = o._[1] ? real(o._[1]) : null;
@@ -495,11 +513,226 @@ async function clean(o) {
   if (all && !targets.length) console.log(`no dev daemons under ${DEV_ROOT}`);
 }
 
+// ------------------------------------------------------------------ guided owner tests (AC-215)
+
+const CHECKS = path.join(SELF_REPO, 'docs/owner-checks');
+
+/** What is wrong with an owner-check file (empty when nothing is). */
+function checkProblems(c) {
+  const bad = [];
+  if (!c || typeof c !== 'object') return ['not a JSON object'];
+  if (!/^[a-z0-9][a-z0-9-]{0,24}$/.test(c.name || '')) bad.push('name: lower-case letters, digits and hyphens, up to 25');
+  for (const k of ['title', 'gate', 'ref', 'source']) if (typeof c[k] !== 'string' || !c[k]) bad.push(`${k}: a non-empty string`);
+  if (!Array.isArray(c.criteria) || !c.criteria.length || !c.criteria.every(x => /^AC-\d{2,3}$/.test(x))) bad.push('criteria: a list of AC-NN');
+  if (!c.prepare || typeof c.prepare !== 'object') bad.push('prepare: an object');
+  if (!Array.isArray(c.steps) || !c.steps.length) bad.push('steps: a non-empty list');
+  const ids = new Set();
+  (c.steps || []).forEach((s, k) => {
+    for (const f of ['id', 'title', 'do', 'record']) if (typeof s[f] !== 'string' || !s[f]) bad.push(`steps[${k}].${f}: a non-empty string`);
+    if (!Array.isArray(s.criteria) || !s.criteria.every(x => /^AC-\d{2,3}$/.test(x))) bad.push(`steps[${k}].criteria: a list of AC-NN`);
+    if (ids.has(s.id)) bad.push(`steps[${k}].id ${s.id} repeats`);
+    ids.add(s.id);
+  });
+  return bad;
+}
+
+function checkNames() { try { return fs.readdirSync(CHECKS).filter(f => f.endsWith('.json')).map(f => f.slice(0, -5)).sort(); } catch { return []; } }
+
+function loadCheck(name, file) {
+  const f = file ? path.resolve(file) : path.join(CHECKS, `${name}.json`);
+  if (!exists(f)) die(`no owner check ${name} (scripts/dev test --list)`);
+  let c;
+  try { c = JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { die(`${f}: ${e.message}`); }
+  const bad = checkProblems(c);
+  if (bad.length) die(`${f} is not a valid owner check:\n  ${bad.join('\n  ')}`);
+  return { ...c, file: f };
+}
+
+const checkState = i => path.join(i.dir, 'check.json');
+function readCheckState(i) { try { return JSON.parse(fs.readFileSync(checkState(i), 'utf8')); } catch { return null; } }
+function writeCheckState(i, s) { fs.writeFileSync(checkState(i), JSON.stringify(s, null, 2) + '\n'); }
+
+function stepText(c, s) {
+  if (s.step >= c.steps.length) return `All ${c.steps.length} steps of "${c.title}" are recorded. Finish: scripts/dev test ${c.name} --finish`;
+  const st = c.steps[s.step];
+  return [
+    `Step ${s.step + 1} of ${c.steps.length}: ${st.title}${st.criteria.length ? ` (${st.criteria.join(', ')})` : ''}`,
+    `  Do:     ${st.do}`,
+    ...(st.watch ? [`  Watch:  ${st.watch}`] : []),
+    `  Record: ${st.record}`,
+    `Then: scripts/dev test ${c.name} --record "<what the owner said or saw>"   (or --skip "<why>")`,
+  ].join('\n');
+}
+
+/** The check's ref, built in its own clone inside the dev daemon's folder. */
+function checkoutRef(i, ref, o) {
+  const src = path.join(i.dir, 'src');
+  const branch = ref.replace(/^origin\//, '');
+  if (!o['--no-fetch']) cp.spawnSync('git', ['-C', SELF_REPO, 'fetch', '-q', 'origin', branch], { stdio: 'ignore' });
+  const commit = [`origin/${branch}`, ref].map(r => git(SELF_REPO, 'rev-parse', '--verify', '-q', `${r}^{commit}`)).find(Boolean);
+  if (!commit) die(`cannot find ${ref} (as origin/${branch} or ${ref}) in ${SELF_REPO}`);
+  fs.mkdirSync(src, { recursive: true });
+  if (!exists(path.join(src, '.git'))) cp.execFileSync('git', ['init', '-q', src]);
+  cp.execFileSync('git', ['-C', src, 'fetch', '-q', SELF_REPO, `+${commit}:refs/check/target`]);
+  cp.execFileSync('git', ['-C', src, 'checkout', '-q', '--force', '--detach', 'refs/check/target']);
+  return { src, commit };
+}
+
+function scratchRepo(dir) {
+  fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+  const g = (...a) => cp.execFileSync('git', a, { cwd: dir, stdio: 'ignore' });
+  g('init', '-q', '-b', 'main'); g('config', 'user.name', 'Owner Check'); g('config', 'user.email', 'owner-check@example.invalid'); g('config', 'commit.gpgsign', 'false');
+  fs.writeFileSync(path.join(dir, 'README.md'), '# scratch\n\nA scratch repository for an owner check.\n');
+  fs.writeFileSync(path.join(dir, 'src/cart.js'), 'export function total(items) {\n  return items.reduce((sum, item) => sum + item.price, 0);\n}\n');
+  g('add', '.'); g('commit', '-q', '-m', 'base');
+  return dir;
+}
+
+async function prepareAgents(i, c, scratch) {
+  const made = [];
+  for (const a of c.prepare.fixture_agents || []) {
+    let created;
+    if (c.prepare.owner_logins) {
+      // With the owner's logins the Claude harness is the real one: stand-in agents never spend a turn.
+      created = await call(i.socket, 'task.create', { repo: scratch, harness: 'generic', program: '/bin/sh', args: ['-c', `echo ${JSON.stringify(a.prompt || a.title)}; sleep 7200`], prompt: '', title: a.title });
+    } else {
+      fs.writeFileSync(path.join(i.dir, 'fixture-mode'), a.mode || 'nested');
+      created = await call(i.socket, 'task.create', { repo: scratch, harness: 'claude', prompt: a.prompt || a.title, title: a.title });
+      for (let k = 0; k < 100; k++) { // the fixture reads its mode when it starts
+        const run = (await call(i.socket, 'state')).runs.find(r => r.id === created.run.id);
+        if (run && !['queued', 'starting'].includes(run.status)) break;
+        await sleep(100);
+      }
+    }
+    made.push({ title: a.title, run: created.run.id });
+  }
+  return made;
+}
+
+async function testStart(o, c) {
+  const i = instance(`check-${c.name}`);
+  guard(i);
+  if (readCheckState(i)) die(`the ${c.name} check is already started: scripts/dev test ${c.name} --status (or --finish)`);
+  fs.mkdirSync(i.dir, { recursive: true });
+  const ref = o['--ref'] || c.ref;
+  let repo, commit;
+  if (o['--repo'] || ref === 'self') { repo = real(o['--repo'] || SELF_REPO); commit = git(repo, 'rev-parse', '--short=12', 'HEAD'); }
+  else { const got = checkoutRef(i, ref, o); repo = got.src; commit = got.commit.slice(0, 12); }
+  const state = { check: c.name, file: c.file, title: c.title, gate: c.gate, criteria: c.criteria, ref, commit, repo, instance: i.id, started: new Date().toISOString(), step: 0, answers: [] };
+  writeCheckState(i, state);
+  QUIET = true;
+  try {
+    process.stderr.write(`starting dev daemon ${i.id} from ${ref} (${commit})\n`);
+    await up({ '--name': i.name, '--repo': repo, '--no-build': o['--no-build'], '--owner-logins': !!c.prepare.owner_logins, '--json': true, _: [] });
+    const scratch = c.prepare.scratch_repo ? scratchRepo(path.join(i.dir, 'scratch')) : null;
+    state.prepared = { scratch, agents: await prepareAgents(i, c, scratch || repo) };
+    if (c.prepare.vscode) {
+      if (!o['--no-build'] && !exists(path.join(repo, 'extension/tooling/vsce/node_modules'))) {
+        for (const tool of ['extension/tooling/vsce', 'extension/branch-diff/tooling/review']) {
+          const r = cp.spawnSync('npm', ['ci', '--silent', '--prefix', tool, '--ignore-scripts'], { cwd: repo, stdio: ['ignore', process.stderr, process.stderr] });
+          if (r.status !== 0) die(`npm ci in ${tool} failed`);
+        }
+      }
+      await code({ '--name': i.name, _: ['code', ...(scratch ? [scratch] : [])], '--inspect': true, '--no-build': o['--no-build'], '--vsix': o['--vsix'], __settings: c.prepare.settings || {} });
+      state.prepared.vscode = i.profile;
+      if (c.prepare.command) {
+        try {
+          const { Cdp } = require(path.join(SELF_REPO, 'test/ui/cdp.js'));
+          const cdp = await Cdp.connect(i.profile);
+          await sleep(3000);
+          await cdp.command(c.prepare.command);
+          cdp.close();
+          state.prepared.command = c.prepare.command;
+        } catch (e) { state.prepared.command_failed = `${c.prepare.command}: ${e.message}`; }
+      }
+    }
+  } finally { QUIET = false; writeCheckState(i, state); }
+  console.log(`Owner check "${c.title}" (Gate ${c.gate}) is ready in dev daemon ${i.id}, built from ${ref} (${commit}).`);
+  if (state.prepared.scratch) console.log(`Scratch repository: ${state.prepared.scratch}`);
+  if (state.prepared.agents.length) console.log(`Agents: ${state.prepared.agents.map(a => a.title).join(', ')}`);
+  if (state.prepared.vscode) console.log(`Dev VS Code: open, pinned to ${i.id}${state.prepared.command ? `, on "${c.prepare.command}"` : ''}${state.prepared.command_failed ? ` (could not run ${state.prepared.command_failed}; open it by hand)` : ''}.`);
+  console.log('\n' + stepText(c, state));
+}
+
+function testAnswer(o, c, status, text) {
+  const i = instance(`check-${c.name}`);
+  const state = readCheckState(i);
+  if (!state) die(`the ${c.name} check is not started: scripts/dev test ${c.name} --start`);
+  if (state.step >= c.steps.length) die(`every step is recorded: scripts/dev test ${c.name} --finish`);
+  const st = c.steps[state.step];
+  state.answers.push({ id: st.id, title: st.title, criteria: st.criteria, status, text, time: new Date().toISOString() });
+  state.step++;
+  writeCheckState(i, state);
+  console.log(`${status === 'recorded' ? 'Recorded' : 'Skipped'} step ${st.id} (${st.title}).\n\n` + stepText(c, state));
+}
+
+function evidenceMarkdown(c, s, finished) {
+  const lines = [`# Owner check: ${c.title}`, '', `- Gate: ${c.gate}; criteria: ${c.criteria.join(', ')}`, `- Built from: ${s.ref} (${s.commit}) in dev daemon ${s.instance}`,
+    `- Source: ${c.source}`, `- Started: ${s.started}; finished: ${finished}`, `- Run with: scripts/dev test ${c.name} (AC-215)`, ''];
+  for (const st of c.steps) {
+    const a = s.answers.find(x => x.id === st.id);
+    lines.push(`## ${st.id}. ${st.title}${st.criteria.length ? ` (${st.criteria.join(', ')})` : ''}`, '', `- Asked: ${st.record}`,
+      a ? `- ${a.status === 'recorded' ? 'Answer' : 'Skipped'} (${a.time}): ${a.text}` : '- Not reached.', '');
+  }
+  return lines.join('\n');
+}
+
+async function testFinish(o, c) {
+  const i = instance(`check-${c.name}`);
+  const state = readCheckState(i);
+  if (!state) die(`the ${c.name} check is not started`);
+  const finished = new Date().toISOString();
+  const dir = o['--evidence'] ? path.resolve(o['--evidence']) : path.join(SELF_REPO, 'docs/verification/evidence/owner-checks', c.name, finished.slice(0, 16).replace(/[:T]/g, '-'));
+  fs.mkdirSync(dir, { recursive: true });
+  const record = { ...state, finished, steps: c.steps.map(st => ({ ...st, answer: state.answers.find(a => a.id === st.id) || null })) };
+  fs.writeFileSync(path.join(dir, 'record.json'), JSON.stringify(record, null, 2) + '\n');
+  fs.writeFileSync(path.join(dir, 'record.md'), evidenceMarkdown(c, state, finished));
+  QUIET = true;
+  try { await clean({ '--name': i.name, _: [] }); } finally { QUIET = false; }
+  const done = state.answers.filter(a => a.status === 'recorded').length;
+  console.log(`Owner check "${c.title}": ${done} of ${c.steps.length} steps recorded${state.answers.length > done ? `, ${state.answers.length - done} skipped` : ''}. Evidence: ${dir}\nDev daemon ${i.id} stopped and removed.`);
+}
+
+async function guided(o) {
+  if (o['--list']) {
+    const all = checkNames().map(n => loadCheck(n));
+    print(all.map(c => ({ name: c.name, title: c.title, gate: c.gate, steps: c.steps.length, ref: c.ref })), o['--json'],
+      all.length ? all.map(c => `${c.name.padEnd(16)} Gate ${c.gate}  ${String(c.steps.length).padStart(2)} steps  from ${c.ref}  ${c.title}`).join('\n') : 'no owner checks yet');
+    return;
+  }
+  const name = o._[1];
+  if (!name) throw new Usage('test needs a CHECK name (scripts/dev test --list)');
+  const c = loadCheck(name, o['--file']);
+  if (o['--start']) return testStart(o, c);
+  if (o['--record'] !== undefined) return testAnswer(o, c, 'recorded', o['--record']);
+  if (o['--skip'] !== undefined) return testAnswer(o, c, 'skipped', o['--skip']);
+  if (o['--finish']) return testFinish(o, c);
+  if (o['--status']) {
+    const s = readCheckState(instance(`check-${c.name}`));
+    if (!s) die(`the ${c.name} check is not started: scripts/dev test ${c.name} --start`);
+    console.log(`Owner check "${c.title}" in ${s.instance}, from ${s.ref} (${s.commit}), started ${s.started}.\n\n` + stepText(c, s));
+    return;
+  }
+  if (!process.stdin.isTTY) throw new Usage(`in a terminal "scripts/dev test ${name}" walks through the check; from an agent use --start, --record, --skip, --status and --finish`);
+  await testStart(o, c);
+  const rl = require('readline').createInterface({ input: process.stdin, output: process.stdout });
+  const ask = q => new Promise(r => rl.question(q, r));
+  const i = instance(`check-${c.name}`);
+  while (readCheckState(i).step < c.steps.length) {
+    const answer = (await ask('\nYour answer (or "skip: why", or "stop" to finish now): ')).trim();
+    if (answer === 'stop') break;
+    const m = answer.match(/^skip:\s*(.*)$/i);
+    testAnswer(o, c, m ? 'skipped' : 'recorded', m ? m[1] : answer);
+  }
+  rl.close();
+  await testFinish(o, c);
+}
+
 async function main(argv) {
   const o = parse(argv);
   const cmd = o._[0];
   if (!cmd || cmd === 'help' || o['--help'] || o['-h']) { process.stdout.write(HELP); return; }
-  const run = { up, down, status, list, logs, ctl, env, code, tui, phone, clean }[cmd];
+  const run = { up, down, status, list, logs, ctl, env, code, tui, phone, clean, test: guided }[cmd];
   if (!run) throw new Usage(`unknown command ${cmd} (see scripts/dev --help)`);
   await run(o);
 }
@@ -512,4 +745,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { COMMANDS, FLAGS, HELP, parse };
+module.exports = { COMMANDS, FLAGS, HELP, parse, checkProblems };
