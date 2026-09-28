@@ -1,0 +1,20 @@
+{
+  "ac168": {
+    "answer": null,
+    "runs_after": 7,
+    "runs_before": 6,
+    "started": {
+      "harness": "claude",
+      "model": "haiku",
+      "status": "waiting_for_user",
+      "title": "Write NOTES.md"
+    },
+    "state": "sent",
+    "targets": [
+      "Write NOTES.md"
+    ]
+  },
+  "account": "the default Claude login (system profile)",
+  "attempts": "one each",
+  "model": "haiku"
+}

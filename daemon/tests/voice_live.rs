@@ -129,10 +129,23 @@ fn live_on_the_default_account() {
         return;
     }
     let bin = listener_bin().display().to_string();
+    // The real Claude Code CLI (the tests disable real harnesses unless told where one is).
+    let claude = std::env::var("OVERSEER_VOICE_LIVE_CLAUDE").unwrap_or_else(|_| {
+        let out = std::process::Command::new("sh")
+            .args(["-lc", "command -v claude"])
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    });
+    assert!(
+        !claude.is_empty(),
+        "no claude CLI on PATH (set OVERSEER_VOICE_LIVE_CLAUDE)"
+    );
     let d = Daemon::start(&[
         ("OVERSEER_VOICE_SIMULATE", "1"),
         ("OVERSEER_LISTENER", &bin),
         ("OVERSEER_LISTENER_TEST_VOICE", "1"),
+        ("OVERSEER_CLAUDE_PATH", &claude),
     ]);
     let a = tmp();
     let b = tmp();
@@ -160,111 +173,119 @@ fn live_on_the_default_account() {
     {
         std::thread::sleep(Duration::from_millis(500));
     }
+    let session = d.call("overseer.session", json!({}));
+    assert_eq!(
+        session["run_status"], "completed",
+        "Overseer's first turn on Haiku: {session}"
+    );
     d.call("voice.set", json!({"enabled": true, "settle_seconds": 1, "start_defaults": {"harness": "claude", "model": "haiku", "workspace_mode": "worktree", "trusted": true}}));
     let live = Live::open(&d);
+    // `OVERSEER_VOICE_LIVE_ONLY=ac168` runs the live start alone (one more attempt after a fix).
+    let only = std::env::var("OVERSEER_VOICE_LIVE_ONLY").unwrap_or_default();
     live.wait(30, |v| v["kind"] == "state" && v["state"] == "listening");
     let mut out = json!({"account": "the default Claude login (system profile)", "model": "haiku", "attempts": "one each"});
 
-    // AC-165: one spoken request through the simulated listener, timed.
-    live.clear();
-    d.call(
-        "voice.simulate",
-        json!({"speechlike": 1.2, "words": "Tell Continuity to use the new wire format."}),
-    );
-    let end = live.wait(60, |v| v["kind"] == "heard" && v["final"] == true);
-    let t = |x: Option<(Instant, Value)>| x.map(|(at, _)| at);
-    let t_end = t(end.clone());
-    let heard = t(live.wait(10, |v| v["kind"] == "heard_signal"));
-    let on_it = t(live.wait(10, |v| v["kind"] == "spoke" && v["event"] == "start"));
-    let taken = live
-        .wait(20, |v| v["kind"] == "request")
-        .map(|(_, v)| v["request"]["id"].as_str().unwrap_or("").to_string())
-        .unwrap_or_default();
-    let plan = t(live.wait(90, |v| {
-        v["kind"] == "say"
-            && v["text"] != "On it."
-            && v["text"] != "Sent."
-            && v["text"] != "Still working on it."
-    }));
-    let sent = t(live.wait(120, |v| v["kind"] == "say" && v["text"] == "Sent."));
-    let ms = |x: Option<Instant>| match (t_end, x) {
-        (Some(a), Some(b)) => json!(b.saturating_duration_since(a).as_millis() as u64),
-        _ => json!(null),
-    };
-    let (row, targets) = settled(&d, &taken, 120);
-    out["ac165"] = json!({"request": taken, "state": row["state"], "targets": targets, "heard_ms": ms(heard), "on_it_ms": ms(on_it), "plan_line_ms": ms(plan), "sent_ms": ms(sent), "answer": row["answer"]});
-
-    // AC-166: a sample of ten, one attempt each; a message to a wrong agent fails the criterion.
-    let all: Vec<String> = agents.iter().map(|(_, t)| t.clone()).collect();
-    let sample: Vec<(&str, Vec<&str>)> = vec![
-        (
-            "Tell Continuity to use the new wire format.",
-            vec!["Continuity"],
-        ),
-        (
-            "The phone app should add tests for the gateway.",
-            vec!["Phone app"],
-        ),
-        (
-            "Ask auto routing for a short report on what it changed.",
-            vec!["Auto routing"],
-        ),
-        (
-            "The landing page needs a darker hero section.",
-            vec!["Landing page"],
-        ),
-        (
-            "Docs cleanup should also fix the intro page.",
-            vec!["Docs cleanup"],
-        ),
-        (
-            "Swarm mode should hold off on new branches for now.",
-            vec!["Swarm mode"],
-        ),
-        (
-            "Phone and Continuity should both rebase onto main.",
-            vec!["Phone app", "Continuity"],
-        ),
-        (
-            "Tell them also to update the ledger.",
-            vec!["Phone app", "Continuity"],
-        ),
-        (
-            "Everybody, pull main before you push.",
-            all.iter().map(String::as_str).collect(),
-        ),
-        ("Please add tests.", vec![]),
-    ];
-    let mut results = Vec::new();
-    let mut wrong = 0;
-    for (text, expected) in &sample {
-        let r = d.call("voice.say", json!({"text": text}));
-        let id = r["request"].as_str().unwrap_or("").to_string();
-        let (row, targets) = if id.is_empty() {
-            (r.clone(), vec![])
-        } else {
-            settled(&d, &id, 150)
+    if only.is_empty() {
+        // AC-165: one spoken request through the simulated listener, timed.
+        live.clear();
+        d.call(
+            "voice.simulate",
+            json!({"speechlike": 1.2, "words": "Tell Continuity to use the new wire format."}),
+        );
+        let end = live.wait(60, |v| v["kind"] == "heard" && v["final"] == true);
+        let t = |x: Option<(Instant, Value)>| x.map(|(at, _)| at);
+        let t_end = t(end.clone());
+        let heard = t(live.wait(10, |v| v["kind"] == "heard_signal"));
+        let on_it = t(live.wait(10, |v| v["kind"] == "spoke" && v["event"] == "start"));
+        let taken = live
+            .wait(20, |v| v["kind"] == "request")
+            .map(|(_, v)| v["request"]["id"].as_str().unwrap_or("").to_string())
+            .unwrap_or_default();
+        let plan = t(live.wait(90, |v| {
+            v["kind"] == "say"
+                && v["text"] != "On it."
+                && v["text"] != "Sent."
+                && v["text"] != "Still working on it."
+        }));
+        let sent = t(live.wait(120, |v| v["kind"] == "say" && v["text"] == "Sent."));
+        let ms = |x: Option<Instant>| match (t_end, x) {
+            (Some(a), Some(b)) => json!(b.saturating_duration_since(a).as_millis() as u64),
+            _ => json!(null),
         };
-        let extra: Vec<&String> = targets
-            .iter()
-            .filter(|t| !expected.contains(&t.as_str()))
-            .collect();
-        let missing: Vec<&&str> = expected
-            .iter()
-            .filter(|e| !targets.iter().any(|t| t == **e))
-            .collect();
-        if !extra.is_empty() {
-            wrong += 1;
-        }
-        results.push(json!({"said": text, "expected": expected, "sent_to": targets, "state": row["state"], "answer": row["answer"], "match": extra.is_empty() && missing.is_empty(), "wrong_agent": !extra.is_empty()}));
-    }
-    out["ac166"] = json!({"sample": results, "messages_to_a_wrong_agent": wrong});
+        let (row, targets) = settled(&d, &taken, 120);
+        out["ac165"] = json!({"request": taken, "state": row["state"], "targets": targets, "heard_ms": ms(heard), "on_it_ms": ms(on_it), "plan_line_ms": ms(plan), "sent_ms": ms(sent), "answer": row["answer"]});
 
+        // AC-166: a sample of ten, one attempt each; a message to a wrong agent fails the criterion.
+        let all: Vec<String> = agents.iter().map(|(_, t)| t.clone()).collect();
+        let sample: Vec<(&str, Vec<&str>)> = vec![
+            (
+                "Tell Continuity to use the new wire format.",
+                vec!["Continuity"],
+            ),
+            (
+                "The phone app should add tests for the gateway.",
+                vec!["Phone app"],
+            ),
+            (
+                "Ask auto routing for a short report on what it changed.",
+                vec!["Auto routing"],
+            ),
+            (
+                "The landing page needs a darker hero section.",
+                vec!["Landing page"],
+            ),
+            (
+                "Docs cleanup should also fix the intro page.",
+                vec!["Docs cleanup"],
+            ),
+            (
+                "Swarm mode should hold off on new branches for now.",
+                vec!["Swarm mode"],
+            ),
+            (
+                "Phone and Continuity should both rebase onto main.",
+                vec!["Phone app", "Continuity"],
+            ),
+            (
+                "Tell them also to update the ledger.",
+                vec!["Phone app", "Continuity"],
+            ),
+            (
+                "Everybody, pull main before you push.",
+                all.iter().map(String::as_str).collect(),
+            ),
+            ("Please add tests.", vec![]),
+        ];
+        let mut results = Vec::new();
+        let mut wrong = 0;
+        for (text, expected) in &sample {
+            let r = d.call("voice.say", json!({"text": text}));
+            let id = r["request"].as_str().unwrap_or("").to_string();
+            let (row, targets) = if id.is_empty() {
+                (r.clone(), vec![])
+            } else {
+                settled(&d, &id, 150)
+            };
+            let extra: Vec<&String> = targets
+                .iter()
+                .filter(|t| !expected.contains(&t.as_str()))
+                .collect();
+            let missing: Vec<&&str> = expected
+                .iter()
+                .filter(|e| !targets.iter().any(|t| t == **e))
+                .collect();
+            if !extra.is_empty() {
+                wrong += 1;
+            }
+            results.push(json!({"said": text, "expected": expected, "sent_to": targets, "state": row["state"], "answer": row["answer"], "match": extra.is_empty() && missing.is_empty(), "wrong_agent": !extra.is_empty()}));
+        }
+        out["ac166"] = json!({"sample": results, "messages_to_a_wrong_agent": wrong});
+    }
     // AC-168: a tiny live start with the composer's choices (Claude, Haiku).
     let before = d.call("state", json!({}))["runs"].as_array().unwrap().len();
     let r = d.call(
         "voice.say",
-        json!({"text": "Someone should write a one-line NOTES.md that says hello."}),
+        json!({"text": "Someone should write a one-line NOTES.md in the website repository that says hello."}),
     );
     let id = r["request"].as_str().unwrap_or("").to_string();
     let (row, targets) = settled(&d, &id, 150);
@@ -293,7 +314,14 @@ fn live_on_the_default_account() {
     for (id, _) in &agents {
         let _ = d.try_call("run.interrupt", json!({"run_id": id}));
     }
-    let path = repo_root().join("docs/verification/evidence/voice/live.json");
+    let name = if only.is_empty() {
+        "live.json".to_string()
+    } else {
+        format!("live-{only}.json")
+    };
+    let path = repo_root()
+        .join("docs/verification/evidence/voice")
+        .join(name);
     std::fs::write(&path, serde_json::to_string_pretty(&out).unwrap()).unwrap();
     eprintln!("{}", serde_json::to_string_pretty(&out).unwrap());
 }

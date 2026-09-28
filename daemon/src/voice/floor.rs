@@ -58,6 +58,22 @@ pub fn addressed(text: &str, agent_names: &[String], awaiting_answer: bool) -> b
     if words.len() > 1 && words[0] == "hold" && words[1] == "on" {
         return true;
     }
+    // Everyone told to do something: "Everybody, pull main before you push" (AC-166).
+    const WORK_VERBS: &[&str] = &[
+        "pull", "push", "rebase", "commit", "update", "review", "revert", "rename", "deploy",
+        "build", "use", "keep", "finish", "pause", "test", "switch", "move", "delete", "clean",
+    ];
+    if words
+        .iter()
+        .any(|w| matches!(w.as_str(), "everyone" | "everybody"))
+        && words.iter().any(|w| {
+            COMMAND_VERBS.contains(&w.as_str())
+                || WORK_VERBS.contains(&w.as_str())
+                || matches!(w.as_str(), "should" | "must" | "needs")
+        })
+    {
+        return true;
+    }
     // A job for someone new: "someone should write the migration note", "we need someone to…"
     // (AC-168). Overseer can still answer that it was not meant for it.
     if words.len() > 2
@@ -267,5 +283,12 @@ mod tests {
             false
         ));
         assert!(!addressed("three friends should come over", &names, false));
+        assert!(addressed(
+            "Everybody, pull main before you push.",
+            &names,
+            false
+        ));
+        assert!(addressed("everyone should rebase onto main", &names, false));
+        assert!(!addressed("everybody loved the movie", &names, false));
     }
 }

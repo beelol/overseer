@@ -249,6 +249,15 @@ impl Daemon {
             store.conn.execute("UPDATE overseer_tokens SET run_id=?1 WHERE run_id='pending' AND role='overseer'", [&run_id])?;
             store.conn.execute("UPDATE overseer_sessions SET run_id=?2, harness=?3, model=?4, task_id=?5 WHERE id=?1", rusqlite::params![sid, run_id, harness, model, task_id])?;
         }
+        // A harness that cannot start (not installed, no login) ends the run with the reason, so it
+        // never sits queued with nobody told; the next message tries again from the start.
+        if let Some(e) = created["launch_error"].as_str() {
+            if let Ok(run) = self.run(&run_id) {
+                let _ = self.mark_ended(&run, "failed", &format!("not launched: {e}"));
+            }
+            self.store.lock().unwrap().conn.execute("UPDATE overseer_sessions SET run_id=NULL, task_id=NULL WHERE id=?1", [&sid])?;
+            bail!("Overseer could not start on {harness}: {e}");
+        }
         Ok(run_id)
     }
 

@@ -1,0 +1,161 @@
+{
+  "ac165": {
+    "answer": null,
+    "heard_ms": 5,
+    "on_it_ms": 20,
+    "plan_line_ms": 4377,
+    "request": "V-0001",
+    "sent_ms": 6227,
+    "state": "sent",
+    "targets": [
+      "Continuity"
+    ]
+  },
+  "ac166": {
+    "messages_to_a_wrong_agent": 0,
+    "sample": [
+      {
+        "answer": "Already sent in V-0001 — Continuity has the instruction.",
+        "expected": [
+          "Continuity"
+        ],
+        "match": false,
+        "said": "Tell Continuity to use the new wire format.",
+        "sent_to": [],
+        "state": "answered",
+        "wrong_agent": false
+      },
+      {
+        "answer": "Message sent to Phone app.",
+        "expected": [
+          "Phone app"
+        ],
+        "match": true,
+        "said": "The phone app should add tests for the gateway.",
+        "sent_to": [
+          "Phone app"
+        ],
+        "state": "sent",
+        "wrong_agent": false
+      },
+      {
+        "answer": null,
+        "expected": [
+          "Auto routing"
+        ],
+        "match": true,
+        "said": "Ask auto routing for a short report on what it changed.",
+        "sent_to": [
+          "Auto routing"
+        ],
+        "state": "sent",
+        "wrong_agent": false
+      },
+      {
+        "answer": "Message sent to Landing page.",
+        "expected": [
+          "Landing page"
+        ],
+        "match": true,
+        "said": "The landing page needs a darker hero section.",
+        "sent_to": [
+          "Landing page"
+        ],
+        "state": "sent",
+        "wrong_agent": false
+      },
+      {
+        "answer": "Message sent to Docs cleanup.",
+        "expected": [
+          "Docs cleanup"
+        ],
+        "match": true,
+        "said": "Docs cleanup should also fix the intro page.",
+        "sent_to": [
+          "Docs cleanup"
+        ],
+        "state": "sent",
+        "wrong_agent": false
+      },
+      {
+        "answer": "Message sent to Swarm mode.",
+        "expected": [
+          "Swarm mode"
+        ],
+        "match": true,
+        "said": "Swarm mode should hold off on new branches for now.",
+        "sent_to": [
+          "Swarm mode"
+        ],
+        "state": "sent",
+        "wrong_agent": false
+      },
+      {
+        "answer": "Messages sent to Phone app and Continuity.",
+        "expected": [
+          "Phone app",
+          "Continuity"
+        ],
+        "match": true,
+        "said": "Phone and Continuity should both rebase onto main.",
+        "sent_to": [
+          "Phone app",
+          "Continuity"
+        ],
+        "state": "sent",
+        "wrong_agent": false
+      },
+      {
+        "answer": "Messages sent to Phone app and Continuity.",
+        "expected": [
+          "Phone app",
+          "Continuity"
+        ],
+        "match": true,
+        "said": "Tell them also to update the ledger.",
+        "sent_to": [
+          "Phone app",
+          "Continuity"
+        ],
+        "state": "sent",
+        "wrong_agent": false
+      },
+      {
+        "answer": null,
+        "expected": [
+          "Phone app",
+          "Continuity",
+          "Swarm mode",
+          "Auto routing",
+          "Landing page",
+          "Docs cleanup"
+        ],
+        "match": false,
+        "said": "Everybody, pull main before you push.",
+        "sent_to": [],
+        "state": null,
+        "wrong_agent": false
+      },
+      {
+        "answer": "Which agent should add tests?",
+        "expected": [],
+        "match": true,
+        "said": "Please add tests.",
+        "sent_to": [],
+        "state": "answered",
+        "wrong_agent": false
+      }
+    ]
+  },
+  "ac168": {
+    "answer": "Which agent should write it?",
+    "runs_after": 6,
+    "runs_before": 6,
+    "started": null,
+    "state": "answered",
+    "targets": []
+  },
+  "account": "the default Claude login (system profile)",
+  "attempts": "one each",
+  "model": "haiku"
+}

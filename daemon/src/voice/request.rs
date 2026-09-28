@@ -881,7 +881,7 @@ impl Voice {
             ));
         }
         if found.is_empty() {
-            message.push_str("(Candidates from the daemon: none named. Unless the request is about everyone or answers itself, ask the owner one short question: who?)\n");
+            message.push_str("(Candidates from the daemon: none named. If the owner asks for new work (\"someone should…\"), start a new agent for it in the repository the context gives; if it is about everyone or answers itself, act on it; otherwise ask the owner one short question: who?)\n");
         } else {
             let list: Vec<String> = found
                 .iter()
