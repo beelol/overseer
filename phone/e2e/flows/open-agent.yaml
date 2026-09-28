@@ -1,13 +1,14 @@
 # An agent's conversation, opened from the list: its row brought to the middle and tapped, again
 # while the list is still changing under the finger (a row that moves takes no tap). Each attempt
-# looks below and above, and taps only a row it found.
+# looks below and above, and taps only a row it found. An empty conversation has no list: the
+# screen itself is what is waited for.
 appId: ${APP}
 ---
 - repeat:
     times: 3
     while:
       notVisible:
-        id: "agent.list"
+        id: "agent.screen"
     commands:
       - scrollUntilVisible:
           element:
@@ -27,10 +28,10 @@ appId: ${APP}
           optional: true
       - extendedWaitUntil:
           visible:
-            id: "agent.list"
+            id: "agent.screen"
           timeout: 20000
           optional: true
 - extendedWaitUntil:
     visible:
-      id: "agent.list"
+      id: "agent.screen"
     timeout: 30000
