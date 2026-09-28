@@ -1,5 +1,12 @@
 # AC-146: merges
 
+## Pull request #19 (production guard, Gate T stage 1), 2026-09-28
+
+- **Finished:** marked ready by the dev daemons agent; AC-212 verified on main (`5b994d28`).
+- **Throwaway copy:** one conflict, `extension/src/daemon-client.js`. The guard waits for the daemon's `hello` answer before connecting, and main's Voice Mode subscribes to `voice.subscribe` on connect. The resolution keeps the guard's flow and subscribes to Voice's channel once connected (`a6d7086f`).
+- **Tests on the merge:** unit 5 of 5, source check, links; `dev_instance` 2 of 2; the TUI suite; the daemon's `voice` 36 of 36; UI scenarios voice and home passed. The branch's own `scripts/test-all` was run by its agent (load-only misses passed alone). The whole suite runs again on main after the phone agent's quiet window (05:15 to 06:55).
+- **Merged:** squash, `66731002`.
+
 ## Pull request #16 (Voice Mode, Gate R), 2026-09-28
 
 - **Finished:** marked ready by the Voice Mode agent, with main merged in.

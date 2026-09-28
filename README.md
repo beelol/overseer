@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **147 / 215** · **46** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-121, AC-122, AC-124, AC-125, AC-126, AC-128, AC-129, AC-130, AC-131, AC-132, AC-133, AC-135, AC-136, AC-137, AC-141, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-182, AC-183, AC-185, AC-186, AC-187, AC-188, AC-189, AC-190, AC-191, AC-192, AC-193, AC-194, AC-195, AC-196, AC-197, AC-198, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-206, AC-207, AC-208, AC-209, AC-210, AC-211, AC-212, AC-213, AC-214, AC-215. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+criteria: **148 / 215** · **46** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-121, AC-122, AC-124, AC-125, AC-126, AC-128, AC-129, AC-130, AC-131, AC-132, AC-133, AC-135, AC-136, AC-137, AC-141, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-182, AC-183, AC-185, AC-186, AC-187, AC-188, AC-189, AC-190, AC-191, AC-192, AC-193, AC-194, AC-195, AC-196, AC-197, AC-198, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-206, AC-207, AC-208, AC-209, AC-210, AC-211, AC-213, AC-214, AC-215. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), Voice Mode (Gate R, AC-162 to AC-177, added by the owner on 2026-09-27: a voice to talk to constantly that redirects every agent from context, answers quickly and shows every word it sent, with audio collected on the Rust side and the animated mark in the middle moving with the voice; [design](docs/rfcs/voice-mode.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -251,7 +251,7 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-209** VS Code and the TUI pointed at one dev daemon (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-209.md)
 - [ ] **AC-210** The phone simulators pinned to a dev daemon (after pull request #10) — not started: after PR #10 (the phone app and the gateway) — [evidence](docs/verification/AC-210.md)
 - [ ] **AC-211** Agents learn it from the repository, and leave nothing running (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-211.md)
-- [ ] **AC-212** Production can never point at a dev version (stage 1) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-212.md)
+- [x] **AC-212** Production can never point at a dev version (stage 1) — [evidence](docs/verification/AC-212.md)
 - [ ] **AC-213** The production phone app never pairs with a dev daemon (after pull request #10) — not started: after PR #10 (the phone app and the gateway) — [evidence](docs/verification/AC-213.md)
 - [ ] **AC-214** Deploy: the one path from dev to production (stage 4) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-214.md)
 - [ ] **AC-215** Guided owner tests in a dev daemon (stage 3) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-215.md)
@@ -396,7 +396,10 @@ agent and the daemon, `?` lists every key, `q` quits.
 
 - State lives in `~/Library/Application Support/Overseer` (`overseer.sqlite`, per-run
   output under `runs/`, worktrees under `worktrees/`, profiles under `profiles/`). Linux
-  uses `$XDG_DATA_HOME/overseer`. `OVERSEER_HOME` overrides it.
+  uses `$XDG_DATA_HOME/overseer`. `OVERSEER_HOME` overrides it for tests and dev instances
+  only: the installed extension and TUI ignore `OVERSEER_HOME`, `OVERSEER_SOCKET` and
+  `OVERSEER_INSTANCE` in their environment and refuse any daemon marked dev
+  ([AC-212](docs/verification/AC-212.md), [dev instances](docs/rfcs/dev-instance.md)).
 - The daemon binary is `target/release/overseerd` in a build, or
   `~/.vscode/extensions/beelol.overseer-0.1.0/bin/overseerd-darwin-arm64` once installed.
   `overseerd serve` runs it in the foreground without VS Code (the extension normally starts
@@ -476,7 +479,6 @@ the owner action or decision each one needs.
 - [ ] [AC-209](docs/verification/AC-209.md) (VS Code and the TUI pointed at one dev daemon (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
 - [ ] [AC-210](docs/verification/AC-210.md) (The phone simulators pinned to a dev daemon (after pull request #10)): After PR #10: the phone app and the gateway must be on main first.
 - [ ] [AC-211](docs/verification/AC-211.md) (Agents learn it from the repository, and leave nothing running (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
-- [ ] [AC-212](docs/verification/AC-212.md) (Production can never point at a dev version (stage 1)): Not started (Gate T, added by the owner on 2026-09-27).
 - [ ] [AC-213](docs/verification/AC-213.md) (The production phone app never pairs with a dev daemon (after pull request #10)): After PR #10: the phone app and the gateway must be on main first.
 - [ ] [AC-214](docs/verification/AC-214.md) (Deploy: the one path from dev to production (stage 4)): Not started (Gate T, added by the owner on 2026-09-27).
 - [ ] [AC-215](docs/verification/AC-215.md) (Guided owner tests in a dev daemon (stage 3)): Not started (Gate T, added by the owner on 2026-09-27).

@@ -51,8 +51,19 @@ fn single_instance() -> anyhow::Result<std::fs::File> {
     Ok(file)
 }
 
+/// A dev daemon never opens the standard instance (AC-212): checked before anything is created.
+fn dev_guard() {
+    if let Err(e) = paths::dev_guard() {
+        eprintln!("overseerd: {e}");
+        std::process::exit(4);
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if matches!(args.get(1).map(String::as_str), Some("serve" | "socket-path" | "ctl")) {
+        dev_guard();
+    }
     match args.get(1).map(String::as_str) {
         Some("version") | Some("--version") => println!("overseerd {} (protocol {})", env!("CARGO_PKG_VERSION"), server::PROTOCOL_VERSION),
         Some("socket-path") => println!("{}", paths::socket_path().display()),
@@ -90,7 +101,8 @@ fn main() {
             let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().expect("runtime");
             let result: anyhow::Result<()> = rt.block_on(async {
                 let d = daemon::Daemon::open()?;
-                log(&format!("overseerd {} starting, data dir {}", env!("CARGO_PKG_VERSION"), paths::data_dir().display()));
+                let instance = paths::instance().map(|i| format!(", dev instance {i}")).unwrap_or_default();
+                log(&format!("overseerd {} starting, data dir {}{instance}", env!("CARGO_PKG_VERSION"), paths::data_dir().display()));
                 let report = d.reconcile()?;
                 log(&format!("reconcile: {report}"));
                 if let Err(e) = continuity::start(d.clone()) {
