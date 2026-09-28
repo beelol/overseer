@@ -9,13 +9,14 @@
     "SWARM-01": {
       "status": "partial",
       "evidence": [
+        "daemon/tests/swarm_native.rs",
         "daemon/tests/swarm_start.rs",
         "fixtures/swarm/s0-start-v1/director.py",
         "test/unit/swarm-start.js",
         "docs/verification/swarm/SWARM-01.md",
         "docs/verification/swarm/S0.md"
       ],
-      "blocker": "Manual x Swarm on has a normal start (swarm.start and Start Swarm) exercised on fixtures: the approved pool is inherited, a target outside it is refused not_allowed, and an unknown reading reads back serial. The director and workers are scripted fixtures; Swarm off, Auto x Swarm and the four-combination matrix are not exercised."
+      "blocker": "four_way_launch_matrix_auto_manual_by_swarm_on_off runs all four combinations on one daemon on fixtures (product path, Swarm fixture API off) and records launch path, booking and slots: ordinary unbooked 1 slot; Auto root with Auto's unknown-draw claim 1 slot; Swarm with Auto Mode off and on identical (Claude director unbooked plus two booked native workers, 3 slots); Swarm off creates no Swarm run or worker. Swarm on outside fixtures needs swarm.native_director, which is off until the owner decides; no Swarm route is chosen by Auto's selector; the full suite was not run and nothing ran live."
     },
     "SWARM-02": {
       "status": "partial",
@@ -195,10 +196,11 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_runtime.rs",
+        "daemon/tests/swarm_native.rs",
         "daemon/src/adapters.rs",
         "docs/verification/swarm/SWARM-17.md"
       ],
-      "blocker": "Fixture admission rejects worker transports without a daemon-owned native-delegation restriction, and synthetic Claude launches carry Agent/Task denial. Claude is additionally held for audit-only runs because that denial supplies no source-write boundary. No version-pinned live attempted-spawn proof, qualified Auto target identity, or normal launch path exists; the fake Claude stream can ignore the flag."
+      "blocker": "Fixture admission rejects worker transports without a daemon-owned native-delegation restriction, and synthetic Claude launches carry Agent/Task denial. Claude is additionally held for audit-only runs because that denial supplies no source-write boundary. No version-pinned live attempted-spawn proof, qualified Auto target identity, or normal launch path exists; the fake Claude stream can ignore the flag. Behind the undecided swarm.native_director switch the proposed Claude director is also launched with Agent/Task denied and a daemon version and flag check; still argument-level on the synthetic fixture."
     },
     "SWARM-18": {
       "status": "partial",
@@ -844,13 +846,16 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_start.rs",
+        "daemon/src/swarm/native.rs",
+        "fixtures/fake-harness/claude-fixture.js",
+        "daemon/tests/swarm_native.rs",
         "fixtures/swarm/s0-start-v1/director.py",
         "fixtures/swarm/s0-start-v1/worker.py",
         "extension/src/swarm-controls.js",
         "test/unit/swarm-start.js",
         "docs/verification/swarm/S0.md"
       ],
-      "blocker": "swarm.start gives one read-back (pool, readings and allocation, ceiling, deadline, director) and commits on one yes; a scripted director launched through the one launch path plans, dispatches three supervised fixture workers through Swarm admission, routes a discovery, accepts evidence and completes, also across a SIGKILL restart. No model harness is a qualified director (outside fixtures the start is blocked no_qualified_director), an audit run refuses native workers before booking and native workers have no report transport, so no account is booked in S0; the VS Code command has not run in a real window and nothing ran live."
+      "blocker": "swarm.start gives one read-back (pool, readings and allocation, ceiling, deadline, director) and commits on one yes; a scripted director launched through the one launch path plans, dispatches three supervised fixture workers through Swarm admission, routes a discovery, accepts evidence and completes, also across a SIGKILL restart. Behind swarm.native_director (off by default; the owner's decision is pending) the same S0 runs end to end and across a restart with a daemon-qualified Claude director using Swarm tools over MCP, and native Claude workers report through their own attempt tokens in an isolated run; all of it on the synthetic Claude fixture, not a model. With the switch off, outside fixtures the start is blocked no_qualified_director; an audit still refuses native workers before booking, so no account is booked in S0; the director's swarm/director draw is never qualified; the VS Code command has not run in a real window and nothing ran live."
     },
     "S1": {
       "status": "partial",

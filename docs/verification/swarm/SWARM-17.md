@@ -48,3 +48,5 @@ needs an enforceable profile policy; Codex and app-server need a qualified
 control path or remain ineligible. Bind the qualification to installed harness
 version, Auto's daemon-owned target identity, and normal Swarm launch. The
 RFC checkbox remains open.
+
+Follow-up (`cfa0eba8`, `claude/auto-swarm`): behind the undecided `swarm.native_director` switch, the proposed Claude director is launched through the normal Swarm start with `--disallowedTools Agent,Task` as well, and its launch is bound to a daemon version check (at least 2.1.246) and a `--help` flag check; native workers with Swarm tools keep the deny, and extra arguments cannot override it (`swarm_tools_give_claude_its_mcp_tools_and_deny_native_delegation`; `daemon/tests/swarm_native.rs`). This is still argument-level evidence on the synthetic fixture: no real Claude has been observed refusing a spawn, so the status is unchanged.
