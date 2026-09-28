@@ -25,6 +25,12 @@ Only the owner can do these (AC-160). Each is one step; the criterion it unblock
 - Run *Overseer: Test Notification* in VS Code, allow notifications when macOS asks, and screenshot the banner and the helper (Overseer Notifier) in Finder [AC-179].
 - Later: a second Claude account [AC-53]; a Linux machine [AC-41]; the owner-confirmed session of the phone app when its agent finishes [AC-133].
 
+## Releasing the phone app (TestFlight)
+
+The iOS app ships through TestFlight — App Store Connect app **Overseer Remote**, bundle `com.beelol.overseer.phone`. Full setup and IDs: [testflight-goal.md](docs/goals/testflight-goal.md). Build, sign and upload with `scripts/testflight-release.sh`. CI workflow is parked at `ci/ios-testflight.yml` until the `workflow` scope is granted (see owner actions), then it moves to `.github/workflows/`.
+
+**⚠️ Build-number rule:** every TestFlight upload must have a **higher build number** (`CFBundleVersion`) than the previous one, or App Store Connect rejects it. The release script stamps a unique timestamp build number so this never bites — never reuse a number or ship the default `1` twice.
+
 ## Acceptance criteria
 
 Checked means verified with evidence; each item links to its evidence record. The same

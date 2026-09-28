@@ -1,0 +1,157 @@
+name: iOS TestFlight
+
+# ┌─ ACTIVATION ─────────────────────────────────────────────────────────────────────────────────┐
+# │ This file is parked at ci/ because pushing under .github/workflows/ needs the `workflow` OAuth │
+# │ scope, which isn't granted yet (AC-148). To activate: the owner runs `gh auth refresh -s       │
+# │ workflow`, then move this file to .github/workflows/ios-testflight.yml and push.               │
+# └────────────────────────────────────────────────────────────────────────────────────────────┘
+#
+# Builds the Overseer phone app and uploads it to TestFlight.
+# Runs on a push to main that touches the phone app, and on manual dispatch.
+#
+# Prerequisites (owner, one-time — the job fails clearly if any secret is missing):
+#   • `gh auth refresh -s workflow` so this file can be pushed at all (AC-148).
+#   • Repository secrets (Settings → Secrets and variables → Actions):
+#       ASC_KEY_ID              App Store Connect API key id (App Manager), e.g. VAT46LATWS
+#       ASC_ISSUER_ID           App Store Connect API issuer id
+#       ASC_API_KEY_P8          the API key .p8, base64-encoded  (base64 -i AuthKey_XXXX.p8 | pbcopy)
+#       IOS_DIST_CERT_P12       "Apple Distribution" cert+key exported as .p12, base64-encoded
+#       IOS_DIST_CERT_PASSWORD  the password set when exporting that .p12
+#       IOS_PROVISION_PROFILE   the "Overseer App Store" .mobileprovision, base64-encoded
+#       KEYCHAIN_PASSWORD       any string; used for the throwaway CI keychain
+#
+# Build number: stamped as YYYYMMDDHHMM (UTC) so every upload is strictly increasing and never
+# collides — see the build-number rule in AGENTS.md.
+
+on:
+  push:
+    branches: [main]
+    paths: ["phone/**", ".github/workflows/ios-testflight.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    runs-on: macos-15
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: phone
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required secrets
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          IOS_DIST_CERT_P12: ${{ secrets.IOS_DIST_CERT_P12 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_PROVISION_PROFILE: ${{ secrets.IOS_PROVISION_PROFILE }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          missing=()
+          for v in ASC_KEY_ID ASC_ISSUER_ID ASC_API_KEY_P8 IOS_DIST_CERT_P12 \
+                   IOS_DIST_CERT_PASSWORD IOS_PROVISION_PROFILE KEYCHAIN_PASSWORD; do
+            [ -n "${!v}" ] || missing+=("$v")
+          done
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing required repository secrets: ${missing[*]}"
+            echo "Add them in Settings → Secrets and variables → Actions (names are in this workflow's header)."
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: phone/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Import signing certificate and profile
+        env:
+          IOS_DIST_CERT_P12: ${{ secrets.IOS_DIST_CERT_P12 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_PROVISION_PROFILE: ${{ secrets.IOS_PROVISION_PROFILE }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          runner_tmp="${RUNNER_TEMP:-/tmp}"
+          cert="$runner_tmp/dist.p12"
+          profile="$runner_tmp/overseer.mobileprovision"
+          keychain="$runner_tmp/overseer-signing.keychain-db"
+          echo "$IOS_DIST_CERT_P12" | base64 --decode > "$cert"
+          echo "$IOS_PROVISION_PROFILE" | base64 --decode > "$profile"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          security import "$cert" -P "$IOS_DIST_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | sed s/\"//g)
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          uuid=$(/usr/libexec/PlistBuddy -c "Print :UUID" /dev/stdin <<< "$(security cms -D -i "$profile")")
+          cp "$profile" "$HOME/Library/MobileDevice/Provisioning Profiles/$uuid.mobileprovision"
+
+      - name: Stage App Store Connect API key
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          echo "$ASC_API_KEY_P8" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_$ASC_KEY_ID.p8"
+
+      - name: Generate brand assets and native project
+        run: |
+          node scripts/gen-assets.mjs
+          npx expo prebuild -p ios --clean
+
+      - name: Archive, export and upload to TestFlight
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          TEAM_ID: FQ6YGD7554
+          PROFILE_NAME: Overseer App Store
+        run: |
+          set -euo pipefail
+          BUILD_NUMBER=$(date -u +%Y%m%d%H%M)
+          echo "Build number: $BUILD_NUMBER"
+          work="$RUNNER_TEMP/tf"; mkdir -p "$work"
+
+          xcodebuild -workspace ios/Overseer.xcworkspace -scheme Overseer -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -archivePath "$work/Overseer.xcarchive" \
+            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            archive
+
+          cat > "$work/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>$TEAM_ID</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>provisioningProfiles</key><dict>
+              <key>com.beelol.overseer.phone</key><string>$PROFILE_NAME</string>
+            </dict>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          PLIST
+
+          xcodebuild -exportArchive -archivePath "$work/Overseer.xcarchive" \
+            -exportPath "$work/export" -exportOptionsPlist "$work/ExportOptions.plist"
+
+          ipa="$(ls "$work"/export/*.ipa | head -1)"
+          xcrun altool --validate-app -f "$ipa" -t ios --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+          xcrun altool --upload-app  -f "$ipa" -t ios --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
