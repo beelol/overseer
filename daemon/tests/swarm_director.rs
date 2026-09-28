@@ -531,3 +531,81 @@ fn stop_wins_over_a_late_no_progress_turn_completion() {
     assert_eq!(state["status"], "stopping");
     assert_eq!(state["stop_reason"], "requested");
 }
+
+/// SWARM-33 joined: twenty workers' results (routine completions) reach the
+/// director as one bounded review turn. The turn survives a daemon restart
+/// (a second claim is `busy`), stale plan revisions are refused, and the
+/// director reviews all twenty in that one turn. Stop, sent while the turn is
+/// still open, takes effect at once: no further admission or attempt is
+/// possible although the model turn has not finished. Completing the turn
+/// applies the twenty notifications once; nothing is dropped or reviewed twice.
+#[test]
+fn twenty_results_are_one_review_turn_and_stop_does_not_wait_for_it() {
+    let mut d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Twenty completions",
+        "objective":"Audit","allowed_targets":["fixture"]}));
+    let id = run["id"].as_str().unwrap().to_string();
+    let mut jobs: Vec<serde_json::Value> = (0..20).map(|n| json!({"id":format!("j{n}"),
+        "title":format!("Job {n}"),"acceptance":"evidence","deps":[]})).collect();
+    jobs.push(json!({"id":"extra","title":"Queued","acceptance":"evidence","deps":[]}));
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":jobs}));
+    for n in 0..20 {
+        let job = format!("j{n}");
+        let attempt = d.call("swarm.attempt.register", json!({"run_id":id,"generation":1,
+            "revision":1,"job_id":job}));
+        d.call("swarm.artifact.put", json!({"run_id":id,"job_id":job,"attempt_id":attempt["id"],
+            "token":attempt["token"],"artifact_id":format!("proof-{n}"),"source_revision":1,
+            "kind":"finding","content":format!("evidence {n}")}));
+        d.call("swarm.report", json!({"run_id":id,"job_id":job,"attempt_id":attempt["id"],
+            "token":attempt["token"],"message_id":format!("result-{n}"),"type":"result",
+            "revision":1,"payload":{"artifact_ids":[format!("proof-{n}")]}}));
+    }
+    let stale = d.try_call("swarm.director.claim_batch", json!({"run_id":id,"generation":1,
+        "revision":0,"now_ms":now()+6000})).unwrap_err();
+    assert!(stale.contains("stale plan revision"), "{stale}");
+    let turn = d.call("swarm.director.claim_batch", json!({"run_id":id,"generation":1,
+        "revision":1,"now_ms":now()+6000}));
+    assert_eq!(turn["status"], "claimed", "{turn}");
+    let messages = turn["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 20, "one turn holds the twenty completions");
+    assert!(messages.iter().all(|m| m["type"] == "result"));
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.director.claim_batch", json!({"run_id":id,"generation":1,
+        "revision":1,"now_ms":now()+6000}))["status"], "busy", "the open turn survives a restart");
+    for n in 0..20 {
+        assert_eq!(d.call("swarm.decide", json!({"run_id":id,"generation":1,"revision":1,
+            "job_id":format!("j{n}"),"decision":"accept","evidence":[format!("proof-{n}")]}))["status"],
+            "accepted");
+    }
+    // Stop while the director's turn is still open.
+    let begin = std::time::Instant::now();
+    d.call("swarm.stop", json!({"run_id":id,"generation":1,"revision":1}));
+    assert!(begin.elapsed() < std::time::Duration::from_secs(2));
+    assert!(d.try_call("swarm.attempt.register", json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"extra"})).is_err(), "no new attempt after Stop");
+    let at = now();
+    let admitted = d.try_call("swarm.admit", json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"extra","target_id":"fixture","request_id":"after-stop","now_ms":at,
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture","account_id":"a","pool_ids":["p"],"capabilities":["audit"],
+                "health":"up","auth":"ok"}],
+            "pools":[{"id":"p","windows":[{"id":"w","unit":"points","remaining_milli":100000,
+                "protected_milli":0,"reserved_milli":0,"confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["audit"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    assert!(admitted.as_ref().map(|r| r["status"] != "admitted").unwrap_or(true), "{admitted:?}");
+    let done = d.call("swarm.director.complete_batch", json!({"run_id":id,"generation":1,
+        "turn_id":turn["turn_id"],"token":turn["token"],"outcome":"progress"}));
+    assert_eq!(done["applied"], 20, "{done}");
+    assert_eq!(d.call("swarm.director.complete_batch", json!({"run_id":id,"generation":1,
+        "turn_id":turn["turn_id"],"token":turn["token"],"outcome":"progress"}))["duplicate"], true);
+    assert_eq!(d.call("swarm.director.claim_batch", json!({"run_id":id,"generation":1,
+        "revision":1,"now_ms":now()+6000}))["status"], "halted");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let (decisions, results, extra): (i64, i64, i64) = db.query_row("SELECT
+        (SELECT COUNT(*) FROM swarm_decisions WHERE run_id=?1),
+        (SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND kind='result' AND phase='applied'),
+        (SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND job_id='extra')",
+        [&id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap();
+    assert_eq!((decisions, results, extra), (20, 20, 0));
+}

@@ -405,7 +405,7 @@
       "blocker": "Fixture admission holds at eight submitted results and resumes below four with bounded waves; outage recovery and actual director review capacity remain unimplemented."
     },
     "SWARM-33": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_director.rs",
         "docs/verification/swarm/milestone-5.md",
@@ -413,7 +413,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "A fixture batch claims at most 20 messages/32 KiB; an undecided result is requeued after turn completion and restart while routine progress applies. A joined Atlas replay acknowledges Stop in 7 ms during 2,000 duplicate progress updates and retains one director envelope. No live model turn, provider reservation, semantic review, or explicit unresolved disposition runs."
+      "blocker": null
     },
     "SWARM-34": {
       "status": "partial",
