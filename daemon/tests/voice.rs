@@ -1017,7 +1017,7 @@ fn ac167_ac168_delivery_setting_and_new_agent_limits() {
     let phone = agent(&env.d, &repo, "Phone");
     listening(&env);
     let sql = |statement: &str| {
-        let out = std::process::Command::new("sqlite3")
+        let out = std::process::Command::new("sqlite3").args(["-cmd", ".timeout 5000"])
             .arg(env.d.home.path().join("overseer.sqlite"))
             .arg(statement)
             .output()
@@ -1194,7 +1194,7 @@ fn wait_state(live: &Live, id: &str, state: &str) -> Value {
 /// Makes the session's next proposal count as spoken by the owner, as a spoken request does.
 fn voice_cause(env: &Env) {
     env.d.call("overseer.session", json!({}));
-    let out = std::process::Command::new("sqlite3")
+    let out = std::process::Command::new("sqlite3").args(["-cmd", ".timeout 5000"])
         .arg(env.d.home.path().join("overseer.sqlite"))
         .arg("UPDATE overseer_sessions SET last_cause='voice'")
         .output()
@@ -1958,7 +1958,7 @@ fn ac173_each_bound_holds() {
     let phone = agent(&env.d, &repo, "Phone");
     let live = listening(&env);
     let sql = |statement: &str| {
-        let out = std::process::Command::new("sqlite3")
+        let out = std::process::Command::new("sqlite3").args(["-cmd", ".timeout 5000"])
             .arg(env.d.home.path().join("overseer.sqlite"))
             .arg(statement)
             .output()
@@ -2064,7 +2064,7 @@ fn ac173_each_bound_holds() {
     sql(&rows);
     agent(&env.d, &repo, "Continuity");
     say(&env, "Tell Continuity to add tests.");
-    let count = std::process::Command::new("sqlite3")
+    let count = std::process::Command::new("sqlite3").args(["-cmd", ".timeout 5000"])
         .arg(env.d.home.path().join("overseer.sqlite"))
         .arg("SELECT COUNT(*), SUM(id='OLD') FROM voice_requests")
         .output()
@@ -2311,7 +2311,7 @@ exec /usr/bin/sandbox-exec -p "$P" "{}" "$@"
     assert!(got["listener"]["last_error"].is_null(), "{got}");
     assert_eq!(received(&env, &phone).len(), 20);
     // What the database holds of Voice Mode: the words of the 20 requests.
-    let out = std::process::Command::new("sqlite3")
+    let out = std::process::Command::new("sqlite3").args(["-cmd", ".timeout 5000"])
         .arg(env.d.home.path().join("overseer.sqlite"))
         .arg("SELECT words FROM voice_requests ORDER BY ts")
         .output()
