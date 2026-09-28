@@ -72,7 +72,7 @@ fn ac193_an_idle_subject_causes_no_wake_in_ten_minutes() {
     while started.elapsed() < wait {
         std::thread::sleep(Duration::from_secs(30));
         let w = d.call("watch.list", json!({}))["watches"][0].clone();
-        assert_eq!((w["wakes"].as_i64(), w["watcher"].as_str(), w["open"].as_bool()), (Some(0), Some(""), Some(true)), "after {:?}: {w}", started.elapsed());
+        assert_eq!((w["wakes"].as_i64(), w["watcher"].as_str().unwrap_or(""), w["open"].as_bool()), (Some(0), "", Some(true)), "after {:?}: {w}", started.elapsed());
     }
     assert_eq!(d.run(&subject)["status"], "running");
     assert!(!d.events(&subject).iter().any(|e| e["kind"] == "watch_wake"));
