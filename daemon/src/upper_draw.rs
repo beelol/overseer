@@ -1162,4 +1162,83 @@ mod tests {
         assert_eq!(outcome.as_deref(), Some("not_started"));
         assert_eq!(claim("unit-child"), "released");
     }
+
+    /// Claude Code's native `rate_limit_event`s arrive only during a run's
+    /// own turns: the first after its first model response, the last before
+    /// its result. Recorded through the real parser, six serial Claude runs
+    /// whose only readings are their own give no sample: the readings carry
+    /// no plan, and even with one stamped on, no reading brackets a run. A
+    /// run's first reading already counts part of its draw and its last
+    /// misses the rest, so using them would under-state the draw.
+    #[test]
+    fn claude_in_run_readings_cannot_bracket_their_own_run() {
+        let f = Fixture::new();
+        const CLAUDE: &str = "claude-a";
+        f.store.record_auto_account_identity(CLAUDE, &"c".repeat(64)).unwrap();
+        let reading = |at: i64, five: f64, plan: Option<&str>| -> i64 {
+            let event = serde_json::json!({"type":"rate_limit_event","rate_limit_info":{
+                "status":"allowed","rateLimitType":"five_hour","resetsAt":f.reset / 1000,
+                "unifiedWindows":{"five_hour":{"utilization":five,"resetsAt":f.reset / 1000},
+                    "seven_day":{"utilization":0.05,"resetsAt":f.reset / 1000 + 86_400}}}});
+            let mut snapshot = crate::auto_quota::parse_claude_rate_limit_event(&event, CLAUDE, at).unwrap();
+            assert_eq!(snapshot.reported_plan_type(), None, "Claude's event reports no plan");
+            assert_eq!(snapshot.ordinary_usage_allowed, None, "nor an explicit allowance");
+            for window in &mut snapshot.windows {
+                window.plan_type = plan.map(str::to_string);
+            }
+            let seq = f.store.insert_event(at, None, None, "auto_quota", "harness", "normalized",
+                &serde_json::json!({"pool_id":CLAUDE})).unwrap().seq;
+            assert!(f.store.insert_auto_quota(seq, CLAUDE, "claude/native-rate-limit-event", &snapshot).unwrap());
+            seq
+        };
+        // True meter: 10% before run 0; each run draws one point, of which
+        // 0.3 is counted by its first reading and 0.8 by its last.
+        let record = |plan: Option<&str>, offset: i64| {
+            for n in 0..6 {
+                let start = offset + n * 10;
+                let base = 0.10 + n as f64 * 0.01;
+                f.run_full(&format!("claude-{offset}-{n}"), Some(CLAUDE), "claude", "sonnet",
+                    Some("medium"), "2.1.246", start, Some(start + 5), "completed");
+                reading(f.at(start + 1), base + 0.003, plan);
+                reading(f.at(start + 4), base + 0.008, plan);
+            }
+        };
+        let bucket = DrawBucket::agent("claude", Some("sonnet"), Some("medium"));
+        let draw = |f: &Fixture| {
+            let cited = f.store.latest_auto_quota(CLAUDE).unwrap().unwrap().event_seq;
+            qualified_upper_draw_in_tx(&f.store.conn, CLAUDE, cited, &bucket, crate::daemon::now()).unwrap()
+        };
+        record(None, 0);
+        assert_eq!(unknown(&draw(&f)).0, "plan_unknown", "as recorded today");
+
+        // Even with a plan, the bracket rule rejects all twelve runs: the
+        // first has no earlier reading, the last no later one, and every
+        // other run's nearest readings fall inside its neighbours' spans.
+        record(Some("max"), 100);
+        let (reason, samples, rejected) = unknown(&draw(&f));
+        assert_eq!((reason, samples), ("upper_draw_uncalibrated", 0));
+        assert_eq!(rejected.get("overlapping_work"), Some(&10), "{rejected:?}");
+        assert_eq!(rejected.get("after_reading_missing"), Some(&1), "{rejected:?}");
+        assert_eq!(rejected.get("before_reading_missing"), Some(&1), "{rejected:?}");
+
+        // A run's own first and last readings are not a before and an after:
+        // the first is taken after the run began and the last before it ended.
+        let snapshot = |seq: i64| -> QuotaSnapshot {
+            let encoded: String = f.store.conn.query_row(
+                "SELECT snapshot FROM auto_quota_observations WHERE event_seq=?1", [seq], |r| r.get(0)).unwrap();
+            serde_json::from_str(&encoded).unwrap()
+        };
+        let first = reading(f.at(201), 0.203, Some("max"));
+        let last = reading(f.at(204), 0.208, Some("max"));
+        let (first, last) = (snapshot(first), snapshot(last));
+        assert_eq!(attribute_window_movement(&first, &last, &last, "max", f.at(200), f.at(205)),
+            Err("before_reading_not_prior"));
+        assert_eq!(attribute_window_movement(&first, &last, &last, "max", f.at(201), f.at(205)),
+            Err("reporting_not_settled"));
+        // Were both rules waived, the visible movement (0.5 of a point) would
+        // miss half of the run's one-point draw: an under-count, unsafe for
+        // an upper bound.
+        let visible = last.windows[0].used_percent - first.windows[0].used_percent;
+        assert!((visible - 0.5).abs() < 1e-9 && visible < 1.0, "{visible}");
+    }
 }

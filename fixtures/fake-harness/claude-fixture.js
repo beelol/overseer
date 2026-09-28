@@ -46,7 +46,23 @@ const sid = 'fixture-session-1';
 const out = o => process.stdout.write(JSON.stringify(o) + '\n');
 const assistant = (content, parent = null) => out({ type: 'assistant', session_id: sid, parent_tool_use_id: parent, message: { role: 'assistant', content } });
 const user = (content, parent = null) => out({ type: 'user', session_id: sid, parent_tool_use_id: parent, message: { role: 'user', content } });
-const result = (isError, text) => out({ type: 'result', subtype: isError ? 'error_during_execution' : 'success', is_error: isError, result: text, session_id: sid, usage: { input_tokens: 1, output_tokens: 1 }, num_turns: 1 });
+// CLAUDE_FIXTURE_METER_FILE: an account meter shared by every run of this fixture (JSON
+// {used, weekly, resets_at, first, last, step}: fractions of each window and the 5-hour reset in
+// epoch seconds). Each turn emits a native rate_limit_event after its first model response
+// (used + first) and another before its result (used + last); the turn's whole draw (step) is
+// added afterwards. As with live Claude Code, neither in-run reading brackets the turn: part of
+// its draw lands before the first and after the last.
+const meterFile = process.env.CLAUDE_FIXTURE_METER_FILE;
+const meterEvent = part => {
+  if (!meterFile) return;
+  const m = JSON.parse(fs.readFileSync(meterFile, 'utf8'));
+  const five = Math.min(1, m.used + m[part]);
+  out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed', resetsAt: m.resets_at, rateLimitType: 'five_hour',
+    unifiedWindows: { five_hour: { utilization: five, resetsAt: m.resets_at }, seven_day: { utilization: m.weekly, resetsAt: m.resets_at + 6 * 86400 } } },
+    uuid: 'fixture-meter-' + part, session_id: sid });
+  if (part === 'last') { m.used = Math.min(1, m.used + m.step); fs.writeFileSync(meterFile, JSON.stringify(m)); }
+};
+const result = (isError, text) => { meterEvent('last'); out({ type: 'result', subtype: isError ? 'error_during_execution' : 'success', is_error: isError, result: text, session_id: sid, usage: { input_tokens: 1, output_tokens: 1 }, num_turns: 1 }); };
 const rl = readline.createInterface({ input: process.stdin });
 const lines = [];
 let waiting;
@@ -83,6 +99,7 @@ async function mcpClient() {
     mode = (forced && fs.existsSync(forced) && fs.readFileSync(forced, 'utf8').trim()) || 'overseer';
   }
   out({ type: 'system', subtype: 'init', session_id: sid, model: 'fixture', cwd: process.cwd(), tools: ['Agent', 'Write'] });
+  meterEvent('first');
   if (mode === 'nested') {
     // Grandchild traffic arrives before the child's Agent tool_use is reported (delayed parent).
     assistant([{ type: 'tool_use', id: 'toolu_grand', name: 'Agent', input: { description: 'grandchild task', prompt: 'hi' } }], 'toolu_child');

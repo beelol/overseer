@@ -590,8 +590,12 @@ pub fn book_shared_account_in_tx(
     {
         return Ok(BookingDecision::Blocked("snapshot_expired"));
     }
-    if quota.ordinary_usage_allowed != Some(true) {
-        return Ok(BookingDecision::Blocked("account_exhausted"));
+    // Only an explicit allowance books. A reading that reports none (a
+    // Claude `allowed` rate-limit event) is unknown, not exhausted.
+    match quota.ordinary_usage_allowed {
+        Some(true) => {}
+        Some(false) => return Ok(BookingDecision::Blocked("account_exhausted")),
+        None => return Ok(BookingDecision::Blocked("account_allowance_unknown")),
     }
     let (upper_draw_milli, draw_source, draw_provenance) = match req.draw {
         BookingDraw::Fixture(draws) => (draws.to_vec(), "fixture", None),
