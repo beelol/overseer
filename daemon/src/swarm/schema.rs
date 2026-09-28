@@ -30,10 +30,6 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           created_ms INTEGER NOT NULL,
           updated_ms INTEGER NOT NULL
         );
-        DROP INDEX IF EXISTS swarm_active_category;
-        CREATE UNIQUE INDEX swarm_active_category
-          ON swarm_runs(category_key)
-          WHERE status IN ('planning','running','paused','stalled','draining','stopping');
         CREATE TABLE IF NOT EXISTS swarm_create_requests(
           request_scope TEXT NOT NULL,
           request_id TEXT NOT NULL,
@@ -536,6 +532,21 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           ON swarm_effects(run_id,operation_sha256);
         "#,
     )?;
+    // The partial index is rebuilt on every open (its status list changed
+    // across versions). Concurrent openers (two daemons' stores, or tests
+    // racing two connections) must not interleave the drop and the create.
+    conn.execute_batch("BEGIN IMMEDIATE")?;
+    let rebuilt = conn.execute_batch("DROP INDEX IF EXISTS swarm_active_category;
+        CREATE UNIQUE INDEX swarm_active_category
+          ON swarm_runs(category_key)
+          WHERE status IN ('planning','running','paused','stalled','draining','stopping');");
+    match rebuilt {
+        Ok(()) => conn.execute_batch("COMMIT")?,
+        Err(error) => {
+            let _ = conn.execute_batch("ROLLBACK");
+            return Err(error.into());
+        }
+    }
     // Older databases restricted partial reports to conflict/exhaustion. Keep
     // their reports while allowing a director to cite a fresh persisted
     // availability block by its exact reason.
