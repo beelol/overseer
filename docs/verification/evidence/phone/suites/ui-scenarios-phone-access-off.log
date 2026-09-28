@@ -1,0 +1,178 @@
+=== accounts (phone access off) 22:41:52
+PASS accounts
+SCENARIO PASSED /private/tmp/ovs-ui-JW9Blq
+=== arrangement (phone access off) 22:43:00
+PASS arrangement
+SCENARIO PASSED /private/tmp/ovs-ui-E9AHYY
+=== audit (phone access off) 22:43:39
+PASS audit
+SCENARIO PASSED /private/tmp/ovs-ui-BCu6Kg
+skip background (it starts paid agents or uses the owner's daemon)
+=== center (phone access off) 22:45:05
+PASS center
+SCENARIO PASSED /private/tmp/ovs-ui-v0anzw
+=== chat (phone access off) 22:45:56
+PASS chat
+SCENARIO PASSED /private/tmp/ovs-ui-iSFmiq
+skip claude-live (it starts paid agents or uses the owner's daemon)
+skip codex-approval (it starts paid agents or uses the owner's daemon)
+skip codex-follow (it starts paid agents or uses the owner's daemon)
+skip codex-live (it starts paid agents or uses the owner's daemon)
+=== composer (phone access off) 22:46:33
+PASS composer
+SCENARIO PASSED /private/tmp/ovs-ui-mGlfYI
+skip conversation-live (it starts paid agents or uses the owner's daemon)
+=== conversation (phone access off) 22:47:21
+PASS conversation
+SCENARIO PASSED /private/tmp/ovs-ui-RBZukF
+=== dashboard (phone access off) 22:47:53
+PASS dashboard
+SCENARIO PASSED /private/tmp/ovs-ui-wHiQPC
+=== dragout (phone access off) 22:48:36
+PASS dragout
+SCENARIO PASSED /private/tmp/ovs-ui-HWGPdt
+=== endings (phone access off) 22:48:59
+PASS endings
+SCENARIO PASSED /private/tmp/ovs-ui-uN5T2y
+=== files (phone access off) 22:49:41
+PASS files
+SCENARIO PASSED /private/tmp/ovs-ui-XomW33
+=== follow (phone access off) 22:50:23
+PASS follow
+SCENARIO PASSED /private/tmp/ovs-ui-aLOBgC
+=== grid (phone access off) 22:51:12
+PASS grid
+SCENARIO PASSED /private/tmp/ovs-ui-AqNTci
+=== history (phone access off) 22:52:06
+PASS history
+SCENARIO PASSED /private/tmp/ovs-ui-0hbspe
+=== hunks (phone access off) 22:59:53
+PASS hunks
+SCENARIO PASSED /private/tmp/ovs-ui-uXSVYQ
+=== keyboard (phone access off) 23:00:49
+FAIL keyboard
+(node:54012) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `Code --trace-deprecation ...` to show where the warning was created)
+[2026-09-27T06:01:56.427Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T06:02:15.745Z] screenshot docs/verification/evidence/ui/keyboard/01-needs-you.png
+[2026-09-27T06:02:15.748Z] PASS Needs you gathers permission requests, the failure and the finished run with changes, counted on the view and in the status bar {"list":[{"title":"Write file A","why":"Approve"},{"title":"Write file B","why":"Approve"},{"title":"Broken build","why":"Failed"},{"title":"Small edit","why":"Review"}],"badge":"4","status":"eye  Overseer 3 active   bell-dot  4, 3 agents running · 4 need you\nAgents keep running when VS Code closes.\nClick to open the dashboard."}
+[2026-09-27T06:02:19.713Z] PASS ⌥⌘J goes to the next agent that needs you; ⌥⌘Y allows and ⌥⌘⌫ denies its request {"first":"r-89f6342fa43c","second":"r-c0d52c06224c","firstDone":"completed","secondDone":"completed","denied":true}
+[2026-09-27T06:02:24.526Z] FAIL ⌥⌘J walks the rest of Needs you (the failure and finished runs with changes); visiting clears each {"visited":["r-5547a58735b7","r-89f6342fa43c","r-89f6342fa43c"],"left":[]}
+[2026-09-27T06:02:28.297Z] PASS ⌥⌘A switches agents from a searchable quick pick and ⌥⌘. stops the selected agent {"switched":"r-e300f4c15462","stopped":"interrupted"}
+[2026-09-27T06:02:32.613Z] PASS ⌥⌘N starts a new agent from the composer without the mouse; it becomes the selected agent {"created":"r-804847116091","nowSelected":"r-804847116091"}
+[2026-09-27T06:02:33.681Z] prompt before Enter {"value":"And add a test","focused":"prompt"}
+[2026-09-27T06:02:35.231Z] PASS Enter in the chat composer sends a follow-up {"turns":2}
+[2026-09-27T06:02:35.497Z] screenshot docs/verification/evidence/ui/keyboard/02-keyboard-done.png
+[2026-09-27T06:02:40.819Z] PASS the shortcuts also work from the side bar (⌥⌘A opens the agent switcher, ⌥⌘N the composer) {"inList":true,"switcher":true,"composer":true}
+[2026-09-27T06:02:40.824Z] PASS every control in the dashboard has a screen-reader label {"checked":36,"bad":[]}
+SCENARIO FAILED /private/tmp/ovs-ui-RMsEbF
+SCENARIO FAILED /private/tmp/ovs-ui-RMsEbF
+skip live-gatej (it starts paid agents or uses the owner's daemon)
+=== look (phone access off) 23:02:44
+PASS look
+SCENARIO PASSED /private/tmp/ovs-ui-6J56Z1
+=== main (phone access off) 23:04:23
+PASS main
+SCENARIO PASSED /private/tmp/ovs-ui-Nk7SsP
+skip merge (it starts paid agents or uses the owner's daemon)
+=== modes (phone access off) 23:06:11
+PASS modes
+SCENARIO PASSED /private/tmp/ovs-ui-jiPkEc
+=== narrow-chat (phone access off) 23:07:20
+PASS narrow-chat
+SCENARIO PASSED /private/tmp/ovs-ui-crcovd
+=== notify (phone access off) 23:09:06
+PASS notify
+SCENARIO PASSED /private/tmp/ovs-ui-zMKcQC
+=== parity (phone access off) 23:10:30
+PASS parity
+SCENARIO PASSED /private/tmp/ovs-ui-GVkQj6
+=== perf (phone access off) 23:11:54
+FAIL perf
+[2026-09-27T06:15:19.227Z] fixture {"tracked":10000}
+(node:96155) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `Code --trace-deprecation ...` to show where the warning was created)
+[2026-09-27T06:15:23.607Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T06:15:57.733Z] processes ["263216 /Applications/Visual Studio Code.app/Contents/MacOS/Code --remote-debugging-port=0 --disable-renderer-backgrounding --disable-backgro","99136 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=gpu-process --user-data-dir","53808 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=utility --utility-sub-type=","597616 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Renderer).app/Contents/MacOS/Code Helper (Renderer) --type=rend","168448 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=utility --utility-sub-type","92208 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=utility --utility-sub-type=","156912 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin) --type=utility "]
+[2026-09-27T06:17:42.565Z] ERROR Error: Webview not found for probe document.getElementById('workspace-note')?.textContent.includes("/private/tmp/ovs-ui-RRdi21/overseer-home/worktrees/big-03511146/load-run-0")
+    at Cdp.webview (/Users/bilal/projects/overseer/.claude/worktrees/phone-remote-vscode-control-b48a34/test/ui/cdp.js:223:11)
+    at async /Users/bilal/projects/overseer/.claude/worktrees/phone-remote-vscode-control-b48a34/test/ui/scenario-perf.js:47:20
+[2026-09-27T06:17:42.835Z] screenshot docs/verification/evidence/ui/perf/01-error.png
+SCENARIO FAILED /private/tmp/ovs-ui-RRdi21
+SCENARIO FAILED /private/tmp/ovs-ui-RRdi21
+=== phone-access (phone access off) 23:17:44
+PASS phone-access
+SCENARIO PASSED /private/tmp/ovs-ui-5vZvZo
+61 of 61 checks passed
+=== place (phone access off) 23:20:03
+PASS place
+SCENARIO PASSED /private/tmp/ovs-ui-is6Q5e
+=== pr (phone access off) 23:20:45
+PASS pr
+SCENARIO PASSED /private/tmp/ovs-ui-OIvXOw
+=== restore (phone access off) 23:21:52
+FAIL restore
+(node:44923) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `Code --trace-deprecation ...` to show where the warning was created)
+[2026-09-27T06:22:25.312Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T06:22:31.496Z] runs {"r1":"r-9521e9642473","r2":"r-7e4486b14b9f","r3":"r-d2c2fc5da505","ws1":"/private/tmp/ovs-ui-F5ZiKj/overseer-home/worktrees/repoA-521b067d/r1-long-review","ws2":"/private/tmp/ovs-ui-F5ZiKj/overseer-home/worktrees/repoB-1d4a7804/r2-other-repo","ws3":"/private/tmp/ovs-ui-F5ZiKj/overseer-home/worktrees/repoA-521b067d/r3-removed-later"}
+[2026-09-27T06:22:52.456Z] ERROR Error: Timed out waiting for run row R3 removed later (last: null)
+    at Cdp.waitFor (/Users/bilal/projects/overseer/.claude/worktrees/phone-remote-vscode-control-b48a34/test/ui/cdp.js:148:11)
+    at async selectRun (/Users/bilal/projects/overseer/.claude/worktrees/phone-remote-vscode-control-b48a34/test/ui/scenario-restore.js:39:18)
+    at async /Users/bilal/projects/overseer/.claude/worktrees/phone-remote-vscode-control-b48a34/test/ui/scenario-restore.js:53:5
+[2026-09-27T06:22:52.537Z] screenshot docs/verification/evidence/ui/restore/01-error.png
+SCENARIO FAILED /private/tmp/ovs-ui-F5ZiKj
+SCENARIO FAILED /private/tmp/ovs-ui-F5ZiKj
+=== review-width (phone access off) 23:22:54
+PASS review-width
+SCENARIO PASSED /private/tmp/ovs-ui-W5935N
+=== review (phone access off) 23:23:28
+FAIL review
+[2026-09-27T06:25:27.548Z] PASS symlink target outside workspace untouched
+[2026-09-27T06:25:27.894Z] merge "Auto-merging conflict.txt\nCONFLICT (content): Merge conflict in conflict.txt\nAutomatic merge failed; fix conflicts and then commit the result."
+[2026-09-27T06:25:31.398Z] PASS merge conflict shown as Conflicted and listed in the review {"conflictShown":true,"conflictListed":true}
+[2026-09-27T06:25:31.511Z] screenshot docs/verification/evidence/ui/review/05-conflict.png
+[2026-09-27T06:25:33.261Z] edit diagnostics {"active":"native-edit-context","save":false,"status":"","notice":"","typed":true}
+[2026-09-27T06:25:33.369Z] screenshot docs/verification/evidence/ui/review/06-edit-atxt.png
+[2026-09-27T06:25:37.407Z] PASS draft survives a rename during edit (kept as a dirty buffer) "Review: B seq (11), Editor Group 1 | a.txt, Editor Group 1 | Overseer, Editor Group 2"
+[2026-09-27T06:25:37.533Z] screenshot docs/verification/evidence/ui/review/07-rename-during-edit.png
+[2026-09-27T06:25:37.647Z] screenshot docs/verification/evidence/ui/review/08-unsupported-files.png
+[2026-09-27T06:25:41.356Z] PASS current checkout review is the repository itself "/private/tmp/ovs-ui-GVZbmE/repoA"
+[2026-09-27T06:25:42.145Z] PASS filesystem-only harness shows the Follow limitation "Filesystem evidence only: this harness does not report its edits, so Follow cannot attribute or jump to them. The file list still refreshes live."
+[2026-09-27T06:25:44.090Z] edit diagnostics {"active":"native-edit-context","save":false,"status":"","notice":"","typed":true}
+[2026-09-27T06:25:44.195Z] screenshot docs/verification/evidence/ui/review/09-edit-atxt.png
+[2026-09-27T06:25:45.783Z] PASS current-checkout review edit saved to the checkout path
+[2026-09-27T06:25:48.007Z] PASS native editor undo/redo on the selected file {"typed":true,"undone":true,"redone":true}
+[2026-09-27T06:25:48.102Z] screenshot docs/verification/evidence/ui/review/10-native-draft.png
+[2026-09-27T06:25:50.605Z] PASS same-line external write does not overwrite the unsaved draft; both versions exist {"draftKept":true,"diskHasAgent":true}
+[2026-09-27T06:25:52.127Z] screenshot docs/verification/evidence/ui/review/11-unsaved-marker.png
+[2026-09-27T06:25:52.127Z] PASS unsaved draft marked in the review file list (AC-75 replaced Workspace Dirty)
+[2026-09-27T06:26:00.647Z] PASS pending draft recovered after reload
+[2026-09-27T06:26:00.719Z] screenshot docs/verification/evidence/ui/review/12-after-reload.png
+[2026-09-27T06:26:00.815Z] PASS review restored after reload "tab restored"
+[2026-09-27T06:26:00.825Z] PASS selected agent and the unsaved marker restored after reload {"chatRestored":true,"markerRestored":true}
+[2026-09-27T06:26:00.900Z] screenshot docs/verification/evidence/ui/review/13-review-after-reload.png
+SCENARIO FAILED /private/tmp/ovs-ui-GVZbmE
+SCENARIO FAILED /private/tmp/ovs-ui-GVZbmE
+=== scopes (phone access off) 23:26:02
+PASS scopes
+SCENARIO PASSED /private/tmp/ovs-ui-i72J4U
+=== sidebar-search (phone access off) 23:26:48
+PASS sidebar-search
+SCENARIO PASSED /private/tmp/ovs-ui-I24AgW
+=== sidebar (phone access off) 23:31:15
+PASS sidebar
+SCENARIO PASSED /private/tmp/ovs-ui-uh9Ruw
+=== signin (phone access off) 23:31:51
+PASS signin
+SCENARIO PASSED /private/tmp/ovs-ui-dBJ78N
+=== theme (phone access off) 23:32:22
+PASS theme
+SCENARIO PASSED /private/tmp/ovs-ui-NejJAB
+=== trust (phone access off) 23:33:24
+PASS trust
+SCENARIO PASSED /private/tmp/ovs-ui-Jq3CMo
+=== usage (phone access off) 23:33:37
+PASS usage
+SCENARIO PASSED /private/tmp/ovs-ui-UiFaOu
+phone access off: 32 passed, 4 failed. keyboard perf restore review

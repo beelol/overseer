@@ -1,0 +1,22 @@
+# The switch for all notifications, turned off on the phone.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- tapOn:
+    id: "agents.menu"
+    retryTapIfNoChange: true
+- tapOn:
+    id: "agents.menu.settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings.notifications.all"
+    timeout: 30000
+- tapOn:
+    id: "settings.notifications.all"
+- assertVisible:
+    id: "settings.phone.name"

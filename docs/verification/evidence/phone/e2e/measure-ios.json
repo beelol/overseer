@@ -1,0 +1,241 @@
+{
+  "platform": "ios",
+  "device": "E6105FAE-0651-4D7B-801A-40FF49980468",
+  "at": "2026-09-28T12:41:34.336Z",
+  "runs": 20,
+  "withDoor": {
+    "launches": 20,
+    "reached": 20,
+    "pairing": 0,
+    "javascript.loaded": {
+      "count": 20,
+      "p50": 26.8,
+      "p95": 27.7,
+      "min": 26.1,
+      "max": 28.5
+    },
+    "door.shown": {
+      "count": 20,
+      "p50": 214.7,
+      "p95": 221.9,
+      "min": 206.6,
+      "max": 224.4
+    },
+    "agents.shown": {
+      "count": 20,
+      "p50": 214.8,
+      "p95": 222,
+      "min": 206.5,
+      "max": 224.6
+    },
+    "door.late": {
+      "count": 20,
+      "p50": -0.1,
+      "p95": 0.1,
+      "min": -0.2,
+      "max": 0.1
+    },
+    "agents.interactive": {
+      "count": 20,
+      "p50": 216.3,
+      "p95": 223.6,
+      "min": 208.9,
+      "max": 226.1
+    },
+    "door.opening": {
+      "count": 20,
+      "p50": 1009.1,
+      "p95": 1027.8,
+      "min": 1002,
+      "max": 1030
+    },
+    "door.frames": {
+      "count": 20,
+      "p50": 60,
+      "p95": 60,
+      "min": 57,
+      "max": 60
+    },
+    "door.dropped": {
+      "count": 20,
+      "p50": 0,
+      "p95": 0,
+      "min": 0,
+      "max": 0
+    },
+    "door.longestFrame": {
+      "count": 20,
+      "p50": 16.7,
+      "p95": 20.1,
+      "min": 16.7,
+      "max": 87.5
+    },
+    "door.all": {
+      "frames": 1177,
+      "dropped": 0
+    },
+    "seeded.slow": {
+      "count": 20,
+      "p50": 0,
+      "p95": 0,
+      "min": 0,
+      "max": 0
+    }
+  },
+  "withoutDoor": {
+    "launches": 20,
+    "reached": 20,
+    "pairing": 0,
+    "javascript.loaded": {
+      "count": 20,
+      "p50": 26.5,
+      "p95": 27.6,
+      "min": 25.9,
+      "max": 30.9
+    },
+    "door.shown": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "min": null,
+      "max": null
+    },
+    "agents.shown": {
+      "count": 20,
+      "p50": 204.5,
+      "p95": 208.4,
+      "min": 202.5,
+      "max": 229.7
+    },
+    "door.late": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "min": null,
+      "max": null
+    },
+    "agents.interactive": {
+      "count": 20,
+      "p50": 205.3,
+      "p95": 209.5,
+      "min": 203,
+      "max": 230.9
+    },
+    "door.opening": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "min": null,
+      "max": null
+    },
+    "door.frames": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "min": null,
+      "max": null
+    },
+    "door.dropped": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "min": null,
+      "max": null
+    },
+    "door.longestFrame": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "min": null,
+      "max": null
+    },
+    "door.all": {
+      "frames": 0,
+      "dropped": 0
+    },
+    "seeded.slow": {
+      "count": 20,
+      "p50": 0,
+      "p95": 0,
+      "min": 0,
+      "max": 0
+    }
+  },
+  "load": {
+    "start": [
+      5.6171875,
+      4.95654296875,
+      5.9169921875
+    ],
+    "end": [
+      2.0361328125,
+      3.71240234375,
+      5.19091796875
+    ]
+  },
+  "checks": [
+    {
+      "name": "every launch reaches the agents list",
+      "value": 20,
+      "limit": 20,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "launches that showed pairing or any other question, of 40",
+      "value": 0,
+      "limit": 0,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "agents list interactive, p95 (ms)",
+      "value": 223.6,
+      "limit": 1000,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "agents list interactive against the baseline, p95 (ms)",
+      "value": 223.6,
+      "limit": 251.7,
+      "ok": true,
+      "note": "baseline 228.8 ms + 10%"
+    },
+    {
+      "name": "the door is on screen with the first screen or before it, worst launch (ms after the first screen)",
+      "value": 0.1,
+      "limit": 17,
+      "ok": true,
+      "note": "20 of 20 launches marked both"
+    },
+    {
+      "name": "the door opens in 1000 ms within 60 ms, shortest (ms)",
+      "value": 1002,
+      "limit": 940,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "the door opens in 1000 ms within 60 ms, longest (ms)",
+      "value": 1030,
+      "limit": 1060,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "frames dropped while the door opens, worst launch (%)",
+      "value": 0,
+      "limit": 1,
+      "ok": true,
+      "note": "0 of 57 frames"
+    },
+    {
+      "name": "the door makes the first screen no later, median (ms)",
+      "value": 216.3,
+      "limit": 245.8,
+      "ok": true,
+      "note": "without the door 205.3 ms"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+# The busy-logic test: an animation on the UI thread while the app's logic is held for 500 ms.
+appId: ${APP}
+---
+- openLink: "overseer://perf"
+- extendedWaitUntil:
+    visible:
+      id: "perf.busy"
+    timeout: 30000
+- tapOn:
+    id: "perf.busy"
+- extendedWaitUntil:
+    visible: ".*droppedPercent.*"
+    timeout: 10000
+- tapOn:
+    id: "perf.back"

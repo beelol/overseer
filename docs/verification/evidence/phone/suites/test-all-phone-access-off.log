@@ -1,0 +1,98 @@
+$ OVERSEER_TEST_PHONE_ACCESS=off node scripts/test-all --jobs=3   (2026-09-27 23:01:09, commit 376146ef, load 16.75 53.34 66.40 )
+▶ Rust (cargo test --workspace) … FAILED (957s) 262 passed, 3 failed
+    test t23_the_daemon_is_asked_again_every_second_and_rarely_after_an_error ... ok
+    test adapters::tests::classify_errors ... ok
+    test adapters::tests::network_errors_are_their_own_class ... ok
+    test net::tests::transport_errors_are_classified ... ok
+    test opencode_bridge::tests::errors_from_the_server_are_classified ... ok
+    test ac185_actions_have_classes_and_cards ... FAILED
+    test ac189_overseer_keeps_agents_on_task ... FAILED
+    test ac190_briefing_and_channel ... FAILED
+    thread 'ac185_actions_have_classes_and_cards' panicked at daemon/tests/overseer.rs:687:5:
+    thread 'ac189_overseer_keeps_agents_on_task' panicked at daemon/tests/overseer.rs:1206:5:
+    thread 'ac190_briefing_and_channel' panicked at daemon/tests/overseer.rs:1355:5:
+    test result: FAILED. 25 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 559.84s
+▶ Unit (test/unit) … ok (1s) 6 of 6 passed
+▶ Check (extension sources) … ok (0s)
+▶ Links (README and ledger) … ok (0s) 745 links checked in 218 files; 0 broken
+▶ Build the VSIX … ok (32s)
+(UI scenarios, 3 at a time)
+▶ UI arrangement … FAILED (43s)
+    (node:53083) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.
+    [2026-09-28T06:17:56.311Z] FAIL the first file edit brings the review forward within 500 ms: review on the left (about two thirds) on the changed file, chat on the right {"lag":1147,"waitedMs":785,"la
+    SCENARIO FAILED /private/tmp/ovs-ui-PUHsbT
+▶ UI audio … ok (43s)
+▶ UI brand … ok (38s)
+▶ UI accounts … FAILED (96s)
+    (node:53309) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.
+    [2026-09-28T06:18:47.637Z] FAIL switching the desktop app account changes only the desktop-linked account {"desk1":"pro · bc92d05b · desktop","desk2":"pro · bc92d05b · desktop","work1":"team · c4a1579
+    [2026-09-28T06:19:04.597Z] FAIL sign-out and re-sign-in affect only that account {"signedOut":"signed out","resigned":"plus · 5ac9196f","othersAfterOut":["max · f03ab3f8","plus · d1dddc49 · desktop"]}
+    SCENARIO FAILED /private/tmp/ovs-ui-SXDJMX
+▶ UI chat … ok (55s)
+▶ UI center … FAILED (71s)
+    (node:92799) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.
+    [2026-09-28T06:19:39.066Z] FAIL selecting a run in another repository switches the review and the conversation {"tabsX":["Review","Overseer, Editor Group 2"],"tabsY":["Review, Editor Group 1","Oversee
+    SCENARIO FAILED /private/tmp/ovs-ui-fJaFPt
+▶ UI composer … FAILED (18s)
+    (node:11791) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.
+    [2026-09-28T06:20:26.367Z] ERROR Error: Timed out in webview waiting for !!document.querySelector('.menu') (last: false)
+    [2026-09-28T06:20:26.493Z] screenshot docs/verification/evidence/ui/composer/02-error.png
+    SCENARIO FAILED /private/tmp/ovs-ui-v3laeW
+▶ UI audit … FAILED (136s)
+    (node:42695) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.
+    [2026-09-28T06:20:37.263Z] FAIL review: no more visible text than Gate J (175 → 178) {"view":"review","gatej":175,"gatek":178}
+    SCENARIO FAILED /private/tmp/ovs-ui-MVZrbK
+▶ UI conversation … ok (46s)
+▶ UI continuity-settings … ok (62s)
+▶ UI continuity … ok (106s)
+▶ UI dragout … ok (36s)
+▶ UI dashboard … ok (68s)
+▶ UI endings … ok (51s)
+▶ UI first-click … ok (50s)
+▶ UI follow … ok (59s)
+▶ UI grid … FAILED (61s)
+    (node:74384) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.
+    [2026-09-28T06:24:05.230Z] FAIL nine agents tile as 3×3 {"tiles":7,"cols":"3","rows":"3"}
+    SCENARIO FAILED /private/tmp/ovs-ui-1gjoPb
+▶ UI followups … ok (149s)
+▶ UI gallery … ok (167s)
+▶ UI grid-track … ok (41s)
+▶ UI grid-drag … ok (114s)
+▶ UI hunks … ok (65s)
+▶ UI home … ok (105s)
+▶ UI keyboard … ok (50s)
+▶ UI inventory … ok (75s)
+▶ UI look … ok (83s)
+▶ UI main … ok (79s)
+▶ UI narrow-chat … ok (45s)
+▶ UI modes … ok (60s)
+▶ UI notify … ok (19s)
+▶ UI parity … ok (35s)
+▶ UI place … ok (60s)
+▶ UI phone-access … ok (148s)
+▶ UI pr … ok (75s)
+▶ UI restore … ok (78s)
+▶ UI history … ok (563s)
+▶ UI review … ok (104s)
+▶ UI review-width … FAILED (35s)
+    (node:21914) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.
+    [2026-09-28T06:35:40.570Z] FAIL nothing in the review overflows sideways [[900,true],[1280,false],[1600,false],[900,true],[1280,false],[1600,false]]
+    SCENARIO FAILED /private/tmp/ovs-ui-wFqQvA
+▶ UI review-files … ok (51s)
+▶ UI scopes … ok (51s)
+▶ UI sidebar … ok (49s)
+▶ UI talk … ok (41s)
+▶ UI signin … ok (50s)
+▶ UI trust … ok (16s)
+▶ UI usage … ok (44s)
+▶ UI theme … FAILED (67s)
+    (node:42065) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.
+    [2026-09-28T06:38:17.451Z] ERROR Error: Webview not found for probe document.body.dataset.ready === '1' && !!document.getElementById('harnesses')
+    [2026-09-28T06:38:17.527Z] screenshot docs/verification/evidence/ui/theme/02-error.png
+    SCENARIO FAILED /private/tmp/ovs-ui-oj3e72
+▶ UI windows … ok (54s)
+▶ UI sidebar-search … ok (332s)
+(not run: background, claude-live, codex-approval, codex-follow, codex-live, conversation-live, live-gatej, merge, offline-session, perf, talk-live; LIVE ones need --live, perf needs --perf)
+
+44 of 53 passed; failed: Rust (cargo test --workspace), UI arrangement, UI accounts, UI center, UI composer, UI audit, UI grid, UI review-width, UI theme
+exit: 1 (23:41:19, load 13.47 31.71 44.36 )

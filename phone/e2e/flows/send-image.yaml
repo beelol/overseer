@@ -1,0 +1,47 @@
+# An image chosen in the system's own photo picker and sent with a message.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- runFlow: open-agent.yaml
+- tapOn:
+    id: "agent.composer.attach"
+    retryTapIfNoChange: true
+- tapOn:
+    id: "agent.composer.attach.library"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: "PXGGridLayout-Info"
+          timeout: 20000
+      - tapOn:
+          id: "PXGGridLayout-Info"
+          index: 0
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: "com\\.google\\.android\\.providers\\.media\\.module:id/icon_thumbnail"
+          timeout: 20000
+      - tapOn:
+          id: "com\\.google\\.android\\.providers\\.media\\.module:id/icon_thumbnail"
+          index: 0
+- extendedWaitUntil:
+    visible:
+      id: "agent.composer.image.0"
+    timeout: 30000
+- takeScreenshot: image-attached
+- tapOn:
+    id: "agent.composer.text"
+- inputText: ${MESSAGE}
+- tapOn:
+    id: "agent.composer.send"

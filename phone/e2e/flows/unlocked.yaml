@@ -1,0 +1,10 @@
+# Unlocked: the cover is gone and the agents are there.
+appId: ${APP}
+---
+- extendedWaitUntil:
+    notVisible:
+      id: "lock.screen"
+    timeout: 30000
+- assertVisible:
+    id: "agents.screen"
+- takeScreenshot: unlocked

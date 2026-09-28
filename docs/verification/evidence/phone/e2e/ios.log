@@ -1,0 +1,1052 @@
+12:11:49 The phone's scenarios on ios. Commit cc4a556.
+lab: {"state":"/private/tmp/claude-501/-Users-bilal-projects-overseer--claude-worktrees-phone-remote-vscode-control-b48a34/ae4a24d6-748d-49fa-a70f-dacf90a6c148/scratchpad/clean-clone/docs/verification/evidence/phone/e2e/lab-ios.json","home":"/tmp/ovs-e2eC5m6vU","socket":"/tmp/ovs-e2eC5m6vU/run/overseerd.sock","port":47841,"repo":"/tmp/ovs-e2eC5m6vU/shop","pid":93932,"code":"<the lab's pairing code, expired>"paired":"Lab ios"}
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow pair
+Launch app "${APP}"... COMPLETED
+Assert that id: pair.code is visible... COMPLETED
+Tap on id: pair.name... COMPLETED
+Erase 40 characters... COMPLETED
+Input text ${NAME}... COMPLETED
+Tap on id: pair.code... COMPLETED
+Input text ${CODE}... COMPLETED
+Tap on id: pair.submit... COMPLETED
+Assert that id: pair.notifications.reason|agents.screen is visible... COMPLETED
+Run flow when id: pair.notifications.reason is visible...
+  Take screenshot notifications-the-reason-first... COMPLETED
+  Tap on id: ${NOTIFICATIONS}... COMPLETED
+  Assert that "Allow" is visible... COMPLETED
+  Take screenshot the-system-asks-about-notifications... COMPLETED
+  Tap on "Allow"... COMPLETED
+Run flow when id: pair.notifications.reason is visible... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+12:12:20 ok   pair
+12:12:20 scenario agents (AC-124): every agent, those that need the owner first; every agent of the Mac has its row on the phone
+12:12:20 flow agents
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow agents
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: agents.row.${SHOWCASE} is visible... COMPLETED
+Assert that id: agents.needs.${PERMISSION} is visible... COMPLETED
+Assert that id: agents.row.${PERMISSION} is visible... COMPLETED
+Tap on id: agents.filter.needs... COMPLETED
+Assert that id: agents.needs.${PERMISSION} is visible... COMPLETED
+Assert that id: agents.row.${SHOWCASE} is not visible... COMPLETED
+Tap on id: agents.filter.all... COMPLETED
+Assert that id: agents.row.${SHOWCASE} is visible... COMPLETED
+12:12:49 flow agents-every-row
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow agents-every-row
+Assert that id: agents.screen is visible... COMPLETED
+Scrolling DOWN until id: agents\.row\.r-5c89045d8177 is visible with speed 40, visibility percentage 100%, timeout 8000 ms, with centering disabled... COMPLETED
+Scrolling UP until id: agents\.row\.r-5c89045d8177 is visible with speed 40, visibility percentage 100%, timeout 8000 ms, with centering disabled... COMPLETED
+Scrolling DOWN until id: agents\.row\.r-67a4cbe477e5 is visible with speed 40, visibility percentage 100%, timeout 8000 ms, with centering disabled... COMPLETED
+Scrolling UP until id: agents\.row\.r-67a4cbe477e5 is visible with speed 40, visibility percentage 100%, timeout 8000 ms, with centering disabled... COMPLETED
+Scrolling DOWN until id: agents\.row\.r-2165125f9980 is visible with speed 40, visibility percentage 100%, timeout 8000 ms, with centering disabled... COMPLETED
+Scrolling UP until id: agents\.row\.r-2165125f9980 is visible with speed 40, visibility percentage 100%, timeout 8000 ms, with centering disabled... COMPLETED
+Scrolling DOWN until id: agents\.row\.r-bf3cfdf3a21c is visible with speed 40, visibility percentage 100%, timeout 8000 ms, with centering disabled... COMPLETED
+Scrolling UP until id: agents\.row\.r-bf3cfdf3a21c is visible with speed 40, visibility percentage 100%, timeout 8000 ms, with centering disabled... COMPLETED
+Scrolling DOWN until id: agents\.row\.r-382b2644e20a is visible with speed 40, visibility percentage 100%, timeout 8000 ms, with centering disabled... COMPLETED
+Scrolling UP until id: agents\.row\.r-382b2644e20a is visible with speed 40, visibility percentage 100%, timeout 8000 ms, with centering disabled... COMPLETED
+Scrolling DOWN until id: agents\.row\.r-ab443a8507d4 is visible with speed 40, visibility percentage 100%, timeout 8000 ms, with centering disabled... COMPLETED
+Scrolling UP until id: agents\.row\.r-ab443a8507d4 is visible with speed 40, visibility percentage 100%, timeout 8000 ms, with centering disabled... COMPLETED
+Scrolling DOWN until id: agents\.row\.r-5470837e4600 is visible with speed 40, visibility percentage 100%, timeout 8000 ms, with centering disabled... COMPLETED
+Scrolling UP until id: agents\.row\.r-5470837e4600 is visible with speed 40, visibility percentage 100%, timeout 8000 ms, with centering disabled... COMPLETED
+Scrolling DOWN until id: agents\.row\.r-c24259515843 is visible with speed 40, visibility percentage 100%, timeout 8000 ms, with centering disabled... COMPLETED
+Scrolling UP until id: agents\.row\.r-c24259515843 is visible with speed 40, visibility percentage 100%, timeout 8000 ms, with centering disabled... COMPLETED
+Scrolling DOWN until id: agents\.row\.r-c05ef4b3329c is visible with speed 40, visibility percentage 100%, timeout 8000 ms, with centering disabled... COMPLETED
+Scrolling UP until id: agents\.row\.r-c05ef4b3329c is visible with speed 40, visibility percentage 100%, timeout 8000 ms, with centering disabled... COMPLETED
+12:13:05   9 agents of the Mac (nested children among them: 2), each found on the phone
+12:13:05 ok   agents
+12:13:05 scenario delay (AC-124): a line an agent prints reaches the phone's screen: the delay from the Mac's event to the frame that shows it
+12:13:06 flow watch-stream
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow watch-stream
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Run open-agent.yaml...
+  Repeat while id: agent.screen is not visible (up to 3 times)...
+    Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+    Scrolling UP until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+    Tap on (Optional) id: agents.row.${RUN}... COMPLETED
+    Assert that (Optional) id: agent.screen is visible... COMPLETED
+  Repeat while id: agent.screen is not visible (up to 3 times)... COMPLETED
+  Assert that id: agent.screen is visible... COMPLETED
+Run open-agent.yaml... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Take screenshot stream-watched... COMPLETED
+12:13:54   from the Mac's event to the frame that shows it: 320 lines, p50 27 ms, p95 34 ms, longest 49 ms (AC-58 holds a VS Code tile to 250 ms); the device's clock 0 ms from the Mac's; load average 7.4
+12:13:54 ok   delay
+12:13:54 scenario conversation (AC-124): an agent's conversation opens with its composer
+12:13:54 flow conversation
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow conversation
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Run open-agent.yaml...
+  Repeat while id: agent.screen is not visible (up to 3 times)...
+    Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+    Scrolling UP until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+    Tap on (Optional) id: agents.row.${RUN}... COMPLETED
+    Assert that (Optional) id: agent.screen is visible... COMPLETED
+  Repeat while id: agent.screen is not visible (up to 3 times)... COMPLETED
+  Assert that id: agent.screen is visible... COMPLETED
+Run open-agent.yaml... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Assert that id: agent.composer.text is visible... COMPLETED
+Assert that id: agent.changes is visible... COMPLETED
+Assert that id: agent.error is not visible... COMPLETED
+12:14:28 ok   conversation
+12:14:28 scenario permission (AC-125): a permission request allowed from the phone unblocks the agent
+12:14:28 flow permission
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow permission
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Scrolling DOWN until id: agents.needs.${PERMISSION} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+Scrolling DOWN until id: agents.needs.${PERMISSION} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled... COMPLETED
+Tap on id: agents.needs.${PERMISSION}... COMPLETED
+Assert that id: agent.permission.allow is visible... COMPLETED
+Tap on id: agent.permission.allow... COMPLETED
+Assert that id: agent.permission.allow is not visible... COMPLETED
+12:14:48 ok   permission
+12:14:48 scenario send (AC-122, AC-125): a message typed on the phone reaches the agent exactly once
+12:14:48 flow send
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow send
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Run open-agent.yaml...
+  Repeat while id: agent.screen is not visible (up to 3 times)...
+    Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+    Scrolling UP until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+    Tap on (Optional) id: agents.row.${RUN}... COMPLETED
+    Assert that (Optional) id: agent.screen is visible... COMPLETED
+  Repeat while id: agent.screen is not visible (up to 3 times)... COMPLETED
+  Assert that id: agent.screen is visible... COMPLETED
+Run open-agent.yaml... COMPLETED
+Assert that id: agent.composer.text is visible... COMPLETED
+Tap on id: agent.composer.text... COMPLETED
+Input text ${MESSAGE}... COMPLETED
+Tap on id: agent.composer.send... COMPLETED
+Assert that ".*${MESSAGE}.*" is visible... COMPLETED
+12:15:25 ok   send
+12:15:25 scenario image (AC-125): an image chosen in the system's photo picker reaches the Claude fixture as an image block
+12:15:25 flow send-image
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow send-image
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Run open-agent.yaml...
+  Repeat while id: agent.screen is not visible (up to 3 times)...
+    Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+    Scrolling UP until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+    Tap on (Optional) id: agents.row.${RUN}... COMPLETED
+    Assert that (Optional) id: agent.screen is visible... COMPLETED
+  Repeat while id: agent.screen is not visible (up to 3 times)... COMPLETED
+  Assert that id: agent.screen is visible... COMPLETED
+Run open-agent.yaml... COMPLETED
+Tap on id: agent.composer.attach... COMPLETED
+Tap on id: agent.composer.attach.library... COMPLETED
+Run flow when Platform is IOS...
+  Assert that id: PXGGridLayout-Info is visible... COMPLETED
+  Tap on id: PXGGridLayout-Info, Index: 0... COMPLETED
+Run flow when Platform is IOS... COMPLETED
+Run flow when Platform is ANDROID...
+Run flow when Platform is ANDROID... SKIPPED
+Assert that id: agent.composer.image.0 is visible... COMPLETED
+Take screenshot image-attached... COMPLETED
+Tap on id: agent.composer.text... COMPLETED
+Input text ${MESSAGE}... COMPLETED
+Tap on id: agent.composer.send... COMPLETED
+12:15:56   the fixture read an image block: image/jpeg, 172411 bytes, with the message's text
+12:15:56 ok   image
+12:15:56 scenario review (AC-126): an agent's changed files, a file's hunks, and a hunk marked reviewed
+12:15:56 flow review
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow review
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Run open-agent.yaml...
+  Repeat while id: agent.screen is not visible (up to 3 times)...
+    Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+    Scrolling UP until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+    Tap on (Optional) id: agents.row.${RUN}... COMPLETED
+    Assert that (Optional) id: agent.screen is visible... COMPLETED
+  Repeat while id: agent.screen is not visible (up to 3 times)... COMPLETED
+  Assert that id: agent.screen is visible... COMPLETED
+Run open-agent.yaml... COMPLETED
+Assert that id: agent.changes is visible... COMPLETED
+Tap on id: agent.changes... COMPLETED
+Assert that id: changes.comparison is visible... COMPLETED
+Tap on id: changes.comparison... COMPLETED
+Tap on id: changes.comparison.menu.task_start... COMPLETED
+Assert that id: changes.row.${FILE} is visible... COMPLETED
+Tap on id: changes.row.${FILE}... COMPLETED
+Assert that id: file.hunk.accept is visible... COMPLETED
+Tap on id: file.hunk.accept, Index: 0... COMPLETED
+Assert that "Unmark reviewed hunk 1", id: file\.hunk\.accept is visible... COMPLETED
+Tap on id: file.back... COMPLETED
+Tap on id: changes.back... COMPLETED
+12:16:23 ok   review
+12:16:23 scenario diff (AC-126): a file's diff on the phone is git diff for the comparison, line for line; a mark made on the Mac shows on the phone
+12:16:23 flow diff-lines
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow diff-lines
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Run /private/tmp/claude-501/-Users-bilal-projects-overseer--claude-worktrees-phone-remote-vscode-control-b48a34/ae4a24d6-748d-49fa-a70f-dacf90a6c148/scratchpad/clean-clone/phone/e2e/flows/open-agent.yaml...
+  Repeat while id: agent.screen is not visible (up to 3 times)...
+    Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+    Scrolling UP until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+    Tap on (Optional) id: agents.row.${RUN}... COMPLETED
+    Assert that (Optional) id: agent.screen is visible... COMPLETED
+  Repeat while id: agent.screen is not visible (up to 3 times)... COMPLETED
+  Assert that id: agent.screen is visible... COMPLETED
+Run /private/tmp/claude-501/-Users-bilal-projects-overseer--claude-worktrees-phone-remote-vscode-control-b48a34/ae4a24d6-748d-49fa-a70f-dacf90a6c148/scratchpad/clean-clone/phone/e2e/flows/open-agent.yaml... COMPLETED
+Assert that id: agent.changes is visible... COMPLETED
+Tap on id: agent.changes... COMPLETED
+Assert that id: changes.comparison is visible... COMPLETED
+Tap on id: changes.comparison... COMPLETED
+Tap on id: changes.comparison.menu.task_start... COMPLETED
+Assert that id: changes.row.${FILE} is visible... COMPLETED
+Tap on id: changes.row.${FILE}... COMPLETED
+Assert that id: file.hunk.accept is visible... COMPLETED
+Scrolling DOWN until id: file\.line\.5bc735375dd1e7ed:\+0 is visible with speed 40, visibility percentage 100%, timeout 15000 ms, with centering disabled... COMPLETED
+Assert that "Added, line 4: ", id: file\.line\.5bc735375dd1e7ed:\+0 is visible... COMPLETED
+Scrolling DOWN until id: file\.line\.5bc735375dd1e7ed:\+1 is visible with speed 40, visibility percentage 100%, timeout 15000 ms, with centering disabled... COMPLETED
+Assert that "Added, line 5: ## Sessions", id: file\.line\.5bc735375dd1e7ed:\+1 is visible... COMPLETED
+Scrolling DOWN until id: file\.line\.5bc735375dd1e7ed:\+2 is visible with speed 40, visibility percentage 100%, timeout 15000 ms, with centering disabled... COMPLETED
+Assert that "Added, line 6: ", id: file\.line\.5bc735375dd1e7ed:\+2 is visible... COMPLETED
+Scrolling DOWN until id: file\.line\.5bc735375dd1e7ed:\+3 is visible with speed 40, visibility percentage 100%, timeout 15000 ms, with centering disabled... COMPLETED
+Assert that "Added, line 7: Expired sessions refresh once through `SessionRefreshCoordinator`\.", id: file\.line\.5bc735375dd1e7ed:\+3 is visible... COMPLETED
+Scrolling UP until "Accept hunk 1", id: file\.hunk\.accept, Child of: id: file\.hunk\.5bc735375dd1e7ed is visible with speed 40, visibility percentage 100%, timeout 15000 ms, with centering disabled... COMPLETED
+Take screenshot diff-lines... COMPLETED
+12:16:48   4 lines in 1 hunks equal git diff and are on the screen; the Mac's mark shows on the phone
+12:16:48 ok   diff
+12:16:48 scenario reject (AC-126, AC-130): a hunk rejected from the phone is asked about once and then gone from the worktree
+12:16:48 flow reject
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow reject
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Run open-agent.yaml...
+  Repeat while id: agent.screen is not visible (up to 3 times)...
+    Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+    Scrolling UP until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+    Tap on (Optional) id: agents.row.${RUN}... COMPLETED
+    Assert that (Optional) id: agent.screen is visible... COMPLETED
+  Repeat while id: agent.screen is not visible (up to 3 times)... COMPLETED
+  Assert that id: agent.screen is visible... COMPLETED
+Run open-agent.yaml... COMPLETED
+Assert that id: agent.changes is visible... COMPLETED
+Tap on id: agent.changes... COMPLETED
+Assert that id: changes.comparison is visible... COMPLETED
+Tap on id: changes.comparison... COMPLETED
+Tap on id: changes.comparison.menu.task_start... COMPLETED
+Assert that id: changes.row.${FILE} is visible... COMPLETED
+Tap on id: changes.row.${FILE}... COMPLETED
+Assert that id: file.hunk.reject is visible... COMPLETED
+Tap on id: file.hunk.reject, Index: 0... COMPLETED
+Assert that id: file.reject.confirm is visible... COMPLETED
+Take screenshot reject-asks-once... COMPLETED
+Tap on id: file.reject.confirm... COMPLETED
+12:17:14 ok   reject
+12:17:14 scenario big-repo (AC-126, AC-135): an agent in a repository of 10,000 files changes 500: the phone lists them, and the list scrolls without dropped frames
+12:17:21 flow big-repo
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow big-repo
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Run open-agent.yaml...
+  Repeat while id: agent.screen is not visible (up to 3 times)...
+    Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+    Scrolling UP until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+    Tap on (Optional) id: agents.row.${RUN}... COMPLETED
+    Assert that (Optional) id: agent.screen is visible... COMPLETED
+  Repeat while id: agent.screen is not visible (up to 3 times)... COMPLETED
+  Assert that id: agent.screen is visible... COMPLETED
+Run open-agent.yaml... COMPLETED
+Assert that id: agent.changes is visible... COMPLETED
+Tap on id: agent.changes... COMPLETED
+Assert that id: changes.list is visible... COMPLETED
+Assert that id: changes.row.${FIRST} is visible... COMPLETED
+Take screenshot big-repo-listed... COMPLETED
+Repeat 6 times...
+  Swipe from (50%, 80%) to (50%, 25%) in 250 ms... COMPLETED
+  Wait for animation to end within 3000 ms... COMPLETED
+Repeat 6 times... COMPLETED
+Repeat 3 times...
+  Swipe from (50%, 25%) to (50%, 80%) in 250 ms... COMPLETED
+  Wait for animation to end within 3000 ms... COMPLETED
+Repeat 3 times... COMPLETED
+Take screenshot big-repo-scrolled... COMPLETED
+12:18:12   10,000 files, 500 changed: 9 scrolls of the list, 1362 frames, 0 dropped (0%), longest 16.7 ms; load average 4.6
+12:18:12 ok   big-repo
+12:18:12 scenario cleanup (AC-130, AC-127): clean up a worktree with uncommitted files: the phone names them and asks once; the worktree is gone
+12:18:12 flow cleanup
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow cleanup
+Run open-agent-menu.yaml...
+  Launch app "${APP}"... COMPLETED
+  Assert that id: agents.screen is visible... COMPLETED
+  Run open-agent.yaml...
+    Repeat while id: agent.screen is not visible (up to 3 times)...
+      Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+      Scrolling UP until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+      Tap on (Optional) id: agents.row.${RUN}... COMPLETED
+      Assert that (Optional) id: agent.screen is visible... COMPLETED
+    Repeat while id: agent.screen is not visible (up to 3 times)... COMPLETED
+    Assert that id: agent.screen is visible... COMPLETED
+  Run open-agent.yaml... COMPLETED
+  Assert that id: agent.more is visible... COMPLETED
+  Tap on id: agent.more... COMPLETED
+Run open-agent-menu.yaml... COMPLETED
+Tap on id: agent.more.cleanup... COMPLETED
+Assert that id: agent.more.cleanup.confirm is visible... COMPLETED
+Assert that ".*${LOST}.*" is visible... COMPLETED
+Take screenshot cleanup-asks-once... COMPLETED
+Tap on id: agent.more.cleanup.confirm... COMPLETED
+12:18:35 ok   cleanup
+12:18:35 scenario merge (AC-130, AC-127): merge back from the phone: aborted after a conflict, and completed, each asked once
+12:18:36 flow merge-abort
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow merge-abort
+Run open-agent-menu.yaml...
+  Launch app "${APP}"... COMPLETED
+  Assert that id: agents.screen is visible... COMPLETED
+  Run open-agent.yaml...
+    Repeat while id: agent.screen is not visible (up to 3 times)...
+      Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+      Scrolling UP until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+      Tap on (Optional) id: agents.row.${RUN}... COMPLETED
+      Assert that (Optional) id: agent.screen is visible... COMPLETED
+    Repeat while id: agent.screen is not visible (up to 3 times)... COMPLETED
+    Assert that id: agent.screen is visible... COMPLETED
+  Run open-agent.yaml... COMPLETED
+  Assert that id: agent.more is visible... COMPLETED
+  Tap on id: agent.more... COMPLETED
+Run open-agent-menu.yaml... COMPLETED
+Tap on id: agent.more.merge... COMPLETED
+Assert that id: merge.prepare is visible... COMPLETED
+Tap on id: merge.prepare... COMPLETED
+Assert that id: merge.abort is visible... COMPLETED
+Tap on id: merge.abort... COMPLETED
+Assert that id: merge.ask.confirm is visible... COMPLETED
+Assert that "Abort this merge\?" is visible... COMPLETED
+Take screenshot merge-abort-asks-once... COMPLETED
+Tap on id: merge.ask.confirm... COMPLETED
+Assert that id: merge.outcome is visible... COMPLETED
+12:19:01 flow merge-complete
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow merge-complete
+Run open-agent-menu.yaml...
+  Launch app "${APP}"... COMPLETED
+  Assert that id: agents.screen is visible... COMPLETED
+  Run open-agent.yaml...
+    Repeat while id: agent.screen is not visible (up to 3 times)...
+      Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+      Scrolling UP until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+      Tap on (Optional) id: agents.row.${RUN}... COMPLETED
+      Assert that (Optional) id: agent.screen is visible... COMPLETED
+    Repeat while id: agent.screen is not visible (up to 3 times)... COMPLETED
+    Assert that id: agent.screen is visible... COMPLETED
+  Run open-agent.yaml... COMPLETED
+  Assert that id: agent.more is visible... COMPLETED
+  Tap on id: agent.more... COMPLETED
+Run open-agent-menu.yaml... COMPLETED
+Tap on id: agent.more.merge... COMPLETED
+Assert that id: merge.prepare is visible... COMPLETED
+Tap on id: merge.prepare... COMPLETED
+Assert that id: merge.complete is visible... COMPLETED
+Tap on id: merge.complete... COMPLETED
+Assert that id: merge.ask.confirm is visible... COMPLETED
+Assert that "Merge .* into main in shop\?" is visible... COMPLETED
+Take screenshot merge-complete-asks-once... COMPLETED
+Tap on id: merge.ask.confirm... COMPLETED
+Assert that id: merge.done is visible... COMPLETED
+12:19:26 ok   merge
+12:19:26 scenario safety (AC-130): both safety settings turned on from the phone, each with the device's own unlock: the app is locked when opened, and Stop all asks for the unlock
+12:19:26 flow safety-toggle
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow safety-toggle
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.menu... COMPLETED
+Tap on id: agents.menu.settings... COMPLETED
+Scrolling DOWN until id: ${SWITCH} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled... COMPLETED
+Tap on id: ${SWITCH}... COMPLETED
+Run unlock-prompt.yaml...
+  Run flow when Platform is IOS...
+    Tap on (Optional) "OK"... WARNED
+  Run flow when Platform is IOS... COMPLETED
+  Run flow when Platform is ANDROID...
+  Run flow when Platform is ANDROID... SKIPPED
+Run unlock-prompt.yaml... COMPLETED
+12:19:59 flow safety-is-on
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow safety-is-on
+Assert that id: ${SWITCH} is visible... COMPLETED
+Take screenshot ${SHOT}... COMPLETED
+12:20:06 flow safety-toggle
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow safety-toggle
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.menu... COMPLETED
+Tap on id: agents.menu.settings... COMPLETED
+Scrolling DOWN until id: ${SWITCH} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled... COMPLETED
+Tap on id: ${SWITCH}... COMPLETED
+Run unlock-prompt.yaml...
+  Run flow when Platform is IOS...
+    Tap on (Optional) "OK"... WARNED
+  Run flow when Platform is IOS... COMPLETED
+  Run flow when Platform is ANDROID...
+  Run flow when Platform is ANDROID... SKIPPED
+Run unlock-prompt.yaml... COMPLETED
+12:20:39 flow safety-is-on
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow safety-is-on
+Assert that id: ${SWITCH} is visible... COMPLETED
+Take screenshot ${SHOT}... COMPLETED
+12:20:45 flow locked-open
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow locked-open
+Launch app "${APP}"... COMPLETED
+Assert that id: lock.screen is visible... COMPLETED
+Take screenshot locked... COMPLETED
+Run unlock-prompt.yaml...
+  Run flow when Platform is IOS...
+    Tap on (Optional) "OK"... WARNED
+  Run flow when Platform is IOS... COMPLETED
+  Run flow when Platform is ANDROID...
+  Run flow when Platform is ANDROID... SKIPPED
+Run unlock-prompt.yaml... COMPLETED
+12:21:08 flow unlocked
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow unlocked
+Assert that id: lock.screen is not visible... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Take screenshot unlocked... COMPLETED
+12:21:17 flow stop-all-unlock
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow stop-all-unlock
+Assert that (Optional) id: notification.banner.dismiss is visible... WARNED
+Run flow when id: notification.banner.dismiss is visible...
+Run flow when id: notification.banner.dismiss is visible... SKIPPED
+Tap on id: agents.menu... COMPLETED
+Assert that id: agents.menu.stop is visible... COMPLETED
+Tap on id: agents.menu.stop... COMPLETED
+Assert that id: agents.stop.confirm is visible... COMPLETED
+Tap on id: agents.stop.confirm... COMPLETED
+Run unlock-prompt.yaml...
+  Run flow when Platform is IOS...
+    Tap on (Optional) "OK"... WARNED
+  Run flow when Platform is IOS... COMPLETED
+  Run flow when Platform is ANDROID...
+  Run flow when Platform is ANDROID... SKIPPED
+Run unlock-prompt.yaml... COMPLETED
+12:22:02 ok   safety
+12:22:02 scenario backup (AC-130): an attempt to read the phone's key from everything the app keeps on disk (more than a backup carries) fails
+12:22:08   27 files of the app searched: no private key of this phone; a planted key was found; keychain items [{"group":"FQ6YGD7554.com.beelol.overseer.phone","accessible":"cku"}]
+12:22:08 ok   backup
+12:22:08 scenario new (AC-125): a new agent started from the phone
+12:22:08 flow new
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow new
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.new... COMPLETED
+Assert that id: new.task is visible... COMPLETED
+Tap on id: new.task... COMPLETED
+Input text ${TASK}... COMPLETED
+Tap on id: new.start... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+12:22:25 ok   new
+12:22:25 scenario accounts (AC-127): the accounts of the Mac
+12:22:25 flow accounts
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow accounts
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.menu... COMPLETED
+Tap on id: agents.menu.accounts... COMPLETED
+Assert that id: accounts.screen is visible... COMPLETED
+Assert that id: accounts.list is visible... COMPLETED
+12:22:38 ok   accounts
+12:22:38 scenario notifications (AC-129): notifications switched off on the phone are off on the Mac, and on again
+12:22:38 flow notifications-off
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow notifications-off
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.menu... COMPLETED
+Tap on id: agents.menu.settings... COMPLETED
+Assert that id: settings.notifications.all is visible... COMPLETED
+Tap on id: settings.notifications.all... COMPLETED
+Assert that id: settings.phone.name is visible... COMPLETED
+12:22:56 flow notifications-on
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow notifications-on
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.menu... COMPLETED
+Tap on id: agents.menu.settings... COMPLETED
+Assert that id: settings.notifications.all is visible... COMPLETED
+Tap on id: settings.notifications.all... COMPLETED
+Assert that id: settings.phone.name is visible... COMPLETED
+12:23:12 ok   notifications
+12:23:12 skip banner: iOS shows the system's own notification (the scenario push)
+12:23:12 scenario push (AC-129): the daemon's own notification on the simulator: a tap opens the agent, Allow unblocks it
+12:23:12 flow home
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow home
+Press Home key... COMPLETED
+12:23:19 flow notification-open
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow notification-open
+Assert that "Needs your permission" is visible... COMPLETED
+Take screenshot notification... COMPLETED
+Tap on "Needs your permission"... COMPLETED
+Assert that id: agent.permission.allow is visible... COMPLETED
+12:23:39 flow home
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow home
+Press Home key... COMPLETED
+12:23:47 flow notification-allow
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow notification-allow
+Assert that "Needs your permission" is visible... COMPLETED
+Take screenshot notification-before-allow... COMPLETED
+Long press on "Needs your permission"... COMPLETED
+Wait for animation to end within 3000 ms... COMPLETED
+Take screenshot notification-actions... COMPLETED
+Tap on point (40%,21%)... COMPLETED
+12:24:08 ok   push
+12:24:08 scenario stop-all (AC-125, AC-130): Stop all agents names how many will stop, asks once, and stops them
+12:24:09 flow stop-all
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow stop-all
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that (Optional) id: notification.banner.dismiss is visible... WARNED
+Run flow when id: notification.banner.dismiss is visible...
+Run flow when id: notification.banner.dismiss is visible... SKIPPED
+Tap on id: agents.menu... COMPLETED
+Assert that id: agents.menu.stop is visible... COMPLETED
+Tap on id: agents.menu.stop... COMPLETED
+Assert that id: agents.stop.confirm is visible... COMPLETED
+Take screenshot stop-all-asks-once... COMPLETED
+Tap on id: agents.stop.confirm... COMPLETED
+12:24:45 ok   stop-all
+12:24:45 scenario update (AC-141): a new build installed over the old one keeps the pairing: the app opens on the agents list
+12:24:46 flow opened
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow opened
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: pair.code is not visible... COMPLETED
+Assert that id: pair.submit is not visible... COMPLETED
+12:24:55 ok   update
+12:24:55 scenario reopen (AC-141, AC-130): opened five times, the app never asks to pair, sign in or unlock
+12:24:55 flow opened
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow opened
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: pair.code is not visible... COMPLETED
+Assert that id: pair.submit is not visible... COMPLETED
+12:25:06 flow opened
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow opened
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: pair.code is not visible... COMPLETED
+Assert that id: pair.submit is not visible... COMPLETED
+12:25:17 flow opened
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow opened
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: pair.code is not visible... COMPLETED
+Assert that id: pair.submit is not visible... COMPLETED
+12:25:28 flow opened
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow opened
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: pair.code is not visible... COMPLETED
+Assert that id: pair.submit is not visible... COMPLETED
+12:25:38 flow opened
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow opened
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: pair.code is not visible... COMPLETED
+Assert that id: pair.submit is not visible... COMPLETED
+12:25:49 ok   reopen
+12:25:49 scenario restart (AC-141): the phone restarted: the app opens on the agents list with no prompt and connects by itself
+12:25:56 flow opened
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow opened
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: pair.code is not visible... COMPLETED
+Assert that id: pair.submit is not visible... COMPLETED
+12:26:21 ok   restart
+12:26:21 scenario off-and-on (AC-116, AC-121): phone access turned off on the Mac and on again: the app says so and comes back by itself
+12:26:21 flow off
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow off
+Assert that id: connection.off is visible... COMPLETED
+Scrolling DOWN until id: agents.row.${SHOWCASE} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+Scrolling DOWN until id: agents.row.${SHOWCASE} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled... COMPLETED
+12:26:33 flow on
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow on
+Assert that id: connection.off is not visible... COMPLETED
+Assert that id: connection.unreachable is not visible... COMPLETED
+Assert that id: pair.code is not visible... COMPLETED
+Scrolling DOWN until id: agents.row.${SHOWCASE} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+Scrolling DOWN until id: agents.row.${SHOWCASE} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled... COMPLETED
+12:26:44 ok   off-and-on
+12:26:44 scenario queued (AC-122, AC-121): a message typed while phone access is off is kept, shown, and sent once when it is on again
+12:26:45 flow send-offline
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow send-offline
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: connection.off|connection.unreachable is visible... COMPLETED
+Run open-agent.yaml...
+  Repeat while id: agent.screen is not visible (up to 3 times)...
+    Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+    Scrolling UP until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+    Tap on (Optional) id: agents.row.${RUN}... COMPLETED
+    Assert that (Optional) id: agent.screen is visible... COMPLETED
+  Repeat while id: agent.screen is not visible (up to 3 times)... COMPLETED
+  Assert that id: agent.screen is visible... COMPLETED
+Run open-agent.yaml... COMPLETED
+Assert that id: agent.composer.text is visible... COMPLETED
+Tap on id: agent.composer.text... COMPLETED
+Input text ${MESSAGE}... COMPLETED
+Tap on id: agent.composer.send... COMPLETED
+Assert that ".*${MESSAGE}.*" is visible... COMPLETED
+Take screenshot queued-while-away... COMPLETED
+12:27:23 ok   queued
+12:27:23 scenario unreachable (AC-123, AC-116, AC-121): the Mac gone without a word: the app says unreachable with the last contact, and comes back by itself
+12:27:23 flow unreachable
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow unreachable
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: connection.unreachable is visible... COMPLETED
+Assert that ".*last contact.*" is visible... COMPLETED
+Scrolling DOWN until id: agents.row.${SHOWCASE} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled... COMPLETED
+Scrolling UP until id: agents.row.${SHOWCASE} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled... COMPLETED
+Take screenshot mac-unreachable... COMPLETED
+12:27:35 flow reachable
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow reachable
+Assert that id: connection.unreachable is not visible... COMPLETED
+Assert that id: pair.code is not visible... COMPLETED
+12:27:44 ok   unreachable
+12:27:44 scenario manual-address (AC-120): the Mac answers somewhere else: an address typed by the owner connects, with no pairing again
+12:27:45 flow manual-address
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow manual-address
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.menu... COMPLETED
+Tap on id: agents.menu.settings... COMPLETED
+Scrolling DOWN until id: settings.mac.address.add is visible with speed 40, visibility percentage 100%, timeout 30000 ms, with centering disabled... COMPLETED
+Tap on id: settings.mac.address... COMPLETED
+Input text ${ADDRESS}... COMPLETED
+Press Enter key... COMPLETED
+Scrolling UP until id: settings.mac.address.0 is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled... COMPLETED
+Take screenshot manual-address... COMPLETED
+12:28:07 ok   manual-address
+12:28:07 scenario away (AC-121): five minutes in the background while an agent writes numbered lines, the daemon restarted in the middle: every event once, in order
+12:28:08 flow away-start
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow away-start
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Run open-agent.yaml...
+  Repeat while id: agent.screen is not visible (up to 3 times)...
+    Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+    Scrolling UP until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+    Tap on (Optional) id: agents.row.${RUN}... COMPLETED
+    Assert that (Optional) id: agent.screen is visible... COMPLETED
+  Repeat while id: agent.screen is not visible (up to 3 times)... COMPLETED
+  Assert that id: agent.screen is visible... COMPLETED
+Run open-agent.yaml... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Take screenshot stream-before-leaving... COMPLETED
+Press Home key... COMPLETED
+12:28:38   the app is in the background for 5 minutes; the daemon restarts half way
+12:33:41 flow away-return
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow away-return
+Launch app "${APP}" without stopping app... COMPLETED
+Take screenshot stream-on-return... COMPLETED
+Assert that id: agent.list|agents.screen is visible... COMPLETED
+Assert that id: pair.code is not visible... COMPLETED
+12:33:58   the Mac's newest event is 3664; the phone received 2517 events up to 3664, gaps 0, duplicates 0, reloads 0
+12:33:58 ok   away
+12:33:58 scenario tour (AC-131): every screen in both themes, at the smallest and the largest text size; the theme changed with the app open
+12:34:00 flow tour
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Take screenshot agents... COMPLETED
+Scrolling DOWN until id: agents.row.${SHOWCASE} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+Scrolling DOWN until id: agents.row.${SHOWCASE} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled... COMPLETED
+Run open-agent.yaml...
+  Repeat while id: agent.screen is not visible (up to 3 times)...
+    Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+    Scrolling UP until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+    Tap on (Optional) id: agents.row.${RUN}... COMPLETED
+    Assert that (Optional) id: agent.screen is visible... COMPLETED
+  Repeat while id: agent.screen is not visible (up to 3 times)... COMPLETED
+  Assert that id: agent.screen is visible... COMPLETED
+Run open-agent.yaml... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Take screenshot conversation... COMPLETED
+Tap on id: agent.changes... COMPLETED
+Assert that id: changes.comparison is visible... COMPLETED
+Tap on id: changes.comparison... COMPLETED
+Tap on id: changes.comparison.menu.task_start... COMPLETED
+Assert that id: changes.row.${FILE} is visible... COMPLETED
+Take screenshot changes... COMPLETED
+Tap on id: changes.row.${FILE}... COMPLETED
+Assert that id: file.list is visible... COMPLETED
+Take screenshot file... COMPLETED
+Tap on id: file.back... COMPLETED
+Assert that id: changes.screen is visible... COMPLETED
+Tap on id: changes.back... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Tap on id: agent.more... COMPLETED
+Tap on id: agent.more.merge... COMPLETED
+Assert that id: merge.screen is visible... COMPLETED
+Take screenshot merge-back... COMPLETED
+Tap on id: merge.back... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Tap on id: agent.more... COMPLETED
+Tap on id: agent.more.pr... COMPLETED
+Assert that id: pr.screen is visible... COMPLETED
+Take screenshot pull-request... COMPLETED
+Tap on id: pr.back... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Tap on id: agent.back... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.new... COMPLETED
+Assert that id: new.task is visible... COMPLETED
+Take screenshot new-agent... COMPLETED
+Tap on id: new.back... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.menu... COMPLETED
+Take screenshot agents-menu... COMPLETED
+Tap on id: agents.menu.accounts... COMPLETED
+Assert that id: accounts.screen is visible... COMPLETED
+Take screenshot accounts... COMPLETED
+Tap on id: accounts.back... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.menu... COMPLETED
+Tap on id: agents.menu.settings... COMPLETED
+Assert that id: settings.screen is visible... COMPLETED
+Take screenshot settings... COMPLETED
+Tap on id: settings.back... COMPLETED
+12:34:48 flow tour
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Take screenshot agents... COMPLETED
+Scrolling DOWN until id: agents.row.${SHOWCASE} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+Scrolling DOWN until id: agents.row.${SHOWCASE} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled... COMPLETED
+Run open-agent.yaml...
+  Repeat while id: agent.screen is not visible (up to 3 times)...
+    Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+    Scrolling UP until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+    Tap on (Optional) id: agents.row.${RUN}... COMPLETED
+    Assert that (Optional) id: agent.screen is visible... COMPLETED
+  Repeat while id: agent.screen is not visible (up to 3 times)... COMPLETED
+  Assert that id: agent.screen is visible... COMPLETED
+Run open-agent.yaml... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Take screenshot conversation... COMPLETED
+Tap on id: agent.changes... COMPLETED
+Assert that id: changes.comparison is visible... COMPLETED
+Tap on id: changes.comparison... COMPLETED
+Tap on id: changes.comparison.menu.task_start... COMPLETED
+Assert that id: changes.row.${FILE} is visible... COMPLETED
+Take screenshot changes... COMPLETED
+Tap on id: changes.row.${FILE}... COMPLETED
+Assert that id: file.list is visible... COMPLETED
+Take screenshot file... COMPLETED
+Tap on id: file.back... COMPLETED
+Assert that id: changes.screen is visible... COMPLETED
+Tap on id: changes.back... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Tap on id: agent.more... COMPLETED
+Tap on id: agent.more.merge... COMPLETED
+Assert that id: merge.screen is visible... COMPLETED
+Take screenshot merge-back... COMPLETED
+Tap on id: merge.back... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Tap on id: agent.more... COMPLETED
+Tap on id: agent.more.pr... COMPLETED
+Assert that id: pr.screen is visible... COMPLETED
+Take screenshot pull-request... COMPLETED
+Tap on id: pr.back... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Tap on id: agent.back... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.new... COMPLETED
+Assert that id: new.task is visible... COMPLETED
+Take screenshot new-agent... COMPLETED
+Tap on id: new.back... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.menu... COMPLETED
+Take screenshot agents-menu... COMPLETED
+Tap on id: agents.menu.accounts... COMPLETED
+Assert that id: accounts.screen is visible... COMPLETED
+Take screenshot accounts... COMPLETED
+Tap on id: accounts.back... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.menu... COMPLETED
+Tap on id: agents.menu.settings... COMPLETED
+Assert that id: settings.screen is visible... COMPLETED
+Take screenshot settings... COMPLETED
+Tap on id: settings.back... COMPLETED
+12:35:34 flow tour
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Take screenshot agents... COMPLETED
+Scrolling DOWN until id: agents.row.${SHOWCASE} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+Scrolling DOWN until id: agents.row.${SHOWCASE} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled... COMPLETED
+Run open-agent.yaml...
+  Repeat while id: agent.screen is not visible (up to 3 times)...
+    Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+    Scrolling UP until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+    Tap on (Optional) id: agents.row.${RUN}... COMPLETED
+    Assert that (Optional) id: agent.screen is visible... COMPLETED
+  Repeat while id: agent.screen is not visible (up to 3 times)... COMPLETED
+  Assert that id: agent.screen is visible... COMPLETED
+Run open-agent.yaml... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Take screenshot conversation... COMPLETED
+Tap on id: agent.changes... COMPLETED
+Assert that id: changes.comparison is visible... COMPLETED
+Tap on id: changes.comparison... COMPLETED
+Tap on id: changes.comparison.menu.task_start... COMPLETED
+Assert that id: changes.row.${FILE} is visible... COMPLETED
+Take screenshot changes... COMPLETED
+Tap on id: changes.row.${FILE}... COMPLETED
+Assert that id: file.list is visible... COMPLETED
+Take screenshot file... COMPLETED
+Tap on id: file.back... COMPLETED
+Assert that id: changes.screen is visible... COMPLETED
+Tap on id: changes.back... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Tap on id: agent.more... COMPLETED
+Tap on id: agent.more.merge... COMPLETED
+Assert that id: merge.screen is visible... COMPLETED
+Take screenshot merge-back... COMPLETED
+Tap on id: merge.back... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Tap on id: agent.more... COMPLETED
+Tap on id: agent.more.pr... COMPLETED
+Assert that id: pr.screen is visible... COMPLETED
+Take screenshot pull-request... COMPLETED
+Tap on id: pr.back... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Tap on id: agent.back... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.new... COMPLETED
+Assert that id: new.task is visible... COMPLETED
+Take screenshot new-agent... COMPLETED
+Tap on id: new.back... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.menu... COMPLETED
+Take screenshot agents-menu... COMPLETED
+Tap on id: agents.menu.accounts... COMPLETED
+Assert that id: accounts.screen is visible... COMPLETED
+Take screenshot accounts... COMPLETED
+Tap on id: accounts.back... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.menu... COMPLETED
+Tap on id: agents.menu.settings... COMPLETED
+Assert that id: settings.screen is visible... COMPLETED
+Take screenshot settings... COMPLETED
+Tap on id: settings.back... COMPLETED
+12:36:22 flow tour
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Take screenshot agents... COMPLETED
+Scrolling DOWN until id: agents.row.${SHOWCASE} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+Scrolling DOWN until id: agents.row.${SHOWCASE} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled... COMPLETED
+Run open-agent.yaml...
+  Repeat while id: agent.screen is not visible (up to 3 times)...
+    Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+    Scrolling UP until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+    Tap on (Optional) id: agents.row.${RUN}... COMPLETED
+    Assert that (Optional) id: agent.screen is visible... COMPLETED
+  Repeat while id: agent.screen is not visible (up to 3 times)... COMPLETED
+  Assert that id: agent.screen is visible... COMPLETED
+Run open-agent.yaml... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Take screenshot conversation... COMPLETED
+Tap on id: agent.changes... COMPLETED
+Assert that id: changes.comparison is visible... COMPLETED
+Tap on id: changes.comparison... COMPLETED
+Tap on id: changes.comparison.menu.task_start... COMPLETED
+Assert that id: changes.row.${FILE} is visible... COMPLETED
+Take screenshot changes... COMPLETED
+Tap on id: changes.row.${FILE}... COMPLETED
+Assert that id: file.list is visible... COMPLETED
+Take screenshot file... COMPLETED
+Tap on id: file.back... COMPLETED
+Assert that id: changes.screen is visible... COMPLETED
+Tap on id: changes.back... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Tap on id: agent.more... COMPLETED
+Tap on id: agent.more.merge... COMPLETED
+Assert that id: merge.screen is visible... COMPLETED
+Take screenshot merge-back... COMPLETED
+Tap on id: merge.back... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Tap on id: agent.more... COMPLETED
+Tap on id: agent.more.pr... COMPLETED
+Assert that id: pr.screen is visible... COMPLETED
+Take screenshot pull-request... COMPLETED
+Tap on id: pr.back... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Tap on id: agent.back... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.new... COMPLETED
+Assert that id: new.task is visible... COMPLETED
+Take screenshot new-agent... COMPLETED
+Tap on id: new.back... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.menu... COMPLETED
+Take screenshot agents-menu... COMPLETED
+Tap on id: agents.menu.accounts... COMPLETED
+Assert that id: accounts.screen is visible... COMPLETED
+Take screenshot accounts... COMPLETED
+Tap on id: accounts.back... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Tap on id: agents.menu... COMPLETED
+Tap on id: agents.menu.settings... COMPLETED
+Assert that id: settings.screen is visible... COMPLETED
+Take screenshot settings... COMPLETED
+Tap on id: settings.back... COMPLETED
+12:37:07 flow opened
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow opened
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: pair.code is not visible... COMPLETED
+Assert that id: pair.submit is not visible... COMPLETED
+12:37:24 ok   tour
+12:37:24 scenario busy (AC-135, AC-137): an animation drops no frame while the logic is held for 500 ms
+12:37:24 flow busy
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow busy
+Open overseer://perf... COMPLETED
+Assert that id: perf.busy is visible... COMPLETED
+Tap on id: perf.busy... COMPLETED
+Assert that ".*droppedPercent.*" is visible... COMPLETED
+Tap on id: perf.back... COMPLETED
+12:37:45   frames 53, dropped 0 (0%), longest 16.7 ms, frame time 16.7 ms
+12:37:45 ok   busy
+12:37:45 scenario watch-only (AC-119): made watch only on the Mac, the phone shows everything and no control that changes something
+12:37:45 flow watch
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow watch
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: agents.new is not visible... COMPLETED
+Run open-agent.yaml...
+  Repeat while id: agent.screen is not visible (up to 3 times)...
+    Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+    Scrolling UP until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+    Tap on (Optional) id: agents.row.${RUN}... COMPLETED
+    Assert that (Optional) id: agent.screen is visible... COMPLETED
+  Repeat while id: agent.screen is not visible (up to 3 times)... COMPLETED
+  Assert that id: agent.screen is visible... COMPLETED
+Run open-agent.yaml... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Assert that id: watch.line is visible... COMPLETED
+Assert that id: agent.composer.text is not visible... COMPLETED
+Assert that id: agent.composer.send is not visible... COMPLETED
+12:38:06 flow full
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow full
+Assert that id: agent.composer.text is visible... COMPLETED
+Assert that id: watch.line is not visible... COMPLETED
+Tap on id: agent.back... COMPLETED
+Assert that id: agents.new is visible... COMPLETED
+12:38:15 ok   watch-only
+Measuring on ios (E6105FAE-0651-4D7B-801A-40FF49980468), 20 cold starts, 2026-09-28T12:38:15.687Z
+Load average (1, 5, 15 min) at the start: 5.6 5.0 5.9
+Cold starts with the door and without it (turned off by the test setting), in turn; the door opens in 1000 ms:
+  warm-up launch (not counted): first screen 203.1 ms, interactive 205.6 ms, door shown 203.1 ms, opening 1016.1 ms, dropped 0
+  launch 1 with the door: first screen 210 ms, interactive 212.7 ms, door shown 210.1 ms, opening 1026.2 ms, dropped 0
+  launch 1 without the door: first screen 205.4 ms, interactive 205.9 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 2 with the door: first screen 208.3 ms, interactive 210.9 ms, door shown 208.3 ms, opening 1030 ms, dropped 0
+  launch 2 without the door: first screen 205.5 ms, interactive 206.4 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 3 with the door: first screen 212.5 ms, interactive 215.2 ms, door shown 212.6 ms, opening 1027.7 ms, dropped 0
+  launch 3 without the door: first screen 205.4 ms, interactive 206 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 4 with the door: first screen 216.4 ms, interactive 218 ms, door shown 216.3 ms, opening 1008.2 ms, dropped 0
+  launch 4 without the door: first screen 229.7 ms, interactive 230.9 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 5 with the door: first screen 222 ms, interactive 223.6 ms, door shown 221.9 ms, opening 1009.9 ms, dropped 0
+  launch 5 without the door: first screen 208.4 ms, interactive 209.5 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 6 with the door: first screen 208.6 ms, interactive 211.3 ms, door shown 208.7 ms, opening 1027.7 ms, dropped 0
+  launch 6 without the door: first screen 206.7 ms, interactive 207.7 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 7 with the door: first screen 217.5 ms, interactive 219 ms, door shown 217.4 ms, opening 1006.9 ms, dropped 0
+  launch 7 without the door: first screen 204 ms, interactive 204.6 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 8 with the door: first screen 218.6 ms, interactive 220.1 ms, door shown 218.5 ms, opening 1008.6 ms, dropped 0
+  launch 8 without the door: first screen 206.3 ms, interactive 207.3 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 9 with the door: first screen 217.9 ms, interactive 219.4 ms, door shown 217.8 ms, opening 1012.4 ms, dropped 0
+  launch 9 without the door: first screen 207.7 ms, interactive 208.7 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 10 with the door: first screen 221 ms, interactive 222.7 ms, door shown 220.9 ms, opening 1003.5 ms, dropped 0
+  launch 10 without the door: first screen 206.8 ms, interactive 207.8 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 11 with the door: first screen 215.9 ms, interactive 217.5 ms, door shown 215.8 ms, opening 1003 ms, dropped 0
+  launch 11 without the door: first screen 203.8 ms, interactive 204.4 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 12 with the door: first screen 215.8 ms, interactive 217.4 ms, door shown 215.7 ms, opening 1005.6 ms, dropped 0
+  launch 12 without the door: first screen 202.6 ms, interactive 203.1 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 13 with the door: first screen 214.6 ms, interactive 216.1 ms, door shown 214.4 ms, opening 1008.9 ms, dropped 0
+  launch 13 without the door: first screen 204.5 ms, interactive 205.1 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 14 with the door: first screen 217 ms, interactive 218.5 ms, door shown 216.8 ms, opening 1009.1 ms, dropped 0
+  launch 14 without the door: first screen 206.3 ms, interactive 207.2 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 15 with the door: first screen 214.8 ms, interactive 216.3 ms, door shown 214.7 ms, opening 1002.3 ms, dropped 0
+  launch 15 without the door: first screen 202.5 ms, interactive 203 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 16 with the door: first screen 206.8 ms, interactive 209.4 ms, door shown 206.9 ms, opening 1024.6 ms, dropped 0
+  launch 16 without the door: first screen 202.6 ms, interactive 203.1 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 17 with the door: first screen 224.6 ms, interactive 226.1 ms, door shown 224.4 ms, opening 1002 ms, dropped 0
+  launch 17 without the door: first screen 203.2 ms, interactive 204.2 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 18 with the door: first screen 208.2 ms, interactive 210.7 ms, door shown 208.2 ms, opening 1027.8 ms, dropped 0
+  launch 18 without the door: first screen 204.3 ms, interactive 205.3 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 19 with the door: first screen 207.1 ms, interactive 209.8 ms, door shown 207.2 ms, opening 1027 ms, dropped 0
+  launch 19 without the door: first screen 202.6 ms, interactive 203.6 ms, door shown NaN ms, opening NaN ms, dropped n/a
+  launch 20 with the door: first screen 206.5 ms, interactive 208.9 ms, door shown 206.6 ms, opening 1021.7 ms, dropped 0
+  launch 20 without the door: first screen 202.5 ms, interactive 203.1 ms, door shown NaN ms, opening NaN ms, dropped n/a
+Load average (1, 5, 15 min) at the end: 2.0 3.7 5.2
+
+ok   every launch reaches the agents list: 20 (limit 20)
+ok   launches that showed pairing or any other question, of 40: 0 (limit 0)
+ok   agents list interactive, p95 (ms): 223.6 (limit 1000)
+ok   agents list interactive against the baseline, p95 (ms): 223.6 (limit 251.7) — baseline 228.8 ms + 10%
+ok   the door is on screen with the first screen or before it, worst launch (ms after the first screen): 0.1 (limit 17) — 20 of 20 launches marked both
+ok   the door opens in 1000 ms within 60 ms, shortest (ms): 1002 (limit 940)
+ok   the door opens in 1000 ms within 60 ms, longest (ms): 1030 (limit 1060)
+ok   frames dropped while the door opens, worst launch (%): 0 (limit 1) — 0 of 57 frames
+ok   the door makes the first screen no later, median (ms): 216.3 (limit 245.8) — without the door 205.3 ms
+12:41:34 ok   budgets
+12:41:34 scenario revoke (AC-119): removed on the Mac, the phone is back on pairing and holds nothing of the Mac
+12:41:34 flow revoked
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow revoked
+Launch app "${APP}" without stopping app... COMPLETED
+Assert that id: pair.code is visible... COMPLETED
+Assert that id: agents.list is not visible... COMPLETED
+12:41:44 storage after the revoke: overseer.counter, perf.busy, perf.delay, perf.last, perf.launches, perf.scroll, perf.stream, settings.appLock, settings.unlockBeforeChanges, test.door
+12:41:44 ok   revoke

@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **148 / 215** · **46** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-121, AC-122, AC-124, AC-125, AC-126, AC-128, AC-129, AC-130, AC-131, AC-132, AC-133, AC-135, AC-136, AC-137, AC-141, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-182, AC-183, AC-185, AC-186, AC-187, AC-188, AC-189, AC-190, AC-191, AC-192, AC-193, AC-194, AC-195, AC-196, AC-197, AC-198, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-206, AC-207, AC-208, AC-209, AC-210, AC-211, AC-213, AC-214, AC-215. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+criteria: **162 / 215** · **37** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-128, AC-129, AC-133, AC-135, AC-136, AC-137, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-182, AC-183, AC-185, AC-186, AC-187, AC-188, AC-189, AC-190, AC-191, AC-192, AC-193, AC-194, AC-195, AC-196, AC-197, AC-198, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-210, AC-213, AC-214, AC-215. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), Voice Mode (Gate R, AC-162 to AC-177, added by the owner on 2026-09-27: a voice to talk to constantly that redirects every agent from context, answers quickly and shows every word it sent, with audio collected on the Rust side and the animated mark in the middle moving with the voice; [design](docs/rfcs/voice-mode.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -15,6 +15,8 @@ which is out of scope for now. The full list is under [Acceptance criteria](#acc
 
 Only the owner can do these (AC-160). Each is one step; the criterion it unblocks is in brackets. The everything goal (`docs/goals/everything.md`) keeps this list current.
 
+- **Before the 11:00 phone test: fix the TestFlight signing password.** The first Actions build (run 36442588449) stopped at signing because `IOS_DIST_CERT_PASSWORD` does not open `IOS_DIST_CERT_P12`. In Keychain Access (login, My Certificates), export *Apple Distribution: STATION 42 INTERACTIVE L.L.C.* as `dist.p12` with a simple letters-and-digits password. Then run `gh secret set IOS_DIST_CERT_P12 --repo beelol/overseer < <(base64 -i ~/Downloads/dist.p12)` and `gh secret set IOS_DIST_CERT_PASSWORD --repo beelol/overseer --body '<that password>'`, and tell the TestFlight agent "re-set" (it reruns and watches the upload) [the phone's first TestFlight build from main, for the pairing test of AC-141].
+- **For the phone test: say yes to installing the current Overseer in your VS Code.** Your installed extension is from 26 September, before the phone feature. It is installed through the dev daemons feature's deploy (or its manual path from a clean clone), and your data and logins are kept [AC-214, Gate N].
 - Try the Gate K build in your own VS Code [AC-114].
 - Say whether the Gate J design review still needs marks or the Gate K review replaces it [AC-66].
 - Work an hour using only Overseer [AC-64].
@@ -154,33 +156,33 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-112** Search you can see — [evidence](docs/verification/AC-112.md)
 - [x] **AC-113** No empty grid — [evidence](docs/verification/AC-113.md)
 - [ ] **AC-114** Gate K in the owner's VS Code (owner-confirmed) — not started (Gate K follow-up from the owner's marks) — [evidence](docs/verification/AC-114.md)
-- [ ] **AC-115** Feasibility and reuse before lock-in — ◐ partial: on both simulators in release builds the app itself, with its own record of each launch (the door shown, the first screen, the opening timed and its frames counted on the UI thread); the encrypted session (Noise IK) between the Rust daemon and the app, resumed after the app was in the background and after the daemon was killed; the shared test vectors passing in the daemon, in the app's library and in the extension's reference phone; the daemon's exact notification payload delivered with `xcrun simctl push` and shown by the iOS simulator; Happy inspected at a recorded revision and the decision written down / deferred: the baselines of the door and the conversation on both simulators (the measurement of 20 cold starts did not run in this session: it runs after every scenario passes, and scenarios failed); the owner's iPhone: the same measured against the speed budget, then the stack decision with its reasons; Bonjour with the local network permission and a real push through Apple's service (steps for the owner in the phone remote RFC) — [evidence](docs/verification/AC-115.md)
+- [ ] **AC-115** Feasibility and reuse before lock-in — ◐ partial: on both simulators in release builds, 20 cold starts each with the door and 20 without, recorded by the app itself (the door shown, the first screen, the opening timed and its frames counted on the UI thread) and the baselines written; the encrypted session (Noise IK) between the Rust daemon and the app, resumed on both after five minutes in the background with the daemon restarted half way; the shared test vectors passing in the daemon, in the app's library and in the extension's reference phone; the daemon's exact notification payload delivered to the iOS simulator by the daemon itself, tapped, and Allow on it; Happy inspected at a recorded revision and the decision written down / deferred: the owner's iPhone: the same measured against the speed budget, then the stack decision with its reasons; Bonjour with the local network permission and a real push through Apple's service (steps for the owner in the phone remote RFC) — [evidence](docs/verification/AC-115.md)
 - [x] **AC-116** A gateway switched on and off on the desktop — [evidence](docs/verification/AC-116.md)
 - [ ] **AC-117** Pairing needs the Mac — ◐ partial: protocol tests for every refusal and the lockout; the code and the confirmation in VS Code and the terminal, in screenshots; the simulator and the emulator pair by typing the code, and the Mac confirms / deferred: the owner's iPhone pairs by scanning the QR code (the camera is unsupported on simulators) — [evidence](docs/verification/AC-117.md)
 - [x] **AC-118** Encrypted and mutually authenticated — [evidence](docs/verification/AC-118.md)
 - [x] **AC-119** Devices, scopes and revoking — [evidence](docs/verification/AC-119.md)
 - [ ] **AC-120** Found on the network — ◐ partial: the daemon advertises `_overseer._tcp` with its key's fingerprint while phone access is on and withdraws it when off; an impostor with the same name and another key is refused by the handshake; both simulators connect through a typed address, with no pairing again, after the Mac moved to another port / deferred: the owner's iPhone: Bonjour browsing in the app (unsupported on both platforms in this build), the local network permission explained before the system asks and the denied state, the Mac's address changing on a real network — [evidence](docs/verification/AC-120.md)
-- [ ] **AC-121** Never lose the session — ◐ partial: the protocol tests at 100 random cuts and the daemon killed mid-stream; on the iOS simulator five minutes in the background with the daemon restarted half way: 2,583 events, no gap, no duplicate; the cached state marked with its age and the reconnecting and unreachable states in screenshots / deferred: the same scenario on the Android emulator: the run's log was overwritten before it was committed; the app did not reconnect within two minutes after the daemon was killed in the `unreachable` scenario (it did after a longer wait), which the takeover branch is looking at — [evidence](docs/verification/AC-121.md)
-- [ ] **AC-122** Sent exactly once — ◐ partial: every protocol test (three at once, a cut before the reply, lost while sending, outcomes across a restart and 25 hours, an interrupted request); on the iOS simulator a message sent once and recorded as the phone's / deferred: the phone scenario that sends with the network off: it failed on the iOS simulator (the composer did not show within 30 s while the app was unreachable) and the Android run that passed it lost its log — [evidence](docs/verification/AC-122.md)
+- [x] **AC-121** Never lose the session — [evidence](docs/verification/AC-121.md)
+- [x] **AC-122** Sent exactly once — [evidence](docs/verification/AC-122.md)
 - [x] **AC-123** The Mac stays awake while it matters — [evidence](docs/verification/AC-123.md)
-- [ ] **AC-124** See every agent — ◐ partial: the phone's list equals the daemon's state and VS Code's side bar over the nine-agent recording; each conversation equals VS Code's chat model row for row; live agents and conversations on the iOS simulator in both themes / deferred: the delay from a printed line to the rendered line as a figure (the app records it, the run does not yet assert it); the Android screenshots (the run's log was overwritten); the tour of every screen (it failed on iOS because the agent it chose had no changes left) — [evidence](docs/verification/AC-124.md)
-- [ ] **AC-125** Control every agent — ◐ partial: the race of two answers settled by the daemon 100 times; launch records equal; on the iOS simulator a message sent once, a new agent started and recorded as the phone's, a permission allowed from the phone (the fixture went on; the flow's last step failed) / deferred: Stop all on the simulators (the scenario's two agents did not both stay going); one tiny live turn each on Claude Code and Codex from the phone; an image reaching the Claude fixture, checked on a device — [evidence](docs/verification/AC-125.md)
-- [ ] **AC-126** Review on the phone — ◐ partial: the daemon's file, diff and hunk methods with their refusals; marks made on each surface seen on the other; on the iOS simulator Accept from the phone (the Mac's mark names the phone) and Reject (asked once, one hunk fewer in the worktree, recorded as the phone's) / deferred: scrolling a 10,000-file repository on a device with frames counted; the rendered diff compared line for line with `git diff` on a device; the Android run — [evidence](docs/verification/AC-126.md)
+- [x] **AC-124** See every agent — [evidence](docs/verification/AC-124.md)
+- [x] **AC-125** Control every agent — [evidence](docs/verification/AC-125.md)
+- [x] **AC-126** Review on the phone — [evidence](docs/verification/AC-126.md)
 - [x] **AC-127** Everything else Overseer has — [evidence](docs/verification/AC-127.md)
 - [ ] **AC-128** Talk to Overseer from the phone — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-128.md)
-- [ ] **AC-129** Needs-you notifications you can switch — ◐ partial: on the iOS simulator: the daemon's exact payload, sent by the daemon itself with `xcrun simctl push`, shows the notification with the app's icon, title and body; the payload holds only the allowed fields; each switch off (phone, kind, the Mac) sends nothing and the log says why; a focused VS Code window suppresses the push; the switches on the phone reach the Mac / deferred: a tap on the notification opening the agent and Allow on it unblocking the fixture, exercised on the simulator (the daemon-side test covers Allow from the notification's fields; Maestro cannot see the system's banner, so this is done by hand next); Android's own banner (its run's log was lost); the owner's locked iPhone through Apple's service within 5 s, and on another network — [evidence](docs/verification/AC-129.md)
-- [ ] **AC-130** Safe without friction — ◐ partial: zero prompts across reopening and an update installed over the app on the iOS simulator; every confirmation and both safety settings against the fakes; the security review with its three findings fixed; the fuzz run / deferred: the forty measured launches (the measurement did not run because scenarios failed), Stop all and Reject asked once on a device (Stop all's scenario failed for a fixture reason, Reject passed on iOS), and an attempt to read the key from an app backup, which needs a device — [evidence](docs/verification/AC-130.md)
-- [ ] **AC-131** One app, iOS and Android, that looks like Overseer — ◐ partial: one source for the tokens with a check that fails on a difference; the lint that fails on a value written by hand, proven with seeded values; 84 text pairs per theme at or above 4.5 to 1; every control of every screen labelled (75); the conventions listed per platform; the iOS simulator's screens in both themes / deferred: the screenshots of every screen at the smallest and largest text size on both platforms and the theme switched with the app open (the tour scenario failed on iOS and the Android log was lost); the side-by-side images with VS Code — [evidence](docs/verification/AC-131.md)
-- [ ] **AC-132** Regression coverage for the phone — ◐ partial: the gateway's protocol tests in `cargo test`; one command that runs the phone's scenarios on both simulators against a real daemon and checks the budgets; the daemon suites and the packaged-UI scenarios run with phone access off and on / deferred: a green run of every scenario on both simulators; the run's log from a clean clone; the packaged-UI scenarios keyboard, perf, restore and files, which fail on this branch in a quiet rerun and pass on the takeover branch according to its session; the two Rust timing tests that fail only under load — [evidence](docs/verification/AC-132.md)
+- [ ] **AC-129** Needs-you notifications you can switch — ◐ partial: on the iOS simulator: the daemon's exact payload, sent by the daemon itself to the simulator, shows the notification with the app's icon, title and body; a tap on it opens the agent; Allow on it unblocks the fixture; on the Android emulator the app's own banner while the app is open; the payload holds only the allowed fields; each switch off (phone, kind, the Mac) sends nothing and the log says why; a focused VS Code window suppresses the push; a switch changed on the phone reaches the Mac, kept and sent again until the Mac answers / deferred: the owner's locked iPhone through Apple's service within 5 s, and on another network (Overseer's own push key in the Mac's Keychain: the RFC's steps for the owner) — [evidence](docs/verification/AC-129.md)
+- [x] **AC-130** Safe without friction — [evidence](docs/verification/AC-130.md)
+- [x] **AC-131** One app, iOS and Android, that looks like Overseer — [evidence](docs/verification/AC-131.md)
+- [x] **AC-132** Regression coverage for the phone — [evidence](docs/verification/AC-132.md)
 - [ ] **AC-133** Phone session (owner-confirmed) — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-133.md)
 - [x] **AC-134** Platform behaviour behind generic interfaces — [evidence](docs/verification/AC-134.md)
-- [ ] **AC-135** Hyper fast — ◐ partial: release builds on both simulators run the scenarios; the app records every launch (the door, the first screen, the opening's frames on the UI thread) and every tap's response, and leaves the record for the run; an animation dropped no frame while the app's logic was held for 500 ms on the iOS simulator (the `busy` scenario); the measurement script, its budgets and the seeded slow start exist / deferred: the measurement of 20 cold starts did not run in this session: it runs after every scenario passes, and scenarios failed; the baselines of both simulators; the seeded slow start failing the run; the owner's iPhone, where every budget is due — [evidence](docs/verification/AC-135.md)
-- [ ] **AC-136** The door — ◐ partial: on the iOS simulator: the closed door from the first frame the app draws (the same picture as the launch screen), its gradient and seam light fading in, the diagonal split with the mark splitting, in recordings of debug builds read frame by frame; one launch recorded by the app itself: the opening 629 ms, 36 frames, 0 dropped; the door waits for the first screen to settle so nothing slides in under it; no door on return from the background and a fade with Reduce Motion, by design and by the app's tests against the fakes / deferred: the 20-launch measurement on both simulators in release builds (the measurement of 20 cold starts did not run in this session: it runs after every scenario passes, and scenarios failed); the recordings of the emulator, of Reduce Motion and of the return from the background (`phone/e2e/door.mjs` is written for them); the owner's iPhone recordings; the owner's marks on the look: the review page is published (https://claude.ai/artifact/FzD5ido4NdwX3annWoY9Uq, from the recordings in `evidence/phone/door`) and the owner has been asked — [evidence](docs/verification/AC-136.md)
-- [ ] **AC-137** Motion throughout — ◐ partial: one motion system: every duration, distance, easing and spring is a token, and the lint fails on one written by hand (proven with seeded values); the door, screen transitions, arriving rows, the needs-you pulse, sheets, presses and the connection line all use it; with Reduce Motion movement becomes a fade; an animation drops no frame while the logic is held for 500 ms / deferred: a recording of each transition on both platforms with dropped frames counted per transition; the owner's marks on a review page — [evidence](docs/verification/AC-137.md)
+- [ ] **AC-135** Hyper fast — ◐ partial: release builds on both simulators: 20 cold starts with the door and 20 without, the baselines written and the last one-command run checked against them; on the iOS simulator every budget held; on the Android emulator every budget but the door's (see below); the app records every launch (the door, the first screen, the opening's frames on the UI thread) and every tap's response; an animation dropped no frame while the app's logic was held for 500 ms on both (the `busy` scenario); a seeded slow start fails the run / deferred: the owner's iPhone, where every budget is due; on the Android emulator the door drops frames in some launches: its baseline run dropped none (0 of 1,210), the last run 22 of 1,217 with one opening of 1,098 ms (limit 1,060), so the emulator did not stay within 10% of its own baseline for the door; the display budget for scrolling a 5,000-item conversation while a fixture streams into it (the simulators carry no display budget; the app counts its frames, the run does not yet assert them) — [evidence](docs/verification/AC-135.md)
+- [ ] **AC-136** The door — ◐ partial: on both simulators in release builds: the closed door from the first frame the app draws (the same picture as the launch screen), its gradient and seam light, the diagonal split with the mark splitting, in recordings read frame by frame with a full-size frame of each opening, in dark and in light, with Reduce Motion (a fade: recording it found Reanimated skipping the app's fades, now kept) and on return from the background (no door); 20 launches per platform timed by the app with the frames counted on the UI thread; the door waits for the first screen to settle so nothing slides in under it / deferred: no dropped frame on the Android emulator, shown by recordings (see below); the owner's iPhone recordings; the owner's marks on the look: the review page is published (https://claude.ai/artifact/FzD5ido4NdwX3annWoY9Uq, from the recordings in `evidence/phone/door`) and the owner has been asked; the owner asked for the same purple streak in the light theme, which this commit draws (accent laid thinly over the background) and the page shows again — [evidence](docs/verification/AC-136.md)
+- [ ] **AC-137** Motion throughout — ◐ partial: one motion system: every duration, distance, easing and spring is a token, and the lint fails on one written by hand (proven with seeded values); the door, screen transitions, arriving rows, the needs-you pulse, sheets, presses and the connection line all use it; with Reduce Motion movement becomes a fade (recorded for the door on both simulators); an animation drops no frame while the logic is held for 500 ms, on both simulators / deferred: a recording of each transition on both platforms with dropped frames counted per transition; the owner's marks on a review page — [evidence](docs/verification/AC-137.md)
 - [x] **AC-138** Permission modes carry over — [evidence](docs/verification/AC-138.md)
 - [x] **AC-139** OpenCode session transport spike — [evidence](docs/verification/AC-139.md)
 - [x] **AC-140** Memory safety guard — [evidence](docs/verification/AC-140.md)
-- [ ] **AC-141** Pair once — ◐ partial: every protocol test (20 reopens, a daemon restart, a newer state version, off and on, thirty days); on the iOS simulator: opened five times with no prompt, a new build installed over the old one, phone access off and on, the Mac's address changed (a typed address, no pairing again); the app's screens with no sign-in among them; revoking on the Mac brings the app to pairing / deferred: the daemon killed and started again: the app did not reconnect within the two minutes the scenario allowed; a phone restart (the simulator rebooted); the Android run's log — [evidence](docs/verification/AC-141.md)
+- [x] **AC-141** Pair once — [evidence](docs/verification/AC-141.md)
 - [x] **AC-142** One Overseer mark everywhere — [evidence](docs/verification/AC-142.md)
 - [x] **AC-143** Opt-in audio cues owned by the daemon — [evidence](docs/verification/AC-143.md)
 - [x] **AC-144** A lost session asks for attention — [evidence](docs/verification/AC-144.md)
@@ -245,12 +247,12 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-203** Stalled work is taken over, and handed back — [evidence](docs/verification/AC-203.md)
 - [ ] **AC-204** Finished slices merge; the rest becomes criteria — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-204.md)
 - [ ] **AC-205** Offline on a real Wi-Fi toggle (owner step) — not started — [evidence](docs/verification/AC-205.md)
-- [ ] **AC-206** One command gives a dev daemon (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-206.md)
-- [ ] **AC-207** A dev daemon never interferes with the running Overseer (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-207.md)
-- [ ] **AC-208** Production knows nothing of dev daemons (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-208.md)
-- [ ] **AC-209** VS Code and the TUI pointed at one dev daemon (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-209.md)
+- [x] **AC-206** One command gives a dev daemon (stage 2) — [evidence](docs/verification/AC-206.md)
+- [x] **AC-207** A dev daemon never interferes with the running Overseer (stage 2) — [evidence](docs/verification/AC-207.md)
+- [x] **AC-208** Production knows nothing of dev daemons (stage 2) — [evidence](docs/verification/AC-208.md)
+- [x] **AC-209** VS Code and the TUI pointed at one dev daemon (stage 2) — [evidence](docs/verification/AC-209.md)
 - [ ] **AC-210** The phone simulators pinned to a dev daemon (after pull request #10) — not started: after PR #10 (the phone app and the gateway) — [evidence](docs/verification/AC-210.md)
-- [ ] **AC-211** Agents learn it from the repository, and leave nothing running (stage 2) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-211.md)
+- [x] **AC-211** Agents learn it from the repository, and leave nothing running (stage 2) — [evidence](docs/verification/AC-211.md)
 - [x] **AC-212** Production can never point at a dev version (stage 1) — [evidence](docs/verification/AC-212.md)
 - [ ] **AC-213** The production phone app never pairs with a dev daemon (after pull request #10) — not started: after PR #10 (the phone app and the gateway) — [evidence](docs/verification/AC-213.md)
 - [ ] **AC-214** Deploy: the one path from dev to production (stage 4) — not started (Gate T, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-214.md)
@@ -310,6 +312,188 @@ and Verify clauses. Both lists are generated from the records by
   arrive together play one cue. Tracks: twelve bundled Reactor synth cues (31,488 bytes), a
   macOS system voice, or your own private Commander folder, played where it is. Playback is
   macOS only for now. See the [design](docs/rfcs/audio-mode.md).
+
+## Phone access (Gate N, in progress)
+
+A phone on the same network can see and control every agent through a gateway in the daemon. Phone
+access is off until you turn it on, and it is switched on the Mac only. A phone is paired once, by
+scanning a code the Mac shows and confirming it on the Mac; after that it reconnects by itself.
+Everything between the phone and the Mac is encrypted, and the phone talks to Overseer only.
+Design: [phone remote](docs/rfcs/phone-remote.md). Wire format: [protocol](docs/rfcs/phone-remote-protocol.md).
+
+Limits: the Mac must be on and awake. While phone access is on and an agent is active, Overseer keeps
+the Mac from idle sleep, but a closed lid on battery sleeps anyway. Away from the local network a
+phone cannot reach the Mac; that needs the relay, which is later work.
+
+What a phone can do, method by method:
+
+<!-- phone-capabilities:start -->
+161 methods: 71 available on a phone, 49 on the Mac only, 41 not yet. A *watch only* phone reads and cannot change anything. Generated by `python3 protocol/capabilities.py` from `protocol/protocol.json`.
+
+| Method | What it does | On a phone | Who |
+| --- | --- | --- | --- |
+| `account.create` | Add an account | Available | Full control |
+| `account.list` | Accounts with sign-in state and plan | Available | Every phone |
+| `account.remove` | Remove an account | Available | Full control |
+| `account.usage` | Usage and limits of one account | Available | Every phone |
+| `audio.get` | Audio Mode: on or off, the track and the cues | Available | Every phone |
+| `audio.voices` | The Mac's installed voices for System voice | Available | Every phone |
+| `comparison.options` | The comparisons a run offers | Available | Every phone |
+| `connection.check` | Check the connection now | Available | Full control |
+| `connection.status` | Online or offline, and whether Continuity is on | Available | Every phone |
+| `continuity.handoffs` | Agents moved to another provider or to local, and back | Available | Every phone |
+| `continuity.status` | Continuity's state: connection, local model, waits and handoffs | Available | Every phone |
+| `continuity.waits` | Agents waiting for a provider to come back | Available | Every phone |
+| `daemon.clients` | How many watching UIs are connected | Available | Every phone |
+| `daemon.last_notice` | The last background notice | Available | Every phone |
+| `device.notifications` | Read or change this device's notification switches and push token | Available | Every phone |
+| `events.list` | A page of events | Available | Every phone |
+| `events.subscribe` | Replay events after a cursor, then stream live events | Available | Every phone |
+| `harness.list` | Installed harnesses with versions and capabilities | Available | Every phone |
+| `hello` | Say who is connecting; returns protocol, version and, for a device, its scope | Available | Every phone |
+| `local.catalogue` | The local models Continuity may use | Available | Every phone |
+| `local.downloads` | Local model downloads in progress | Available | Every phone |
+| `local.inventory` | What is installed locally: Ollama, OpenCode, models | Available | Every phone |
+| `local.models` | Local models and whether each fits this Mac's memory | Available | Every phone |
+| `ollama.status` | Whether Ollama is installed and running | Available | Every phone |
+| `ping` | Keep the session alive; returns the daemon's time | Available | Every phone |
+| `profile.create` | Add an account profile | Available | Full control |
+| `profile.device_login` | Sign in with the provider's device code, in the phone's browser | Available | Full control |
+| `profile.list` | Account profiles | Available | Every phone |
+| `profile.logout` | Sign an account profile out | Available | Full control |
+| `profile.rename` | Rename an account profile | Available | Full control |
+| `profile.status` | Sign-in state of one account profile | Available | Every phone |
+| `repo.files` | Files of a worktree or repository, for mentions | Available | Every phone |
+| `repo.inspect` | Branches, head and status of a repository Overseer knows | Available | Every phone |
+| `repo.known` | The repositories Overseer has used | Available | Every phone |
+| `review.accept` | Mark a hunk reviewed | Available | Full control |
+| `review.import` | Hand the daemon marks a surface kept before | Available | Full control |
+| `review.marks` | The hunks marked reviewed for a run | Available | Every phone |
+| `review.reject` | Revert a hunk in the worktree | Available | Full control |
+| `review.unaccept` | Remove a hunk's reviewed mark | Available | Full control |
+| `run.active` | Runs that are active now | Available | Every phone |
+| `run.follow_up` | Send a message to an agent | Available | Full control |
+| `run.handoff` | Move an agent to local, back, or another provider | Available | Full control |
+| `run.interrupt` | Stop an agent's turn | Available | Full control |
+| `run.permission` | Allow or deny a permission request | Available | Full control |
+| `run.raw_output` | The end of a run's raw output | Available | Every phone |
+| `run.retry_now` | Retry a waiting agent now | Available | Full control |
+| `run.stay` | Keep an agent where it is instead of moving it | Available | Full control |
+| `run.targets` | Where an agent can be moved to (local, back, a provider) | Available | Every phone |
+| `run.turns` | The turns of a run | Available | Every phone |
+| `runs.stop_all` | Stop every active agent; the daemon keeps running | Available | Full control |
+| `search` | Search tasks and runs | Available | Every phone |
+| `state` | Every task, run, workspace and account profile | Available | Every phone |
+| `task.archive` | Archive or restore a task | Available | Full control |
+| `task.create` | Start an agent | Available | Full control |
+| `workspace.changes` | Changed files of a workspace since the task started | Available | Every phone |
+| `workspace.cleanup` | Remove a finished agent's worktree | Available | Full control |
+| `workspace.cleanup_plan` | What cleaning up a worktree would remove | Available | Every phone |
+| `workspace.diff` | The diff of a workspace against a comparison | Available | Every phone |
+| `workspace.file` | One file of a workspace, at a comparison and in the working copy | Available | Every phone |
+| `workspace.hunks` | The changes of one file as hunks, with their keys and reviewed marks | Available | Every phone |
+| `workspace.merge_abort` | Abort merging back | Available | Full control |
+| `workspace.merge_complete` | Complete merging back | Available | Full control |
+| `workspace.merge_plan` | What merging back would do | Available | Every phone |
+| `workspace.merge_prepare` | Prepare merging back | Available | Full control |
+| `workspace.merge_resolved` | Say conflicts are resolved | Available | Full control |
+| `workspace.pr_open` | Open the pull request with the Mac's Git and GitHub credentials | Available | Full control |
+| `workspace.pr_opened` | Record a pull request that was opened | Available | Full control |
+| `workspace.pr_plan` | What opening a pull request would do | Available | Every phone |
+| `workspace.pr_prepare` | Commit and prepare the branch for a pull request | Available | Full control |
+| `workspace.status` | Git status of a workspace | Available | Every phone |
+| `workspace.tree` | One directory of a worktree | Available | Every phone |
+| `agent.area` | Set or read the area an agent works in | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `agent.briefings` | The briefings an agent was given | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `agent.cadence` | Set how often an agent checks in | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `agent.channel` | Turn briefings and the channel on or off | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `agent.check_ins` | An agent's check-ins | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `agent.digest` | A digest of what an agent did | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `agent.guardrail` | Add a guardrail to an agent | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `agent.guardrail_remove` | Remove a guardrail | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `agent.guardrails` | An agent's guardrails | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `agent.hold` | Hold an agent | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `agent.holds` | The agents on hold | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `agent.redirect` | Redirect an agent | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `agent.release` | Release a held agent | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `agent.share_deny` | Refuse shares to an agent | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `agents.roster` | Every agent, as Overseer sees them | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `channel.messages` | The agents' channel | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `conflict.dismiss` | Dismiss a conflict between agents | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `conflict.resolve` | Resolve a conflict between agents | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `conflicts.list` | Conflicts between agents | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `overseer.answer` | Answer one of Overseer's proposals | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `overseer.cancel` | Cancel one of Overseer's proposals | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `overseer.cap` | Set Overseer's spending cap | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `overseer.card` | One of Overseer's cards | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `overseer.fresh` | Start a fresh Overseer conversation | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `overseer.level` | Set how much Overseer does on its own | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `overseer.messages` | The conversation with Overseer | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `overseer.propose` | Propose actions for the owner to approve | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `overseer.rally` | Rally the agents | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `overseer.scan` | Scan an agent for conflicts | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `overseer.send` | Say something to Overseer | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `overseer.session` | Overseer's session | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `run.queue` | Queue a message for an agent | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `run.queued` | An agent's queued messages | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `run.redirect` | Redirect an agent | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `run.unqueue` | Remove a queued message | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `share.list` | What agents shared | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `share.withdraw` | Withdraw a share | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `watch.end` | End a watch | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `watch.findings` | What a watch found | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `watch.list` | The watches | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `watch.start` | Start a watch on an agent | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `audio.import_commander` | Use a private folder of cues in place | The Mac only: it names a folder on the Mac | — |
+| `audio.preview` | Play a cue on the Mac | The Mac only: audio Mode plays on the Mac; it is set there | — |
+| `audio.set` | Change Audio Mode | The Mac only: audio Mode plays on the Mac; it is set there | — |
+| `continuity.notice` | Dismiss the first-use notice | The Mac only: it describes the Mac's own windows | — |
+| `continuity.prefetch_offer` | Offer to download a local model ahead of time | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
+| `continuity.test_age` | Age a wait (tests only) | The Mac only: a test hook | — |
+| `continuity.ui` | The first-use notice's state in VS Code | The Mac only: it describes the Mac's own windows | — |
+| `daemon.background_notice` | Post the background notice | The Mac only: it belongs to the Mac's own notifications | — |
+| `daemon.shutdown` | Stop the daemon | The Mac only: a phone that stopped the daemon could not start it again | — |
+| `daemon.stop_all` | Stop every agent and the daemon | The Mac only: it stops the daemon; a phone uses runs.stop_all | — |
+| `daemon.test_notice` | Post a test notification on the Mac | The Mac only: it belongs to the Mac's own notifications | — |
+| `gateway.device_rename` | Rename a device | The Mac only: devices are managed on the Mac | — |
+| `gateway.device_revoke` | Revoke a device | The Mac only: a phone that could manage devices could let another one in | — |
+| `gateway.device_scope` | Change a device's scope | The Mac only: a phone could raise its own scope | — |
+| `gateway.devices` | Paired devices | The Mac only: devices are managed on the Mac | — |
+| `gateway.disable` | Turn phone access off | The Mac only: phone access is switched on the desktop only | — |
+| `gateway.enable` | Turn phone access on | The Mac only: phone access is switched on the desktop only | — |
+| `gateway.pair_cancel` | Close pairing | The Mac only: pairing starts on the Mac | — |
+| `gateway.pair_confirm` | Accept or decline a phone that asked to pair | The Mac only: the owner confirms on the Mac | — |
+| `gateway.pair_start` | Open pairing and return the pairing code | The Mac only: pairing starts on the Mac | — |
+| `gateway.settings` | Read or change gateway settings | The Mac only: phone access is managed on the Mac | — |
+| `gateway.status` | Phone access: on or off, port, connected phones | The Mac only: phone access is managed on the Mac | — |
+| `local.approve` | Approve a local model download | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
+| `local.load` | Load a local model into memory | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
+| `local.pick` | Choose the local model | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
+| `local.pull` | Download a local model | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
+| `local.pull_cancel` | Cancel a local model download | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
+| `local.unload` | Unload a local model | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
+| `ollama.install` | Install Ollama | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
+| `ollama.start` | Start Ollama | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
+| `ollama.stop` | Stop Ollama | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
+| `overseer.token` | A token for an agent's Overseer tools | The Mac only: it is for the agents' own Overseer tools, never a phone | — |
+| `overseer.tool` | Run one of Overseer's tools for an agent | The Mac only: it is for the agents' own Overseer tools, never a phone | — |
+| `overseer.tools` | The Overseer tools an agent may use | The Mac only: it is for the agents' own Overseer tools, never a phone | — |
+| `profile.login_command` | The sign-in command for a terminal | The Mac only: it needs a terminal on the Mac; a phone uses profile.device_login | — |
+| `settings.get` | Continuity settings | The Mac only: continuity is set on the Mac | — |
+| `settings.set` | Change Continuity settings | The Mac only: continuity is set on the Mac | — |
+| `ui.focus` | Which agent a window on the Mac is looking at | The Mac only: it describes the Mac's own windows | — |
+| `voice.answer` | Answer by voice | The Mac only: voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose | — |
+| `voice.cancel` | Stop what Voice Mode is doing | The Mac only: voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose | — |
+| `voice.download` | Download a voice | The Mac only: voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose | — |
+| `voice.focus` | Which agent Voice Mode speaks for | The Mac only: voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose | — |
+| `voice.get` | Voice Mode's settings | The Mac only: voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose | — |
+| `voice.read_back` | Read an agent's answer aloud on the Mac | The Mac only: voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose | — |
+| `voice.requests` | What Voice Mode is waiting to hear | The Mac only: voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose | — |
+| `voice.say` | Say something to Voice Mode | The Mac only: voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose | — |
+| `voice.set` | Change Voice Mode's settings | The Mac only: voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose | — |
+| `voice.simulate` | Simulate speech for tests | The Mac only: voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose | — |
+| `voice.speak` | Speak a text aloud on the Mac | The Mac only: voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose | — |
+<!-- phone-capabilities:end -->
 
 ## Build and install (macOS)
 
@@ -439,21 +623,12 @@ the owner action or decision each one needs.
 - [ ] [AC-115](docs/verification/AC-115.md) (Feasibility and reuse before lock-in): not blocked
 - [ ] [AC-117](docs/verification/AC-117.md) (Pairing needs the Mac): not blocked
 - [ ] [AC-120](docs/verification/AC-120.md) (Found on the network): not blocked
-- [ ] [AC-121](docs/verification/AC-121.md) (Never lose the session): not blocked
-- [ ] [AC-122](docs/verification/AC-122.md) (Sent exactly once): not blocked
-- [ ] [AC-124](docs/verification/AC-124.md) (See every agent): not blocked
-- [ ] [AC-125](docs/verification/AC-125.md) (Control every agent): not blocked
-- [ ] [AC-126](docs/verification/AC-126.md) (Review on the phone): not blocked
-- [ ] [AC-128](docs/verification/AC-128.md) (Talk to Overseer from the phone): Depends on AC-107 (the chat with Overseer itself), which is not built. Nothing to put on the phone yet.
+- [ ] [AC-128](docs/verification/AC-128.md) (Talk to Overseer from the phone): AC-107 (verified on main through pull request #11) and Overseer's session in the daemon (Gate S, pull request #14) reached main after this milestone was built; the phone half is the next piece of Gate N. Until it is built, Overseer's methods are Mac-only for phones and shown as not yet in the README's phone table.
 - [ ] [AC-129](docs/verification/AC-129.md) (Needs-you notifications you can switch): not blocked
-- [ ] [AC-130](docs/verification/AC-130.md) (Safe without friction): not blocked
-- [ ] [AC-131](docs/verification/AC-131.md) (One app, iOS and Android, that looks like Overseer): not blocked
-- [ ] [AC-132](docs/verification/AC-132.md) (Regression coverage for the phone): not blocked
 - [ ] [AC-133](docs/verification/AC-133.md) (Phone session (owner-confirmed)): The owner's iPhone: the steps for the owner in the phone remote RFC (a new app identifier, a push key, signing, the local network and notification permissions, then pairing by scanning). The simulator milestone is in pull request #10.
 - [ ] [AC-135](docs/verification/AC-135.md) (Hyper fast): not blocked
 - [ ] [AC-136](docs/verification/AC-136.md) (The door): not blocked
 - [ ] [AC-137](docs/verification/AC-137.md) (Motion throughout): not blocked
-- [ ] [AC-141](docs/verification/AC-141.md) (Pair once): not blocked
 - [ ] [AC-146](docs/verification/AC-146.md) (Reconcile and merge the work in flight): The hourly schedule needs the owner's permission.
 - [ ] [AC-148](docs/verification/AC-148.md) (Checks on every pull request): Not started (Gate P, added by the owner on 2026-09-27).
 - [ ] [AC-149](docs/verification/AC-149.md) (A steady UI suite): Needs a quiet machine (no other agent running UI scenarios) for the three-in-a-row runs and the p95.
@@ -489,12 +664,7 @@ the owner action or decision each one needs.
 - [ ] [AC-202](docs/verification/AC-202.md) (Orchestration session (owner-confirmed)): Not started (Gate S, added by the owner on 2026-09-27).
 - [ ] [AC-204](docs/verification/AC-204.md) (Finished slices merge; the rest becomes criteria): Not started (Gate Q, added by the owner on 2026-09-27).
 - [ ] [AC-205](docs/verification/AC-205.md) (Offline on a real Wi-Fi toggle (owner step)): Owner, when no agents are in flight: run `node test/local/wifi-live.js`, switch Wi-Fi off when it asks and on again when it says Overseer is offline (about a minute). It writes `evidence/ac-205/`; then this record is updated.
-- [ ] [AC-206](docs/verification/AC-206.md) (One command gives a dev daemon (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
-- [ ] [AC-207](docs/verification/AC-207.md) (A dev daemon never interferes with the running Overseer (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
-- [ ] [AC-208](docs/verification/AC-208.md) (Production knows nothing of dev daemons (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
-- [ ] [AC-209](docs/verification/AC-209.md) (VS Code and the TUI pointed at one dev daemon (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
 - [ ] [AC-210](docs/verification/AC-210.md) (The phone simulators pinned to a dev daemon (after pull request #10)): After PR #10: the phone app and the gateway must be on main first.
-- [ ] [AC-211](docs/verification/AC-211.md) (Agents learn it from the repository, and leave nothing running (stage 2)): Not started (Gate T, added by the owner on 2026-09-27).
 - [ ] [AC-213](docs/verification/AC-213.md) (The production phone app never pairs with a dev daemon (after pull request #10)): After PR #10: the phone app and the gateway must be on main first.
 - [ ] [AC-214](docs/verification/AC-214.md) (Deploy: the one path from dev to production (stage 4)): Not started (Gate T, added by the owner on 2026-09-27).
 - [ ] [AC-215](docs/verification/AC-215.md) (Guided owner tests in a dev daemon (stage 3)): Not started (Gate T, added by the owner on 2026-09-27).

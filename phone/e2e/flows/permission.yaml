@@ -1,0 +1,33 @@
+# A permission request, allowed from the phone.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "agents.needs.${PERMISSION}"
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "agents.needs.${PERMISSION}"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "agents.needs.${PERMISSION}"
+- extendedWaitUntil:
+    visible:
+      id: "agent.permission.allow"
+    timeout: 30000
+- tapOn:
+    id: "agent.permission.allow"
+- extendedWaitUntil:
+    notVisible:
+      id: "agent.permission.allow"
+    timeout: 20000

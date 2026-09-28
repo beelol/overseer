@@ -1,0 +1,114 @@
+/Users/bilal/projects/overseer/.claude/worktrees/phone-remote-vscode-control-b48a34/extension/bin/Overseer Notifier.app: replacing existing signature
+notifier: /Users/bilal/projects/overseer/.claude/worktrees/phone-remote-vscode-control-b48a34/extension/bin/Overseer Notifier.app
+   Compiling overseerd v0.1.0 (/Users/bilal/projects/overseer/.claude/worktrees/phone-remote-vscode-control-b48a34/daemon)
+warning: value assigned to `note` is never read
+   --> daemon/src/background.rs:236:17
+    |
+236 |         let mut note = String::new();
+    |                 ^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` on by default
+
+warning: method `workspace_diff` is never used
+    --> daemon/src/daemon.rs:1359:12
+     |
+94   | impl Daemon {
+     | ----------- method in this implementation
+...
+1359 |     pub fn workspace_diff(&self, workspace_id: &str, base: &str) -> Result<Value> {
+     |            ^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` on by default
+
+warning: field `device_name` is never read
+  --> daemon/src/gateway/mod.rs:86:9
+   |
+84 | pub struct Session {
+   |            ------- field in this struct
+85 |     pub device_id: String,
+86 |     pub device_name: String,
+   |         ^^^^^^^^^^^
+
+warning: field `public` is never read
+  --> daemon/src/gateway/noise.rs:40:9
+   |
+38 | pub struct Keypair {
+   |            ------- field in this struct
+39 |     pub private: Vec<u8>,
+40 |     pub public: Vec<u8>,
+   |         ^^^^^^
+
+warning: constant `ALLOWED_FIELDS` is never used
+  --> daemon/src/gateway/push.rs:16:11
+   |
+16 | pub const ALLOWED_FIELDS: &[&str] = &[
+   |           ^^^^^^^^^^^^^^
+
+warning: method `is_clean` is never used
+   --> daemon/src/git.rs:217:12
+    |
+216 | impl Status {
+    | ----------- method in this implementation
+217 |     pub fn is_clean(&self) -> bool {
+    |            ^^^^^^^^
+
+warning: function `tree_has` is never used
+   --> daemon/src/git.rs:274:8
+    |
+274 | pub fn tree_has(workspace: &Path, tree_ish: &str, path: &str) -> bool {
+    |        ^^^^^^^^
+
+warning: function `show_blob` is never used
+   --> daemon/src/git.rs:278:8
+    |
+278 | pub fn show_blob(workspace: &Path, tree_ish: &str, path: &str) -> Result<Vec<u8>> {
+    |        ^^^^^^^^^
+
+warning: function `is_ancestor` is never used
+   --> daemon/src/git.rs:282:8
+    |
+282 | pub fn is_ancestor(workspace: &Path, a: &str, b: &str) -> bool {
+    |        ^^^^^^^^^^^
+
+warning: function `worktree_list` is never used
+   --> daemon/src/git.rs:286:8
+    |
+286 | pub fn worktree_list(repo: &Path) -> Vec<PathBuf> {
+    |        ^^^^^^^^^^^^^
+
+warning: methods `set_task_start_snapshot` and `child_by_native` are never used
+   --> daemon/src/store.rs:295:12
+    |
+123 | impl Store {
+    | ---------- methods in this implementation
+...
+295 |     pub fn set_task_start_snapshot(&self, id: &str, snap: &str) -> Result<()> {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+...
+348 |     pub fn child_by_native(&self, parent: &str, native: &str) -> Result<Option<Run>> {
+    |            ^^^^^^^^^^^^^^^
+
+warning: `overseerd` (bin "overseerd") generated 11 warnings
+    Finished `release` profile [optimized] target(s) in 15.07s
+ WARNING  This extension consists of 172 files, out of which 122 are JavaScript files. For performance reasons, you should bundle your extension: https://aka.ms/vscode-bundle-extension. You should also exclude unnecessary files by adding them to your .vscodeignore: https://aka.ms/vscode-vscodeignore.
+
+ INFO  Files included in the VSIX:
+overseer-0.1.0.vsix
+├─ [Content_Types].xml 
+├─ extension.vsixmanifest 
+└─ extension/
+   ├─ LICENSE.txt [1.04 KB]
+   ├─ NOTICE.md [3.04 KB]
+   ├─ package.json [20.89 KB]
+   ├─ readme.md [0.26 KB]
+   ├─ bin/ (5 files) [7.8 MB]
+   ├─ branch-diff/ (94 files) [3.84 MB]
+   ├─ media/ (49 files) [682.79 KB]
+   ├─ src/ (16 files) [187.85 KB]
+   └─ themes/ (2 files) [35.77 KB]
+
+=> Run vsce ls --tree to see all included files.
+
+ DONE  Packaged: /Users/bilal/projects/overseer/.claude/worktrees/phone-remote-vscode-control-b48a34/extension/overseer-0.1.0.vsix (172 files, 4.86 MB)
+/Users/bilal/projects/overseer/.claude/worktrees/phone-remote-vscode-control-b48a34/extension/overseer-0.1.0.vsix

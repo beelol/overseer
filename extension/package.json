@@ -49,7 +49,8 @@
       "overseer": [
         { "type": "webview", "id": "overseer.search", "name": "Search", "initialSize": 1 },
         { "id": "overseer.agents", "name": "Agents", "initialSize": 14 },
-        { "id": "overseer.accounts", "name": "Accounts", "initialSize": 5 }
+        { "id": "overseer.accounts", "name": "Accounts", "initialSize": 5 },
+        { "id": "overseer.devices", "name": "Devices", "visibility": "collapsed", "initialSize": 3 }
       ],
       "overseer-talk": [
         { "type": "webview", "id": "overseer.talk", "name": "Talk to Overseer" }
@@ -57,7 +58,10 @@
     },
     "viewsWelcome": [
       { "view": "overseer.agents", "contents": "No agent tasks yet.\n[New Task](command:overseer.newTask)\nOverseer runs agents through a local daemon; closing VS Code does not stop them.", "when": "isWorkspaceTrusted" },
-      { "view": "overseer.agents", "contents": "Launching agents requires a trusted workspace.\n[Manage Workspace Trust](command:workbench.trust.manage)", "when": "!isWorkspaceTrusted" }
+      { "view": "overseer.agents", "contents": "Launching agents requires a trusted workspace.\n[Manage Workspace Trust](command:workbench.trust.manage)", "when": "!isWorkspaceTrusted" },
+      { "view": "overseer.devices", "contents": "No phone is paired. Pair one to watch and answer your agents from it.\n[Pair a Phone](command:overseer.pairPhone)", "when": "isWorkspaceTrusted && overseer.phoneAccessAvailable" },
+      { "view": "overseer.devices", "contents": "Pairing a phone requires a trusted workspace.\n[Manage Workspace Trust](command:workbench.trust.manage)", "when": "!isWorkspaceTrusted && overseer.phoneAccessAvailable" },
+      { "view": "overseer.devices", "contents": "Phone access is not available until Overseer is connected to an up-to-date daemon.", "when": "!overseer.phoneAccessAvailable" }
     ],
     "commands": [
       { "command": "overseer.openCenter", "title": "Open Overseer View", "category": "Overseer", "icon": "$(layout)" },
@@ -121,7 +125,18 @@
       { "command": "overseer.voice.simulate", "title": "Voice Mode: Simulate the Voice (development)", "category": "Overseer", "enablement": "overseer.voiceSimulated" },
       { "command": "overseer.testNotification", "title": "Test Notification", "category": "Overseer", "icon": "$(bell)" },
       { "command": "overseer.showLog", "title": "Show Daemon Log", "category": "Overseer" },
-      { "command": "overseer.restartDaemonConnection", "title": "Reconnect to Daemon", "category": "Overseer" }
+      { "command": "overseer.restartDaemonConnection", "title": "Reconnect to Daemon", "category": "Overseer" },
+      { "command": "overseer.phoneAccess", "title": "Phone Access…", "category": "Overseer", "icon": "$(device-mobile)" },
+      { "command": "overseer.turnOnPhoneAccess", "title": "Turn On Phone Access", "category": "Overseer", "icon": "$(device-mobile)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.turnOffPhoneAccess", "title": "Turn Off Phone Access", "category": "Overseer", "icon": "$(circle-slash)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.pairPhone", "title": "Pair a Phone…", "category": "Overseer", "icon": "$(add)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.showDevices", "title": "Show Devices", "category": "Overseer", "icon": "$(device-mobile)" },
+      { "command": "overseer.revokeDevice", "title": "Revoke Device…", "category": "Overseer", "icon": "$(trash)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.makeDeviceWatchOnly", "title": "Make Watch Only", "category": "Overseer", "icon": "$(eye)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.giveDeviceFullControl", "title": "Give Full Control", "category": "Overseer", "icon": "$(unlock)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.renameDevice", "title": "Rename…", "category": "Overseer", "icon": "$(edit)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.turnOffPhoneNotifications", "title": "Turn Off Notifications to Phones", "category": "Overseer", "icon": "$(bell-slash)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.turnOnPhoneNotifications", "title": "Turn On Notifications to Phones", "category": "Overseer", "icon": "$(bell)", "enablement": "isWorkspaceTrusted" }
     ],
     "keybindings": [
       { "command": "overseer.archiveAgent", "key": "delete", "mac": "cmd+backspace", "when": "focusedView == overseer.agents" },
@@ -160,7 +175,12 @@
         { "command": "overseer.audioMode", "when": "view == overseer.agents", "group": "5_audio@1" },
         { "command": "overseer.stopAll", "when": "view == overseer.agents", "group": "9_stop@1" },
         { "command": "overseer.addProfile", "when": "view == overseer.accounts", "group": "navigation@1" },
-        { "command": "overseer.refreshAccounts", "when": "view == overseer.accounts", "group": "navigation@2" }
+        { "command": "overseer.refreshAccounts", "when": "view == overseer.accounts", "group": "navigation@2" },
+        { "command": "overseer.pairPhone", "when": "view == overseer.devices", "group": "navigation@1" },
+        { "command": "overseer.turnOnPhoneAccess", "when": "view == overseer.devices && !overseer.phoneAccessOn", "group": "1_access@1" },
+        { "command": "overseer.turnOffPhoneAccess", "when": "view == overseer.devices && overseer.phoneAccessOn", "group": "1_access@1" },
+        { "command": "overseer.turnOffPhoneNotifications", "when": "view == overseer.devices && overseer.phoneNotificationsOn", "group": "2_notify@1" },
+        { "command": "overseer.turnOnPhoneNotifications", "when": "view == overseer.devices && !overseer.phoneNotificationsOn", "group": "2_notify@1" }
       ],
       "view/item/context": [
         { "command": "overseer.interrupt", "when": "view == overseer.agents && viewItem =~ /^agent-active/", "group": "inline@1" },
@@ -184,10 +204,25 @@
         { "command": "overseer.renameProfile", "when": "view == overseer.accounts && viewItem =~ /profile-isolated/", "group": "1_edit@1" },
         { "command": "overseer.signOut", "when": "view == overseer.accounts && viewItem =~ /^profile-isolated-signedin$/", "group": "1_edit@2" },
         { "command": "overseer.removeAccount", "when": "view == overseer.accounts && viewItem =~ /profile-isolated/", "group": "9_remove@1" },
-        { "command": "overseer.addProfile", "when": "view == overseer.accounts && viewItem == provider", "group": "inline@1" }
+        { "command": "overseer.addProfile", "when": "view == overseer.accounts && viewItem == provider", "group": "inline@1" },
+        { "command": "overseer.renameDevice", "when": "view == overseer.devices && viewItem =~ /^device-(full|watch)/", "group": "inline@1" },
+        { "command": "overseer.makeDeviceWatchOnly", "when": "view == overseer.devices && viewItem =~ /^device-full/", "group": "inline@2" },
+        { "command": "overseer.giveDeviceFullControl", "when": "view == overseer.devices && viewItem =~ /^device-watch/", "group": "inline@2" },
+        { "command": "overseer.revokeDevice", "when": "view == overseer.devices && viewItem =~ /^device-(full|watch)/", "group": "inline@3" },
+        { "command": "overseer.makeDeviceWatchOnly", "when": "view == overseer.devices && viewItem =~ /^device-full/", "group": "1_scope@1" },
+        { "command": "overseer.giveDeviceFullControl", "when": "view == overseer.devices && viewItem =~ /^device-watch/", "group": "1_scope@1" },
+        { "command": "overseer.renameDevice", "when": "view == overseer.devices && viewItem =~ /^device-(full|watch)/", "group": "2_edit@1" },
+        { "command": "overseer.revokeDevice", "when": "view == overseer.devices && viewItem =~ /^device-(full|watch)/", "group": "9_remove@1" }
       ],
       "commandPalette": [
-        { "command": "overseer.openEdit", "when": "false" }
+        { "command": "overseer.openEdit", "when": "false" },
+        { "command": "overseer.turnOnPhoneAccess", "when": "!overseer.phoneAccessOn" },
+        { "command": "overseer.turnOffPhoneAccess", "when": "overseer.phoneAccessOn" },
+        { "command": "overseer.turnOffPhoneNotifications", "when": "overseer.phoneNotificationsOn" },
+        { "command": "overseer.turnOnPhoneNotifications", "when": "!overseer.phoneNotificationsOn" },
+        { "command": "overseer.makeDeviceWatchOnly", "when": "false" },
+        { "command": "overseer.giveDeviceFullControl", "when": "false" },
+        { "command": "overseer.renameDevice", "when": "false" }
       ]
     },
     "configuration": {
@@ -231,7 +266,7 @@
     }
   },
   "scripts": {
-    "check": "node --check src/extension.js && node --check src/daemon-client.js && node --check src/views.js && node --check src/review.js && node --check src/output-panel.js && node --check branch-diff/review/panel.js",
+    "check": "node --check src/extension.js && node --check src/daemon-client.js && node --check src/views.js && node --check src/review.js && node --check src/output-panel.js && node --check src/phone-access.js && node --check src/phone-text.js && node --check media/pairing.js && node --check branch-diff/review/panel.js",
     "build:review": "node branch-diff/scripts/build-review.js",
     "package": "node scripts/package.js",
     "test": "node ../test/unit/run.js"

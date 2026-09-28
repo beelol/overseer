@@ -30,7 +30,10 @@ const result = (isError, text) => out({ type: 'result', subtype: isError ? 'erro
 const rl = readline.createInterface({ input: process.stdin });
 const lines = [];
 let waiting;
-rl.on('line', l => { let m; try { m = JSON.parse(l); } catch { return; } lines.push(m); if (waiting) waiting(); });
+// FIXTURE_STDIN_LOG_DIR: every line Overseer sends is appended to <dir>/<worktree name>.log, so a
+// test can count what really reached the harness (one answer per permission request).
+const stdinLog = process.env.FIXTURE_STDIN_LOG_DIR && path.join(process.env.FIXTURE_STDIN_LOG_DIR, path.basename(process.cwd()) + '.log');
+rl.on('line', l => { if (stdinLog) { try { fs.appendFileSync(stdinLog, l + '\n'); } catch {} } let m; try { m = JSON.parse(l); } catch { return; } lines.push(m); if (waiting) waiting(); });
 const next = pred => new Promise(resolve => { const check = () => { const i = lines.findIndex(pred); if (i >= 0) { const [m] = lines.splice(i, 1); waiting = undefined; resolve(m); } }; waiting = check; check(); });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 

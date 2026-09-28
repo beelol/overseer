@@ -1,0 +1,33 @@
+# Merge back meets a conflict; the merge is aborted from the phone, asked once.
+appId: ${APP}
+---
+- runFlow: open-agent-menu.yaml
+- tapOn:
+    id: "agent.more.merge"
+- extendedWaitUntil:
+    visible:
+      id: "merge.prepare"
+    timeout: 30000
+- tapOn:
+    id: "merge.prepare"
+- extendedWaitUntil:
+    visible:
+      id: "merge.abort"
+    timeout: 60000
+- tapOn:
+    id: "merge.abort"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "merge.ask.confirm"
+    timeout: 15000
+- assertVisible:
+    text: "Abort this merge\\?"
+- takeScreenshot: merge-abort-asks-once
+- tapOn:
+    id: "merge.ask.confirm"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "merge.outcome"
+    timeout: 30000

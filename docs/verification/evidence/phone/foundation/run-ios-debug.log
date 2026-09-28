@@ -1,0 +1,16 @@
+start 20:06:51
+20:06:51 > overseer-phone@0.1.0 ios
+20:06:51 > node scripts/run-ios.mjs
+20:06:52 Simulator: iPhone 17 Pro, iOS 26.5 (E6105FAE-0651-4D7B-801A-40FF49980468)
+20:07:20 Build output: ios/build/xcodebuild-Debug.log
+20:07:20 xcodebuild Debug: 28.1 s
+20:07:21 Starting Metro on port 8081
+20:07:21 Starting project at <repo>/phone
+20:07:22 Starting Metro Bundler
+20:07:23 Waiting on http://localhost:8081
+20:07:23 Logs for your project will appear below.
+20:07:23 com.beelol.overseer.phone: 67491
+20:07:23 com.beelol.overseer.phone (Debug) is open on iPhone 17 Pro
+20:07:23 Metro runs in the foreground. Stop it with Ctrl-C.
+20:07:26 iOS Bundled 2303ms node_modules/expo-router/entry.js (1416 modules)
+end 20:07:56
