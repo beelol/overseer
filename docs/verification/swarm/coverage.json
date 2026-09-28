@@ -561,15 +561,17 @@
       "blocker": "Joined S1 adds J7 after J2's task result and independently reproduces it from a fresh PostgreSQL schema within the worker ceiling. Director-selected budgeted creation, contradiction handling and finding merge remain unimplemented."
     },
     "SWARM-46": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
         "docs/verification/swarm/milestone-3.md",
         "daemon/tests/swarm_scenarios.rs",
         "docs/verification/swarm/S3.md",
-        "docs/verification/swarm/SWARM-46.md"
+        "docs/verification/swarm/SWARM-46.md",
+        "daemon/tests/swarm_broker.rs",
+        "daemon/src/swarm/broker.rs"
       ],
-      "blocker": "The S3 fixture redirects one in-flight revision-1 module and rejects its stale result after contract repair. An S1 fault replay rejects stale J4 evidence and sends a scripted retraction to J2/J4 after contradictory J7 evidence. Applied acknowledgement across qualified live sessions, autonomous correction, and unrelated accepted-work preservation in this scenario remain unverified."
+      "blocker": null
     },
     "SWARM-47": {
       "status": "verified",
