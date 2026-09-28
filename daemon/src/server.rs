@@ -222,7 +222,7 @@ fn s<'a>(p: &'a Value, key: &str) -> Result<&'a str> {
 
 pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     Ok(match method {
-        "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path()}),
+        "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path(), "instance": paths::instance()}),
         "state" => d.state_for(p["include_hidden"].as_bool().unwrap_or(false))?,
         "audio.get" => crate::audio::get(d)?,
         "audio.set" => crate::audio::set(d, p)?,

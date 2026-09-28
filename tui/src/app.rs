@@ -622,6 +622,12 @@ impl App {
                 self.audio_inflight = false;
                 self.request_audio();
             }
+            Msg::Refused(why) => {
+                self.connected = false;
+                self.pending.clear();
+                self.state_inflight = false;
+                self.say(why, true);
+            }
             Msg::Disconnected(why) => {
                 self.connected = false;
                 // Replies to requests on the old connection never come.
