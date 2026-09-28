@@ -523,7 +523,9 @@ node test/unit/webview-scripts.js
 Packaged-UI scenarios (open a real, isolated VS Code window; see [test/ui](test/ui)). The
 free ones use fixtures and mocks: `trust`, `main`, `review`, `restore`, `conversation`,
 `hunks`, `accounts`, `signin`, `center`, `theme` and `perf` (10 minutes). Scenarios whose
-header says LIVE spend a few tiny paid prompts.
+header says LIVE spend a few tiny paid prompts. On macOS the window opens behind whatever
+you are using and never takes focus (`test/ui/quiet-launch.js`); set
+`OVERSEER_UI_FOREGROUND=1` to bring it to the front and watch a run.
 
 ```bash
 node test/ui/scenario-main.js

@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
 const { Cdp, delay } = require('./cdp');
+const quiet = require('./quiet-launch');
 
 const repoRoot = path.resolve(__dirname, '../..');
 const CODE = process.env.OVERSEER_CODE || '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code';
@@ -115,12 +116,23 @@ class Session {
 
   launch(folder, env = {}) {
     fs.rmSync(path.join(this.profile, 'DevToolsActivePort'), { force: true });
-    this.child = cp.spawn(CODE, ['--remote-debugging-port=0', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
-      '--new-window', '--user-data-dir', this.profile, '--extensions-dir', this.extensions, '--skip-welcome', '--skip-release-notes', ...(env.OVERSEER_TEST_TRUST ? [] : ['--disable-workspace-trust']), ...(folder ? [folder] : [])],
+    const args = ['--remote-debugging-port=0', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
+      '--new-window', '--user-data-dir', this.profile, '--extensions-dir', this.extensions, '--skip-welcome', '--skip-release-notes', ...(env.OVERSEER_TEST_TRUST ? [] : ['--disable-workspace-trust']), ...(folder ? [folder] : [])];
+    if (quiet.wanted(CODE)) {
+      // macOS: the window opens behind whatever the owner is using and never becomes the active app.
+      this.quiet?.close();
+      this.quiet = quiet.launchQuiet({ code: CODE, args, env: { ...this.baseEnv(), ...env }, root: this.root, note: msg => this.note(msg) });
+      // Nothing to wait on: `open` returns at once; the window is found and killed by its profile.
+      const profile = this.profile;
+      this.child = { kill: signal => { for (const pid of cp.spawnSync('pgrep', ['-f', profile], { encoding: 'utf8' }).stdout.trim().split('\n').filter(Boolean)) { try { process.kill(Number(pid), signal); } catch {} } } };
+      return;
+    }
+    this.child = cp.spawn(CODE, args,
     { env: { ...this.baseEnv(), ...env }, stdio: ['ignore', fs.openSync(path.join(this.root, 'code-' + Date.now() + '.log'), 'a'), fs.openSync(path.join(this.root, 'code-err-' + Date.now() + '.log'), 'a')], detached: false });
   }
 
   async connect() {
+    await this.quiet?.ready;
     this.cdp = await Cdp.connect(this.profile);
     await delay(1500);
     await this.phoneAccess();
@@ -144,12 +156,15 @@ class Session {
 
   async quit() {
     // Close VS Code the way a user does (Cmd+Q); fall back to SIGTERM.
-    try { await this.cdp?.focusWorkbench(); await this.cdp?.key('q', { meta: true }); } catch {}
+    // In a background launch the app is never active, so its Quit menu shortcut cannot fire: quit through the app.
+    if (this.quiet) await this.quiet.quit();
+    else { try { await this.cdp?.focusWorkbench(); await this.cdp?.key('q', { meta: true }); } catch {} }
     for (let i = 0; i < 30; i++) {
       await delay(500);
       if (!cp.spawnSync('pgrep', ['-f', this.profile], { encoding: 'utf8' }).stdout.trim()) break;
     }
     try { this.cdp?.close(); } catch {}
+    this.quiet?.close(); this.quiet = null;
     const pids = cp.spawnSync('pgrep', ['-f', this.profile], { encoding: 'utf8' }).stdout.trim().split('\n').filter(Boolean);
     if (pids.length) this.note('VS Code did not quit on Cmd+Q; sending SIGTERM', pids.length);
     for (const pid of pids) { try { process.kill(Number(pid), 'SIGTERM'); } catch {} }
