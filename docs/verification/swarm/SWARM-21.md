@@ -1,6 +1,6 @@
 # SWARM-21 — revisions preserve only valid work
 
-Status: partial. Implementation revision: `3c802c8`. Fixture: local Git repository, scripted accepted worker patch and plan revision; no provider call.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. Implementation revisions: `3c802c8`, `690bcff2`. Fixture: local Git repository, scripted accepted worker patch and plan revision; no provider call.
 
 Input: accept a revision-1 patch for `writer`, then revise only a separate `other` job to revision 2. Request patch integration using the current run revision. In a paired run, revise `writer` itself after accepting its old patch.
 
@@ -66,3 +66,19 @@ focused `swarm_director_loop` suite and full serialized offline workspace suite 
 This is scripted local evidence; user-message intake and qualified live delivery remain
 open, so SWARM-21 stays partial.
 Replay: `cargo test --offline -q -p overseerd --test swarm_director_loop -- --test-threads=1`.
+
+## Verified at fixture scope (2026-09-28)
+
+The missing piece was the user's side of "change user requirements": there was no intake, only a director revision. `690bcff2` adds `swarm.requirements.change` (the owner's words into the director's inbox; admission held `requirements_pending` until the director's revision names the request; the revision recorded against it; generation unchanged; Overseer class Confirm).
+
+| Clause | Test |
+| --- | --- |
+| Change user requirements during execution | `catalog_s3_owner_requirement_change_becomes_a_recorded_plan_revision` (`daemon/tests/swarm_scenarios.rs`, new): mid-run, the owner asks to migrate only twelve of 24 modules; the change is idempotent by request id, survives a daemon restart, reaches the director as a `requirement` event, and holds new admission until the director's revision names it |
+| Invalidate incompatible queued jobs | the director's revision supersedes the twelve excluded modules; the excluded module in flight receives Stop; `revision_invalidates_affected_work_and_preserves_unrelated_acceptance`, `narrowing_scope_supersedes_queued_work_and_stops_an_active_excluded_attempt` |
+| Retain revision provenance | `swarm.get` lists the owner's change with `applied_revision: 2`; the generation stays 1; `committed_revision_replays_after_lost_reply_and_restart` (revision replay) |
+| Reject stale worker results from automatic acceptance into the revised plan | the excluded module's revision-1 result cannot be accepted; `superseded_result_is_applied_after_delivery_without_accepting_old_evidence`, `source_commit_change_blocks_stale_patch_integration` |
+| S3 24→12: accept and integrate only retained jobs; refuse completion with an unintegrated retained patch; excluded routes still work under the shared contract | `catalog_s3_narrowed_branch_integrates_and_checks_twelve_modules` (versioned Catalog fixture, Node.js 24; passed again on 2026-09-28): twelve retained patches integrate, completion is refused while one retained patch is unintegrated, the combined check fails at 11 and passes at 12, and the excluded routes keep their original page/offset behaviour; `narrowing_scope_refuses_to_hide_an_already_integrated_patch` |
+
+Rerun serially on 2026-09-28: `swarm_scenarios` 5 (including the two opt-in Catalog replays), `swarm_admission` 40, `swarm_state` 21, `swarm_revision_replay` 5, `swarm_plan` 13, daemon unit tests 250, and `overseer ac185` (every daemon method classified).
+
+Boundary: the owner's change arrives through the daemon method; its VS Code and phone entry points are not built here, and the native director's tools do not yet carry the `requirements` argument (the native path stays behind `swarm.native_director`, off).
