@@ -1,6 +1,6 @@
 # SWARM-51 — uncertain worker liveness
 
-Status: partial. Revision: `8a72059`. Fixture: supervised local generic worker running `/bin/sleep` with a live quota reservation.
+Status: verified at fixture scope on 2026-09-28 (`claude/auto-swarm`); see the last section. First revision: `8a72059`. Fixture: supervised local generic worker running `/bin/sleep` with a live quota reservation.
 
 Input: admit and launch one worker, then inject Overseer's `disconnected` run state with an `ended_ms` value while its process may still be alive. Call worker reconciliation, allow the daemon's periodic terminal scan to run, and call reconciliation again. Restore the ordinary running state before the rest of the restart/stop fixture proceeds.
 
@@ -33,3 +33,17 @@ At `14c62f6`, the Stop retry fixture also verifies that a reservation changes fr
 Follow-up revision `be1c885`: a full-suite run exposed a worker that was probed while its control socket was still starting, marked `suspect`, then waited the ordinary 15-second sampling interval; the five-second recovery fixture timed out. A deterministic regression first failed because polling one second after that suspect sample found zero due workers. The daemon now retries `suspect` workers after one second while retaining the 15-second cadence for reachable workers and the existing 60-second unknown threshold. The retry reaches the restored control socket and returns `reachable` without another attempt. The focused test and full offline Rust suite pass (178 non-ignored tests). This is local supervised-worker recovery, not live harness qualification.
 
 Follow-up revision `45ed538`: `atlas_s5_progress_heartbeats_do_not_extend_job_deadline` joins evidence-free progress to the versioned Atlas backend. The scripted J4 worker probes a real attachment endpoint, keeps its child command active, and reports `working` repeatedly. At least two progress records are durable, yet the original four-second job deadline remains fixed and interrupts that worker. The job has `job_deadline`, zero result and acceptance records, and completion is rejected. `./fixtures/swarm/atlas-v1/run-swarm.sh` passes eight joined tests on disposable PostgreSQL 16 with Node.js 24. This strengthens deadline evidence for a real backend and local supervised worker; the 60-second wall-clock transport outage and live provider path are still open.
+
+## Verified at fixture scope (2026-09-28)
+
+| Clause | Test |
+| --- | --- |
+| Output silence, an unreachable transport and a confirmed dead process are distinct | `admitted_worker_launch_replays_to_one_supervised_run_after_daemon_restart`: a silent scripted worker samples `reachable`; its moved control socket gives `suspect`, then `unknown`; reconciliation of a `disconnected` run returns `unknown`, never a confirmed exit; only a recorded exit finishes the attempt (`failed_prelaunch_setup_cannot_be_confirmed_dead_by_caller`, `stop_retries_an_initially_unreachable_worker_after_daemon_restart`) |
+| Liveness is sampled without inference; `unknown` after the configured 60 s | the daemon probes the real local control socket on its tick (15 s cadence, 1 s retry while suspect); with the test clock advanced through the real transport path the state is `suspect` at 15–45 s and `unknown` at 60 s; out-of-order samples are refused; no model turn is involved |
+| Reconcile before retry | while `unknown`, reconciliation reports `unknown`, the attempt stays registered with its reservation, and no replacement attempt starts; restoring the socket returns `reachable` without a new attempt |
+| Progress spam extends no deadline and resets no attempt | the same fixture's progress message does not reset the unreachable clock; `job_deadline_interrupts_only_its_worker_despite_progress` (ten progress messages, deadline unchanged); joined `atlas_s5_progress_heartbeats_do_not_extend_job_deadline` (real Atlas probe held, repeated `working` reports, fixed deadline); the run deadline moves only by an explicit extension (`explicit_run_deadline_extension_survives_restart_without_new_account_allocation`) |
+| No timeout produces a successful result | `job_deadline_never_accepts_a_worker_that_ignores_interrupt`, `job_deadline_interrupt_retries_after_daemon_crash`: a timed-out job ends `failed` with `job_deadline`, no acceptance, no extra attempt |
+
+Rerun on 2026-09-28: `swarm_runtime` 24 passed serially; the Atlas heartbeat replay passed against PostgreSQL 16.
+
+Boundary: the 60-second threshold is exercised with the daemon's test clock through the real socket path, not a minute of wall-clock outage; a live harness's transport is SWARM-25 material.

@@ -635,15 +635,16 @@
       "blocker": null
     },
     "SWARM-51": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_runtime.rs",
         "daemon/src/swarm/runtime.rs",
         "docs/verification/swarm/SWARM-51.md",
         "daemon/tests/swarm_atlas.rs",
-        "docs/verification/swarm/S5.md"
+        "docs/verification/swarm/S5.md",
+        "daemon/tests/swarm_admission.rs"
       ],
-      "blocker": "Local supervised fixtures and a joined Atlas J4 probe now show that repeated evidence-free progress cannot extend an absolute job deadline or create acceptance. Other local fixtures distinguish output silence, interrupted transport, disconnected/unconfirmed exit, prompt suspect retry, crash between job-timeout persistence and interrupt, and a worker ignoring the first signal. Confirmed exit keeps the reservation binding as uncertain. A 60-second wall-clock outage, late launch/review race, worker ignoring all escalation, shared usage settlement, and qualified live harness behavior remain unverified."
+      "blocker": null
     },
     "SWARM-52": {
       "status": "partial",
