@@ -4,8 +4,8 @@
   "gate": "R",
   "criteria": ["AC-162", "AC-163", "AC-164", "AC-176", "AC-177"],
   "source": "docs/rfcs/voice-mode.md#the-owners-checks",
-  "ref": "claude/voice-mode",
-  "ref_note": "The Voice Mode branch (pull request #16) until it merges; then main.",
+  "ref": "main",
+  "ref_note": "Voice Mode is on main (pull request #16, merged 2026-09-28).",
   "minutes": 30,
   "prepare": {
     "vscode": true,
