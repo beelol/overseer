@@ -645,10 +645,13 @@ impl Daemon {
         if voice {
             needs_yes = crate::voice::request::decorate(self, &mut checked)?;
         }
-        let confirm = needs_yes || checked.iter().any(|a| match a["class"].as_str() {
-            Some(class) => class == super::control::CONFIRM,
-            None => super::control::action_class(a["action"].as_str().unwrap_or("")) == Some(super::control::CONFIRM),
-        });
+        // A swarm action's class is the daemon's own (set above from its op); any other action is
+        // Confirm by the action table or when the daemon marked it so, whatever the plan claims.
+        let confirm = needs_yes
+            || checked.iter().any(|a| match a["action"].as_str().unwrap_or("") {
+                "swarm" => a["class"] == super::control::CONFIRM,
+                kind => super::control::action_class(kind) == Some(super::control::CONFIRM) || a["class"] == super::control::CONFIRM,
+            });
         // At Ask first everything waits for a yes. At Steer and Auto what the owner asked for goes
         // out after the settle window; what Overseer starts by itself goes at once when the level
         // allows it (quiet actions at Steer, every Steer action at Auto), else it is a proposal.
