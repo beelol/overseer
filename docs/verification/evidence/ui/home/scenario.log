@@ -1,19 +1,28 @@
-[2026-09-27T23:01:15.193Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-27T23:01:25.269Z] PASS home shows the conversation with Overseer above the composer, whose target is New agent {"target":"agent"}
-[2026-09-27T23:01:27.386Z] PASS Enter at home starts an agent exactly as before, with no Overseer turn in the event log {"started":"r-d2daf9a19041","overseerTurns":0}
-[2026-09-27T23:01:27.793Z] screenshot docs/verification/evidence/ui/home/01-home-started.png
-[2026-09-27T23:01:27.793Z] PASS the start appears in the conversation as a card
-[2026-09-27T23:01:30.388Z] PASS typing @overseer first switches the target chip to Overseer {"chip":"overseer"}
-[2026-09-27T23:01:32.773Z] PASS the same text sent to Overseer starts no agent and is answered in the conversation {"runs":1,"answer":"OverseerHere is what everyone is doing:\n\n- **tidy the docs**: completed"}
-[2026-09-27T23:01:33.195Z] screenshot docs/verification/evidence/ui/home/02-home-overseer.png
-[2026-09-27T23:01:34.091Z] PASS `@` offers the agents by name, narrowed as you type ["tidy the docscompleted"]
-[2026-09-27T23:01:34.369Z] PASS Enter inserts the named agent {"inserted":"@overseer Tell @tidy the docs "}
-[2026-09-27T23:01:34.771Z] PASS a named agent reaches Overseer as that agent's id {"sent":"Tell @tidy the docs (r-d2daf9a19041) to add a changelog"}
-[2026-09-27T23:02:15.863Z] PASS *Start as an agent* starts one from a message sent to Overseer {"corrected":"r-b3464b6c7d7c"}
-[2026-09-27T23:02:20.923Z] PASS *Ask Overseer instead* stops the agent just started, removes its untouched worktree, and puts the words back for Overseer {"gone":true,"back":"what is the plan for the docs?","chip2":"overseer"}
-[2026-09-27T23:02:24.455Z] PASS the docked chat and home show the same conversation {"docked":"What is everyone doing?\nShared the state of 1 agent\nUsed\nmcp__overseer__check_in\n\nHere is what everyone is doing:\n\ntidy the docs: completed\nDone\n0s\n2 tokens\nTell @tidy the docs (r-d2daf9a19041) to add a changelog\nShared the state of 1 agent\n\nI could not find an agent called @tidy the docs (r-d2daf9a","home":"Started tidy the docs (claude) in home-repo\ntidy the docs\nAsk Overseer instead\nYou\nWhat is everyone doing?\nStart as an agent\nOverseer\nHere is what everyone is doing:\n\n- **tidy the docs**: completed\nYou\nTell @tidy the docs (r-d2daf9a19041) to add a changelog\nStart as an agent\nOverseer\nI could not fin"}
-[2026-09-27T23:02:24.616Z] screenshot docs/verification/evidence/ui/home/03-docked-same.png
-[2026-09-27T23:02:26.586Z] PASS *Start fresh* begins a new conversation and leaves a hold in place {"holds":[{"by":"owner","card":null,"reason":"kept through a fresh start","release_on":{"kind":"release"},"run_id":"r-d2daf9a19041","set_ms":1790550144624,"title":"tidy the docs"}]}
-[2026-09-27T23:02:26.780Z] screenshot docs/verification/evidence/ui/home/04-home-fresh.png
-[2026-09-27T23:02:30.965Z] screenshot docs/verification/evidence/ui/home/05-home-overseer-dark.png
-[2026-09-27T23:02:35.147Z] screenshot docs/verification/evidence/ui/home/06-home-overseer-light.png
+[2026-09-28T14:00:49.793Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-28T14:00:55.977Z] PASS home shows the conversation with Overseer above the composer, whose target is New agent {"target":"agent"}
+[2026-09-28T14:00:56.855Z] PASS Enter at home starts an agent exactly as before, with no Overseer turn in the event log {"started":"r-51b9a57b7a19","overseerTurns":0}
+[2026-09-28T14:00:57.053Z] screenshot docs/verification/evidence/ui/home/01-home-started.png
+[2026-09-28T14:00:57.053Z] PASS the start appears in the conversation as a card
+[2026-09-28T14:01:00.596Z] screenshot docs/verification/evidence/ui/home/02-home-target-overseer.png
+[2026-09-28T14:01:01.495Z] PASS the target chip's menu, by keyboard, offers New agent and Overseer and switches between them {"menuOpen":true,"items":["New agent","Overseer"],"viaMenu":"overseer","backToAgent":"agent"}
+[2026-09-28T14:01:03.635Z] PASS typing @overseer first switches the target chip to Overseer {"chip":"overseer"}
+[2026-09-28T14:01:04.316Z] PASS the same text sent to Overseer starts no agent and is answered in the conversation {"runs":1,"answer":"OverseerHere is what everyone is doing:\n\n- **tidy the docs**: completed"}
+[2026-09-28T14:01:04.467Z] screenshot docs/verification/evidence/ui/home/03-home-overseer.png
+[2026-09-28T14:01:04.954Z] PASS `@` offers the agents by name, narrowed as you type ["tidy the docscompleted"]
+[2026-09-28T14:01:05.220Z] PASS Enter inserts the named agent {"inserted":"@overseer Tell @tidy the docs "}
+[2026-09-28T14:01:05.576Z] PASS a named agent reaches Overseer as that agent's id {"sent":"Tell @tidy the docs (r-51b9a57b7a19) to add a changelog"}
+[2026-09-28T14:01:46.631Z] PASS *Start as an agent* starts one from a message sent to Overseer {"corrected":"r-71e4666610c1"}
+[2026-09-28T14:01:51.561Z] PASS *Ask Overseer instead* stops the agent just started, removes its untouched worktree, and puts the words back for Overseer {"gone":true,"back":"what is the plan for the docs?","chip2":"overseer"}
+[2026-09-28T14:01:55.084Z] PASS the docked chat and home show the same conversation {"docked":"What is everyone doing?\nShared the state of 1 agent\nUsed\nmcp__overseer__check_in\n\nHere is what everyone is doing:\n\ntidy the docs: completed\nDone\n0s\n2 tokens\nTell @tidy the docs (r-51b9a57b7a19) to add a changelog\nShared the state of 1 agent\n\nI could not find an agent called @tidy the docs (r-51b9a57","home":"Started tidy the docs (claude) in home-repo\ntidy the docs\nAsk Overseer instead\nYou\nWhat is everyone doing?\nStart as an agent\nOverseer\nHere is what everyone is doing:\n\n- **tidy the docs**: completed\nYou\nTell @tidy the docs (r-51b9a57b7a19) to add a changelog\nStart as an agent\nOverseer\nI could not fin"}
+[2026-09-28T14:01:55.261Z] screenshot docs/verification/evidence/ui/home/04-docked-same.png
+[2026-09-28T14:01:57.175Z] PASS what Overseer did is a card with one row per agent: why, the delivery, the state and its time, the whole text in the tooltip {"text":"Tell @tidy the docs (r-51b9a57b7a19) to add a changelog\nnamed · add\ndelivered\n07:01:56 AM","title":"Please add the release date too.\n\nWhy: named · delivery: add\nheld 07:01:56 AM · sent 07:01:56 AM · delivered 07:01:56 AM","state":"delivered"}
+[2026-09-28T14:01:57.651Z] screenshot docs/verification/evidence/ui/home/05-home-card-rows.png
+[2026-09-28T14:01:58.595Z] PASS *Start fresh* begins a new conversation and leaves a hold in place {"holds":[{"by":"owner","card":null,"reason":"kept through a fresh start","release_on":{"kind":"release"},"run_id":"r-51b9a57b7a19","set_ms":1790604115269,"title":"tidy the docs"}]}
+[2026-09-28T14:01:58.795Z] screenshot docs/verification/evidence/ui/home/06-home-fresh.png
+[2026-09-28T14:02:02.803Z] screenshot docs/verification/evidence/ui/home/07-home-overseer-1280.png
+[2026-09-28T14:02:04.471Z] screenshot docs/verification/evidence/ui/home/08-home-overseer-900.png
+[2026-09-28T14:02:10.198Z] screenshot docs/verification/evidence/ui/home/09-home-overseer-dark-1280.png
+[2026-09-28T14:02:11.846Z] screenshot docs/verification/evidence/ui/home/10-home-overseer-dark-900.png
+[2026-09-28T14:02:17.552Z] screenshot docs/verification/evidence/ui/home/11-home-overseer-light-1280.png
+[2026-09-28T14:02:19.204Z] screenshot docs/verification/evidence/ui/home/12-home-overseer-light-900.png
+[2026-09-28T14:02:19.221Z] PASS the text budget (AC-54) at 1280 and 900 px in the three themes: no overflow, no long runs, every icon-only control named, and at least 40% under the baseline new-agent view {"Overseer@1280":{"chars":105,"longRuns":[],"overflow":0,"unnamed":[]},"Overseer@900":{"chars":105,"longRuns":[],"overflow":0,"unnamed":[]},"Overseer Dark@1280":{"chars":105,"longRuns":[],"overflow":0,"unnamed":[]},"Overseer Dark@900":{"chars":105,"longRuns":[],"overflow":0,"unnamed":[]},"Overseer Light@1280":{"chars":105,"longRuns":[],"overflow":0,"unnamed":[]},"Overseer Light@900":{"chars":105,"longRuns":[],"overflow":0,"unnamed":[]}}
