@@ -116,11 +116,11 @@ clause, then record them through `docs/verification/records.py`.
 - [~] **TF-8 — Installed on the iPhone (owner).** Internal group "Overseer Internal" created with the
   owner as tester and auto-distribution on. **Verify (pending owner):** once processing finishes the
   owner installs and launches from the TestFlight app on the iPhone (owner action).
-- [ ] **TF-9 — Android (optional).** Only if attainable with no new paid account and no other
-  project's assets: a signed Android release (AAB/APK) from the same source and marks, using an
-  Overseer keystore. **Verify:** the signed artifact is built from the latest source with the
-  Overseer marks, and no other project's keystore or emulator was used; otherwise this is recorded
-  not-started with the blocker named.
+- [ ] **TF-9 — Android (optional).** **Not started (blocker recorded 2026-09-27):** the TestFlight
+  goal is iOS; the Android equivalent (Play Console internal testing) needs a **Google Play
+  Developer account** (a separate one-time paid account the owner hasn't set up), which the goal put
+  out of scope ("no new paid account"). A signed AAB with an Overseer keystore is buildable locally
+  from the same source and marks if the owner later wants sideload/Play distribution — say the word.
 
 ## What is owner-only vs agent-doable
 
