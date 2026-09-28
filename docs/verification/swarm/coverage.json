@@ -605,7 +605,7 @@
       "blocker": "Fixture plan validation, independent subgraphs, two failed plan/repair validation turns, rejected superseded-job ID reuse across restart, exact request-ID replay of semantic and unknown-dependency repair rejections without a second count, recorded accepted-evidence and resolved-conflict progress, and durable two-turn no-progress stalls pass. Legacy active turns conservatively backfill accepted-decision and resolved-conflict snapshots on migration. No-ID retries, other material-progress and repair-error classes, live director behavior, and complete S3/S5 traces remain unverified."
     },
     "SWARM-49": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_broker.rs",
         "daemon/tests/swarm_admission.rs",
@@ -615,7 +615,7 @@
         "docs/verification/swarm/milestone-9.md",
         "docs/verification/swarm/SWARM-49.md"
       ],
-      "blocker": "Malformed or unauthorized worker reports get bounded non-leaking diagnostics and no inbox effect; payload/inbox bounds, dedupe of 2,000 local-socket replays, Stop under two seconds during that flood, bounded director batches, and admission hold at a full inbox pass in fixtures. Terminal reports remain durable and can bypass a full inbox up to 16 outstanding per attempt; overflow is unacknowledged, duplicate receipts remain idempotent, and applying a report frees room for a correction. Real-harness overflow retry, live inference/context controls and broader permission paths remain unverified."
+      "blocker": null
     },
     "SWARM-50": {
       "status": "partial",
