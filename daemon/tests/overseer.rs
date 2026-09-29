@@ -1334,9 +1334,17 @@ fn ac189_overseer_keeps_agents_on_task() {
     std::fs::write(&mode_file, "echo").unwrap();
     let partial = claude_task(&d, &repo, &mode_file, "echo", "Partial", "write the API and the docs [leave out: the docs]");
     d.wait_done(&partial, 30);
-    std::thread::sleep(Duration::from_secs(6));
-    let s = wait_overseer_idle(&d, 60);
-    let done = s["messages"].as_array().unwrap().iter().find(|m| m["source"] == "card" && m["card"]["kind"] == "done" && m["card"]["agent"] == partial).expect("done card");
+    // The check-in comes after the grace and the batch window, and reads the finished work first
+    // (AC-238): wait for its card rather than for a fixed time.
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    let done = loop {
+        let s = wait_overseer_idle(&d, 60);
+        if let Some(m) = s["messages"].as_array().unwrap().iter().find(|m| m["source"] == "card" && m["card"]["kind"] == "done" && m["card"]["agent"] == partial) {
+            break m.clone();
+        }
+        assert!(std::time::Instant::now() < deadline, "done card\n{}", overseer_trace(&d));
+        std::thread::sleep(Duration::from_millis(300));
+    };
     assert_eq!(done["card"]["left_out"], "the docs");
     // The same failure three times trips a check-in.
     let circles = claude_task(&d, &repo, &mode_file, "circles", "Loops", "fix the tests");
