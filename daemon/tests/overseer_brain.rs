@@ -390,13 +390,17 @@ fn ac239_stuck_failed_and_limited_agents_come_back_to_overseer() {
 
     // No surface shows an error class or an HTTP code: the conversation, its cards, Overseer's
     // words and the agents' reasons in the daemon's state.
-    let all = d.call("overseer.messages", json!({"after": 0, "limit": 500}))["messages"].to_string();
+    // What is shown: each message's words and its card's reason and offers (not ids or times,
+    // where "429" can appear by chance).
+    let all: String = d.call("overseer.messages", json!({"after": 0, "limit": 500}))["messages"].as_array().unwrap().iter().map(|m| format!("{} {} {}", m["text"].as_str().unwrap_or(""), m["card"]["reason"].as_str().unwrap_or(""), m["card"]["offers"].as_array().map(|o| o.iter().map(|x| x["label"].as_str().unwrap_or("").to_string()).collect::<Vec<_>>().join(" ")).unwrap_or_default())).collect::<Vec<_>>().join("\n");
+    let words = |t: &str| t.split(|c: char| !c.is_ascii_alphanumeric() && c != '_' && c != '[' && c != ']').map(str::to_string).collect::<Vec<_>>();
     let state = d.call("state", json!({}));
     let plain: Vec<String> = state["runs"].as_array().unwrap().iter().filter_map(|r| r["plain_reason"].as_str().map(str::to_string)).collect();
     assert!(plain.iter().any(|p| p.contains("users_v2")), "{plain:?}");
     for raw in ["[rate_limit]", "rate_limit", "429", "turn reported failure"] {
-        assert!(!all.contains(raw), "{raw} in the conversation: {all}");
-        assert!(plain.iter().all(|p| !p.contains(raw)), "{raw} in a plain reason: {plain:?}");
+        let shown = |t: &str| if raw.contains(' ') { t.contains(raw) } else { words(t).iter().any(|w| w == raw) };
+        assert!(!shown(&all), "{raw} in the conversation: {all}");
+        assert!(plain.iter().all(|p| !shown(p)), "{raw} in a plain reason: {plain:?}");
     }
 }
 
