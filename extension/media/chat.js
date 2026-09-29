@@ -3,6 +3,8 @@
 // Everything rare (merge back, pull request, raw output, event log, details, cleanup) lives in the
 // … menu. IDs used by tests are stable: #title #status #prompt #send #interrupt #review #more
 // #merge #pr #raw #tab-conv #tab-log #perm #changes #conv #log #rawout.
+// A finished agent's work (AC-243) has its own bar above the composer, #land: what it became
+// (#land-text, "Merged into main (1a2b3c4)") and #merge-now, #open-pr, #publish, #cancel-merge, #cleanup-now.
 (function () {
   const ui = window.OverseerUI;
   const el = ui.el;
@@ -55,10 +57,11 @@
       row.append(this.chips, this.sendBtn);
       composer.append(tools, this.prompt, row);
       this.queuedEl = el('div', 'queued'); this.queuedEl.hidden = true; this.queuedEl.id = 'queued';
+      this.landBar = el('div', 'land-bar'); this.landBar.id = 'land'; this.landBar.hidden = true; this.landBar.setAttribute('role', 'group'); this.landBar.setAttribute('aria-label', "The agent's work");
       this.tools = window.OverseerPromptTools.create(this.prompt, tools, this.tray, { post: m => this.post(m), harness: () => this.msg?.run.harness, target: () => this.msg?.workspace ? { workspace_id: this.msg.workspace.id } : null,
         notice: t => this.notice(t), onChange: () => {} });
       this.why = el('div', 'composer-note'); this.why.id = 'send-why';
-      inner.append(this.permBar, this.queuedEl, this.noticeEl, this.tray, composer, this.why);
+      inner.append(this.permBar, this.landBar, this.queuedEl, this.noticeEl, this.tray, composer, this.why);
       bottom.append(inner);
       this.root.replaceChildren(head, this.scroll, this.jump, bottom);
 
@@ -138,7 +141,50 @@
       this.worktree = worktree; this.child = child;
       this.renderDetails();
       this.renderPermBar();
+      this.renderLand();
       this.opts.onState && this.opts.onState();
+    }
+
+    /**
+     * AC-243: a finished agent's work, one line above the composer: Merge into main (and Open PR
+     * with a GitHub remote, or Publish to GitHub without any remote, AC-232); Finish or Cancel a
+     * merge that stopped on conflicts; "Merged into main (1a2b3c4)" and Clean up afterwards.
+     */
+    renderLand() {
+      const m = this.msg, land = m && m.land, bar = this.landBar;
+      // Redrawn only when it changes: a button replaced between mouse down and up never gets its click.
+      const sig = JSON.stringify([land, this.child, m && m.trusted]);
+      if (sig === this.landSig) return;
+      this.landSig = sig;
+      const hide = () => { bar.hidden = true; bar.replaceChildren(); delete bar.dataset.state; };
+      if (!land || this.child || !land.worktree || land.active || !m.trusted) return hide();
+      const button = (id, label, icon, type, primary) => {
+        const b = el('button', 'btn sm' + (primary ? ' primary' : '')); b.type = 'button'; b.id = id;
+        if (icon) b.append(ui.icon(icon, 'xs'));
+        b.append(el('span', null, label));
+        b.addEventListener('click', () => this.post({ type }));
+        return b;
+      };
+      const items = []; let icon, text, state;
+      if (land.conflicts) {
+        state = 'conflicts'; icon = 'warning';
+        text = land.conflicts.length ? `Merge stopped: conflicts in ${land.conflicts.join(', ')}` : 'Merge stopped: conflicts';
+        items.push(button('merge-now', 'Finish merge', 'git-merge', 'mergeBack', true), button('cancel-merge', 'Cancel merge', 'discard', 'cancelMerge'));
+      } else if (land.merged) {
+        state = 'merged'; icon = 'git-merge'; text = land.text;
+        if (!land.removed) items.push(button('cleanup-now', 'Clean up', 'trash', 'cleanup'));
+      } else if (land.canMerge) {
+        state = 'ready'; icon = land.landing && land.landing.state === 'pr' ? 'git-pull-request' : 'git-branch';
+        text = land.landing && land.landing.state === 'pr' ? land.text : `${land.files} file${land.files === 1 ? '' : 's'} to land`;
+        items.push(button('merge-now', `Merge into ${land.target}`, 'git-merge', 'mergeBack', true));
+        if (land.github) items.push(button('open-pr', 'Open PR', 'git-pull-request', 'openPullRequest'));
+        else if (land.remote === null) items.push(button('publish', 'Publish to GitHub…', 'github', 'publishToGitHub'));
+      } else if (land.text) {
+        state = land.landing.state; icon = 'git-pull-request'; text = land.text;
+      } else return hide();
+      const words = el('span', 'land-text', text); words.id = 'land-text'; words.title = land.why || text;
+      bar.replaceChildren(ui.icon(icon, 'sm'), words, ...items);
+      bar.dataset.state = state; bar.hidden = false;
     }
 
     renderPermBar() {
@@ -183,8 +229,14 @@
         items.push('sep');
       }
       if (!this.child) {
-        items.push({ id: 'merge', label: 'Merge back…', icon: 'git-merge', disabled: !!blocked, why: blocked, run: () => this.post({ type: 'mergeBack' }) });
-        items.push({ id: 'pr', label: 'Open pull request…', logo: window.OverseerLogos && window.OverseerLogos.logo('github', { size: 14 }), disabled: !!blocked, why: blocked, run: () => this.post({ type: 'openPullRequest' }) });
+        // AC-232, AC-243: Merge into the target; Open PR only with a GitHub remote, Publish to GitHub
+        // when there is no remote at all (unknown until the plan arrives: Open PR explains then).
+        const land = m.land || {};
+        this.post({ type: 'refreshLanding' });
+        items.push({ id: 'merge', label: land.conflicts ? 'Finish merge…' : `Merge into ${land.target || 'main'}…`, icon: 'git-merge', disabled: !!blocked, why: blocked, run: () => this.post({ type: 'mergeBack' }) });
+        if (land.conflicts) items.push({ id: 'cancel-merge-menu', label: 'Cancel merge', icon: 'discard', disabled: !!blocked, why: blocked, run: () => this.post({ type: 'cancelMerge' }) });
+        if (land.remote === null) items.push({ id: 'publish-menu', label: 'Publish to GitHub…', logo: window.OverseerLogos && window.OverseerLogos.logo('github', { size: 14 }), disabled: !!blocked, why: blocked, run: () => this.post({ type: 'publishToGitHub' }) });
+        else if (land.github || land.remote === undefined) items.push({ id: 'pr', label: 'Open pull request…', logo: window.OverseerLogos && window.OverseerLogos.logo('github', { size: 14 }), disabled: !!blocked, why: blocked, run: () => this.post({ type: 'openPullRequest' }) });
         items.push('sep');
       }
       items.push({ id: this.view === 'log' ? 'tab-conv' : 'tab-log', label: this.view === 'log' ? 'Show conversation' : 'Show event log', icon: this.view === 'log' ? 'comment-discussion' : 'list-flat', run: () => this.show(this.view === 'log' ? 'conv' : 'log') });
@@ -250,7 +302,7 @@
       if (card) this.conversation.settleProposal(card, text);
     }
     events(items) { for (const x of items) this.add(x.event, x.label); }
-    notice(text) { this.noticeEl.textContent = text || ''; this.noticeEl.classList.toggle('error', !!text); }
+    notice(text, info) { this.noticeEl.textContent = text || ''; this.noticeEl.classList.toggle('error', !!text && !info); }
     raw(raw) { this.rawEl.hidden = false; this.rawEl.textContent = (raw.truncated ? `[${raw.note}]\n` : '') + raw.lines.map(l => `[${l.s}] ${l.d}`).join('\n'); this.rawEl.scrollIntoView({ block: 'start' }); }
     // AC-100: the changed files are listed in the review only; the Review button says how many.
     changes(c) {

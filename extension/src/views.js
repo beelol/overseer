@@ -2,6 +2,7 @@
 const vscode = require('vscode');
 const path = require('path');
 const features = require('./features');
+const Landing = require('../media/landing-text.js');
 
 const STATUS_ICON = {
   queued: ['clock', 'charts.yellow'], starting: ['loading~spin', 'charts.blue'], running: ['sync~spin', 'charts.blue'],
@@ -150,7 +151,7 @@ class AgentsProvider {
   /** What the list shows (relative times in 30-second steps). */
   signature() {
     const st = this.model.state || {};
-    return JSON.stringify([Math.floor(Date.now() / 30000), st.oversight || {}, st.overseer || {}, (st.tasks || []).map(t => [t.id, t.title, t.repo_root, t.archived_ms ? 1 : 0]),
+    return JSON.stringify([Math.floor(Date.now() / 30000), st.oversight || {}, st.overseer || {}, st.landings || {}, (st.tasks || []).map(t => [t.id, t.title, t.repo_root, t.archived_ms ? 1 : 0]),
       (st.runs || []).map(r => [r.id, r.status, r.parent_run_id, r.attention?.kind, r.harness, r.model, r.profile_id, r.workspace_id, r.title, r.exit_reason, r.ended_ms ? 1 : 0]),
       (st.profiles || []).map(p => [p.id, p.name]), (st.workspaces || []).map(w => [w.id, w.branch, w.kind]),
       (this.handlers.attention?.() || []).map(a => [a.run_id, a.label, a.detail]), this.handlers.pinned?.() || [],
@@ -505,10 +506,12 @@ class AgentsProvider {
     const o = (m.state.overseer && m.state.overseer.run_id ? (m.state.oversight || {})[run.id] : undefined) || {};
     const voiced = this.handlers.voiceTargeted?.().has(run.id);
     const marks = [voiced && '🎙 voice', o.held && '⏸ held', o.watched && '◉ watched', o.watching && o.watching.length && '◉ watching', o.conflicts && `⚠ ${o.conflicts} conflict${o.conflicts === 1 ? '' : 's'}`].filter(Boolean);
-    item.description = [ACTIVE.has(run.status) ? '' : ago(run.ended_ms || run.created_ms), ...marks].filter(Boolean).join(' · ');
+    // AC-243: what its work became, first: "Merged into main (1a2b3c4)".
+    const landed = ACTIVE.has(run.status) ? '' : Landing.text((m.state.landings || {})[run.workspace_id]);
+    item.description = [landed, ACTIVE.has(run.status) ? '' : ago(run.ended_ms || run.created_ms), ...marks].filter(Boolean).join(' · ');
     const profile = run.profile_id ? m.profile(run.profile_id) : undefined;
     const ws = m.workspace(run.workspace_id);
-    const status = STATUS_TEXT[run.status] || run.status;
+    const status = (STATUS_TEXT[run.status] || run.status) + (landed ? ` · ${landed}` : '');
     item.tooltip = new vscode.MarkdownString([`**${task.title}**`, `${status}${run.exit_reason && !ACTIVE.has(run.status) ? ` — ${run.exit_reason}` : ''}`,
       [run.harness, profile?.name, run.model].filter(Boolean).join(' · '), ws ? `${ws.kind === 'current' ? 'current checkout' : ws.branch} · ${path.basename(task.repo_root)}` : ''].filter(Boolean).join('\n\n'));
     item.accessibilityInformation = { label: `${task.title}, ${status}, ${run.harness}${profile ? ', ' + profile.name : ''}${marks.length ? ', ' + marks.map(x => x.replace(/^\S+ /, '')).join(', ') : ''}` };

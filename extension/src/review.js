@@ -54,6 +54,9 @@ class Review {
       reviewHunk: (session, message) => this.reviewHunk(session, message),
       closed: runId => this.onClosed?.(runId),
       setScope: (runId, scope) => this.setScope(runId, scope),
+      // AC-243: the review's Merge / Open PR / Cancel merge buttons, the same as the chat's.
+      land: runId => (runId ? this.model.landing?.summary(runId) : undefined),
+      land_action: (runId, type) => this.landAction(runId, type),
     });
     context.subscriptions.push(this.manager,
       vscode.window.registerWebviewPanelSerializer('overseer.review', this.manager),
@@ -148,6 +151,19 @@ class Review {
     })().catch(error => { this.marksLoading.delete(runId); this.log('reviewed marks: ' + error.message); });
     this.marksLoading.set(runId, loading);
     return loading;
+  }
+
+  /** A merge button pressed in the review: the chat's commands, for the review's agent only. */
+  async landAction(runId, type) {
+    const command = { merge: 'overseer.mergeBack', openPullRequest: 'overseer.openPullRequest', cancelMerge: 'overseer.cancelMerge', publish: 'overseer.publishToGitHub', cleanup: 'overseer.cleanupWorkspace' }[type];
+    if (runId && command) await vscode.commands.executeCommand(command, runId);
+  }
+
+  /** What the agent's work became changed (merged, stopped, cancelled): the review's buttons follow. */
+  landingChanged(runId) {
+    const run = runId && this.model.run(runId);
+    const root = run && this.model.rootRun(run);
+    for (const id of new Set([runId, root?.id])) { const found = id && this.manager.panelFor(id); if (found) this.manager.postOverseer(found.session); }
   }
 
   showMarks(runId) {

@@ -17,7 +17,7 @@
     if (m.type === 'run') chat.setRun(m);
     else if (m.type === 'history') chat.history(m.events, m.truncated, same ? saved : undefined);
     else if (m.type === 'events') chat.events(m.items);
-    else if (m.type === 'notice') chat.notice(m.message);
+    else if (m.type === 'notice') chat.notice(m.message, m.info);
     else if (m.type === 'raw') chat.raw(m.raw);
     else if (m.type === 'changes') chat.changes(m.changes);
     else if (m.type === 'mentionFiles') chat.mentionFiles(m);

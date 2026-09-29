@@ -13,7 +13,9 @@ function runMessage(model, runId, steering) {
     repo: task?.repo_root, trusted: vscode.workspace.isTrusted, active: ACTIVE.has(run.status), queued: steering?.queued(runId),
     followUpSupported: !String(run.capabilities?.follow_up || '').startsWith('unsupported'),
     interruptSupported: !String(run.capabilities?.interrupt || '').startsWith('unsupported'),
-    children: model.descendants(runId).map(c => ({ id: c.id, title: c.title, status: c.status, parent: c.parent_run_id, evidence: c.relation_source })) };
+    children: model.descendants(runId).map(c => ({ id: c.id, title: c.title, status: c.status, parent: c.parent_run_id, evidence: c.relation_source })),
+    // AC-243: what its work became and what it can do with it (Merge, Open PR, Cancel merge, Clean up).
+    land: run.parent_run_id ? undefined : model.landing?.summary(runId) };
 }
 
 class RunFeed {

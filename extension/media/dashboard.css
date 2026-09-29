@@ -114,6 +114,8 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .composer-view { display: flex; flex-direction: column; }
 .tile-marks { display: inline-flex; gap: 6px; margin-left: 6px; font-size: var(--ov-font-xs); color: var(--ov-muted); }
 .tile-mark { display: inline-flex; align-items: center; gap: 2px; }
+.tile-landed { margin-left: 6px; font-size: var(--ov-font-xs); color: var(--ov-done); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.tile-landed[hidden] { display: none; }
 .tile.held .tile-head { border-left: 3px solid var(--ov-accent); }
 .tile.conflict .tile-marks .codicon-warning { color: var(--ov-accent); }
 .composer-view .composer.big { position: relative; }

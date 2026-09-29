@@ -26,6 +26,9 @@ class OutputPanels {
     entry.panel.webview.postMessage({ type: 'run', ...msg });
   }
 
+  /** A line under an agent's chat (what a merge did, or why it could not). */
+  notice(runId, text) { this.panels.get(runId)?.panel.webview.postMessage({ type: 'notice', message: text, info: true }); }
+
   async pushChanges(runId, entry, force) {
     const run = this.model.run(runId);
     if (!run || run.parent_run_id) return;

@@ -230,6 +230,9 @@ class CommandCenter {
     this.pushChanges(true);
   }
 
+  /** A line under the dashboard chat, when it shows that agent (AC-243's merge results). */
+  notice(runId, text) { if (this.chatRun === runId) this.panel?.webview.postMessage({ type: 'notice', message: text, info: true }); }
+
   async pushChanges(force) {
     const run = this.chatRun && this.model.run(this.chatRun);
     if (!run || run.parent_run_id) return;
@@ -240,7 +243,7 @@ class CommandCenter {
   async push() {
     if (!this.panel) return;
     const { tasks, runs, workspaces, profiles } = this.model.state;
-    const state = { tasks, runs, workspaces, profiles, oversight: this.model.state.oversight || {}, overseer: this.model.state.overseer || {}, accounts: this.handlers.launcher.accounts(), attention: this.handlers.attention(), pinned: this.handlers.pinned(),
+    const state = { tasks, runs, workspaces, profiles, oversight: this.model.state.oversight || {}, overseer: this.model.state.overseer || {}, landings: this.model.state.landings || {}, accounts: this.handlers.launcher.accounts(), attention: this.handlers.attention(), pinned: this.handlers.pinned(),
       gridMax: Math.max(1, Math.min(16, vscode.workspace.getConfiguration('overseer').get('grid.maxTiles', 6))), archived: this.handlers.archived() };
     await this.panel.webview.postMessage({ type: 'state', state, selected: this.handlers.selected() });
     if (this.chatRun) { const msg = runMessage(this.model, this.chatRun, this.handlers.steering); if (msg) { this.chatFeed.refreshDescendants(); this.panel.webview.postMessage({ type: 'run', channel: 'chat', ...msg }); } }

@@ -12,6 +12,7 @@ const { CommandCenter } = require('./command-center');
 const { Arrangement } = require('./arrangement');
 const { NewTaskPanel } = require('./new-task');
 const { PullRequests } = require('./pull-request');
+const { Landing } = require('./landing');
 const { TaskLauncher } = require('./task-launcher');
 const { Steering } = require('./run-actions');
 const { Dashboard } = require('./dashboard-mode');
@@ -234,6 +235,12 @@ async function activate(context) {
   // relays what is typed in its chat, and carries out the actions the daemon asks the UI for.
   const overseerChat = new OverseerChat({ context, client, model, outputs, setPinned: (id, on) => { setPinned(id, on); agents.refresh(); center.push(); }, log: say });
   const pullRequests = new PullRequests(client, model, say);
+  // AC-232, AC-243: the Merge button, its one confirmation, Cancel merge, and the local merge for a
+  // repository with no GitHub remote. Chats read it through the model (run-feed.js), the review through its host.
+  const landing = new Landing(client, model, { pickAgent: (...a) => pickAgent(...a), hasWorktree: r => hasWorktree(r), log: say,
+    notice: (runId, text) => { outputs.notice?.(runId, text); center.notice?.(runId, text); }, onMerged: runId => markReviewed(runId) });
+  model.landing = landing; pullRequests.landing = landing;
+  landing.onDidChange(runId => { model.emitter.fire(); review.landingChanged?.(runId); });
   const newTaskPanel = new NewTaskPanel(context, client, model, { selectRun: (...a) => selectRun(...a), launcher, column: () => vscode.ViewColumn.Beside });
   // Voice Mode (Gate R): the voice view, its status bar item and toasts; the daemon listens.
   const voice = new Voice(context, client, { selectRun: (...a) => selectRun(...a), view: () => center.panel, showHome: () => goHome() });
@@ -604,53 +611,13 @@ async function activate(context) {
   }
 
   /**
-   * Merge back (never automatic): prepare in the worktree (commit its work, merge the target into
-   * the run's branch; conflicts go to the same session), show what will land for review, then
-   * merge into the target branch in the source checkout only after confirmation.
+   * Merge (never automatic, AC-243): one confirmation that lists the files that land (the untracked
+   * ones apart), then the merge; conflicts stop in the worktree, where the agent combines them and
+   * the chat offers Finish merge or Cancel merge. See landing.js.
    */
   async function mergeBack(arg) {
     requireTrust();
-    const picked = model.run(await pickAgent(arg, { title: 'Merge back which agent?', fits: r => hasWorktree(r) && !ACTIVE.has(r.status), none: 'No finished agent has a worktree to merge back.' }));
-    if (!picked) return;
-    const run = model.rootRun(picked);
-    const wsId = run.workspace_id;
-    let plan = await client.request('workspace.merge_plan', { workspace_id: wsId });
-    if (!plan.ok) { vscode.window.showWarningMessage(`Merge back is unavailable: ${plan.reason}`); return; }
-    if (plan.state === 'idle') {
-      const detail = [`${plan.branch} → ${plan.target} in ${plan.repo}`,
-        plan.worktree_uncommitted.length ? `1. Commit ${plan.worktree_uncommitted.length} uncommitted worktree file(s) to ${plan.branch}.` : '1. The worktree has no uncommitted changes.',
-        `2. Merge ${plan.target} into ${plan.branch} inside the worktree. Conflicts go back to ${run.harness} in the same session.`,
-        `3. You review exactly what will land, then confirm. Nothing reaches ${plan.target} before that.`,
-        ...plan.blockers.map(b => '⚠ ' + b)].join('\n');
-      const go = await vscode.window.showInformationMessage(`Merge back ${plan.branch} into ${plan.target}?`, { modal: true, detail }, 'Prepare Merge Back');
-      if (go !== 'Prepare Merge Back') return;
-      const prep = await client.request('workspace.merge_prepare', { workspace_id: wsId, handoff: true });
-      await model.refresh();
-      if (prep.state === 'conflicts') {
-        const how = prep.handoff?.sent ? `Sent to ${run.harness} as a follow-up in the same session. Run Merge Back again when it finishes.` : `Resolve them in the worktree (${prep.handoff?.why || 'no follow-up possible'}), then run Merge Back again.`;
-        vscode.window.showWarningMessage(`Merge back: conflicts in ${prep.files.join(', ')}. ${how}`);
-        await outputs.show(run.id, { preserveFocus: false });
-        return;
-      }
-      plan = await client.request('workspace.merge_plan', { workspace_id: wsId });
-    }
-    if (plan.state === 'resolving' || plan.state === 'resolved') {
-      const res = await client.request('workspace.merge_resolved', { workspace_id: wsId });
-      if (res.state !== 'ready') { vscode.window.showWarningMessage(`Merge back: conflict markers remain in ${res.remaining.join(', ')}. Resolve them (or ask the agent again), then run Merge Back again.`); return; }
-      plan = await client.request('workspace.merge_plan', { workspace_id: wsId });
-    }
-    // Show the result for review: exactly what lands on the target (merge-base comparison).
-    const opts = await client.request('comparison.options', { run_id: run.id, branch: plan.target });
-    const landing = opts.options.find(o => o.mode === 'branch_merge_base' && o.branch === plan.target && o.available);
-    if (landing) { review.setComparison(run.id, landing); await review.open(run.id); }
-    const files = landing ? (await client.request('workspace.diff', { workspace_id: wsId, base: landing.base, status: false })).changes : [];
-    if (plan.blockers.length) { vscode.window.showWarningMessage(`Merge back is ready but blocked: ${plan.blockers.join(' ')}`); return; }
-    const detail = `The review now shows exactly what lands on ${plan.target} (merge-base comparison), ${files.length} file(s):\n${files.slice(0, 20).map(f => `${f.status} ${f.path}`).join('\n')}${files.length > 20 ? '\n…' : ''}\n\nThe worktree and ${plan.branch} are kept.`;
-    const ok = await vscode.window.showWarningMessage(`Merge ${plan.branch} into ${plan.target} in ${path.basename(plan.repo)}?`, { modal: true, detail }, 'Complete Merge Back');
-    if (ok !== 'Complete Merge Back') return;
-    const done = await client.request('workspace.merge_complete', { workspace_id: wsId });
-    await model.refresh();
-    vscode.window.showInformationMessage(`Merged ${done.branch} into ${done.target} (${String(done.commit).slice(0, 10)}). The worktree and branch are kept; clean them up when you no longer need them.`);
+    return landing.merge(arg);
   }
 
   /** Interrupts every active agent and stops the daemon, after confirmation. Nothing respawns it. */
@@ -1052,6 +1019,9 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.cleanupArchived', guard(cleanupArchived)),
     vscode.commands.registerCommand('overseer.stopSelected', guard(async () => { requireTrust(); const id = await pickAgent(undefined, { title: 'Stop which agent?', fits: r => ACTIVE.has(r.status), none: 'No agent is running.' }); if (id) await client.request('run.interrupt', { run_id: id }); })),
     vscode.commands.registerCommand('overseer.mergeBack', guard(mergeBack)),
+    // Internal (the chat's and the review's buttons): cancel a merge stopped on conflicts; publish a repository with no remote.
+    vscode.commands.registerCommand('overseer.cancelMerge', guard(async arg => { requireTrust(); const id = runArg(arg); if (id) await landing.cancel(id); })),
+    vscode.commands.registerCommand('overseer.publishToGitHub', guard(async arg => { requireTrust(); const id = runArg(arg); if (id) await landing.publish(id); })),
     vscode.commands.registerCommand('overseer.openPullRequest', guard(async arg => { const id = await pickAgent(arg, { title: 'Open a pull request for which agent?', fits: hasWorktree, none: 'No agent has a worktree to open a pull request from.' }); if (id) await pullRequests.open(id); })),
     vscode.commands.registerCommand('overseer.startDaemon', guard(async () => { client.disposed = false; await client.start(); await model.refresh(); updateStatus(); })),
     vscode.commands.registerCommand('overseer.showLog', () => log.show()),

@@ -57,12 +57,13 @@ impl Daemon {
         let branch = ws.branch.clone().ok_or_else(|| anyhow!("worktree has no branch"))?;
         let remotes: Vec<String> = git::git(path, &["remote"])?.lines().map(str::to_string).collect();
         let Some(remote) = remotes.iter().find(|r| *r == "origin").or(remotes.first()).cloned() else {
-            return refuse(format!("The repository {} has no Git remote. Add a GitHub remote (git remote add origin https://github.com/OWNER/REPO.git) to open pull requests.", task.repo_root));
+            // AC-232: the surfaces offer the local merge (or Publish to GitHub) instead, by `why`.
+            return Ok(json!({"ok": false, "why": "no_remote", "reason": format!("The repository {} has no Git remote, so there is no pull request to open. Merge the work into its branch here instead, or publish the repository to GitHub first.", task.repo_root)}));
         };
         // The configured URL (not `get-url`, which applies insteadOf rewrites).
         let url = git::git(path, &["config", "--get", &format!("remote.{remote}.url")])?;
         let Some((owner, repo)) = github_repo(&url) else {
-            return refuse(format!("The remote {remote} ({}) is not on GitHub; Open PR only supports github.com remotes.", without_userinfo(&url)));
+            return Ok(json!({"ok": false, "why": "not_github", "reason": format!("The remote {remote} ({}) is not on GitHub; Open PR only supports github.com remotes.", without_userinfo(&url))}));
         };
         let target = task.target_ref.clone().filter(|t| !t.is_empty() && !t.contains("..")).and_then(|t| {
             let local = git::git(Path::new(&task.repo_root), &["show-ref", "--verify", "--quiet", &format!("refs/heads/{t}")]).is_ok();

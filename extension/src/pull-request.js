@@ -71,6 +71,9 @@ class PullRequests {
     const plan = await this.client.request('workspace.pr_plan', { workspace_id: run.workspace_id });
     this.log(`open PR for ${run.id}: ${plan.ok ? `${plan.owner}/${plan.repo} ${plan.branch} → ${plan.target}` : plan.reason}`);
     // Dialogs, not toasts: this answers a click, and VS Code's Do Not Disturb hides warning and info toasts.
+    // AC-232: no GitHub remote is not an error: the local merge (or Publish to GitHub) is offered
+    // in the window instead, never as a system alert.
+    if (!plan.ok && ['no_remote', 'not_github'].includes(plan.why) && this.landing) return this.landing.offerLocal(run.id, plan.reason);
     if (!plan.ok) { vscode.window.showWarningMessage('Open PR is unavailable.', { modal: true, detail: plan.reason }); return; }
     const token = await this.token();
     if (!token) return;

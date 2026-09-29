@@ -181,6 +181,11 @@
       if (!tile.marks) { tile.marks = el('span', 'tile-marks'); tile.who.after(tile.marks); }
       tile.marks.replaceChildren(...marks.map(([icon, text]) => { const s = el('span', 'tile-mark'); s.append(ui.icon(icon, 'xs'), el('span', null, text)); return s; }));
       tile.el.classList.toggle('held', !!o.held); tile.el.classList.toggle('watched', !!o.watched); tile.el.classList.toggle('conflict', !!o.conflicts);
+      // AC-243: what a finished agent's work became: "Merged into main (1a2b3c4)".
+      const landed = !ACTIVE.has(run.status) && window.OverseerLanding ? window.OverseerLanding.text((state.landings || {})[run.workspace_id]) : '';
+      if (!tile.landed) { tile.landed = el('span', 'tile-landed'); tile.marks.after(tile.landed); }
+      tile.landed.hidden = !landed; tile.landed.textContent = landed; tile.landed.title = landed;
+      tile.el.classList.toggle('merged', /^Merged/.test(landed));
       const att = run.attention && run.attention.kind === 'permission' ? run.attention : undefined;
       tile.perm.hidden = !att;
       if (att) {
