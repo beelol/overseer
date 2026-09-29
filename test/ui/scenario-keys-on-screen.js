@@ -96,7 +96,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
   } finally {
     s.writeLog();
     fs.writeFileSync(path.join(s.evidence, 'result.json'), JSON.stringify(result, null, 2));
-    if (!process.env.KEEP_OPEN) { await s.quit(); s.stopDaemon(); }
+    // Whatever happened, no fixture agent is left waiting (daemon.stop_all interrupts them, then the daemon exits).
+    if (!process.env.KEEP_OPEN) { await s.quit(); try { s.ctl('daemon.stop_all'); } catch {} s.stopDaemon(); }
     const failed = result.error || result.checks.some(c => !c.ok);
     console.log(failed ? 'SCENARIO FAILED' : 'SCENARIO PASSED', s.root);
     process.exit(failed ? 1 : 0);
