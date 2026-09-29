@@ -273,6 +273,24 @@ async function mcpClient() {
     }
     out({ type: 'result', subtype: 'success', is_error: false, result: 'Sessions refresh once.', session_id: sid, num_turns: 1, duration_ms: 48210, total_cost_usd: 0.0412,
       usage: { input_tokens: 18423, output_tokens: 1204, cache_read_input_tokens: 9321 } });
+  } else if (mode === 'worker') {
+    // An agent at work (AC-228's stages): thinks, writes a file with the Write tool, reads it back,
+    // over about FIXTURE_WORKER_MS (4 s by default), then finishes. Honours an interrupt.
+    const total = Number(process.env.FIXTURE_WORKER_MS || 4000);
+    const stop = next(m => m.type === 'control_request' && m.request?.subtype === 'interrupt').then(() => 'interrupt');
+    const step = async ms => (await Promise.race([stop, sleep(ms).then(() => 'go')])) === 'interrupt';
+    assistant([{ type: 'text', text: 'Drafting the page.' }]);
+    if (await step(total / 4)) { result(true, 'interrupted'); await sleep(50); process.exit(130); }
+    const file = path.join(process.cwd(), 'draft.md');
+    assistant([{ type: 'tool_use', id: 'toolu_w1', name: 'Write', input: { file_path: file, content: '# Draft\n\nThe sections.\n' } }]);
+    fs.writeFileSync(file, '# Draft\n\nThe sections.\n');
+    user([{ type: 'tool_result', tool_use_id: 'toolu_w1', content: 'File created successfully' }]);
+    if (await step(total / 4)) { result(true, 'interrupted'); await sleep(50); process.exit(130); }
+    assistant([{ type: 'tool_use', id: 'toolu_w2', name: 'Read', input: { file_path: file } }]);
+    user([{ type: 'tool_result', tool_use_id: 'toolu_w2', content: '# Draft' }]);
+    if (await step(total / 2)) { result(true, 'interrupted'); await sleep(50); process.exit(130); }
+    assistant([{ type: 'text', text: 'Wrote draft.md.' }]);
+    result(false, 'Wrote draft.md.');
   } else if (mode === 'slow') {
     // Busy for a few seconds (steering tests); honours an interrupt; each turn echoes its prompt.
     const content = first.message.content;
@@ -489,6 +507,22 @@ async function mcpClient() {
       // One line per agent: "<id> · <title> · <status> · …".
       agents = roster.split('\n').map(l => l.split(' · ')).filter(p => p.length >= 3).map(p => ({ id: p[0], title: p[1], status: p[2] }));
     }
+    // Moving the owner around VS Code (AC-226), typed or spoken the same: "show me the draft agent"
+    // focuses it, "what did it make?" shows its finished work, "open the file it made" opens it.
+    // "It" is the agent started last (the roster lists the newest first).
+    const navFor = words => {
+      const w = String(words || '').trim().replace(/[.!?]+$/, '').replace(/^(?:overseer,?\s*)/i, '');
+      const named = n => { const k = String(n || '').toLowerCase().replace(/^the /, '').replace(/ agent$/, '').trim(); return k && agents.find(a => a.title.toLowerCase().includes(k)); };
+      const one = n => (!n || /^(it|that|this|that one)$/i.test(n) ? agents[0] : named(n));
+      let m;
+      if ((m = /^what did (it|.+?) (?:make|build|write|do)$/i.exec(w)) || (m = /^show me (?:it|what (it|.+?) made|(?:the |its )?(?:finished )?work)$/i.exec(w))) { const a = one(m[1]); return a && { actions: [{ action: 'show_work', agent: a.id, confidence: 'high' }], reply: `Here is what ${a.title} made.` }; }
+      if ((m = /^open the files? (it|.+?) (?:made|wrote|changed)$/i.exec(w))) { const a = one(m[1]); return a && { actions: [{ action: 'open_file', agent: a.id, path: '', confidence: 'high' }], reply: `Opening the file ${a.title} made.` }; }
+      if ((m = /^open (?:its|the) (review|worktree)(?: of (.+))?$/i.exec(w))) { const a = one(m[2]); return a && { actions: [{ action: m[1].toLowerCase() === 'review' ? 'open_review' : 'open_worktree', agent: a.id, confidence: 'high' }], reply: `Opening ${a.title}'s ${m[1].toLowerCase()}.` }; }
+      if ((m = /^(?:show me|take me to|go to|focus(?: on)?) (?:the )?(.+?)$/i.exec(w))) { const a = one(m[1]); return a && { actions: [{ action: 'focus', agent: a.id, confidence: 'high' }], reply: `Here is ${a.title}.` }; }
+      return null;
+    };
+    // Not meant for Overseer (a spoken aside about something else): the exact reply the prompt asks for.
+    const aside = words => /\b(dishes|dinner|groceries|laundry)\b/i.test(words);
     // A spoken request (Voice Mode, Gate R): choose among the daemon's candidates, as the prompt
     // asks; with none, ask one short question and propose nothing. A correction's words give the
     // new task ("I meant wait for the review"); its names were already applied by the daemon.
@@ -498,6 +532,9 @@ async function mcpClient() {
       const replies = [];
       for (const voiceReq of voiceReqs) {
         let words = voiceReq[2].trim();
+        if (aside(words) && /reply exactly NOT_FOR_OVERSEER/.test(said)) { replies.push('NOT_FOR_OVERSEER'); continue; }
+        const nav = navFor(words);
+        if (nav) { await call('propose', { actions: nav.actions }).catch(e => replies.push('refused: ' + e.message)); replies.push(nav.reply); continue; }
         // New agents: "…, and someone should write the note", "three agents should each …".
         const words0 = words;
         const count = { one: 1, two: 2, three: 3, four: 4, five: 5, nine: 9 };
@@ -535,6 +572,29 @@ async function mcpClient() {
         }
       }
       reply = replies.join(' ');
+      assistant([{ type: 'text', text: reply }]);
+      result(false, reply);
+      mcp.close();
+      await sleep(100);
+      process.exit(0);
+    }
+    const nav = mcp && navFor(said);
+    if (nav) {
+      const outcome = await call('propose', { actions: nav.actions }).catch(e => 'refused: ' + e.message);
+      reply = /refused|not/i.test(outcome) && !/done/i.test(outcome) ? `I could not do that: ${outcome}` : nav.reply;
+      assistant([{ type: 'text', text: reply }]);
+      result(false, reply);
+      mcp.close();
+      await sleep(100);
+      process.exit(0);
+    }
+    // Typed new work (AC-228's stages): "someone should …" or "start an agent to …" in the repository of the agents shown.
+    const someoneTyped = /^(?:someone should|start an agent to|start one agent to) (.+?)[.!?]*$/i.exec(said);
+    const typedRepo = stateAgents.find(a => a.repo)?.repo;
+    if (mcp && someoneTyped && typedRepo) {
+      const task = someoneTyped[1];
+      const outcome = await call('propose', { actions: [{ action: 'start', repo: typedRepo, title: task.split(' ').slice(0, 3).join(' '), prompt: `Please ${task}.`, confidence: 'high' }] }).catch(e => 'refused: ' + e.message);
+      reply = `Starting one agent to ${task}. ${outcome}`;
       assistant([{ type: 'text', text: reply }]);
       result(false, reply);
       mcp.close();

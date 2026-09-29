@@ -9,6 +9,9 @@
   const saved = vscode.getState() || {};
   let state = { tasks: [], runs: [], workspaces: [], profiles: [], accounts: [], attention: [], pinned: [], gridMax: 6, archived: [] };
   let selected = saved.selected, mode = saved.mode || (saved.selected ? 'chat' : 'composer');
+  // Beside the agent a request started (AC-226): the agent's chat on the left, the conversation
+  // with Overseer (its mark) slid to the right.
+  let aside = false;
   const persist = () => vscode.setState({ ...(vscode.getState() || {}), selected, mode, chat: chat && chat.state() });
 
   // ---------- Layout ----------
@@ -35,7 +38,8 @@
   // ---------- Main area ----------
   function setMode(m, opts = {}) {
     mode = m;
-    chatHost.hidden = m !== 'chat'; composerHost.hidden = m !== 'composer'; gridHost.hidden = m !== 'grid';
+    if (aside && m !== 'chat') setAside(false, { quiet: true });
+    chatHost.hidden = m !== 'chat'; composerHost.hidden = !(m === 'composer' || (aside && m === 'chat')); gridHost.hidden = m !== 'grid';
     document.body.dataset.mode = m;
     if (m === 'composer') { composer.open(opts); }
     if (m === 'grid') { grid.open(); } else grid.close();
@@ -43,11 +47,19 @@
     persist();
   }
 
+  function setAside(on, { quiet } = {}) {
+    aside = !!on;
+    document.body.dataset.aside = aside ? '1' : '';
+    composerHost.hidden = !(mode === 'composer' || (aside && mode === 'chat'));
+    if (!quiet) post({ type: 'asideShown', on: aside });
+  }
+
   // ---------- New-agent composer (AC-59) and home's conversation with Overseer (AC-182) ----------
   const agents = () => state.runs.filter(r => !r.parent_run_id).sort((a, b) => (ACTIVE_STATUS.has(b.status) - ACTIVE_STATUS.has(a.status)) || (b.created_ms - a.created_ms)).map(r => ({ id: r.id, title: r.title, status: r.status, harness: r.harness }));
   const ACTIVE_STATUS = new Set(['queued', 'starting', 'running', 'waiting_for_user', 'waiting_for_connection', 'waiting_for_memory']);
   const composer = window.OverseerComposer.create(composerHost, { post, agents, onStarted: runId => { selected = runId; if (!(vscode.getState() || {}).stayHome) setMode('chat'); } });
-  const home = window.OverseerHome.create(composerHost, { post, startWith: text => composer.startWith(text) });
+  const layers = (() => { try { return JSON.parse(document.body.dataset.layers || 'null'); } catch { return null; } })();
+  const home = window.OverseerHome.create(composerHost, { post: m => { if (m.type === 'aside' && !m.on) setAside(false); post(m); }, startWith: text => composer.startWith(text), getState: () => state, layers });
 
   // ---------- Grid (AC-58) ----------
   const grid = window.OverseerGrid.create(gridHost, { post, open: runId => selectRun(runId, { focusChat: true }), getState: () => state,
@@ -59,7 +71,7 @@
     switch (m.type) {
       case 'state':
         state = m.state; if (m.selected && m.selected !== selected && mode !== 'composer') selected = m.selected;
-        grid.onState(state); composer.onState(state);
+        grid.onState(state); composer.onState(state); home.state();
         document.body.dataset.ready = '1';
         break;
       case 'selected': if (m.runId && (m.runId !== selected || mode !== 'chat')) selectRun(m.runId, { fromHost: true }); break;
@@ -76,6 +88,9 @@
       case 'composerData': composer.data(m.data); break;
       case 'overseer': home.session(m.session); break;
       case 'voice': home.voice(m.voice); grid.voiceTargets(m.targets || []); break;
+      case 'voiceView': home.voiceView(m.m); break;
+      case 'activity': home.activity(m.runs); break;
+      case 'aside': setAside(m.on); if (m.on && m.runId) selectRun(m.runId, { fromHost: true }); break;
       case 'overseerNotice': if (m.id) home.proposalStatus(m.id, m.message); else composer.notice({ message: m.message }); break;
       case 'askOverseer': setMode('composer'); composer.askOverseer(m.text || ''); break;
       case 'mentionFiles': if (m.scope === 'composer') composer.mentionFiles(m); else chat.mentionFiles(m); break;
@@ -92,7 +107,7 @@
   });
 
   // Read-only view of the dashboard's state for UI tests.
-  window.__overseer = { state: () => state, mode: () => mode, selected: () => selected, home: () => home.current };
+  window.__overseer = { state: () => state, mode: () => mode, selected: () => selected, home: () => home.current, aside: () => aside };
   setMode(mode === 'chat' && !selected ? 'composer' : mode, { quiet: true });
   if (selected && mode === 'chat') post({ type: 'select', runId: selected, restore: true });
   post({ type: 'ready' });

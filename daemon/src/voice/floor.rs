@@ -31,6 +31,29 @@ pub fn is_command_verb(w: &str) -> bool {
     COMMAND_VERBS.contains(&w)
 }
 
+/// Whether words are surely meant for Overseer, with no model (AC-228): they name Overseer, lead
+/// with a command or a stop word, or answer a question Overseer asked. Such a request is taken with
+/// "On it." at once and Overseer is not asked whether it was meant for it; words that are only
+/// probably meant for it (a question about the agents, "someone should…", an agent's name) wait
+/// for Overseer's own judgement before anything is said (AC-228: decided before "On it").
+pub fn addressed_strongly(text: &str, awaiting_answer: bool) -> bool {
+    let words: Vec<String> = text
+        .to_lowercase()
+        .replace(['-', '’', '\''], " ")
+        .split_whitespace()
+        .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+        .filter(|w| !w.is_empty())
+        .collect();
+    if words.is_empty() {
+        return false;
+    }
+    awaiting_answer
+        || words.iter().any(|w| w == "overseer")
+        || COMMAND_VERBS.contains(&words[0].as_str())
+        || (words.len() > 1 && words[0] == "please" && COMMAND_VERBS.contains(&words[1].as_str()))
+        || (words.len() > 1 && words[0] == "hold" && words[1] == "on")
+}
+
 /// Whether words read as meant for Overseer, with no model (AC-164): they name Overseer or an
 /// agent, lead with a stop word or a command, or answer a question Overseer asked.
 pub fn addressed(text: &str, agent_names: &[String], awaiting_answer: bool) -> bool {

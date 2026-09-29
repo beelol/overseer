@@ -143,6 +143,8 @@ async function activate(context) {
   const search = async q => { try { return (await client.request('search', { query: q, limit: 200 })).task_ids || []; } catch { return []; } };
   // With the dashboard open, the chat stays inside it and reviews go to the column on its right.
   const center = new CommandCenter(context, model, { select: (runId, opts) => selectRun(runId, opts), selected: () => selectedRun, client, model, launcher, attention, pinned, setPinned, archived: archivedTasks, search, steering,
+    // A card, a request's stage or a Needs-you item opens its agent, or its finished work (AC-226).
+    openAgent: (runId, opts) => openAgent(runId, opts),
     // The grid takes the editor area and gives it back as it was (AC-79).
     onMode: async (mode, was) => { if (mode === 'grid') await arrangement.enterGrid(); else if (was === 'grid') await arrangement.leaveGrid(); },
     // No empty grid (AC-113): when its last tile goes, the grid gives way to the home composer.
@@ -221,13 +223,14 @@ async function activate(context) {
     if (pick.panel) pick.panel.reveal(pick.group.viewColumn, false);
     else if (pick.tab.input instanceof vscode.TabInputCustom) await vscode.commands.executeCommand('vscode.openWith', pick.tab.input.uri, pick.tab.input.viewType, { viewColumn: pick.group.viewColumn, preserveFocus: false });
   };
-  // AC-107: Talk to Overseer, docked in the panel under the editor area.
+  // AC-107, AC-227: Talk to Overseer is home, the one view for talking to Overseer (typed or, with
+  // Voice Mode on, spoken). Nothing docks below any more; this keeps Overseer's own run hidden and
+  // relays what is typed in its chat, and carries out the actions the daemon asks the UI for.
   const overseerChat = new OverseerChat({ context, client, model, outputs, setPinned: (id, on) => { setPinned(id, on); agents.refresh(); center.push(); }, log: say });
-  context.subscriptions.push(vscode.window.registerWebviewViewProvider('overseer.talk', overseerChat, { webviewOptions: { retainContextWhenHidden: true } }));
   const pullRequests = new PullRequests(client, model, say);
   const newTaskPanel = new NewTaskPanel(context, client, model, { selectRun: (...a) => selectRun(...a), launcher, column: () => vscode.ViewColumn.Beside });
   // Voice Mode (Gate R): the voice view, its status bar item and toasts; the daemon listens.
-  const voice = new Voice(context, client, { selectRun: (...a) => selectRun(...a) });
+  const voice = new Voice(context, client, { selectRun: (...a) => selectRun(...a), view: () => center.panel, showHome: () => goHome() });
   // The voice mark on targeted agents (side bar and grid) and home's voice strip follow it.
   voiceTargeted = () => voice.targeted;
   center.voiceSource = voice;
@@ -321,6 +324,73 @@ async function activate(context) {
     center.setMode('composer');
     if (note) center.panel?.webview.postMessage({ type: 'notice', scope: 'composer', kind: 'info', message: note });
   }
+
+  /** Opens an agent from a card, a request's stage or Needs you (AC-226, AC-227): its chat, with
+   *  its review beside it when it has changes; `work` asks for the finished work (the review). */
+  async function openAgent(runId, { work } = {}) {
+    const run = model.run(runId) || (await model.refresh(), model.run(runId));
+    if (!run) return;
+    const root = model.rootRun(run) || run;
+    if (work && !ACTIVE.has(root.status)) { await showWork(root.id); return; }
+    await selectRun(root.id);
+    center.focus('chat');
+  }
+
+  /** The finished work: the review when the agent changed files, else its chat. */
+  async function showWork(runId) {
+    const run = model.run(runId);
+    if (!run) return;
+    let files = 0;
+    try { files = (await client.request('workspace.changes', { workspace_id: run.workspace_id })).files || 0; } catch { /* removed worktree */ }
+    if (files) { selectedRun = runId; await arrangement.openReview(runId); await center.select(runId); }
+    else await selectRun(runId);
+  }
+
+  // Overseer moves the owner around VS Code (AC-226): Look actions the daemon carried out and asks
+  // the UI to show. Only the window the owner is in acts (the last one focused).
+  context.subscriptions.push(vscode.window.onDidChangeWindowState(w => { if (w.focused) context.globalState.update('overseer.lastWindow', vscode.env.sessionId); }));
+  if (vscode.window.state.focused) context.globalState.update('overseer.lastWindow', vscode.env.sessionId);
+  const ownerIsHere = () => vscode.window.state.focused || [undefined, vscode.env.sessionId].includes(context.globalState.get('overseer.lastWindow'));
+  async function lookAction(event) {
+    const p = event.payload || {}, runId = event.run_id;
+    if (!runId || !ownerIsHere()) return;
+    say(`overseer: ${p.action} ${runId}`);
+    if (p.action === 'focus') { await selectRun(runId); center.focus('chat'); return; }
+    if (p.action === 'open_review') { selectedRun = runId; await arrangement.openReview(runId); await center.select(runId); return; }
+    if (p.action === 'show_work') { await showWork(runId); return; }
+    if (p.action === 'open_file' && p.path) {
+      await vscode.window.showTextDocument(vscode.Uri.file(p.path), { preview: false, viewColumn: vscode.ViewColumn.Beside });
+      return;
+    }
+    if (p.action === 'open_worktree' && p.path) {
+      // The agent's worktree, in place (no new window): its files to pick from, then the file opens.
+      const run = model.run(runId);
+      const files = await new Promise(resolve => execFile('git', ['ls-files', '-co', '--exclude-standard'], { cwd: p.path, maxBuffer: 16 * 1024 * 1024 }, (err, out) => resolve(err ? [] : out.split('\n').filter(Boolean).slice(0, 5000))));
+      const pick = await vscode.window.showQuickPick(files.map(f => ({ label: path.basename(f), description: path.dirname(f) === '.' ? '' : path.dirname(f), rel: f })), { title: `${run?.title || 'Agent'}: its worktree`, placeHolder: p.path, matchOnDescription: true });
+      if (pick) await vscode.window.showTextDocument(vscode.Uri.file(path.join(p.path, pick.rel)), { preview: false, viewColumn: vscode.ViewColumn.Beside });
+    }
+  }
+  // When a request starts a single agent, the view slides aside and shows it working (AC-226),
+  // unless the owner turned "Show the agent I start" off.
+  async function startedByRequest(event) {
+    const p = event.payload || {};
+    if (!p.proposal || !event.run_id || !ownerIsHere()) return;
+    if (!vscode.workspace.getConfiguration('overseer').get('showStartedAgent', true)) return;
+    if (!center.panel || center.mode !== 'composer') return;
+    let starts = 0;
+    try { starts = ((await client.request('overseer.card', { id: p.proposal })).actions || []).filter(a => a.action === 'start').length; } catch { return; }
+    if (starts !== 1) return;
+    for (let i = 0; i < 20 && !model.run(event.run_id); i++) { await model.refresh(); if (!model.run(event.run_id)) await new Promise(r => setTimeout(r, 150)); }
+    if (!model.run(event.run_id)) return;
+    center.setAside(true, event.run_id);
+    await selectRun(event.run_id);
+  }
+  client.on('event', event => {
+    if (event?.kind !== 'overseer_action') return;
+    const action = event.payload?.action;
+    if (['focus', 'open_review', 'open_file', 'open_worktree', 'show_work'].includes(action)) lookAction(event).catch(e => say('overseer look: ' + e.message));
+    if (action === 'start') startedByRequest(event).catch(e => say('overseer start: ' + e.message));
+  });
 
   /** Shows an agent: its chat, and its review beside it when it has changes (Gate K). */
   async function selectRun(runId, { follow, reveal = true } = {}) {
@@ -886,7 +956,8 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.openDashboardWindow', guard(() => dashboard.openWindow())),
     vscode.commands.registerCommand('overseer.newAgent', guard(async () => { requireTrust(); await arrangement.chatOnly(); center.setMode('composer'); center.focus('composer'); })),
     vscode.commands.registerCommand('overseer.whereAmI', guard(() => whereAmI())),
-    vscode.commands.registerCommand('overseer.talk', guard(() => vscode.commands.executeCommand('overseer.talk.focus'))),
+    // Talk to Overseer (AC-227): home, with the composer's target Overseer.
+    vscode.commands.registerCommand('overseer.talk', guard(async () => { await arrangement.chatOnly(); center.setMode('composer'); center.panel?.webview.postMessage({ type: 'askOverseer', text: '' }); })),
     vscode.commands.registerCommand('overseer.voice.toggle', guard(() => voice.toggle())),
     vscode.commands.registerCommand('overseer.voice.open', guard(() => voice.open())),
     vscode.commands.registerCommand('overseer.voice.mute', guard(() => voice.mute())),

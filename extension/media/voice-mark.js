@@ -141,6 +141,8 @@
     const frame = now => {
       raf = 0;
       if (document.visibilityState === 'hidden') { stats.hiddenFrames += 1; return; }
+      // Inside a larger view (home, AC-227) the mark draws only while it is shown.
+      if (options.active && !options.active()) { stats.hiddenFrames += 1; return; }
       const dt = Math.min(0.05, (now - last) / 1000 || 0);
       if (last) { stats.frameMs.push(now - last); if (stats.frameMs.length > 600) stats.frameMs.shift(); }
       last = now;
@@ -165,6 +167,8 @@
       setState(s) { state = STATES.includes(s) ? s : 'listening'; },
       setLevel(source, value) { const l = levels[source]; if (l) { l.value = Math.max(0, Math.min(1, Number(value) || 0)); l.at = performance.now(); } },
       setReduced(r) { reduced = !!r; },
+      /** Starts drawing again after the mark was hidden (options.active said no). */
+      wake() { start(); },
     };
   }
 

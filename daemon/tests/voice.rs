@@ -2877,3 +2877,81 @@ fn a_check_in_turn_is_not_the_answer_to_a_spoken_request() {
     assert_eq!(received(&env, &phone).len(), 1);
     let _ = env.d.try_call("run.interrupt", json!({"run_id": phone}));
 }
+
+// ---------------------------------------------------------------------- the owner's first session
+
+/// AC-228: whether a request is for Overseer is decided before it says "On it.". Words only
+/// probably meant for it (a question that is not about the agents' work) are not answered "On
+/// it."; Overseer judges them, and its "not for me" is kept as context in plain words, never the
+/// token. A command is taken with "On it." at once, and Overseer is not offered the way out.
+#[test]
+fn ac228_a_request_not_for_overseer_never_says_on_it() {
+    let env = voice_daemon(&[]);
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    agent(&env.d, &repo, "Phone");
+    let live = listening(&env);
+    let aside = say(&env, "Are you done with the dishes?");
+    let closed = wait_state(&live, &aside, "not_for_overseer");
+    assert_eq!(closed["request"]["state"], "not_for_overseer");
+    std::thread::sleep(Duration::from_millis(500));
+    let spoken: Vec<Value> = live.kind("say");
+    assert!(
+        !spoken.iter().any(|v| v["text"] == "On it."),
+        "no \"On it.\" for a request that was not for Overseer: {spoken:?}"
+    );
+    let messages = env.d.call("overseer.session", json!({}))["messages"].clone();
+    let texts: Vec<&str> = messages.as_array().unwrap().iter().map(|m| m["text"].as_str().unwrap_or("")).collect();
+    assert!(texts.iter().all(|t| !t.contains("NOT_FOR_OVERSEER") || t.contains("Request ")), "the token is never shown: {texts:?}");
+    assert!(
+        messages.as_array().unwrap().iter().any(|m| m["card"]["kind"] == "aside" && m["text"] == "Not meant for Overseer: kept as context."),
+        "kept as context, in plain words: {messages}"
+    );
+    // A command is surely for Overseer: "On it." at once.
+    live.clear();
+    let id = say(&env, "Tell Phone to use the new wire format.");
+    live.wait("On it.", 5, |v| v["kind"] == "say" && v["text"] == "On it.");
+    wait_state(&live, &id, "sent");
+}
+
+/// AC-226, spoken: "show me the Phone agent" is a Look action on that agent, carried out at once
+/// (no settle window, no yes).
+#[test]
+fn ac226_show_me_the_agent_by_voice() {
+    let env = voice_daemon(&[]);
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let phone = agent(&env.d, &repo, "Phone");
+    agent(&env.d, &repo, "Continuity");
+    let live = listening(&env);
+    let id = say(&env, "Show me the Phone agent.");
+    wait_state(&live, &id, "sent");
+    let looks: Vec<Value> = env.d.events(&phone).into_iter().filter(|e| e["kind"] == "overseer_action" && e["payload"]["action"] == "focus").collect();
+    assert_eq!(looks.len(), 1, "the Phone agent is shown: {looks:?}");
+    let states: Vec<Value> = live.kind("request").into_iter().filter(|v| v["request"]["id"] == id).map(|v| v["request"]["state"].clone()).collect();
+    assert!(!states.iter().any(|s| s == "settling"), "no settle window for a Look action: {states:?}");
+}
+
+/// AC-227, spoken: "handle what needs me" reads the waiting permission back as the one question
+/// it needs (the same card as typed), and "yes" answers it after the window.
+#[test]
+fn ac227_handle_what_needs_me_by_voice() {
+    let env = voice_daemon(&[]);
+    env.d.call("voice.set", json!({"settle_seconds": 1}));
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let asks = permission_agent(&env, &repo, "Sessions");
+    std::fs::write(env.mode_file(), "overseer").unwrap();
+    let live = listening(&env);
+    let r1 = env.d.call("voice.say", json!({"text": "Handle what needs me."}));
+    assert_eq!(r1["needs"], true, "{r1}");
+    let line = live.wait("the question", 10, |v| v["kind"] == "say" && v["text"].as_str().unwrap_or("").ends_with("Allow it?"));
+    assert!(line["text"].as_str().unwrap().starts_with("Sessions wants to change perm.txt"), "{line}");
+    let messages = env.d.call("overseer.session", json!({}))["messages"].clone();
+    assert!(messages.as_array().unwrap().iter().any(|m| m["card"]["kind"] == "needs" && m["card"]["state"] == "asked"), "the same card as typed: {messages}");
+    assert_eq!(env.d.run(&asks)["status"], "waiting_for_user");
+    env.d.call("voice.say", json!({"text": "Yes."}));
+    env.d.wait_status(&asks, |s| s != "waiting_for_user", 10);
+    env.d.wait_done(&asks, 30);
+    assert_eq!(env.d.run(&asks)["status"], "completed");
+}

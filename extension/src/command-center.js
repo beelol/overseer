@@ -14,12 +14,16 @@ class CommandCenter {
     this.context = context; this.model = model; this.handlers = handlers; this.client = handlers.client;
     this.changes = changesFetcher(this.client);
     this.mode = 'chat';
+    this.activity = {}; // root run id -> { text, at }: what each agent is doing now (AC-228)
     model.onDidChange(() => this.push());
     this.client.on('event', event => {
+      this.noteActivity(event);
       if (!this.panel) return;
       if (['file_activity', 'turn_done', 'status'].includes(event.kind) && this.chatRun && this.chatFeed?.roots.get(this.chatRun)?.has(event.run_id)) this.pushChanges();
       // Home's conversation (AC-182): what the daemon's session gained.
       if (['overseer_message', 'proposal', 'proposal_answered', 'overseer_level', 'overseer_session'].includes(event.kind)) this.pushOverseer();
+      // A card's rows advance on its agents' turns, and a request's stage on their status (AC-228).
+      else if (['turn_started', 'turn_done', 'queued', 'status', 'permission', 'permission_answered', 'task_created'].includes(event.kind)) this.pushOverseerSoon();
     });
     this.client.on('connected', () => this.pushOverseer());
   }
@@ -44,7 +48,10 @@ class CommandCenter {
     this.panel = panel;
     panel.webview.options = { enableScripts: true, localResourceRoots: localRoots(this.context.extensionUri) };
     panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'overseer-logo.png');
-    panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'Overseer', chat: true, css: ['dashboard.css'], js: ['composer.js', 'home.js', 'grid.js', 'dashboard.js'] });
+    // The mark's layers for Voice Mode's stage (AC-227: the voice view is this view).
+    const layer = name => panel.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'voice', name)).toString();
+    const layers = JSON.stringify({ core: layer('overseer-logo-core.png'), swooshes: layer('overseer-logo-swooshes.png'), star: layer('overseer-logo-star.png'), flat: layer('overseer-logo-flat.png') }).replace(/'/g, '&#39;');
+    panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'Overseer', chat: true, css: ['dashboard.css', 'voice.css'], js: ['composer.js', 'voice-mark.js', 'voice.js', 'home.js', 'grid.js', 'dashboard.js'], bodyAttrs: `data-layers='${layers}'` });
     const post = m => panel.webview.postMessage(m);
     this.chatFeed = new RunFeed(this.client, this.model, m => post({ ...m, channel: 'chat' }));
     this.gridFeed = new RunFeed(this.client, this.model, m => post({ ...m, channel: 'grid' }));
@@ -69,9 +76,17 @@ class CommandCenter {
     if (!m || typeof m !== 'object') return;
     const post = x => this.panel?.webview.postMessage(x);
     switch (m.type) {
-      case 'ready': await this.push(); await this.pushOverseer(); this.pushVoice(); if (this.inDashboard) post({ type: 'dashboard', on: true }); return;
+      case 'ready': await this.push(); await this.pushOverseer(); this.pushVoice(); this.voiceSource?.refresh(); this.pushActivity(); if (this.inDashboard) post({ type: 'dashboard', on: true }); if (this.aside) post({ type: 'aside', on: true }); return;
+      // Voice Mode's controls in the view (AC-227).
       case 'voiceMute': await vscode.commands.executeCommand('overseer.voice.mute'); return;
-      case 'voiceShow': await vscode.commands.executeCommand('overseer.voice.open'); return;
+      case 'voiceToggle': await vscode.commands.executeCommand('overseer.voice.toggle'); return;
+      case 'voiceTarget': await vscode.commands.executeCommand('overseer.voice.talkTo'); return;
+      case 'voiceCancel': await this.client.request('voice.cancel', { id: String(m.id || '') }); return;
+      case 'voiceAnswer': await this.voiceSource?.answer(!!m.yes); return;
+      // A card, a stage or a Needs-you item opens its agent or its work (AC-226, AC-227).
+      case 'openAgent': if (typeof m.runId === 'string' && m.runId) await this.handlers.openAgent?.(m.runId, { work: !!m.work, from: m.from }); return;
+      case 'aside': this.aside = !!m.on; if (!m.on) post({ type: 'aside', on: false }); return;
+      case 'asideShown': this.aside = !!m.on; return;
       // Home (AC-182): the one conversation with Overseer, from the daemon.
       case 'overseerSend': {
         const text = String(m.text || '').trim(); if (!text) return;
@@ -148,13 +163,38 @@ class CommandCenter {
     }
   }
 
-  /** Home's conversation: the daemon's session, whole (its messages are few and their ids stable). */
   /** Voice Mode (Gate R): home's voice strip and the voice mark on the grid's tiles. */
   pushVoice() {
     if (!this.panel || !this.voiceSource) return;
     this.panel.webview.postMessage({ type: 'voice', voice: this.voiceSource.summary(), targets: [...this.voiceSource.targeted] });
   }
 
+  /** Voice Mode's stage in the view (the mark, the words, the spoken requests' states). */
+  postVoice(m) { this.panel?.webview.postMessage({ type: 'voiceView', m }); }
+
+  /** Beside the agent a request started (AC-226): its chat on the left, the view slid right. */
+  setAside(on, runId) { this.aside = !!on; this.panel?.webview.postMessage({ type: 'aside', on: !!on, runId }); }
+
+  /** What an agent is doing now: its last tool, file or words (AC-228's live activity). */
+  noteActivity(event) {
+    if (!event || !event.run_id || !['tool', 'file_activity', 'output'].includes(event.kind)) return;
+    const p = event.payload || {};
+    let text = '';
+    if (event.kind === 'tool') text = [p.name, p.summary].filter(Boolean).join(': ');
+    else if (event.kind === 'file_activity') text = `Editing ${(p.paths || []).map(x => String(x).split('/').pop()).slice(0, 2).join(', ')}`;
+    else if (p.role === 'assistant' && p.text) text = String(p.text).split('\n').find(l => l.trim()) || '';
+    if (!text) return;
+    const run = this.model.run(event.run_id);
+    const root = (run && this.model.rootRun(run)?.id) || event.run_id;
+    this.activity[root] = { text: text.length > 70 ? text.slice(0, 69).trimEnd() + '…' : text, at: event.ts || Date.now() };
+    clearTimeout(this.activityTimer);
+    this.activityTimer = setTimeout(() => this.pushActivity(), 400);
+  }
+  pushActivity() { this.panel?.webview.postMessage({ type: 'activity', runs: this.activity }); }
+
+  pushOverseerSoon() { clearTimeout(this.overseerTimer); this.overseerTimer = setTimeout(() => this.pushOverseer(), 250); }
+
+  /** Home's conversation: the daemon's session, whole (its messages are few and their ids stable). */
   async pushOverseer() {
     if (!this.panel || !this.client.connected) return;
     if (this.pushingOverseer) { this.pushOverseerAgain = true; return; }
