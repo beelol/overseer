@@ -601,6 +601,13 @@ fn discover_auto_profile_shared(d: &Arc<Daemon>, profile_id: &str, workspace_id:
 
 /// Public status has no account or workspace scope. Share only overlapping
 /// reads of the same fixed feed, and preserve the source observation time.
+/// The providers' public status pages can be switched off from outside
+/// (`OVERSEER_PUBLIC_STATUS=off`): the test daemons do, so a real outage
+/// cannot change which route a fixture picks.
+fn public_status_enabled() -> bool {
+    std::env::var("OVERSEER_PUBLIC_STATUS").map(|v| v != "off").unwrap_or(true)
+}
+
 fn collect_public_status_shared(program: &std::path::Path, provider: &str,
     budget: Duration) -> Result<crate::auto_health::Observation> {
     let flights = AUTO_PUBLIC_STATUS_FLIGHTS.get_or_init(||
@@ -1199,7 +1206,7 @@ fn auto_root_preview(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         .collect::<Vec<_>>();
     let public_budget = Duration::from_millis(750)
         .min(deadline.saturating_duration_since(Instant::now()));
-    if !public.is_empty() && public_budget >= Duration::from_millis(20) {
+    if !public.is_empty() && public_budget >= Duration::from_millis(20) && public_status_enabled() {
         for (provider, reading) in collect_unique_bounded(&public, public_budget, |id, timeout|
             collect_public_status_shared(std::path::Path::new("/usr/bin/curl"), id, timeout)) {
             match reading {
@@ -2285,7 +2292,8 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     .collect::<Vec<_>>();
                 let public_budget = Duration::from_millis(750)
                     .min(decision_deadline.saturating_duration_since(Instant::now()));
-                if !public_providers.is_empty() && public_budget >= Duration::from_millis(20) {
+                if !public_providers.is_empty() && public_budget >= Duration::from_millis(20)
+                    && public_status_enabled() {
                     for (provider, reading) in collect_unique_bounded(&public_providers,
                         public_budget, |id, timeout| {
                             collect_public_status_shared(std::path::Path::new("/usr/bin/curl"),
