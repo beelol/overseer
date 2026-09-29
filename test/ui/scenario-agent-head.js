@@ -119,7 +119,14 @@ const THEMES = ['Overseer Dark', 'Overseer Light', 'Overseer'];
     const c1 = await cursor();
     check('AC-233: Follow opens the file the agent is editing (a.txt) at the changed line, the line tinted and saying what it was',
       !!head && head.first <= 40 && head.last >= 40 && head.tinted >= 1 && head.after.some(a => /^was: L40: original/.test(a)) && c1?.line === 40, { head, cursor: c1 });
-    const rows1 = await worktreeRows();
+    // The tree catches up with the agent's edit within a moment (it refreshes on the agent's events).
+    let rows1;
+    for (let t = 0; t < 8000; t += 250) {
+      rows1 = await worktreeRows();
+      const plain = rows1?.rows.find(r => r.name === 'c.txt')?.color;
+      if (rows1?.rows.some(r => r.name === 'a.txt' && (/M/.test(r.badge) || r.color !== plain))) break;
+      await delay(250);
+    }
     // Marked: git's or Overseer's "M", or the changed colour (Overseer leaves the letter to git when git knows the worktree).
     const plainColor = rows1?.rows.find(r => r.name === 'c.txt')?.color;
     check('AC-233: the changed file is marked in the Worktree view', rows1?.rows.some(r => r.name === 'a.txt' && (/M/.test(r.badge) || r.color !== plainColor)), rows1?.rows.filter(r => /txt|md/.test(r.name)));

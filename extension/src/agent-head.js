@@ -142,7 +142,6 @@ class AgentHead {
     this.files = []; this.changed = new Map(); this.base = undefined;
     this.view.title = 'Worktree';
     this.view.description = root.title;
-    vscode.commands.executeCommand('setContext', 'overseer.headOpen', true);
     this.updateContext(vscode.window.activeTextEditor);
     this.onSelect?.(root);
     this.loading = this.refresh();
@@ -204,9 +203,18 @@ class AgentHead {
     return out;
   }
 
+  /**
+   * The head's editors: files of the worktree open outside the group holding Overseer's view (a file
+   * opened there, by a Look action say, is not the head: focusing it would cover the conversation).
+   */
+  headTabs(root) {
+    const overseer = vscode.window.tabGroups.all.find(g => g.tabs.some(t => t.input?.viewType?.endsWith('overseer.center')));
+    return this.tabs(root).filter(t => t.group !== overseer);
+  }
+
   /** Where the head's editors go: beside its files already open, else where it was asked to open. */
   headColumn(runId = this.runId) {
-    const open = this.tabs(this.openRoots.get(runId) || this.rootOf(runId));
+    const open = this.headTabs(this.openRoots.get(runId) || this.rootOf(runId));
     const active = open.find(t => t.tab.isActive && t.group.isActive) || open.find(t => t.tab.isActive) || open[0];
     return active?.group.viewColumn || this.column || vscode.ViewColumn.One;
   }
@@ -223,7 +231,8 @@ class AgentHead {
     if (!root || this.runId !== runId) { this.log(`head: ${runId} has no worktree to open`); return false; }
     if (viewColumn) this.column = viewColumn;
     this.openRoots.set(runId, root);
-    const open = this.tabs(root);
+    this.showView(true);
+    const open = this.headTabs(root);
     if (open.length && !reveal) {
       // Already open: bring its active file forward where it is.
       const t = open.find(x => x.tab.isActive) || open[0];
@@ -265,6 +274,7 @@ class AgentHead {
     // Opened from the Worktree view while only the chat is on screen: the head comes in first.
     if (fromTree && !this.tabs(root).length && this.handlers.ensureShown) await this.handlers.ensureShown(runId);
     this.openRoots.set(runId, root);
+    this.showView(true);
     const abs = path.join(root, rel);
     if (this.changed.get(rel) === 'D' || !fs.existsSync(abs)) {
       // A file the agent removed: its last text against nothing.
@@ -317,7 +327,9 @@ class AgentHead {
 
   /** Focuses the head's active file (back to the agent, AC-257). Returns false when none is open. */
   async focus(runId = this.runId) {
-    const open = this.tabs(this.openRoots.get(runId) || this.rootOf(runId));
+    const review = this.review.manager.panelFor(runId);
+    if (review && this.modeFor(runId) === 'diffs') { review.panel.reveal(review.panel.viewColumn, false); return true; }
+    const open = this.headTabs(this.openRoots.get(runId) || this.rootOf(runId));
     const t = open.find(x => x.tab.isActive && x.group.isActive) || open.find(x => x.tab.isActive) || open[0];
     if (!t) {
       const found = this.review.manager.panelFor(runId);
@@ -344,6 +356,7 @@ class AgentHead {
       for (const t of this.tabs(root)) if (!t.tab.isDirty) closing.push(t.tab);
       this.openRoots.delete(runId);
     }
+    if (!this.openRoots.size) this.showView(false);
     if (!closing.length) return;
     this.quiet++;
     vscode.window.tabGroups.close(closing, true).then(() => {}, error => this.log('head: close: ' + error.message)).finally(() => setTimeout(() => this.quiet--, 600));
@@ -358,10 +371,14 @@ class AgentHead {
     this.closedTimer = setTimeout(() => {
       if (this.quiet || this.openRoots.get(runId) !== root || this.tabs(root).length) return;
       this.openRoots.delete(runId);
+      if (!this.openRoots.size) this.showView(false);
       this.places.delete(runId); this.savePlaces();
       this.review.onClosed?.(runId);
     }, 500);
   }
+
+  /** The Worktree view is in the side bar while an agent's files are open in Follow (not in Diffs only, whose review lists them). */
+  showView(on) { if (this.viewShown !== on) { this.viewShown = on; vscode.commands.executeCommand('setContext', 'overseer.headOpen', on); } }
 
   // ------------------------------------------------------------ where the owner was
 

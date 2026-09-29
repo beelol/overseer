@@ -161,8 +161,6 @@ async function activate(context) {
   // the Worktree view while only the chat is shown brings the head in first.
   const head = new AgentHead({ context, client, model, review, log: say, handlers: { ensureShown: runId => arrangement.openReview(runId) } });
   review.head = head;
-  // The conversation's way back to the agent shown (AC-257).
-  head.onSelect = root => center.headAgent({ runId: root.id, title: model.task(root.task_id)?.title || root.title });
   outputs.column = () => vscode.ViewColumn.Beside;
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.center', center));
   const immersive = new Immersive(context, say);
@@ -346,16 +344,21 @@ async function activate(context) {
 
   /** Opens an agent from a card, a request's stage or Needs you (AC-226, AC-227): its chat, with
    *  its review beside it when it has changes; `work` asks for the finished work (the review). */
-  async function openAgent(runId, { work } = {}) {
+  async function openAgent(runId, { work, from } = {}) {
     const run = model.run(runId) || (await model.refresh(), model.run(runId));
     if (!run) return;
     const root = model.rootRun(run) || run;
     // From Overseer's conversation (AC-257): the agent's head opens beside it and the conversation
-    // keeps its tab; the agent's chat is one click away (its card, the side bar).
-    const fromConversation = center.mode === 'composer';
+    // keeps its tab; the agent's chat is one click away (the side bar, ⌥⌘U after it). A Needs-you
+    // item is there to be answered, which takes the agent's chat, as before.
+    const fromConversation = center.mode === 'composer' && from !== 'needs';
     if (work && !ACTIVE.has(root.status)) { await showWork(root.id, { keepConversation: fromConversation }); return; }
     if (fromConversation) {
-      try { await selectRun(root.id, { keepConversation: true, force: true }); await head.focus(root.id); }
+      try {
+        await selectRun(root.id, { keepConversation: true, force: true }); await head.focus(root.id);
+        // The conversation's way back to the agent beside it.
+        center.headAgent({ runId: root.id, title: agentTitle(root) });
+      }
       catch (error) { say('open agent: ' + (error.stack || error.message)); throw error; }
       return;
     }

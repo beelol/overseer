@@ -242,10 +242,11 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await view.eval(`[...document.querySelectorAll('#home-conv .done-card .card-row-agent')].find(b => /draft the page/.test(b.textContent))?.scrollIntoView({ block: 'center' })`); await delay(300);
     const rowSel = `#home-conv .done-card .card-row[data-run="${draft.id}"] .card-row-agent`;
     { const p = await s.webviewPoint(view, rowSel); await cdp.click(p.x, p.y); }
-    await view.waitFor(`window.__overseer.selected() === ${JSON.stringify(draft.id)} && window.__overseer.mode() === 'chat'`, 10000).catch(() => {});
-    const clicked = { selected: await selected(), mode: await view.eval(`window.__overseer.mode()`) };
+    // AC-257: the agent opens beside the conversation, which keeps the Overseer tab (its "Back to" chip names the agent).
+    await view.waitFor(`document.getElementById('home-back-agent')?.dataset.run === ${JSON.stringify(draft.id)}`, 10000).catch(() => {});
+    const clicked = { back: await view.eval(`document.getElementById('home-back-agent')?.dataset.run`), mode: await view.eval(`window.__overseer.mode()`) };
     await delay(600); await s.screenshot('card-click-opens-agent');
-    check('clicking a request card opens the agent it started', clicked.selected === draft.id && clicked.mode === 'chat', clicked);
+    check('clicking a request card opens the agent it started (beside the conversation, AC-257)', clicked.back === draft.id && clicked.mode === 'composer', clicked);
 
     // ---------- With "Show the agent I start" off, the view stays as it is.
     s.settings({ 'workbench.colorTheme': 'Overseer', ...base, 'overseer.showStartedAgent': false });
