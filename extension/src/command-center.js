@@ -180,7 +180,13 @@ class CommandCenter {
     if (!event || !event.run_id || !['tool', 'file_activity', 'output'].includes(event.kind)) return;
     const p = event.payload || {};
     let text = '';
-    if (event.kind === 'tool') text = [p.name, p.summary].filter(Boolean).join(': ');
+    if (event.kind === 'tool') {
+      // A tool's summary may be its raw input: say what it touches in plain words (AC-228).
+      let what = p.summary || '';
+      if (/^\s*\{/.test(what)) { try { const x = JSON.parse(what); what = x.command || x.file_path || x.path || x.pattern || x.description || x.query || ''; } catch { const m = /"(?:file_path|path|command)"\s*:\s*"([^"]*)/.exec(what); what = m ? m[1] : ''; } }
+      if (/^\//.test(what) || /\/[^\s]+$/.test(what)) what = String(what).split('/').pop();
+      text = [p.name, what].filter(Boolean).join(': ');
+    }
     else if (event.kind === 'file_activity') text = `Editing ${(p.paths || []).map(x => String(x).split('/').pop()).slice(0, 2).join(', ')}`;
     else if (p.role === 'assistant' && p.text) text = String(p.text).split('\n').find(l => l.trim()) || '';
     if (!text) return;

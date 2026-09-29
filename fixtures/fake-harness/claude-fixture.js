@@ -509,11 +509,15 @@ async function mcpClient() {
     }
     // Moving the owner around VS Code (AC-226), typed or spoken the same: "show me the draft agent"
     // focuses it, "what did it make?" shows its finished work, "open the file it made" opens it.
-    // "It" is the agent started last (the roster lists the newest first).
+    // "It" is the agent the conversation was last about, as a model would remember it: the fixture
+    // keeps that title in Overseer's own folder between turns; else the first agent listed.
+    const memory = path.join(process.cwd(), '.fixture-last-agent');
+    const remember = title => { try { fs.writeFileSync(memory, title); } catch {} };
+    const recalled = () => { try { return fs.readFileSync(memory, 'utf8').trim(); } catch { return ''; } };
     const navFor = words => {
       const w = String(words || '').trim().replace(/[.!?]+$/, '').replace(/^(?:overseer,?\s*)/i, '');
       const named = n => { const k = String(n || '').toLowerCase().replace(/^the /, '').replace(/ agent$/, '').trim(); return k && agents.find(a => a.title.toLowerCase().includes(k)); };
-      const one = n => (!n || /^(it|that|this|that one)$/i.test(n) ? agents[0] : named(n));
+      const one = n => { const a = !n || /^(it|that|this|that one)$/i.test(n) ? (named(recalled()) || agents[0]) : named(n); if (a) remember(a.title); return a; };
       let m;
       if ((m = /^what did (it|.+?) (?:make|build|write|do)$/i.exec(w)) || (m = /^show me (?:it|what (it|.+?) made|(?:the |its )?(?:finished )?work)$/i.exec(w))) { const a = one(m[1]); return a && { actions: [{ action: 'show_work', agent: a.id, confidence: 'high' }], reply: `Here is what ${a.title} made.` }; }
       if ((m = /^open the files? (it|.+?) (?:made|wrote|changed)$/i.exec(w))) { const a = one(m[1]); return a && { actions: [{ action: 'open_file', agent: a.id, path: '', confidence: 'high' }], reply: `Opening the file ${a.title} made.` }; }
@@ -556,6 +560,7 @@ async function mcpClient() {
           else task = taskOf(c) || task;
         }
         if (!task && /^(yes|go ahead|ok|okay)\b/i.test(words)) task = 'go ahead';
+        if (starts.length === 1) remember(starts[0].title);
         if (starts.length && !list.length) {
           await call('propose', { actions: starts }).catch(e => replies.push('refused: ' + e.message));
           replies.push(`Starting ${starts.length === 1 ? 'one agent' : starts.length + ' agents'}.`);
@@ -593,6 +598,7 @@ async function mcpClient() {
     const typedRepo = stateAgents.find(a => a.repo)?.repo;
     if (mcp && someoneTyped && typedRepo) {
       const task = someoneTyped[1];
+      remember(task.split(' ').slice(0, 3).join(' '));
       const outcome = await call('propose', { actions: [{ action: 'start', repo: typedRepo, title: task.split(' ').slice(0, 3).join(' '), prompt: `Please ${task}.`, confidence: 'high' }] }).catch(e => 'refused: ' + e.message);
       reply = `Starting one agent to ${task}. ${outcome}`;
       assistant([{ type: 'text', text: reply }]);

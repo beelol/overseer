@@ -80,6 +80,7 @@
     const shown = new Map(); // message id -> element
     const voiceReqs = new Map(); // V-id -> the voice request (spoken requests' states)
     const stages = new Map(); // owner message id -> the request's stage
+    const proposed = new Set(); // owner message ids whose request had a proposal (until its card comes)
 
     // ---------- The owner's words and Overseer's replies.
     function spokenOf(m) { return m.source === 'owner' && m.surface === 'voice' && /Request (V-\d+): ([\s\S]*)$/.exec(m.text || ''); }
@@ -274,6 +275,8 @@
       if (c) return cardStage(c);
       const p = (vr && vr.proposal && ((session && session.proposals) || []).find(x => x.id === vr.proposal)) || group.proposals[group.proposals.length - 1];
       if (p) return p.state === 'settling' ? { stage: 'sending', text: 'Going out in a moment unless you cancel it' } : { stage: 'waiting', text: 'Waits for your yes' };
+      // Answered a moment ago and being carried out: not a card yet.
+      if (proposed.has(owner.id)) return { stage: 'sending', text: 'Going ahead' };
       const turn = session && ACTIVE.has(session.run_status);
       const failedReply = group.replies.find(m => m.card && m.card.kind === 'cannot_answer');
       if (failedReply) return { stage: 'failed', text: `Overseer couldn't answer${failedReply.card.reason ? ': ' + plain(failedReply.card.reason, 100) : ''}` };
@@ -311,6 +314,7 @@
       for (const m of messages) if (m.source !== 'owner') { const o = ownerAt(m.ts); if (o) groups.get(o.id).replies.push(m); }
       for (const p of session.proposals || []) { const o = ownerAt(p.ts); if (o) groups.get(o.id).proposals.push(p); }
       for (const c of session.cards || []) { const o = ownerAt(c.ts); if (o) groups.get(o.id).cards.push(c); }
+      for (const [id, g] of groups) { if (g.proposals.length) proposed.add(id); if (g.cards.length) proposed.delete(id); }
       let any = false, last = null;
       all.forEach((o, i) => {
         const s = stageOf(o, groups.get(o.id), i === all.length - 1);
@@ -338,6 +342,8 @@
       // The head (voice on and off, Needs you) is always there; the conversation once there is one.
       list.hidden = empty;
       wrap.dataset.empty = empty ? '1' : '';
+      // With a conversation the view is the conversation, the composer at its foot (AC-227).
+      document.body.dataset.conversation = empty ? '' : '1';
     }
 
     // ---------- Needs you (AC-227): the badge, its short list, a click focuses the agent.

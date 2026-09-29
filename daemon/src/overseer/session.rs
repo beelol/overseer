@@ -512,10 +512,12 @@ impl Daemon {
             let store = self.store.lock().unwrap();
             store.turns(run_id)?.first().and_then(|t| store.conn.query_row("SELECT source FROM turn_sources WHERE turn_id=?1", [&t.id], |r| r.get::<_, String>(0)).optional().ok().flatten()).as_deref() == Some("overseer")
         };
-        if from_overseer {
+        let task = payload["task"].clone();
+        // A start from Overseer already has its proposal's card; its turn's source may not be
+        // recorded yet when this event arrives, so its prompt says it too.
+        if from_overseer || task["prompt"].as_str().is_some_and(|p| p.starts_with(FROM_OVERSEER)) {
             return Ok(());
         }
-        let task = payload["task"].clone();
         let card = json!({"kind": "started", "agent": run_id, "title": run.title, "harness": run.harness, "repo": task["repo_root"], "prompt": crate::redact::redact(task["prompt"].as_str().unwrap_or("")).chars().take(400).collect::<String>(), "by": "owner"});
         self.append_session_message(&sid, "card", None, &format!("Started {} ({}) in {}", run.title, run.harness, task["repo_root"].as_str().map(|r| r.rsplit('/').next().unwrap_or(r).to_string()).unwrap_or_default()), Some(&card))?;
         Ok(())

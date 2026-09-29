@@ -1334,13 +1334,13 @@ fn summarize(att: &Value) -> String {
         .as_str()
         .or(input["file_path"].as_str())
         .or(input["path"].as_str())
-        .map(|s| s.chars().take(80).collect::<String>());
+        .map(|s| s.to_string());
     match (tool, detail) {
-        ("Bash" | "bash" | "shell" | "exec_command" | "command", Some(c)) => format!("run {c}"),
+        ("Bash" | "bash" | "shell" | "exec_command" | "command", Some(c)) => format!("run {}", c.chars().take(80).collect::<String>()),
         ("Edit" | "Write" | "edit" | "write" | "apply_patch", Some(p)) => {
             format!("change {}", p.rsplit('/').next().unwrap_or(&p))
         }
-        (t, Some(x)) => format!("use {t} on {x}"),
+        (t, Some(x)) => format!("use {t} on {}", x.rsplit('/').next().unwrap_or(&x).chars().take(80).collect::<String>()),
         (t, None) => format!("use {t}"),
     }
 }

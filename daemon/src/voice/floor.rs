@@ -173,6 +173,12 @@ pub fn addressed(text: &str, agent_names: &[String], awaiting_answer: bool) -> b
         "merge",
         "status",
         "progress",
+        // What an agent made (AC-226: "what did it make?").
+        "make",
+        "made",
+        "built",
+        "wrote",
+        "changed",
     ];
     if QUESTION.contains(&words[0].as_str())
         && words.iter().any(|w| ABOUT_WORK.contains(&w.as_str()))

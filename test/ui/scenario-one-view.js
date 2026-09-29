@@ -163,14 +163,14 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
 
     // ---------- A request's stages, typed (AC-228), and the view sliding aside (AC-226).
     await cdp.command('Overseer: Talk to Overseer'); await delay(800);
-    await view.eval(`(() => { window.__stages = []; const note = () => { const all = [...document.querySelectorAll('#home-conv .home-msg.from-owner')]; const last = all[all.length - 1]; const st = last && last.querySelector('.req-stage'); if (!st || st.hidden) return; const cur = st.dataset.stage + '|' + st.textContent; const prev = window.__stages[window.__stages.length - 1]; if (!prev || prev.key !== cur) window.__stages.push({ key: cur, stage: st.dataset.stage, text: st.textContent, progress: document.getElementById('home-progress').textContent, t: Date.now() }); }; new MutationObserver(note).observe(document.getElementById('home-conv'), { subtree: true, childList: true, attributes: true, characterData: true }); setInterval(note, 100); })()`);
+    await view.eval(`(() => { window.__stages = []; const note = () => { const last = [...document.querySelectorAll('#home-conv .home-msg.from-owner')].filter(m => /draft the page/.test(m.querySelector('.home-text')?.textContent || '')).pop(); const st = last && last.querySelector('.req-stage'); if (!st || st.hidden) return; const cur = st.dataset.stage + '|' + st.textContent; const prev = window.__stages[window.__stages.length - 1]; if (!prev || prev.key !== cur) window.__stages.push({ key: cur, stage: st.dataset.stage, text: st.textContent, progress: document.getElementById('home-progress').textContent, t: Date.now() }); }; new MutationObserver(note).observe(document.getElementById('home-conv'), { subtree: true, childList: true, attributes: true, characterData: true }); setInterval(note, 100); })()`);
     let known = ids();
     fs.writeFileSync(modeFile, 'worker');
     await typeToOverseer('Someone should draft the page');
     await view.waitFor(`!!document.querySelector('#home-conv .proposal:not(.answered) [data-proposal="yes"]')`, 30000);
     await delay(600);
     await s.screenshot('stage-waiting-for-yes');
-    await view.eval(`document.querySelector('#home-conv .proposal:not(.answered)').scrollIntoView({ block: 'center' })`); await delay(300);
+    await view.eval(`document.querySelector('#home-conv .proposal:not(.answered) [data-proposal="yes"]').scrollIntoView({ block: 'center' })`); await delay(300);
     { const p = await s.webviewPoint(view, '#home-conv .proposal:not(.answered) [data-proposal="yes"]'); await cdp.click(p.x, p.y); }
     const draft = await newRun(known);
     await settled(draft.id);
@@ -255,7 +255,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     fs.writeFileSync(modeFile, 'worker');
     await typeToOverseer('Someone should write the notes');
     await view.waitFor(`!!document.querySelector('#home-conv .proposal:not(.answered) [data-proposal="yes"]')`, 30000);
-    await view.eval(`document.querySelector('#home-conv .proposal:not(.answered)').scrollIntoView({ block: 'center' })`); await delay(300);
+    await view.eval(`document.querySelector('#home-conv .proposal:not(.answered) [data-proposal="yes"]').scrollIntoView({ block: 'center' })`); await delay(300);
     { const p = await s.webviewPoint(view, '#home-conv .proposal:not(.answered) [data-proposal="yes"]'); await cdp.click(p.x, p.y); }
     const notes = await newRun(known);
     await settled(notes.id);
