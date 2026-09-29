@@ -1,0 +1,52 @@
+[2026-09-29T07:55:18.803Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-29T07:55:24.131Z] PASS Talk to Overseer opens home with the composer talking to Overseer, and no Overseer view is docked below {"target":"overseer","panelViews":[]}
+[2026-09-29T07:55:24.131Z] PASS home has a visible Voice Mode button with its shortcut shown (AC-217) {"text":"Voice⌥⌘⇧V","label":"Turn Voice Mode on (⌥⌘⇧V)","pressed":"false","visible":true}
+[2026-09-29T07:55:30.676Z] screenshot docs/verification/evidence/ui/one-view/01-chat-overseer.png
+[2026-09-29T07:55:31.236Z] screenshot docs/verification/evidence/ui/one-view/02-turning-on-1.png
+[2026-09-29T07:55:31.601Z] screenshot docs/verification/evidence/ui/one-view/03-turning-on-2.png
+[2026-09-29T07:55:31.963Z] screenshot docs/verification/evidence/ui/one-view/04-turning-on-3.png
+[2026-09-29T07:55:36.996Z] screenshot docs/verification/evidence/ui/one-view/05-voice-spoken-card-overseer.png
+[2026-09-29T07:55:37.229Z] screenshot docs/verification/evidence/ui/one-view/06-voice-on-overseer.png
+[2026-09-29T07:55:38.314Z] screenshot docs/verification/evidence/ui/one-view/07-voice-off-overseer.png
+[2026-09-29T07:55:41.263Z] screenshot docs/verification/evidence/ui/one-view/08-chat-dark.png
+[2026-09-29T07:55:42.465Z] screenshot docs/verification/evidence/ui/one-view/09-voice-on-dark.png
+[2026-09-29T07:55:43.459Z] screenshot docs/verification/evidence/ui/one-view/10-voice-off-dark.png
+[2026-09-29T07:55:46.394Z] screenshot docs/verification/evidence/ui/one-view/11-chat-light.png
+[2026-09-29T07:55:47.601Z] screenshot docs/verification/evidence/ui/one-view/12-voice-on-light.png
+[2026-09-29T07:55:48.594Z] screenshot docs/verification/evidence/ui/one-view/13-voice-off-light.png
+[2026-09-29T07:55:48.594Z] PASS turning Voice Mode on turns the chat into the voice view (the mark on top, in the same view) and off returns to the chat, in the three themes [{"tag":"overseer","mark":{"w":175.5546875,"top":94},"same":true,"on":{"stage":true,"voice":"on","mode":"composer","pressed":"true","cards":3,"tabs":["Overseer"],"panel":false},"off":{"stage":false,"cards":7,"tabs":["Overseer"],"panel":false},"opened":0,"panelBefore":false},{"tag":"dark","mark":{"w":175.5546875,"top":94},"same":true,"on":{"stage":true,"voice":"on","mode":"composer","pressed":"true","cards":7,"tabs":["Overseer"],"panel":false},"off":{"stage":false,"cards":7,"tabs":["Overseer"],"panel":false},"opened":0,"panelBefore":false},{"tag":"light","mark":{"w":175.5546875,"top":94},"same":true,"on":{"stage":true,"voice":"on","mode":"composer","pressed":"true","cards":7,"tabs":["Overseer"],"panel":false},"off":{"stage":false,"cards":7,"tabs":["Overseer"],"panel":false},"opened":0,"panelBefore":false}]
+[2026-09-29T07:55:48.594Z] PASS nothing opens below or beside: no new editor tab and no panel [{"tag":"overseer","opened":0,"panel":false},{"tag":"dark","opened":0,"panel":false},{"tag":"light","opened":0,"panel":false}]
+[2026-09-29T07:55:48.594Z] PASS the same cards throughout (chat, voice on, voice off), the spoken request among them [{"tag":"overseer","same":true},{"tag":"dark","same":true},{"tag":"light","same":true}]
+[2026-09-29T07:55:48.595Z] PASS the line "Stop, mute and what's running still work" is gone (AC-217)
+[2026-09-29T07:55:53.159Z] screenshot docs/verification/evidence/ui/one-view/14-needs-badge.png
+[2026-09-29T07:55:53.551Z] screenshot docs/verification/evidence/ui/one-view/15-needs-list.png
+[2026-09-29T07:55:53.552Z] PASS Needs you is a small badge with a count, and a click pops out the short list {"badge":{"count":"1","label":"Needs you: 1","visible":true},"items":[{"label":"Sessions","hint":"Approve"}]}
+[2026-09-29T07:55:54.972Z] screenshot docs/verification/evidence/ui/one-view/16-needs-item-focuses-agent.png
+[2026-09-29T07:55:54.972Z] PASS a click on a Needs-you item focuses that agent (its chat) {"selected":"r-1d92b8566803","mode":"chat"}
+[2026-09-29T07:55:56.945Z] screenshot docs/verification/evidence/ui/one-view/17-handle-what-needs-me-asks.png
+[2026-09-29T07:55:58.942Z] screenshot docs/verification/evidence/ui/one-view/18-handle-what-needs-me-answered.png
+[2026-09-29T07:55:58.942Z] PASS "handle what needs me" asks about the waiting permission and the owner's yes answers it {"stillWaiting":"waiting_for_user","answered":6}
+[2026-09-29T07:55:58.943Z] PASS answering an agent's permission clears its Needs-you row within a second {"before":2,"after":0,"ms":0}
+[2026-09-29T07:56:00.539Z] PASS an agent finishing clears its Needs-you row within a second {"status":"interrupted","withWriter":2,"after":1,"ms":53}
+[2026-09-29T07:56:04.923Z] screenshot docs/verification/evidence/ui/one-view/19-stage-waiting-for-yes.png
+[2026-09-29T07:56:08.416Z] screenshot docs/verification/evidence/ui/one-view/20-aside-working.png
+[2026-09-29T07:56:16.254Z] screenshot docs/verification/evidence/ui/one-view/21-aside-done.png
+[2026-09-29T07:56:16.256Z] PASS a typed request's card passes through every stage in order: thinking, waiting for the yes, starting the agent, working, done {"seen":["thinking","waiting","sending","starting","working","done"],"stages":[{"stage":"thinking","text":"Overseer is thinking","progress":"Overseer is thinking"},{"stage":"waiting","text":"Waits for your yes","progress":"Waits for your yes"},{"stage":"sending","text":"Going ahead","progress":"Going ahead"},{"stage":"starting","text":"Starting draft the page","progress":"Starting draft the page"},{"stage":"working","text":"draft the page is working · 0s","progress":"draft the page is working · 0s"},{"stage":"working","text":"draft the page is working · 1s","progress":"draft the page is working · 1s"},{"stage":"working","text":"draft the page is working · 1s · Drafting the page.","progress":"draft the page is working · 1s · Drafting the page."},{"stage":"working","text":"draft the page is working · 2s · Drafting the page.","progress":"draft the page is working · 2s · Drafting the page."},{"stage":"working","text":"draft the page is working · 3s · Drafting the page.","progress":"draft the page is working · 3s · Drafting the page."},{"stage":"working","text":"draft the page is working · 3s · Write: draft.md","progress":"draft the page is working · 3s · Write: draft.md"},{"stage":"working","text":"draft the page is working · 4s · Write: draft.md","progress":"draft the page is working · 4s · Write: draft.md"},{"stage":"working","text":"draft the page is working · 5s · Write: draft.md","progress":"draft the page is working · 5s · Write: draft.md"},{"stage":"working","text":"draft the page is working · 5s · Read: draft.md","progress":"draft the page is working · 5s · Read: draft.md"},{"stage":"working","text":"draft the page is working · 6s · Read: draft.md","progress":"draft the page is working · 6s · Read: draft.md"},{"stage":"working","text":"draft the page is working · 7s · Read: draft.md","progress":"draft the page is working · 7s · Read: draft.md"},{"stage":"working","text":"draft the page is working · 8s · Read: draft.md","progress":"draft the page is working · 8s · Read: draft.md"},{"stage":"working","text":"draft the page is working · 9s · Read: draft.md","progress":"draft the page is working · 9s · Read: draft.md"},{"stage":"working","text":"draft the page is working · 10s · Read: draft.md","progress":"draft the page is working · 10s · Read: draft.md"},{"stage":"done","text":"draft the page finished","progress":"draft the page finished"}]}
+[2026-09-29T07:56:16.256Z] PASS while working, the card and the view show the agent's live activity and the elapsed time {"stage":"working","text":"draft the page is working · 1s · Drafting the page.","progress":"draft the page is working · 1s · Drafting the page."}
+[2026-09-29T07:56:16.256Z] PASS a request that starts a single agent slides the view aside: the agent's chat on the left, the view with the mark on the right {"aside":"1","selected":"r-76b780ed7fa6","mode":"chat","chatLeft":0,"chatWidth":702,"homeLeft":702,"homeWidth":380,"homeVisible":true}
+[2026-09-29T07:56:21.317Z] screenshot docs/verification/evidence/ui/one-view/22-typed-show-me-the-draft-agent.png
+[2026-09-29T07:56:26.579Z] screenshot docs/verification/evidence/ui/one-view/23-typed-what-did-it-make.png
+[2026-09-29T07:56:31.412Z] screenshot docs/verification/evidence/ui/one-view/24-typed-open-the-file-it-made.png
+[2026-09-29T07:56:36.311Z] screenshot docs/verification/evidence/ui/one-view/25-spoken-show-me-the-draft-agent.png
+[2026-09-29T07:56:39.744Z] screenshot docs/verification/evidence/ui/one-view/26-spoken-what-did-it-make.png
+[2026-09-29T07:56:42.801Z] screenshot docs/verification/evidence/ui/one-view/27-spoken-open-the-file-it-made.png
+[2026-09-29T07:56:42.801Z] PASS typed and spoken, "show me the draft agent", "what did it make?" and "open the file it made" focus or open the right thing [{"how":"typed","say":"show me the draft agent","selected":"r-76b780ed7fa6","mode":"chat"},{"how":"typed","say":"what did it make?","tabs":["Review, Editor Group 1","Overseer, Editor Group 2"]},{"how":"typed","say":"open the file it made","tabs":["Overseer, Editor Group 2","draft.md, Editor Group 2"]},{"how":"spoken","say":"show me the draft agent","selected":"r-76b780ed7fa6","mode":"chat"},{"how":"spoken","say":"what did it make?","tabs":["Review, Editor Group 1","Overseer, Editor Group 2"]},{"how":"spoken","say":"open the file it made","tabs":["Overseer, Editor Group 2","draft.md, Editor Group 2"]}]
+[2026-09-29T07:56:42.808Z] PASS these are Look actions: none of them waited for a yes []
+[2026-09-29T07:56:45.974Z] screenshot docs/verification/evidence/ui/one-view/28-card-click-opens-agent.png
+[2026-09-29T07:56:45.974Z] PASS clicking a request card opens the agent it started {"selected":"r-76b780ed7fa6","mode":"chat"}
+[2026-09-29T07:56:54.914Z] screenshot docs/verification/evidence/ui/one-view/29-setting-off-stays.png
+[2026-09-29T07:56:54.914Z] PASS with "Show the agent I start" off, the view does not slide aside {"aside":"","mode":"composer","selected":"r-76b780ed7fa6"}
+[2026-09-29T07:56:56.291Z] screenshot docs/verification/evidence/ui/one-view/30-aside-kept-as-context.png
+[2026-09-29T07:56:56.297Z] PASS a request not for Overseer never says "On it." and is kept as context in plain words {"said":[]}
+[2026-09-29T07:56:56.298Z] PASS no card shows an internal token (NOT_FOR_OVERSEER) or a raw error {"tokens":[]}
+[2026-09-29T07:56:56.509Z] background window: main-process events [{"ms":184,"what":"window created","show":true}]

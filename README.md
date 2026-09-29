@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **173 / 261** · **31** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-128, AC-129, AC-133, AC-135, AC-136, AC-137, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-183, AC-185, AC-186, AC-188, AC-189, AC-190, AC-192, AC-195, AC-196, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-210, AC-213, AC-216, AC-217, AC-218, AC-219, AC-220, AC-221, AC-222, AC-223, AC-224, AC-225, AC-226, AC-227, AC-228, AC-229, AC-230, AC-231, AC-232, AC-233, AC-234, AC-235, AC-236, AC-237, AC-238, AC-239, AC-240, AC-241, AC-243, AC-244, AC-245, AC-246, AC-247, AC-248, AC-249, AC-250, AC-251, AC-252, AC-253, AC-254, AC-255, AC-256, AC-257, AC-258, AC-259, AC-260. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+criteria: **178 / 261** · **32** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-128, AC-129, AC-133, AC-135, AC-136, AC-137, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-183, AC-185, AC-186, AC-188, AC-189, AC-190, AC-192, AC-195, AC-196, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-210, AC-213, AC-216, AC-217, AC-218, AC-219, AC-220, AC-221, AC-222, AC-223, AC-224, AC-225, AC-229, AC-230, AC-231, AC-232, AC-233, AC-234, AC-235, AC-236, AC-237, AC-238, AC-239, AC-240, AC-241, AC-243, AC-244, AC-245, AC-246, AC-247, AC-248, AC-249, AC-250, AC-251, AC-252, AC-253, AC-254, AC-255, AC-256, AC-257, AC-258. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), Voice Mode (Gate R, AC-162 to AC-177, added by the owner on 2026-09-27: a voice to talk to constantly that redirects every agent from context, answers quickly and shows every word it sent, with audio collected on the Rust side and the animated mark in the middle moving with the voice; [design](docs/rfcs/voice-mode.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -257,7 +257,7 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-214** Deploy: the one path from dev to production (stage 4) — [evidence](docs/verification/AC-214.md)
 - [x] **AC-215** Guided owner tests in a dev daemon (stage 3) — [evidence](docs/verification/AC-215.md)
 - [ ] **AC-216** A conversation, not only requests, the same typed or spoken — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-216.md)
-- [ ] **AC-217** Turning it on is visible — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-217.md)
+- [ ] **AC-217** Turning it on is visible — ◐ partial: home's Voice button with its shortcut; home turning into the voice view with the mark's animation, before, during and after in the Overseer theme; the removed line absent / deferred: the frames during the animation in Overseer Dark and Overseer Light, and a recording rather than three screenshots — [evidence](docs/verification/AC-217.md)
 - [ ] **AC-218** A voice worth listening to — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-218.md)
 - [ ] **AC-219** No internal ids in front of the owner — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-219.md)
 - [ ] **AC-220** Dictation is not a call — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-220.md)
@@ -266,9 +266,9 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-223** Other audio keeps its volume — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-223.md)
 - [ ] **AC-224** Goals for an agent, at the harness level — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-224.md)
 - [ ] **AC-225** Goals for Overseer, at the global level — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-225.md)
-- [ ] **AC-226** Overseer moves you around VS Code — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-226.md)
-- [ ] **AC-227** One view for talking to Overseer; Needs you as a small notification — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-227.md)
-- [ ] **AC-228** You can always tell it is working — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-228.md)
+- [x] **AC-226** Overseer moves you around VS Code — [evidence](docs/verification/AC-226.md)
+- [x] **AC-227** One view for talking to Overseer; Needs you as a small notification — [evidence](docs/verification/AC-227.md)
+- [x] **AC-228** You can always tell it is working — [evidence](docs/verification/AC-228.md)
 - [ ] **AC-229** Heard right before it acts — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-229.md)
 - [ ] **AC-230** Permission modes by conversation — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-230.md)
 - [ ] **AC-231** Agents start with what Overseer knows — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-231.md)
@@ -299,8 +299,8 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-256** A repository's badge never goes quiet on finished work — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-256.md)
 - [ ] **AC-257** Following an agent sits beside Overseer's conversation, not on top of it — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-257.md)
 - [ ] **AC-258** VS Code's own chat panel stays out of Overseer's way all session, not only at first launch — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-258.md)
-- [ ] **AC-259** Sending a task clears the box and says so — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-259.md)
-- [ ] **AC-260** Starting an agent in another repository never needs a native dialog — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-260.md)
+- [x] **AC-259** Sending a task clears the box and says so — [evidence](docs/verification/AC-259.md)
+- [x] **AC-260** Starting an agent in another repository never needs a native dialog — [evidence](docs/verification/AC-260.md)
 - [x] **AC-261** One Sign In, clearly Overseer's or clearly not — [evidence](docs/verification/AC-261.md)
 <!-- ac-list:end -->
 
@@ -373,7 +373,7 @@ phone cannot reach the Mac; that needs the relay, which is later work.
 What a phone can do, method by method:
 
 <!-- phone-capabilities:start -->
-266 methods: 71 available on a phone, 154 on the Mac only, 41 not yet. A *watch only* phone reads and cannot change anything. Generated by `python3 protocol/capabilities.py` from `protocol/protocol.json`.
+263 methods: 71 available on a phone, 151 on the Mac only, 41 not yet. A *watch only* phone reads and cannot change anything. Generated by `python3 protocol/capabilities.py` from `protocol/protocol.json`.
 
 | Method | What it does | On a phone | Who |
 | --- | --- | --- | --- |
@@ -543,8 +543,6 @@ What a phone can do, method by method:
 | `local.pull` | Download a local model | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
 | `local.pull_cancel` | Cancel a local model download | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
 | `local.unload` | Unload a local model | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
-| `notices.get` | Which agent moments become Mac notifications | The Mac only: it belongs to the Mac's own notifications | — |
-| `notices.set` | Choose which agent moments become Mac notifications | The Mac only: it belongs to the Mac's own notifications | — |
 | `ollama.install` | Install Ollama | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
 | `ollama.start` | Start Ollama | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
 | `ollama.stop` | Stop Ollama | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
@@ -631,7 +629,6 @@ What a phone can do, method by method:
 | `swarm.worker.liveness.sample` | Sample a Swarm worker's liveness (test) | The Mac only: auto routing and Swarm come to the phone later (the partial merge, AC-204) | — |
 | `swarm.worker.reconcile` | Reconcile a Swarm worker's exit | The Mac only: auto routing and Swarm come to the phone later (the partial merge, AC-204) | — |
 | `ui.focus` | Which agent a window on the Mac is looking at | The Mac only: it describes the Mac's own windows | — |
-| `ui.window` | Whether a VS Code window on the Mac has the focus | The Mac only: it describes the Mac's own windows | — |
 | `voice.answer` | Answer by voice | The Mac only: voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose | — |
 | `voice.cancel` | Stop what Voice Mode is doing | The Mac only: voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose | — |
 | `voice.download` | Download a voice | The Mac only: voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose | — |
@@ -827,7 +824,7 @@ the owner action or decision each one needs.
 - [ ] [AC-210](docs/verification/AC-210.md) (The phone simulators pinned to a dev daemon (after pull request #10)): After PR #10: the phone app and the gateway must be on main first.
 - [ ] [AC-213](docs/verification/AC-213.md) (The production phone app never pairs with a dev daemon (after pull request #10)): After PR #10: the phone app and the gateway must be on main first.
 - [ ] [AC-216](docs/verification/AC-216.md) (A conversation, not only requests, the same typed or spoken): To be built by its own agent after the Auto/Swarm merge.
-- [ ] [AC-217](docs/verification/AC-217.md) (Turning it on is visible): To be built by its own agent after the Auto/Swarm merge.
+- [ ] [AC-217](docs/verification/AC-217.md) (Turning it on is visible): not blocked
 - [ ] [AC-218](docs/verification/AC-218.md) (A voice worth listening to): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-219](docs/verification/AC-219.md) (No internal ids in front of the owner): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-220](docs/verification/AC-220.md) (Dictation is not a call): To be built by its own agent after the Auto/Swarm merge.
@@ -836,9 +833,6 @@ the owner action or decision each one needs.
 - [ ] [AC-223](docs/verification/AC-223.md) (Other audio keeps its volume): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-224](docs/verification/AC-224.md) (Goals for an agent, at the harness level): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-225](docs/verification/AC-225.md) (Goals for Overseer, at the global level): To be built by its own agent after the Auto/Swarm merge.
-- [ ] [AC-226](docs/verification/AC-226.md) (Overseer moves you around VS Code): To be built by its own agent after the Auto/Swarm merge.
-- [ ] [AC-227](docs/verification/AC-227.md) (One view for talking to Overseer; Needs you as a small notification): To be built by its own agent after the Auto/Swarm merge.
-- [ ] [AC-228](docs/verification/AC-228.md) (You can always tell it is working): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-229](docs/verification/AC-229.md) (Heard right before it acts): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-230](docs/verification/AC-230.md) (Permission modes by conversation): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-231](docs/verification/AC-231.md) (Agents start with what Overseer knows): To be built by its own agent after the Auto/Swarm merge.
@@ -868,8 +862,6 @@ the owner action or decision each one needs.
 - [ ] [AC-256](docs/verification/AC-256.md) (A repository's badge never goes quiet on finished work): Overnight build waves.
 - [ ] [AC-257](docs/verification/AC-257.md) (Following an agent sits beside Overseer's conversation, not on top of it): Overnight build waves.
 - [ ] [AC-258](docs/verification/AC-258.md) (VS Code's own chat panel stays out of Overseer's way all session, not only at first launch): Overnight build waves.
-- [ ] [AC-259](docs/verification/AC-259.md) (Sending a task clears the box and says so): Overnight build waves.
-- [ ] [AC-260](docs/verification/AC-260.md) (Starting an agent in another repository never needs a native dialog): Overnight build waves.
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.

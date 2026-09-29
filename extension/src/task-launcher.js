@@ -3,6 +3,8 @@
 // daemon request that creates a task.
 const vscode = require('vscode');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 const crypto = require('crypto');
 const features = require('./features');
 const { execFile } = require('child_process');
@@ -12,6 +14,9 @@ const INSTALL = { claude: 'https://docs.anthropic.com/en/docs/claude-code/setup'
 function gitRoot(dir) {
   return new Promise(resolve => execFile('git', ['rev-parse', '--show-toplevel'], { cwd: dir }, (err, out) => resolve(err ? undefined : out.trim())));
 }
+
+/** `~` and `~/…` are the home folder; anything else is returned as typed. */
+function expandHome(p) { return p === '~' ? os.homedir() : p.startsWith('~/') ? path.join(os.homedir(), p.slice(2)) : p; }
 
 function hints(caps) {
   const out = [];
@@ -32,13 +37,69 @@ class TaskLauncher {
   defaults() { return this.context.globalState.get('overseer.composerDefaults', {}); }
   saveDefaults(d) { return this.context.globalState.update('overseer.composerDefaults', { ...this.defaults(), ...d }); }
 
+  /**
+   * The repositories the composer offers (AC-260): open folders, then recent ones (added in the
+   * picker, or with agents), then Git repositories beside an open one ("nearby", for the picker's
+   * search). Nearby ones are not inspected until chosen.
+   */
   async repos() {
     const folders = vscode.workspace.workspaceFolders || [];
     const repos = new Map();
-    for (const root of (await Promise.all(folders.map(f => gitRoot(f.uri.fsPath)))).filter(Boolean)) repos.set(root, 'open folder');
+    const open = (await Promise.all(folders.map(f => gitRoot(f.uri.fsPath)))).filter(Boolean);
+    for (const root of open) repos.set(root, 'open folder');
+    for (const p of this.knownRepos()) if (!repos.has(p)) repos.set(p, 'recent');
     for (const t of [...(this.model.state.tasks || [])].sort((a, b) => b.created_ms - a.created_ms)) if (!repos.has(t.repo_root)) repos.set(t.repo_root, 'recent');
     const info = await Promise.all([...repos].map(async ([p, source]) => ({ path: p, name: path.basename(p), source, branch: (await this.client.request('repo.inspect', { path: p }).catch(() => ({}))).branch })));
-    return info.filter(r => r.branch !== undefined || r.source === 'open folder');
+    const out = info.filter(r => r.branch !== undefined || r.source === 'open folder');
+    const seen = new Set(repos.keys());
+    for (const parent of new Set(open.map(r => path.dirname(r)))) {
+      let names = [];
+      try { names = fs.readdirSync(parent, { withFileTypes: true }).filter(d => d.isDirectory() && !d.name.startsWith('.')).map(d => d.name).sort(); } catch {}
+      for (const name of names.slice(0, 200)) {
+        const p = path.join(parent, name);
+        if (seen.has(p) || !fs.existsSync(path.join(p, '.git'))) continue;
+        seen.add(p); out.push({ path: p, name, source: 'nearby' });
+        if (out.length >= 60) return out;
+      }
+    }
+    return out;
+  }
+
+  /** Repositories added from the composer's picker, most recent first. */
+  knownRepos() { return this.context.globalState.get('overseer.knownRepos', []).filter(p => typeof p === 'string'); }
+  async rememberRepo(p) { await this.context.globalState.update('overseer.knownRepos', [p, ...this.knownRepos().filter(x => x !== p)].slice(0, 20)); }
+
+  /**
+   * A repository from a path typed in the composer's picker (AC-260): `~` is the home folder, a
+   * folder inside a repository means that repository. Refusals are plain words for the picker.
+   */
+  async addRepo(input) {
+    const typed = String(input || '').trim();
+    if (!typed) throw new Error('Type the path of a folder.');
+    const full = expandHome(typed);
+    if (!path.isAbsolute(full)) throw new Error('Type the full path, starting with / or ~.');
+    let stat; try { stat = fs.statSync(full); } catch { stat = undefined; }
+    if (!stat || !stat.isDirectory()) throw new Error(`No folder at ${full}.`);
+    const root = await gitRoot(full);
+    if (!root) throw new Error(`${full} is not in a Git repository.`);
+    const info = await this.client.request('repo.inspect', { path: root });
+    await this.rememberRepo(root);
+    return { path: root, name: path.basename(root), source: 'chosen', branch: info.branch };
+  }
+
+  /** Folders that complete a typed path (the picker's Tab), Git repositories marked. */
+  async pathHints(input) {
+    const typed = String(input || '');
+    const full = expandHome(typed);
+    if (!path.isAbsolute(full)) return [];
+    const dir = typed.endsWith('/') ? full : path.dirname(full);
+    const prefix = typed.endsWith('/') ? '' : path.basename(full).toLowerCase();
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return []; }
+    const shown = typed.endsWith('/') ? typed : typed.slice(0, typed.length - path.basename(full).length);
+    return entries.filter(d => d.isDirectory() && d.name.toLowerCase().startsWith(prefix) && (prefix.startsWith('.') || !d.name.startsWith('.')))
+      .map(d => d.name).sort((a, b) => a.localeCompare(b)).slice(0, 8)
+      .map(name => ({ path: shown + name + '/', git: fs.existsSync(path.join(dir, name, '.git')) }));
   }
 
   accounts() {
@@ -63,6 +124,7 @@ class TaskLauncher {
     const root = await gitRoot(uri[0].fsPath);
     if (!root) throw new Error('That folder is not in a Git repository.');
     const info = await this.client.request('repo.inspect', { path: root });
+    await this.rememberRepo(root);
     return { path: root, name: path.basename(root), source: 'chosen', branch: info.branch };
   }
 

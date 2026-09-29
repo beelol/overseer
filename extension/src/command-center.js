@@ -118,6 +118,13 @@ class CommandCenter {
       case 'composerData': post({ type: 'composerData', data: await this.handlers.launcher.data() }); return;
       case 'composerDefaults': await this.handlers.launcher.saveDefaults(m.defaults || {}); return;
       case 'composerBrowse': { const repo = await this.handlers.launcher.browse(); if (repo) post({ type: 'notice', scope: 'composer', kind: 'repo', repo }); return; }
+      // The repository chip's own picker (AC-260): a typed path, and its Tab completions; no dialog.
+      case 'composerAddRepo': {
+        try { post({ type: 'notice', scope: 'composer', kind: 'repo', repo: await this.handlers.launcher.addRepo(m.path) }); }
+        catch (error) { post({ type: 'notice', scope: 'composer', kind: 'repoError', path: m.path, message: error.message }); }
+        return;
+      }
+      case 'composerPathHints': post({ type: 'notice', scope: 'composer', kind: 'pathHints', input: m.input, hints: await this.handlers.launcher.pathHints(m.input) }); return;
       case 'composerBranches': post({ type: 'notice', scope: 'composer', kind: 'branches', branches: await this.handlers.launcher.branches(m.repo) }); return;
       case 'composerModel': {
         const model = await vscode.window.showInputBox({ title: 'Model', prompt: 'Any model name this harness accepts. Leave empty for the default.', value: m.current || '' });
