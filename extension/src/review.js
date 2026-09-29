@@ -240,14 +240,28 @@ class Review {
     return opts.options.find(o => o.default) || opts.options[0];
   }
 
+  /**
+   * Looks up what opening a run's review needs (its repository and comparison) ahead of open(), so
+   * the arrangement can do it while it still asks whether the agent has changes (AC-73's 500 ms).
+   */
+  prepare(runId) {
+    const run = this.model.run(runId);
+    const ws = run && this.model.workspace(run.workspace_id);
+    if (!run || this.unavailable(run, ws)) return Promise.resolve();
+    const lookup = Promise.all([this.repoFor(ws.path), this.currentComparison(runId)]);
+    this.prepared = { runId, path: ws.path, at: Date.now(), lookup };
+    return lookup.then(() => {}, () => {});
+  }
+
   async open(runId, { preserveFocus = false, follow, viewColumn } = {}) {
     const run = this.model.run(runId);
     if (!run) throw new Error('Unknown run.');
     const ws = this.model.workspace(run.workspace_id);
     const why = this.unavailable(run, ws);
     if (why) throw new Error(why);
-    const repo = await this.repoFor(ws.path);
-    const comparison = await this.currentComparison(runId);
+    const ready = this.prepared?.runId === runId && this.prepared.path === ws.path && Date.now() - this.prepared.at < 60000 ? this.prepared.lookup.catch(() => null) : null;
+    this.prepared = undefined;
+    const [repo, comparison] = (ready && await ready) || [await this.repoFor(ws.path), await this.currentComparison(runId)];
     if (follow !== undefined) { this.follow.set(runId, follow ? 'following' : 'off'); this.persistFollow(); }
     if (String(run.capabilities?.file_activity || '').startsWith('unknown')) this.followNotes.set(runId, 'Filesystem evidence only: this harness does not report its edits, so Follow cannot attribute or jump to them. The file list still refreshes live.');
     return this.manager.open({ repo, workspaceId: ws.id, runId, runTitle: run.title, harness: run.harness, workspaceKind: ws.kind, comparison, scope: this.scopes.get(runId) || 'all' }, { preserveFocus, viewColumn: viewColumn || this.reviewColumn?.() });

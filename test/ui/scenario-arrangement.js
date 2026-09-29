@@ -54,18 +54,32 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     check('an agent with no changes: one editor group with its chat and no review', l1.length === 1 && kind(l1) === 'chat' && !l1[0].tabs.some(t => /^Review/.test(t)), l1);
     await s.screenshot('chat-alone');
 
-    // Its first edit brings the review forward within 500 ms.
+    // Its first edit brings the review forward within 500 ms. The moment the review is shown is
+    // taken in the window itself (a mutation observer), not by this test's polling over CDP, whose
+    // round trips add hundreds of milliseconds on a loaded machine.
+    await cdp.evalWorkbench(`(() => {
+      window.__reviewShownAt = 0;
+      const kind = () => [...document.querySelectorAll('.editor-group-container')].filter(g => g.offsetParent).map(g => { const a = g.querySelector('.tab.active')?.getAttribute('aria-label') || ''; return /^Review/.test(a) ? 'review' : /^Overseer/.test(a) ? 'chat' : a; }).join('+');
+      const seen = new MutationObserver(() => { if (!window.__reviewShownAt && kind() === 'review+chat') { window.__reviewShownAt = Date.now(); seen.disconnect(); } });
+      seen.observe(document.querySelector('.monaco-workbench') || document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'aria-label', 'style'] });
+      return true;
+    })()`);
     await cdp.command('Overseer: Allow Pending Request');
     let switched, l2; const t0 = Date.now();
     for (let i = 0; i < 400; i++) { l2 = await layout(); if (kind(l2) === 'review+chat') { switched = Date.now(); break; } await delay(20); }
+    const shownAt = await cdp.evalWorkbench('window.__reviewShownAt');
     // The edit is the file's write (the fixture names the file earlier, when it asks for permission).
     const written = fs.statSync(path.join(perm.workspace.path, 'perm.txt')).mtimeMs;
-    const lag = switched ? Math.round(switched - written) : undefined;
+    const lag = shownAt ? Math.round(shownAt - written) : undefined;
+    // Where the time went: the write, the daemon's event for it, the review in the window.
+    const events = s.ctl('events.list', { run_id: perm.run.id, limit: 2000 }).events;
+    const timing = { polledLag: switched ? Math.round(switched - written) : null, events: events.filter(e => e.ts >= written - 100).map(e => `${e.kind}${e.payload?.status ? ':' + e.payload.status : ''}@${Math.round(e.ts - written)}`) };
+    s.note('first edit → review', { lag, ...timing });
     await delay(1500); l2 = await layout();
     const reviewFrame = await cdp.webview(`!!document.getElementById('diffs')`, 20000).catch(() => null);
     const reviewFiles = reviewFrame ? await reviewFrame.waitFor(`document.getElementById('tree')?.innerText.includes('perm.txt') && document.getElementById('tree').innerText.split('\\n').map(x => x.trim()).filter(Boolean)`, 10000).catch(() => []) : [];
     check('the first file edit brings the review forward within 500 ms: review on the left (about two thirds) on the changed file, chat on the right',
-      kind(l2) === 'review+chat' && l2[0].share >= 0.6 && l2[0].share <= 0.72 && lag !== undefined && lag <= 500 && reviewFiles.some(f => /perm\.txt/.test(f)), { lag, waitedMs: switched - t0, layout: l2, reviewFiles });
+      kind(l2) === 'review+chat' && l2[0].share >= 0.6 && l2[0].share <= 0.72 && lag !== undefined && lag <= 500 && reviewFiles.some(f => /perm\.txt/.test(f)), { lag, ...timing, waitedMs: switched - t0, layout: l2, reviewFiles });
     await s.screenshot('review-and-chat');
 
     // A second agent that already has changes (for the "keeps the arrangement" check).

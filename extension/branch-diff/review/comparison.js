@@ -100,8 +100,17 @@ class Comparison {
     this.progressEmitter.fire({ stage, id: uri ? digest(keyOf(uri)) : undefined, epoch: this.epoch });
   }
 
-  invalidate(status = false, uri) {
+  /** A compute's stage, shown unless only quiet refreshes asked for it. */
+  announce(stage) {
+    if (!this.snapshot || this.loud) this.progress(stage);
+  }
+
+  /** quiet: a background reconciliation (the panel's poll). It refreshes like any other, but says
+   *  "Updating comparison…" only if something else asked for the refresh too: a check that finds
+   *  nothing new every 2.5 s must not flash in the toolbar (the audit's transient 175 → 178). */
+  invalidate(status = false, uri, { quiet = false } = {}) {
     if (this.disposed) return;
+    if (!quiet) this.loud = true;
     this.epoch++;
     this.needsStatus ||= status;
     if (uri) this.progress('Updating comparison…', uri);
@@ -131,7 +140,7 @@ class Comparison {
       const current = () => epoch === this.epoch || restarts >= 1;
       let next;
       try {
-        this.progress(this.snapshot ? 'Updating comparison…' : 'Finding branch base…');
+        this.announce(this.snapshot ? 'Updating comparison…' : 'Finding branch base…');
         if (this.needsStatus && !this.helpers.skipRepoStatus) {
           this.needsStatus = false;
           this.refreshingStatus = true;
@@ -147,7 +156,7 @@ class Comparison {
           const resolvedKey = await this.helpers.comparisonKey(this.repo, this.target);
           this.baseCache = resolvedKey === key ? { key, context } : undefined;
         }
-        this.progress(this.snapshot ? 'Updating comparison…' : 'Finding changed files…');
+        this.announce(this.snapshot ? 'Updating comparison…' : 'Finding changed files…');
         const inputs = this.inputs();
         const description = this.baseCache?.description || { base: context.base, mergeBase: context.mergeBase,
           headName: this.repo.state.HEAD?.name, headSha: head, mode: this.mode };
@@ -184,6 +193,7 @@ class Comparison {
         this.snapshot = { ...next, version: ++this.version };
         this.emitter.fire(this.snapshot);
       }
+      this.loud = false;
       this.progress('');
       const published = this.snapshot;
       if (stale) { clearTimeout(this.timer); this.timer = setTimeout(() => { this.ready().catch(() => {}); }, 150); }

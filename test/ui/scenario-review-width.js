@@ -49,10 +49,16 @@ const THEMES = ['Overseer Dark', 'Overseer Light'];
         }
       }
       const doc = document.documentElement;
-      const overflow = doc.scrollWidth > doc.clientWidth + 1 || document.getElementById('toolbar').scrollWidth > document.getElementById('toolbar').clientWidth + 1;
+      const bar = document.getElementById('toolbar');
+      const overflow = doc.scrollWidth > doc.clientWidth + 1 || bar.scrollWidth > bar.clientWidth + 1;
+      // What sticks out, when something does: the page's widest elements and the toolbar's parts.
+      const name = e => e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (typeof e.className === 'string' && e.className ? '.' + e.className.trim().split(/\s+/).slice(0, 3).join('.') : '');
+      const wide = !overflow ? [] : [...document.querySelectorAll('body *')].filter(e => e.offsetParent && box(e).right > doc.clientWidth + 1).map(e => ({ el: name(e), right: Math.round(box(e).right), width: Math.round(box(e).width) })).slice(0, 12);
+      const parts = !overflow ? [] : [...bar.children].map(k => ({ el: name(k), width: Math.round(box(k).width), scroll: k.scrollWidth }));
+      const sizes = { page: [doc.scrollWidth, doc.clientWidth], toolbar: [bar.scrollWidth, bar.clientWidth] };
       const rowsWithoutIcon = [...document.querySelectorAll('#tree .file')].filter(b => !b.querySelector('.codicon')).map(b => b.textContent);
       const card = [...document.querySelectorAll('.large-diff')].map(c => c.textContent);
-      return { width: innerWidth, toolbar, headers, overlaps, overflow, rowsWithoutIcon, card, hunks: document.querySelectorAll('.hunk-actions').length };
+      return { width: innerWidth, toolbar, headers, overlaps, overflow, wide, parts, sizes, rowsWithoutIcon, card, hunks: document.querySelectorAll('.hunk-actions').length };
     })()`);
     for (const th of THEMES) {
       await theme(th);
@@ -60,8 +66,13 @@ const THEMES = ['Overseer Dark', 'Overseer Light'];
         await width(w);
         // Scroll through the diffs so every hunk renders once.
         await review.eval(`document.getElementById('diffs').scrollTop = 0`); await delay(600);
-        const a = await audit();
-        result.audits.push({ theme: th, window: w, ...a });
+        // Measured once the review has settled at this width: while it is still laying out, a
+        // reading can catch it mid-resize. What a transient reading showed is kept.
+        let a = await audit();
+        const transient = [];
+        for (let i = 0; i < 6 && a.overflow; i++) { transient.push({ wide: a.wide, parts: a.parts, sizes: a.sizes }); await delay(500); a = await audit(); }
+        if (transient.length) s.note(`review at ${w} px in ${th}: overflow in ${transient.length} reading(s) before it settled`, { settled: !a.overflow, transient });
+        result.audits.push({ theme: th, window: w, ...a, ...(transient.length ? { transient } : {}) });
         await s.screenshot(`review-${th.split(' ')[1].toLowerCase()}-${w}`);
       }
     }
@@ -71,7 +82,7 @@ const THEMES = ['Overseer Dark', 'Overseer Light'];
     check('the review header stays on one line at 900, 1280 and 1600 px in both themes', all.every(a => a.toolbar.ok && a.toolbar.height <= 50), all.map(a => [a.theme, a.window, a.toolbar]));
     check('each file header stays on one line', all.every(a => a.headers.every(h => h.ok && h.height <= 46)), all.map(a => [a.window, a.headers.filter(h => !h.ok || h.height > 46)]));
     check('no hunk Accept/Revert control covers code', all.every(a => a.hunks >= 3 && a.overlaps.length === 0), all.map(a => [a.theme, a.window, a.hunks, a.overlaps]));
-    check('nothing in the review overflows sideways', all.every(a => !a.overflow), all.map(a => [a.window, a.overflow]));
+    check('nothing in the review overflows sideways', all.every(a => !a.overflow), all.map(a => [a.theme, a.window, a.overflow, ...(a.overflow ? [a.wide, a.parts, a.sizes] : [])]));
     check('file rows carry codicons', all.every(a => a.rowsWithoutIcon.length === 0), all[0].rowsWithoutIcon);
     check('a very large diff starts collapsed with its line count', all.every(a => a.card.some(c => /800 changed lines/.test(c))), all[0].card);
   } catch (error) {

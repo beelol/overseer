@@ -34,7 +34,7 @@ class ReviewManager {
     // Local reconciliation catches missed/excluded watcher events, only while a view is visible.
     this.poll = setInterval(() => {
       for (const session of this.sessions.values()) {
-        if (!session.running && this.panels.get(session)?.visible) session.invalidate(true);
+        if (!session.running && this.panels.get(session)?.visible) session.invalidate(true, undefined, { quiet: true });
       }
     }, 2500);
     this.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
