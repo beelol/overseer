@@ -92,9 +92,9 @@ const slug = t => t.toLowerCase().replace(/\s+/g, '-');
       await s.screenshot(`where-am-i-${t}`); reached('where am I', theme, await cdp.evalWorkbench(`/Where am I/.test(document.querySelector('.quick-input-widget')?.textContent || '')`));
       await cdp.key('Escape'); await delay(400);
       // The immersive dashboard.
-      await cdp.command('Overseer: Open Dashboard'); await delay(3000);
+      await cdp.command('Overseer: Enter Focus Mode'); await delay(3000);
       await s.screenshot(`dashboard-${t}`); reached('dashboard', theme, await cdp.evalWorkbench(`![...document.querySelectorAll('.editor-group-container .tabs-container')].some(e => e.offsetHeight > 0)`));
-      await cdp.command('Overseer: Exit Dashboard'); await delay(2000);
+      await cdp.command('Overseer: Exit Focus Mode'); await delay(2000);
     }
     for (const [view, themes] of Object.entries(result.reached)) check(`${view}: reached in ${THEMES.join(', ')}`, THEMES.every(t => themes[t]), themes);
   } catch (error) {

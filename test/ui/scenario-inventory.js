@@ -114,11 +114,11 @@ const WEBVIEW = `(() => {
     check('grid: agents once (side bar); no file lists', once(grid, 'agents', 1) && once(grid, 'files', 0) && once(grid, 'changedFiles', 0), grid);
     await cdp.command('Overseer: Toggle Agent Grid'); await delay(1500);
 
-    await cdp.command('Overseer: Open Dashboard'); await delay(3000);
+    await cdp.command('Overseer: Enter Focus Mode'); await delay(3000);
     await s.selectAgent('Changes agent', { settle: 3000 });
     const dashboard = await inventory('dashboard');
     check('dashboard: agents once, files once, changed files once', once(dashboard, 'agents', 1) && once(dashboard, 'files', 1) && once(dashboard, 'changedFiles', 1), dashboard);
-    await cdp.command('Overseer: Exit Dashboard'); await delay(1500);
+    await cdp.command('Overseer: Exit Focus Mode'); await delay(1500);
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}

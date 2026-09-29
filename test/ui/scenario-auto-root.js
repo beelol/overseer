@@ -23,7 +23,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
   try {
     const repo = makeRepo(path.join(s.root, 'auto-repo'), { dirty: false });
     // Auto routing is behind its unfinished-feature setting (AC-204).
-    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'files.simpleDialog.enable': true, 'overseer.experimental.autoRouting': true });
+    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'overseer.home.sendTo': 'agent', 'files.simpleDialog.enable': true, 'overseer.experimental.autoRouting': true });
     s.install(latestVsix());
     s.launch(repo, { OVERSEER_CODEX_PATH: app, OVERSEER_CLAUDE_PATH: '/nonexistent/claude', OVERSEER_OPENCODE_PATH: '/nonexistent/opencode',
       OVERSEER_TEST_SYSTEM_HOME: sys, FIXTURE_MODE: 'managed-models', FIXTURE_TRACE_FILE: trace, FIXTURE_QUOTA_MODE_FILE: quota,

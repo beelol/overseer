@@ -1,0 +1,93 @@
+waiting for another test-all run to finish (81389 /private/tmp/claude-501/-Users-bilal-projects-overseer--claude-worktrees-overseer-macos-app-2d3d20/30afc9d7-c694-4083-9032-ce1c0f5a48e3/scratchpad/brain-wt)
+▶ Rust (cargo test --workspace) … FAILED (1043s) 808 passed, 3 failed
+    test t23_the_daemon_is_asked_again_every_second_and_rarely_after_an_error ... ok
+    test adapters::tests::classify_errors ... ok
+    test adapters::tests::network_errors_are_their_own_class ... ok
+    test adapters::tests::structured_retry_after_is_bounded_and_never_read_from_error_prose ... ok
+    test auto_health::tests::managed_local_error_scopes_to_endpoint_and_blocks_shared_loopback_url ... ok
+    test net::tests::transport_errors_are_classified ... ok
+    test opencode_bridge::tests::errors_from_the_server_are_classified ... ok
+    test auto_health::tests::persisted_managed_local_error_uses_its_selected_endpoint_not_the_harness_name ... ok
+    test auto_health::tests::unrelated_error_burst_cannot_hide_an_active_structured_cooldown ... ok
+    test ac16_fixture_error_classes_stay_distinct ... ok
+    test auto_pre_effect_rejections_stop_after_three_distinct_routes_without_a_child ... FAILED
+    test auto_pre_effect_account_rejection_selects_an_allowed_independent_route ... FAILED
+▶ Unit (test/unit) … ok (10s) 21 of 21 passed
+▶ Check (extension sources) … ok (0s)
+▶ Links (README and ledger) … ok (0s) 885 links checked in 265 files; 0 broken
+▶ Dev daemons (test/dev) … ok (19s) 12 of 12 passed
+▶ Guided owner tests (test/dev/guided.js) … ok (2s) 7 of 7 passed
+▶ Deploy (test/deploy) … ok (78s) 6 of 6 passed
+▶ Build the VSIX … ok (23s)
+(UI scenarios, 3 at a time)
+▶ UI audio … ok (32s)
+▶ UI arrangement … ok (35s)
+▶ UI accounts … ok (56s)
+▶ UI auto-root … ok (27s)
+▶ UI brand … ok (25s)
+▶ UI center … ok (48s)
+▶ UI chat … ok (38s)
+▶ UI composer-friction … ok (25s)
+▶ UI composer … ok (56s)
+▶ UI audit … ok (143s)
+▶ UI conversation … ok (29s)
+▶ UI continuity … ok (70s)
+▶ UI continuity-settings … ok (55s)
+▶ UI dragout … ok (20s)
+▶ UI dashboard … ok (48s)
+▶ UI dev-instance … ok (49s)
+▶ UI endings … ok (35s)
+▶ UI first-click … ok (36s)
+▶ UI follow … ok (47s)
+▶ UI grid … ok (39s)
+▶ UI followups … ok (100s)
+▶ UI gallery … ok (115s)
+▶ UI grid-track … ok (29s)
+▶ UI grid-drag … ok (67s)
+▶ UI home-input … ok (18s)
+▶ UI home-overseer … ok (38s)
+▶ UI home … ok (94s)
+▶ UI hunks … ok (43s)
+▶ UI keyboard … ok (33s)
+▶ UI inventory … FAILED (52s)
+    (node:66245) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.
+    [2026-09-29T14:38:48.184Z] FAIL an unsaved edit is marked once among Overseer's views (the review) {"agents":["side bar"],"files":["review navigator"],"changedFiles":["review navigator"],"unsaved":["e
+    SCENARIO FAILED /private/tmp/ovs-ui-2YKTRc
+▶ UI keys-on-screen … ok (30s)
+▶ UI history … ok (199s)
+▶ UI look … ok (73s)
+▶ UI modes … ok (50s)
+▶ UI main … ok (81s)
+▶ UI narrow-chat … ok (40s)
+▶ UI notify … ok (13s)
+▶ UI notify-agents … ok (14s)
+▶ UI one-signin … ok (17s)
+▶ UI parity … ok (27s)
+▶ UI oversight … ok (68s)
+▶ UI one-view … ok (98s)
+▶ UI place … ok (37s)
+▶ UI pr … ok (25s)
+▶ UI phone-access … ok (126s)
+▶ UI restore … ok (68s)
+▶ UI review … ok (74s)
+▶ UI review-files … ok (29s)
+▶ UI review-width … ok (27s)
+▶ UI review-marks … ok (41s)
+▶ UI scopes … ok (42s)
+▶ UI sidebar … ok (32s)
+▶ UI swarm-allowance … ok (9s)
+▶ UI signin … ok (38s)
+▶ UI swarm-status … ok (13s)
+▶ UI swarm-scale … ok (43s)
+▶ UI talk … ok (26s)
+▶ UI trust … ok (11s)
+▶ UI usage … ok (25s)
+▶ UI theme … ok (71s)
+▶ UI sidebar-search … ok (167s)
+▶ UI voice-turn-on … ok (35s)
+▶ UI windows … ok (48s)
+▶ UI voice … ok (247s)
+(not run: background, claude-live, codex-approval, codex-follow, codex-live, conversation-live, live-gatej, merge, offline-session, perf, talk-live; LIVE ones need --live, perf needs --perf)
+▶ Leftovers (no process left running) … ok (0s)
+
+71 of 73 passed; failed: Rust (cargo test --workspace), UI inventory

@@ -1,0 +1,60 @@
+ ◆ Overseer  page 1/1 · 4 agents · ● 1 active · ◆ 1 needs you                                                                                                            phone access off · ● connected 
+┏ 1 ✓ Tidy lint ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╭ ◆ Overseer · Ask first ────────────────────────────────────────────────────────────────────────────────────╮────────────────────────────── Program · 0s ╮
+┃ tidy                                       │ ▶ Started Release notes (Claude Code) in web-app                                                           │                                            │
+┃                                            │ ▶ Started Changelog entry (Claude Code) in web-app                                                         │                                            │
+┃                                            │ ▶ Started Migration dry-run (generic) in web-app                                                           │                                            │
+┃                                            │ ▶ Started Tidy lint (generic) in web-app                                                                   │                                            │
+┃                                            │ you › What is everyone doing?                                                                              │                                            │
+┃                                            │ ◆ Here is what everyone is doing:                                                                          │                                            │
+┃                                            │                                                                                                            │                                            │
+┃                                            │   • Changelog entry: waiting for you (permission)                                                          │                                            │
+┃                                            │   • Tidy lint: completed                                                                                   │                                            │
+┃                                            │   • Migration dry-run: failed                                                                              │                                            │
+┃                                            │   • Release notes: failed                                                                                  │                                            │
+┃                                            │──────────────────────────────────────────────────────────────────────────────────────────────────────────  │                                            │
+┃                                            │ › type a message for Overseer                                                                              │                                            │
+┃                                            │                                                                                                            │                                            │
+┃                                            │                                                                                                            │                                            │
+┃                                            │                                                                                                            │                                            │
+┃                                            │                                                                                                            │                                            │
+┃                                            │                                                                                                            │                                            │
+┃                                            │                                                                                                            │                                            │
+┃                                            │                                                                                                            │                                            │
+┃                                            │                                                                                                            │                                            │
+┃                                            │                                                                                                            │                                            │
+┃                                            │                                                                                                            │                                            │
+┃                                            │                                                                                                            │                                            │
+┃                                            │                                                                                                            │                                            │
+┃                                            │                                                                                                            │                                            │
+┃                                            │                                                                                                            │                                            │
+┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━│                                                                                                            │────────────────────────────────────────────╯
+╭ 3 ◆ Changelog entry ───────────────────────│                                                                                                            │────────────────────────── Claude Code · 0s ╮
+│ › Add a changelog entry                    │                                                                                                            │                                            │
+│ ✎ perm.txt                                 │                                                                                                            │                                            │
+│ ⚙ Write perm.txt …                         │                                                                                                            │                                            │
+│ ◆ wants Write perm.txt                     │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+│                                            │                                                                                                            │                                            │
+╰ ◆ Write perm.txt  a allow d deny ──────────╰────────────────────────────────────────────── enter sends · ctrl+y / ctrl+n answer a proposal · esc closes ╯────────────────────────────────────────────╯
+ type to Overseer   enter send   ctrl+y/n yes/no to a proposal   j/k scroll   esc close                                                                                                                 

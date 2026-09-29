@@ -92,6 +92,7 @@
       case 'activity': home.activity(m.runs); break;
       case 'aside': setAside(m.on); if (m.on && m.runId) selectRun(m.runId, { fromHost: true }); break;
       case 'overseerNotice': if (m.id) home.proposalStatus(m.id, m.message); else composer.notice({ message: m.message }); break;
+      case 'composerTarget': setMode('composer'); composer.setTarget(m.target); post({ type: 'composerTargetSeen' }); break;
       case 'askOverseer': setMode('composer'); composer.askOverseer(m.text || ''); break;
       case 'mentionFiles': if (m.scope === 'composer') composer.mentionFiles(m); else chat.mentionFiles(m); break;
       case 'measure': post({ type: 'measured', id: m.id, w: window.innerWidth, h: window.innerHeight }); break;

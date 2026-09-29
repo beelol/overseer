@@ -107,7 +107,7 @@ class Voice {
   async toast(m) {
     if (m.cancel) {
       const pick = await vscode.window.showInformationMessage(m.text, 'Cancel');
-      if (pick === 'Cancel') await this.client.request('voice.cancel', { id: m.request }).catch(e => vscode.window.showWarningMessage(`Overseer: ${e.message}`));
+      if (pick === 'Cancel') await this.client.request('voice.cancel', { id: m.request }).catch(e => vscode.window.showWarningMessage(`Overseer: ${require('../media/plain-words.js').plain(e.message, 300)}`));
     } else {
       vscode.window.showInformationMessage(m.text);
     }

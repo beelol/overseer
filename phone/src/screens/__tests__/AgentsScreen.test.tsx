@@ -102,10 +102,13 @@ describe('the agents list', () => {
     expect(order()).toEqual(expected);
   });
 
-  test('puts the agents that need the owner first, the one that waits before the ones that failed', async () => {
+  // AC-246: Needs you is what waits for the owner's answer, as VS Code and the TUI count it; the
+  // failed agents are in their repositories with the failure's mark, not in Needs you.
+  test('puts the agent that waits for the owner first; the failed ones stay in their repositories', async () => {
     await open();
     const all = order();
-    expect(all.slice(0, 5)).toEqual(['agents.section.needs', needs(RUN.waiting), needs(RUN.auth), needs(RUN.ratelimit), needs(RUN.failed)]);
+    expect(all.slice(0, 2)).toEqual(['agents.section.needs', needs(RUN.waiting)]);
+    for (const id of [RUN.auth, RUN.ratelimit, RUN.failed]) { expect(screen.queryByTestId(needs(id))).toBeNull(); expect(screen.getByTestId(row(id))).toBeTruthy(); }
     expect(screen.getByTestId(`${needs(RUN.waiting)}.status`)).toHaveTextContent('billing-service · Approve · Wants to use Write');
     // A row that needs the owner carries the mark, in the section and in its repository.
     expect(screen.getByTestId(`${needs(RUN.waiting)}.mark`)).toBeTruthy();
@@ -116,9 +119,9 @@ describe('the agents list', () => {
   test('filters by All, Active and Needs you, and says how many need the owner', async () => {
     await open();
     const counts = agents.counts(store.load(NINE), { now: NOW, seen: {}, changed: {} });
-    expect(counts.needs).toBe(4);
+    expect(counts.needs).toBe(1);
     expect(screen.getByTestId('agents.filter.needs')).toHaveTextContent(`Needs you${counts.needs}`);
-    expect(screen.getByTestId('agents.filter.needs').props.accessibilityLabel).toBe('Needs you, 4');
+    expect(screen.getByTestId('agents.filter.needs').props.accessibilityLabel).toBe('Needs you, 1');
     expect(screen.getByTestId('agents.filter.all')).toHaveTextContent('All');
     expect(screen.getByTestId('agents.filter.all').props.accessibilityState).toMatchObject({ selected: true });
 
@@ -131,7 +134,7 @@ describe('the agents list', () => {
     expect(order().filter((id) => id.startsWith('agents.needs.'))).toEqual([needs(RUN.waiting)]);
 
     await fireEvent.press(screen.getByTestId('agents.filter.needs'));
-    expect(order()).toEqual(['agents.section.needs', needs(RUN.waiting), needs(RUN.auth), needs(RUN.ratelimit), needs(RUN.failed)]);
+    expect(order()).toEqual(['agents.section.needs', needs(RUN.waiting)]);
 
     await fireEvent.press(screen.getByTestId('agents.filter.all'));
     expect(screen.getByTestId(row(RUN.showcase))).toBeTruthy();
@@ -188,7 +191,7 @@ describe('the agents list', () => {
     const app = await open();
     const running = screen.getByTestId(`${row(RUN.running)}.status`);
     expect(running).toHaveTextContent('shop · working');
-    expect(screen.getByTestId('agents.filter.needs')).toHaveTextContent('Needs you4');
+    expect(screen.getByTestId('agents.filter.needs')).toHaveTextContent('Needs you1');
 
     await app.events(makeEvent('status', { status: 'completed', reason: 'turn completed' }, { run_id: RUN.running, task_id: taskOf(RUN.running), ts: NOW }));
     expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent('shop · done · now');
@@ -198,7 +201,7 @@ describe('the agents list', () => {
     expect(screen.queryByTestId(needs(RUN.waiting))).toBeNull();
     expect(screen.queryByTestId(`${row(RUN.waiting)}.mark`)).toBeNull();
     expect(screen.getByTestId(`${row(RUN.waiting)}.status`)).toHaveTextContent('billing-service · working');
-    expect(screen.getByTestId('agents.filter.needs')).toHaveTextContent('Needs you3');
+    expect(screen.getByTestId('agents.filter.needs').props.accessibilityLabel).toBe('Needs you, 0');
   });
 
   test('a changed status cross-fades: the old words leave while the new ones arrive', async () => {
@@ -243,21 +246,19 @@ describe('the agents list', () => {
 
   test('tapping an agent opens its conversation and remembers when', async () => {
     const app = await open();
-    expect(screen.getByTestId(needs(RUN.failed))).toBeTruthy();
     await fireEvent.press(screen.getByTestId(row(RUN.failed)));
     expect(router.pushed).toEqual([routes.agent(RUN.failed)]);
     expect(app.platform.capabilities.keyValue.scope<{ seen: Record<string, number> }>('agents').get('seen')).toEqual({ [RUN.failed]: NOW });
-    // What failed was looked at: it no longer needs the owner.
-    expect(screen.queryByTestId(needs(RUN.failed))).toBeNull();
-    expect(screen.getByTestId('agents.filter.needs')).toHaveTextContent('Needs you3');
+    // Looking at an agent never changes what waits for the owner's answer.
+    expect(screen.getByTestId('agents.filter.needs')).toHaveTextContent('Needs you1');
   });
 
-  test('what was opened before is remembered from the last launch', async () => {
+  test('what was opened before is remembered from the last launch, and Needs you is still what waits', async () => {
     await open({}, (app) => app.platform.capabilities.keyValue.scope<{ seen: Record<string, number> }>('agents').set('seen', { [RUN.auth]: NOW, [RUN.ratelimit]: NOW }));
-    expect(order().filter((id) => id.startsWith('agents.needs.'))).toEqual([needs(RUN.waiting), needs(RUN.failed)]);
+    expect(order().filter((id) => id.startsWith('agents.needs.'))).toEqual([needs(RUN.waiting)]);
   });
 
-  test('a finished agent with changes to review needs the owner', async () => {
+  test('a finished agent with changes is not in Needs you (it is to review, AC-254)', async () => {
     const app = await createTestApp({ state: NINE });
     const asked: string[] = [];
     const showcase = NINE.runs.find((run) => run.id === RUN.showcase);
@@ -267,9 +268,9 @@ describe('the agents list', () => {
     };
     await app.render(<AgentsScreen />);
     await loaded();
-    await waitFor(() => expect(screen.getByTestId(needs(RUN.showcase))).toBeTruthy());
-    expect(screen.getByTestId(`${needs(RUN.showcase)}.status`)).toHaveTextContent('shop · Review · 3 files changed');
-    expect(screen.getByTestId('agents.filter.needs')).toHaveTextContent('Needs you5');
+    await waitFor(() => expect(asked.length).toBeGreaterThan(0));
+    expect(screen.queryByTestId(needs(RUN.showcase))).toBeNull();
+    expect(screen.getByTestId('agents.filter.needs')).toHaveTextContent('Needs you1');
     // Once for each finished agent that is not archived, and never for a child.
     const finished = NINE.runs.filter((run) => !run.parent_run_id && run.status === 'completed' && run.id !== RUN.archived);
     expect([...asked].sort()).toEqual(finished.map((run) => run.workspace_id).sort());
@@ -508,7 +509,7 @@ describe('a phone that may only watch', () => {
   test('sees every agent and nothing that changes one', async () => {
     const app = await open({ scope: 'watch' });
     expect(screen.getByTestId(row(RUN.running))).toBeTruthy();
-    expect(screen.getByTestId('agents.filter.needs')).toHaveTextContent('Needs you4');
+    expect(screen.getByTestId('agents.filter.needs')).toHaveTextContent('Needs you1');
     expect(screen.queryByTestId('agents.new')).toBeNull();
     expect(screen.getByTestId('watch.line')).toHaveTextContent('This phone may watch. Change it on the Mac.');
     expect(screen.queryByTestId(`${row(RUN.running)}.archive`)).toBeNull();
@@ -542,8 +543,8 @@ describe('a phone that may only watch', () => {
 describe('nothing yet, and not connected', () => {
   test('with no agents it says so and offers New agent', async () => {
     await open({ state: EMPTY_STATE });
-    expect(agents.emptyText(store.load(EMPTY_STATE), { now: NOW })).toBe('No agent tasks yet.');
-    expect(screen.getByTestId('agents.empty')).toHaveTextContent('No agent tasks yet.New agent');
+    expect(agents.emptyText(store.load(EMPTY_STATE), { now: NOW })).toBe('No agents yet.');
+    expect(screen.getByTestId('agents.empty')).toHaveTextContent('No agents yet.New agent');
     await fireEvent.press(screen.getByTestId('agents.empty.new'));
     expect(router.pushed).toEqual([routes.newAgent]);
     expect(screen.getByTestId('agents.new')).toBeTruthy();
@@ -605,7 +606,7 @@ describe('nothing yet, and not connected', () => {
     expect(session.getSnapshot().fromCache).toBe(true);
     expect(screen.getByTestId('agents.age')).toHaveTextContent('as of 3h ago');
     expect(screen.getByTestId(row(RUN.waiting))).toBeTruthy();
-    expect(screen.getByTestId('agents.filter.needs')).toHaveTextContent('Needs you4');
+    expect(screen.getByTestId('agents.filter.needs')).toHaveTextContent('Needs you1');
     expect(connection.asked).toEqual([]);
   });
 

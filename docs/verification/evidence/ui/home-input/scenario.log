@@ -1,0 +1,12 @@
+[2026-09-29T14:36:53.834Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-29T14:37:01.568Z] PASS the conversation has at least 20 messages {"messages":20}
+[2026-09-29T14:37:04.656Z] Continuity notice {"shown":true,"height":35}
+[2026-09-29T14:37:06.600Z] screenshot docs/verification/evidence/ui/home-input/01-home-20-messages-1280x800.png
+[2026-09-29T14:37:06.613Z] PASS at 1280×800 home's text box and its choices are fully on screen with a 20-message conversation {"vh":698,"vw":922,"task":{"top":506,"bottom":573,"height":67},"box":{"top":491,"bottom":620,"height":129},"chips":[654],"choices":{"top":628,"bottom":654,"height":26},"notice":35,"list":{"scrolls":true,"top":1020,"height":351,"full":1526,"bottom":425}}
+[2026-09-29T14:37:06.613Z] PASS at 1280×800 the conversation scrolls above the input {"scrolls":true,"top":1020,"height":351,"full":1526,"bottom":425}
+[2026-09-29T14:37:06.613Z] PASS at 1280×800 the Continuity notice (when shown) is one line {"notice":35}
+[2026-09-29T14:37:08.599Z] screenshot docs/verification/evidence/ui/home-input/02-home-20-messages-1440x900.png
+[2026-09-29T14:37:08.610Z] PASS at 1440×900 home's text box and its choices are fully on screen with a 20-message conversation {"vh":798,"vw":1082,"task":{"top":606,"bottom":673,"height":67},"box":{"top":591,"bottom":720,"height":129},"chips":[754],"choices":{"top":728,"bottom":754,"height":26},"notice":35,"list":{"scrolls":true,"top":1020,"height":451,"full":1526,"bottom":525}}
+[2026-09-29T14:37:08.610Z] PASS at 1440×900 the conversation scrolls above the input {"scrolls":true,"top":1020,"height":451,"full":1526,"bottom":525}
+[2026-09-29T14:37:08.610Z] PASS at 1440×900 the Continuity notice (when shown) is one line {"notice":35}
+[2026-09-29T14:37:09.013Z] PASS scrolling the conversation to its top leaves the input on screen {"top":606,"bottom":673,"height":67}

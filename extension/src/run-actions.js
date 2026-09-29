@@ -73,7 +73,7 @@ async function handleRunMessage({ client, model, steering }, runId, message, rep
     case 'signIn': {
       const run = model.rootRun(model.run(runId) || {}) || model.run(runId);
       const profile = run?.profile_id && model.profile(run.profile_id);
-      if (!profile) throw new Error('This run has no account to sign in.');
+      if (!profile) throw new Error('This agent has no account to sign in.');
       await vscode.commands.executeCommand('overseer.signIn', { profile });
       return true;
     }

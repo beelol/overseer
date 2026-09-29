@@ -1,0 +1,118 @@
+{
+  "checks": [
+    {
+      "name": "a fresh profile's home sends to Overseer, and says so in words",
+      "ok": true,
+      "detail": {
+        "target": "overseer",
+        "label": "Overseer",
+        "hint": "Ask what your agents are doing, or say what to build: Overseer starts, steers and answers.",
+        "head": true,
+        "placeholder": "Tell Overseer what to do, or ask what is going on",
+        "ariaLabel": "Message to Overseer",
+        "choices": [
+          "target"
+        ]
+      }
+    },
+    {
+      "name": "home shows the conversation's head and a one-line hint of what to ask from the first visit",
+      "ok": true,
+      "detail": {
+        "target": "overseer",
+        "label": "Overseer",
+        "hint": "Ask what your agents are doing, or say what to build: Overseer starts, steers and answers.",
+        "head": true,
+        "placeholder": "Tell Overseer what to do, or ask what is going on",
+        "ariaLabel": "Message to Overseer",
+        "choices": [
+          "target"
+        ]
+      }
+    },
+    {
+      "name": "with Overseer as the target there is no repository, agent, model or workspace choice to make",
+      "ok": true,
+      "detail": [
+        "target"
+      ]
+    },
+    {
+      "name": "the first Enter on home reaches Overseer, which answers, and no agent is started",
+      "ok": true,
+      "detail": {
+        "said": [
+          "What is everyone doing?"
+        ],
+        "agents": []
+      }
+    },
+    {
+      "name": "the box still sends to Overseer, and the hint gives way to the conversation",
+      "ok": true,
+      "detail": {
+        "target": "overseer",
+        "hint": false
+      }
+    },
+    {
+      "name": "the Send to menu offers Overseer and \"Start an agent directly\"; the direct choice brings back the repository, agent, model and workspace choices",
+      "ok": true,
+      "detail": {
+        "items": [
+          "Overseer",
+          "Start an agent directly"
+        ],
+        "direct": {
+          "target": "agent",
+          "label": "Send to: Start directly",
+          "choices": [
+            "repo",
+            "agent",
+            "model",
+            "mode",
+            "target"
+          ]
+        }
+      }
+    },
+    {
+      "name": "\"Start an agent directly\" starts one as before",
+      "ok": true,
+      "detail": {
+        "started": "tidy the docs"
+      }
+    },
+    {
+      "name": "the choice is remembered for the owner (overseer.home.sendTo in the user settings)",
+      "ok": true,
+      "detail": {
+        "sendTo": "agent"
+      }
+    },
+    {
+      "name": "Talk to Overseer always talks to Overseer",
+      "ok": true,
+      "detail": {
+        "talk": "overseer"
+      }
+    },
+    {
+      "name": "choosing Overseer again is remembered too",
+      "ok": true,
+      "detail": {
+        "sendTo": "overseer"
+      }
+    },
+    {
+      "name": "New Agent starts one agent directly, then home sends to Overseer again (the remembered choice is unchanged)",
+      "ok": true,
+      "detail": {
+        "viaNew": "agent",
+        "second": "write the changelog",
+        "home": "overseer",
+        "sendTo": "overseer"
+      }
+    }
+  ]
+}

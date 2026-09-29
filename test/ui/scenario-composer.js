@@ -21,7 +21,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
   try {
     const repo = makeRepo(path.join(s.root, 'composer-repo'), { dirty: false });
     // Auto routing is behind its unfinished-feature setting (AC-204).
-    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'overseer.experimental.autoRouting': true });
+    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'overseer.home.sendTo': 'agent', 'overseer.experimental.autoRouting': true });
     s.install(latestVsix());
     // Codex and Claude both run through the account fixture (signed in above); OpenCode is missing.
     s.launch(repo, { OVERSEER_CODEX_PATH: cli, OVERSEER_CLAUDE_PATH: cli, OVERSEER_OPENCODE_PATH: '/nonexistent/opencode', OVERSEER_TEST_SYSTEM_HOME: sys, FIXTURE_LOGIN_ACCOUNT_FILE: next,
@@ -133,7 +133,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
 
     // Untrusted workspace (Restricted Mode, empty window): explained inline with the fix.
     await s.quit();
-    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'security.workspace.trust.enabled': true, 'security.workspace.trust.emptyWindow': false });
+    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'overseer.home.sendTo': 'agent', 'security.workspace.trust.enabled': true, 'security.workspace.trust.emptyWindow': false });
     s.launch('--new-window', { OVERSEER_TEST_TRUST: '1', OVERSEER_CODEX_PATH: cli, OVERSEER_CLAUDE_PATH: cli, OVERSEER_TEST_SYSTEM_HOME: sys, FIXTURE_LOGIN_ACCOUNT_FILE: next, OVERSEER_HARNESS_ENV_PASSTHROUGH: 'FIXTURE_LOGIN_ACCOUNT_FILE,OVERSEER_TEST_SYSTEM_HOME' });
     cdp = await s.connect(); s.cdp = cdp;
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer/.test(e.textContent))`, 60000, 'status bar');
