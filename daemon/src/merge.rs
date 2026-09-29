@@ -25,8 +25,25 @@ fn has_markers(text: &str) -> bool {
     lines.iter().any(|l| l.starts_with(MARKERS[0])) && lines.iter().any(|l| *l == MARKERS[1]) && lines.iter().any(|l| l.starts_with(MARKERS[2]))
 }
 
-fn merging(ws: &Path) -> bool {
+pub(crate) fn merging(ws: &Path) -> bool {
     git::rev_parse(ws, "MERGE_HEAD").is_some()
+}
+
+/// While a merge is in progress in the worktree: the files still conflicted, and the changed
+/// files that still hold conflict markers (a file staged as resolved with its markers in it).
+pub(crate) fn unresolved(ws: &Path) -> Result<Vec<String>> {
+    if !merging(ws) {
+        return Ok(Vec::new());
+    }
+    let st = git::status(ws)?;
+    let mut out: Vec<String> = st.conflicted.clone();
+    let changed = git::git(ws, &["diff", "--name-only", "HEAD"])?;
+    for f in changed.lines().map(str::to_string).chain(st.untracked.iter().cloned()) {
+        if !out.contains(&f) && std::fs::read_to_string(ws.join(&f)).map(|t| has_markers(&t)).unwrap_or(false) {
+            out.push(f);
+        }
+    }
+    Ok(out)
 }
 
 impl Daemon {
@@ -226,6 +243,11 @@ impl Daemon {
 
 /// Commits all of a worktree's uncommitted work to its branch (merge back and Open PR).
 pub fn commit_worktree(path: &Path, title: &str) -> Result<bool> {
+    // Never commit a merge that stopped on conflicts: `add -A` would stage the markers.
+    let open = unresolved(path)?;
+    if !open.is_empty() {
+        bail!("A merge in this worktree is unfinished: {} still {} conflicts. Resolve them or cancel the merge first.", open.join(", "), if open.len() == 1 { "has" } else { "have" });
+    }
     let st = git::status(path)?;
     if st.staged.is_empty() && st.unstaged.is_empty() && st.untracked.is_empty() {
         return Ok(false);

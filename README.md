@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **178 / 261** · **32** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-128, AC-129, AC-133, AC-135, AC-136, AC-137, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-183, AC-185, AC-186, AC-188, AC-189, AC-190, AC-192, AC-195, AC-196, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-210, AC-213, AC-216, AC-217, AC-218, AC-219, AC-220, AC-221, AC-222, AC-223, AC-224, AC-225, AC-229, AC-230, AC-231, AC-232, AC-233, AC-234, AC-235, AC-236, AC-237, AC-238, AC-239, AC-240, AC-241, AC-243, AC-244, AC-245, AC-246, AC-247, AC-248, AC-249, AC-250, AC-251, AC-252, AC-253, AC-254, AC-255, AC-256, AC-257, AC-258. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+criteria: **179 / 261** · **32** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-128, AC-129, AC-133, AC-135, AC-136, AC-137, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-183, AC-185, AC-186, AC-188, AC-189, AC-190, AC-192, AC-195, AC-196, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-210, AC-213, AC-216, AC-217, AC-218, AC-219, AC-220, AC-221, AC-222, AC-223, AC-224, AC-225, AC-229, AC-230, AC-231, AC-232, AC-233, AC-234, AC-235, AC-236, AC-237, AC-238, AC-239, AC-240, AC-241, AC-243, AC-244, AC-245, AC-246, AC-247, AC-248, AC-250, AC-251, AC-252, AC-253, AC-254, AC-255, AC-256, AC-257, AC-258. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), Voice Mode (Gate R, AC-162 to AC-177, added by the owner on 2026-09-27: a voice to talk to constantly that redirects every agent from context, answers quickly and shows every word it sent, with audio collected on the Rust side and the animated mark in the middle moving with the voice; [design](docs/rfcs/voice-mode.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -289,7 +289,7 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-246** One name for each thing — not started (the usability audit, 2026-09-28) — [evidence](docs/verification/AC-246.md)
 - [ ] **AC-247** Home's input is always on screen — not started (the usability audit, 2026-09-28) — [evidence](docs/verification/AC-247.md)
 - [ ] **AC-248** Overseer's session never drops what it was told — not started (the usability audit, 2026-09-28) — [evidence](docs/verification/AC-248.md)
-- [ ] **AC-249** Test windows never reach the owner's screen — not started (the usability audit, 2026-09-28) — [evidence](docs/verification/AC-249.md)
+- [x] **AC-249** Test windows never reach the owner's screen — [evidence](docs/verification/AC-249.md)
 - [ ] **AC-250** One command opens the whole Overseer layout — not started (the owner's zero-friction goal, 2026-09-28) — [evidence](docs/verification/AC-250.md)
 - [ ] **AC-251** Follow an agent on another screen — not started: blocked by VS Code (no API to float a webview, 1.139.1); skipped on the owner's instruction — [evidence](docs/verification/AC-251.md)
 - [ ] **AC-252** Zero-friction loop, measured — not started (the owner's zero-friction goal, 2026-09-28) — [evidence](docs/verification/AC-252.md)
@@ -373,7 +373,7 @@ phone cannot reach the Mac; that needs the relay, which is later work.
 What a phone can do, method by method:
 
 <!-- phone-capabilities:start -->
-263 methods: 71 available on a phone, 151 on the Mac only, 41 not yet. A *watch only* phone reads and cannot change anything. Generated by `python3 protocol/capabilities.py` from `protocol/protocol.json`.
+266 methods: 71 available on a phone, 154 on the Mac only, 41 not yet. A *watch only* phone reads and cannot change anything. Generated by `python3 protocol/capabilities.py` from `protocol/protocol.json`.
 
 | Method | What it does | On a phone | Who |
 | --- | --- | --- | --- |
@@ -543,6 +543,8 @@ What a phone can do, method by method:
 | `local.pull` | Download a local model | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
 | `local.pull_cancel` | Cancel a local model download | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
 | `local.unload` | Unload a local model | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
+| `notices.get` | Which agent moments become Mac notifications | The Mac only: it belongs to the Mac's own notifications | — |
+| `notices.set` | Choose which agent moments become Mac notifications | The Mac only: it belongs to the Mac's own notifications | — |
 | `ollama.install` | Install Ollama | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
 | `ollama.start` | Start Ollama | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
 | `ollama.stop` | Stop Ollama | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
@@ -629,6 +631,7 @@ What a phone can do, method by method:
 | `swarm.worker.liveness.sample` | Sample a Swarm worker's liveness (test) | The Mac only: auto routing and Swarm come to the phone later (the partial merge, AC-204) | — |
 | `swarm.worker.reconcile` | Reconcile a Swarm worker's exit | The Mac only: auto routing and Swarm come to the phone later (the partial merge, AC-204) | — |
 | `ui.focus` | Which agent a window on the Mac is looking at | The Mac only: it describes the Mac's own windows | — |
+| `ui.window` | Whether a VS Code window on the Mac has the focus | The Mac only: it describes the Mac's own windows | — |
 | `voice.answer` | Answer by voice | The Mac only: voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose | — |
 | `voice.cancel` | Stop what Voice Mode is doing | The Mac only: voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose | — |
 | `voice.download` | Download a voice | The Mac only: voice Mode (Gate R) listens and speaks on the Mac; the phone remote has no voice, as the owner chose | — |
@@ -852,7 +855,6 @@ the owner action or decision each one needs.
 - [ ] [AC-246](docs/verification/AC-246.md) (One name for each thing): To be built by its own agent.
 - [ ] [AC-247](docs/verification/AC-247.md) (Home's input is always on screen): To be built by its own agent.
 - [ ] [AC-248](docs/verification/AC-248.md) (Overseer's session never drops what it was told): To be built by its own agent.
-- [ ] [AC-249](docs/verification/AC-249.md) (Test windows never reach the owner's screen): To be built by its own agent.
 - [ ] [AC-250](docs/verification/AC-250.md) (One command opens the whole Overseer layout): Overnight goal.
 - [ ] [AC-251](docs/verification/AC-251.md) (Follow an agent on another screen): Overnight goal.
 - [ ] [AC-252](docs/verification/AC-252.md) (Zero-friction loop, measured): Overnight goal.

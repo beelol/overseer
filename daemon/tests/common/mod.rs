@@ -57,6 +57,8 @@ impl Daemon {
         if phone_access && !env.iter().any(|(k, _)| k == "OVERSEER_GATEWAY_MDNS") {
             env.push(("OVERSEER_GATEWAY_MDNS".to_string(), "off".to_string()));
         }
+        // Which test run made this folder, for scripts/test-all's check for leftovers (test/processes.js).
+        let _ = std::fs::write(home.path().join(".ovs-test-run"), json!({"run": std::env::var("OVERSEER_TEST_RUN").ok(), "pid": std::process::id()}).to_string());
         let mut d = Daemon { home, child: None, env };
         d.spawn();
         if enable_auto {
@@ -200,7 +202,29 @@ impl Drop for Daemon {
             }
         }
         self.kill9();
+        // A harness runs in a process group of its own under its shim; killing only the shim (below)
+        // left it running, reparented to launchd. Every group whose shim recorded no exit goes first.
+        stop_harness_groups(&self.home.path().join("runs"), 0);
         let _ = Command::new("pkill").arg("-9").arg("-f").arg(self.home.path()).status();
+    }
+}
+
+/// Kills the process group of every harness under `dir` (a run's `shim.json` names it) that has
+/// not exited (no `exit.json` beside it).
+fn stop_harness_groups(dir: &Path, depth: usize) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            if depth < 3 {
+                stop_harness_groups(&path, depth + 1);
+            }
+        } else if path.file_name().is_some_and(|n| n == "shim.json") && !path.with_file_name("exit.json").exists() {
+            let info: Value = std::fs::read(&path).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
+            if let Some(child) = info["child_pid"].as_u64().filter(|p| *p > 1) {
+                let _ = Command::new("kill").args(["-9", "--", &format!("-{child}")]).stderr(Stdio::null()).status();
+            }
+        }
     }
 }
 

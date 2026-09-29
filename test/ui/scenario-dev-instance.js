@@ -3,7 +3,8 @@
 // not B's, reads "Overseer dev-a" in the status bar and "[dev-a]" in the title; A counts it as a
 // client and B does not. When A stops (down --keep-clients) the window says A is not running and
 // nothing connects to B or starts a daemon; when A comes back, the window reconnects on its own.
-// The dev root is temporary; the owner's daemon, VS Code and data are never involved.
+// The window draws its modal dialogs inside itself (AC-249): Merge Back's confirmation is found in its
+// DOM and cancelled. The dev root is temporary; the owner's daemon, VS Code and data are never involved.
 const fs = require('fs');
 const net = require('net');
 const path = require('path');
@@ -63,6 +64,20 @@ function call(socket, method, params = {}) {
     const settings = JSON.parse(fs.readFileSync(path.join(s.profile, 'User/settings.json'), 'utf8'));
     check('the profile pins the window (overseer.daemonPath, daemonSocket, devInstance) and lives in the instance folder, not the owner\'s',
       settings['overseer.daemonSocket'] === a.socket && settings['overseer.devInstance'] === 'dev-a' && settings['overseer.daemonPath'] === path.join(root, 'a/bin/overseerd') && s.profile.startsWith(root), settings);
+
+    // AC-249: a modal from this background window (Merge Back's confirmation) is drawn in the
+    // window's own page, not as a macOS alert on the owner's screen; it is found in the DOM and cancelled.
+    check('the profile draws dialogs inside the window (window.dialogStyle: custom)', settings['window.dialogStyle'] === 'custom', settings['window.dialogStyle']);
+    const mergeMe = await call(a.socket, 'task.create', { repo: repoA, harness: 'generic', workspace_mode: 'worktree', program: '/bin/sh', args: ['-c', "printf 'from A\\n' > merged.txt"], prompt: '', title: 'Merge me' });
+    for (let i = 0; i < 60 && (await call(a.socket, 'state')).runs.find(r => r.id === mergeMe.run.id)?.status !== 'completed'; i++) await delay(250);
+    await s.selectAgent('Merge me');
+    await cdp.command('Overseer: Merge Back…');
+    const dialog = await cdp.waitFor(`(() => { const d = document.querySelector('.monaco-dialog-box'); return d && d.offsetParent !== null ? d.innerText : null; })()`, 20000, 'the Merge Back dialog in the page').catch(() => null);
+    await s.screenshot('merge-back-dialog-in-window');
+    check("Merge Back's modal confirmation appears in the window's DOM", /Merge back/.test(dialog || ''), dialog);
+    await cdp.key('Escape');
+    const closed = await cdp.waitFor(`!document.querySelector('.monaco-dialog-box')`, 10000).then(() => true, () => false);
+    check('Escape cancels it; nothing was merged', closed && !fs.existsSync(path.join(repoA, 'merged.txt')), { closed });
 
     // A stops; the window stays open and waits.
     dev('down', '--name', 'a', '--keep-clients');

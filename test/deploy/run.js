@@ -20,6 +20,7 @@ require('../../scripts/git-fallback').ensureGit('deploy'); // AC-159
 const DEPLOY = path.join(repo, 'scripts/deploy');
 const realHome = require('os').homedir();
 const tmp = fs.realpathSync(fs.mkdtempSync('/tmp/ovs-dpl-'));
+require('../processes').markFolder(tmp); // scripts/test-all's check for leftovers
 const home = path.join(tmp, 'home');
 const profile = path.join(tmp, 'code/profile');
 const extensions = path.join(tmp, 'code/ext');

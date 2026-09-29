@@ -7,6 +7,7 @@
 //   Dev       test/dev/run.js (dev daemons through scripts/dev beside a temporary production, Gate T)
 //   Deploy    test/deploy/run.js (scripts/deploy onto a temporary production, AC-214)
 //   UI        the packaged-VSIX fixture scenarios in test/ui (built VSIX, isolated VS Code profiles)
+//   Leftovers nothing the run started is still running at the end (test/processes.js)
 // Flags: --no-ui (skip UI), --only=a,b (UI scenarios by name), --live (also the LIVE scenarios, which
 // spend paid turns within the budget in AGENTS.md), --perf (also the ten-minute AC-35 load test),
 // --jobs=N (run N UI scenarios at once; each has its own VS Code profile, ports and evidence folder,
@@ -44,6 +45,11 @@ const flag = f => args.includes(f);
 const only = (args.find(a => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean);
 const env = { ...process.env };
 const jobs = Math.max(1, Math.min(8, Number((args.find(a => a.startsWith('--jobs=')) || '').slice(7)) || 1));
+// What was running before the run, so the check at the end counts only what the run started; the
+// run's id is written into each test folder (test/processes.js) to tell it from other checkouts' tests.
+const processes = require('../test/processes');
+const before = { baseline: new Set(processes.list().map(p => p.pid)), since: Date.now() };
+env.OVERSEER_TEST_RUN = `ta-${process.pid}-${Date.now().toString(36)}`;
 
 // Git must work for the tests (they create repositories). If the system git refuses to run (for
 // example an unaccepted Xcode license), use the Command Line Tools' git (AC-159).
@@ -121,6 +127,22 @@ if (!flag('--no-ui')) {
   }
   const skipped = all.filter(n => !chosen.includes(n) && (!only.length || only.includes(n)));
   if (skipped.length) console.log(`(not run: ${skipped.join(', ')}; ${flag('--live') ? '' : 'LIVE ones need --live, '}perf needs --perf)`);
+}
+
+// Nothing the run started is left running. What finishing tests still stop gets a moment; what
+// is left then is listed, stopped, and fails the run.
+{
+  const t0 = Date.now();
+  process.stdout.write('▶ Leftovers (no process left running) … ');
+  const look = () => processes.leftovers({ ...before, run: env.OVERSEER_TEST_RUN, checkout: root });
+  let found = look();
+  for (let i = 0; i < 15 && found.ours.length; i++) { await new Promise(r => setTimeout(r, 1000)); found = look(); }
+  const ok = !found.ours.length;
+  const line = p => `    ${p.pid} (parent ${p.ppid}) ${p.cmd.slice(0, 160)}${p.cwd ? `  [in ${p.cwd}]` : ''}`;
+  console.log(`${ok ? 'ok' : 'FAILED'} (${Math.round((Date.now() - t0) / 1000)}s)${ok ? '' : ` ${found.ours.length} left running; stopped now`}`);
+  if (!ok) { console.log(found.ours.slice(0, 20).map(line).join('\n')); processes.stop(found.ours); }
+  if (found.others.length) console.log(`  note: ${found.others.length} test process(es) of another checkout or run, not stopped:\n${found.others.slice(0, 10).map(line).join('\n')}`);
+  results.push({ name: 'Leftovers', ok, s: 0 });
 }
 
 const failed = results.filter(r => !r.ok);

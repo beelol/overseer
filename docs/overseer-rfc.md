@@ -514,7 +514,7 @@ From the usability audit of 2026-09-28 ([report](audits/2026-09-28-usability.md)
   - Agents' asks, reports and findings are kept until Overseer's first turn (and across Start fresh and the daily cap).
   - Queued owner messages are retried when a turn fails to start. A voice request closed as "not sent" cancels anything its turn later proposes.
   - **Verify:** daemon tests force a `Lagged` error and still deliver the reply and the queued message. An ask made before Overseer's first turn is answered in it. A failed turn start is retried. A proposal arriving after its voice request closed is withdrawn.
-- [ ] **AC-249 — Test windows never reach the owner's screen.**
+- [x] **AC-249 — Test windows never reach the owner's screen.**
   - `scripts/dev code --inspect` and every harness launch set in-window dialogs (`window.dialogStyle: custom`), so a modal from a background test window never shows as a macOS alert. Owner-check windows (AC-221) keep native dialogs.
   - `scripts/dev code` installs its packaging tools on first use.
   - **Verify:** a dev-instance scenario triggers Merge Back in a `--inspect` window and finds the dialog in the page's DOM. `scripts/dev code` in a fresh worktree packages without a manual `npm ci`.

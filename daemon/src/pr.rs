@@ -75,6 +75,12 @@ impl Daemon {
           .ok_or_else(|| anyhow!("no target branch"))?;
         // What to compare against locally: the branch if it exists here, else its remote-tracking ref.
         let base_ref = if git::git(Path::new(&task.repo_root), &["show-ref", "--verify", "--quiet", &format!("refs/heads/{target}")]).is_ok() { target.clone() } else { format!("{remote}/{target}") };
+        // A merge back that stopped on conflicts leaves the worktree mid-merge; committing that
+        // would publish the conflict markers.
+        let open = crate::merge::unresolved(path)?;
+        if !open.is_empty() {
+            return refuse(format!("Merging {target} into {branch} is unfinished: {} still {} conflicts. Resolve them, or cancel the merge back, before opening a pull request.", open.join(", "), if open.len() == 1 { "has" } else { "have" }));
+        }
         let st = git::status(path)?;
         let uncommitted: Vec<String> = st.staged.iter().chain(st.unstaged.iter()).map(|c| c.path.clone()).chain(st.untracked.iter().cloned()).collect();
         let base = git::merge_base(path, "HEAD", &base_ref);

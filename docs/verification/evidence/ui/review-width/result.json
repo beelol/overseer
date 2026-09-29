@@ -131,26 +131,32 @@
       "ok": true,
       "detail": [
         [
+          "Overseer Dark",
           900,
           false
         ],
         [
+          "Overseer Dark",
           1280,
           false
         ],
         [
+          "Overseer Dark",
           1600,
           false
         ],
         [
+          "Overseer Light",
           900,
           false
         ],
         [
+          "Overseer Light",
           1280,
           false
         ],
         [
+          "Overseer Light",
           1600,
           false
         ]
@@ -197,6 +203,18 @@
       ],
       "overlaps": [],
       "overflow": false,
+      "wide": [],
+      "parts": [],
+      "sizes": {
+        "page": [
+          322,
+          322
+        ],
+        "toolbar": [
+          322,
+          322
+        ]
+      },
       "rowsWithoutIcon": [],
       "card": [
         "800 changed lines. Load this diff to review it.Load Diff"
@@ -206,7 +224,7 @@
     {
       "theme": "Overseer Dark",
       "window": 1280,
-      "width": 609,
+      "width": 549,
       "toolbar": {
         "ok": true,
         "height": 48
@@ -230,6 +248,18 @@
       ],
       "overlaps": [],
       "overflow": false,
+      "wide": [],
+      "parts": [],
+      "sizes": {
+        "page": [
+          549,
+          549
+        ],
+        "toolbar": [
+          549,
+          549
+        ]
+      },
       "rowsWithoutIcon": [],
       "card": [
         "800 changed lines. Load this diff to review it.Load Diff"
@@ -239,7 +269,7 @@
     {
       "theme": "Overseer Dark",
       "window": 1600,
-      "width": 820,
+      "width": 740,
       "toolbar": {
         "ok": true,
         "height": 48
@@ -263,6 +293,18 @@
       ],
       "overlaps": [],
       "overflow": false,
+      "wide": [],
+      "parts": [],
+      "sizes": {
+        "page": [
+          740,
+          740
+        ],
+        "toolbar": [
+          740,
+          740
+        ]
+      },
       "rowsWithoutIcon": [],
       "card": [
         "800 changed lines. Load this diff to review it.Load Diff"
@@ -296,6 +338,18 @@
       ],
       "overlaps": [],
       "overflow": false,
+      "wide": [],
+      "parts": [],
+      "sizes": {
+        "page": [
+          322,
+          322
+        ],
+        "toolbar": [
+          322,
+          322
+        ]
+      },
       "rowsWithoutIcon": [],
       "card": [
         "800 changed lines. Load this diff to review it.Load Diff"
@@ -305,7 +359,7 @@
     {
       "theme": "Overseer Light",
       "window": 1280,
-      "width": 609,
+      "width": 549,
       "toolbar": {
         "ok": true,
         "height": 48
@@ -329,6 +383,18 @@
       ],
       "overlaps": [],
       "overflow": false,
+      "wide": [],
+      "parts": [],
+      "sizes": {
+        "page": [
+          549,
+          549
+        ],
+        "toolbar": [
+          549,
+          549
+        ]
+      },
       "rowsWithoutIcon": [],
       "card": [
         "800 changed lines. Load this diff to review it.Load Diff"
@@ -338,7 +404,7 @@
     {
       "theme": "Overseer Light",
       "window": 1600,
-      "width": 820,
+      "width": 740,
       "toolbar": {
         "ok": true,
         "height": 48
@@ -362,6 +428,18 @@
       ],
       "overlaps": [],
       "overflow": false,
+      "wide": [],
+      "parts": [],
+      "sizes": {
+        "page": [
+          740,
+          740
+        ],
+        "toolbar": [
+          740,
+          740
+        ]
+      },
       "rowsWithoutIcon": [],
       "card": [
         "800 changed lines. Load this diff to review it.Load Diff"

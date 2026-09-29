@@ -548,6 +548,49 @@ fn ac181_the_conversation_lives_in_the_daemon() {
     assert!(seqs.windows(2).all(|w| w[0] < w[1]) && seqs.len() >= 5, "{seqs:?}");
 }
 
+/// Audit 2026-09-28, finding 59: the session loop falls behind the event bus while agents flood
+/// it with output. What it missed meanwhile (Overseer's reply, the end of its turn and so the
+/// owner's queued message) is caught up from the stored events, not dropped.
+#[test]
+fn ac181_the_session_loop_catches_up_after_falling_behind() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    std::fs::write(&mode_file, "overseer").unwrap();
+    // A small bus, so the flood below certainly puts the loop more than a bus behind.
+    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &claude_fixture()), ("CLAUDE_FIXTURE_MODE_FILE", &mode_file.display().to_string()), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE,FIXTURE_OVERSEER_DELAY_MS"), ("FIXTURE_OVERSEER_DELAY_MS", "2000"), ("OVERSEER_TEST_EVENT_BUS", "64")]);
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    // Overseer's run exists and is idle before the flood.
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    // Four agents that print as fast as they can: 800,000 output events in a few seconds.
+    let flood = "i=0; while [ $i -lt 400 ]; do yes 'flood line' | head -n 500; sleep 0.02; i=$((i+1)); done";
+    // The owner speaks, twice: the second waits for the first turn's end. Overseer answers while
+    // the flood runs.
+    d.call("overseer.send", json!({"text": "Who is flooding?", "surface": "ctl"}));
+    let queued = d.call("overseer.send", json!({"text": "And now?", "surface": "ctl"}));
+    let floods: Vec<String> = (0..4).map(|_| run_id(&d.generic(&repo, "worktree", "/bin/sh", &["-c", flood]))).collect();
+    for f in &floods {
+        d.wait_done(f, 120);
+    }
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    let replies = || session(&d)["messages"].as_array().unwrap().iter().filter(|m| m["source"] == "overseer").count();
+    while replies() < 3 && std::time::Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(250));
+    }
+    let s = session(&d);
+    let run = s["run_id"].as_str().unwrap().to_string();
+    // The loop did fall behind (else this test proves nothing).
+    let log = std::fs::read_to_string(d.home.path().join("overseerd.log")).unwrap_or_default();
+    assert!(log.contains("overseer session: fell"), "the session loop never fell behind; the flood is too small for this machine");
+    let assistant = d.events(&run).iter().filter(|e| e["kind"] == "output" && e["payload"]["role"] == "assistant").count();
+    assert_eq!(queued["queued"], true, "{queued}");
+    assert_eq!(s["pending"], 0, "the queued message went out: {s}");
+    assert_eq!(replies(), assistant, "every reply of Overseer's run reached the conversation ({assistant} said, {} shown)", replies());
+    assert!(assistant >= 3, "three turns answered: {assistant}\n{}", overseer_trace(&d));
+}
+
 /// AC-181: what Overseer coordinates survives a daemon restart; an action approved but not
 /// carried out when the daemon died is reported as not done, never done twice.
 #[test]
@@ -1478,6 +1521,58 @@ fn ac190_briefing_and_channel() {
     d.call("agent.channel", json!({"run_id": quiet, "briefing": true, "channel": true, "by": "owner"}));
     let c = d.call("agent.channel", json!({"run_id": quiet}));
     assert!(c["briefing"] == true && c["channel"] == true, "{c}");
+    d.call("agent.channel", json!({"default": "auto", "by": "owner"}));
+}
+
+/// Audit 2026-09-28, finding 60: an agent's question asked before the owner has spoken to
+/// Overseer, or after Start fresh, waits for Overseer's run instead of being deleted, and is
+/// answered by the first turn Overseer can take.
+#[test]
+fn ac190_a_question_waits_for_overseers_first_turn_and_survives_start_fresh() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call("overseer.level", json!({"level": "steer"}));
+    d.call("agent.channel", json!({"default": "on", "by": "owner"}));
+    let ask = |title: &str, question: &str| -> String {
+        let run = claude_task(&d, &repo, &mode_file, "channel", title, &format!("ask: {question}"));
+        d.wait_done(&run, 40);
+        assert!(d.events(&run).iter().any(|e| e["kind"] == "ask"), "{title} asked");
+        run
+    };
+    let answered = |run: &str| -> Option<String> {
+        d.call("channel.messages", json!({"run_id": run}))["messages"].as_array().unwrap().iter().find(|m| m["kind"] == "ask").and_then(|m| m["answer"].as_str().map(str::to_string))
+    };
+    // Before the owner's first word there is no Overseer run: the question waits past the batch window.
+    let early = ask("Early bird", "which port does the API use?");
+    assert!(session(&d)["run_id"].is_null());
+    std::thread::sleep(Duration::from_secs(7));
+    // The owner speaks; Overseer's run exists from now on, and the waiting question gets its turn.
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    let deadline = std::time::Instant::now() + Duration::from_secs(40);
+    while answered(&early).is_none() && std::time::Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(250));
+    }
+    assert!(answered(&early).map(|a| a.contains("From the roster")).unwrap_or(false), "the question asked before Overseer's first turn was answered\n{}", overseer_trace(&d));
+    wait_turn_with(&d, &early, "Answer to your question “which port does the API use?”", 20);
+    wait_overseer_idle(&d, 30);
+    // Start fresh: a new conversation with no run yet. A question asked now is kept too.
+    d.call("overseer.fresh", json!({}));
+    assert!(session(&d)["run_id"].is_null());
+    let late = ask("Late bird", "where do the fixtures live?");
+    std::thread::sleep(Duration::from_secs(7));
+    d.call("overseer.send", json!({"text": "Anything new?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    let deadline = std::time::Instant::now() + Duration::from_secs(40);
+    while answered(&late).is_none() && std::time::Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(250));
+    }
+    assert!(answered(&late).map(|a| a.contains("From the roster")).unwrap_or(false), "the question asked after Start fresh was answered\n{}", overseer_trace(&d));
     d.call("agent.channel", json!({"default": "auto", "by": "owner"}));
 }
 

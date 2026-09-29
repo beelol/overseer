@@ -251,8 +251,10 @@ impl Daemon {
         let session = self.overseer_session()?;
         // A turn Overseer starts by itself never creates its run: until the owner has spoken to
         // Overseer there is no model to spend, and the free checks keep recording on their own.
+        // What the agents sent through the channel (questions, reports, findings) waits for the
+        // first turn Overseer can take: the agent was told an answer is coming.
         if session["run_id"].is_null() {
-            self.store.lock().unwrap().conn.execute("DELETE FROM check_in_queue", [])?;
+            self.drop_plain_check_ins()?;
             return Ok(());
         }
         let _one_at_a_time = super::session::TURN_START.lock().unwrap_or_else(|e| e.into_inner());
@@ -268,7 +270,7 @@ impl Daemon {
             if said == 0 {
                 self.append_session_message(&sid, "overseer", None, &format!("At the cap: I started {cap} turns by myself today. I will check in again when you ask, or tomorrow; the free checks keep running."), None)?;
             }
-            self.store.lock().unwrap().conn.execute("DELETE FROM check_in_queue", [])?;
+            self.drop_plain_check_ins()?;
             return Ok(());
         }
         // One entry per agent, reasons joined; agents that are gone are dropped.
@@ -310,6 +312,13 @@ impl Daemon {
             let task = self.run(run).ok().map(|r| r.task_id);
             self.emit(task.as_deref(), Some(run), "check_in_started", "overseer", "exact", json!({"reasons": reasons}))?;
         }
+        Ok(())
+    }
+
+    /// Drops the due check-ins the daemon's own checks queued; keeps what came through the
+    /// channel (ask:, report:, finding:), which only a turn of Overseer's answers.
+    fn drop_plain_check_ins(&self) -> Result<()> {
+        self.store.lock().unwrap().conn.execute("DELETE FROM check_in_queue WHERE reason NOT LIKE 'ask:%' AND reason NOT LIKE 'report:%' AND reason NOT LIKE 'finding:%'", [])?;
         Ok(())
     }
 

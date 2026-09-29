@@ -806,6 +806,12 @@ export interface Methods {
   "gateway.device_scope": { class: 'mac_only'; params: unknown; result: unknown };
   /** Rename a device. The Mac only: Devices are managed on the Mac. */
   "gateway.device_rename": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Whether a VS Code window on the Mac has the focus. The Mac only: It describes the Mac's own windows. */
+  "ui.window": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Which agent moments become Mac notifications. The Mac only: It belongs to the Mac's own notifications. */
+  "notices.get": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Choose which agent moments become Mac notifications. The Mac only: It belongs to the Mac's own notifications. */
+  "notices.set": { class: 'mac_only'; params: unknown; result: unknown };
   /** Which agent a window on the Mac is looking at. The Mac only: It describes the Mac's own windows. */
   "ui.focus": { class: 'mac_only'; params: unknown; result: unknown };
   /** Audio Mode: on or off, the track and the cues. */
@@ -1277,6 +1283,9 @@ export const METHOD_CLASS = {
   "gateway.device_revoke": 'mac_only',
   "gateway.device_scope": 'mac_only',
   "gateway.device_rename": 'mac_only',
+  "ui.window": 'mac_only',
+  "notices.get": 'mac_only',
+  "notices.set": 'mac_only',
   "ui.focus": 'mac_only',
   "audio.get": 'read',
   "audio.voices": 'read',

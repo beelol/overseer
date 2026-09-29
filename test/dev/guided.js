@@ -15,6 +15,7 @@ require('../../scripts/git-fallback').ensureGit('guided tests'); // AC-159
 const DEV = path.join(repo, 'scripts/dev');
 const { checkProblems } = require(DEV);
 const tmp = fs.realpathSync(fs.mkdtempSync('/tmp/ovs-gdt-'));
+require('../processes').markFolder(tmp); // scripts/test-all's check for leftovers
 const home = path.join(tmp, 'h'), root = path.join(tmp, 'r'), evidence = path.join(tmp, 'evidence');
 fs.mkdirSync(home);
 const results = [];

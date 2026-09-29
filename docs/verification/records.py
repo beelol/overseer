@@ -2489,9 +2489,17 @@ rec(247, "Home's input is always on screen", "not started", date="—", commit="
 rec(248, "Overseer's session never drops what it was told", "not started", date="—", commit="—",
     expected="See the RFC criterion (the usability audit of 2026-09-28).",
     actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
-rec(249, "Test windows never reach the owner's screen", "not started", date="—", commit="—",
-    expected="See the RFC criterion (the usability audit of 2026-09-28).",
-    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(249, "Test windows never reach the owner's screen", "verified", commit="c3becdd7 (branch claude/audit-correctness, pull request #28)", date="2026-09-28",
+    harness="Fixture harnesses only; no paid turns",
+    steps="""1. `node test/ui/scenario-dev-instance.js`: `scripts/dev code --name a --inspect` opens the background window; the scenario reads its profile, starts a worktree agent on A, selects it and runs **Overseer: Merge Back…**, looks for the confirmation in the window's DOM (`.monaco-dialog-box`) and presses Escape.
+2. A fresh `git worktree add` of the branch (no `node_modules` under `extension/tooling`), `scripts/dev up --name fresh`, then `scripts/dev code --name fresh --inspect` with a temporary `OVERSEER_DEV_ROOT`; then `scripts/dev clean --all`.
+3. Every harness launch (`Session.launch` in test/ui/harness.js) rewrites `window.dialogStyle` to `custom` if a scenario's settings left it out or changed it; owner checks (`scripts/dev test`, AC-221) pass `__owner` and keep native dialogs.""",
+    expected="See the RFC criterion (the usability audit of 2026-09-28, finding 64).",
+    actual="""- The `--inspect` window's profile has `window.dialogStyle: "custom"`. Merge Back's confirmation ("Merge back overseer/merge-me into main?", with Cancel and Prepare Merge Back) is found in the window's DOM; Escape closes it and nothing is merged. No macOS alert appeared.
+- In the fresh worktree `scripts/dev code` printed "installing the packaging tools in extension/tooling/vsce (first time in this checkout)" and the same for extension/branch-diff/tooling/review, packaged the VSIX and opened the window; no manual `npm ci`.
+- Also from the same change: the UI harness, the daemon tests and `scripts/test-all` stop what a test started, including after an interrupted run (test/processes.js; the Leftovers check in test-all).""",
+    evidence="[dev-instance scenario](evidence/ui/dev-instance/), [fresh worktree](evidence/ac249/fresh-worktree.txt)",
+    live="Fixture harnesses; no paid turns. Background windows only; the owner's daemon, VS Code, data and logins were never involved.")
 
 rec(250, "One command opens the whole Overseer layout", "not started", date="—", commit="—",
     expected="See the RFC criterion (the owner's zero-friction goal, 2026-09-28).",

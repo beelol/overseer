@@ -8,7 +8,8 @@
 // not counted; text scrolled out of view is (it is part of the view).
 // nativeHover: VS Code's own workbench actions (.action-label) show their name in VS Code's managed
 // hover instead of a title attribute; there the accessible name is the tooltip text.
-function auditExpression({ root = 'body', exclude = [], nativeHover = false } = {}) {
+// words: also return every visible text run (to compare two readings and name what changed).
+function auditExpression({ root = 'body', exclude = [], nativeHover = false, words: withWords = false } = {}) {
   return `(() => {
   const root = document.querySelector(${JSON.stringify(root)});
   if (!root) return { missing: ${JSON.stringify(root)} };
@@ -58,7 +59,7 @@ function auditExpression({ root = 'body', exclude = [], nativeHover = false } = 
     const tip = b.getAttribute('title') || b.closest('[title]')?.getAttribute('title') || b.getAttribute('data-tooltip') || (${nativeHover} && b.matches('.action-label') && name);
     if (!name || !tip) unnamed.push({ html: b.outerHTML.slice(0, 100), name: !!name, tip: !!tip });
   }
-  return { chars, longRuns: longRuns.slice(0, 20), overflow, unnamed, sample: words.join(' | ').slice(0, 400), width: W };
+  return { chars, longRuns: longRuns.slice(0, 20), overflow, unnamed, sample: words.join(' | ').slice(0, 400), width: W, ...(${withWords} ? { words } : {}) };
 })()`;
 }
 

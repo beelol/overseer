@@ -63,7 +63,31 @@ const HEIGHT = 860;
       fs.writeFileSync(settingsFile, JSON.stringify(cur, null, 2)); await delay(2000);
     };
     const setWidth = async w => { await cdp.call('Emulation.setDeviceMetricsOverride', { width: w, height: HEIGHT, deviceScaleFactor: 0, mobile: false }, cdp.workbench); await delay(1500); };
-    const audit = async (frame, opts) => (frame ? frame.eval(auditExpression(opts)) : cdp.evalWorkbench(auditExpression(opts)));
+    // A view is measured once it has settled: two equal readings 500 ms apart. A transient state
+    // (text that comes and goes while the view updates) is not what the owner reads; it is recorded
+    // with the words that differed, so it can be found, and never counted.
+    const auditOnce = (frame, opts) => (frame ? frame.eval(auditExpression({ ...opts, words: true })) : cdp.evalWorkbench(auditExpression({ ...opts, words: true })));
+    const wordDiff = (a, b) => {
+      const count = ws => ws.reduce((m, w) => m.set(w, (m.get(w) || 0) + 1), new Map());
+      const ca = count(a || []), cb = count(b || []);
+      const only = (x, y) => [...x].flatMap(([w, n]) => Array(Math.max(0, n - (y.get(w) || 0))).fill(w));
+      return { gone: only(ca, cb), came: only(cb, ca) };
+    };
+    const same = (a, b) => !a.missing && !b.missing && a.chars === b.chars && JSON.stringify(a.words) === JSON.stringify(b.words) && a.overflow.length === b.overflow.length && a.unnamed.length === b.unnamed.length;
+    const audit = async (frame, opts) => {
+      let prev = await auditOnce(frame, opts);
+      const transient = [];
+      for (let i = 0; i < 12; i++) {
+        await delay(500);
+        const cur = await auditOnce(frame, opts);
+        if (same(prev, cur)) break;
+        if (!prev.missing && !cur.missing) transient.push({ from: prev.chars, to: cur.chars, ...wordDiff(prev.words, cur.words), overflow: [prev.overflow.length, cur.overflow.length] });
+        prev = cur;
+      }
+      const { words, ...res } = prev;
+      if (transient.length) { res.transient = transient; s.note('transient reading before the view settled', transient); }
+      return res;
+    };
     const record = (view, key, res) => {
       (result.views[view] ||= {})[key] = res;
       if (res.missing) { s.note(`view ${view} ${key}: missing ${res.missing}`); return; }

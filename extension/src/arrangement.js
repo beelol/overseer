@@ -16,6 +16,8 @@ class Arrangement {
     this.current = undefined; // 'chat' | 'split' | 'grid'
     this.runId = undefined;
     this.changed = new Map(); // root run id -> changed file count
+    this.editing = new Map(); // root run id -> tool id of an edit announced before it was written
+    this.lastTool = new Map(); // run id -> the id of its latest tool call (a file edit names its file right after)
     this.quiet = 0; // > 0 while Overseer itself closes reviews
     client.on('event', event => this.onEvent(event).catch(error => log('arrangement: ' + error.message)));
     review.onClosed = runId => this.onReviewClosed(runId);
@@ -173,12 +175,26 @@ class Arrangement {
 
   async onEvent(event) {
     if (!this.runId || this.current !== 'chat' || this.preference !== 'auto') return;
-    if (!['file_activity', 'turn_done'].includes(event.kind)) return;
+    if (!['tool', 'file_activity', 'tool_result', 'turn_done'].includes(event.kind)) return;
     const run = this.model.run(event.run_id);
     const root = run && this.model.rootRun(run);
     if (!root || root.id !== this.runId) return;
-    // The agent's first edit brings the review forward (AC-73).
-    if (await this.changes(root) > 0 && this.current === 'chat' && this.runId === root.id) await this.split(root.id, { follow: true });
+    if (event.kind === 'tool') { this.lastTool.set(event.run_id, event.payload?.id); return; }
+    // The agent's first edit brings the review forward (AC-73), within 500 ms of the write. A
+    // harness names the file when it starts the edit (Claude, before its permission request): the
+    // review's lookups are done then, and the tool's successful end is the edit, with no second
+    // question to the daemon (counting changes takes it a few hundred milliseconds on a loaded Mac).
+    if (event.kind === 'tool_result') {
+      const edit = this.editing.get(root.id);
+      if (!edit || event.payload?.id !== edit || event.payload?.status !== 'completed' || event.payload?.is_error) return;
+      this.editing.delete(root.id);
+      if (this.current === 'chat' && this.runId === root.id) await this.split(root.id, { follow: true });
+      return;
+    }
+    const [changed] = await Promise.all([this.changes(root), this.review.prepare?.(root.id)]);
+    if (changed > 0 && this.current === 'chat' && this.runId === root.id) await this.split(root.id, { follow: true });
+    // An edit announced before it is written: its tool's end brings the review.
+    else if (event.kind === 'file_activity' && this.lastTool.get(event.run_id)) this.editing.set(root.id, this.lastTool.get(event.run_id));
   }
 
   persist() {

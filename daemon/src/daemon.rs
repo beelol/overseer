@@ -442,7 +442,9 @@ impl Daemon {
         paths::ensure_private_dir(&paths::runs_dir())?;
         let store = Store::open(&paths::db_path())?;
         let learning_paused = !store.learning_persistent;
-        let (tx, _) = broadcast::channel(4096);
+        // The event bus. Tests shrink it (OVERSEER_TEST_EVENT_BUS) to make a subscriber fall behind.
+        let bus = std::env::var("OVERSEER_TEST_EVENT_BUS").ok().and_then(|v| v.parse::<usize>().ok()).filter(|n| *n >= 16).unwrap_or(4096);
+        let (tx, _) = broadcast::channel(bus);
         let exe = std::env::current_exe()?;
         let daemon = Arc::new(Self { store: Mutex::new(store), profile_gates: Mutex::new(BTreeMap::new()), workspace_gates: Mutex::new(BTreeMap::new()), work_unit_gates: Mutex::new(BTreeMap::new()), events: tx, tails: Mutex::new(HashSet::new()), swarm_launch_lock: Mutex::new(()), swarm_integration_lock: Mutex::new(()), swarm_storage_blocked: std::sync::atomic::AtomicBool::new(false), exe, started_ms: now(), learning_paused: std::sync::atomic::AtomicBool::new(learning_paused),
             learning_usage_paused: std::sync::atomic::AtomicBool::new(false), learning_work_paused: std::sync::atomic::AtomicBool::new(false),
