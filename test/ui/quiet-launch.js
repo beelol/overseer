@@ -49,6 +49,17 @@ const PATCH = `(() => {
     proto.__overseerWrapped = true;
     const focus = proto.focus;
     proto.focus = function () { log('webContents.focus()', { stack: new Error().stack.split(String.fromCharCode(10)).slice(2, 6).map(l => l.trim()) }); return focus.apply(this, arguments); };
+    // A floating editor window (VS Code's "Move Editor into New Window", AC-251) is a window.open()
+    // that Electron creates itself, shown at once: it is created hidden and shown inactive instead.
+    const setHandler = proto.setWindowOpenHandler;
+    if (setHandler) proto.setWindowOpenHandler = function (handler) {
+      return setHandler.call(this, details => {
+        const r = handler(details);
+        const o = r && r.action === 'allow' && r.overrideBrowserWindowOptions;
+        if (o && o.show !== false) { o.show = false; globalThis.__overseerQuietShow++; log('floating window opened hidden'); }
+        return r;
+      });
+    };
   });
   globalThis.__overseerQuietShow = 0;
   app.on('browser-window-created', (_event, win) => {

@@ -65,6 +65,10 @@
       { "command": "overseer.exitDashboard", "title": "Exit Dashboard", "category": "Overseer", "icon": "$(screen-normal)", "enablement": "overseer.inDashboard" },
       { "command": "overseer.toggleDashboard", "title": "Toggle Dashboard", "category": "Overseer" },
       { "command": "overseer.openDashboardWindow", "title": "Open Dashboard in New Window", "category": "Overseer", "icon": "$(empty-window)" },
+      { "command": "overseer.openWorkspace", "title": "Open Workspace", "category": "Overseer", "icon": "$(layout)" },
+      { "command": "overseer.closeWorkspace", "title": "Close Workspace", "category": "Overseer", "icon": "$(layout-sidebar-left-off)", "enablement": "overseer.inWorkspace" },
+      { "command": "overseer.popOutReview", "title": "Pop Out Follow into Its Own Window", "category": "Overseer", "icon": "$(multiple-windows)" },
+      { "command": "overseer.returnReview", "title": "Return Follow to the Main Window", "category": "Overseer", "icon": "$(screen-normal)" },
       { "command": "overseer.newAgent", "title": "New Agent", "category": "Overseer", "icon": "$(add)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.toggleGrid", "title": "Toggle Agent Grid", "category": "Overseer", "icon": "$(layout)" },
       { "command": "overseer.resetGridLayout", "title": "Reset Grid Layout", "category": "Overseer" },
@@ -147,6 +151,7 @@
       { "command": "overseer.searchAgents", "key": "ctrl+alt+f", "mac": "cmd+alt+f", "when": "!editorTextFocus" },
       { "command": "overseer.clearAgentSearch", "key": "escape", "when": "focusedView == overseer.agents && overseer.agentsFiltered" },
       { "command": "overseer.toggleDashboard", "key": "ctrl+alt+o", "mac": "cmd+alt+o" },
+      { "command": "overseer.openWorkspace", "key": "ctrl+alt+shift+o", "mac": "cmd+alt+shift+o" },
       { "command": "overseer.voice.open", "key": "ctrl+alt+v", "mac": "cmd+alt+v" },
       { "command": "overseer.voice.toggle", "key": "ctrl+alt+shift+v", "mac": "cmd+alt+shift+v" },
       { "command": "overseer.voice.mute", "key": "ctrl+alt+shift+m", "mac": "cmd+alt+shift+m", "when": "overseer.voiceOn" },
@@ -163,6 +168,10 @@
       { "command": "overseer.stopSelected", "key": "ctrl+alt+.", "mac": "cmd+alt+.", "when": "overseer.connected" }
     ],
     "menus": {
+      "editor/title": [
+        { "command": "overseer.popOutReview", "when": "activeWebviewPanelId == 'overseer.review' && !isAuxiliaryWindow", "group": "navigation@90" },
+        { "command": "overseer.returnReview", "when": "activeWebviewPanelId == 'overseer.review' && isAuxiliaryWindow", "group": "navigation@90" }
+      ],
       "view/title": [
         { "command": "overseer.newAgent", "when": "view == overseer.agents", "group": "navigation@1" },
         { "command": "overseer.searchAgents", "when": "view == overseer.agents && !overseer.agentsFiltered", "group": "navigation@2" },
@@ -171,6 +180,8 @@
         { "command": "overseer.showArchived", "when": "view == overseer.agents && !overseer.showArchived", "group": "1_view@1" },
         { "command": "overseer.hideArchived", "when": "view == overseer.agents && overseer.showArchived", "group": "1_view@1" },
         { "command": "overseer.openDashboard", "when": "view == overseer.agents", "group": "1_view@2" },
+        { "command": "overseer.openWorkspace", "when": "view == overseer.agents && !overseer.inWorkspace", "group": "1_view@2" },
+        { "command": "overseer.closeWorkspace", "when": "view == overseer.agents && overseer.inWorkspace", "group": "1_view@2" },
         { "command": "overseer.switchAgent", "when": "view == overseer.agents", "group": "1_view@3" },
         { "command": "overseer.newTask", "when": "view == overseer.agents", "group": "2_new@1" },
         { "command": "overseer.startSwarm", "when": "view == overseer.agents && config.overseer.experimental.swarm", "group": "2_new@2" },
@@ -254,7 +265,8 @@
         "overseer.chat.model": { "type": "string", "default": "", "markdownDescription": "The model Talk to Overseer asks for (for example `haiku`); empty uses the harness's default." },
         "overseer.chat.harness": { "type": "string", "enum": ["claude", "codex", "opencode"], "default": "claude", "markdownDescription": "The harness Talk to Overseer runs on (its default account)." },
         "overseer.sideBar.openOnStartup": { "type": ["boolean", "null"], "default": null, "markdownDescription": "Show Overseer in the side bar instead of Explorer when VS Code opens (Explorer stays one click away in the activity bar). Overseer asks once while this is not set." },
-        "overseer.dashboard.immersive": { "type": "boolean", "default": true, "markdownDescription": "In the dashboard, hide VS Code's chrome above Overseer's views. While the dashboard is open Overseer sets these user settings, and puts back exactly what was there when you leave it: `workbench.editor.showTabs` = `none`, `breadcrumbs.enabled` = `false`, `workbench.editor.editorActionsLocation` = `hidden`." },
+        "overseer.dashboard.immersive": { "type": "boolean", "default": true, "markdownDescription": "In the dashboard, hide VS Code's chrome above Overseer's views. While the dashboard is open Overseer sets these settings, and puts back exactly what was there when you leave it: `workbench.editor.showTabs` = `none`, `breadcrumbs.enabled` = `false`, `workbench.editor.editorActionsLocation` = `hidden`. In the dashboard's own window (**Open Dashboard in New Window**) or a window opened on a `.code-workspace` file they are that window's workspace settings and no other window changes; in a window opened on a folder or on nothing they are user settings, which every VS Code window of this profile reads." },
+        "overseer.hideVsCodeChat": { "type": "boolean", "default": true, "markdownDescription": "Close VS Code's own chat view the first time Overseer's view opens in a window (once per window; reopening it yourself is left alone)." },
         "overseer.history.autoArchiveDays": { "type": "number", "minimum": 0, "default": 14, "markdownDescription": "Archive finished agents automatically after this many days (0 turns it off). Archived agents stay searchable and can be restored." },
         "overseer.experimental.autoRouting": { "type": "boolean", "default": false, "markdownDescription": "**Unfinished.** Offer Auto routing in the composer and the New Task form. Auto routing picks the account, agent, model and effort for each task; several of its checks are not yet verified. Off by default." },
         "overseer.experimental.swarm": { "type": "boolean", "default": false, "markdownDescription": "**Unfinished.** Show Swarm runs and the Swarm commands (Start Swarm…, pause, resume, stop, deadline). Swarm also uses the daemon's native director setting (`swarm.native_director`, on unless the owner turns it off). Off by default." },
@@ -293,7 +305,7 @@
     }
   },
   "scripts": {
-    "check": "node --check src/extension.js && node --check src/daemon-client.js && node --check src/views.js && node --check src/swarm-controls.js && node --check src/review.js && node --check src/output-panel.js && node --check src/phone-access.js && node --check src/phone-text.js && node --check media/pairing.js && node --check branch-diff/review/panel.js",
+    "check": "node --check src/extension.js && node --check src/daemon-client.js && node --check src/views.js && node --check src/swarm-controls.js && node --check src/review.js && node --check src/output-panel.js && node --check src/phone-access.js && node --check src/phone-text.js && node --check media/pairing.js && node --check branch-diff/review/panel.js && node --check src/arrangement.js && node --check src/dashboard-mode.js && node --check src/layout.js && node --check src/vscode-chat.js && node --check src/immersive.js",
     "build:review": "node branch-diff/scripts/build-review.js",
     "package": "node scripts/package.js",
     "test": "node ../test/unit/run.js"
