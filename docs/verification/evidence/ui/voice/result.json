@@ -12,9 +12,9 @@
       "name": "the mark is centred in the voice view (measured)",
       "ok": true,
       "detail": {
-        "cx": 461,
+        "cx": 541,
         "w": 223.4375,
-        "vw": 922
+        "vw": 1082
       }
     },
     {
@@ -29,17 +29,17 @@
       "name": "hearing: the star grows with the voice and swings with its syllables",
       "ok": true,
       "detail": {
-        "frames": 332,
-        "max": 1.7981690190669948,
-        "min": 1.4393070069778884
+        "frames": 176,
+        "max": 1.7928473724432887,
+        "min": 1.4414030048998543
       }
     },
     {
       "name": "levels arrive at least every 100 ms while the owner speaks (25 a second)",
       "ok": true,
       "detail": {
-        "jumps": 74,
-        "spacing": 42.89999997615814
+        "jumps": 77,
+        "spacing": 44.10000002384186
       }
     },
     {
@@ -48,16 +48,16 @@
       "detail": {
         "lag": 40,
         "r": 0.9,
-        "frames": 333,
-        "levels": 74
+        "frames": 176,
+        "levels": 77
       }
     },
     {
       "name": "speaking: rings of light cross the core and the star stays under 1.3x",
       "ok": true,
       "detail": {
-        "scale": 1.2882883515919439,
-        "glow": 0.5140967887281618,
+        "scale": 1.2032605584007563,
+        "glow": 0.415391442717739,
         "rings": 1,
         "still": false,
         "meter": null,
@@ -68,8 +68,8 @@
       "name": "thinking: the star turns, 12% larger",
       "ok": true,
       "detail": {
-        "scale": 1.1731857654644906,
-        "glow": 0.28499773147436386,
+        "scale": 1.1875118985351905,
+        "glow": 0.32862904622032735,
         "rings": 0,
         "still": false,
         "meter": null,
@@ -82,16 +82,16 @@
       "detail": {
         "words": "Tell Phone to use the new wire format.",
         "stage": "Phone is working · 0s",
-        "row": "Phonenamed · adddelivered10:12:43 PM",
-        "full": "(voice, request V-0001) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.\n\nWhy: named · delivery: add\nheld 10:12:43 PM · sent 10:12:43 PM · delivered 10:12:43 PM"
+        "row": "Phonenamed · adddelivered12:59:45 AM",
+        "full": "(voice, request V-0001) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.\n\nWhy: named · delivery: add\nheld 12:59:45 AM · sent 12:59:45 AM · delivered 12:59:45 AM"
       }
     },
     {
       "name": "muted: the mark is still with the mute sign, and no listener runs",
       "ok": true,
       "detail": {
-        "scale": 1.0005379648766048,
-        "glow": 0.18062743099687448,
+        "scale": 1.0003685325842384,
+        "glow": 0.1804298074287741,
         "rings": 0,
         "still": true,
         "meter": null,
@@ -106,10 +106,10 @@
       "name": "beside a streaming chat, the animation keeps up at 60 frames a second: work per frame p95 under 16 ms, and frames arrive at the display's rate",
       "ok": true,
       "detail": {
-        "n": 486,
-        "work_p95": 0.19999992847442627,
-        "interval_median": 8.30000000000291,
-        "interval_p95": 9.19999999999709,
+        "n": 226,
+        "work_p95": 0.10000002384185791,
+        "interval_median": 16.69999999999709,
+        "interval_p95": 18.30000000000291,
         "dropped": 0,
         "groups": 2
       }
@@ -119,19 +119,19 @@
       "ok": true,
       "detail": {
         "visibility": "not shown",
-        "f1": 11345,
-        "f2": 11345
+        "f1": 5534,
+        "f2": 5534
       }
     },
     {
       "name": "reduced motion: a still mark and a level meter",
       "ok": true,
       "detail": {
-        "scale": 1.676011520325954,
-        "glow": 0.8172462703567596,
+        "scale": 1.6899538582786167,
+        "glow": 0.829061892956929,
         "rings": 0,
         "still": true,
-        "meter": 0.7953076709717106,
+        "meter": 0.8117104215042551,
         "state": "hearing"
       }
     },
@@ -233,47 +233,47 @@
         "chats": [
           {
             "tag": "overseer",
-            "id": "r-24d01f244f65",
+            "id": "r-cf8d15f5aaa5",
             "shows": true
           },
           {
             "tag": "overseer",
-            "id": "r-23b996a412f6",
+            "id": "r-c022e08158af",
             "shows": true
           },
           {
             "tag": "overseer",
-            "id": "r-47072980a38e",
+            "id": "r-554d070247dc",
             "shows": true
           },
           {
             "tag": "dark",
-            "id": "r-24d01f244f65",
+            "id": "r-cf8d15f5aaa5",
             "shows": true
           },
           {
             "tag": "dark",
-            "id": "r-23b996a412f6",
+            "id": "r-c022e08158af",
             "shows": true
           },
           {
             "tag": "dark",
-            "id": "r-47072980a38e",
+            "id": "r-554d070247dc",
             "shows": true
           },
           {
             "tag": "light",
-            "id": "r-24d01f244f65",
+            "id": "r-cf8d15f5aaa5",
             "shows": true
           },
           {
             "tag": "light",
-            "id": "r-23b996a412f6",
+            "id": "r-c022e08158af",
             "shows": true
           },
           {
             "tag": "light",
-            "id": "r-47072980a38e",
+            "id": "r-554d070247dc",
             "shows": true
           }
         ]

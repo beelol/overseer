@@ -11,7 +11,7 @@
       "name": "Enter at home starts an agent exactly as before, with no Overseer turn in the event log",
       "ok": true,
       "detail": {
-        "started": "r-ba115b4823e7",
+        "started": "r-cdecb7bdd602",
         "overseerTurns": 0
       }
     },
@@ -65,14 +65,14 @@
       "name": "a named agent reaches Overseer as that agent's id",
       "ok": true,
       "detail": {
-        "sent": "Tell @tidy the docs (r-ba115b4823e7) to add a changelog"
+        "sent": "Tell @tidy the docs (r-cdecb7bdd602) to add a changelog"
       }
     },
     {
       "name": "*Start as an agent* starts one from a message sent to Overseer",
       "ok": true,
       "detail": {
-        "corrected": "r-88391556648b"
+        "corrected": "r-29aac0754de8"
       }
     },
     {
@@ -88,7 +88,7 @@
       "name": "Talk to Overseer is home with the same conversation, and nothing is docked below",
       "ok": true,
       "detail": {
-        "talk": "Started tidy the docs (claude) in home-repo\ntidy the docs\nAsk Overseer instead\nYou\nWhat is everyone doing?\nAnswered\nStart as an agent\nOverseer\n\nHere is what everyone is doing:\n\ntidy the docs: completed\nYou\nTell @tidy the docs (r-ba115b4823e7) to add a changelog\nAnswered\nStart as an agent\nOverseer\n\nI",
+        "talk": "Started tidy the docs (claude) in home-repo\ntidy the docs\nAsk Overseer instead\nYou\nWhat is everyone doing?\nAnswered\nStart as an agent\nOverseer\n\nHere is what everyone is doing:\n\ntidy the docs: completed\nYou\nTell @tidy the docs (r-cdecb7bdd602) to add a changelog\nAnswered\nStart as an agent\nOverseer\n\nI",
         "panelViews": []
       }
     },
@@ -96,8 +96,8 @@
       "name": "what Overseer did is a card with one row per agent: why, the delivery, the state and its time, the whole text in the tooltip",
       "ok": true,
       "detail": {
-        "text": "Tell @tidy the docs (r-ba115b4823e7) to add a changelog\nnamed · add\ndelivered\n10:13:29 PM",
-        "title": "Please add the release date too.\n\nWhy: named · delivery: add\nheld 10:13:29 PM · sent 10:13:29 PM · delivered 10:13:29 PM",
+        "text": "Tell @tidy the docs (r-cdecb7bdd602) to add a changelog\nnamed · add\ndelivered\n12:54:21 AM",
+        "title": "Please add the release date too.\n\nWhy: named · delivery: add\nheld 12:54:21 AM · sent 12:54:21 AM · delivered 12:54:21 AM",
         "state": "delivered"
       }
     },
@@ -113,8 +113,8 @@
             "release_on": {
               "kind": "release"
             },
-            "run_id": "r-ba115b4823e7",
-            "set_ms": 1790658808055,
+            "run_id": "r-cdecb7bdd602",
+            "set_ms": 1790668460483,
             "title": "tidy the docs"
           }
         ]
@@ -125,37 +125,37 @@
       "ok": true,
       "detail": {
         "Overseer@1280": {
-          "chars": 157,
+          "chars": 129,
           "longRuns": [],
           "overflow": 0,
           "unnamed": []
         },
         "Overseer@900": {
-          "chars": 157,
+          "chars": 129,
           "longRuns": [],
           "overflow": 0,
           "unnamed": []
         },
         "Overseer Dark@1280": {
-          "chars": 157,
+          "chars": 129,
           "longRuns": [],
           "overflow": 0,
           "unnamed": []
         },
         "Overseer Dark@900": {
-          "chars": 157,
+          "chars": 129,
           "longRuns": [],
           "overflow": 0,
           "unnamed": []
         },
         "Overseer Light@1280": {
-          "chars": 157,
+          "chars": 129,
           "longRuns": [],
           "overflow": 0,
           "unnamed": []
         },
         "Overseer Light@900": {
-          "chars": 157,
+          "chars": 129,
           "longRuns": [],
           "overflow": 0,
           "unnamed": []
@@ -165,37 +165,37 @@
   ],
   "textBudget": {
     "Overseer@1280": {
-      "chars": 157,
+      "chars": 129,
       "longRuns": [],
       "overflow": 0,
       "unnamed": []
     },
     "Overseer@900": {
-      "chars": 157,
+      "chars": 129,
       "longRuns": [],
       "overflow": 0,
       "unnamed": []
     },
     "Overseer Dark@1280": {
-      "chars": 157,
+      "chars": 129,
       "longRuns": [],
       "overflow": 0,
       "unnamed": []
     },
     "Overseer Dark@900": {
-      "chars": 157,
+      "chars": 129,
       "longRuns": [],
       "overflow": 0,
       "unnamed": []
     },
     "Overseer Light@1280": {
-      "chars": 157,
+      "chars": 129,
       "longRuns": [],
       "overflow": 0,
       "unnamed": []
     },
     "Overseer Light@900": {
-      "chars": 157,
+      "chars": 129,
       "longRuns": [],
       "overflow": 0,
       "unnamed": []
