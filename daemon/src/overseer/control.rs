@@ -37,6 +37,9 @@ pub const ACTION_CLASSES: &[(&str, &str)] = &[
     ("start", STEER),
     ("answer", STEER),
     ("withdraw", STEER),
+    // AC-239: an agent that stopped goes on elsewhere, or tries again.
+    ("continue", STEER),
+    ("retry", STEER),
     ("archive", CONFIRM),
     ("permission", CONFIRM),
     ("merge_back", CONFIRM),

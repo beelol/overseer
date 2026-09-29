@@ -416,6 +416,21 @@ async function mcpClient() {
     const questions = /Questions \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
     const reports = /Reports \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
     const findings = /Findings \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
+    // AC-239: agents in trouble. Say what happened in plain words and offer the fix: another
+    // account for a limit or a sign-in, a retry for a failure, a stop for one that went quiet.
+    const troubles = /Trouble \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
+    const actOnTrouble = async list => {
+      const lines = [];
+      for (const t of list) {
+        let action, offer;
+        if ((t.kind === 'limit' || t.kind === 'signed_out') && t.other_accounts.length) { const o = t.other_accounts[0]; action = { action: 'continue', agent: t.id, profile: o.id }; offer = `I can continue it on ${o.name}`; }
+        else if (t.kind === 'failed' || t.kind === 'limit') { action = { action: 'retry', agent: t.id }; offer = 'I can retry it'; }
+        else { action = { action: 'stop', agent: t.id }; offer = 'I can stop it'; }
+        const outcome = await call('propose', { actions: [action] }).catch(e => 'refused: ' + e.message);
+        lines.push(`${t.title} ${t.reason}. ${offer}${/^Done/.test(outcome) ? ', and did.' : '; say yes to go ahead.'}`);
+      }
+      return lines;
+    };
     // A watcher's finding: Overseer acts on the subject at its level. A stop is a hold (at Ask
     // first a proposal) and then a redirect (a proposal at Steer, done at Auto); a concern is a
     // message to the subject. Each goes in its own proposal so a quiet one is not held back.
@@ -458,9 +473,10 @@ async function mcpClient() {
       await sleep(100);
       process.exit(0);
     }
-    if (mcp && (questions || reports || findings) && !checkIn) {
+    if (mcp && (questions || reports || findings || troubles) && !checkIn) {
       const lines = [];
       const level = (/The level is (\w+)\./.exec(text) || [])[1] || 'ask_first';
+      if (troubles) lines.push(...await actOnTrouble(JSON.parse(troubles[1])));
       if (findings) lines.push(...await actOnFindings(JSON.parse(findings[1]), level));
       for (const q of questions ? JSON.parse(questions[1]) : []) lines.push(await call('answer', { ask: q.id, text: 'From the roster: ' + q.question.replace(/\?$/, '') + ' — see the other agents\' digests.' }));
       if (reports) { const list = JSON.parse(reports[1]); lines.push(await rally(list[0]?.repository)); }
@@ -475,6 +491,7 @@ async function mcpClient() {
       const level = (/The level is (\w+)\./.exec(text) || [])[1] || 'ask_first';
       const items = JSON.parse(checkIn[1]);
       const lines = [];
+      if (troubles) lines.push(...await actOnTrouble(JSON.parse(troubles[1])));
       if (findings) lines.push(...await actOnFindings(JSON.parse(findings[1]), level));
       for (const q of questions ? JSON.parse(questions[1]) : []) lines.push(await call('answer', { ask: q.id, text: 'From the roster: ' + q.question.replace(/\?$/, '') + ' — see the other agents\' digests.' }));
       for (const it of items) {

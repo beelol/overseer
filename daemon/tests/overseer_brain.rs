@@ -274,3 +274,126 @@ fn ac237_an_unnamed_start_follows_the_route_pick() {
     assert_eq!(run["profile_id"], "system-claude");
     d.wait_done(run["id"].as_str().unwrap(), 30);
 }
+
+// ---------------------------------------------------------------------- AC-239
+
+/// The causes of the turns Overseer's run has taken, oldest first.
+fn turn_causes(d: &Daemon) -> Vec<String> {
+    let db = d.home.path().join("overseer.sqlite");
+    let out = Command::new("sqlite3").args(["-cmd", ".timeout 5000"]).arg(&db).arg("SELECT cause FROM overseer_turns ORDER BY ts;").output().unwrap();
+    String::from_utf8_lossy(&out.stdout).lines().map(str::to_string).collect()
+}
+
+fn trouble_turns(d: &Daemon) -> usize {
+    turn_causes(d).iter().filter(|c| *c == "trouble").count()
+}
+
+/// Waits for Overseer's trouble turn number `n` to end with an open proposal whose first action
+/// is `action` on `agent`.
+fn wait_trouble_proposal(d: &Daemon, n: usize, action: &str, agent: &str) -> Value {
+    let deadline = Instant::now() + Duration::from_secs(60);
+    loop {
+        if trouble_turns(d) >= n {
+            let s = wait_overseer_idle(d, 60);
+            if let Some(p) = s["proposals"].as_array().unwrap().iter().find(|p| p["actions"][0]["action"] == action && p["actions"][0]["agent"] == agent) {
+                return p.clone();
+            }
+        }
+        assert!(Instant::now() < deadline, "no {action} proposal for {agent} after trouble turn {n}: causes {:?}\n{}", turn_causes(d), overseer_trace(d));
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
+fn trouble_card(d: &Daemon, agent: &str) -> Value {
+    wait_message(d, "a trouble card", 30, |m| m["card"]["kind"] == "trouble" && m["card"]["agent"] == agent)
+}
+
+/// AC-239: a limited, a failed and a silent agent each come back to Overseer as one turn and one
+/// card with a plain reason; Overseer offers the fix; "continue on the other account" goes on in
+/// the same worktree on the second profile; no surface shows an error class or an HTTP code.
+#[test]
+fn ac239_stuck_failed_and_limited_agents_come_back_to_overseer() {
+    let _one = heavy();
+    let r = tmp();
+    let checkout = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file, &[("FIXTURE_SLOW_MS", "60000"), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE,FIXTURE_SLOW_MS")]);
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    let work = d.call("profile.create", json!({"name": "Work", "harness": "claude"}))["id"].as_str().unwrap().to_string();
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+
+    // A usage limit: the card says so plainly and offers the other account; Overseer proposes it.
+    let limited = claude_task(&d, &checkout, &mode_file, "ratelimit", "Limited", "write the API");
+    assert_eq!(d.wait_done(&limited, 30)["status"], "failed");
+    let card = trouble_card(&d, &limited);
+    assert_eq!(card["text"], "Limited reached its account's usage limit.", "{card}");
+    let shown = d.call("state", json!({}))["runs"].as_array().unwrap().iter().find(|x| x["id"] == limited.as_str()).unwrap()["plain_reason"].clone();
+    assert_eq!(shown, "Reached its account's usage limit", "what every surface can show instead of the raw reason");
+    assert!(card["card"]["offers"].as_array().unwrap().iter().any(|o| o["action"] == "continue" && o["profile"] == work.as_str()), "{card}");
+    let p = wait_trouble_proposal(&d, 1, "continue", &limited);
+    assert_eq!(p["actions"][0]["profile"], work.as_str());
+    assert_eq!(trouble_turns(&d), 1, "one turn");
+    let reply = replies(&d).last().cloned().unwrap();
+    assert!(reply.contains("Limited reached its account's usage limit") && reply.contains("Work"), "{reply}");
+    // Continue on the other account: the same worktree, the second profile.
+    std::fs::write(&mode_file, "echo").unwrap();
+    let yes = d.call("overseer.answer", json!({"id": p["id"], "yes": true, "surface": "ctl", "by": "owner"}));
+    assert!(yes["result"].as_str().unwrap().contains("continued Limited on Claude Code (account Work)"), "{yes}");
+    let before = d.run(&limited);
+    assert_eq!(before["status"], "handed_off");
+    let next = d.runs().into_iter().find(|x| x["profile_id"] == work.as_str()).expect("a run on Work");
+    assert_eq!(next["workspace_id"], before["workspace_id"], "the same worktree");
+    assert_eq!(next["task_id"], before["task_id"], "the same task");
+    d.wait_done(next["id"].as_str().unwrap(), 30);
+
+    // A failure with its reason: said in the harness's own words, offered a retry.
+    let broken = claude_task(&d, &checkout, &mode_file, "failed-reason", "Broken", "migrate the users");
+    assert_eq!(d.wait_done(&broken, 30)["status"], "failed");
+    let card = trouble_card(&d, &broken);
+    assert_eq!(card["text"], "Broken failed: Migration failed: relation users_v2 does not exist.", "{card}");
+    let p = wait_trouble_proposal(&d, 2, "retry", &broken);
+    assert_eq!(trouble_turns(&d), 2, "one turn");
+    std::fs::write(&mode_file, "echo").unwrap();
+    let yes = d.call("overseer.answer", json!({"id": p["id"], "yes": true, "surface": "ctl", "by": "owner"}));
+    assert!(yes["result"].as_str().unwrap().contains("retried Broken"), "{yes}");
+    assert!(turns(&d, &broken).last().unwrap()["prompt"].as_str().unwrap().contains("migrate the users"), "the turn that did not finish, again");
+    assert_eq!(d.wait_done(&broken, 30)["status"], "completed", "the retry went through");
+
+    // Silence while running: stuck. At the Auto level Overseer does the fix itself (a stop).
+    d.call("overseer.level", json!({"level": "auto"}));
+    sql(&d, "INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.silence_ms', '3000')");
+    let quiet = claude_task(&d, &checkout, &mode_file, "slow", "Quiet", "think hard");
+    d.wait_status(&quiet, |s| s == "running", 20);
+    let card = trouble_card(&d, &quiet);
+    assert_eq!(card["text"], "Quiet has said nothing for a while as it works.", "{card}");
+    d.wait_status(&quiet, |s| s == "interrupted", 40);
+    wait_overseer_idle(&d, 30);
+    assert_eq!(trouble_turns(&d), 3, "one turn");
+    let reply = replies(&d).last().cloned().unwrap();
+    assert!(reply.starts_with("Quiet has said nothing") && reply.contains("and did"), "{reply}");
+
+    // A failure that repeats is not a loop: at Auto, Overseer retries once by itself; the second
+    // time the retry waits for the owner's yes.
+    let again = claude_task(&d, &checkout, &mode_file, "failed-reason", "Again", "migrate the orders");
+    let deadline = Instant::now() + Duration::from_secs(60);
+    while turns(&d, &again).len() < 2 && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    assert_eq!(turns(&d, &again).len(), 2, "retried once by itself");
+    let p = wait_trouble_proposal(&d, 5, "retry", &again);
+    assert_eq!(p["state"], "open", "the second retry waits for a yes: {p}");
+    std::thread::sleep(Duration::from_secs(2));
+    assert_eq!(turns(&d, &again).len(), 2, "and nothing more ran");
+
+    // No surface shows an error class or an HTTP code: the conversation, its cards, Overseer's
+    // words and the agents' reasons in the daemon's state.
+    let all = d.call("overseer.messages", json!({"after": 0, "limit": 500}))["messages"].to_string();
+    let state = d.call("state", json!({}));
+    let plain: Vec<String> = state["runs"].as_array().unwrap().iter().filter_map(|r| r["plain_reason"].as_str().map(str::to_string)).collect();
+    assert!(plain.iter().any(|p| p.contains("users_v2")), "{plain:?}");
+    for raw in ["[rate_limit]", "rate_limit", "429", "turn reported failure"] {
+        assert!(!all.contains(raw), "{raw} in the conversation: {all}");
+        assert!(plain.iter().all(|p| !p.contains(raw)), "{raw} in a plain reason: {plain:?}");
+    }
+}

@@ -3632,6 +3632,15 @@ impl Daemon {
             if let Some(link) = run["id"].as_str().and_then(|id| memberships.get(id)) {
                 run["swarm_membership"] = link.clone();
             }
+            // Why a failed agent stopped, in plain words, for every surface (AC-239); exit_reason
+            // keeps the daemon's own record.
+            if run["status"] == "failed" {
+                let last: Option<(String, String)> = store.conn.query_row("SELECT COALESCE(json_extract(payload, '$.class'), ''), COALESCE(json_extract(payload, '$.message'), '') FROM events WHERE run_id=?1 AND kind='error' ORDER BY seq DESC LIMIT 1", [run["id"].as_str().unwrap_or("")], |r| Ok((r.get(0)?, r.get(1)?))).ok();
+                let (class, message) = last.map(|(c, m)| (Some(c), m)).unwrap_or((None, String::new()));
+                let (_, reason) = crate::overseer::trouble::plain(class.as_deref(), &message, run["exit_reason"].as_str().unwrap_or(""));
+                let mut chars = reason.chars();
+                run["plain_reason"] = json!(chars.next().map(|c| c.to_uppercase().collect::<String>() + chars.as_str()).unwrap_or_default());
+            }
         }
         let mut turns = serde_json::Map::new();
         for r in runs.iter().filter(|r| r.parent_run_id.is_none() || matches!(r.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation"))) {

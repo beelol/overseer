@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 pub const LEVELS: &[&str] = &["ask_first", "steer", "auto"];
 /// Actions Overseer may ask for today; watch arrives with its step.
-pub const ACTIONS: &[&str] = &["message", "stop", "start", "pin", "hold", "release", "guardrail", "redirect", "archive", "cadence", "answer", "report", "area", "share", "withdraw", "watch", "permission", "merge_back", "pull_request", "swarm", "focus", "open_review", "open_file", "open_worktree", "show_work"];
+pub const ACTIONS: &[&str] = &["message", "stop", "start", "pin", "hold", "release", "guardrail", "redirect", "archive", "cadence", "answer", "report", "area", "share", "withdraw", "watch", "permission", "merge_back", "pull_request", "swarm", "focus", "open_review", "open_file", "open_worktree", "show_work", "continue", "retry"];
 /// The settle window in which what the owner asked for can still be cancelled (AC-170's).
 pub const SETTLE_MS: i64 = 2000;
 const TURN_BYTES: usize = 32 * 1024;
@@ -596,6 +596,12 @@ impl Daemon {
             "merge_back" => format!("Merge {} back into its target branch", who(a["agent"].as_str().unwrap_or("?"))),
             "pull_request" => format!("Open a pull request for {} (VS Code pushes with your GitHub sign-in)", who(a["agent"].as_str().unwrap_or("?"))),
             "answer" => format!("Answer {}: “{}”", who(a["agent"].as_str().unwrap_or("?")), a["text"].as_str().unwrap_or("")),
+            "continue" => {
+                let account = a["profile"].as_str().or(a["profile_id"].as_str()).filter(|p| !p.is_empty()).map(|p| format!("account {}", self.profile(p).map(|x| x.name).unwrap_or_else(|_| p.to_string())));
+                let on: Vec<String> = [a["harness"].as_str().map(|h| crate::handoff::harness_name(h).to_string()), a["model"].as_str().map(str::to_string), account].into_iter().flatten().filter(|s| !s.is_empty()).collect();
+                format!("Continue {} on {}", who(a["agent"].as_str().unwrap_or("?")), if on.is_empty() { "another account".to_string() } else { on.join(" · ") })
+            }
+            "retry" => format!("Retry {}", who(a["agent"].as_str().unwrap_or("?"))),
             "report" => format!("Ask {} for a report (one agent turn)", who(a["agent"].as_str().unwrap_or("?"))),
             "area" => format!("Set {}'s area to {}", who(a["agent"].as_str().unwrap_or("?")), a["paths"].as_array().map(|p| p.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(", ")).unwrap_or_default()),
             "share" => format!("Share {} with {}", match a["from"].as_str().filter(|s| !s.is_empty()) { Some(f) => format!("{}'s {}{}", who(f), a["what"].as_str().unwrap_or("report"), a["path"].as_str().map(|p| format!(" of {p}")).unwrap_or_default()), None => format!("a {}", a["what"].as_str().unwrap_or("note")) }, who(a["to"].as_str().or(a["agent"].as_str()).unwrap_or("?"))),
@@ -776,6 +782,16 @@ impl Daemon {
                 }
                 self.refuse_swarm_worker_steering(kind, a, id, &run.title)?;
                 let mut a = a.clone();
+                // One try by itself (AC-239): a second retry or move of the same agent that
+                // Overseer starts without the owner waits for their yes, at every level, so a
+                // failure that repeats never becomes a loop of turns.
+                if (kind == "retry" || kind == "continue") && !owner_asked {
+                    let tried: i64 = self.store.lock().unwrap().conn.query_row("SELECT COUNT(*) FROM dispatches WHERE action IN ('retry', 'continue') AND (run_id=?1 OR run_id IN (SELECT successor FROM continuity_handoffs WHERE predecessor=?1) OR run_id IN (SELECT predecessor FROM continuity_handoffs WHERE successor=?1)) AND held_ms > ?2", rusqlite::params![id, crate::daemon::now() - 24 * 3600 * 1000], |r| r.get(0)).unwrap_or(0);
+                    if tried > 0 {
+                        a["class"] = json!(super::control::CONFIRM);
+                        a["why"] = json!(format!("{} was already tried again once today; it waits for you", run.title));
+                    }
+                }
                 a["title"] = json!(run.title);
                 a["status_then"] = json!(run.status);
                 checked.push(a);
@@ -785,6 +801,11 @@ impl Daemon {
                 }
                 let mut a = a.clone();
                 self.start_route(&mut a)?;
+                // Starting an Auto root is the owner's (the Auto contract: Overseer's level grants
+                // no route): one Overseer starts by itself on Auto's pick waits for their yes.
+                if a["route"]["how"] == "auto" && !owner_asked {
+                    a["class"] = json!(super::control::CONFIRM);
+                }
                 checked.push(a);
             }
         }
@@ -1377,6 +1398,54 @@ impl Daemon {
                 Ok(format!("withdrew the share; {} agents told", r["told"].as_array().map(|t| t.len()).unwrap_or(0)))
             }
             "start" if a["route"]["how"] == "auto" => self.start_on_route(a, proposal, by),
+            // AC-239: an agent that stopped goes on elsewhere, or tries again.
+            "continue" => {
+                let agent = a["agent"].as_str().unwrap_or("");
+                let run = self.run(agent)?;
+                if ACTIVE.contains(&run.status.as_str()) {
+                    bail!("{title} is still working; stop it first");
+                }
+                let profile = match a["profile"].as_str().or(a["profile_id"].as_str()).filter(|p| !p.is_empty()) {
+                    Some(p) => Some(self.store.lock().unwrap().profiles()?.into_iter().find(|x| x.id == p || x.name.eq_ignore_ascii_case(p)).ok_or_else(|| anyhow!("there is no account named {p}"))?),
+                    None => None,
+                };
+                let harness = match a["harness"].as_str().filter(|h| !h.is_empty()) {
+                    Some("codex") => "codex-app".to_string(),
+                    Some(h) => h.to_string(),
+                    None => match &profile {
+                        Some(p) if crate::daemon::profile_harness(&run.harness) != p.harness => if p.harness == "codex" { "codex-app".into() } else { p.harness.clone() },
+                        _ => run.harness.clone(),
+                    },
+                };
+                if let Some(p) = &profile {
+                    if crate::daemon::profile_harness(&harness) != p.harness {
+                        bail!("the account {} is a {} account, not {}", p.name, p.harness, crate::handoff::harness_name(&harness));
+                    }
+                    if self.profile_status(&p.id)?["logged_in"] == false {
+                        bail!("the account {} is signed out", p.name);
+                    }
+                }
+                let model = a["model"].as_str().filter(|m| !m.is_empty()).map(str::to_string);
+                let target = crate::handoff::overseer_target(self, &run, &harness, profile.map(|p| p.id), model)?;
+                let label = target.label.clone();
+                let successor = crate::handoff::handoff(self, &run, &target, "overseer")?;
+                self.dispatch_record(proposal, &successor.id, "continue", "continue", "", a["why"].as_str().unwrap_or("named"), "delivered")?;
+                Ok(format!("continued {title} on {label}"))
+            }
+            "retry" => {
+                let agent = a["agent"].as_str().unwrap_or("");
+                let run = self.run(agent)?;
+                if ACTIVE.contains(&run.status.as_str()) {
+                    bail!("{title} is still working");
+                }
+                // The turn that did not finish, sent again; else a word to carry on.
+                let turns = self.store.lock().unwrap().turns(agent)?;
+                let prompt = turns.iter().rev().find(|t| t.status != "completed").map(|t| t.prompt.clone()).filter(|p| !p.is_empty()).unwrap_or_else(|| "Carry on where you stopped.".to_string());
+                let turn = self.start_turn(agent, &prompt, true, &TurnOpts::default())?;
+                self.store.lock().unwrap().conn.execute("INSERT OR REPLACE INTO turn_sources(turn_id, source, detail) VALUES(?1, 'overseer', ?2)", rusqlite::params![turn.id, json!({"proposal": proposal, "by": by, "retry": true}).to_string()])?;
+                self.dispatch_record(proposal, agent, "retry", "retry", &prompt, a["why"].as_str().unwrap_or("named"), "delivered")?;
+                Ok(format!("retried {title}"))
+            }
             "start" => {
                 let harness = a["harness"].as_str().map(str::to_string).or_else(|| self.overseer_session().ok().and_then(|s| s["harness"].as_str().map(str::to_string))).unwrap_or_else(|| "claude".into());
                 // A harness that is not on this Mac, a signed-out account or a workspace VS Code does not
@@ -1607,6 +1676,9 @@ pub fn start(daemon: Arc<Daemon>) {
                 if let Err(e) = d.retry_kept_messages() {
                     crate::log(&format!("overseer: {e:#}"));
                 }
+                if let Err(e) = d.find_silent_agents() {
+                    crate::log(&format!("overseer: {e:#}"));
+                }
             })
             .await;
         }
@@ -1774,6 +1846,7 @@ fn handle_event(d: &Arc<Daemon>, e: &crate::store::Event) -> Result<()> {
             d.expire_stale_proposals(run)?;
             let status = payload["status"].as_str().unwrap_or("");
             d.finished_for_check_in(run, status)?;
+            d.trouble_on_status(run, status)?;
             d.subject_finishing(run, status)?;
         }
         ("file_activity", _) => {
