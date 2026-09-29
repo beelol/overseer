@@ -2394,6 +2394,10 @@ rec(233, "Work in an agent's worktree from your window", "not started", date="�
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
 
+rec(234, "Deploys follow merges by themselves", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate T, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28; the first manual deploys (87aa4f87, cc5e5463) were run by the coordinator with the owner's yes.", live="—", blocker="Its own agent; CI's required checks must be green first (the TUI t10 timing test on hosted runners is the owner's decision).")
+
 SHORT_BLOCKERS = {
     154: "verified",
     155: "verified",
@@ -2556,6 +2560,7 @@ SHORT_BLOCKERS = {
     231: "not started (added by the owner on 2026-09-28)",
     232: "not started (added by the owner on 2026-09-28)",
     233: "not started (added by the owner on 2026-09-28)",
+    234: "not started (added by the owner on 2026-09-28)",
 }
 TOTAL = 53
 
