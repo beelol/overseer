@@ -3467,10 +3467,12 @@ impl Daemon {
         let mut options = Vec::new();
         let snap_info = |id: &str| -> Option<Snapshot> { self.store.lock().unwrap().snapshot(id).ok().flatten() };
         // AC-232: while the agent works, the review opens on its latest run (the owner's default);
-        // once it has finished, on everything it did since the task started, so work committed in
-        // an earlier turn is never hidden behind a later turn that changed nothing ("0 files").
+        // once an agent in its own worktree has finished, on everything it did since the task
+        // started, so work committed in an earlier turn is never hidden behind a later turn that
+        // changed nothing ("0 files"). In the owner's own checkout the latest run stays the
+        // default: since the task started would also hold the owner's own work between turns.
         let working = self.store.lock().unwrap().runs()?.iter().any(|r| r.workspace_id == ws.id && ACTIVE.contains(&r.status.as_str()));
-        let start_default = !working && task.start_snapshot.as_deref().and_then(snap_info).is_some();
+        let start_default = ws.kind == "worktree" && !working && task.start_snapshot.as_deref().and_then(snap_info).is_some();
         match turns.last().and_then(|t| t.snapshot_id.as_deref().and_then(snap_info).map(|s| (t.clone(), s))) {
             Some((turn, snap)) => options.push(json!({
                 "mode": "latest_run", "label": "Latest run", "base": snap.commit_sha, "available": true, "default": !start_default,

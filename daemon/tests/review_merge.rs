@@ -58,6 +58,10 @@ fn ac232_a_finished_agents_committed_new_file_is_in_its_default_review() {
     d.wait_status(&run_id(&busy), |s| s == "running", 20);
     assert_eq!(default_option(&d, &run_id(&busy))["mode"], "latest_run");
     d.call("run.interrupt", json!({"run_id": run_id(&busy)}));
+    // In the owner's own checkout the latest run stays the default.
+    let current = d.generic(&repo, "current", "/bin/sh", &["-c", "true"]);
+    d.wait_done(&run_id(&current), 20);
+    assert_eq!(default_option(&d, &run_id(&current))["mode"], "latest_run");
 }
 
 /// AC-232: Open PR needs a GitHub remote; the plan says which remote there is, so a repository

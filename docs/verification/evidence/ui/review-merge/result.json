@@ -4,7 +4,7 @@
       "name": "fixture: the agent committed data/features.js on its branch and left .env untracked",
       "ok": true,
       "detail": {
-        "log": "4813c0d add features\n94708d2 fixture base",
+        "log": "8fa560b add features\ndf9cb34 fixture base",
         "status": "?? .env"
       }
     },
@@ -118,7 +118,7 @@
       "name": "merged: main has the agent's file, and the pre-commit hook ran for the commit of .env",
       "ok": true,
       "detail": {
-        "log": "68506b9 Merge overseer/add-the-features-list into main (Overseer merge back)\na50debc Overseer: Add the features list\n4813c0d add features",
+        "log": "215f51a Merge overseer/add-the-features-list into main (Overseer merge back)\n503fdd6 Overseer: Add the features list\n8fa560b add features",
         "hooks": "pre-commit overseer/add-the-features-list\npre-commit overseer/add-the-features-list\npre-commit overseer/add-the-features-list\n"
       }
     },
@@ -128,7 +128,7 @@
       "detail": {
         "hidden": false,
         "state": "merged",
-        "text": "Merged into main (68506b9)",
+        "text": "Merged into main (215f51a)",
         "buttons": [
           "cleanup-now:Clean up"
         ]
@@ -137,30 +137,30 @@
     {
       "name": "its conversation says it once, with the commit (no raw \"merge back\" lines)",
       "ok": true,
-      "detail": "Merged into main (68506b9)"
+      "detail": "Merged into main (215f51a)"
     },
     {
       "name": "the side bar reads \"Merged into main (commit)\"",
       "ok": true,
       "detail": {
         "label": "Add the features list",
-        "description": "Merged into main (68506b9) · now",
+        "description": "Merged into main (215f51a) · now",
         "level": 2,
         "expanded": null,
         "selected": true,
         "focused": true,
-        "aria": "Add the features list, done · Merged into main (68506b9), generic"
+        "aria": "Add the features list, done · Merged into main (215f51a), Program"
       }
     },
     {
       "name": "the review reads \"Merged into main (commit)\" and offers Clean up, no Merge",
       "ok": true,
-      "detail": "Merged into main (68506b9)\nClean up"
+      "detail": "Merged into main (215f51a)\nClean up"
     },
     {
       "name": "the grid tile reads \"Merged into main (commit)\"",
       "ok": true,
-      "detail": "Merged into main (68506b9)"
+      "detail": "Merged into main (215f51a)"
     },
     {
       "name": "a merge stopped on conflicts says so in the chat, with Finish merge and Cancel merge",
@@ -176,7 +176,7 @@
     {
       "name": "main is untouched while the merge is stopped",
       "ok": true,
-      "detail": "2a0440d main changes L5\n68506b9 Merge overseer/add-the-features-list into main (Overseer merge back)"
+      "detail": "4b469fa main changes L5\n215f51a Merge overseer/add-the-features-list into main (Overseer merge back)"
     },
     {
       "name": "Open PR refuses the worktree in the middle of the merge",
