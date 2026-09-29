@@ -2455,6 +2455,34 @@ rec(252, "Zero-friction loop, measured", "not started", date="—", commit="—"
     expected="See the RFC criterion (the owner's zero-friction goal, 2026-09-28).",
     actual="Not started: added for the overnight zero-friction goal (docs/goals/zero-friction.md).", live="—", blocker="Overnight goal.")
 
+rec(253, "Overseer leads with what happened while you were away", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(254, "Reviewed and unreviewed are never the same mark", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(255, "A state rollup between the list and the grid", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(256, "A repository's badge never goes quiet on finished work", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(257, "Following an agent sits beside Overseer's conversation, not on top of it", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(258, "VS Code's own chat panel stays out of Overseer's way all session, not only at first launch", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(259, "Sending a task clears the box and says so", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(260, "Starting an agent in another repository never needs a native dialog", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(261, "One Sign In, clearly Overseer's or clearly not", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+
 SHORT_BLOCKERS = {
     154: "verified",
     155: "verified",
@@ -2634,8 +2662,17 @@ SHORT_BLOCKERS = {
     248: "not started (the usability audit, 2026-09-28)",
     249: "not started (the usability audit, 2026-09-28)",
     250: "not started (the owner's zero-friction goal, 2026-09-28)",
-    251: "not started (the owner's zero-friction goal, 2026-09-28)",
+    251: "not started: blocked by VS Code (no API to float a webview, 1.139.1); skipped on the owner's instruction",
     252: "not started (the owner's zero-friction goal, 2026-09-28)",
+    253: "not started (the friction research, 2026-09-28)",
+    254: "not started (the friction research, 2026-09-28)",
+    255: "not started (the friction research, 2026-09-28)",
+    256: "not started (the friction research, 2026-09-28)",
+    257: "not started (the friction research, 2026-09-28)",
+    258: "not started (the friction research, 2026-09-28)",
+    259: "not started (the friction research, 2026-09-28)",
+    260: "not started (the friction research, 2026-09-28)",
+    261: "not started (the friction research, 2026-09-28)",
 }
 TOTAL = 53
 

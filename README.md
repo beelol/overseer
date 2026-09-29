@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **171 / 252** · **30** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-128, AC-129, AC-133, AC-135, AC-136, AC-137, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-183, AC-185, AC-186, AC-188, AC-189, AC-190, AC-192, AC-195, AC-196, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-210, AC-213, AC-216, AC-217, AC-218, AC-219, AC-220, AC-221, AC-222, AC-223, AC-224, AC-225, AC-226, AC-227, AC-228, AC-229, AC-230, AC-231, AC-232, AC-233, AC-234, AC-235, AC-236, AC-237, AC-238, AC-239, AC-240, AC-241, AC-242, AC-243, AC-244, AC-245, AC-246, AC-247, AC-248, AC-249, AC-250, AC-251, AC-252. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+criteria: **171 / 261** · **30** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-128, AC-129, AC-133, AC-135, AC-136, AC-137, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-183, AC-185, AC-186, AC-188, AC-189, AC-190, AC-192, AC-195, AC-196, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-210, AC-213, AC-216, AC-217, AC-218, AC-219, AC-220, AC-221, AC-222, AC-223, AC-224, AC-225, AC-226, AC-227, AC-228, AC-229, AC-230, AC-231, AC-232, AC-233, AC-234, AC-235, AC-236, AC-237, AC-238, AC-239, AC-240, AC-241, AC-242, AC-243, AC-244, AC-245, AC-246, AC-247, AC-248, AC-249, AC-250, AC-251, AC-252, AC-253, AC-254, AC-255, AC-256, AC-257, AC-258, AC-259, AC-260, AC-261. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), Voice Mode (Gate R, AC-162 to AC-177, added by the owner on 2026-09-27: a voice to talk to constantly that redirects every agent from context, answers quickly and shows every word it sent, with audio collected on the Rust side and the animated mark in the middle moving with the voice; [design](docs/rfcs/voice-mode.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -291,8 +291,17 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-248** Overseer's session never drops what it was told — not started (the usability audit, 2026-09-28) — [evidence](docs/verification/AC-248.md)
 - [ ] **AC-249** Test windows never reach the owner's screen — not started (the usability audit, 2026-09-28) — [evidence](docs/verification/AC-249.md)
 - [ ] **AC-250** One command opens the whole Overseer layout — not started (the owner's zero-friction goal, 2026-09-28) — [evidence](docs/verification/AC-250.md)
-- [ ] **AC-251** Follow an agent on another screen — not started (the owner's zero-friction goal, 2026-09-28) — [evidence](docs/verification/AC-251.md)
+- [ ] **AC-251** Follow an agent on another screen — not started: blocked by VS Code (no API to float a webview, 1.139.1); skipped on the owner's instruction — [evidence](docs/verification/AC-251.md)
 - [ ] **AC-252** Zero-friction loop, measured — not started (the owner's zero-friction goal, 2026-09-28) — [evidence](docs/verification/AC-252.md)
+- [ ] **AC-253** Overseer leads with what happened while you were away — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-253.md)
+- [ ] **AC-254** Reviewed and unreviewed are never the same mark — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-254.md)
+- [ ] **AC-255** A state rollup between the list and the grid — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-255.md)
+- [ ] **AC-256** A repository's badge never goes quiet on finished work — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-256.md)
+- [ ] **AC-257** Following an agent sits beside Overseer's conversation, not on top of it — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-257.md)
+- [ ] **AC-258** VS Code's own chat panel stays out of Overseer's way all session, not only at first launch — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-258.md)
+- [ ] **AC-259** Sending a task clears the box and says so — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-259.md)
+- [ ] **AC-260** Starting an agent in another repository never needs a native dialog — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-260.md)
+- [ ] **AC-261** One Sign In, clearly Overseer's or clearly not — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-261.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -851,6 +860,15 @@ the owner action or decision each one needs.
 - [ ] [AC-250](docs/verification/AC-250.md) (One command opens the whole Overseer layout): Overnight goal.
 - [ ] [AC-251](docs/verification/AC-251.md) (Follow an agent on another screen): Overnight goal.
 - [ ] [AC-252](docs/verification/AC-252.md) (Zero-friction loop, measured): Overnight goal.
+- [ ] [AC-253](docs/verification/AC-253.md) (Overseer leads with what happened while you were away): Overnight build waves.
+- [ ] [AC-254](docs/verification/AC-254.md) (Reviewed and unreviewed are never the same mark): Overnight build waves.
+- [ ] [AC-255](docs/verification/AC-255.md) (A state rollup between the list and the grid): Overnight build waves.
+- [ ] [AC-256](docs/verification/AC-256.md) (A repository's badge never goes quiet on finished work): Overnight build waves.
+- [ ] [AC-257](docs/verification/AC-257.md) (Following an agent sits beside Overseer's conversation, not on top of it): Overnight build waves.
+- [ ] [AC-258](docs/verification/AC-258.md) (VS Code's own chat panel stays out of Overseer's way all session, not only at first launch): Overnight build waves.
+- [ ] [AC-259](docs/verification/AC-259.md) (Sending a task clears the box and says so): Overnight build waves.
+- [ ] [AC-260](docs/verification/AC-260.md) (Starting an agent in another repository never needs a native dialog): Overnight build waves.
+- [ ] [AC-261](docs/verification/AC-261.md) (One Sign In, clearly Overseer's or clearly not): Overnight build waves.
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.
