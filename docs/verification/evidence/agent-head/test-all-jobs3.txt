@@ -1,0 +1,93 @@
+waiting for another test-all run to finish (47842 /private/tmp/claude-501/-Users-bilal-projects-overseer--claude-worktrees-overseer-macos-app-2d3d20/30afc9d7-c694-4083-9032-ce1c0f5a48e3/scratchpad/brain-wt)
+▶ Rust (cargo test --workspace) … FAILED (938s) 584 passed, 1 failed
+    test t23_the_daemon_is_asked_again_every_second_and_rarely_after_an_error ... ok
+    test adapters::tests::classify_errors ... ok
+    test adapters::tests::network_errors_are_their_own_class ... ok
+    test adapters::tests::structured_retry_after_is_bounded_and_never_read_from_error_prose ... ok
+    test auto_health::tests::managed_local_error_scopes_to_endpoint_and_blocks_shared_loopback_url ... ok
+    test net::tests::transport_errors_are_classified ... ok
+    test opencode_bridge::tests::errors_from_the_server_are_classified ... ok
+    test auto_health::tests::persisted_managed_local_error_uses_its_selected_endpoint_not_the_harness_name ... ok
+    test auto_health::tests::unrelated_error_burst_cannot_hide_an_active_structured_cooldown ... ok
+    test ac189_overseer_keeps_agents_on_task ... FAILED
+    thread 'ac189_overseer_keeps_agents_on_task' panicked at daemon/tests/overseer.rs:1339:153:
+    test result: FAILED. 35 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 533.25s
+▶ Unit (test/unit) … ok (10s) 20 of 20 passed
+▶ Check (extension sources) … ok (0s)
+▶ Links (README and ledger) … ok (0s) 869 links checked in 265 files; 0 broken
+▶ Dev daemons (test/dev) … ok (20s) 12 of 12 passed
+▶ Guided owner tests (test/dev/guided.js) … ok (2s) 7 of 7 passed
+▶ Deploy (test/deploy) … ok (85s) 6 of 6 passed
+▶ Build the VSIX … ok (27s)
+(UI scenarios, 3 at a time)
+▶ UI arrangement … ok (36s)
+▶ UI agent-head … ok (45s)
+▶ UI accounts … ok (57s)
+▶ UI audio … ok (32s)
+▶ UI auto-root … ok (28s)
+▶ UI brand … ok (26s)
+▶ UI center … ok (48s)
+▶ UI chat … ok (41s)
+▶ UI composer-friction … ok (26s)
+▶ UI audit … ok (138s)
+▶ UI composer … ok (57s)
+▶ UI conversation … ok (31s)
+▶ UI continuity … ok (72s)
+▶ UI continuity-settings … ok (56s)
+▶ UI dragout … ok (22s)
+▶ UI dashboard … ok (48s)
+▶ UI dev-instance … ok (50s)
+▶ UI endings … ok (37s)
+▶ UI first-click … ok (37s)
+▶ UI follow … ok (38s)
+▶ UI grid … ok (39s)
+▶ UI followups … ok (101s)
+▶ UI gallery … ok (114s)
+▶ UI grid-track … ok (29s)
+▶ UI grid-drag … ok (69s)
+▶ UI hunks … ok (44s)
+▶ UI home … ok (95s)
+▶ UI inventory … ok (53s)
+▶ UI keyboard … ok (35s)
+▶ UI keys-on-screen … ok (32s)
+▶ UI main … ok (69s)
+▶ UI look … ok (74s)
+▶ UI history … ok (248s)
+▶ UI narrow-chat … ok (41s)
+▶ UI modes … ok (55s)
+▶ UI notify … ok (14s)
+▶ UI notify-agents … ok (16s)
+▶ UI one-signin … ok (17s)
+▶ UI parity … ok (28s)
+▶ UI oversight … ok (68s)
+▶ UI one-view … ok (99s)
+▶ UI place … ok (38s)
+▶ UI pr … ok (25s)
+▶ UI phone-access … ok (128s)
+▶ UI restore … ok (69s)
+▶ UI review-files … ok (30s)
+▶ UI review-width … ok (28s)
+▶ UI review … FAILED (86s)
+    (node:97723) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.
+    [2026-09-29T19:23:42.697Z] FAIL merge conflict shown as Conflicted and listed in the review {"conflictShown":false,"conflictListed":true}
+    SCENARIO FAILED /private/tmp/ovs-ui-DiEtza
+▶ UI sidebar … ok (33s)
+▶ UI scopes … ok (43s)
+▶ UI swarm-allowance … ok (10s)
+▶ UI signin … ok (34s)
+▶ UI swarm-status … ok (14s)
+▶ UI swarm-scale … ok (45s)
+▶ UI talk … ok (27s)
+▶ UI trust … ok (12s)
+▶ UI usage … ok (34s)
+▶ UI theme … ok (72s)
+▶ UI sidebar-search … ok (194s)
+▶ UI windows … ok (49s)
+▶ UI voice … ok (247s)
+(not run: background, claude-live, codex-approval, codex-follow, codex-live, conversation-live, live-gatej, merge, offline-session, perf, talk-live; LIVE ones need --live, perf needs --perf)
+▶ Leftovers (no process left running) … ok (0s)
+
+68 of 70 passed; failed: Rust (cargo test --workspace), UI review
+exit 1
+
+Rerun alone afterwards: node test/ui/scenario-review.js -> SCENARIO PASSED; cargo test -p overseerd --test overseer ac189_overseer_keeps_agents_on_task -> ok (1 passed)

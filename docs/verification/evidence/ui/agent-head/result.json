@@ -116,7 +116,7 @@
           "badge": "",
           "selected": true,
           "color": "rgb(229, 163, 60)",
-          "title": "a.txt • Changed by the agent | a.txt"
+          "title": "a.txt — changed by the agent • Changed by the agent | a.txt — changed by the agent"
         },
         {
           "name": "b.txt",
@@ -172,7 +172,7 @@
       "name": "AC-233: an edit typed in the head and saved lands in the agent's worktree, not the window's folder",
       "ok": true,
       "detail": {
-        "worktree": "/private/tmp/ovs-ui-OwU0Ve/overseer-home/worktrees/head-repo-318ddd26/head-agent",
+        "worktree": "/private/tmp/ovs-ui-pUxVfd/overseer-home/worktrees/head-repo-ded9f371/head-agent",
         "line10": "owner edit: L10: original"
       }
     },
@@ -404,7 +404,7 @@
         "conv4": "composer",
         "mode5": {
           "mode": "chat",
-          "selected": "r-f791feec6e56"
+          "selected": "r-ef58fc70db2e"
         },
         "left2": {
           "head": {
