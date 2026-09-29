@@ -46,7 +46,7 @@
       "name": "1440x900: one click gives the three-part layout: Overseer's conversation, the agent's review, the agent's chat",
       "ok": true,
       "detail": {
-        "took": 1911,
+        "took": 1908,
         "groups": [
           {
             "width": 380,
@@ -232,7 +232,7 @@
       "name": "1920x1080: one click gives the three-part layout: Overseer's conversation, the agent's review, the agent's chat",
       "ok": true,
       "detail": {
-        "took": 1701,
+        "took": 1709,
         "groups": [
           {
             "width": 406,
@@ -295,7 +295,7 @@
       "name": "1920x1080: the review follows the working agent (its file grows while the workspace is open)",
       "ok": true,
       "detail": {
-        "before": 26,
+        "before": 25,
         "after": 29
       }
     },

@@ -1,13 +1,13 @@
-[2026-09-29T13:18:05.825Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-29T13:18:11.559Z] screenshot docs/verification/evidence/ui/vscode-chat/01-window-start-vscode-chat-open.png
-[2026-09-29T13:18:11.559Z] PASS at the start VS Code's own chat view is open (a fresh profile with AI features on)
-[2026-09-29T13:18:15.918Z] screenshot docs/verification/evidence/ui/vscode-chat/02-1440x900-1-home.png
-[2026-09-29T13:18:19.623Z] screenshot docs/verification/evidence/ui/vscode-chat/03-1440x900-2-following.png
-[2026-09-29T13:18:21.802Z] screenshot docs/verification/evidence/ui/vscode-chat/04-1440x900-3-review.png
-[2026-09-29T13:18:21.802Z] PASS 1440x900: starting an agent, following it and opening its review never shows VS Code's own chat view [{"step":"start","chat":false},{"step":"follow","chat":false},{"step":"review","chat":false}]
-[2026-09-29T13:18:26.188Z] screenshot docs/verification/evidence/ui/vscode-chat/05-1920x1080-1-home.png
-[2026-09-29T13:18:28.955Z] screenshot docs/verification/evidence/ui/vscode-chat/06-1920x1080-2-following.png
-[2026-09-29T13:18:31.158Z] screenshot docs/verification/evidence/ui/vscode-chat/07-1920x1080-3-review.png
-[2026-09-29T13:18:31.158Z] PASS 1920x1080: starting an agent, following it and opening its review never shows VS Code's own chat view [{"step":"start","chat":false},{"step":"follow","chat":false},{"step":"review","chat":false}]
-[2026-09-29T13:18:40.969Z] screenshot docs/verification/evidence/ui/vscode-chat/08-owner-reopened-chat-stays.png
-[2026-09-29T13:18:40.969Z] PASS the owner reopening VS Code's chat is left alone (it stays open while agents are selected and reviews open) {"reopened":true,"still":true}
+[2026-09-29T16:35:37.545Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-29T16:35:43.415Z] screenshot docs/verification/evidence/ui/vscode-chat/01-window-start-vscode-chat-open.png
+[2026-09-29T16:35:43.415Z] PASS at the start VS Code's own chat view is open (a fresh profile with AI features on)
+[2026-09-29T16:35:47.788Z] screenshot docs/verification/evidence/ui/vscode-chat/02-1440x900-1-home.png
+[2026-09-29T16:35:51.553Z] screenshot docs/verification/evidence/ui/vscode-chat/03-1440x900-2-following.png
+[2026-09-29T16:35:53.737Z] screenshot docs/verification/evidence/ui/vscode-chat/04-1440x900-3-review.png
+[2026-09-29T16:35:53.737Z] PASS 1440x900: starting an agent, following it and opening its review never shows VS Code's own chat view [{"step":"start","chat":false},{"step":"follow","chat":false},{"step":"review","chat":false}]
+[2026-09-29T16:35:58.107Z] screenshot docs/verification/evidence/ui/vscode-chat/05-1920x1080-1-home.png
+[2026-09-29T16:36:00.973Z] screenshot docs/verification/evidence/ui/vscode-chat/06-1920x1080-2-following.png
+[2026-09-29T16:36:03.178Z] screenshot docs/verification/evidence/ui/vscode-chat/07-1920x1080-3-review.png
+[2026-09-29T16:36:03.178Z] PASS 1920x1080: starting an agent, following it and opening its review never shows VS Code's own chat view [{"step":"start","chat":false},{"step":"follow","chat":false},{"step":"review","chat":false}]
+[2026-09-29T16:36:12.978Z] screenshot docs/verification/evidence/ui/vscode-chat/08-owner-reopened-chat-stays.png
+[2026-09-29T16:36:12.978Z] PASS the owner reopening VS Code's chat is left alone (it stays open while agents are selected and reviews open) {"reopened":true,"still":true}

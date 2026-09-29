@@ -57,7 +57,7 @@
       "name": "the separate window keeps following the agent live (two screenshots seconds apart; its file grew)",
       "ok": true,
       "detail": {
-        "first": 7,
+        "first": 8,
         "later": 12
       }
     },
@@ -151,33 +151,45 @@
       "detail": {
         "events": [
           {
-            "ms": 156,
+            "ms": 222,
             "what": "window created",
             "show": true
           },
           {
-            "ms": 8515,
+            "ms": 287,
+            "what": "window shown"
+          },
+          {
+            "ms": 8707,
             "what": "floating window opened hidden"
           },
           {
-            "ms": 8529,
+            "ms": 8726,
             "what": "window created",
             "show": true
           },
           {
-            "ms": 19160,
+            "ms": 8750,
+            "what": "window shown"
+          },
+          {
+            "ms": 19326,
             "what": "floating window opened hidden"
           },
           {
-            "ms": 19169,
+            "ms": 19339,
             "what": "window created",
             "show": true
+          },
+          {
+            "ms": 19359,
+            "what": "window shown"
           }
         ]
       }
     }
   ],
   "frontmost": {
-    "loginwindow": 86
+    "ChatGPT": 87
   }
 }
