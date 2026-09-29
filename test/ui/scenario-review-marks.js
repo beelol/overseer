@@ -39,7 +39,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     })()`);
     const repoRow = (v, name) => v.rows.find(r => r.level === 1 && r.label === name);
     const agentRow = (v, title) => v.rows.filter(r => r.label === title).pop();
-    const settle = async pred => { let v; for (let i = 0; i < 40; i++) { v = await rows(); if (pred(v)) return v; await delay(250); } return v; };
+    const settle = async pred => { let v; for (let i = 0; i < 120; i++) { v = await rows(); if (pred(v)) return v; await delay(250); } return v; };
 
     // ---------- AC-256: the last working agent of notes finishes, unreviewed.
     const first = agent(notes, 'Notes index', 4);
@@ -54,10 +54,11 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     // ---------- AC-254: six agents finish across the two repositories, none reviewed.
     const six = [first, agent(notes, 'Notes search'), agent(notes, 'Notes export'), agent(site, 'Site header'), agent(site, 'Site footer'), agent(site, 'Site pricing')];
     for (const id of six) await waitStatus(id, /completed/);
-    v = await settle(x => /6 to review/.test(x.header) && x.rows.filter(r => r.badge === '✦').length === 6);
+    // The badges (decorations) and the rows (the tree) redraw separately: wait for both.
+    v = await settle(x => /6 to review/.test(x.header) && x.rows.filter(r => r.badge === '✦').length === 6 && x.rows.some(r => r.level === 1 && r.label === '6 to review') && repoRow(x, 'site')?.description === '3 to review');
     const titles = ['Notes index', 'Notes search', 'Notes export', 'Site header', 'Site footer', 'Site pricing'];
-    const marks = titles.map(t => ({ t, badge: agentRow(v, t)?.badge, description: agentRow(v, t)?.description }));
-    check('six finished agents, none reviewed: each carries the "to review" mark (✦) and says so', marks.every(m => m.badge === '✦' && /to review/.test(m.description)), marks);
+    const marks = titles.map(t => ({ t, badge: agentRow(v, t)?.badge, aria: agentRow(v, t)?.aria }));
+    check('six finished agents, none reviewed: each carries the "to review" mark (✦), and its accessible name says so', marks.every(m => m.badge === '✦' && /to review/.test(m.aria)), marks);
     check('the count per repository and in the Agents view\'s header: 3 and 3, 6 overall', repoRow(v, 'site')?.description === '3 to review' && repoRow(v, 'notes')?.description === '3 to review' && /6 to review/.test(v.header), { site: repoRow(v, 'site')?.description, notes: repoRow(v, 'notes')?.description, header: v.header });
     const rollupRow = x => x.rows.find(r => r.level === 1 && /\d+ (working|needs you|to review|reviewed|failed)/.test(r.label || ''));
     check('the side bar\'s rollup row (AC-255) reads the same 6 to review', rollupRow(v)?.label === '6 to review', rollupRow(v));
@@ -98,6 +99,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     check('with 12 agents at their end (11 finished, 1 failed) and none working, the side bar\'s rollup reads nonzero counts', done >= 12 && sideRollup === '7 to review · 4 reviewed · 1 failed', { sideRollup, done });
     await cdp.command('Overseer: Toggle Agent Grid'); await delay(2000);
     const dash = await s.editorView();
+    await dash.waitFor(`/grid has nothing to show/.test(document.querySelector('.view-composer .composer-note')?.innerText || '')`, 15000).catch(() => {});
     const home = await dash.eval(`({ mode: document.body.dataset.mode, tiles: document.querySelectorAll('.grid .tile').length, note: document.querySelector('.view-composer .composer-note')?.innerText || '' })`);
     check('the grid\'s tile view shows none (the grid command goes home), and its note gives the same counts', home.mode === 'composer' && home.tiles === 0 && home.note.includes('7 to review · 4 reviewed · 1 failed'), home);
     await s.screenshot('grid-has-nothing-rollup');

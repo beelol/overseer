@@ -31,6 +31,9 @@
     let data, form = {}, starting = false, requested = false, remembered = 'overseer', target = 'overseer', explicit = false;
     // AC-259: what was just sent, while the field says so ({ phase: 'sending' | 'started', text }).
     let sent = null, sentTimer = 0;
+    // A one-line note from the host ("the grid has nothing to show…") stays until the owner types or sends.
+    let info = '';
+    const showInfo = () => { note.className = 'composer-note'; note.replaceChildren(ui.icon('info', 'sm'), el('span', null, info)); };
     const PLACEHOLDER = 'Send off a task';
     const TO_OVERSEER = 'Tell Overseer what to do, or ask what is going on';
     const wrap = el('div', 'composer-view');
@@ -191,10 +194,11 @@
       return {};
     }
     function validate() {
-      if (toOverseer()) { note.replaceChildren(); note.className = 'composer-note'; start.disabled = !task.value.trim(); return true; }
+      if (toOverseer()) { if (info) showInfo(); else { note.replaceChildren(); note.className = 'composer-note'; } start.disabled = !task.value.trim(); return true; }
       const p = problem();
       if (sent && (!p.text || p.soft || p.warn)) { showSentNote(); start.disabled = true; start.title = 'Describe the next task'; return false; }
       note.replaceChildren(); note.className = 'composer-note' + (p.text && !p.soft && !p.warn ? ' error' : p.warn ? ' warn' : '');
+      if (info && (!p.text || p.soft)) showInfo();
       if (p.text) {
         note.append(ui.icon(p.soft ? 'info' : 'warning', 'sm'), el('span', null, p.text));
         if (p.fix) { const b = el('button', 'link fix', p.fix); b.type = 'button'; b.addEventListener('click', () => { if (p.action) p.action(); else if (p.url) post({ type: 'openExternal', url: p.url }); else post({ type: 'command', command: p.command, args: p.args }); }); note.append(b); }
@@ -377,7 +381,7 @@
     more.addEventListener('click', () => data && menuMore());
     full.addEventListener('click', () => post({ type: 'command', command: 'overseer.newTask' }));
     const grow = () => { task.style.height = 'auto'; task.style.height = Math.min(320, Math.max(66, task.scrollHeight)) + 'px'; };
-    task.addEventListener('input', () => { if (sent && sent.phase === 'started' && task.value) endSent(); grow(); renderTarget(); renderMentions(); validate(); });
+    task.addEventListener('input', () => { info = ''; if (sent && sent.phase === 'started' && task.value) endSent(); grow(); renderTarget(); renderMentions(); validate(); });
     program.addEventListener('input', validate);
     task.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); go(); } });
     start.addEventListener('click', go);
@@ -385,6 +389,7 @@
     // Choices become the defaults only when an agent starts with them (the launcher saves them then).
     function save() { render(); }
     function go() {
+      info = '';
       if (toOverseer()) {
         const text = forOverseer(task.value.trim());
         if (!text) return;
@@ -460,7 +465,7 @@
         if (failedStart && !task.value) { task.value = sent.text; grow(); }
         if (failedStart) { clearTimeout(sentTimer); sent = null; delete box.dataset.sent; render(); }
         starting = false; validate();
-        if (m.kind === 'info') { note.className = 'composer-note'; note.replaceChildren(ui.icon('info', 'sm'), el('span', null, m.message)); return; }
+        if (m.kind === 'info') { info = m.message; showInfo(); return; }
         note.className = 'composer-note error'; note.replaceChildren(ui.icon('error', 'sm'), el('span', null, m.message));
       },
       onState(s) { if (data && s.accounts) { data.accounts = s.accounts; render(); } },

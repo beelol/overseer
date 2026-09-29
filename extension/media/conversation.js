@@ -77,7 +77,8 @@
       default:
         if (/^collab:spawn_agent|^spawn_agent/.test(n)) return { icon: 'hubot', verb: 'Delegated', target: ui.firstLine(summary, 80), full: summary };
         if (/^collab:/.test(n)) return { icon: 'watch', verb: n.replace('collab:', '').replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase()), target: '' };
-        if (/mcp/i.test(n)) return { icon: 'plug', verb: 'Used', target: n, full: summary };
+        // A tool's internal name (mcp__server__tool) in words (AC-245).
+        if (/mcp/i.test(n)) return { icon: 'plug', verb: 'Used', target: window.OverseerPlain ? window.OverseerPlain.tool(n) : n, full: summary };
         return { icon: 'tools', verb: n, target: ui.firstLine(Object.values(i).find(v => typeof v === 'string') || '', 60), full: summary };
     }
   }
@@ -256,7 +257,7 @@
       card.verbEl.textContent = !done && d.pending && card.status !== undefined ? d.pending : d.verb;
       card.sumEl.textContent = d.target || '';
       card.sumEl.classList.toggle('mono', !!d.code);
-      card.el.title = [d.full, card.name !== d.verb ? `(${card.name})` : ''].filter(Boolean).join(' ');
+      card.el.title = [d.full, card.name !== d.verb && !/^mcp__/.test(card.name) ? `(${card.name})` : ''].filter(Boolean).join(' ');
       if (card.group) {
         const g = card.group; g.verbs = new Map();
         for (const c of this.tools.values()) if (c.group === g) g.verbs.set(c.desc?.verb || c.name, (g.verbs.get(c.desc?.verb || c.name) || 0) + 1);
@@ -408,7 +409,7 @@
           row.append(ui.icon('diff', 'sm edit-icon'));
           for (const path of p.paths || []) {
             const b = el('button', 'link edit-path', ui.basename(path)); b.type = 'button';
-            b.title = `${path}\nOpen at the edited hunk in the review${ev.confidence && ev.confidence !== 'reported' ? ` (${ev.confidence})` : ''}`;
+            b.title = `${path}\nOpen at the edited hunk in the review`;
             b.addEventListener('click', () => this.opts.post({ type: 'openEdit', runId: ev.run_id || this.rootId, path }));
             row.append(b);
           }

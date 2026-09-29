@@ -26,6 +26,7 @@ const { Voice } = require('./voice');
 const { agentsOnScreen, permissionTarget, commandTarget } = require('./on-screen');
 const { Notices, agentFromUri } = require('./notices');
 const Rollup = require('../media/rollup.js');
+const Plain = require('../media/plain-words.js');
 
 let client;
 let centerRef;
@@ -311,7 +312,7 @@ async function activate(context) {
     if (!vscode.workspace.isTrusted) throw new Error('Overseer only launches or controls agents in a trusted workspace.');
   };
   const guard = fn => async (...args) => {
-    try { return await fn(...args); } catch (error) { vscode.window.showErrorMessage(`Overseer: ${error.message}`); say('error: ' + (error.stack || error.message)); }
+    try { return await fn(...args); } catch (error) { vscode.window.showErrorMessage(`Overseer: ${Plain.plain(error.message, 300)}`); say('error: ' + (error.stack || error.message)); }
   };
   const runArg = arg => (typeof arg === 'string' ? arg : arg?.run?.id) || selectedRun;
   // Unfinished features stay hidden until their setting is on (AC-204); a command run anyway says so.
@@ -619,19 +620,19 @@ async function activate(context) {
     const run = model.rootRun(picked);
     const wsId = run.workspace_id;
     let plan = await client.request('workspace.merge_plan', { workspace_id: wsId });
-    if (!plan.ok) { vscode.window.showWarningMessage(`Merge back is unavailable: ${plan.reason}`); return; }
+    if (!plan.ok) { vscode.window.showWarningMessage(`Merge back is unavailable: ${Plain.plain(plan.reason, 300)}`); return; }
     if (plan.state === 'idle') {
       const detail = [`${plan.branch} → ${plan.target} in ${plan.repo}`,
         plan.worktree_uncommitted.length ? `1. Commit ${plan.worktree_uncommitted.length} uncommitted worktree file(s) to ${plan.branch}.` : '1. The worktree has no uncommitted changes.',
-        `2. Merge ${plan.target} into ${plan.branch} inside the worktree. Conflicts go back to ${run.harness} in the same session.`,
+        `2. Merge ${plan.target} into ${plan.branch} inside the worktree. Conflicts go back to ${Plain.harness(run.harness)} in the same session.`,
         `3. You review exactly what will land, then confirm. Nothing reaches ${plan.target} before that.`,
-        ...plan.blockers.map(b => '⚠ ' + b)].join('\n');
+        ...plan.blockers.map(b => '⚠ ' + Plain.plain(b, 300))].join('\n');
       const go = await vscode.window.showInformationMessage(`Merge back ${plan.branch} into ${plan.target}?`, { modal: true, detail }, 'Prepare Merge Back');
       if (go !== 'Prepare Merge Back') return;
       const prep = await client.request('workspace.merge_prepare', { workspace_id: wsId, handoff: true });
       await model.refresh();
       if (prep.state === 'conflicts') {
-        const how = prep.handoff?.sent ? `Sent to ${run.harness} as a follow-up in the same session. Run Merge Back again when it finishes.` : `Resolve them in the worktree (${prep.handoff?.why || 'no follow-up possible'}), then run Merge Back again.`;
+        const how = prep.handoff?.sent ? `Sent to ${Plain.harness(run.harness)} as a follow-up in the same session. Run Merge Back again when it finishes.` : `Resolve them in the worktree (${Plain.plain(prep.handoff?.why || 'no follow-up possible')}), then run Merge Back again.`;
         vscode.window.showWarningMessage(`Merge back: conflicts in ${prep.files.join(', ')}. ${how}`);
         await outputs.show(run.id, { preserveFocus: false });
         return;
@@ -648,7 +649,7 @@ async function activate(context) {
     const landing = opts.options.find(o => o.mode === 'branch_merge_base' && o.branch === plan.target && o.available);
     if (landing) { review.setComparison(run.id, landing); await review.open(run.id); }
     const files = landing ? (await client.request('workspace.diff', { workspace_id: wsId, base: landing.base, status: false })).changes : [];
-    if (plan.blockers.length) { vscode.window.showWarningMessage(`Merge back is ready but blocked: ${plan.blockers.join(' ')}`); return; }
+    if (plan.blockers.length) { vscode.window.showWarningMessage(`Merge back is ready but blocked: ${plan.blockers.map(b => Plain.plain(b, 300)).join(' ')}`); return; }
     const detail = `The review now shows exactly what lands on ${plan.target} (merge-base comparison), ${files.length} file(s):\n${files.slice(0, 20).map(f => `${f.status} ${f.path}`).join('\n')}${files.length > 20 ? '\n…' : ''}\n\nThe worktree and ${plan.branch} are kept.`;
     const ok = await vscode.window.showWarningMessage(`Merge ${plan.branch} into ${plan.target} in ${path.basename(plan.repo)}?`, { modal: true, detail }, 'Complete Merge Back');
     if (ok !== 'Complete Merge Back') return;
@@ -1095,7 +1096,7 @@ async function activate(context) {
   } catch (error) {
     say('daemon start failed: ' + error.message);
     // A pinned dev window says it once ('unreachable') and keeps waiting for its instance.
-    if (pin && !client.refusal) { updateStatus(); client.reconnectLater(); } else vscode.window.showErrorMessage(`Overseer could not start its daemon: ${error.message}`);
+    if (pin && !client.refusal) { updateStatus(); client.reconnectLater(); } else vscode.window.showErrorMessage(`Overseer could not start its daemon: ${Plain.plain(error.message, 300)}`);
   }
   return { client, model, review, outputs, selectRun, agents, agentsView, center, dashboard, arrangement, attention, phoneAccess, voice, openUri, selectedRun: () => selectedRun }; // exported for UI tests
 }

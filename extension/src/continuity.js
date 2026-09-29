@@ -79,7 +79,7 @@ class Continuity {
   }
   /** The daemon refused a value: say why, and show its own value again. */
   async refused(error) {
-    vscode.window.showErrorMessage(`Overseer: ${error.message}`);
+    vscode.window.showErrorMessage(`Overseer: ${require('../media/plain-words.js').plain(error.message, 300)}`);
     this.say('continuity: refused: ' + error.message);
     await this.mirror(true).catch(() => {});
   }
@@ -245,7 +245,7 @@ class Continuity {
     const picked = await vscode.window.showQuickPick(items, { title: 'Overseer: connection and Continuity', placeHolder: c.sentence });
     if (!picked) return;
     if (picked.command) await vscode.commands.executeCommand(picked.command, picked.args);
-    else if (picked.action) await this.act(picked.action).catch(error => vscode.window.showErrorMessage(`Overseer: ${error.message}`));
+    else if (picked.action) await this.act(picked.action).catch(error => vscode.window.showErrorMessage(`Overseer: ${require('../media/plain-words.js').plain(error.message, 300)}`));
   }
 
   /** Every local model with its badge; choosing one that is not installed downloads it, when allowed. */
@@ -260,7 +260,7 @@ class Continuity {
     ];
     const title = choices.running ? `Local models · budget ${choices.budget ? text.gib(choices.budget.budget) + ' GiB' : 'unknown'}` : choices.ollama;
     const picked = await vscode.window.showQuickPick(items, { title, placeHolder: choices.pick ? `Best fit now: ${choices.pick.tag}` : (choices.why_no_pick || 'No model fits now'), matchOnDescription: true });
-    if (picked?.action) await this.act(picked.action).catch(error => vscode.window.showErrorMessage(`Overseer: ${error.message}`));
+    if (picked?.action) await this.act(picked.action).catch(error => vscode.window.showErrorMessage(`Overseer: ${require('../media/plain-words.js').plain(error.message, 300)}`));
   }
 }
 

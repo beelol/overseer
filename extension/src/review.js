@@ -404,7 +404,8 @@ class Review {
     const root = this.model.rootRun(run);
     const ws = this.model.workspace(run.workspace_id);
     if (!ws) return;
-    const attribution = event.confidence === 'reported' ? 'agent-reported edit' : `agent tool input (${event.confidence})`;
+    // In words, never the confidence tag itself (AC-245).
+    const attribution = event.confidence === 'reported' ? 'agent-reported edit' : 'from what the agent asked to change';
     for (const rel of event.payload.paths || []) {
       if (rel.startsWith('/') || rel.startsWith('..')) continue; // outside the workspace
       const abs = path.join(ws.path, rel);

@@ -14,6 +14,7 @@ const REVIEW = 'extension/src/review.js';
 const BROWSER = 'extension/branch-diff/review/browser.js';
 const PHONE_TEXT = 'extension/src/phone-text.js';
 const DAEMON = 'daemon/src/daemon.rs';
+const ROLLUP = 'extension/media/rollup.js';
 
 export interface Copied {
   /** The words, as they stand in the file. */
@@ -84,14 +85,10 @@ export const TEXT = {
     inferred: from(VIEWS, ' (inferred)'),
     currentCheckout: from(VIEWS, 'current checkout'),
     repoLabel: shaped(VIEWS, "agent${tasks.length === 1 ? '' : 's'}${active ? `, ${active} active` : ''}", (name: string, agents: number, active: number) => `${name}, ${agents} agent${plural(agents)}${active ? `, ${active} active` : ''}`),
-    approve: from(EXTENSION, 'Approve'),
-    reply: from(EXTENSION, 'Reply'),
-    failed: from(EXTENSION, 'Failed'),
-    review: from(EXTENSION, 'Review'),
-    wantsToUse: shaped(EXTENSION, '`Wants to use ${r.attention.tool}`', (tool: string) => `Wants to use ${tool}`),
-    waitingForReply: from(EXTENSION, 'Waiting for your reply'),
-    agentFailed: from(EXTENSION, 'The agent failed'),
-    filesChanged: shaped(EXTENSION, "`${n} file${n === 1 ? '' : 's'} changed`", (n: number) => `${n} file${plural(n)} changed`),
+    approve: from(ROLLUP, 'Approve'),
+    reply: from(ROLLUP, 'Reply'),
+    wantsToUse: shaped(ROLLUP, "`Wants to use ${r.attention.tool || 'a tool'}`", (tool: string) => `Wants to use ${tool}`),
+    waitingForReply: from(ROLLUP, 'Waiting for your reply'),
     needYou: shaped(EXTENSION, "`${n} need${n === 1 ? 's' : ''} you`", (n: number) => `${n} need${n === 1 ? 's' : ''} you`),
     search: from(PACKAGE, 'Search Agents'),
     searchHint: from(EXTENSION, 'Title, message, file, repository, account or status'),

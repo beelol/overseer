@@ -3,6 +3,7 @@ const vscode = require('vscode');
 const path = require('path');
 const features = require('./features');
 const Rollup = require('../media/rollup.js');
+const Plain = require('../media/plain-words.js');
 
 const STATUS_ICON = {
   queued: ['clock', 'charts.yellow'], starting: ['loading~spin', 'charts.blue'], running: ['sync~spin', 'charts.blue'],
@@ -152,7 +153,8 @@ class AgentsProvider {
         if (fresh && Rollup.DONE.has(run.status)) return { badge: '✦', color: new vscode.ThemeColor('charts.green'), tooltip: 'Done, to review', propagate: false };
         const [badge, color] = STATUS_BADGE[run.status] || STATUS_BADGE.unknown;
         const colored = run.status === 'waiting_for_user' || (fresh && Rollup.FAILED.has(run.status));
-        return { badge, color: colored ? new vscode.ThemeColor(color) : undefined, tooltip: `${STATUS_TEXT[run.status] || plainStatus(run.status)}${Rollup.DONE.has(run.status) || Rollup.FAILED.has(run.status) ? (fresh ? ', to review' : ', reviewed') : ''}`, propagate: false };
+        const ended = !run.parent_run_id && (Rollup.DONE.has(run.status) || Rollup.FAILED.has(run.status));
+        return { badge, color: colored ? new vscode.ThemeColor(color) : undefined, tooltip: `${STATUS_TEXT[run.status] || plainStatus(run.status)}${ended ? (fresh ? ', to review' : ', reviewed') : ''}`, propagate: false };
       },
     };
   }
@@ -539,12 +541,13 @@ class AgentsProvider {
     const voiced = this.handlers.voiceTargeted?.().has(run.id);
     const marks = [voiced && '🎙 voice', o.held && '⏸ held', o.watched && '◉ watched', o.watching && o.watching.length && '◉ watching', o.conflicts && `⚠ ${o.conflicts} conflict${o.conflicts === 1 ? '' : 's'}`].filter(Boolean);
     const fresh = !ACTIVE.has(run.status) && this.unreviewed(run);
-    item.description = [fresh && Rollup.DONE.has(run.status) && 'to review', ACTIVE.has(run.status) ? '' : ago(run.ended_ms || run.created_ms), ...marks].filter(Boolean).join(' · ');
+    // The ✦ badge marks it (its colour, tooltip and accessible name say "to review"); the row's words stay short.
+    item.description = [ACTIVE.has(run.status) ? '' : ago(run.ended_ms || run.created_ms), ...marks].filter(Boolean).join(' · ');
     const profile = run.profile_id ? m.profile(run.profile_id) : undefined;
     const ws = m.workspace(run.workspace_id);
     const status = STATUS_TEXT[run.status] || run.status;
-    item.tooltip = new vscode.MarkdownString([`**${task.title}**`, `${status}${run.exit_reason && !ACTIVE.has(run.status) ? ` — ${run.exit_reason}` : ''}`,
-      [run.harness, profile?.name, run.model].filter(Boolean).join(' · '), ws ? `${ws.kind === 'current' ? 'current checkout' : ws.branch} · ${path.basename(task.repo_root)}` : ''].filter(Boolean).join('\n\n'));
+    item.tooltip = new vscode.MarkdownString([`**${task.title}**`, `${status}${run.exit_reason && !ACTIVE.has(run.status) ? ` — ${Plain.plain(run.exit_reason, 200)}` : ''}`,
+      [HARNESS_NAME[run.harness] || run.harness, profile?.name, run.model].filter(Boolean).join(' · '), ws ? `${ws.kind === 'current' ? 'current checkout' : ws.branch} · ${path.basename(task.repo_root)}` : ''].filter(Boolean).join('\n\n'));
     item.accessibilityInformation = { label: `${task.title}, ${status}${fresh ? ', to review' : ''}, ${HARNESS_NAME[run.harness] || run.harness}${profile ? ', ' + profile.name : ''}${marks.length ? ', ' + marks.map(x => x.replace(/^\S+ /, '')).join(', ') : ''}` };
     if (marks.length) item.tooltip.appendMarkdown(`\n\n${[voiced && 'A spoken request is for this agent', o.held && `Held: ${o.hold_reason || ''}`, o.watched && 'Watched by another agent', o.watching && o.watching.length && 'Watching another agent', o.conflicts && `${o.conflicts} open conflict${o.conflicts === 1 ? '' : 's'}`, o.area && o.area.length && `Area: ${o.area.join(', ')}`].filter(Boolean).join('\n\n')}`);
     const pinned = (this.handlers.pinned?.() || []).includes(run.id);
@@ -614,7 +617,7 @@ class AccountsProvider {
         item.id = 'provider:' + pr.id;
         item.iconPath = pr.available ? this.logo(pr.id, 'account') : new vscode.ThemeIcon('circle-slash');
         item.description = pr.available ? '' : 'unavailable';
-        item.tooltip = pr.available ? `${pr.label}\nSign-in: ${pr.sign_in || 'provider flow'}. Account login only; no API keys.` : pr.why;
+        item.tooltip = pr.available ? `${pr.label}\nAccount login only; no API keys.` : Plain.plain(pr.why, 200);
         item.contextValue = pr.available && pr.id !== 'local' ? 'provider' : 'provider-unavailable';
         return { item, provider: pr };
       });
@@ -628,7 +631,7 @@ class AccountsProvider {
       let detail = 'status not checked';
       if (st) {
         if (!st.installed) detail = 'harness not installed';
-        else if (st.logged_in) detail = [st.identity?.plan, (st.identity?.account_fingerprint || st.identity?.fingerprint || '').slice(0, 8)].filter(Boolean).join(' · ') || 'signed in';
+        else if (st.logged_in) detail = st.identity?.plan || 'signed in';
         else detail = 'signed out';
       }
       // Local models run through Ollama on this machine: there is no account to sign in to (AC-95).
@@ -645,7 +648,7 @@ class AccountsProvider {
       item.description = `${detail}${a.kind === 'follows-app' ? ' · desktop' : ''}${near ? ` · ${Math.round(near.used * 100)}% of ${near.label}` : ''}`;
       item.iconPath = st?.logged_in ? this.logo(a.provider, 'account') : new vscode.ThemeIcon('circle-slash');
       item.accessibilityInformation = { label: `${a.name}, ${st?.logged_in ? 'signed in' : 'not signed in'}${detail && st?.logged_in ? ', ' + detail : ''}${a.kind === 'follows-app' ? ', follows the desktop app' : ''}` };
-      item.tooltip = new vscode.MarkdownString(`**${a.name}** — ${node.provider.label}\n\n${a.kind === 'follows-app' ? `Follows ${a.follows}. It changes when that app switches accounts; Overseer never signs it out.` : `Fixed account with its own credential folder: \`${p.home || ''}\`. The desktop app switching accounts does not change it.`}\n\nUsable by: ${(a.harnesses || []).join(', ')}${a.last_used_ms ? `\n\nLast used ${new Date(a.last_used_ms).toLocaleString()}` : ''}\n\n${usage?.reported ? `Usage (${usage.source}): ${(usage.windows || []).map(w => `${w.label} ${Math.round(w.used * 100)}%${w.resets_at_ms ? `, resets ${new Date(w.resets_at_ms).toLocaleString()}` : ''}`).join('; ')}` : 'Usage: not reported by this harness yet'}${st ? '\n\n```\n' + (st.detail || '') + '\n```' : ''}`);
+      item.tooltip = new vscode.MarkdownString(`**${a.name}** — ${node.provider.label}\n\n${a.kind === 'follows-app' ? `Follows ${a.follows}. It changes when that app switches accounts; Overseer never signs it out.` : `Fixed account with its own credential folder: \`${p.home || ''}\`. The desktop app switching accounts does not change it.`}\n\nUsable by: ${(a.harnesses || []).map(h => HARNESS_NAME[h] || h).join(', ')}${a.last_used_ms ? `\n\nLast used ${new Date(a.last_used_ms).toLocaleString()}` : ''}\n\n${usage?.reported ? `Usage (${usage.source}): ${(usage.windows || []).map(w => `${w.label} ${Math.round(w.used * 100)}%${w.resets_at_ms ? `, resets ${new Date(w.resets_at_ms).toLocaleString()}` : ''}`).join('; ')}` : 'Usage: not reported by this harness yet'}`);
       // The sign-in state picks the menu: Sign In for a signed-out account, Sign Out only for a signed-in one.
       item.contextValue = `${a.kind === 'follows-app' ? 'profile-system' : 'profile-isolated'}-${st?.logged_in ? 'signedin' : 'signedout'}`;
       return { item, profile: p, account: a };

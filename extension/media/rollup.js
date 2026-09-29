@@ -33,7 +33,7 @@
     return [...roots.values()];
   }
 
-  const waiting = r => WAITING.has(r.status) || (r.attention && r.attention.kind === 'permission' && !FAILED.has(r.status) && !DONE.has(r.status));
+  const waiting = r => WAITING.has(r.status);
 
   /** Needs you: what waits for the owner's answer, most urgent first. */
   function needsYou(state) {

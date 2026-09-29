@@ -7,6 +7,7 @@ const { RunFeed, runMessage } = require('./run-feed');
 const { handleRunMessage, changesFetcher } = require('./run-actions');
 const { page, localRoots } = require('./webview-html');
 const { ACTIVE } = require('./views');
+const Plain = require('../media/plain-words.js');
 
 
 class CommandCenter {
@@ -67,8 +68,8 @@ class CommandCenter {
     panel.onDidChangeViewState(e => vscode.commands.executeCommand('setContext', 'overseer.dashboardFocus', e.webviewPanel.active));
     vscode.commands.executeCommand('setContext', 'overseer.dashboardOpen', true);
     panel.webview.onDidReceiveMessage(message => this.receive(message).catch(error => {
-      if (message?.type === 'start') post({ type: 'notice', scope: 'composer', message: error.message });
-      else post({ type: 'notice', message: error.message });
+      if (message?.type === 'start') post({ type: 'notice', scope: 'composer', message: Plain.plain(error.message, 300) });
+      else post({ type: 'notice', message: Plain.plain(error.message, 300) });
     }));
   }
 
@@ -92,12 +93,12 @@ class CommandCenter {
         const text = String(m.text || '').trim(); if (!text) return;
         const cfg = vscode.workspace.getConfiguration('overseer');
         try { await this.client.request('overseer.send', { text, surface: 'vscode', harness: cfg.get('chat.harness', 'claude'), ...(cfg.get('chat.model', '') ? { model: cfg.get('chat.model', '') } : {}) }); }
-        catch (error) { post({ type: 'overseerNotice', message: error.message }); }
+        catch (error) { post({ type: 'overseerNotice', message: Plain.plain(error.message, 300) }); }
         await this.model.refresh(); await this.pushOverseer(); return;
       }
       case 'overseerAnswer': {
         try { await this.client.request('overseer.answer', { id: String(m.id || ''), yes: !!m.yes, surface: 'vscode', by: 'owner' }); }
-        catch (error) { post({ type: 'overseerNotice', id: m.id, message: error.message }); }
+        catch (error) { post({ type: 'overseerNotice', id: m.id, message: Plain.plain(error.message, 300) }); }
         await this.pushOverseer(); return;
       }
       case 'overseerFresh': await this.client.request('overseer.fresh', {}); await this.pushOverseer(); return;
@@ -110,7 +111,7 @@ class CommandCenter {
           try {
             const changes = await this.client.request('workspace.changes', { workspace_id: run.workspace_id });
             if (!changes.files) { await this.client.request('task.archive', { task_id: run.task_id, archived: true }); await this.client.request('workspace.cleanup', { workspace_id: run.workspace_id, discard_dirty: false }); }
-          } catch (error) { post({ type: 'overseerNotice', message: `The agent was stopped; its worktree stays: ${error.message}` }); }
+          } catch (error) { post({ type: 'overseerNotice', message: `The agent was stopped; its worktree stays: ${Plain.plain(error.message, 300)}` }); }
           await this.model.refresh();
         }
         post({ type: 'askOverseer', text: String(m.text || '') });
@@ -139,7 +140,7 @@ class CommandCenter {
       // The repository chip's own picker (AC-260): a typed path, and its Tab completions; no dialog.
       case 'composerAddRepo': {
         try { post({ type: 'notice', scope: 'composer', kind: 'repo', repo: await this.handlers.launcher.addRepo(m.path) }); }
-        catch (error) { post({ type: 'notice', scope: 'composer', kind: 'repoError', path: m.path, message: error.message }); }
+        catch (error) { post({ type: 'notice', scope: 'composer', kind: 'repoError', path: m.path, message: Plain.plain(error.message, 300) }); }
         return;
       }
       case 'composerPathHints': post({ type: 'notice', scope: 'composer', kind: 'pathHints', input: m.input, hints: await this.handlers.launcher.pathHints(m.input) }); return;

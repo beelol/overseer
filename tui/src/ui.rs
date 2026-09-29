@@ -202,7 +202,7 @@ fn header(f: &mut Frame, app: &App, area: Rect) {
     let visible = app.visible();
     let all = app.state.agents();
     let active = all.iter().filter(|r| r.active()).count();
-    let needs = all.iter().filter(|r| r.needs_you()).count();
+    let needs = app.state.needs_you_count();
     let dot = Style::new().fg(MUTED);
     let mut spans = vec![
         Span::styled(" ◆ Overseer ", Style::new().fg(accent()).add_modifier(Modifier::BOLD)),
