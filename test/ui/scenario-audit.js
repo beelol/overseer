@@ -125,7 +125,7 @@ const HEIGHT = 860;
       views.review = { frame: await cdp.webview(`!!document.getElementById('diffs') && document.body.dataset.runId === ${JSON.stringify(runs.showcase.run.id)} && !(document.getElementById('loading-stage')?.textContent || '').trim()`, 30000), opts: { root: 'body' } };
       if (!views.agents) delete views.agents;
     } else {
-      await cdp.command('Overseer: Open Dashboard');
+      await cdp.command('Overseer: Enter Focus Mode');
       const dash = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('[data-audit-view="agents"]')`, 30000);
       const id = runs.showcase.run.id;
       await dash.eval(`(() => { const r = document.querySelector('[data-run=${JSON.stringify(id)}]'); r.scrollIntoView(); r.id = 'pick'; return true; })()`);
@@ -171,7 +171,7 @@ const HEIGHT = 860;
     }
 
     // New agent: the New Task form (baseline) or the composer shown with no agent selected (new).
-    if (UI === 'baseline') await cdp.command('Overseer: New Task');
+    if (UI === 'baseline') await cdp.command('Overseer: Start an Agent with the Full Form');
     else if (UI === 'gatek') await cdp.command('Overseer: New Agent');
     else await views.dashboard.frame.eval(`document.querySelector('[data-action="new-agent"]').click()`);
     const composer = UI === 'baseline'

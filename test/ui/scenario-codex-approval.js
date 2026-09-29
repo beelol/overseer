@@ -23,19 +23,19 @@ const PROMPT = 'Run exactly this shell command in the workspace: touch approved.
     const cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
     // Task 1 entirely through the UI.
-    await cdp.command('Overseer: Start Task with Quick Picks');
-    await cdp.pick('New task: repository');
-    await cdp.pick('New task: harness', 'codex-app');
-    await cdp.pick('New task: account for', 'Your login');
+    await cdp.command('Overseer: Start an Agent with Quick Picks');
+    await cdp.pick('New agent: repository');
+    await cdp.pick('New agent: harness', 'codex-app');
+    await cdp.pick('New agent: account for', 'Your login');
     if (dry) {
       const b = await cdp.waitFor(`(() => { const b = [...document.querySelectorAll('.notification-toast .monaco-button')].find(b => b.textContent.includes('Launch anyway')); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`, 10000);
       await cdp.click(b.x, b.y);
     }
-    await cdp.pick('New task: workspace');
+    await cdp.pick('New agent: workspace');
     await cdp.pick('Start the worktree from');
     await cdp.input('Model (optional)', dry ? '' : 'gpt-5.6-luna');
     await cdp.pick('Codex approval policy', 'untrusted');
-    await cdp.input('Task prompt', PROMPT);
+    await cdp.input('What should the agent do?', PROMPT);
     const r1 = s.ctl('state').runs.find(r => r.harness === 'codex-app');
     const w1 = await waitFor(r1.id, r => r.status === 'waiting_for_user' || !['queued', 'starting', 'running'].includes(r.status));
     check('codex-app run waits for permission (not auto-approved)', w1.status === 'waiting_for_user', { status: w1.status, attention: w1.attention && w1.attention.tool, reason: w1.exit_reason });

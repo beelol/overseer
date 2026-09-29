@@ -64,7 +64,7 @@
     const tools = window.OverseerPromptTools.create(task, toolsBar, tray, { post, noModel: true, harness: () => form.routing === 'auto' ? 'auto' : form.harness, target: () => form.repo ? { repo: form.repo } : null, notice: t => { note.className = 'composer-note error'; note.replaceChildren(ui.icon('warning', 'sm'), el('span', null, t)); }, onChange: () => {} });
     const note = el('div', 'composer-note'); note.setAttribute('role', 'status');
     const foot = el('div', 'composer-foot');
-    const full = el('button', 'link', 'Full form'); full.type = 'button'; full.title = 'Open the New Task form with every option';
+    const full = el('button', 'link', 'Full form'); full.type = 'button'; full.title = 'Open the full form with every option';
     foot.append(el('span', 'kbd-hint', '⏎ start · ⇧⏎ new line'), full);
     hero.append(mark, h, hint, box, chips, note, foot);
     wrap.append(hero);
@@ -359,7 +359,7 @@
       ui.menu(modeChip, items, { label: 'Workspace' });
     }
     function menuMore() {
-      const items = [{ label: 'Full New Task form', icon: 'window', run: () => post({ type: 'command', command: 'overseer.newTask' }) }];
+      const items = [{ label: 'Full form', icon: 'window', run: () => post({ type: 'command', command: 'overseer.newTask' }) }];
       if (form.harness === 'codex-app') for (const p of ['on-request', 'untrusted', 'never']) items.push({ label: `Approvals: ${p}`, icon: 'shield', checked: (form.approval || 'on-request') === p, run: () => { form.approval = p; save(); } });
       ui.menu(more, items, { label: 'More options' });
     }

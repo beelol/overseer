@@ -108,10 +108,10 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
 
     // New Task offers only compatible accounts.
     const accountChoices = async harness => {
-      await cdp.command('Overseer: Start Task with Quick Picks');
-      await cdp.pick('New task: repository');
-      await cdp.pick('New task: harness', harness);
-      await cdp.waitQuickTitle(`New task: account for ${harness}`);
+      await cdp.command('Overseer: Start an Agent with Quick Picks');
+      await cdp.pick('New agent: repository');
+      await cdp.pick('New agent: harness', harness);
+      await cdp.waitQuickTitle(`New agent: account for ${harness}`);
       await delay(500);
       const rowsNow = (await cdp.quickInputState()).rows;
       await s.screenshot('new-task-accounts-' + harness);

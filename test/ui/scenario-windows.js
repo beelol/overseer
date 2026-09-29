@@ -31,7 +31,7 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
       overseer: inv.tabs.filter(t => /^Overseer\b/.test(t)).length,
       review: inv.tabs.filter(t => /^Review/.test(t)).length,
       chatOut: inv.tabs.filter(t => /^Alpha agent\b/.test(t)).length,
-      newTask: inv.tabs.filter(t => /^New Task/.test(t)).length,
+      newTask: inv.tabs.filter(t => /^New Agent/.test(t)).length,
     });
     const dragAlpha = async () => {
       await s.openOverseerView(); await delay(600);
@@ -45,7 +45,7 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     for (let i = 0; i < 2; i++) await s.selectAgent('Alpha agent', { settle: 2500 });
     for (let i = 0; i < 2; i++) { await cdp.command('Overseer: Open Review'); await delay(1500); }
     for (let i = 0; i < 2; i++) await dragAlpha();
-    for (let i = 0; i < 2; i++) { await cdp.command('Overseer: New Task'); await delay(1500); }
+    for (let i = 0; i < 2; i++) { await cdp.command('Overseer: Start an Agent with the Full Form'); await delay(1500); }
     const opened = await inventory();
     const k = kinds(opened);
     await s.screenshot('everything-open');
@@ -58,17 +58,17 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     await cdp.waitQuickTitle('Where am I');
     const rows = await cdp.evalWorkbench(`[...document.querySelectorAll('.quick-input-widget .monaco-list-row')].map(r => r.getAttribute('aria-label') || r.textContent.trim())`);
     await s.screenshot('where-am-i');
-    const listed = { chat: rows.some(r => /Chat|Grid|New agent/.test(r)), review: rows.some(r => /Review/.test(r)), newTask: rows.some(r => /New task/.test(r)), here: rows.some(r => /you are here/.test(r)) };
+    const listed = { chat: rows.some(r => /Chat|Grid|New agent/.test(r)), review: rows.some(r => /Review/.test(r)), newTask: rows.some(r => /Full form/.test(r)), here: rows.some(r => /you are here/.test(r)) };
     check('⌥⌘M opens Where am I, listing the Overseer view, the review and New Task, and where you are', listed.chat && listed.review && listed.newTask && listed.here, { rows });
     await cdp.key('Escape'); await delay(300);
     const jumps = [];
-    for (const want of ['Review', 'New task', 'Chat']) {
+    for (const want of ['Review', 'Full form', 'Chat']) {
       await cdp.command('Overseer: Where Am I');
       await cdp.type(want); await delay(400); await cdp.key('Enter'); await delay(1500);
       const active = await cdp.evalWorkbench(`document.querySelector('.editor-group-container.active .tab.active')?.getAttribute('aria-label') || ''`);
       jumps.push({ want, active });
     }
-    check('picking a view in the map goes to it (review, New Task, the Overseer view)', /^Review/.test(jumps[0].active) && /^New Task/.test(jumps[1].active) && /^Overseer/.test(jumps[2].active), jumps);
+    check('picking a view in the map goes to it (review, New Task, the Overseer view)', /^Review/.test(jumps[0].active) && /^New Agent/.test(jumps[1].active) && /^Overseer/.test(jumps[2].active), jumps);
     // The header controls open the same map.
     const dash = await s.editorView(`!!document.getElementById('where')`);
     const hasControls = { chat: await dash.eval(`!!document.getElementById('where') && !document.getElementById('where').hidden`),
@@ -76,7 +76,7 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     check('the chat and the review each have a Where am I control in their own header', hasControls.chat && hasControls.review, hasControls);
 
     // Close views: no empty editor group is left behind.
-    for (const want of ['New task', 'Review']) {
+    for (const want of ['Full form', 'Review']) {
       await cdp.command('Overseer: Where Am I');
       await cdp.type(want); await delay(400); await cdp.key('Enter'); await delay(1200);
       s.note('before closing ' + want, { active: await cdp.evalWorkbench(`document.querySelector('.editor-group-container.active .tab.active')?.getAttribute('aria-label') || ''`), tabs: (await inventory()).tabs });
@@ -85,7 +85,7 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     }
     const closed = await inventory();
     await s.screenshot('after-closing');
-    check('closing views leaves no empty editor group behind, and the other views stay open', closed.empty === 0 && !closed.tabs.some(t => /^New Task|^Review/.test(t)) && closed.tabs.some(t => /^Overseer\b/.test(t)), closed);
+    check('closing views leaves no empty editor group behind, and the other views stay open', closed.empty === 0 && !closed.tabs.some(t => /^New Agent|^Review/.test(t)) && closed.tabs.some(t => /^Overseer\b/.test(t)), closed);
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}

@@ -97,7 +97,7 @@ class OutputPanels {
       panel.webview.options = { enableScripts: false, localResourceRoots: localRoots(this.context.extensionUri) };
       panel.title = 'Agent unavailable';
       panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'Agent unavailable',
-        body: `<div class="empty-state"><span class="codicon codicon-debug-disconnect"></span><div>${this.client.connected ? 'This agent is no longer in Overseer.' : 'Overseer is reconnecting. Reopen the agent from the dashboard.'}</div></div>` });
+        body: `<div class="empty-state"><span class="codicon codicon-debug-disconnect"></span><div>${this.client.connected ? 'This agent is no longer in Overseer.' : 'Overseer is reconnecting. Reopen the agent from the Agents list.'}</div></div>` });
       return;
     }
     await this.attach(runId, panel);

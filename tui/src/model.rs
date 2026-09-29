@@ -221,4 +221,14 @@ mod needs_you {
         .unwrap();
         assert_eq!(state.needs_you_count(), 2, "the waiting agent and Overseer's proposal; not the failed, archived or superseded ones");
     }
+
+    /// The same recorded state the extension's and the phone's tests read gives the same count.
+    #[test]
+    fn the_nine_agents_recording_counts_as_everywhere() {
+        let recorded: serde_json::Value = serde_json::from_str(include_str!("../../phone/model/test/fixtures/nine-agents.json")).unwrap();
+        let mut state: State = serde_json::from_value(recorded["final"].clone()).unwrap();
+        assert_eq!(state.needs_you_count(), 1);
+        state.overseer = json!({ "run_id": "ov", "open_proposals": 2 });
+        assert_eq!(state.needs_you_count(), 2);
+    }
 }

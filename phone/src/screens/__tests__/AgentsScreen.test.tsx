@@ -543,8 +543,8 @@ describe('a phone that may only watch', () => {
 describe('nothing yet, and not connected', () => {
   test('with no agents it says so and offers New agent', async () => {
     await open({ state: EMPTY_STATE });
-    expect(agents.emptyText(store.load(EMPTY_STATE), { now: NOW })).toBe('No agent tasks yet.');
-    expect(screen.getByTestId('agents.empty')).toHaveTextContent('No agent tasks yet.New agent');
+    expect(agents.emptyText(store.load(EMPTY_STATE), { now: NOW })).toBe('No agents yet.');
+    expect(screen.getByTestId('agents.empty')).toHaveTextContent('No agents yet.New agent');
     await fireEvent.press(screen.getByTestId('agents.empty.new'));
     expect(router.pushed).toEqual([routes.newAgent]);
     expect(screen.getByTestId('agents.new')).toBeTruthy();

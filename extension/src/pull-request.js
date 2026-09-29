@@ -55,7 +55,7 @@ class PullRequests {
   async pick() {
     const runs = this.model.state.runs.filter(r => !r.parent_run_id && this.model.workspace(r.workspace_id)?.kind === 'worktree' && !this.model.workspace(r.workspace_id)?.removed_ms)
       .sort((a, b) => b.created_ms - a.created_ms);
-    if (!runs.length) { vscode.window.showInformationMessage('No run to open a pull request from.', { modal: true, detail: 'Open PR works on a run in its own worktree, and there are none yet. Start a task in a new worktree first.' }); return undefined; }
+    if (!runs.length) { vscode.window.showInformationMessage('No agent to open a pull request from.', { modal: true, detail: 'Open PR works on an agent in its own worktree, and there are none yet. Start an agent in a new worktree first.' }); return undefined; }
     const choice = await vscode.window.showQuickPick(runs.map(r => {
       const task = this.model.task(r.task_id), ws = this.model.workspace(r.workspace_id);
       return { label: task?.title || r.title, description: `${path.basename(task?.repo_root || '')} · ${ws.branch}`, detail: `${Plain.harness(r.harness)}${r.model ? ' · ' + r.model : ''} · ${Plain.plain(r.status)}`, run: r };

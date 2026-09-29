@@ -60,7 +60,7 @@ class AutoUsage {
     const items = [
       ...rows(state.work_units, state.learning_paused),
       { action: 'export', label: 'Export local usage…', detail: 'Save a redacted JSON file on this Mac; nothing is uploaded.' },
-      { action: 'clear', label: 'Clear local usage…', detail: 'Remove learning records and summaries; agents and task history stay.' },
+      { action: 'clear', label: 'Clear local usage…', detail: 'Remove learning records and summaries; agents and their history stay.' },
     ];
     const picked = await vscode.window.showQuickPick(items, { title: 'Auto usage',
       placeHolder: state.learning_paused ? 'Local learning is paused; agents can keep working.' : 'Reported activity is not subscription allowance.',
@@ -91,7 +91,7 @@ class AutoUsage {
   async clear() {
     const action = 'Clear local Auto usage';
     const answer = await vscode.window.showWarningMessage(
-      'Clear local Auto usage and learning? Agents and task history stay available.', { modal: true }, action);
+      'Clear local Auto usage and learning? Agents and their history stay available.', { modal: true }, action);
     if (answer !== action) return;
     const result = await this.client.request('auto.usage.clear', {});
     await vscode.window.showInformationMessage(`Cleared ${result.deleted} local usage record${result.deleted === 1 ? '' : 's'}.`);

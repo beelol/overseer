@@ -38,5 +38,12 @@ const repos = R.repos(state, reviewed, now);
 check('per repository (AC-256): site has 2 at work and 2 to review; notes has 1 failed to look at and nothing at work', JSON.stringify(repos.get('/site')) === JSON.stringify({ active: 2, unreviewed: 2, failed: 0 }) && JSON.stringify(repos.get('/notes')) === JSON.stringify({ active: 0, unreviewed: 0, failed: 1 }), [...repos]);
 const all = R.counts(state, { r3: now, r4: now, r5: now, r8: now }, now);
 check('once every agent at its end is reviewed, nothing is to review or failed-unseen', all.unreviewed === 0 && all.failed === 0 && all.reviewed === 5, all);
+// AC-246: the same recorded state gives the same Needs-you count here (the badge), in the TUI's
+// header (tui/src/model.rs `needs_you_count`) and on the phone (phone/model `counts`): the daemon's
+// recording of nine agents, one of them waiting on a permission.
+const nine = require('../../phone/model/test/fixtures/nine-agents.json').final;
+check('the nine-agents recording: 1 needs you (the same number the TUI and the phone count)', R.needsYou(nine).length === 1, R.needsYou(nine));
+const withProposal = { ...nine, overseer: { run_id: 'ov', open_proposals: 2 } };
+check('with Overseer\'s proposals waiting it is 2 (the TUI counts the same; the phone does not receive proposals yet)', R.needsYou(withProposal).length === 2, R.needsYou(withProposal));
 console.log(failures ? `${failures} failed` : 'the counts agree');
 process.exit(failures ? 1 : 0);

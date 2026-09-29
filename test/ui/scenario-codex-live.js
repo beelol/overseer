@@ -43,18 +43,18 @@ async function sendFollowUp(s, output, text) {
     const status = s.ctl('profile.status', { id: 'system-codex' });
     check('codex profile signed in with ChatGPT account', status.logged_in && status.method === 'chatgpt-account', { version: status.version, method: status.method, plan: status.identity?.plan, account: status.identity?.account_fingerprint, api_key_present: status.identity?.has_api_key });
 
-    await cdp.command('Overseer: Start Task with Quick Picks');
-    await cdp.pick('New task: repository');
-    await cdp.pick('New task: harness', 'codex');
-    await cdp.pick('New task: account for', 'Your login');
+    await cdp.command('Overseer: Start an Agent with Quick Picks');
+    await cdp.pick('New agent: repository');
+    await cdp.pick('New agent: harness', 'codex');
+    await cdp.pick('New agent: account for', 'Your login');
     if (dry) {
       const b = await cdp.waitFor(`(() => { const b = [...document.querySelectorAll('.notification-toast .monaco-button')].find(b => b.textContent.includes('Launch anyway')); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`, 10000);
       await cdp.click(b.x, b.y);
     }
-    await cdp.pick('New task: workspace');
+    await cdp.pick('New agent: workspace');
     await cdp.pick('Start the worktree from');
     await cdp.input('Model (optional)', MODEL);
-    await cdp.input('Task prompt', 'Spawn exactly one sub-agent whose only task is to reply with the word hi, and wait for it. Then create the file docs/dogfood/hello.md containing exactly one line: Hello from an Overseer dogfood run. Change nothing else and do not run tests.');
+    await cdp.input('What should the agent do?', 'Spawn exactly one sub-agent whose only task is to reply with the word hi, and wait for it. Then create the file docs/dogfood/hello.md containing exactly one line: Hello from an Overseer dogfood run. Change nothing else and do not run tests.');
     const review = await cdp.webview('!!document.getElementById("diffs") && !!document.getElementById("follow")', 60000);
     const output = await cdp.webview('!!document.getElementById("prompt") && !!document.getElementById("log")', 30000);
     const root = s.ctl('state').runs.find(r => !r.parent_run_id && r.harness === 'codex');

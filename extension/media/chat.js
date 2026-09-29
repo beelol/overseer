@@ -175,7 +175,7 @@
 
     menu() {
       const m = this.msg; if (!m) return;
-      const blocked = m.active ? 'Wait for the agent to finish or stop it first' : !m.trusted ? 'Requires a trusted workspace' : !this.worktree ? 'This task works in the current checkout' : '';
+      const blocked = m.active ? 'Wait for the agent to finish or stop it first' : !m.trusted ? 'Requires a trusted workspace' : !this.worktree ? 'This agent works in the current checkout' : '';
       const items = [];
       // Narrow (beside a diff): the header's Review and Files buttons are in this menu instead.
       if (window.innerWidth <= 480) {
@@ -190,7 +190,7 @@
       items.push({ id: this.view === 'log' ? 'tab-conv' : 'tab-log', label: this.view === 'log' ? 'Show conversation' : 'Show event log', icon: this.view === 'log' ? 'comment-discussion' : 'list-flat', run: () => this.show(this.view === 'log' ? 'conv' : 'log') });
       items.push({ id: 'raw', label: 'Raw output', icon: 'output', run: () => this.post({ type: 'raw' }) });
       items.push({ id: 'details-toggle', label: this.details.hidden ? 'Details' : 'Hide details', icon: 'info', run: () => { this.details.hidden = !this.details.hidden; if (!this.details.hidden) this.scroll.scrollTop = 0; } });
-      items.push({ label: 'Copy run ID', icon: 'copy', run: () => ui.copy(this.post, m.run.id) });
+      items.push({ label: 'Copy agent ID', icon: 'copy', run: () => ui.copy(this.post, m.run.id) });
       if (!this.child && !m.active && m.taskId) items.push({ id: 'archive', label: m.archived ? 'Restore from archive' : 'Archive', icon: m.archived ? 'discard' : 'archive', run: () => this.post({ type: 'archive', taskId: m.taskId, archived: !m.archived }) });
       if (this.opts.mode === 'dashboard') items.push({ label: 'Open in its own tab', icon: 'link-external', run: () => this.post({ type: 'openPanel' }) });
       if (!this.child && this.worktree) { items.push('sep'); items.push({ id: 'cleanup', label: 'Remove worktree…', icon: 'trash', danger: true, disabled: m.active, why: m.active ? 'Stop the agent first' : '', run: () => this.post({ type: 'cleanup' }) }); }

@@ -204,7 +204,7 @@ async function activate(context) {
       }
       if (/overseer\.review$/.test(vt)) return { icon: 'diff-multiple', kind: 'Review', what: tab.label.replace(/^Review: /, '') };
       if (/overseer\.chatEditor$/.test(vt)) return { icon: 'comment', kind: 'Chat, taken out', what: tab.label.replace(/\.overseer-chat$/, '') };
-      if (/overseer\.newTask$/.test(vt)) return { icon: 'new-file', kind: 'New task', what: 'the full form' };
+      if (/overseer\.newTask$/.test(vt)) return { icon: 'new-file', kind: 'Full form', what: 'a new agent with every option' };
       if (/overseer\.output$/.test(vt)) return { icon: 'output', kind: 'Output', what: tab.label };
       return undefined;
     };
@@ -262,7 +262,7 @@ async function activate(context) {
     const active = runs.filter(r => ACTIVE.has(r.status)).length;
     const needs = client.connected ? attention().length : 0;
     status.text = client.connected ? `$(overseer-mark) Overseer${devLabel} ${active} active${needs ? `  $(bell-dot) ${needs}` : ''}` : client.stopped ? '$(circle-slash) Overseer stopped' : '$(debug-disconnect) Overseer disconnected';
-    status.tooltip = client.connected ? `${active} agent${active === 1 ? '' : 's'} running${needs ? ` · ${needs} need${needs === 1 ? 's' : ''} you` : ''}\nAgents keep running when VS Code closes.\nClick to open the dashboard.` : client.stopped ? 'Agents and daemon were stopped. Click to start the daemon again.' : 'Reconnecting to overseerd…';
+    status.tooltip = client.connected ? `${active} agent${active === 1 ? '' : 's'} running${needs ? ` · ${needs} need${needs === 1 ? 's' : ''} you` : ''}\nAgents keep running when VS Code closes.\nClick to open the Overseer view.` : client.stopped ? 'Agents and daemon were stopped. Click to start the daemon again.' : 'Reconnecting to overseerd…';
     status.command = client.stopped && !client.connected ? 'overseer.startDaemon' : 'overseer.openCenter';
     if (pin && !client.connected && !client.refusal) { status.text = `$(debug-disconnect) Overseer${devLabel} not running`; status.tooltip = client.notRunning(); }
     if (client.refusal) { status.text = '$(error) Overseer refused a dev daemon'; status.tooltip = client.refusal; status.command = 'overseer.showLog'; }
@@ -507,7 +507,7 @@ async function activate(context) {
     // Repository
     const folders = vscode.workspace.workspaceFolders || [];
     const roots = [...new Set((await Promise.all(folders.map(f => gitRoot(f.uri.fsPath)))).filter(Boolean))];
-    const repoPick = await vscode.window.showQuickPick([...roots.map(r => ({ label: path.basename(r), description: r, root: r })), { label: '$(folder) Choose repository…', browse: true }], { title: 'New task: repository' });
+    const repoPick = await vscode.window.showQuickPick([...roots.map(r => ({ label: path.basename(r), description: r, root: r })), { label: '$(folder) Choose repository…', browse: true }], { title: 'New agent: repository' });
     if (!repoPick) return;
     let repo = repoPick.root;
     if (repoPick.browse) {
@@ -518,7 +518,7 @@ async function activate(context) {
     }
     // Harness
     const harnesses = await client.request('harness.list');
-    const hPick = await vscode.window.showQuickPick(harnesses.map(h => ({ label: h.harness, description: h.installed ? (h.version || 'installed') : 'not installed', detail: `children: ${h.capabilities.children}`, h })), { title: 'New task: harness' });
+    const hPick = await vscode.window.showQuickPick(harnesses.map(h => ({ label: h.harness, description: h.installed ? (h.version || 'installed') : 'not installed', detail: `children: ${h.capabilities.children}`, h })), { title: 'New agent: harness' });
     if (!hPick) return;
     const harness = hPick.h.harness;
     if (!hPick.h.installed) throw new Error(`${harness} is not installed.`);
@@ -536,7 +536,7 @@ async function activate(context) {
       const compatible = (model.accounts || []).filter(a => (a.harnesses || []).includes(harness));
       const statuses = compatible.map(a => model.profileStatus.get(a.id));
       const pPick = await vscode.window.showQuickPick(compatible.map((a, i) => ({ label: a.name, description: `${statuses[i]?.logged_in ? 'signed in' : 'not signed in'}${statuses[i]?.identity?.plan ? ' · ' + statuses[i].identity.plan : ''} · ${a.kind === 'follows-app' ? 'follows the desktop app (can change)' : 'fixed account'}`, detail: statuses[i]?.detail, p: model.profile(a.id) || { id: a.id, name: a.name }, ok: statuses[i]?.logged_in })),
-        { title: `New task: account for ${harness} (only compatible accounts; account login only, no API keys)` });
+        { title: `New agent: account for ${harness} (only compatible accounts; account login only, no API keys)` });
       if (!pPick) return;
       if (!pPick.ok) {
         const choice = await vscode.window.showWarningMessage(`${pPick.p.name} is not signed in.`, 'Sign In', 'Launch anyway');
@@ -549,7 +549,7 @@ async function activate(context) {
     const mode = await vscode.window.showQuickPick([
       { label: '$(git-branch) New worktree', description: 'recommended', detail: 'Isolated branch and worktree; your checkout is not touched.', mode: 'worktree' },
       { label: '$(repo) Current checkout', detail: 'Works directly in your checkout. Existing staged, unstaged, untracked and unsaved work is recorded and preserved.', mode: 'current' },
-    ], { title: 'New task: workspace' });
+    ], { title: 'New agent: workspace' });
     if (!mode) return;
     let targetRef;
     if (mode.mode === 'worktree') {
@@ -575,7 +575,7 @@ async function activate(context) {
       if (!pick) return;
       approvalPolicy = pick.label;
     }
-    const prompt = await vscode.window.showInputBox({ title: 'Task prompt', prompt: harness === 'generic' ? 'Optional first line sent to stdin' : 'What should the agent do?', ignoreFocusOut: true });
+    const prompt = await vscode.window.showInputBox({ title: 'What should the agent do?', prompt: harness === 'generic' ? 'Optional first line sent to stdin' : 'What should the agent do?', ignoreFocusOut: true });
     if (prompt === undefined || (!prompt && harness !== 'generic')) return;
     const title = (prompt || path.basename(program || 'task')).slice(0, 60);
     const created = await client.request('task.create', { repo, harness, profile_id: profileId, workspace_mode: mode.mode, target_ref: targetRef, model: model_ || undefined,

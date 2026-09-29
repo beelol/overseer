@@ -32,18 +32,18 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     fs.writeFileSync(path.join(profile.home, 'config/opencode/opencode.json'), openCodeConfig(await mock.port()));
 
     // New task through the command palette and quick picks.
-    await cdp.command('Overseer: Start Task with Quick Picks');
-    await cdp.pick('New task: repository');
-    await cdp.pick('New task: harness', 'opencode');
-    await cdp.pick('New task: account for', 'OpenCode mock');
+    await cdp.command('Overseer: Start an Agent with Quick Picks');
+    await cdp.pick('New agent: repository');
+    await cdp.pick('New agent: harness', 'opencode');
+    await cdp.pick('New agent: account for', 'OpenCode mock');
     // Not signed in (the mock needs no credentials): choose "Launch anyway" in the notification.
     await cdp.waitFor(`[...document.querySelectorAll('.notification-toast .monaco-button')].some(b => b.textContent.includes('Launch anyway'))`, 10000, 'launch anyway button');
     const btn = await cdp.evalWorkbench(`(() => { const b = [...document.querySelectorAll('.notification-toast .monaco-button')].find(b => b.textContent.includes('Launch anyway')); const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
     await cdp.click(btn.x, btn.y);
-    await cdp.pick('New task: workspace');
+    await cdp.pick('New agent: workspace');
     await cdp.pick('Start the worktree from');
     await cdp.input('Model (optional)', 'mock/mock-coder');
-    await cdp.input('Task prompt', 'sequence 8');
+    await cdp.input('What should the agent do?', 'sequence 8');
     await s.screenshot('task-launched');
 
     const review = await cdp.webview('!!document.getElementById("diffs") && !!document.getElementById("follow")', 60000);
