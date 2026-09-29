@@ -1938,6 +1938,35 @@ fn ac173_a_call_pauses_voice_mode_and_it_resumes() {
     });
 }
 
+/// AC-220: a listener that restarts starts unpaused. A call pauses Voice Mode, the listener dies
+/// during it, and the call ends before the new listener starts: Voice Mode listens again instead
+/// of staying paused for a call the new listener never saw.
+#[test]
+fn ac220_a_restarted_listener_is_not_paused_by_the_old_one() {
+    let calls = tmp();
+    let file = calls.path().join("recording");
+    let file_s = file.display().to_string();
+    let env = voice_daemon(&[("OVERSEER_LISTENER_TEST_MIC_USERS", &file_s)]);
+    let live = listening(&env);
+    std::fs::write(&file, "us.zoom.xos\n").unwrap();
+    live.wait("paused", 5, |v| v["kind"] == "state" && v["state"] == "paused");
+    let pid = env.d.call("voice.get", json!({}))["listener"]["pid"].as_i64().unwrap();
+    // The listener dies mid-call; the call ends before the daemon starts the next one.
+    std::process::Command::new("kill").args(["-9", &pid.to_string()]).status().unwrap();
+    std::fs::write(&file, "").unwrap();
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        let g = env.d.call("voice.get", json!({}));
+        let new_pid = g["listener"]["pid"].as_i64();
+        if new_pid.is_some() && new_pid != Some(pid) && g["state"] == "listening" {
+            assert!(g["reason"].is_null(), "{g}");
+            break;
+        }
+        assert!(Instant::now() < deadline, "still not listening after the restart: {g}");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
 /// AC-173: each bound of the side RFC is held: open requests (a fifth waits), requests per hour,
 /// the size of one message, the request records, the speech model's memory budget and the rate
 /// of levels. (Audio held, one utterance and the speech queue are in the listener's tests and

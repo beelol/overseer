@@ -81,7 +81,7 @@ const HEIGHT = 860;
       views.agents = { frame: center, opts: { root: 'body', exclude: ['#files-section'] } };
       views.files = { frame: center, opts: { root: '#files-section' } };
       views.chat = { frame: await cdp.webview(`document.body.dataset.runId === ${JSON.stringify(id)} && !!document.querySelector('#conv .turn')`, 30000), opts: { root: 'body' } };
-      views.review = { frame: await cdp.webview(`document.getElementById('workspace-note')?.textContent.includes(${JSON.stringify(runs.showcase.workspace.path)}) && document.querySelectorAll('.diff-file').length > 0`, 30000), opts: { root: 'body' } };
+      views.review = { frame: await cdp.webview(`document.getElementById('workspace-note')?.textContent.includes(${JSON.stringify(runs.showcase.workspace.path)}) && document.querySelectorAll('.diff-file').length > 0 && !(document.getElementById('loading-stage')?.textContent || '').trim()`, 30000), opts: { root: 'body' } };
     } else if (UI === 'gatek') {
       // Gate K: the showcase agent has changes, so the review opens left and the chat right.
       await s.selectRun(runs.showcase.run.id, { settle: 3000 });
@@ -97,7 +97,7 @@ const HEIGHT = 860;
       if (act) await cdp.move(act.x + 300, act.y + 300);
       check('agents: side-bar title actions show their name in VS Code\'s hover', !!hoverText, hoverText);
       views.chat = { frame: dash, opts: { root: '[data-audit-view="chat"]' } };
-      views.review = { frame: await cdp.webview(`!!document.getElementById('diffs') && document.body.dataset.runId === ${JSON.stringify(runs.showcase.run.id)}`, 30000), opts: { root: 'body' } };
+      views.review = { frame: await cdp.webview(`!!document.getElementById('diffs') && document.body.dataset.runId === ${JSON.stringify(runs.showcase.run.id)} && !(document.getElementById('loading-stage')?.textContent || '').trim()`, 30000), opts: { root: 'body' } };
       if (!views.agents) delete views.agents;
     } else {
       await cdp.command('Overseer: Open Dashboard');
@@ -112,7 +112,7 @@ const HEIGHT = 860;
       views.agents = { frame: dash, opts: { root: '[data-audit-view="agents"]' } };
       views.chat = { frame: dash, opts: { root: '[data-audit-view="chat"]' } };
       views.files = { frame: dash, opts: { root: '[data-audit-view="files"]' } };
-      views.review = { frame: await cdp.webview(`document.getElementById('workspace-note')?.textContent.includes(${JSON.stringify(runs.showcase.workspace.path)}) || document.body.dataset.workspace === ${JSON.stringify(runs.showcase.workspace.path)}`, 30000), opts: { root: 'body' } };
+      views.review = { frame: await cdp.webview(`document.getElementById('workspace-note')?.textContent.includes(${JSON.stringify(runs.showcase.workspace.path)}) || document.body.dataset.workspace === ${JSON.stringify(runs.showcase.workspace.path)} && !(document.getElementById('loading-stage')?.textContent || '').trim()`, 30000), opts: { root: 'body' } };
     }
 
     for (const theme of THEMES) {

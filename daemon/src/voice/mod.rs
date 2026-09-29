@@ -418,7 +418,12 @@ impl Voice {
                 self.emit(json!({"kind": "listener", "event": "resumed"}));
             }
             "ready" => {
-                self.st.lock().unwrap().ready = true;
+                {
+                    // A listener that has just started is not paused: a pause belonged to the one before.
+                    let mut st = self.st.lock().unwrap();
+                    st.ready = true;
+                    st.paused_for = None;
+                }
                 self.emit(json!({"kind": "listener", "event": "ready", "input": e["input"], "model": e["model"]}));
             }
             "gate" => {
