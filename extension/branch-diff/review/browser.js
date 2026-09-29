@@ -755,20 +755,22 @@ function applyOverseer(o) {
 }
 // Overseer (AC-243): the chat's Merge buttons in the review's toolbar, for this agent.
 const landBox = document.getElementById('land');
-for (const [id, action] of [['land-merge', 'merge'], ['land-pr', 'openPullRequest'], ['land-publish', 'publish'], ['land-cancel', 'cancelMerge'], ['land-cleanup', 'cleanup']]) {
+// Publish to GitHub (no remote) is in the chat only; the review keeps its toolbar short (AC-54, AC-76).
+for (const [id, action] of [['land-merge', 'merge'], ['land-pr', 'openPullRequest'], ['land-cancel', 'cancelMerge'], ['land-cleanup', 'cleanup']]) {
   document.getElementById(id)?.addEventListener('click', () => vscode.postMessage({ type: 'land', action }));
 }
 function renderLand(l) {
   if (!landBox) return;
-  const show = (id, on, text) => { const b = document.getElementById(id); b.hidden = !on; if (text) b.textContent = text; };
+  // Narrow reviews show the buttons' icons only; their names stay in the tooltip and accessible name.
+  const show = (id, on, text) => { const b = document.getElementById(id); b.hidden = !on; const w = b.querySelector('.land-word'); if (text) w.textContent = text; b.title = w.textContent; b.setAttribute('aria-label', w.textContent); };
   const state = !l || !l.worktree || l.active ? '' : l.conflicts ? 'conflicts' : l.merged ? 'merged' : l.canMerge ? 'ready' : l.text ? 'landed' : '';
   landBox.hidden = !state; landBox.dataset.state = state;
   if (!state) return;
   const words = document.getElementById('land-text');
+  words.title = state === 'conflicts' ? `Merge stopped: conflicts in ${l.conflicts.join(', ')}` : l.text || '';
   words.textContent = state === 'conflicts' ? (l.conflicts.length ? `Merge stopped: conflicts in ${l.conflicts.join(', ')}` : 'Merge stopped: conflicts') : state === 'ready' ? (l.landing && l.landing.state === 'pr' ? l.text : '') : l.text;
   show('land-merge', state === 'conflicts' || state === 'ready', state === 'conflicts' ? 'Finish merge' : `Merge into ${l.target || 'main'}`);
   show('land-pr', state === 'ready' && !!l.github);
-  show('land-publish', state === 'ready' && l.remote === null);
   show('land-cancel', state === 'conflicts');
   show('land-cleanup', state === 'merged' && !l.removed);
 }
