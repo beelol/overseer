@@ -376,6 +376,12 @@ impl Daemon {
             self.append_session_message(&self.session_id()?, "agent", None, &format!("{} asks: {question}", run.title), Some(&card))?;
             crate::broker::mark(&self.store.lock().unwrap().conn, &crate::broker::agent_id(&id), "delivered")?;
             self.check_in_due_at(run_id, &format!("ask:{id}"), 0)?;
+        } else {
+            // Asked again and still unanswered: it is due again (a queued one is not doubled).
+            let open: i64 = self.store.lock().unwrap().conn.query_row("SELECT COUNT(*) FROM agent_messages WHERE id=?1 AND answer IS NULL", [&id], |r| r.get(0))?;
+            if open > 0 {
+                self.check_in_due_at(run_id, &format!("ask:{id}"), 0)?;
+            }
         }
         Ok("Asked Overseer; its answer arrives as a message from Overseer. Carry on meanwhile.".into())
     }

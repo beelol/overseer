@@ -1247,82 +1247,182 @@ pub fn start(daemon: Arc<Daemon>) {
         }
     });
     tokio::spawn(async move {
+        // Every event is stored (numbered) before it is sent on the bus. When the loop falls more
+        // than a bus behind, what the bus dropped is read back from the store (audit finding 59).
+        let mut seen = Seen::new(daemon.store.lock().unwrap().max_seq().unwrap_or(0));
         let mut live = daemon.events.subscribe();
         loop {
-            let e = match live.recv().await {
-                Ok(e) => e,
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                Err(_) => return,
-            };
-            let Some(run) = e.run_id.clone() else { continue };
-            let d = daemon.clone();
-            let kind = e.kind.clone();
-            let payload = e.payload.clone();
-            let _ = tokio::task::spawn_blocking(move || {
-                let role = d.run_role(&run);
-                let result = (|| -> Result<()> {
-                    match (kind.as_str(), role.as_str()) {
-                        ("output", "overseer") if payload["role"] == "assistant" => d.overseer_said(&run, payload["text"].as_str().unwrap_or(""))?,
-                        ("status", "overseer") if payload["status"] == "failed" => {
-                            d.overseer_cannot_answer(&run)?;
-                            d.overseer_turn_ended(&run)?;
-                        }
-                        // Overseer's own run follows Continuity: while it waits, the conversation says why.
-                        ("status", "overseer") if payload["status"] == crate::handoff::WAITING_FOR_CONNECTION || payload["status"] == crate::handoff::WAITING_FOR_MEMORY => d.overseer_waiting(&run, payload["reason"].as_str().unwrap_or("its connection failed"))?,
-                        ("turn_done", "overseer") | ("status", "overseer") => d.overseer_turn_ended(&run)?,
-                        ("turn_started", _) => {
-                            d.dispatch_advance(&run, "delivered", payload["turn"]["id"].as_str())?;
-                            d.turn_started_for_check_in(&run)?;
-                            d.subject_turn_started(&run)?;
-                        }
-                        // A second agent in a repository: the ones already working there get their briefing.
-                        ("task_created", "agent") => {
-                            d.brief_companions(&run)?;
-                            d.started_card(&run, &payload)?;
-                        }
-                        // A turn Continuity kept is sent again as the same turn: delivered now.
-                        ("retry", _) if payload["sending"] == true => {
-                            d.dispatch_advance(&run, "delivered", payload["turn"].as_str())?;
-                        }
-                        ("turn_done", _) => {
-                            d.dispatch_advance(&run, "answered", None)?;
-                            d.deliver_queued(&run)?;
-                            d.turn_ended_for_check_in(&run)?;
-                            d.subject_changed(&run, "the subject's turn ended")?;
-                        }
-                        ("status", _) => {
-                            d.deliver_queued(&run)?;
-                            d.release_due_holds("status", Some(&run), &payload)?;
-                            let status = payload["status"].as_str().unwrap_or("");
-                            d.finished_for_check_in(&run, status)?;
-                            d.subject_finishing(&run, status)?;
-                        }
-                        ("file_activity", _) => {
-                            let paths: Vec<String> = payload["paths"].as_array().map(|a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()).unwrap_or_default();
-                            d.check_guardrails(&run, &paths)?;
-                            d.check_area(&run, &paths)?;
-                        }
-                        // Claude's adapter reports a tool twice: its input when it starts and its
-                        // outcome when it ends; only the outcome counts as a result.
-                        ("tool_result", _) => {
-                            let status = payload["status"].as_str().unwrap_or("");
-                            let is_result = status == "completed" || status == "failed" || (status != "started" && !payload["output"].is_null());
-                            d.check_circles(&run, payload["id"].as_str().unwrap_or(""), &payload["input"], payload["is_error"] == true, is_result)?
-                        }
-                        ("guardrail_crossed", _) => d.free_check_tripped(&run, "wrote across a guardrail")?,
-                        ("conflict", _) if payload["needs_decision"] == true && payload["changed"] != true => d.free_check_tripped(&run, "collides with another agent")?,
-                        ("conflict_closed", _) => d.release_due_holds("conflict_closed", Some(&run), &payload)?,
-                        _ => {}
+            match live.recv().await {
+                Ok(e) => {
+                    if !loop_wants(&e) || !seen.first(e.seq) {
+                        continue;
                     }
-                    Ok(())
-                })();
-                if let Err(err) = result {
-                    crate::log(&format!("overseer session: {err:#}"));
+                    handle_events(daemon.clone(), vec![e]).await;
                 }
-            })
-            .await;
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                    crate::log(&format!("overseer session: fell {n} events behind; catching up from the stored events"));
+                    loop {
+                        let from = seen.top() - CATCH_UP_SLACK;
+                        let d = daemon.clone();
+                        let page = match tokio::task::spawn_blocking(move || d.session_events_after(from, CATCH_UP_PAGE)).await {
+                            Ok(Ok(page)) => page,
+                            Ok(Err(err)) => {
+                                crate::log(&format!("overseer session: catching up failed: {err:#}"));
+                                break;
+                            }
+                            Err(_) => break,
+                        };
+                        let full = page.len() as i64 == CATCH_UP_PAGE;
+                        let fresh: Vec<crate::store::Event> = page.into_iter().filter(|e| seen.first(e.seq) && loop_wants(e)).collect();
+                        if !fresh.is_empty() {
+                            handle_events(daemon.clone(), fresh).await;
+                        }
+                        if !full {
+                            break;
+                        }
+                    }
+                }
+                Err(_) => return,
+            }
         }
     });
+}
+
+/// The kinds the session loop acts on (`handle_event`).
+const LOOP_KINDS: [&str; 11] = ["output", "status", "turn_done", "turn_started", "task_created", "retry", "file_activity", "tool_result", "guardrail_crossed", "conflict", "conflict_closed"];
+/// An event is numbered when it is stored and sent a moment later, so a few can arrive out of
+/// order: a catch-up starts this far before the newest event handled.
+const CATCH_UP_SLACK: i64 = 256;
+const CATCH_UP_PAGE: i64 = 1000;
+
+/// Only an agent's run events matter, and of output only what a model said (never a flood of
+/// program output).
+fn loop_wants(e: &crate::store::Event) -> bool {
+    e.run_id.is_some() && LOOP_KINDS.contains(&e.kind.as_str()) && (e.kind != "output" || e.payload["role"] == "assistant")
+}
+
+/// The events already handled, so a catch-up and the bus never handle one twice.
+struct Seen {
+    floor: i64,
+    set: std::collections::BTreeSet<i64>,
+}
+
+impl Seen {
+    fn new(floor: i64) -> Self {
+        Seen { floor, set: std::collections::BTreeSet::new() }
+    }
+    /// True the first time an event is seen.
+    fn first(&mut self, seq: i64) -> bool {
+        if seq <= self.floor || !self.set.insert(seq) {
+            return false;
+        }
+        if self.set.len() > 8 * CATCH_UP_SLACK as usize {
+            self.floor = self.top() - 4 * CATCH_UP_SLACK;
+            let floor = self.floor;
+            self.set.retain(|s| *s > floor);
+        }
+        true
+    }
+    fn top(&self) -> i64 {
+        self.set.last().copied().unwrap_or(self.floor)
+    }
+}
+
+impl Daemon {
+    /// The stored events the session loop acts on, after `after`, oldest first.
+    fn session_events_after(&self, after: i64, limit: i64) -> Result<Vec<crate::store::Event>> {
+        let store = self.store.lock().unwrap();
+        let mut stmt = store.conn.prepare(&format!(
+            "SELECT seq, ts, task_id, run_id, kind, source, confidence, payload FROM events WHERE seq > ?1 AND run_id IS NOT NULL AND kind IN ({}) AND (kind <> 'output' OR json_extract(payload, '$.role') = 'assistant') ORDER BY seq LIMIT ?2",
+            LOOP_KINDS.iter().map(|k| format!("'{k}'")).collect::<Vec<_>>().join(",")
+        ))?;
+        let rows = stmt.query_map(rusqlite::params![after, limit], |r| {
+            Ok(crate::store::Event {
+                seq: r.get(0)?,
+                ts: r.get(1)?,
+                task_id: r.get(2)?,
+                run_id: r.get(3)?,
+                kind: r.get(4)?,
+                source: r.get(5)?,
+                confidence: r.get(6)?,
+                payload: serde_json::from_str(&r.get::<_, String>(7)?).unwrap_or(Value::Null),
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+}
+
+async fn handle_events(daemon: Arc<Daemon>, events: Vec<crate::store::Event>) {
+    let _ = tokio::task::spawn_blocking(move || {
+        for e in events {
+            if let Err(err) = handle_event(&daemon, &e) {
+                crate::log(&format!("overseer session: {err:#}"));
+            }
+        }
+    })
+    .await;
+}
+
+/// What one event means for the session: Overseer's words, the end of its turn, an agent's turn
+/// starting or ending, and the free checks.
+fn handle_event(d: &Arc<Daemon>, e: &crate::store::Event) -> Result<()> {
+    let Some(run) = e.run_id.as_deref() else { return Ok(()) };
+    let payload = &e.payload;
+    let role = d.run_role(run);
+    match (e.kind.as_str(), role.as_str()) {
+        ("output", "overseer") if payload["role"] == "assistant" => d.overseer_said(run, payload["text"].as_str().unwrap_or(""))?,
+        ("status", "overseer") if payload["status"] == "failed" => {
+            d.overseer_cannot_answer(run)?;
+            d.overseer_turn_ended(run)?;
+        }
+        // Overseer's own run follows Continuity: while it waits, the conversation says why.
+        ("status", "overseer") if payload["status"] == crate::handoff::WAITING_FOR_CONNECTION || payload["status"] == crate::handoff::WAITING_FOR_MEMORY => d.overseer_waiting(run, payload["reason"].as_str().unwrap_or("its connection failed"))?,
+        ("turn_done", "overseer") | ("status", "overseer") => d.overseer_turn_ended(run)?,
+        ("turn_started", _) => {
+            d.dispatch_advance(run, "delivered", payload["turn"]["id"].as_str())?;
+            d.turn_started_for_check_in(run)?;
+            d.subject_turn_started(run)?;
+        }
+        // A second agent in a repository: the ones already working there get their briefing.
+        ("task_created", "agent") => {
+            d.brief_companions(run)?;
+            d.started_card(run, payload)?;
+        }
+        // A turn Continuity kept is sent again as the same turn: delivered now.
+        ("retry", _) if payload["sending"] == true => {
+            d.dispatch_advance(run, "delivered", payload["turn"].as_str())?;
+        }
+        ("turn_done", _) => {
+            d.dispatch_advance(run, "answered", None)?;
+            d.deliver_queued(run)?;
+            d.turn_ended_for_check_in(run)?;
+            d.subject_changed(run, "the subject's turn ended")?;
+        }
+        ("status", _) => {
+            d.deliver_queued(run)?;
+            d.release_due_holds("status", Some(run), payload)?;
+            let status = payload["status"].as_str().unwrap_or("");
+            d.finished_for_check_in(run, status)?;
+            d.subject_finishing(run, status)?;
+        }
+        ("file_activity", _) => {
+            let paths: Vec<String> = payload["paths"].as_array().map(|a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()).unwrap_or_default();
+            d.check_guardrails(run, &paths)?;
+            d.check_area(run, &paths)?;
+        }
+        // Claude's adapter reports a tool twice: its input when it starts and its
+        // outcome when it ends; only the outcome counts as a result.
+        ("tool_result", _) => {
+            let status = payload["status"].as_str().unwrap_or("");
+            let is_result = status == "completed" || status == "failed" || (status != "started" && !payload["output"].is_null());
+            d.check_circles(run, payload["id"].as_str().unwrap_or(""), &payload["input"], payload["is_error"] == true, is_result)?
+        }
+        ("guardrail_crossed", _) => d.free_check_tripped(run, "wrote across a guardrail")?,
+        ("conflict", _) if payload["needs_decision"] == true && payload["changed"] != true => d.free_check_tripped(run, "collides with another agent")?,
+        ("conflict_closed", _) => d.release_due_holds("conflict_closed", Some(run), payload)?,
+        _ => {}
+    }
+    Ok(())
 }
 
 /// The events the session loop waits for, to keep them in one place.
