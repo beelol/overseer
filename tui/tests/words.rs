@@ -11,27 +11,6 @@ use serde_json::json;
 use std::path::Path;
 use support::*;
 
-/// Whatever a screen shows that the owner must never read (the same list as test/ui/plain-words.js).
-fn leaks(screen: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    for line in screen.lines() {
-        for w in line.split(|c: char| c.is_whitespace() || "·›│┃║|()[],:;\"'".contains(c)) {
-            let w = w.trim_matches(|c: char| c == '.' || c == '…');
-            let snake = w.contains('_') && w.split('_').all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase()));
-            let id = w.split_once('-').is_some_and(|(p, r)| matches!(p, "r" | "p" | "sh" | "w") && r.len() >= 8 && r.chars().all(|c| c.is_ascii_hexdigit()));
-            if snake || id || w.starts_with("mcp__") || matches!(w, "claude" | "codex" | "opencode" | "tool-input" | "rate_limit") {
-                out.push(format!("{w:?} in {line:?}"));
-            }
-        }
-        for raw in ["os error", "Connection refused", "API Error", "turn reported failure", "(429)", "HTTP 4", "HTTP 5", "owner · vscode"] {
-            if line.contains(raw) {
-                out.push(format!("{raw:?} in {line:?}"));
-            }
-        }
-    }
-    out
-}
-
 #[test]
 fn t30_no_internal_words_and_overseer_markdown_as_a_list() {
     let t = tempfile::tempdir().unwrap();

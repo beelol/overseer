@@ -2,6 +2,11 @@
 //! internal id, snake_case state, lowercase harness id or raw error text; and Overseer's Markdown
 //! drawn as a terminal can (bullets, bold, headings, code without its marks).
 
+/// An account as VS Code names it: the machine's own login is "Your login", not "claude (existing login)".
+pub fn account(name: &str) -> String {
+    if name.ends_with(" (existing login)") { "Your login".into() } else { name.to_string() }
+}
+
 /// A harness by name: "Claude Code", never "claude".
 pub fn harness(id: &str) -> String {
     match id {
@@ -64,7 +69,11 @@ pub fn plain(text: &str) -> String {
 
 /// An agent's state words in Overseer's replies (it reads the daemon's roster): "waiting for you".
 pub fn states(text: &str) -> String {
-    let mut t = text.to_string();
+    // A proposal's or an agent's id echoed into the reply ("(proposal p-…)") is left out.
+    let mut t = text.split(' ').filter(|w| {
+        let core = w.trim_matches(|c: char| !(c.is_alphanumeric() || c == '-'));
+        !is_id(core) && *w != "(proposal"
+    }).collect::<Vec<_>>().join(" ");
     for (raw, word) in [("waiting_for_user", "waiting for you"), ("waiting_for_connection", "waiting for a connection"), ("waiting_for_memory", "waiting for memory"), ("handed_off", "handed off"), ("cancel_requested", "stopping")] {
         t = t.replace(raw, word);
     }

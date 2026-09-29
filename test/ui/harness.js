@@ -203,7 +203,10 @@ class Session {
   /** AC-245: reads the owner-facing text of the window and keeps what shows an internal word. */
   async checkWords(label) {
     if (process.env.OVERSEER_PLAIN_WORDS === 'off' || !this.cdp) return;
-    for (const hit of await plainWords.collect(this.cdp)) {
+    // Agents' titles and prompts are the owner's words, not Overseer's.
+    let owned = [];
+    try { const st = this.home ? this.ctl('state', {}, { wait: false }) : null; if (st) owned = [...(st.tasks || []).flatMap(t => [t.title, t.prompt]), ...(st.runs || []).map(r => r.title)]; } catch { /* no daemon */ }
+    for (const hit of await plainWords.collect(this.cdp, owned)) {
       const key = hit.where + '|' + hit.text;
       if (!this.words.has(key)) { this.words.set(key, { ...hit, at: label }); this.note('PLAIN WORDS: internal words on screen', hit); }
     }

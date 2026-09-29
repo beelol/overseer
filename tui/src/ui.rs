@@ -343,7 +343,7 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     let focused = app.focus.as_deref() == Some(run.id.as_str());
     let (glyph, color) = status_mark(&run.status);
     let border = if focused { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else { Style::new().fg(MUTED) };
-    let account = run.profile_id.as_deref().and_then(|p| app.state.profile(p)).map(|p| p.name.replace(" (existing login)", "")).unwrap_or_default();
+    let account = run.profile_id.as_deref().and_then(|p| app.state.profile(p)).map(|p| if p.name.ends_with(" (existing login)") { String::new() } else { p.name.clone() }).unwrap_or_default();
     let harness = crate::words::harness(&run.harness);
     let mut meta = vec![harness.clone()];
     // The desktop login is implied; name other accounts.
@@ -595,7 +595,7 @@ fn accounts(f: &mut Frame, app: &App, area: Rect) {
         };
         lines.push(Line::from(vec![
             Span::styled(if sel { "  › " } else { "    " }, Style::new().fg(accent())),
-            Span::styled(format!("{:<28}", fit(&a.name, 28)), if sel { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else { Style::new() }),
+            Span::styled(format!("{:<28}", fit(&crate::words::account(&a.name), 28)), if sel { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else { Style::new() }),
             Span::styled(format!("{:<14}", if a.follows_app { "follows app" } else { "fixed" }), Style::new().fg(MUTED)),
             Span::styled(format!("{mark} "), Style::new().fg(color)),
             Span::styled(text, Style::new().fg(if signed == Some(true) { Color::Reset } else { color })),
@@ -795,7 +795,7 @@ fn audio_mode(f: &mut Frame, app: &App, area: Rect) {
         Line::raw(format!("  Voice: {voice}    v/V changes installed macOS voice")),
         Line::raw(format!("  Commander: {commander}    i imports a private folder")),
         Line::raw(""),
-        Line::raw(format!("  Preview: {}    tab changes cue · p plays it", a.preview_key())),
+        Line::raw(format!("  Preview: {}    tab changes cue · p plays it", a.preview_key().replace('_', " "))),
         Line::raw(""),
         Line::raw("  space enable/disable    r refresh    esc close"),
     ];
@@ -840,10 +840,10 @@ fn new_agent(f: &mut Frame, form: &NewAgentForm, area: Rect) {
     };
     let home = std::env::var("HOME").unwrap_or_default();
     let repos: Vec<String> = form.repos.iter().map(|p| if !home.is_empty() && p.starts_with(&home) { format!("~{}", &p[home.len()..]) } else { p.clone() }).collect();
-    let harnesses: Vec<String> = form.harnesses.iter().map(|h| if h.2.is_empty() { h.0.clone() } else { format!("{} {}", h.0, h.2) }).collect();
+    let harnesses: Vec<String> = form.harnesses.iter().map(|h| if h.2.is_empty() { crate::words::harness(&h.0) } else { format!("{} {}", crate::words::harness(&h.0), h.2) }).collect();
     let accounts: Vec<String> = form.compatible().iter().map(|&i| {
         let a = &form.accounts[i];
-        format!("{}{}", a.1, match a.3 { Some(true) => "  ✓ signed in", Some(false) => "  ✗ not signed in", None => "" })
+        format!("{}{}", crate::words::account(&a.1), match a.3 { Some(true) => "  ✓ signed in", Some(false) => "  ✗ not signed in", None => "" })
     }).collect();
     let values: Vec<(String, String)> = vec![
         ("Repository".into(), choice(repos, form.repo)),

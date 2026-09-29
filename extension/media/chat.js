@@ -118,7 +118,7 @@
         items.push(w);
       }
       this.metaEl.replaceChildren(...items.flatMap((x, i) => (i ? [el('span', 'sep', '·'), x] : [x])));
-      if (run.exit_reason && /failed|interrupted|disconnected/.test(run.status)) this.metaEl.title = run.exit_reason; else this.metaEl.removeAttribute('title');
+      if (run.exit_reason && /failed|interrupted|disconnected/.test(run.status)) this.metaEl.title = window.OverseerPlain ? window.OverseerPlain.plain(run.exit_reason, 400) : run.exit_reason; else this.metaEl.removeAttribute('title');
 
       this.stopBtn.hidden = child || !msg.active || !msg.interruptSupported || !msg.trusted;
       const worktree = msg.workspace && msg.workspace.kind === 'worktree';
@@ -160,7 +160,7 @@
       const run = this.msg.run, ws = this.msg.workspace;
       const dl = el('dl');
       const row = (k, v, wrap) => { if (!v) return; const dd = el('dd', wrap ? 'wrap' : null, v); dd.title = v; dl.append(el('dt', null, k), dd); };
-      row('Status', ui.statusText(run.status) + (run.exit_reason ? ` (${run.exit_reason})` : ''), true);
+      row('Status', ui.statusText(run.status) + (run.exit_reason ? ` (${window.OverseerPlain ? window.OverseerPlain.plain(run.exit_reason, 400) : run.exit_reason})` : ''), true);
       row('Harness', `${ui.HARNESS[run.harness] || run.harness} ${run.harness_version || ''}`.trim());
       row('Account', this.msg.profile);
       row('Model', run.model);
@@ -279,7 +279,7 @@
       case 'output': return (p.role && p.role !== 'assistant' ? `[${p.role}] ` : '') + (p.text || '');
       case 'tool': return `${p.name}: ${p.summary || ''}`;
       case 'tool_result': return `${p.id || ''}${p.status ? ' [' + p.status + ']' : ''}${p.output ? ': ' + String(p.output).slice(0, 300) : ''}`;
-      case 'file_activity': return `${(p.paths || []).join(', ')} (${p.kind}, ${ev.confidence})`;
+      case 'file_activity': return `${(p.paths || []).join(', ')} (${p.kind})`;
       case 'error': return `[${p.class}] ${p.message}`;
       case 'status': return `${p.status}${p.reason ? ': ' + p.reason : ''}`;
       case 'turn_started': return `turn ${p.turn && p.turn.n}: ${(p.turn && p.turn.prompt) || ''}`;

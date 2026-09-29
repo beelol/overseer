@@ -213,7 +213,8 @@
       const usage = this.childUsage.get(runId);
       block.summary.replaceChildren(ui.icon('type-hierarchy-sub', 'sm child-mark'), title,
         ...(usage ? [el('span', 'child-usage', usage.label)] : []), ui.status(st));
-      block.summary.title = [info.title, ui.statusText(st), usage?.detail, info.evidence || info.relation_source].filter(Boolean).join('\n');
+      // Its title, state and usage; how it was linked to its parent is the daemon's business (AC-245).
+      block.summary.title = [info.title, ui.statusText(st), usage?.detail].filter(Boolean).join('\n');
     }
 
     toolCard(ev, id, name) {
@@ -436,11 +437,13 @@
           const TITLES = { auth: 'Signed out', rate_limit: 'Rate limited', quota: 'Usage limit reached', network: 'Connection problem' };
           const e = el('div', 'error-block'); e.setAttribute('role', 'alert');
           const head = el('div', 'error-head'); head.append(ui.icon('error', 'sm'), el('strong', null, TITLES[p.class] || 'Error'));
-          e.append(head, el('div', 'text', p.message || ''));
-          e.title = p.class || 'error';
+          // The harness's words in plain words (AC-245): no raw [rate_limit], HTTP code or OS error.
+          const plainWords = t => (window.OverseerPlain ? window.OverseerPlain.plain(t, 600) : t);
+          e.append(head, el('div', 'text', plainWords(p.message || '')));
+          e.title = TITLES[p.class] || 'Error';
           if (p.class === 'auth') {
             const b = el('button', 'btn sm sign-in-again', 'Sign in again'); b.type = 'button';
-            b.setAttribute('aria-label', 'Sign in again with this run\'s account');
+            b.setAttribute('aria-label', 'Sign in again with this agent\'s account');
             b.addEventListener('click', () => this.opts.post({ type: 'signIn' }));
             e.append(b);
           }
@@ -467,10 +470,11 @@
           // A turn the user stopped reads "Stopped"; a failed one shows its reason once.
           const stopped = !p.ok && this.stopping;
           const label = p.ok ? 'Done' : stopped ? 'Stopped' : 'Failed';
-          const reason = !p.ok && !stopped && !t.hadError && p.summary ? String(p.summary).split('\n')[0].slice(0, 160) : '';
+          const said = t => (window.OverseerPlain ? window.OverseerPlain.plain(t, 400) : t);
+          const reason = !p.ok && !stopped && !t.hadError && p.summary ? said(String(p.summary).split('\n')[0]).slice(0, 160) : '';
           t.done.replaceChildren(ui.icon(p.ok ? 'check' : stopped ? 'circle-slash' : 'error', 'xs'), el('span', null, reason ? `${label}: ${reason}` : label));
           t.done.className = 'done ' + (p.ok ? 'ok' : stopped ? 'stopped' : 'fail');
-          if (p.summary && !p.ok) t.done.title = p.summary;
+          if (p.summary && !p.ok) t.done.title = said(p.summary);
           this.stopping = false;
           const end = ev.ts_ms || ev.ts;
           if (t.started && end && end > t.started) t.dur.textContent = ui.duration(end - t.started);
@@ -544,7 +548,7 @@
         if (t && p.status === 'interrupted') { t.foot.hidden = false; t.ended = true; t.done.replaceChildren(ui.icon('circle-slash', 'xs'), el('span', null, 'Stopped')); t.done.className = 'done stopped'; this.stopping = false; return; }
         const line = el('div', `sys status-line status-${p.status}`);
         line.append(ui.icon(p.status === 'interrupted' ? 'circle-slash' : 'error', 'xs'), el('span', null, ui.statusText(p.status)));
-        if (p.reason) line.title = p.reason;
+        if (p.reason) line.title = window.OverseerPlain ? window.OverseerPlain.plain(p.reason, 400) : p.reason;
         this.container(ev).append(line);
       }
     }

@@ -24,7 +24,7 @@ function leaks(text) {
 }
 
 // Content, not chrome: what agents and the owner wrote, code, diffs and typed input.
-const CONTENT = ['.msg', '.md', 'pre', 'code', '.codeblock', '.home-text', '.home-voice-heard', '.card-text', '.card-detail', '.proposal-list', '.card-row-agent', '.tile-body', '.tile-perm-text', '.perm-card', '.tool', '.tool-detail', '.cont-fold',
+const CONTENT = ['.msg', '.md', 'pre', 'code', '.codeblock', '.home-text', '.home-voice-heard', '.card-text', '.card-detail', '.proposal-list', '.card-row-agent', '.tile-body', '.tile-perm-text', '.perm-card', '.tool', '.tool-detail', '.cont-fold', '#log', '#rawout', '.raw-out', '.details-panel',
   '.diff', '.hunk', '.file-list', '.files', '.review-body', '.monaco-editor', '.xterm', '.terminal', 'input', 'textarea', '[contenteditable]', '.chat-title', '.tile-title', '.agent-mention', '.repo-picker', '.req-stage', '.home-progress', '#voice-heard', '.voice-said', '.voice-words', '.transcript', '[data-content]'].join(', ');
 
 /** The owner-facing text of an Overseer webview (evaluated inside the frame). */
@@ -54,10 +54,15 @@ const WORKBENCH = `(() => {
   return out.filter(Boolean);
 })()`;
 
-/** Reads the window's owner-facing text now; returns [{ where, text, leaks }] for texts that leak. */
-async function collect(cdp) {
+/**
+ * Reads the window's owner-facing text now; returns [{ where, text, leaks }] for texts that leak.
+ * `owned` are words the owner or an agent wrote (agent titles, prompts): taken out before the check.
+ */
+async function collect(cdp, owned = []) {
   const found = [];
-  const add = (where, texts) => { for (const t of texts || []) { const l = leaks(t); if (l.length) found.push({ where, text: String(t).slice(0, 300), leaks: l }); } };
+  const mine = [...new Set(owned.filter(w => w && w.length > 2))].sort((a, b) => b.length - a.length);
+  const strip = t => mine.reduce((x, w) => x.split(w).join('«»'), String(t));
+  const add = (where, texts) => { for (const t of texts || []) { const l = leaks(strip(t)); if (l.length) found.push({ where, text: String(t).slice(0, 300), leaks: l }); } };
   try { add('workbench', await cdp.evalWorkbench(WORKBENCH)); } catch { /* the window is going */ }
   try {
     const frames = await cdp.webviews(`!document.querySelector('.monaco-workbench') && !!document.querySelector('link[href*="tokens.css"], #diffs')`);

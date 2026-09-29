@@ -32,6 +32,7 @@
     if (/\[rate_limit\]|\brate[ _-]?limit(?:ed)?\b|\b429\b|usage limit|quota exceeded/i.test(t)) return 'It hit its usage limit. It can go on later, or on another account.';
     t = t.replace(/\bturn reported failure;?\s*(?:last error)?:?\s*/gi, '');
     t = t.replace(/\bAPI Error:?\s*/g, '');
+    t = t.replace(/\s*error sending request for url \([^)]*\)/gi, ' could not reach it');
     t = t.replace(/\b([a-z_]+) failed: /g, (m, a) => `${ACTION_WORD[a] || 'That'} did not work: `);
     t = t.replace(/\b(?:Error|error|anyhow|panicked at|fatal)[:!]\s*/g, '');
     t = t.replace(/\s*(?:Caused by|caused by|Stack backtrace|stack backtrace)[\s\S]*$/, '');
@@ -53,7 +54,7 @@
   }
 
   /** An agent's state words in Overseer's own replies (it reads the daemon's roster): "waiting for you", not waiting_for_user. */
-  const states = text => String(text || '').replace(/\b(waiting_for_user|waiting_for_connection|waiting_for_memory|handed_off|cancel_requested|not_for_overseer)\b/g, m => TOKENS[m]);
+  const states = text => String(text || '').replace(/\s*\((?:proposal\s+)?(?:r|p|sh|w)-[0-9a-f]{6,}\)/g, '').replace(/\b(waiting_for_user|waiting_for_connection|waiting_for_memory|handed_off|cancel_requested|not_for_overseer)\b/g, m => TOKENS[m]);
 
   /** Who answered and where, in words: "You, in VS Code". */
   function answeredBy(by, surface) {
