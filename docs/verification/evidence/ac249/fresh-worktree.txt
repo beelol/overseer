@@ -1,0 +1,11 @@
+# AC-249: scripts/dev code in a fresh worktree (no manual npm ci), 2026-09-28, branch commit c3becdd7
+$ git worktree add --detach <scratch>/fresh-wt HEAD   # no extension/tooling/vsce/node_modules
+$ OVERSEER_DEV_ROOT=/tmp/ovs-dvx-… scripts/dev up --name fresh --json   → exit 0
+$ scripts/dev code --name fresh --inspect   → exit 0
+installing the packaging tools in extension/tooling/vsce (first time in this checkout)
+installing the packaging tools in extension/branch-diff/tooling/review (first time in this checkout)
+packaging the extension in <scratch>/fresh-wt
+ DONE  Packaged: <scratch>/fresh-wt/extension/overseer-0.1.0.vsix (200 files, 14.12 MB)
+VS Code opened for dev-fresh (profile /tmp/ovs-dvx-7Ctk/fresh/vscode/profile; extension overseer-0.1.0.vsix). Its status bar reads "Overseer dev-fresh". Close it with scripts/dev down --name fresh.
+profile User/settings.json: window.dialogStyle = "custom"
+$ scripts/dev clean --all   → Dev daemon dev-fresh: stopped and removed; processes left under the dev root: 0
