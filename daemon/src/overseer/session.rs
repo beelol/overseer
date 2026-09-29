@@ -1261,10 +1261,10 @@ pub fn start(daemon: Arc<Daemon>) {
                 }
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
                     crate::log(&format!("overseer session: fell {n} events behind; catching up from the stored events"));
+                    let mut after = seen.top() - CATCH_UP_SLACK;
                     loop {
-                        let from = seen.top() - CATCH_UP_SLACK;
                         let d = daemon.clone();
-                        let page = match tokio::task::spawn_blocking(move || d.session_events_after(from, CATCH_UP_PAGE)).await {
+                        let page = match tokio::task::spawn_blocking(move || d.session_events_after(after, CATCH_UP_PAGE)).await {
                             Ok(Ok(page)) => page,
                             Ok(Err(err)) => {
                                 crate::log(&format!("overseer session: catching up failed: {err:#}"));
@@ -1273,6 +1273,9 @@ pub fn start(daemon: Arc<Daemon>) {
                             Err(_) => break,
                         };
                         let full = page.len() as i64 == CATCH_UP_PAGE;
+                        if let Some(last) = page.last() {
+                            after = last.seq;
+                        }
                         let fresh: Vec<crate::store::Event> = page.into_iter().filter(|e| seen.first(e.seq) && loop_wants(e)).collect();
                         if !fresh.is_empty() {
                             handle_events(daemon.clone(), fresh).await;
@@ -1290,10 +1293,13 @@ pub fn start(daemon: Arc<Daemon>) {
 
 /// The kinds the session loop acts on (`handle_event`).
 const LOOP_KINDS: [&str; 11] = ["output", "status", "turn_done", "turn_started", "task_created", "retry", "file_activity", "tool_result", "guardrail_crossed", "conflict", "conflict_closed"];
-/// An event is numbered when it is stored and sent a moment later, so a few can arrive out of
-/// order: a catch-up starts this far before the newest event handled.
-const CATCH_UP_SLACK: i64 = 256;
+/// An event is numbered when it is stored and sent after its batch commits, so events can arrive
+/// out of order by up to a batch of a run's output: a catch-up starts this far (in event numbers)
+/// before the newest event handled. Only the kinds the loop acts on are read back.
+const CATCH_UP_SLACK: i64 = 20_000;
 const CATCH_UP_PAGE: i64 = 1000;
+/// The handled events remembered, newest first, so a catch-up and the bus never handle one twice.
+const SEEN_KEPT: usize = 32_768;
 
 /// Only an agent's run events matter, and of output only what a model said (never a flood of
 /// program output).
@@ -1301,30 +1307,29 @@ fn loop_wants(e: &crate::store::Event) -> bool {
     e.run_id.is_some() && LOOP_KINDS.contains(&e.kind.as_str()) && (e.kind != "output" || e.payload["role"] == "assistant")
 }
 
-/// The events already handled, so a catch-up and the bus never handle one twice.
+/// The events already handled, so a catch-up and the bus never handle one twice. Events from
+/// before the loop started are not its business.
 struct Seen {
-    floor: i64,
+    start: i64,
     set: std::collections::BTreeSet<i64>,
 }
 
 impl Seen {
-    fn new(floor: i64) -> Self {
-        Seen { floor, set: std::collections::BTreeSet::new() }
+    fn new(start: i64) -> Self {
+        Seen { start, set: std::collections::BTreeSet::new() }
     }
     /// True the first time an event is seen.
     fn first(&mut self, seq: i64) -> bool {
-        if seq <= self.floor || !self.set.insert(seq) {
+        if seq <= self.start || !self.set.insert(seq) {
             return false;
         }
-        if self.set.len() > 8 * CATCH_UP_SLACK as usize {
-            self.floor = self.top() - 4 * CATCH_UP_SLACK;
-            let floor = self.floor;
-            self.set.retain(|s| *s > floor);
+        if self.set.len() > SEEN_KEPT {
+            self.set.pop_first();
         }
         true
     }
     fn top(&self) -> i64 {
-        self.set.last().copied().unwrap_or(self.floor)
+        self.set.last().copied().unwrap_or(self.start)
     }
 }
 
