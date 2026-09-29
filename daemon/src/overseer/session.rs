@@ -807,14 +807,7 @@ impl Daemon {
                 if a["repo"].as_str().unwrap_or("").is_empty() || a["prompt"].as_str().unwrap_or("").is_empty() {
                     bail!("start needs a repository and a prompt");
                 }
-                let mut a = a.clone();
-                self.start_route(&mut a)?;
-                // Starting an Auto root is the owner's (the Auto contract: Overseer's level grants
-                // no route): one Overseer starts by itself on Auto's pick waits for their yes.
-                if a["route"]["how"] == "auto" && !owner_asked {
-                    a["class"] = json!(super::control::CONFIRM);
-                }
-                checked.push(a);
+                checked.push(a.clone());
             }
         }
         let text_len: usize = checked.iter().map(|a| a["text"].as_str().map(str::len).unwrap_or(0) + a["prompt"].as_str().map(str::len).unwrap_or(0)).sum();
@@ -842,8 +835,25 @@ impl Daemon {
         // A spoken request (Gate R): the owner's words quoted in each message, the delivery setting,
         // more new agents than the owner's limit wait for a yes.
         let mut needs_yes = false;
+        let named_by_overseer: Vec<bool> = checked.iter().map(|a| ["harness", "model", "profile", "profile_id", "effort", "permission_mode"].iter().any(|k| a[*k].as_str().is_some_and(|v| !v.is_empty()))).collect();
         if voice {
             needs_yes = crate::voice::request::decorate(self, &mut checked)?;
+        }
+        // Where each new agent runs (AC-237), after a spoken request took the composer's
+        // remembered harness, account and model (AC-168).
+        for (a, named) in checked.iter_mut().zip(named_by_overseer) {
+            if a["action"] != "start" {
+                continue;
+            }
+            self.start_route(a)?;
+            if voice && !named && a["route"]["how"] == "named" {
+                a["route"]["why"] = json!("your composer's choice");
+            }
+            // Starting an Auto root is the owner's (the Auto contract: Overseer's level grants
+            // no route): one Overseer starts by itself on Auto's pick waits for their yes.
+            if a["route"]["how"] == "auto" && !owner_asked {
+                a["class"] = json!(super::control::CONFIRM);
+            }
         }
         // A swarm action's class is the daemon's own (set above from its op); any other action is
         // Confirm by the action table or when the daemon marked it so, whatever the plan claims.
