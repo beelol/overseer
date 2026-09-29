@@ -2402,6 +2402,49 @@ rec(235, "You can always see which account an agent uses", "not started", date="
     expected="See the RFC criterion (added by the owner on 2026-09-28).",
     actual="Not started: the agent header shows only \"Your login\" (the owner's voice session, 2026-09-28).", live="—", blocker="With the account work after the one-view build.")
 
+rec(236, "Home talks to Overseer first", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(237, "Overseer starts agents on the right harness, model and account", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(238, "Overseer checks finished work and offers the next step", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(239, "Stuck, failed and limited agents come back to Overseer", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(240, "You hear about it outside VS Code", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(241, "A waiting agent can always be answered", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(242, "Keys act only on what you can see", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(243, "Merge from the agent, and it reads merged afterwards", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(244, "Opening an agent leaves your layout alone", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(245, "No internal words on any surface", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(246, "One name for each thing", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(247, "Home's input is always on screen", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(248, "Overseer's session never drops what it was told", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(249, "Test windows never reach the owner's screen", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+
 SHORT_BLOCKERS = {
     154: "verified",
     155: "verified",
@@ -2566,6 +2609,20 @@ SHORT_BLOCKERS = {
     233: "not started (added by the owner on 2026-09-28)",
     234: "not started (added by the owner on 2026-09-28)",
     235: "not started (added by the owner on 2026-09-28)",
+    236: "not started (the usability audit, 2026-09-28)",
+    237: "not started (the usability audit, 2026-09-28)",
+    238: "not started (the usability audit, 2026-09-28)",
+    239: "not started (the usability audit, 2026-09-28)",
+    240: "not started (the usability audit, 2026-09-28)",
+    241: "not started (the usability audit, 2026-09-28)",
+    242: "not started (the usability audit, 2026-09-28)",
+    243: "not started (the usability audit, 2026-09-28)",
+    244: "not started (the usability audit, 2026-09-28)",
+    245: "not started (the usability audit, 2026-09-28)",
+    246: "not started (the usability audit, 2026-09-28)",
+    247: "not started (the usability audit, 2026-09-28)",
+    248: "not started (the usability audit, 2026-09-28)",
+    249: "not started (the usability audit, 2026-09-28)",
 }
 TOTAL = 53
 
