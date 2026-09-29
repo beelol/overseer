@@ -463,7 +463,7 @@ From the usability audit of 2026-09-28 ([report](audits/2026-09-28-usability.md)
 - [ ] **AC-246 — One name for each thing.**
 - [ ] **AC-247 — Home's input is always on screen.**
 - [ ] **AC-248 — Overseer's session never drops what it was told.**
-- [ ] **AC-249 — Test windows never reach the owner's screen.**
+- [x] **AC-249 — Test windows never reach the owner's screen.**
 
 Owner request (2026-09-28, overnight goal [zero friction](goals/zero-friction.md)): opening it, telling it to do something, changing course, following an agent and switching to Manual edit must take no effort, with better UX than standard VS Code.
 
