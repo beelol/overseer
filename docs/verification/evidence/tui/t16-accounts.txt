@@ -14,14 +14,14 @@
                       ╭ accounts ────────────────────────────────────────────────────────────────────────────────────╮                      
                       │                                                                                              │                      
                       │  OpenAI / ChatGPT                                                                            │                      
-                      │  › codex (existing login)      follows app   ✓ signed in · pro · 55b9da0f                    │                      
+                      │  › Mac's default login         follows app   ✓ signed in · Pro · des…@example.invalid        │                      
                       │    ChatGPT Work                fixed         ✗ not signed in                                 │                      
                       │                                                                                              │                      
                       │  Anthropic / Claude                                                                          │                      
-                      │    claude (existing login)     follows app   ✗ not signed in                                 │                      
+                      │    Mac's default login         follows app   ✗ not signed in                                 │                      
                       │                                                                                              │                      
                       │  OpenCode (local models)                                                                     │                      
-                      │    opencode (existing login)   follows app   ✗ not signed in                                 │                      
+                      │    Mac's default login         follows app   ✗ not signed in                                 │                      
                       │                                                                                              │                      
                       ╰─────────────────────────────── account login only · never API keys · s signs in · esc closes ╯                      
                                                                                                                                             

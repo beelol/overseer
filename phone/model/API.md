@@ -63,10 +63,11 @@ again: `Task`, `Run`, `RunStatus`, `Turn`, `Workspace`, `Profile`, `Event`, `Sta
 | `interface NeedsYou { run_id: string; rank: number; label: string; detail: string }` | One agent that needs the owner, and why. |
 | `needsYou(state: PhoneState, options: Pick<AgentsOptions, 'now' \| 'seen' \| 'changed'>): ReadonlyArray<NeedsYou>` | The Needs you list, most urgent first. |
 | `counts(state: PhoneState, options: Pick<AgentsOptions, 'now' \| 'seen' \| 'changed'>): { active: number; needs: number }` | For a badge and a status line. |
+| `accountName(p)`, `accountLabel(p)`, `accountShort(p)`, `DEFAULT_LOGIN` | How an account is named (AC-235): the Mac's own login is "Mac's default login"; the label is the daemon's (provider and plan, the shortened email, whose login), the short form leaves out whose login. |
 | `searchLocally(state: PhoneState, query: string): ReadonlyArray<string>` | Task ids whose title, repository, harness, model, account or prompt holds `query`. |
 | `emptyText(state: PhoneState, options: AgentsOptions): string \| null` | What to say when the list has no rows; `null` when it has rows. |
 | `logoForHarness(harness: string): LogoKey \| null`, `logoForProvider(provider: string): LogoKey \| null` | The logo of a harness or provider. |
-| `interface RunHeader { runId: string; title: string; status: string; statusText: string; statusIcon: string; logo: LogoKey \| null; icon: string \| null; account: string; accountTooltip: string; model: string \| null; branch: string \| null; branchIcon: string \| null; branchTooltip: string \| null; exitReason: string \| null; child: boolean; active: boolean; archived: boolean; canSend: boolean; canStop: boolean; placeholder: string }` | The head of a conversation: title, status and one quiet line (account, model, branch). |
+| `interface RunHeader { runId: string; title: string; status: string; statusText: string; statusIcon: string; logo: LogoKey \| null; icon: string \| null; account: string; accountShort: string; accountTooltip: string; model: string \| null; branch: string \| null; branchIcon: string \| null; branchTooltip: string \| null; exitReason: string \| null; child: boolean; active: boolean; archived: boolean; canSend: boolean; canStop: boolean; placeholder: string }` | The head of a conversation: title, status and one quiet line (account, model, branch). |
 | `runHeader(state: PhoneState, runId: string): RunHeader \| undefined` | The header of a run's conversation. |
 
 ## `conversation`: one agent's conversation

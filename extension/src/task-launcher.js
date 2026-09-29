@@ -105,7 +105,7 @@ class TaskLauncher {
   accounts() {
     return (this.model.accounts || []).map(a => {
       const st = this.model.profileStatus.get(a.id);
-      return { ...a, signedIn: !!st?.logged_in, installed: st?.installed === true, plan: st?.identity?.plan, fingerprint: (st?.identity?.account_fingerprint || st?.identity?.fingerprint || '').slice(0, 8), usage: this.model.accountUsage?.get(a.id) };
+      return { ...a, signedIn: !!st?.logged_in, installed: st?.installed === true, plan: a.account?.plan || st?.identity?.plan, label: a.account?.label || a.name, short: a.account?.short || a.name, fingerprint: (st?.identity?.account_fingerprint || st?.identity?.fingerprint || '').slice(0, 8), usage: this.model.accountUsage?.get(a.id) };
     });
   }
 

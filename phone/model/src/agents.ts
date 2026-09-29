@@ -9,7 +9,26 @@ import { childrenOf, profile as profileOf, rows as rowsOfTable, run as runOf, ta
 import type { PhoneState } from './store.ts';
 import { ago, basename, firstLine, listStatusText, PHONE_ONLY, statusText, TEXT } from './text.ts';
 import { isActive, record } from './types.ts';
-import type { Run, Task } from './types.ts';
+import type { Profile, Run, Task } from './types.ts';
+
+/** What the Mac's own login is called, as VS Code calls it (AC-235, views.js `DEFAULT_LOGIN`). */
+export const DEFAULT_LOGIN = "Mac's default login";
+
+/** An account's own name: the Mac's login is "Mac's default login", never "claude (existing login)". */
+export function accountName(p: Profile | undefined): string {
+  if (p === undefined) return '';
+  return p.is_system || / \(existing login\)$/.test(p.name || '') ? DEFAULT_LOGIN : p.name;
+}
+
+/** The account an agent runs on, in full (AC-235): "Claude Max · bil…@testbox.com · Mac's default login". */
+export function accountLabel(p: Profile | undefined): string {
+  return p === undefined ? '' : p.account?.label || accountName(p);
+}
+
+/** The same where room is tight: "Claude Max · bil…@testbox.com". */
+export function accountShort(p: Profile | undefined): string {
+  return p === undefined ? '' : p.account?.short || accountName(p);
+}
 
 export type AgentFilter = 'all' | 'active' | 'needs';
 export type LogoKey = 'claudecode' | 'codex' | 'opencode' | 'claude' | 'openai' | 'github' | 'anthropic';
@@ -126,7 +145,7 @@ export function searchLocally(state: PhoneState, query: string): ReadonlyArray<s
   const has = (value: unknown): boolean => typeof value === 'string' && value.toLowerCase().includes(q);
   return rowsOfTable(state.tasks).filter(t => {
     const r = roots.get(t.id);
-    return has(t.title) || has(t.prompt) || has(t.repo_root) || (r !== undefined && (has(r.title) || has(r.harness) || has(TEXT.harness[r.harness]) || has(r.model) || has(profileOf(state, r.profile_id)?.name)));
+    return has(t.title) || has(t.prompt) || has(t.repo_root) || (r !== undefined && (has(r.title) || has(r.harness) || has(TEXT.harness[r.harness]) || has(r.model) || has(accountLabel(profileOf(state, r.profile_id)))));
   }).map(t => t.id);
 }
 
@@ -239,8 +258,8 @@ function build(state: PhoneState, options: AgentsOptions): AgentRow[] {
       const status = listStatusText(run.status);
       const going = isActive(run.status);
       const isPinned = pinned.includes(run.id);
-      const tooltip = [task.title, `${status}${run.exit_reason && !going ? ` — ${run.exit_reason}` : ''}`, [run.harness, account?.name, run.model].filter(Boolean).join(' · '), ws ? `${ws.kind === 'current' ? t.currentCheckout : ws.branch} · ${basename(task.repo_root)}` : ''].filter(Boolean).join('\n');
-      out.push({ id: rowId, kind: 'agent', depth: 1, label: task.title, description: going ? '' : ago(run.ended_ms || run.created_ms, options.now), tooltip, accessibilityLabel: `${task.title}, ${status}, ${run.harness}${account ? ', ' + account.name : ''}`, ...picture(run.harness), ...mark(run.status), runId: run.id, taskId: task.id, repo, expandable: kids.length > 0, expanded, context: `agent-${going ? 'active' : 'done'}${task.archived_ms ? '-archived' : ''}${isPinned ? '-pinned' : ''}`, active: going, archived: !!task.archived_ms, pinned: isPinned });
+      const tooltip = [task.title, `${status}${run.exit_reason && !going ? ` — ${run.exit_reason}` : ''}`, [TEXT.harness[run.harness] || run.harness, accountLabel(account), run.model].filter(Boolean).join(' · '), ws ? `${ws.kind === 'current' ? t.currentCheckout : ws.branch} · ${basename(task.repo_root)}` : ''].filter(Boolean).join('\n');
+      out.push({ id: rowId, kind: 'agent', depth: 1, label: task.title, description: [going ? '' : ago(run.ended_ms || run.created_ms, options.now), accountShort(account)].filter(Boolean).join(' · '), tooltip, accessibilityLabel: `${task.title}, ${status}, ${TEXT.harness[run.harness] || run.harness}${account ? ', ' + accountLabel(account) : ''}`, ...picture(run.harness), ...mark(run.status), runId: run.id, taskId: task.id, repo, expandable: kids.length > 0, expanded, context: `agent-${going ? 'active' : 'done'}${task.archived_ms ? '-archived' : ''}${isPinned ? '-pinned' : ''}`, active: going, archived: !!task.archived_ms, pinned: isPinned });
       if (expanded) for (const kid of kids) child(kid, 2);
     }
   }
@@ -267,8 +286,10 @@ export interface RunHeader {
   readonly statusIcon: string;
   readonly logo: LogoKey | null;
   readonly icon: string | null;
-  /** The account's name, or the harness when it has none. */
+  /** The account it runs on (AC-235): provider and plan, the shortened email, whose login; the harness when it has none. */
   readonly account: string;
+  /** The account where room is tight ("Claude Max · bil…@testbox.com"); empty when it has none. */
+  readonly accountShort: string;
   readonly accountTooltip: string;
   readonly model: string | null;
   /** The branch's last part, or "current checkout". */
@@ -305,7 +326,7 @@ export function runHeader(state: PhoneState, runId: string): RunHeader | undefin
   return {
     runId: run.id, title: run.title || firstLine(task?.prompt) || TEXT.chat.agent, status: run.status, statusText: statusText(run.status),
     statusIcon: ['running', 'starting', 'queued'].includes(run.status) ? 'dot' : icons[run.status] || 'question', ...picture(run.harness),
-    account: account?.name || harness, accountTooltip: `${harness}${run.harness_version ? ' ' + run.harness_version : ''}${account ? ' · ' + account.name : ''}`, model: run.model || null,
+    account: accountLabel(account) || harness, accountShort: accountShort(account), accountTooltip: `${harness}${run.harness_version ? ' ' + run.harness_version : ''}${account ? '\nAccount: ' + accountLabel(account) : ''}`, model: run.model || null,
     branch: ws ? (worktree ? basename(ws.branch) : TEXT.chat.currentCheckout) : null, branchIcon: ws ? (worktree ? 'git-branch' : 'repo') : null,
     branchTooltip: ws ? `${worktree ? ws.branch : TEXT.chat.currentCheckoutTitle}\n${ws.path}` : null,
     exitReason: run.exit_reason && /failed|interrupted|disconnected/.test(run.status) ? run.exit_reason : null,

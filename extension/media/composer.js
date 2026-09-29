@@ -151,8 +151,8 @@
       const repo = data.repos.find(r => r.path === form.repo);
       setChip(repoChip, 'repo', repo ? repo.name : 'Choose repository', repo ? `${repo.path}${repo.branch ? `\nOn ${repo.branch}` : ''}` : 'Choose a Git repository');
       const hx = harness(), a = account();
-      const agentLabel = form.routing === 'auto' ? `Auto routing${form.preferredHarness ? ' · prefer ' + (ui.HARNESS[form.preferredHarness] || form.preferredHarness) : ''}` : form.harness === 'generic' ? 'Program' : `${ui.HARNESS[form.harness] || form.harness || 'Agent'}${a ? ' · ' + a.name : ''}`;
-      setChip(agentChip, form.routing === 'auto' ? 'sparkle' : ui.harnessMark(form.harness, 14), agentLabel, form.routing === 'auto' ? 'Selects an eligible account, agent, model and effort for each work unit' : [hx && `${ui.HARNESS[hx.harness]} ${hx.version || ''}`, a && `${a.name}: ${a.signedIn ? 'signed in' + (a.plan ? ' · ' + a.plan : '') : 'not signed in'}`, a && ui.usageDetail(a.usage)].filter(Boolean).join('\n'));
+      const agentLabel = form.routing === 'auto' ? `Auto routing${form.preferredHarness ? ' · prefer ' + (ui.HARNESS[form.preferredHarness] || form.preferredHarness) : ''}` : form.harness === 'generic' ? 'Program' : `${ui.HARNESS[form.harness] || form.harness || 'Agent'}${a ? ' · ' + (a.short || a.name) : ''}`;
+      setChip(agentChip, form.routing === 'auto' ? 'sparkle' : ui.harnessMark(form.harness, 14), agentLabel, form.routing === 'auto' ? 'Selects an eligible account, agent, model and effort for each work unit' : [hx && `${ui.HARNESS[hx.harness]} ${hx.version || ''}`, a && `${a.label || a.name}: ${a.signedIn ? 'signed in' : 'not signed in'}`, a && ui.usageDetail(a.usage)].filter(Boolean).join('\n'));
       modelChip.hidden = toOverseer() || form.routing === 'auto' || form.harness === 'generic';
       setChip(modelChip, 'sparkle', form.model || 'Default model', form.model ? `Model: ${form.model}` : 'The harness default model');
       setChip(modeChip, form.mode === 'current' ? 'repo' : 'git-branch', form.mode === 'current' ? 'Current checkout' : 'New worktree', form.mode === 'current' ? 'Works directly in your checkout' : `A new branch and worktree${form.ref ? ' from ' + form.ref : ''}; your checkout is untouched`);
@@ -337,8 +337,8 @@
         if (hx.harness === 'generic') { items.push({ label: 'Run a program', logo: ui.harnessMark('generic', 14), checked: form.routing !== 'auto' && form.harness === 'generic', run: () => { form.routing = 'manual'; form.harness = 'generic'; save(); } }); continue; }
         const accts = data.accounts.filter(a => (a.harnesses || []).includes(hx.harness));
         if (!accts.length) items.push({ label: 'Add account…', icon: 'person-add', run: () => post({ type: 'command', command: 'overseer.addProfile' }) });
-        for (const a of accts) items.push({ label: a.name, logo: ui.harnessMark(hx.harness, 14), hint: a.signedIn ? (ui.usageText(a.usage) || a.plan || '') : 'signed out', checked: form.routing !== 'auto' && form.harness === hx.harness && form.account === a.id,
-          title: `${a.name}: ${a.signedIn ? 'signed in' : 'not signed in'}${a.kind === 'follows-app' ? ' · follows the desktop app' : ''}`, run: () => { form.routing = 'manual'; form.harness = hx.harness; form.account = a.id; if (!MODELS[hx.harness]?.includes(form.model)) form.model = ''; save(); } });
+        for (const a of accts) items.push({ label: a.name, logo: ui.harnessMark(hx.harness, 14), hint: a.signedIn ? [a.account && a.account.email ? a.short : a.plan, ui.usageText(a.usage)].filter(Boolean).join(' · ') : 'signed out', checked: form.routing !== 'auto' && form.harness === hx.harness && form.account === a.id,
+          title: `${a.label || a.name}: ${a.signedIn ? 'signed in' : 'not signed in'}${a.kind === 'follows-app' ? ' · follows the desktop app' : ''}`, run: () => { form.routing = 'manual'; form.harness = hx.harness; form.account = a.id; if (!MODELS[hx.harness]?.includes(form.model)) form.model = ''; save(); } });
       }
       if (window.OverseerContinuity) window.OverseerContinuity.agentMenu(items, { data, form, save });
       ui.menu(agentChip, items, { label: 'Agent' });

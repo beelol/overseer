@@ -17,6 +17,10 @@ export interface Account {
   readonly provider: string;
   /** True for the desktop app's own login, which Overseer never changes. */
   readonly followsApp: boolean;
+  /** The account's email, its local part shortened ("bil…@testbox.com", AC-235), once known. */
+  readonly email: string | null;
+  /** The plan as the Mac names it ("Max"), once known. */
+  readonly plan: string | null;
 }
 
 export interface ProviderGroup {
@@ -138,10 +142,12 @@ export function byProvider(
     const held = groups.get(provider) ?? [];
     held.push({
       id: profile.id,
-      name: profile.name,
+      name: agents.accountName(profile),
       harness: profile.harness,
       provider,
       followsApp: profile.is_system,
+      email: profile.account?.email ?? null,
+      plan: profile.account?.plan ?? null,
     });
     groups.set(provider, held);
   }
@@ -165,16 +171,17 @@ export function planName(status: Status | undefined, usage: Usage | undefined): 
   return plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : null;
 }
 
-/** "Signed in · Pro", "Signed out", or that it is not known yet. */
+/** "Signed in · Pro · bil…@testbox.com", "Signed out", or that it is not known yet. */
 export function stateText(
   status: Status | undefined,
   usage: Usage | undefined,
   checking: boolean,
+  account?: Pick<Account, 'email' | 'plan'>,
 ): string {
   if (!status) return checking ? ACCOUNTS.checking : ACCOUNTS.notChecked;
   if (!status.installed) return ACCOUNTS.notInstalled;
   if (!status.signedIn) return ACCOUNTS.signedOut;
-  return [ACCOUNTS.signedIn, planName(status, usage)].filter(Boolean).join(' · ');
+  return [ACCOUNTS.signedIn, account?.plan ?? planName(status, usage), account?.email].filter(Boolean).join(' · ');
 }
 
 const sameDay = (a: Date, b: Date): boolean =>

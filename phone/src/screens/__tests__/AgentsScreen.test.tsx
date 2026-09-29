@@ -18,8 +18,28 @@ jest.mock('expo-router', () => require('@/testing/router').mockRouter());
 
 /** A recorded session of nine agents: two going, three failed, one archived, one with children. */
 const recorded = require('../../../model/test/fixtures/nine-agents.json') as { final: DaemonState; marks: Record<string, string> };
-const NINE = recorded.final;
+/**
+ * The accounts as the daemon names them since AC-235 (synthetic): the Mac's default login and a
+ * named account, each with its plan and shortened email.
+ */
+const MAC = "Claude Max · bil…@testbox.com";
+const WORK = 'Claude Pro · wor…@acme.example';
+const NINE: DaemonState = {
+  ...recorded.final,
+  profiles: recorded.final.profiles.map((p) =>
+    p.id === 'system-claude'
+      ? { ...p, account: { provider: 'Claude', plan: 'Max', email: 'bil…@testbox.com', default: true, name: "Mac's default login", label: `${MAC} · Mac's default login`, short: MAC } }
+      : p.harness === 'claude' && !p.is_system
+        ? { ...p, account: { provider: 'Claude', plan: 'Pro', email: 'wor…@acme.example', default: false, name: p.name, label: `${WORK} · ${p.name}`, short: WORK } }
+        : p,
+  ),
+};
 const RUN = recorded.marks as { showcase: string; nested: string; auth: string; ratelimit: string; archived: string; generic: string; failed: string; waiting: string; running: string };
+/** A row's status line: its words, then the account it runs on. */
+const said = (runId: string, words: string): string => {
+  const profile = NINE.profiles.find((p) => p.id === NINE.runs.find((run) => run.id === runId)?.profile_id);
+  return profile?.account ? `${words} · ${profile.account.short}` : words;
+};
 const childOf = (runId: string): string => NINE.runs.find((run) => run.parent_run_id === runId)?.id ?? '';
 const CHILD = childOf(RUN.nested);
 const GRANDCHILD = childOf(CHILD);
@@ -81,9 +101,9 @@ describe('the agents list', () => {
     // The title on one line; under it the repository, the status in words and the time.
     expect(screen.getByTestId(`${row(RUN.running)}.title`)).toHaveTextContent('A slow migration');
     expect(screen.getByTestId(`${row(RUN.running)}.title`).props.numberOfLines).toBe(1);
-    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent('shop · working');
-    expect(screen.getByTestId(`${row(RUN.showcase)}.status`)).toHaveTextContent('shop · done · now');
-    expect(screen.getByTestId(`${row(RUN.auth)}.status`)).toHaveTextContent('billing-service · failed · now');
+    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent(said(RUN.running, 'shop · working'));
+    expect(screen.getByTestId(`${row(RUN.showcase)}.status`)).toHaveTextContent(said(RUN.showcase, 'shop · done · now'));
+    expect(screen.getByTestId(`${row(RUN.auth)}.status`)).toHaveTextContent(said(RUN.auth, 'billing-service · failed · now'));
 
     // Children are indented under their parent, each level further, with a line.
     expect(screen.queryByTestId(`${row(RUN.nested)}.under`)).toBeNull();
@@ -187,30 +207,38 @@ describe('the agents list', () => {
     expect(order().filter((id) => id.startsWith('agents.row.'))).toEqual([row(RUN.ratelimit)]);
   });
 
+  test('every agent names the account it runs on: plan and shortened email, the Mac\'s default login or a named one (AC-235)', async () => {
+    await open();
+    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent(`shop · working · ${MAC}`);
+    expect(screen.getByTestId(`${row(RUN.nested)}.status`)).toHaveTextContent(/ · Claude Pro · wor…@acme\.example$/);
+    expect(screen.getByTestId(row(RUN.running)).props.accessibilityLabel).toContain(`${MAC} · Mac's default login`);
+    expect(screen.queryAllByText(/Your login|existing login/, HIDDEN)).toHaveLength(0);
+  });
+
   test('a status that changes on the Mac changes the row while it is looked at', async () => {
     const app = await open();
     const running = screen.getByTestId(`${row(RUN.running)}.status`);
-    expect(running).toHaveTextContent('shop · working');
+    expect(running).toHaveTextContent(said(RUN.running, 'shop · working'));
     expect(screen.getByTestId('agents.filter.needs')).toHaveTextContent('Needs you1');
 
     await app.events(makeEvent('status', { status: 'completed', reason: 'turn completed' }, { run_id: RUN.running, task_id: taskOf(RUN.running), ts: NOW }));
-    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent('shop · done · now');
+    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent(said(RUN.running, 'shop · done · now'));
 
     // The one that waited was answered on the Mac: it no longer needs the owner.
     await app.events(makeEvent('status', { status: 'running' }, { run_id: RUN.waiting, task_id: taskOf(RUN.waiting), ts: NOW }));
     expect(screen.queryByTestId(needs(RUN.waiting))).toBeNull();
     expect(screen.queryByTestId(`${row(RUN.waiting)}.mark`)).toBeNull();
-    expect(screen.getByTestId(`${row(RUN.waiting)}.status`)).toHaveTextContent('billing-service · working');
+    expect(screen.getByTestId(`${row(RUN.waiting)}.status`)).toHaveTextContent(said(RUN.waiting, 'billing-service · working'));
     expect(screen.getByTestId('agents.filter.needs').props.accessibilityLabel).toBe('Needs you, 0');
   });
 
   test('a changed status cross-fades: the old words leave while the new ones arrive', async () => {
     const app = await open();
     await app.events(makeEvent('status', { status: 'completed', reason: 'turn completed' }, { run_id: RUN.running, task_id: taskOf(RUN.running), ts: NOW }));
-    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent('shop · done · now');
-    expect(screen.getAllByText('shop · working', HIDDEN)).toHaveLength(1);
-    await waitFor(() => expect(screen.queryByText('shop · working', HIDDEN)).toBeNull());
-    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent('shop · done · now');
+    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent(said(RUN.running, 'shop · done · now'));
+    expect(screen.getAllByText(said(RUN.running, 'shop · working'), HIDDEN)).toHaveLength(1);
+    await waitFor(() => expect(screen.queryByText(said(RUN.running, 'shop · working'), HIDDEN)).toBeNull());
+    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent(said(RUN.running, 'shop · done · now'));
   });
 
   test('what an agent writes does not draw the list again', async () => {
@@ -241,7 +269,7 @@ describe('the agents list', () => {
       ),
     );
     expect(screen.getByTestId(`${row('r-new')}.title`)).toHaveTextContent('Add a changelog');
-    expect(screen.getByTestId(`${row('r-new')}.status`)).toHaveTextContent('shop · queued');
+    expect(screen.getByTestId(`${row('r-new')}.status`)).toHaveTextContent(`shop · queued · ${MAC}`);
   });
 
   test('tapping an agent opens its conversation and remembers when', async () => {
@@ -439,7 +467,7 @@ describe('what the list changes on the Mac', () => {
     await fireEvent.press(screen.getByTestId('agents.actions.close', HIDDEN));
 
     await app.events(makeEvent('status', { status: 'interrupted', reason: 'interrupted by user' }, { run_id: RUN.running, task_id: taskOf(RUN.running), ts: NOW }));
-    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent('shop · stopped · now');
+    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent(said(RUN.running, 'shop · stopped · now'));
   });
 
   test('Stop all agents asks once, naming how many will stop', async () => {

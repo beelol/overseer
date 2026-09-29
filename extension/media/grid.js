@@ -179,7 +179,10 @@
       tile.status.replaceChildren(ui.status(run.status, run.attention?.kind));
       tile.title.textContent = run.title; tile.title.title = `Open ${run.title}`;
       const p = run.profile_id && state.profiles.find(x => x.id === run.profile_id);
-      tile.who.replaceChildren(ui.harnessMark(run.harness, 12)); tile.who.title = [ui.HARNESS[run.harness] || run.harness, p?.name, run.model].filter(Boolean).join(' · ');
+      // The account it runs on (AC-235): provider and plan, the shortened email.
+      const acct = p ? (p.account && p.account.short) || p.name : '';
+      tile.who.replaceChildren(ui.harnessMark(run.harness, 12), ...(acct ? [el('span', 'tile-account', acct)] : []));
+      tile.who.title = [ui.HARNESS[run.harness] || run.harness, p ? (p.account && p.account.label) || p.name : '', run.model].filter(Boolean).join(' · ');
       const pinned = (state.pinned || []).includes(run.id);
       tile.pin.setAttribute('aria-pressed', String(pinned)); tile.pin.title = pinned ? 'Unpin' : 'Pin to grid'; tile.pin.setAttribute('aria-label', tile.pin.title);
       tile.el.classList.toggle('needs', run.status === 'waiting_for_user');
