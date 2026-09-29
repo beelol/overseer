@@ -82,4 +82,8 @@ fn ac235_the_default_login_and_a_named_account_show_provider_plan_and_shortened_
     d.call("profile.logout", json!({"id": work}));
     d.call("profile.status", json!({"id": work}));
     assert_eq!(lab.account(&work)["label"], "ChatGPT · Work ChatGPT");
+    // Signed in again as the same account: named again at once.
+    lab.sign_in(&work, "worker:team:worker@acme.example");
+    d.call("profile.status", json!({"id": work}));
+    assert_eq!(lab.account(&work)["label"], "ChatGPT Team · wor…@acme.example · Work ChatGPT");
 }

@@ -49,7 +49,7 @@ const agentRow = id => rows.find(n => n.run && n.run.id === id && n.task);
 for (const [id, p] of [['r1', mac], ['r2', work]]) {
   const row = agentRow(id);
   assert.ok(row, `the side bar lists ${id}`);
-  assert.ok(row.item.description.includes(p.account.short), `row description names the account: ${row.item.description}`);
+  assert.ok(row.item.description.includes(`${p.account.plan} · ${p.account.email}`), `row description names the account: ${row.item.description}`);
   assert.ok(row.item.tooltip.value.includes(p.account.label), `tooltip names the account: ${row.item.tooltip.value}`);
   assert.ok(row.item.accessibilityInformation.label.includes(p.account.label), 'the accessible name says the account');
 }

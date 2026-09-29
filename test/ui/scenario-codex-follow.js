@@ -25,7 +25,7 @@ const PROMPT = 'Edit files one at a time, one patch per step, in exactly this or
     await cdp.command('Overseer: Start an Agent with Quick Picks');
     await cdp.pick('New agent: repository');
     await cdp.pick('New agent: harness', 'Codex app-server');
-    await cdp.pick('New agent: account for', 'Your login');
+    await cdp.pick('New agent: account for', "Mac's default login");
     await cdp.pick('New agent: workspace');
     await cdp.pick('Start the worktree from');
     await cdp.input('Model (optional)', 'gpt-5.6-luna');

@@ -63,7 +63,7 @@ again: `Task`, `Run`, `RunStatus`, `Turn`, `Workspace`, `Profile`, `Event`, `Sta
 | `interface NeedsYou { run_id: string; rank: number; label: string; detail: string }` | One agent that needs the owner, and why. |
 | `needsYou(state: PhoneState, options: Pick<AgentsOptions, 'now' \| 'seen' \| 'changed'>): ReadonlyArray<NeedsYou>` | The Needs you list, most urgent first. |
 | `counts(state: PhoneState, options: Pick<AgentsOptions, 'now' \| 'seen' \| 'changed'>): { active: number; needs: number }` | For a badge and a status line. |
-| `accountName(p)`, `accountLabel(p)`, `accountShort(p)`, `DEFAULT_LOGIN` | How an account is named (AC-235): the Mac's own login is "Mac's default login"; the label is the daemon's (provider and plan, the shortened email, whose login), the short form leaves out whose login. |
+| `accountName(p)`, `accountLabel(p)`, `accountShort(p)`, `accountBrief(p)`, `DEFAULT_LOGIN` | How an account is named (AC-235): the Mac's own login is "Mac's default login"; the label is the daemon's (provider and plan, the shortened email, whose login), the short form leaves out whose login; the brief one (a row beside the provider's logo) is the plan and the email. |
 | `searchLocally(state: PhoneState, query: string): ReadonlyArray<string>` | Task ids whose title, repository, harness, model, account or prompt holds `query`. |
 | `emptyText(state: PhoneState, options: AgentsOptions): string \| null` | What to say when the list has no rows; `null` when it has rows. |
 | `logoForHarness(harness: string): LogoKey \| null`, `logoForProvider(provider: string): LogoKey \| null` | The logo of a harness or provider. |

@@ -20,7 +20,8 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .composer .chips .chip { flex: 0 1 auto; }
 .generic-fields { display: flex; gap: var(--ov-space-2); }
 .generic-fields input { flex: 1; min-width: 0; height: 28px; padding: 0 var(--ov-space-2); }
-.composer-foot { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; color: var(--ov-muted); font-size: var(--ov-font-sm); }
+.composer-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--ov-space-3); padding: 0 4px; color: var(--ov-muted); font-size: var(--ov-font-sm); }
+.composer-foot .composer-account { flex: 1; min-width: 0; text-align: center; }
 .composer-note { display: flex; align-items: center; gap: 6px; }
 .composer-note .fix { margin-left: 4px; }
 /* AC-259: the moment a task is sent, the note says so beside the cleared field. */
@@ -222,6 +223,8 @@ body[data-conversation="1"] .home-stage .voice-mark { width: min(220px, 50vw, 22
 .composer-hint[hidden], body[data-conversation="1"] .composer-hint { display: none; }
 .composer-hero > .composer-choices .chip[data-chip="target"] { flex: 0 1 auto; }
 .composer-hero > .composer-choices .chip[data-chip="target"] .chip-label { flex: 0 1 auto; }
+/* The agent choice names the account it runs on (AC-235): room for the plan and the email. */
+.composer-hero > .composer-choices .chip[data-chip="agent"] { flex-grow: 2.2; }
 
 /* AC-255: the rollup by state in the grid's header (the side bar shows the same counts). */
 .grid-rollup { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap; color: var(--ov-muted); font-size: var(--ov-font-sm); font-variant-numeric: tabular-nums; }

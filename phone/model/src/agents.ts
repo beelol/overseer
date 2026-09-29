@@ -25,6 +25,11 @@ export function accountLabel(p: Profile | undefined): string {
   return p === undefined ? '' : p.account?.label || accountName(p);
 }
 
+/** Beside the provider's logo (a list row): the plan and the shortened email, "Max · bil…@testbox.com". */
+export function accountBrief(p: Profile | undefined): string {
+  return p === undefined ? '' : [p.account?.plan, p.account?.email || accountName(p)].filter(Boolean).join(' · ');
+}
+
 /** The same where room is tight: "Claude Max · bil…@testbox.com". */
 export function accountShort(p: Profile | undefined): string {
   return p === undefined ? '' : p.account?.short || accountName(p);
@@ -259,7 +264,7 @@ function build(state: PhoneState, options: AgentsOptions): AgentRow[] {
       const going = isActive(run.status);
       const isPinned = pinned.includes(run.id);
       const tooltip = [task.title, `${status}${run.exit_reason && !going ? ` — ${run.exit_reason}` : ''}`, [TEXT.harness[run.harness] || run.harness, accountLabel(account), run.model].filter(Boolean).join(' · '), ws ? `${ws.kind === 'current' ? t.currentCheckout : ws.branch} · ${basename(task.repo_root)}` : ''].filter(Boolean).join('\n');
-      out.push({ id: rowId, kind: 'agent', depth: 1, label: task.title, description: [going ? '' : ago(run.ended_ms || run.created_ms, options.now), accountShort(account)].filter(Boolean).join(' · '), tooltip, accessibilityLabel: `${task.title}, ${status}, ${TEXT.harness[run.harness] || run.harness}${account ? ', ' + accountLabel(account) : ''}`, ...picture(run.harness), ...mark(run.status), runId: run.id, taskId: task.id, repo, expandable: kids.length > 0, expanded, context: `agent-${going ? 'active' : 'done'}${task.archived_ms ? '-archived' : ''}${isPinned ? '-pinned' : ''}`, active: going, archived: !!task.archived_ms, pinned: isPinned });
+      out.push({ id: rowId, kind: 'agent', depth: 1, label: task.title, description: [going ? '' : ago(run.ended_ms || run.created_ms, options.now), accountBrief(account)].filter(Boolean).join(' · '), tooltip, accessibilityLabel: `${task.title}, ${status}, ${TEXT.harness[run.harness] || run.harness}${account ? ', ' + accountLabel(account) : ''}`, ...picture(run.harness), ...mark(run.status), runId: run.id, taskId: task.id, repo, expandable: kids.length > 0, expanded, context: `agent-${going ? 'active' : 'done'}${task.archived_ms ? '-archived' : ''}${isPinned ? '-pinned' : ''}`, active: going, archived: !!task.archived_ms, pinned: isPinned });
       if (expanded) for (const kid of kids) child(kid, 2);
     }
   }

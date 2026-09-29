@@ -35,6 +35,8 @@ function accountName(a) { return a && (a.is_system || a.kind === 'follows-app' |
  */
 function accountLabel(p) { return p ? p.account?.label || accountName(p) : ''; }
 function accountShort(p) { return p ? p.account?.short || accountName(p) : ''; }
+/** Beside the provider's logo (a side bar row): the plan and the shortened email, "Max · bil…@testbox.com". */
+function accountBrief(p) { return p ? [p.account?.plan, p.account?.email || accountName(p)].filter(Boolean).join(' · ') : ''; }
 
 class Model {
   constructor(client) {
@@ -550,8 +552,8 @@ class AgentsProvider {
     const fresh = !ACTIVE.has(run.status) && this.unreviewed(run);
     // The ✦ badge marks it (its colour, tooltip and accessible name say "to review"); the row's words stay short.
     const profile = run.profile_id ? m.profile(run.profile_id) : undefined;
-    // The account it runs on, always (AC-235): provider and plan, and the shortened email.
-    item.description = [ACTIVE.has(run.status) ? '' : ago(run.ended_ms || run.created_ms), accountShort(profile), ...marks].filter(Boolean).join(' · ');
+    // The account it runs on, always (AC-235): the plan and the shortened email beside the provider's logo.
+    item.description = [ACTIVE.has(run.status) ? '' : ago(run.ended_ms || run.created_ms), accountBrief(profile), ...marks].filter(Boolean).join(' · ');
     const ws = m.workspace(run.workspace_id);
     const status = STATUS_TEXT[run.status] || run.status;
     item.tooltip = new vscode.MarkdownString([`**${task.title}**`, `${status}${run.exit_reason && !ACTIVE.has(run.status) ? ` — ${Plain.plain(run.exit_reason, 200)}` : ''}`,
@@ -666,4 +668,4 @@ class AccountsProvider {
   }
 }
 
-module.exports = { Model, AgentsProvider, AccountsProvider, ACTIVE, statusIcon, ago, accountName, accountLabel, accountShort, DEFAULT_LOGIN };
+module.exports = { Model, AgentsProvider, AccountsProvider, ACTIVE, statusIcon, ago, accountName, accountLabel, accountShort, accountBrief, DEFAULT_LOGIN };

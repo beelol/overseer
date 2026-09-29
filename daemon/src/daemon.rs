@@ -18,6 +18,10 @@ use tokio::sync::broadcast;
 
 /// `waiting_for_connection` and `waiting_for_memory` are Continuity's: the run has no process,
 /// keeps its message and its worktree, and is started again by Overseer (daemon/src/handoff.rs).
+/// When each Codex profile's account was last read with Codex's own `account/read`, and for which
+/// login (AC-235).
+static CODEX_ACCOUNT_READS: std::sync::OnceLock<Mutex<HashMap<String, (i64, String)>>> = std::sync::OnceLock::new();
+
 pub const ACTIVE: &[&str] = &["queued", "starting", "running", "waiting_for_user", "waiting_for_connection", "waiting_for_memory"];
 const RAW_SEGMENTS_KEPT: u64 = 4;
 pub const DEFAULT_AUTO_EXECUTION_BUDGET_MS: u64 = 300_000;
@@ -698,7 +702,17 @@ impl Daemon {
                     // Codex's own account read names the account (AC-235); never while an agent of
                     // this profile runs (its own session reads it), and the last one stays shown.
                     let busy = self.store.lock().unwrap().runs()?.iter().any(|r| r.profile_id.as_deref() == Some(id) && ACTIVE.contains(&r.status.as_str()));
-                    if !busy {
+                    // Read again when the login changed (its identity's fingerprint) or ten minutes on:
+                    // every client asks for every account's status often, and each read starts Codex.
+                    let who = result["identity"]["account_fingerprint"].as_str().unwrap_or_default().to_string()
+                        + result["identity"]["plan"].as_str().unwrap_or_default();
+                    let fresh = {
+                        let mut seen = CODEX_ACCOUNT_READS.get_or_init(Default::default).lock().unwrap();
+                        let fresh = seen.get(id).is_some_and(|(at, was)| *was == who && now() - at < 10 * 60 * 1000);
+                        if !fresh && !busy { seen.insert(id.to_string(), (now(), who)); }
+                        fresh
+                    };
+                    if !busy && !fresh {
                         let mut full = adapters::base_env(&program.display().to_string());
                         full.extend(env.clone());
                         let read = crate::auto_collect::codex_account(&program, &full, &adapters::neutral_dir(), std::time::Duration::from_secs(5));
@@ -709,6 +723,7 @@ impl Daemon {
                         }
                     }
                 } else {
+                    CODEX_ACCOUNT_READS.get_or_init(Default::default).lock().unwrap().remove(id);
                     self.record_account(id, None, None)?;
                 }
             }

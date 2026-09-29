@@ -65,7 +65,9 @@
     const note = el('div', 'composer-note'); note.setAttribute('role', 'status');
     const foot = el('div', 'composer-foot');
     const full = el('button', 'link', 'Full form'); full.type = 'button'; full.title = 'Open the full form with every option';
-    foot.append(el('span', 'kbd-hint', '⏎ start · ⇧⏎ new line'), full);
+    // The account the new agent will run on, in full (AC-235): provider and plan, the shortened email, whose login.
+    const runsOn = el('span', 'composer-account ellipsis'); runsOn.id = 'composer-account';
+    foot.append(el('span', 'kbd-hint', '⏎ start · ⇧⏎ new line'), runsOn, full);
     hero.append(mark, h, hint, box, chips, note, foot);
     wrap.append(hero);
     host.append(wrap);
@@ -151,7 +153,13 @@
       const repo = data.repos.find(r => r.path === form.repo);
       setChip(repoChip, 'repo', repo ? repo.name : 'Choose repository', repo ? `${repo.path}${repo.branch ? `\nOn ${repo.branch}` : ''}` : 'Choose a Git repository');
       const hx = harness(), a = account();
-      const agentLabel = form.routing === 'auto' ? `Auto routing${form.preferredHarness ? ' · prefer ' + (ui.HARNESS[form.preferredHarness] || form.preferredHarness) : ''}` : form.harness === 'generic' ? 'Program' : `${ui.HARNESS[form.harness] || form.harness || 'Agent'}${a ? ' · ' + (a.short || a.name) : ''}`;
+      // The agent chip names the account it will run on (AC-235): the harness (which says the
+      // provider), the plan and the shortened email, or whose login it is until the email is known.
+      // The harness is said once (AC-110); the full label is in the tooltip.
+      const agentLabel = form.routing === 'auto' ? `Auto routing${form.preferredHarness ? ' · prefer ' + (ui.HARNESS[form.preferredHarness] || form.preferredHarness) : ''}` : form.harness === 'generic' ? 'Program' : [ui.HARNESS[form.harness] || form.harness || 'Agent', ...(a ? [a.account && a.account.plan, (a.account && a.account.email) || a.name] : [])].filter(Boolean).join(' · ');
+      runsOn.hidden = toOverseer() || form.routing === 'auto' || form.harness === 'generic' || !a;
+      runsOn.textContent = a && !runsOn.hidden ? `Runs on ${a.label || a.name}` : '';
+      runsOn.title = runsOn.textContent;
       setChip(agentChip, form.routing === 'auto' ? 'sparkle' : ui.harnessMark(form.harness, 14), agentLabel, form.routing === 'auto' ? 'Selects an eligible account, agent, model and effort for each work unit' : [hx && `${ui.HARNESS[hx.harness]} ${hx.version || ''}`, a && `${a.label || a.name}: ${a.signedIn ? 'signed in' : 'not signed in'}`, a && ui.usageDetail(a.usage)].filter(Boolean).join('\n'));
       modelChip.hidden = toOverseer() || form.routing === 'auto' || form.harness === 'generic';
       setChip(modelChip, 'sparkle', form.model || 'Default model', form.model ? `Model: ${form.model}` : 'The harness default model');

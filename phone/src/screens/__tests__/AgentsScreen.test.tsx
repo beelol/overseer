@@ -38,7 +38,7 @@ const RUN = recorded.marks as { showcase: string; nested: string; auth: string; 
 /** A row's status line: its words, then the account it runs on. */
 const said = (runId: string, words: string): string => {
   const profile = NINE.profiles.find((p) => p.id === NINE.runs.find((run) => run.id === runId)?.profile_id);
-  return profile?.account ? `${words} · ${profile.account.short}` : words;
+  return profile?.account ? `${words} · ${profile.account.plan} · ${profile.account.email}` : words;
 };
 const childOf = (runId: string): string => NINE.runs.find((run) => run.parent_run_id === runId)?.id ?? '';
 const CHILD = childOf(RUN.nested);
@@ -209,8 +209,8 @@ describe('the agents list', () => {
 
   test('every agent names the account it runs on: plan and shortened email, the Mac\'s default login or a named one (AC-235)', async () => {
     await open();
-    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent(`shop · working · ${MAC}`);
-    expect(screen.getByTestId(`${row(RUN.nested)}.status`)).toHaveTextContent(/ · Claude Pro · wor…@acme\.example$/);
+    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent('shop · working · Max · bil…@testbox.com');
+    expect(screen.getByTestId(`${row(RUN.nested)}.status`)).toHaveTextContent(/ · Pro · wor…@acme\.example$/);
     expect(screen.getByTestId(row(RUN.running)).props.accessibilityLabel).toContain(`${MAC} · Mac's default login`);
     expect(screen.queryAllByText(/Your login|existing login/, HIDDEN)).toHaveLength(0);
   });
@@ -269,7 +269,7 @@ describe('the agents list', () => {
       ),
     );
     expect(screen.getByTestId(`${row('r-new')}.title`)).toHaveTextContent('Add a changelog');
-    expect(screen.getByTestId(`${row('r-new')}.status`)).toHaveTextContent(`shop · queued · ${MAC}`);
+    expect(screen.getByTestId(`${row('r-new')}.status`)).toHaveTextContent('shop · queued · Max · bil…@testbox.com');
   });
 
   test('tapping an agent opens its conversation and remembers when', async () => {
