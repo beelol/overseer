@@ -49,7 +49,8 @@
     t = t.replace(/\b[a-z]+(?:_[a-z]+)+\b/g, m => TOKENS[m] || m.replace(/_/g, ' '));
     t = t.replace(/^[:;,.\s]+/, '').replace(/\s+([,.;:])/g, '$1').replace(/\(\s*\)/g, '').replace(/\s{2,}/g, ' ').trim();
     if (!t) return '';
-    t = t[0].toUpperCase() + t.slice(1);
+    // A sentence starts with a capital; a name (ramCeilingPercent, qwen3-coder) keeps its own.
+    if (!/^[a-z]+[A-Z0-9:-]/.test(t)) t = t[0].toUpperCase() + t.slice(1);
     return t.length > max ? t.slice(0, max - 1).trimEnd() + '…' : t;
   }
 
