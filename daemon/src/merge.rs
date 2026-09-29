@@ -10,6 +10,10 @@
 //! 5. `merge_complete`: `git merge --no-ff` of the run's branch into the target branch in the
 //!    source checkout, which is conflict-free by then. Refuses if that checkout has uncommitted
 //!    changes or is not on the target branch, and never touches its dirty work.
+//!
+//! AC-243: the plan lists the files that land (and the untracked ones that step 2 commits), Git's
+//! hooks run on every commit, `merge_abort` puts the worktree back as it was before step 2, and
+//! the outcome is kept (`landings`) so every surface reads "Merged into main (commit)".
 
 use crate::daemon::{Daemon, ACTIVE};
 use crate::git;
@@ -27,6 +31,67 @@ fn has_markers(text: &str) -> bool {
 
 pub(crate) fn merging(ws: &Path) -> bool {
     git::rev_parse(ws, "MERGE_HEAD").is_some()
+}
+
+/// Where a worktree's merge back remembers the HEAD it started from, so a cancel can put back the
+/// work it committed (AC-243). Inside the worktree's own Git folder, never in the files.
+fn pre_merge_file(ws: &Path) -> Option<std::path::PathBuf> {
+    git::git(ws, &["rev-parse", "--absolute-git-dir"]).ok().map(|d| Path::new(&d).join("OVERSEER_PRE_MERGE"))
+}
+
+/// The remote a pull request would go to: its name, and whether it is on GitHub (AC-232).
+pub(crate) fn remote_info(ws: &Path) -> Value {
+    let remotes: Vec<String> = git::git(ws, &["remote"]).unwrap_or_default().lines().map(str::to_string).collect();
+    let Some(name) = remotes.iter().find(|r| *r == "origin").or(remotes.first()).cloned() else { return Value::Null };
+    let url = git::git(ws, &["config", "--get", &format!("remote.{name}.url")]).unwrap_or_default();
+    let github = crate::pr::github_repo(&url);
+    json!({"name": name, "github": github.is_some(), "owner": github.as_ref().map(|g| g.0.clone()), "repo": github.map(|g| g.1)})
+}
+
+/// What a workspace's work became (AC-243): `merged` (into `target`, at `commit`), `conflicts`
+/// (a merge back stopped in the worktree) or `pr` (a pull request at `url`).
+pub(crate) fn set_landing(conn: &rusqlite::Connection, ws: &str, state: &str, target: Option<&str>, branch: Option<&str>, commit: Option<&str>, url: Option<&str>, files: &[String]) -> Result<()> {
+    conn.execute(
+        "INSERT OR REPLACE INTO landings(workspace_id,state,target,branch,commit_sha,url,files,ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
+        rusqlite::params![ws, state, target, branch, commit, url, serde_json::to_string(files)?, crate::daemon::now()],
+    )?;
+    Ok(())
+}
+
+pub(crate) fn clear_landing(conn: &rusqlite::Connection, ws: &str) -> Result<()> {
+    conn.execute("DELETE FROM landings WHERE workspace_id=?1", [ws])?;
+    Ok(())
+}
+
+pub(crate) fn landing(conn: &rusqlite::Connection, ws: &str) -> Value {
+    all_landings(conn).ok().and_then(|mut m| m.remove(ws)).unwrap_or(Value::Null)
+}
+
+pub(crate) fn all_landings(conn: &rusqlite::Connection) -> Result<serde_json::Map<String, Value>> {
+    let mut stmt = conn.prepare("SELECT workspace_id,state,target,branch,commit_sha,url,files,ms FROM landings")?;
+    let rows = stmt.query_map([], |r| {
+        let files: Option<String> = r.get(6)?;
+        Ok((r.get::<_, String>(0)?, json!({
+            "state": r.get::<_, String>(1)?, "target": r.get::<_, Option<String>>(2)?, "branch": r.get::<_, Option<String>>(3)?,
+            "commit": r.get::<_, Option<String>>(4)?, "url": r.get::<_, Option<String>>(5)?,
+            "files": files.and_then(|f| serde_json::from_str::<Value>(&f).ok()).unwrap_or(json!([])), "ms": r.get::<_, i64>(7)?,
+        })))
+    })?;
+    Ok(rows.collect::<rusqlite::Result<serde_json::Map<String, Value>>>()?)
+}
+
+/// The landings the state shows: a merge the agent has worked past (a turn started after it) no
+/// longer reads "Merged".
+pub(crate) fn landings_for_state(conn: &rusqlite::Connection, runs: &[crate::store::Run], turns: &serde_json::Map<String, Value>) -> Result<Value> {
+    let mut out = all_landings(conn)?;
+    out.retain(|ws, l| {
+        if l["state"] != "merged" {
+            return true;
+        }
+        let at = l["ms"].as_i64().unwrap_or(0);
+        !runs.iter().filter(|r| &r.workspace_id == ws).any(|r| turns.get(&r.id).and_then(Value::as_array).is_some_and(|t| t.iter().any(|t| t["started_ms"].as_i64().unwrap_or(0) > at)))
+    });
+    Ok(Value::Object(out))
 }
 
 /// While a merge is in progress in the worktree: the files still conflicted, and the changed
@@ -96,7 +161,10 @@ impl Daemon {
             let ahead = git::git(path, &["rev-list", "--count", &format!("{target}..HEAD")]).ok().and_then(|n| n.parse::<u64>().ok()).unwrap_or(0);
             let behind = git::git(path, &["rev-list", "--count", &format!("HEAD..{target}")]).ok().and_then(|n| n.parse::<u64>().ok()).unwrap_or(0);
             let uncommitted = wt.staged.len() + wt.unstaged.len() + wt.untracked.len();
-            if uncommitted == 0 && ahead == 0 { return refuse(format!("Nothing to merge: {branch} has no changes that are not already on {target}.")); }
+            if uncommitted == 0 && ahead == 0 {
+                let landed = landing(&self.store.lock().unwrap().conn, &ws.id);
+                return Ok(json!({"ok": false, "reason": format!("Nothing to merge: {branch} has no changes that are not already on {target}."), "workspace": ws, "landing": landed, "remote": remote_info(path)}));
+            }
             if uncommitted == 0 && behind == 0 { "ready" } else { "idle" }
         };
         let source_dirty: Vec<String> = source.staged.iter().chain(source.unstaged.iter()).map(|c| c.path.clone()).chain(source.conflicted.iter().cloned()).collect();
@@ -111,10 +179,25 @@ impl Daemon {
             blockers.push(format!("A merge is already in progress in {}.", task.repo_root));
         }
         let uncommitted: Vec<String> = wt.staged.iter().chain(wt.unstaged.iter()).map(|c| c.path.clone()).chain(wt.untracked.iter().cloned()).collect();
+        // What lands on the target: the branch's committed work and the worktree's uncommitted
+        // files, against where the branch left the target (AC-243's confirmation lists them).
+        let files: Vec<git::Change> = match git::merge_base(path, &target, "HEAD") {
+            Some(base) => git::capture_trees(path, &crate::paths::data_dir().join("tmp")).and_then(|t| git::diff_trees(path, &base, &t.worktree_tree)).unwrap_or_default(),
+            None => Vec::new(),
+        };
+        let landed = {
+            let store = self.store.lock().unwrap();
+            // A merge back stopped on conflicts that is no longer in progress (finished or cancelled in Git).
+            if !merging(path) && landing(&store.conn, &ws.id)["state"] == "conflicts" {
+                clear_landing(&store.conn, &ws.id)?;
+            }
+            landing(&store.conn, &ws.id)
+        };
         Ok(json!({
             "ok": true, "state": state, "workspace": ws, "run_id": root.map(|r| r.id), "repo": task.repo_root, "branch": branch, "target": target,
-            "worktree_uncommitted": uncommitted, "conflicts": wt.conflicted, "source_branch": source.branch, "source_dirty": source_dirty,
+            "worktree_uncommitted": uncommitted, "untracked": wt.untracked, "files": files, "conflicts": wt.conflicted, "source_branch": source.branch, "source_dirty": source_dirty,
             "blockers": blockers, "can_complete": state == "ready" && blockers_empty(&source_dirty, &source.branch, &target) && !merging(repo),
+            "remote": remote_info(path), "landing": landed,
         }))
     }
 
@@ -132,9 +215,14 @@ impl Daemon {
         let task_id = self.store.lock().unwrap().tasks()?.into_iter().find(|t| t.workspace_id == ws.id).map(|t| t.id);
         if plan["state"] == "idle" {
             let dirty = plan["worktree_uncommitted"].as_array().map(|a| !a.is_empty()).unwrap_or(false);
+            let before = git::head(path).unwrap_or_default();
             if dirty {
                 let title = run_id.as_deref().and_then(|r| self.run(r).ok()).map(|r| r.title).unwrap_or_else(|| branch.clone());
                 commit_worktree(path, &title)?;
+            }
+            // A cancel puts the worktree back here: the HEAD before, and whether Overseer committed on top of it.
+            if let Some(f) = pre_merge_file(path) {
+                let _ = std::fs::write(f, format!("{before} {}", dirty));
             }
             // Bring the target's newer commits into the run's branch where the agent works.
             let merged = git::git(path, &["merge", "--no-ff", "--no-edit", &target]);
@@ -144,6 +232,7 @@ impl Daemon {
                     let _ = git::git(path, &["merge", "--abort"]);
                     bail!("git merge of {target} into {branch} failed: {}", merged.unwrap_err());
                 }
+                set_landing(&self.store.lock().unwrap().conn, &ws.id, "conflicts", Some(&target), Some(&branch), None, None, &st.conflicted)?;
                 self.emit(task_id.as_deref(), run_id.as_deref(), "merge_back", "daemon", "exact", json!({"state": "conflicts", "target": target, "branch": branch, "files": st.conflicted}))?;
                 let mut out = json!({"state": "conflicts", "files": st.conflicted, "target": target, "branch": branch, "handoff": Value::Null});
                 if handoff {
@@ -188,15 +277,24 @@ impl Daemon {
         }
         let st = git::status(path)?;
         let files: Vec<String> = git::git(path, &["diff", "--name-only", "--diff-filter=U"])?.lines().map(str::to_string).collect();
-        let marked: Vec<String> = files.iter().chain(st.conflicted.iter()).filter(|f| std::fs::read_to_string(path.join(f)).map(|t| has_markers(&t)).unwrap_or(false)).cloned().collect();
+        // Every file the resolution touched: the conflicted ones, and any changed since (a file
+        // staged with its markers and fixed afterwards must be staged again, never committed as staged).
+        let mut touched: Vec<String> = files.iter().chain(st.conflicted.iter()).cloned().collect();
+        for f in git::git(path, &["diff", "--name-only", "HEAD"])?.lines().map(str::to_string).chain(st.untracked.iter().cloned()) {
+            if !touched.contains(&f) {
+                touched.push(f);
+            }
+        }
+        let marked: Vec<String> = touched.iter().filter(|f| std::fs::read_to_string(path.join(f)).map(|t| has_markers(&t)).unwrap_or(false)).cloned().collect();
         if !marked.is_empty() {
             return Ok(json!({"state": "resolving", "remaining": marked}));
         }
-        for f in files.iter().chain(st.conflicted.iter()) {
-            git::git(path, &["add", "--", f])?;
-        }
-        git::git(path, &["commit", "--no-verify", "--no-edit", "-q"])?;
+        // The agent's own work was committed before the merge began, so what changed since is the resolution.
+        git::git(path, &["add", "-A"])?;
+        // Git's hooks run (AC-243): a refused commit leaves the merge in progress, with the hook's words.
+        git::git(path, &["commit", "--no-edit", "-q"]).map_err(|e| anyhow!("The merge commit was refused (a Git hook may have stopped it): {e}"))?;
         let task_id = self.store.lock().unwrap().tasks()?.into_iter().find(|t| t.workspace_id == ws.id).map(|t| t.id);
+        clear_landing(&self.store.lock().unwrap().conn, &ws.id)?;
         self.emit(task_id.as_deref(), ws.owner_run_id.as_deref(), "merge_back", "daemon", "exact", json!({"state": "ready", "resolved": files}))?;
         Ok(json!({"state": "ready", "resolved": files}))
     }
@@ -227,17 +325,49 @@ impl Daemon {
         let ws = self.workspace(workspace_id)?;
         let task_id = self.store.lock().unwrap().tasks()?.into_iter().find(|t| t.workspace_id == ws.id).map(|t| t.id);
         let result = json!({"merged": true, "repo": repo, "target": target, "branch": branch, "before": before, "commit": after});
+        let files: Vec<String> = plan["files"].as_array().map(|a| a.iter().filter_map(|f| f["path"].as_str().map(str::to_string)).collect()).unwrap_or_default();
+        set_landing(&self.store.lock().unwrap().conn, &ws.id, "merged", Some(&target), Some(&branch), after.as_deref(), None, &files)?;
+        if let Some(f) = pre_merge_file(Path::new(&ws.path)) {
+            let _ = std::fs::remove_file(f);
+        }
         self.emit(task_id.as_deref(), plan["run_id"].as_str(), "merge_back", "user", "exact", json!({"state": "merged", "target": target, "branch": branch, "commit": after}))?;
         Ok(result)
     }
 
+    /// Cancels a merge back that stopped in the worktree (AC-243): aborts Git's merge and, when
+    /// Overseer committed the worktree's work for it, un-commits that work again (a mixed reset to
+    /// the HEAD it started from), so the worktree reads as it did before the merge.
     pub fn merge_abort(&self, workspace_id: &str) -> Result<Value> {
         let ws = self.workspace(workspace_id)?;
         let path = Path::new(&ws.path);
-        if merging(path) {
+        let was_merging = merging(path);
+        if was_merging {
             git::git(path, &["merge", "--abort"])?;
         }
-        Ok(json!({"aborted": true}))
+        let mut restored = false;
+        if let Some(f) = pre_merge_file(path) {
+            let saved = std::fs::read_to_string(&f).unwrap_or_default();
+            let mut parts = saved.split_whitespace();
+            if let (Some(before), Some("true")) = (parts.next(), parts.next()) {
+                // Only the commit Overseer made, directly on top of where it started.
+                if was_merging && git::rev_parse(path, "HEAD~1").as_deref() == Some(before) {
+                    git::git(path, &["reset", "-q", "--mixed", before])?;
+                    restored = true;
+                }
+            }
+            let _ = std::fs::remove_file(f);
+        }
+        clear_landing(&self.store.lock().unwrap().conn, &ws.id)?;
+        if was_merging {
+            let (task_id, run_id) = {
+                let store = self.store.lock().unwrap();
+                let task = store.tasks()?.into_iter().find(|t| t.workspace_id == ws.id).map(|t| t.id);
+                let run = store.runs()?.into_iter().find(|r| r.workspace_id == ws.id && r.parent_run_id.is_none()).map(|r| r.id);
+                (task, run)
+            };
+            self.emit(task_id.as_deref(), run_id.as_deref(), "merge_back", "user", "exact", json!({"state": "cancelled", "uncommitted": restored}))?;
+        }
+        Ok(json!({"aborted": true, "was_merging": was_merging, "uncommitted": restored}))
     }
 }
 
@@ -253,7 +383,12 @@ pub fn commit_worktree(path: &Path, title: &str) -> Result<bool> {
         return Ok(false);
     }
     git::git(path, &["add", "-A"])?;
-    git::git(path, &["commit", "--no-verify", "-q", "-m", &format!("Overseer: {title}")])?;
+    // Git's hooks run (AC-243): a secret-scanning pre-commit hook can refuse the commit, and then
+    // the files stay uncommitted (unstaged again) with the hook's words in the error.
+    if let Err(e) = git::git(path, &["commit", "-q", "-m", &format!("Overseer: {title}")]) {
+        let _ = git::git(path, &["reset", "-q"]);
+        bail!("Committing the agent's work was refused (a Git hook may have stopped it): {e}");
+    }
     Ok(true)
 }
 

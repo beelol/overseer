@@ -114,6 +114,7 @@
       "turns": "record<Turn[]>",
       "oversight": "record<json>",
       "overseer": "json",
+      "landings": "record<json>",
       "daemon": {
         "pid": "number",
         "started_ms": "number",

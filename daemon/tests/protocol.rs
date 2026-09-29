@@ -612,7 +612,10 @@ fn ac26_snapshots_and_selectable_bases() {
     d.wait_done(&run, 10);
     assert_eq!(fingerprint(&repo).replace("pre-existing untracked\nrun1", "pre-existing untracked"), before, "snapshots did not mutate, stage or stash anything");
     let latest1 = option(&d, &run, "latest_run", None);
-    assert_eq!(latest1["default"], true);
+    // AC-232: a finished agent's review opens on everything since the task started; the latest
+    // run is the default while it works (ac232_a_finished_agents_committed_new_file_is_in_its_default_review).
+    assert_eq!(latest1["default"], false);
+    assert_eq!(option(&d, &run, "task_start", None)["default"], true);
     assert_eq!(diff_paths(&d, &created, latest1["base"].as_str().unwrap()), vec![("M".into(), "pre.txt".into())], "baseline included dirty+untracked contents");
     // A user edit between runs, then turn 2 (follow-up) gets its own baseline.
     std::fs::write(repo.join("between.txt"), "user edit between runs\n").unwrap();
@@ -1627,12 +1630,17 @@ fn ac50_open_pr_refuses_a_worktree_left_mid_merge_with_conflicts() {
     assert_eq!(plan["ok"], false, "markers staged as if resolved: {plan}");
     assert!(d.try_call("workspace.pr_prepare", json!({"workspace_id": id})).is_err());
     assert_eq!(git(&ws, &["rev-parse", "HEAD"]), head_before);
-    // Resolved for real: the pull request carries the finished merge and no markers.
+    // Resolved for real but the merge not finished: still the middle of a merge (AC-243).
     std::fs::write(ws.join("a.txt"), "main version\nagent version\n").unwrap();
+    let plan = d.call("workspace.pr_plan", json!({"workspace_id": id}));
+    assert_eq!(plan["ok"], false, "{plan}");
+    assert!(plan["reason"].as_str().unwrap().contains("still in progress"), "{plan}");
+    // Finished: the pull request carries the finished merge and no markers.
+    assert_eq!(d.call("workspace.merge_resolved", json!({"workspace_id": id}))["state"], "ready");
     let plan = d.call("workspace.pr_plan", json!({"workspace_id": id}));
     assert_eq!(plan["ok"], true, "{plan}");
     let prep = d.call("workspace.pr_prepare", json!({"workspace_id": id}));
-    assert_eq!(prep["committed"], true, "{prep}");
+    assert_eq!(prep["committed"], false, "the merge commit is already made: {prep}");
     assert_eq!(git(&ws, &["show", "HEAD:a.txt"]), "main version\nagent version");
     assert_eq!(git(&ws, &["rev-list", "--parents", "-n", "1", "HEAD"]).split(' ').count(), 3, "the merge commit is finished");
 }

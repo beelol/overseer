@@ -84,7 +84,8 @@ class PullRequests {
       const ws = this.model.workspace(run.workspace_id);
       // In-memory auth for this push only (not in argv, not in git config, not logged).
       const auth = /^https:\/\/github\.com\//.test(plan.remote_url) ? { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader', GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}` } : {};
-      await git(ws.path, ['push', '--no-verify', plan.remote, `HEAD:refs/heads/${plan.branch}`], auth);
+      // Git's hooks run (AC-243): a pre-push hook can stop the push.
+      await git(ws.path, ['push', plan.remote, `HEAD:refs/heads/${plan.branch}`], auth);
       const api = this.apiUrl();
       let res = await this.request('POST', `${api}/repos/${plan.owner}/${plan.repo}/pulls`, token, { title: plan.title, head: plan.branch, base: plan.target, body: describe(plan, prep), draft: false });
       let pr = res.json;

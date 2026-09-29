@@ -482,6 +482,8 @@ impl Store {
               id TEXT PRIMARY KEY, session_id TEXT NOT NULL, message_id TEXT, ts INTEGER NOT NULL, actions TEXT NOT NULL,
               state TEXT NOT NULL, source TEXT, answered_by TEXT, answered_ms INTEGER, surface TEXT, result TEXT, settle_until INTEGER, cause TEXT);
             CREATE TABLE IF NOT EXISTS overseer_pending(session_id TEXT NOT NULL, message_id TEXT, ts INTEGER NOT NULL, text TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS landings(
+              workspace_id TEXT PRIMARY KEY, state TEXT NOT NULL, target TEXT, branch TEXT, commit_sha TEXT, url TEXT, files TEXT, ms INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS holds(
               run_id TEXT PRIMARY KEY, set_by TEXT NOT NULL, reason TEXT NOT NULL, set_ms INTEGER NOT NULL, release_on TEXT NOT NULL, card_id TEXT);
             CREATE TABLE IF NOT EXISTS guardrails(

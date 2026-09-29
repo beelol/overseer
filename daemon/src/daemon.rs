@@ -3466,14 +3466,19 @@ impl Daemon {
         let turns = self.store.lock().unwrap().turns(&root.id)?;
         let mut options = Vec::new();
         let snap_info = |id: &str| -> Option<Snapshot> { self.store.lock().unwrap().snapshot(id).ok().flatten() };
+        // AC-232: while the agent works, the review opens on its latest run (the owner's default);
+        // once it has finished, on everything it did since the task started, so work committed in
+        // an earlier turn is never hidden behind a later turn that changed nothing ("0 files").
+        let working = self.store.lock().unwrap().runs()?.iter().any(|r| r.workspace_id == ws.id && ACTIVE.contains(&r.status.as_str()));
+        let start_default = !working && task.start_snapshot.as_deref().and_then(snap_info).is_some();
         match turns.last().and_then(|t| t.snapshot_id.as_deref().and_then(snap_info).map(|s| (t.clone(), s))) {
             Some((turn, snap)) => options.push(json!({
-                "mode": "latest_run", "label": "Latest run", "base": snap.commit_sha, "available": true, "default": true,
+                "mode": "latest_run", "label": "Latest run", "base": snap.commit_sha, "available": true, "default": !start_default,
                 "detail": format!("run-start snapshot {} (turn {} of {}, {}), captured including dirty and untracked files", snap.id, turn.n, root.id, turn.started_ms),
                 "provenance": "recorded", "snapshot": snap,
                 "inherited": run.parent_run_id.is_some(),
             })),
-            None => options.push(json!({"mode": "latest_run", "label": "Latest run", "available": false, "default": true, "detail": "no run-start snapshot recorded"})),
+            None => options.push(json!({"mode": "latest_run", "label": "Latest run", "available": false, "default": !start_default, "detail": "no run-start snapshot recorded"})),
         }
         for turn in turns.iter().rev().skip(1) {
             if let Some(snap) = turn.snapshot_id.as_deref().and_then(snap_info) {
@@ -3482,7 +3487,7 @@ impl Daemon {
             }
         }
         match task.start_snapshot.as_deref().and_then(snap_info) {
-            Some(snap) => options.push(json!({"mode": "task_start", "label": "Since task start", "base": snap.commit_sha, "available": true,
+            Some(snap) => options.push(json!({"mode": "task_start", "label": "Since task start", "base": snap.commit_sha, "available": true, "default": start_default,
                 "detail": format!("task-start snapshot {} (HEAD {} plus dirty contents at creation)", snap.id, snap.head.clone().unwrap_or_else(|| "none".into())), "provenance": "recorded"})),
             None => options.push(json!({"mode": "task_start", "label": "Since task start", "available": false, "detail": "task-start snapshot missing"})),
         }
@@ -3684,7 +3689,9 @@ impl Daemon {
                 None => json!({"session": Value::Null, "level": "ask_first", "open_proposals": 0, "conflicts_needing_decision": 0}),
             }
         };
-        Ok(json!({"cursor": store.max_seq()?, "tasks": tasks, "runs": run_values, "workspaces": workspaces, "profiles": store.profiles()?, "turns": turns, "oversight": oversight, "overseer": overseer,
+        // What each agent's work became (AC-243): merged, stopped on conflicts, or a pull request.
+        let landings = crate::merge::landings_for_state(&store.conn, &runs, &turns)?;
+        Ok(json!({"cursor": store.max_seq()?, "tasks": tasks, "runs": run_values, "workspaces": workspaces, "profiles": store.profiles()?, "turns": turns, "oversight": oversight, "overseer": overseer, "landings": landings,
             "daemon": {"pid": std::process::id(), "started_ms": self.started_ms, "version": env!("CARGO_PKG_VERSION"), "parser_version": adapters::PARSER_VERSION,
                 "swarm_storage": if self.swarm_storage_blocked.load(std::sync::atomic::Ordering::SeqCst) { "blocked" } else { "ready" }}}))
     }

@@ -81,6 +81,10 @@ impl Daemon {
         if !open.is_empty() {
             return refuse(format!("Merging {target} into {branch} is unfinished: {} still {} conflicts. Resolve them, or cancel the merge back, before opening a pull request.", open.join(", "), if open.len() == 1 { "has" } else { "have" }));
         }
+        // Resolved but not finished is still the middle of a merge (AC-243): finish or cancel it first.
+        if crate::merge::merging(path) {
+            return refuse(format!("Merging {target} into {branch} is still in progress in the worktree. Finish the merge, or cancel it, before opening a pull request."));
+        }
         let st = git::status(path)?;
         let uncommitted: Vec<String> = st.staged.iter().chain(st.unstaged.iter()).map(|c| c.path.clone()).chain(st.untracked.iter().cloned()).collect();
         let base = git::merge_base(path, "HEAD", &base_ref);
@@ -128,7 +132,7 @@ impl Daemon {
             Some(b) => b.chars().take(20_000).collect::<String>(),
             None => pr_body(&prepared),
         };
-        let push = std::process::Command::new("git").args(["-C", &ws.path, "push", "--no-verify", &remote, &format!("HEAD:refs/heads/{branch}")]).env("GIT_TERMINAL_PROMPT", "0").output()?;
+        let push = std::process::Command::new("git").args(["-C", &ws.path, "push", &remote, &format!("HEAD:refs/heads/{branch}")]).env("GIT_TERMINAL_PROMPT", "0").output()?;
         if !push.status.success() {
             bail!("git push failed: {}", crate::redact::redact(String::from_utf8_lossy(&push.stderr).trim()));
         }
@@ -169,6 +173,7 @@ impl Daemon {
         if !url.starts_with("https://") && !url.starts_with("http://127.0.0.1") && !url.starts_with("http://localhost") {
             bail!("not a pull request URL");
         }
+        crate::merge::set_landing(&self.store.lock().unwrap().conn, &ws.id, "pr", None, ws.branch.as_deref(), None, Some(url), &[])?;
         self.emit(task_id.as_deref(), run_id.as_deref(), "pull_request", "user", "exact", json!({"url": url, "number": number, "branch": ws.branch}))?;
         Ok(json!({"recorded": true}))
     }

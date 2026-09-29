@@ -119,6 +119,7 @@ export interface State {
   turns: Record<string, Array<Turn>>;
   oversight: Record<string, unknown>;
   overseer: unknown;
+  landings: Record<string, unknown>;
   daemon: {
     pid: number;
     started_ms: number;
