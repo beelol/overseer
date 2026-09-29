@@ -22,6 +22,22 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .composer-foot { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; color: var(--ov-muted); font-size: var(--ov-font-sm); }
 .composer-note { display: flex; align-items: center; gap: 6px; }
 .composer-note .fix { margin-left: 4px; }
+/* AC-259: the moment a task is sent, the note says so beside the cleared field. */
+.composer-note.sent { color: var(--ov-text); }
+.composer-note.sent .codicon { color: var(--ov-done); }
+.composer.big[data-sent] textarea::placeholder { color: var(--ov-text); }
+/* AC-260: the repository chip's own picker (search, typed path, Tab completion). */
+.menu.repo-picker { display: flex; flex-direction: column; gap: 4px; max-width: none; max-height: 60vh; overflow: hidden; padding: 6px; }
+.repo-picker-input { width: 100%; height: 30px; padding: 0 10px; flex: none; }
+.repo-picker-list { overflow-y: auto; min-height: 0; }
+.repo-option { cursor: pointer; }
+.repo-option.active { background: var(--ov-selected); }
+.repo-option .menu-label { flex: 0 1 auto; }
+.repo-option .repo-option-path { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--ov-muted); font-size: var(--ov-font-xs); }
+.repo-picker-status { display: flex; align-items: center; gap: 6px; padding: 2px 8px; color: var(--ov-muted); font-size: var(--ov-font-sm); }
+.repo-picker-status[hidden] { display: none; }
+.repo-picker-status.repo-picker-error { color: var(--ov-failed); }
+.repo-picker-foot { padding: 2px 8px 0; color: var(--ov-muted); font-size: var(--ov-font-xs); border-top: 1px solid var(--ov-border); padding-top: 4px; }
 
 /* ---- Grid ---- */
 .view-grid { position: relative; display: flex; flex-direction: column; height: 100vh; min-height: 0; }
