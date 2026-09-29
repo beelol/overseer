@@ -2390,9 +2390,98 @@ rec(231, "Agents start with what Overseer knows", "not started", date="—", com
 rec(232, "The review says what it shows", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
-rec(233, "Work in an agent's worktree from your window", "not started", date="—", commit="—",
+rec(233, "Clicking an agent puts you in its head", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+
+rec(234, "Deploys follow merges by themselves", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate T, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28; the first manual deploys (87aa4f87, cc5e5463) were run by the coordinator with the owner's yes.", live="—", blocker="Its own agent; CI's required checks must be green first (the TUI t10 timing test on hosted runners is the owner's decision).")
+
+rec(235, "You can always see which account an agent uses", "not started", date="—", commit="—",
+    expected="See the RFC criterion (added by the owner on 2026-09-28).",
+    actual="Not started: the agent header shows only \"Your login\" (the owner's voice session, 2026-09-28).", live="—", blocker="With the account work after the one-view build.")
+
+rec(236, "Home talks to Overseer first", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(237, "Overseer starts agents on the right harness, model and account", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(238, "Overseer checks finished work and offers the next step", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(239, "Stuck, failed and limited agents come back to Overseer", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(240, "You hear about it outside VS Code", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(241, "A waiting agent can always be answered", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(242, "Keys act only on what you can see", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(243, "Merge from the agent, and it reads merged afterwards", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(244, "Opening an agent leaves your layout alone", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(245, "No internal words on any surface", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(246, "One name for each thing", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(247, "Home's input is always on screen", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(248, "Overseer's session never drops what it was told", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(249, "Test windows never reach the owner's screen", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the usability audit of 2026-09-28).",
+    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+
+rec(250, "One command opens the whole Overseer layout", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the owner's zero-friction goal, 2026-09-28).",
+    actual="Not started: added for the overnight zero-friction goal (docs/goals/zero-friction.md).", live="—", blocker="Overnight goal.")
+rec(251, "Follow an agent on another screen", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the owner's zero-friction goal, 2026-09-28).",
+    actual="Not started: added for the overnight zero-friction goal (docs/goals/zero-friction.md).", live="—", blocker="Overnight goal.")
+rec(252, "Zero-friction loop, measured", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the owner's zero-friction goal, 2026-09-28).",
+    actual="Not started: added for the overnight zero-friction goal (docs/goals/zero-friction.md).", live="—", blocker="Overnight goal.")
+
+rec(253, "Overseer leads with what happened while you were away", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(254, "Reviewed and unreviewed are never the same mark", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(255, "A state rollup between the list and the grid", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(256, "A repository's badge never goes quiet on finished work", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(257, "Following an agent sits beside Overseer's conversation, not on top of it", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(258, "VS Code's own chat panel stays out of Overseer's way all session, not only at first launch", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(259, "Sending a task clears the box and says so", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(260, "Starting an agent in another repository never needs a native dialog", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(261, "One Sign In, clearly Overseer's or clearly not", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
 
 SHORT_BLOCKERS = {
     154: "verified",
@@ -2556,6 +2645,34 @@ SHORT_BLOCKERS = {
     231: "not started (added by the owner on 2026-09-28)",
     232: "not started (added by the owner on 2026-09-28)",
     233: "not started (added by the owner on 2026-09-28)",
+    234: "not started (added by the owner on 2026-09-28)",
+    235: "not started (added by the owner on 2026-09-28)",
+    236: "not started (the usability audit, 2026-09-28)",
+    237: "not started (the usability audit, 2026-09-28)",
+    238: "not started (the usability audit, 2026-09-28)",
+    239: "not started (the usability audit, 2026-09-28)",
+    240: "not started (the usability audit, 2026-09-28)",
+    241: "not started (the usability audit, 2026-09-28)",
+    242: "not started (the usability audit, 2026-09-28)",
+    243: "not started (the usability audit, 2026-09-28)",
+    244: "not started (the usability audit, 2026-09-28)",
+    245: "not started (the usability audit, 2026-09-28)",
+    246: "not started (the usability audit, 2026-09-28)",
+    247: "not started (the usability audit, 2026-09-28)",
+    248: "not started (the usability audit, 2026-09-28)",
+    249: "not started (the usability audit, 2026-09-28)",
+    250: "not started (the owner's zero-friction goal, 2026-09-28)",
+    251: "not started: blocked by VS Code (no API to float a webview, 1.139.1); skipped on the owner's instruction",
+    252: "not started (the owner's zero-friction goal, 2026-09-28)",
+    253: "not started (the friction research, 2026-09-28)",
+    254: "not started (the friction research, 2026-09-28)",
+    255: "not started (the friction research, 2026-09-28)",
+    256: "not started (the friction research, 2026-09-28)",
+    257: "not started (the friction research, 2026-09-28)",
+    258: "not started (the friction research, 2026-09-28)",
+    259: "not started (the friction research, 2026-09-28)",
+    260: "not started (the friction research, 2026-09-28)",
+    261: "not started (the friction research, 2026-09-28)",
 }
 TOTAL = 53
 
