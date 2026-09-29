@@ -533,6 +533,7 @@ impl Daemon {
                     home: None,
                     is_system: true,
                     created_ms: now(),
+                    account: None,
                 })?;
             }
         }
@@ -550,7 +551,7 @@ impl Daemon {
         let id = format!("p-{}", short_id());
         let home = paths::profiles_dir().join(&id);
         paths::ensure_private_dir(&home)?;
-        let profile = Profile { id, name: name.into(), harness: harness.into(), home: Some(home.display().to_string()), is_system: false, created_ms: now() };
+        let profile = Profile { id, name: name.into(), harness: harness.into(), home: Some(home.display().to_string()), is_system: false, created_ms: now(), account: None };
         // Create the harness credential folder now (0700), so a sign-in never starts without it.
         let _ = Self::profile_env(&profile);
         self.store.lock().unwrap().insert_profile(&profile)?;
@@ -657,6 +658,19 @@ impl Daemon {
         Ok(json!({"exit": out.0, "output": redact(&out.1)}))
     }
 
+    /// Keeps the account a profile is signed in to, as every surface shows it (AC-235): the email
+    /// shortened here, so the full address is never stored or sent. A change reaches every client
+    /// as a `profile` event.
+    fn record_account(&self, id: &str, email: Option<&str>, plan: Option<&str>) -> Result<()> {
+        let email = email.and_then(crate::accounts::short_email);
+        let plan = plan.map(str::to_string).filter(|p| crate::accounts::plan_words(p).is_some());
+        let changed = self.store.lock().unwrap().record_account_shown(id, email.as_deref(), plan.as_deref(), now())?;
+        if changed {
+            self.emit(None, None, "profile", "daemon", "exact", json!({"profile_id": id, "action": "account"}))?;
+        }
+        Ok(())
+    }
+
     pub fn profile_status(&self, id: &str) -> Result<Value> {
         let profile = self.profile(id)?;
         let env = Self::profile_env(&profile);
@@ -680,6 +694,23 @@ impl Daemon {
                     result["logged_in"] = json!(false);
                     result["detail"] = json!("This profile uses an API key. Overseer requires ChatGPT account login.");
                 }
+                if result["logged_in"] == true {
+                    // Codex's own account read names the account (AC-235); never while an agent of
+                    // this profile runs (its own session reads it), and the last one stays shown.
+                    let busy = self.store.lock().unwrap().runs()?.iter().any(|r| r.profile_id.as_deref() == Some(id) && ACTIVE.contains(&r.status.as_str()));
+                    if !busy {
+                        let mut full = adapters::base_env(&program.display().to_string());
+                        full.extend(env.clone());
+                        let read = crate::auto_collect::codex_account(&program, &full, &adapters::neutral_dir(), std::time::Duration::from_secs(5));
+                        let plan = result["identity"]["plan"].as_str().map(str::to_string);
+                        match read {
+                            Ok(account) => self.record_account(id, account["email"].as_str(), account["planType"].as_str().or(plan.as_deref()))?,
+                            Err(_) => self.record_account(id, None, plan.as_deref())?,
+                        }
+                    }
+                } else {
+                    self.record_account(id, None, None)?;
+                }
             }
             "claude" => {
                 let (_, out) = run_with_env(&program, &["auth", "status"], &env)?;
@@ -694,6 +725,12 @@ impl Daemon {
                 if parsed["authMethod"].as_str().map(|m| m.contains("api")).unwrap_or(false) {
                     result["logged_in"] = json!(false);
                     result["detail"] = json!("This profile uses an API key. Overseer requires Claude account login.");
+                }
+                if result["logged_in"] == true {
+                    let email = parsed["email"].as_str().or(parsed["emailAddress"].as_str());
+                    self.record_account(id, email, crate::auto_collect::bounded_plan(parsed.get("subscriptionType")).as_deref())?;
+                } else {
+                    self.record_account(id, None, None)?;
                 }
             }
             "opencode" => {

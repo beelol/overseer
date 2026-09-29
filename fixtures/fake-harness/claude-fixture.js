@@ -25,7 +25,11 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 if (process.argv.includes('auth') && process.argv.includes('status')) {
-  let email = 'fixture@example.test';
+  // The account a profile folder is signed in to (AC-235): `fixture-account.json` in its
+  // CLAUDE_CONFIG_DIR ({"email", "plan"}), so a test shows two accounts apart.
+  const own = process.env.CLAUDE_CONFIG_DIR && path.join(process.env.CLAUDE_CONFIG_DIR, 'fixture-account.json');
+  const account = own && fs.existsSync(own) ? JSON.parse(fs.readFileSync(own, 'utf8')) : {};
+  let email = account.email || 'fixture@example.test';
   if (process.env.CLAUDE_FIXTURE_AUTH_COUNTER_FILE || process.env.CLAUDE_FIXTURE_AUTH_PER_PROFILE === '1') {
     const marker = process.env.CLAUDE_FIXTURE_AUTH_PER_PROFILE === '1'
       ? path.join(process.env.CLAUDE_CONFIG_DIR, 'fixture-auth-count')
@@ -44,7 +48,7 @@ if (process.argv.includes('auth') && process.argv.includes('status')) {
     email, orgId: 'fixture-org',
     // CLAUDE_FIXTURE_PLAN_FILE: the reported plan, so a test can change it between identity reads.
     subscriptionType: (process.env.CLAUDE_FIXTURE_PLAN_FILE && fs.existsSync(process.env.CLAUDE_FIXTURE_PLAN_FILE)
-      && fs.readFileSync(process.env.CLAUDE_FIXTURE_PLAN_FILE, 'utf8').trim()) || 'fixture' }));
+      && fs.readFileSync(process.env.CLAUDE_FIXTURE_PLAN_FILE, 'utf8').trim()) || account.plan || 'fixture' }));
   process.exit(0);
 }
 if (process.argv.includes('--help')) {

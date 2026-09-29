@@ -322,7 +322,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let profile = crate::store::Profile { id:"isolated".into(), name:"Local".into(),
             harness:"opencode".into(), home:Some(dir.path().display().to_string()),
-            is_system:false, created_ms:0 };
+            is_system:false, created_ms:0, account:None };
         let env = crate::daemon::Daemon::profile_env(&profile);
         assert_eq!(env.get("HOME").map(String::as_str), dir.path().to_str());
         assert_eq!(env.get("XDG_CONFIG_HOME").map(String::as_str),
@@ -455,7 +455,7 @@ mod tests {
         std::fs::create_dir_all(home.join("config")).unwrap();
         let profile = crate::store::Profile { id:"p-local".into(), name:"Local".into(),
             harness:"opencode".into(), home:Some(home.display().to_string()),
-            is_system:false, created_ms:0 };
+            is_system:false, created_ms:0, account:None };
         let port_file = dir.path().join("mock-port");
         let mock_log = dir.path().join("mock-log");
         let server_file = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -543,7 +543,7 @@ mod tests {
         std::fs::create_dir(&project).unwrap();
         let profile = crate::store::Profile { id:"p-local".into(), name:"Local".into(),
             harness:"opencode".into(), home:Some(home.display().to_string()),
-            is_system:false, created_ms:0 };
+            is_system:false, created_ms:0, account:None };
         let endpoint = "http://127.0.0.1:47811/v1";
         let mut config = serde_json::json!({"provider":{
             "local_a":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":endpoint},
