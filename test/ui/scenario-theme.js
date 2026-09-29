@@ -54,7 +54,7 @@ function lint() {
     // Keyboard-only task creation in the New Task form.
     await cdp.command('Overseer: Open Overseer View');
     await s.editorView();
-    await cdp.command('Overseer: New Task');
+    await cdp.command('Overseer: Start an Agent with the Full Form');
     const form = await cdp.webview(`document.body.dataset.ready === '1' && !!document.getElementById('harnesses')`, 30000);
     await form.waitFor(`document.querySelectorAll('#harnesses .tile').length >= 4 && document.querySelectorAll('#repos .tile').length >= 2`, 20000);
     const key = async (k, opts) => { await cdp.key(k, opts); await delay(120); };
@@ -90,7 +90,7 @@ function lint() {
       await cdp.waitFor(`document.body.classList.contains(${JSON.stringify(theme.includes('High Contrast Light') ? 'hc-light' : theme.includes('High Contrast') ? 'hc-black' : theme.includes('Light') ? 'vs' : 'vs-dark')}) || !!document.querySelector('.monaco-workbench.${theme.includes('High Contrast Light') ? 'hc-light' : theme.includes('High Contrast') ? 'hc-black' : theme.includes('Light') ? 'vs' : 'vs-dark'}')`, 20000, 'theme ' + theme);
       await delay(1500);
       const slug = theme.replace(/^Default /, '').replace(/\W+/g, '-').toLowerCase();
-      await cdp.command('Overseer: New Task');
+      await cdp.command('Overseer: Start an Agent with the Full Form');
       const f = await cdp.webview(`document.body.dataset.ready === '1' && !!document.getElementById('harnesses')`, 30000);
       await f.waitFor(`document.querySelectorAll('#harnesses .tile').length >= 4`, 20000);
       await f.eval(`(() => { const t = [...document.querySelectorAll('#harnesses .tile')].find(t => /Codex app-server/.test(t.textContent)); t?.click(); })()`);

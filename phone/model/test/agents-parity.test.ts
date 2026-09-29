@@ -156,7 +156,7 @@ describe('agents list parity with VS Code', () => {
 
   it('says what an empty list means', () => {
     const empty = load({ ...state, tasks: [], runs: [], turns: {} });
-    expect(emptyText(empty, { now: NOW })).toBe('No agent tasks yet.');
+    expect(emptyText(empty, { now: NOW })).toBe('No agents yet.');
     expect(emptyText(empty, { now: NOW, filter: 'active' })).toBe('No agents are working.');
     expect(emptyText(empty, { now: NOW, filter: 'needs' })).toBe('Nothing needs you.');
     expect(emptyText(empty, { now: NOW, showArchived: true })).toBe('No archived agents.');

@@ -8,3 +8,4 @@ pub mod locate;
 pub mod model;
 pub mod qr;
 pub mod ui;
+pub mod words;

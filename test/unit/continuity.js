@@ -81,7 +81,7 @@ check('every local model has a badge, and a failed model says so', () => {
     ['qwen2.5-coder:7b', 'not installed · 4.4 GiB download', 'off', 'failed its check', false],
   ]);
   assert.strictEqual(c.models[0].badge.detail, 'qwen3-coder:30b fits at a 64k context: 24.3 GiB of 51.2 GiB.');
-  assert.ok(c.models[1].badge.detail.endsWith('Failed its check with opencode: wrote its tool calls as text.'), c.models[1].badge.detail);
+  assert.ok(c.models[1].badge.detail.endsWith('Failed its check with OpenCode: wrote its tool calls as text.'), c.models[1].badge.detail);
   assert.ok(c.models[2].badge.detail.startsWith('qwen3.5:122b is too big to load: 77.2 GiB at a 16k context is over the budget of 51.2 GiB'));
   assert.strictEqual(t.fit({ tag: 'x', verified: 'passed', fit: { status: 'fits', context: 16384, bytes: 8 * G } }, { budget: 10 * G }).tone, 'tight');
   assert.deepStrictEqual([c.pick.tag, c.running], ['qwen3-coder:30b', true]);

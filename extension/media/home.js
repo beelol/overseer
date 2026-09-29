@@ -14,26 +14,8 @@
   const STAGE_ICON = { thinking: 'loading~spin', sending: 'send', waiting: 'question', starting: 'rocket', working: 'sync~spin', stuck: 'bell-dot', done: 'check', failed: 'error', aside: 'comment-discussion' };
   const STUCK_MS = 3 * 60 * 1000;
 
-  // ---------- Plain words (AC-228): never an internal token or a raw error on a card.
-  const TOKENS = { NOT_FOR_OVERSEER: 'not meant for Overseer', already_answered: 'already answered', waiting_for_user: 'waiting for you', waiting_for_connection: 'waiting for a connection', waiting_for_memory: 'waiting for memory', not_sent: 'not sent', not_for_overseer: 'not meant for Overseer', partly_sent: 'partly sent', picked_up: 'picked up', merge_back: 'merge', pull_request: 'pull request', ask_first: 'Ask first' };
-  const ACTION_WORD = { cadence: 'Changing the check-ins', message: 'Sending the message', start: 'Starting the agent', stop: 'Stopping the agent', permission: 'Answering the permission', merge_back: 'The merge', pull_request: 'The pull request', archive: 'Archiving', redirect: 'Redirecting', hold: 'Holding', focus: 'Showing the agent', open_review: 'Opening the review', open_file: 'Opening the file', open_worktree: 'Opening the worktree', show_work: 'Showing the work' };
-  function plain(text, max = 160) {
-    let t = String(text == null ? '' : text).trim();
-    if (!t) return '';
-    if (/^NOT_FOR_OVERSEER\W*$/.test(t)) return 'Not meant for Overseer: kept as context.';
-    t = t.replace(/^Done:\s*/, '');
-    t = t.replace(/\b([a-z_]+) failed: /g, (m, a) => `${ACTION_WORD[a] || 'That'} did not work: `);
-    t = t.replace(/\b(?:Error|error|anyhow|panicked at)[:!]\s*/g, '');
-    t = t.replace(/\s*(?:Caused by|caused by|Stack backtrace|stack backtrace)[\s\S]*$/, '');
-    t = t.replace(/\s+at \S+:\d+(?::\d+)?/g, '');
-    t = t.replace(/\{[^{}]*"[^"]*"\s*:[^{}]*\}/g, '');
-    t = t.replace(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g, m => TOKENS[m] || m.toLowerCase().replace(/_/g, ' '));
-    t = t.replace(/\b[a-z]+(?:_[a-z]+)+\b/g, m => TOKENS[m] || m.replace(/_/g, ' '));
-    t = t.replace(/^[:;,.\s]+/, '').replace(/\s{2,}/g, ' ').trim();
-    if (!t) return '';
-    t = t[0].toUpperCase() + t.slice(1);
-    return t.length > max ? t.slice(0, max - 1).trimEnd() + '…' : t;
-  }
+  // ---------- Plain words (AC-228, AC-245): never an internal token or a raw error (media/plain-words.js).
+  const plain = (text, max) => window.OverseerPlain.plain(text, max);
   const clock = ms => ms ? new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
   const elapsed = ms => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`; };
 
@@ -99,14 +81,16 @@
       if (src === 'overseer') who.append(ui.mark('sm'), el('span', null, 'Overseer'));
       else if (spoken) { const mic = ui.icon('mic', 'xs'); who.append(mic, el('span', null, 'You, by voice')); r.classList.add('spoken'); r.dataset.request = spoken[1]; }
       else if (src === 'owner') who.append(ui.icon('account', 'xs'), el('span', null, 'You'));
-      else who.append(ui.icon('info', 'xs'), el('span', null, src));
+      else who.append(ui.icon('info', 'xs'), el('span', null, { agent: 'An agent', system: 'Overseer' }[src] || 'Note'));
       let words = spoken ? spoken[2].trim() : m.text || '';
+      // An agent named with `@` reaches Overseer with its id; the owner reads the name alone (AC-245).
+      if (src === 'owner') words = words.replace(/\s\((?:r|p|sh|w)-[0-9a-f]{6,}\)/g, '');
       // Overseer's own notes about a proposal that could not be made: the reason, in plain words.
       const failed = src === 'overseer' && /^\(The proposal could not be (?:made|read)[:,]?\s*([\s\S]*?)\)$/.exec(words);
       if (failed) words = `I couldn't do that${failed[1] ? ': ' + plain(failed[1]) : '.'}`;
       const text = el('div', 'home-text', words);
       // Overseer's replies are Markdown, as in an agent's chat (lists, code, a quoted diff).
-      if (src === 'overseer' && !failed && window.OverseerMarkdown) { text.classList.add('md'); window.OverseerMarkdown.render(text, words, { post }); }
+      if (src === 'overseer' && !failed && window.OverseerMarkdown) { text.classList.add('md'); window.OverseerMarkdown.render(text, window.OverseerPlain.states(words), { post }); }
       r.append(who, text);
       if (src === 'owner') {
         const st = el('button', 'req-stage'); st.type = 'button'; st.hidden = true;
@@ -177,11 +161,14 @@
     // the delivery, the state and when it got there; the whole text sent is the row's tooltip. A
     // row opens its agent (AC-226).
     const STATE = { yes: 'Done', done: 'Done', no: 'Declined', cancelled: 'Cancelled', stale: 'Not done', not_done: 'Not done', failed: 'Failed', refused: 'Refused' };
+    // Why an agent was chosen and how the words reached it, in words (AC-245).
+    const WHY = { named: 'you named it' };
+    const DELIVERY = { add: 'added to its work', advisory: 'for its information', start: 'a new agent', stop: 'stop', allow: 'allowed', deny: 'denied', guardrail: 'a guardrail', auto: 'as it fits' };
     const ROW = { held: 'held', sent: 'sent', delivered: 'delivered', picked_up: 'picked up', answered: 'answered', failed: 'failed', cancelled: 'cancelled', not_sent: 'not sent' };
     function answered(c) {
       const card = el('div', 'proposal answered done-card'); card.setAttribute('role', 'group'); card.setAttribute('aria-label', 'What Overseer did'); card.dataset.id = c.id; card.dataset.state = c.state; card.dataset.ts = c.ts;
       const head = el('div', 'proposal-head'); head.append(ui.mark('sm'), el('span', null, STATE[c.state] || plain(c.state)));
-      const by = [c.answered_by, c.surface && c.surface !== 'settle' ? c.surface : ''].filter(Boolean).join(' · ');
+      const by = window.OverseerPlain.answeredBy(c.answered_by, c.surface);
       if (by) head.append(el('span', 'card-by', by));
       const list = el('ul', 'proposal-list');
       for (const line of c.lines || []) list.append(el('li', null, line));
@@ -195,8 +182,8 @@
           const who = el('button', 'card-row-agent link', r.title || (r.action === 'start' ? 'New agent' : 'Agent')); who.type = 'button';
           who.disabled = !r.run_id; who.title = r.run_id ? 'Open this agent' : 'Not started';
           who.addEventListener('click', () => post({ type: 'openAgent', runId: r.run_id }));
-          row.append(who, el('span', 'card-row-meta', [r.why, r.delivery].filter(Boolean).join(' · ')), el('span', `card-row-state state-${r.state}`, ROW[r.state] || plain(r.state)), el('span', 'card-row-time', clock(at)));
-          row.title = `${r.message || ''}\n\nWhy: ${r.why || '—'} · delivery: ${r.delivery || '—'}\n${times}`;
+          row.append(who, el('span', 'card-row-meta', [WHY[r.why] || r.why, DELIVERY[r.delivery] || r.delivery].filter(Boolean).join(' · ')), el('span', `card-row-state state-${r.state}`, ROW[r.state] || plain(r.state)), el('span', 'card-row-time', clock(at)));
+          row.title = `${(r.message || '').replace(/\s\((?:r|p|sh|w)-[0-9a-f]{6,}\)/g, '')}\n\nWhy: ${WHY[r.why] || r.why || '—'} · ${DELIVERY[r.delivery] || r.delivery || '—'}\n${times}`;
           rows.append(row);
         }
         card.append(rows);

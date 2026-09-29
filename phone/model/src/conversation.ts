@@ -714,10 +714,9 @@ function summarize(w: Work, gkey: string): void {
 function childRow(b: RowBase, run: string, c: Conversation): ChildRow {
   const info = mapGet(c.childInfo, run) || {};
   const st = info.status || 'unknown';
-  const evidence = info.evidence;
   return {
     ...b, kind: 'child', icon: 'type-hierarchy-sub', childRun: run, title: info.title || TEXT.conversation.subAgent, status: st, statusText: statusText(st),
-    tooltip: [info.title, statusText(st), evidence].filter(Boolean).join('\n'),
+    tooltip: [info.title, statusText(st)].filter(Boolean).join('\n'),
   };
 }
 
@@ -1011,10 +1010,9 @@ function add(w: Work, ev: DaemonEvent): void {
       const place = placeFor(w, ev);
       const group = lastGroup(w.c, place);
       const paths = Array.isArray(p['paths']) ? p['paths'] : [];
-      const hint = ev.confidence && ev.confidence !== 'reported' ? ` (${ev.confidence})` : '';
       const row: EditRow = {
         ...base(place, `edit:${ev.seq}`, run, ev.seq, group !== undefined ? group.key : place.owner), kind: 'edit', icon: 'diff', confidence: ev.confidence, group: group !== undefined ? group.key : null,
-        files: paths.map(path => ({ name: basename(path), path: String(path), tooltip: `${String(path)}\n${t.openAtHunk}${hint}` })),
+        files: paths.map(path => ({ name: basename(path), path: String(path), tooltip: `${String(path)}\n${t.openAtHunk}` })),
       };
       put(w, place.end, [row]);
       if (group !== undefined) w.c.groups = mapSet(w.c.groups, group.key, { ...(mapGet(w.c.groups, group.key) as GroupState), edits: group.edits + 1 });

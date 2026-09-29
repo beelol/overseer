@@ -1,0 +1,207 @@
+{
+  "checks": [
+    {
+      "name": "the owner's layout: two editor groups of their files and the secondary side bar open",
+      "ok": true,
+      "detail": {
+        "auxiliary": true,
+        "panel": false,
+        "tabStrips": 2,
+        "groups": [
+          {
+            "tabs": [
+              "a.txt",
+              "b.txt"
+            ],
+            "active": "b.txt"
+          },
+          {
+            "tabs": [
+              "b.txt",
+              "c.txt"
+            ],
+            "active": "c.txt"
+          }
+        ]
+      }
+    },
+    {
+      "name": "selecting an agent keeps both of the owner's groups (their tabs, nothing of Overseer's in them) and the secondary side bar; its chat opens beside them",
+      "ok": true,
+      "detail": {
+        "auxiliary": true,
+        "panel": false,
+        "tabStrips": 3,
+        "groups": [
+          {
+            "tabs": [
+              "a.txt",
+              "b.txt"
+            ],
+            "active": "b.txt"
+          },
+          {
+            "tabs": [
+              "b.txt",
+              "c.txt"
+            ],
+            "active": "c.txt"
+          },
+          {
+            "tabs": [
+              "Overseer"
+            ],
+            "active": "Overseer"
+          }
+        ]
+      }
+    },
+    {
+      "name": "an agent with changes: its review and chat open beside the owner's groups, which stay as they were",
+      "ok": true,
+      "detail": {
+        "auxiliary": true,
+        "panel": false,
+        "tabStrips": 4,
+        "groups": [
+          {
+            "tabs": [
+              "a.txt",
+              "b.txt"
+            ],
+            "active": "b.txt"
+          },
+          {
+            "tabs": [
+              "b.txt",
+              "c.txt"
+            ],
+            "active": "c.txt"
+          },
+          {
+            "tabs": [
+              "Review: Edit a file (1)"
+            ],
+            "active": "Review: Edit a file (1)"
+          },
+          {
+            "tabs": [
+              "Overseer"
+            ],
+            "active": "Overseer"
+          }
+        ]
+      }
+    },
+    {
+      "name": "opening home keeps them too (the review closes; the owner's groups stay)",
+      "ok": true,
+      "detail": {
+        "auxiliary": true,
+        "panel": false,
+        "tabStrips": 3,
+        "groups": [
+          {
+            "tabs": [
+              "a.txt",
+              "b.txt"
+            ],
+            "active": "b.txt"
+          },
+          {
+            "tabs": [
+              "b.txt",
+              "c.txt"
+            ],
+            "active": "c.txt"
+          },
+          {
+            "tabs": [
+              "Overseer"
+            ],
+            "active": "Overseer"
+          }
+        ]
+      }
+    },
+    {
+      "name": "the second window shows its tab strip",
+      "ok": true,
+      "detail": {
+        "auxiliary": false,
+        "panel": false,
+        "tabStrips": 1,
+        "groups": [
+          {
+            "tabs": [
+              "Untitled-1"
+            ],
+            "active": "Untitled-1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "the dashboard hides the tab strips in its own window only (its workspace settings); the second window keeps its tab strip and user settings do not change",
+      "ok": true,
+      "detail": {
+        "dashboardWindowTabStrips": 0,
+        "secondWindowTabStrips": 1,
+        "userSettingsUnchanged": true,
+        "workspaceSettings": {
+          "workbench.editor.showTabs": "none",
+          "breadcrumbs.enabled": false,
+          "workbench.editor.editorActionsLocation": "hidden"
+        }
+      }
+    },
+    {
+      "name": "leaving it takes the settings out of the workspace file; the second window and user settings are unchanged throughout",
+      "ok": true,
+      "detail": {
+        "first": {
+          "auxiliary": true,
+          "panel": false,
+          "tabStrips": 2,
+          "groups": [
+            {
+              "tabs": [
+                "a.txt",
+                "b.txt",
+                "Review: Edit a file (1)"
+              ],
+              "active": "Review: Edit a file (1)"
+            },
+            {
+              "tabs": [
+                "b.txt",
+                "c.txt",
+                "Overseer"
+              ],
+              "active": "Overseer"
+            }
+          ]
+        },
+        "second": {
+          "auxiliary": false,
+          "panel": false,
+          "tabStrips": 1,
+          "groups": [
+            {
+              "tabs": [
+                "Untitled-1"
+              ],
+              "active": "Untitled-1"
+            }
+          ]
+        },
+        "workspace": {},
+        "user": true
+      }
+    },
+    {
+      "name": "no user setting changed at any point",
+      "ok": true
+    }
+  ]
+}

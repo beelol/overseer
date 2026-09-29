@@ -46,12 +46,15 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
       const out = []; for (const r of rows.slice(i + 1)) { if (r.getAttribute('aria-level') === '1') break; out.push({ title: r.querySelector('.label-name')?.textContent.trim(), why: r.querySelector('.label-description')?.textContent.trim() }); } return out; })()`);
     const badge = () => cdp.evalWorkbench(`[...document.querySelectorAll('.part.sidebar .monaco-list-row')].find(r => r.querySelector('.label-name')?.textContent.trim() === 'Needs you')?.querySelector('.label-description')?.textContent.trim()`);
     const status = () => cdp.evalWorkbench(`[...document.querySelectorAll('.statusbar-item')].map(e => e.getAttribute('aria-label') || e.textContent).find(t => /Overseer/.test(t)) || ''`);
-    let list = []; for (let i = 0; i < 20; i++) { list = await needs(); if (list.length >= 4) break; await delay(500); }
+    // Needs you is what waits for an answer (AC-246); the failure and the finished run carry the
+    // "to review" mark instead (AC-254), counted in the Agents view's header.
+    const header = () => cdp.evalWorkbench(`[...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || ''))?.querySelector('.pane-header')?.innerText.replace(/\\s+/g, ' ') || ''`);
+    let list = []; for (let i = 0; i < 20; i++) { list = await needs(); if (list.length >= 2 && /1 to review · 1 failed/.test(await header())) break; await delay(500); }
     const st = await status();
     await s.screenshot('needs-you');
-    check('Needs you gathers permission requests, the failure and the finished run with changes, counted on the view and in the status bar',
-      list.length === 4 && list.filter(x => x.why === 'Approve').length === 2 && list.some(x => x.why === 'Failed') && list.some(x => x.why === 'Review') && (await badge()) === '4' && /4/.test(st),
-      { list, badge: await badge(), status: st });
+    check('Needs you gathers the permission requests, counted on the view and in the status bar; the failure and the finished run are to review',
+      list.length === 2 && list.every(x => x.why === 'Approve') && (await badge()) === '2' && /2/.test(st) && /1 to review · 1 failed/.test(await header()),
+      { list, badge: await badge(), status: st, header: await header() });
 
     const selected = () => dash.eval(`window.__overseer.selected()`);
     const key = async (k, o = {}) => { await cdp.focusWorkbench(); await cdp.key(k, o); await delay(900); };
@@ -69,10 +72,11 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
     const secondDone = await waitFor(second, /completed/);
     const denied = s.ctl('events.list', { run_id: second, limit: 500 }).events.some(e => e.kind === 'permission_answered' && e.payload.allow === false);
     check('⌥⌘J goes to the next agent that needs you; ⌥⌘Y allows and ⌥⌘⌫ denies its request', [permA.run.id, permB.run.id].includes(first) && [permA.run.id, permB.run.id].includes(second) && first !== second && firstDone === 'completed' && secondDone === 'completed' && denied, { first, second, firstDone, secondDone, denied });
-    // The rest (the failure, the finished runs with changes): ⌥⌘J visits each; visiting clears it.
-    const visited = []; let left = await needs();
-    for (let i = 0; i < 6 && left.length; i++) { visited.push(await nextAgent()); await delay(600); left = await needs(); }
-    check('⌥⌘J walks the rest of Needs you (the failure and finished runs with changes); visiting clears each', visited.includes(failed.run.id) && visited.includes(changed.run.id) && left.length === 0, { visited, left });
+    // Then the agents to review (the failure, the finished run with changes): ⌥⌘J visits each; visiting clears it.
+    const visited = [];
+    for (let i = 0; i < 6 && /to review|failed/.test(await header()); i++) { visited.push(await nextAgent()); await delay(600); }
+    const left = await header();
+    check('⌥⌘J goes on to the agents to review (the failure, then the finished run with changes); visiting clears each', visited.includes(failed.run.id) && visited.includes(changed.run.id) && !/to review|failed/.test(left), { visited, left });
 
     // Switch agents with the searchable quick pick, then stop it.
     await key('a', { meta: true, alt: true });

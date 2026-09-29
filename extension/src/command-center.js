@@ -7,6 +7,7 @@ const { RunFeed, runMessage } = require('./run-feed');
 const { handleRunMessage, changesFetcher } = require('./run-actions');
 const { page, localRoots } = require('./webview-html');
 const { ACTIVE } = require('./views');
+const Plain = require('../media/plain-words.js');
 
 
 class CommandCenter {
@@ -51,7 +52,7 @@ class CommandCenter {
     // The mark's layers for Voice Mode's stage (AC-227: the voice view is this view).
     const layer = name => panel.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'voice', name)).toString();
     const layers = JSON.stringify({ core: layer('overseer-logo-core.png'), swooshes: layer('overseer-logo-swooshes.png'), star: layer('overseer-logo-star.png'), flat: layer('overseer-logo-flat.png') }).replace(/'/g, '&#39;');
-    panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'Overseer', chat: true, css: ['dashboard.css', 'voice.css'], js: ['composer.js', 'voice-mark.js', 'voice.js', 'home.js', 'grid.js', 'dashboard.js'], bodyAttrs: `data-layers='${layers}'` });
+    panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'Overseer', chat: true, css: ['dashboard.css', 'voice.css'], js: ['composer.js', 'voice-mark.js', 'voice.js', 'rollup.js', 'home.js', 'grid.js', 'dashboard.js'], bodyAttrs: `data-layers='${layers}'` });
     const post = m => panel.webview.postMessage(m);
     this.chatFeed = new RunFeed(this.client, this.model, m => post({ ...m, channel: 'chat' }));
     this.gridFeed = new RunFeed(this.client, this.model, m => post({ ...m, channel: 'grid' }));
@@ -67,8 +68,8 @@ class CommandCenter {
     panel.onDidChangeViewState(e => vscode.commands.executeCommand('setContext', 'overseer.dashboardFocus', e.webviewPanel.active));
     vscode.commands.executeCommand('setContext', 'overseer.dashboardOpen', true);
     panel.webview.onDidReceiveMessage(message => this.receive(message).catch(error => {
-      if (message?.type === 'start') post({ type: 'notice', scope: 'composer', message: error.message });
-      else post({ type: 'notice', message: error.message });
+      if (message?.type === 'start') post({ type: 'notice', scope: 'composer', message: Plain.plain(error.message, 300) });
+      else post({ type: 'notice', message: Plain.plain(error.message, 300) });
     }));
   }
 
@@ -76,7 +77,7 @@ class CommandCenter {
     if (!m || typeof m !== 'object') return;
     const post = x => this.panel?.webview.postMessage(x);
     switch (m.type) {
-      case 'ready': await this.push(); await this.pushOverseer(); this.pushVoice(); this.voiceSource?.refresh(); this.pushActivity(); if (this.inDashboard) post({ type: 'dashboard', on: true }); if (this.aside) post({ type: 'aside', on: true }); if (this.head) post({ type: 'headAgent', agent: this.head }); return;
+      case 'ready': if (this.pendingTarget) post({ type: 'composerTarget', target: this.pendingTarget }); await this.push(); await this.pushOverseer(); this.pushVoice(); this.voiceSource?.refresh(); this.pushActivity(); if (this.inDashboard) post({ type: 'dashboard', on: true }); if (this.aside) post({ type: 'aside', on: true }); if (this.head) post({ type: 'headAgent', agent: this.head }); return;
       // Voice Mode's controls in the view (AC-227).
       case 'voiceMute': await vscode.commands.executeCommand('overseer.voice.mute'); return;
       case 'voiceToggle': await vscode.commands.executeCommand('overseer.voice.toggle'); return;
@@ -94,12 +95,12 @@ class CommandCenter {
         const text = String(m.text || '').trim(); if (!text) return;
         const cfg = vscode.workspace.getConfiguration('overseer');
         try { await this.client.request('overseer.send', { text, surface: 'vscode', harness: cfg.get('chat.harness', 'claude'), ...(cfg.get('chat.model', '') ? { model: cfg.get('chat.model', '') } : {}) }); }
-        catch (error) { post({ type: 'overseerNotice', message: error.message }); }
+        catch (error) { post({ type: 'overseerNotice', message: Plain.plain(error.message, 300) }); }
         await this.model.refresh(); await this.pushOverseer(); return;
       }
       case 'overseerAnswer': {
         try { await this.client.request('overseer.answer', { id: String(m.id || ''), yes: !!m.yes, surface: 'vscode', by: 'owner' }); }
-        catch (error) { post({ type: 'overseerNotice', id: m.id, message: error.message }); }
+        catch (error) { post({ type: 'overseerNotice', id: m.id, message: Plain.plain(error.message, 300) }); }
         await this.pushOverseer(); return;
       }
       case 'overseerFresh': await this.client.request('overseer.fresh', {}); await this.pushOverseer(); return;
@@ -112,7 +113,7 @@ class CommandCenter {
           try {
             const changes = await this.client.request('workspace.changes', { workspace_id: run.workspace_id });
             if (!changes.files) { await this.client.request('task.archive', { task_id: run.task_id, archived: true }); await this.client.request('workspace.cleanup', { workspace_id: run.workspace_id, discard_dirty: false }); }
-          } catch (error) { post({ type: 'overseerNotice', message: `The agent was stopped; its worktree stays: ${error.message}` }); }
+          } catch (error) { post({ type: 'overseerNotice', message: `The agent was stopped; its worktree stays: ${Plain.plain(error.message, 300)}` }); }
           await this.model.refresh();
         }
         post({ type: 'askOverseer', text: String(m.text || '') });
@@ -132,13 +133,16 @@ class CommandCenter {
         await this.gridFeed.set(ids, { limit: 400 });
         return;
       }
-      case 'composerData': post({ type: 'composerData', data: await this.handlers.launcher.data() }); return;
+      // Home talks to Overseer first (AC-236); "Start directly" is remembered for the owner.
+      case 'composerData': post({ type: 'composerData', data: { ...await this.handlers.launcher.data(), sendTo: vscode.workspace.getConfiguration('overseer').get('home.sendTo', 'overseer') === 'agent' ? 'agent' : 'overseer' } }); return;
+      case 'composerTargetSeen': this.pendingTarget = undefined; return;
+      case 'composerSendTo': await vscode.workspace.getConfiguration('overseer').update('home.sendTo', m.target === 'agent' ? 'agent' : 'overseer', vscode.ConfigurationTarget.Global); return;
       case 'composerDefaults': await this.handlers.launcher.saveDefaults(m.defaults || {}); return;
       case 'composerBrowse': { const repo = await this.handlers.launcher.browse(); if (repo) post({ type: 'notice', scope: 'composer', kind: 'repo', repo }); return; }
       // The repository chip's own picker (AC-260): a typed path, and its Tab completions; no dialog.
       case 'composerAddRepo': {
         try { post({ type: 'notice', scope: 'composer', kind: 'repo', repo: await this.handlers.launcher.addRepo(m.path) }); }
-        catch (error) { post({ type: 'notice', scope: 'composer', kind: 'repoError', path: m.path, message: error.message }); }
+        catch (error) { post({ type: 'notice', scope: 'composer', kind: 'repoError', path: m.path, message: Plain.plain(error.message, 300) }); }
         return;
       }
       case 'composerPathHints': post({ type: 'notice', scope: 'composer', kind: 'pathHints', input: m.input, hints: await this.handlers.launcher.pathHints(m.input) }); return;
@@ -245,7 +249,7 @@ class CommandCenter {
   async push() {
     if (!this.panel) return;
     const { tasks, runs, workspaces, profiles } = this.model.state;
-    const state = { tasks, runs, workspaces, profiles, oversight: this.model.state.oversight || {}, overseer: this.model.state.overseer || {}, accounts: this.handlers.launcher.accounts(), attention: this.handlers.attention(), pinned: this.handlers.pinned(),
+    const state = { tasks, runs, workspaces, profiles, oversight: this.model.state.oversight || {}, overseer: this.model.state.overseer || {}, accounts: this.handlers.launcher.accounts(), attention: this.handlers.attention(), rollup: this.handlers.rollup?.(), pinned: this.handlers.pinned(),
       gridMax: Math.max(1, Math.min(16, vscode.workspace.getConfiguration('overseer').get('grid.maxTiles', 6))), archived: this.handlers.archived() };
     await this.panel.webview.postMessage({ type: 'state', state, selected: this.handlers.selected() });
     if (this.chatRun) { const msg = runMessage(this.model, this.chatRun, this.handlers.steering); if (msg) { this.chatFeed.refreshDescendants(); this.panel.webview.postMessage({ type: 'run', channel: 'chat', ...msg }); } }
@@ -273,6 +277,8 @@ class CommandCenter {
   }
   setMode(mode) { this.panel?.webview.postMessage({ type: 'mode', mode }); }
   focus(target) { this.panel?.webview.postMessage({ type: 'focus', target }); }
+  /** Where home's box sends this time (AC-236): kept until the view is ready to hear it. */
+  composerTarget(target) { this.pendingTarget = target; this.panel?.webview.postMessage({ type: 'composerTarget', target }); }
 
   async deserializeWebviewPanel(panel) {
     // One Overseer view per window: a second restored copy (from an earlier session) is closed.
