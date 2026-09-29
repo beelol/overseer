@@ -24,6 +24,7 @@ Codex, Kilo and Claude all read this file (Claude through `CLAUDE.md`). The owne
 ## Tests
 - `scripts/test-all` runs everything and prints one summary (AC-147): Rust (daemon and TUI), the extension's unit tests and source check, the ledger's link check, the VSIX build and every packaged-UI fixture scenario. `--jobs=3` runs UI scenarios three at a time; `--only=a,b` picks scenarios; `--no-ui` skips them; `--live` and `--perf` add the paid and load scenarios. Run it before asking for a merge, and run at least one UI scenario before pushing extension changes to `main` (a change that stops the extension activating breaks every agent's build).
 - Several agents run VS Code scenarios on the same machine: a timing check that fails under that load is rerun alone before it is called a regression.
+- `scripts/test-all` takes a machine-wide lock (`$TMPDIR/overseer-test-all.lock`): one full run at a time on this Mac, and a run waits its turn. Don't work around it; single scenarios and single `cargo test` files need no lock. `OVERSEER_TEST_LOCK=off` is for CI runners only.
 - Leave no test windows, daemons, shims or runs going.
 
 ## Running a dev Overseer
