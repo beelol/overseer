@@ -339,7 +339,7 @@
         "daemon/src/swarm/route.rs",
         "daemon/tests/swarm_gate_s.rs"
       ],
-      "blocker": "Covered at fixture scope for metering and the cap: the same test runs the director at Overseer's exhausted daily cap of self-started turns; it plans and dispatches, and Overseer's count does not move. A calibrated native director books against the run's category allocation: its booking (swarm-director/<run>/...) freezes the run's caps and counts in its outstanding use, and a worker that would fit only without it is refused category_allocation_exceeded (the_directors_booking_draws_on_the_runs_allocation_and_works_at_overseers_cap, red first and red with the director's draw left out of the count). Open: an uncalibrated director, or one whose draw exceeds the allocation, still runs unbooked and unmetered (an owner choice: hold fan-out, or refuse the director); live calibration on the owner's personal Claude account. The rest of the criterion (the Auto producer behind a versioned adapter, changed eligibility between routing and launch) is as in the record."
+      "blocker": "Covered at fixture scope for metering and the cap: the same test runs the director at Overseer's exhausted daily cap of self-started turns; it plans and dispatches, and Overseer's count does not move. A calibrated native director books against the run's category allocation: its booking (swarm-director/<run>/...) freezes the run's caps and counts in its outstanding use, and a worker that would fit only without it is refused category_allocation_exceeded (the_directors_booking_draws_on_the_runs_allocation_and_works_at_overseers_cap, red first and red with the director's draw left out of the count). Open: an uncalibrated director, or one whose draw exceeds the allocation, still runs unbooked and unmetered (an owner choice: hold fan-out, or refuse the director); live calibration on the owner's personal Claude account. The rest of the criterion (the Auto producer behind a versioned adapter, changed eligibility between routing and launch) is as in the record. Owner's decision (2026-09-28): an unmetered director starts unbooked."
     },
     "SWARM-25": {
       "status": "unverified",
@@ -509,7 +509,7 @@
       "blocker": "Built-in defaults, saved precedence, approved-target inheritance, immutable run snapshots, percentage override arithmetic, the 100-job ready window and configured nonterminal backlog cap pass in fixtures. Durable replay-safe run-limit revisions can lower the worker ceiling and raise the backlog cap without rewriting the initial allowance; lowering backlog below existing nonterminal jobs is rejected. A normal start (swarm.start and Start Swarm) now inherits the pool and defaults, asks only for a one-time account selection and commits after one read-back, on fixtures with a scripted director. Immediate revocation and preset edits during a run through the normal start, a qualified director, a real VS Code window and full Auto Mode scheduler enforcement remain open."
     },
     "SWARM-40": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_policy.rs",
         "docs/verification/swarm/milestone-4.md",
@@ -517,7 +517,7 @@
         "docs/verification/swarm/milestone-7.md",
         "docs/verification/swarm/SWARM-40.md"
       ],
-      "blocker": "Covered at fixture scope, planning included when the director's draw is qualified. A calibrated native director books against the run's category allocation: its booking (swarm-director/<run>/...) freezes the run's caps and counts in its outstanding use, and a worker that would fit only without it is refused category_allocation_exceeded (the_directors_booking_draws_on_the_runs_allocation_and_works_at_overseers_cap, red first and red with the director's draw left out of the count). Open: an uncalibrated director, or one whose draw exceeds the allocation, still runs unbooked and unmetered (an owner choice: hold fan-out, or refuse the director); live calibration on the owner's personal Claude account."
+      "blocker": "Verified at fixture scope; the unmetered-director case is the owner's decision (2026-09-28): it starts unbooked."
     },
     "SWARM-41": {
       "status": "verified",
