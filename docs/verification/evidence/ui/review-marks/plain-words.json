@@ -1,0 +1,27 @@
+{
+  "checked": 4,
+  "leaks": [
+    {
+      "where": "workbench",
+      "text": "Anthropic / Claude\nSign-in: Claude account sign-in (claude auth login). Account login only; no API keys., has actions",
+      "leaks": [
+        {
+          "why": "a lowercase harness id",
+          "match": "claude"
+        }
+      ],
+      "at": "six-to-review"
+    },
+    {
+      "where": "webview Overseer Review",
+      "text": "Latest run\nBase: 2a90b433c0deab5b12a7de5dcae4014fd8a0c819\nrun-start snapshot s-8dbf7912db8e (turn 1 of r-261f168b3ffe, 1790681458991), captured including dirty and untracked files\nProvenance: recorded\nClick to choose another comparison.\nWorktree: …/notes-4544b7eb/notes-index",
+      "leaks": [
+        {
+          "why": "an internal id",
+          "match": "r-261f168b3ffe"
+        }
+      ],
+      "at": "three-to-review"
+    }
+  ]
+}

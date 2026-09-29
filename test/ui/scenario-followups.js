@@ -23,7 +23,7 @@ const { auditExpression } = require('./audit');
   try {
     const repo = makeRepo(path.join(s.root, 'followups-repo'), { dirty: false });
     const settingsFile = path.join(s.profile, 'User/settings.json');
-    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'window.dialogStyle': 'custom', 'window.menuStyle': 'custom', 'overseer.grid.maxTiles': 9 });
+    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'overseer.home.sendTo': 'agent', 'window.dialogStyle': 'custom', 'window.menuStyle': 'custom', 'overseer.grid.maxTiles': 9 });
     s.install(latestVsix());
     s.launch(repo, { OVERSEER_CODEX_PATH: cli, OVERSEER_CLAUDE_PATH: cli, OVERSEER_OPENCODE_PATH: '/nonexistent/opencode', OVERSEER_TEST_SYSTEM_HOME: sys, FIXTURE_LOGIN_ACCOUNT_FILE: next,
       OVERSEER_HARNESS_ENV_PASSTHROUGH: 'FIXTURE_LOGIN_ACCOUNT_FILE,OVERSEER_TEST_SYSTEM_HOME' });

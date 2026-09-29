@@ -1,6 +1,6 @@
 // Packaged-UI scenario for AC-182 (Claude Code fixture, no paid tokens): one conversation, from
 // home. With no agent selected the editor area shows the conversation with Overseer above the
-// composer. Keyboard only: a task typed at home starts an agent (no Overseer turn) and its card
+// composer; this profile has chosen "Start an agent directly" (AC-236, overseer.home.sendTo). Keyboard only: a task typed at home starts an agent (no Overseer turn) and its card
 // appears; the target chip's menu and `@overseer …` send to Overseer and start no agent; an agent
 // named with `@` reaches Overseer as its id; the two corrections and Start fresh, reached with Tab
 // and pressed with Enter; the docked chat shows the same conversation; Start fresh keeps a hold;
@@ -18,7 +18,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
   const modeFile = path.join(s.root, 'claude-mode');
   try {
     const repo = makeRepo(path.join(s.root, 'home-repo'), { dirty: false });
-    s.settings({ 'workbench.colorTheme': 'Overseer', 'overseer.followNewRuns': false });
+    s.settings({ 'workbench.colorTheme': 'Overseer', 'overseer.followNewRuns': false, 'overseer.home.sendTo': 'agent' });
     s.install(latestVsix());
     fs.writeFileSync(modeFile, 'echo');
     s.launch(repo, { OVERSEER_CLAUDE_PATH: path.join(repoRoot, 'fixtures/fake-harness/claude-fixture.js'), OVERSEER_CODEX_PATH: '/nonexistent/codex', OVERSEER_OPENCODE_PATH: '/nonexistent/opencode',
@@ -50,7 +50,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await cdp.command('Overseer: Open Overseer View'); await delay(2500);
     const home = await s.editorView(`!!document.querySelector('#task') && !!document.querySelector('#target')`);
     const target = await home.eval(`document.querySelector('#target')?.dataset.target`);
-    check('home shows the conversation with Overseer above the composer, whose target is New agent', target === 'agent', { target });
+    check('home shows the conversation with Overseer above the composer, whose target is the remembered "Start directly" (AC-236)', target === 'agent', { target });
     // A task typed at home starts an agent with no Overseer turn, and its card appears.
     await focusTask();
     await cdp.type('tidy the docs'); await delay(200); await cdp.key('Enter');
@@ -82,7 +82,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await s.screenshot('home-target-overseer');
     await cdp.key('Enter'); await delay(300); await cdp.key('ArrowUp'); await delay(100); await cdp.key('Enter'); await delay(300);
     const backToAgent = await home.eval(`document.querySelector('#target')?.dataset.target`);
-    check('the target chip\'s menu, by keyboard, offers New agent and Overseer and switches between them', menuOpen && JSON.stringify(items) === JSON.stringify(['New agent', 'Overseer']) && viaMenu === 'overseer' && backToAgent === 'agent', { menuOpen, items, viaMenu, backToAgent });
+    check('the target chip\'s menu, by keyboard, offers Overseer and Start an agent directly and switches between them', menuOpen && JSON.stringify(items) === JSON.stringify(['Overseer', 'Start an agent directly']) && viaMenu === 'overseer' && backToAgent === 'agent', { menuOpen, items, viaMenu, backToAgent });
 
     // `@overseer` sends the text to Overseer and starts no agent.
     fs.writeFileSync(modeFile, 'overseer');
@@ -189,7 +189,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const setTheme = async theme => {
       const bg = `getComputedStyle(document.querySelector('.part.activitybar') || document.body).backgroundColor`;
       const before = await cdp.evalWorkbench(bg);
-      s.settings({ 'workbench.colorTheme': theme, 'overseer.followNewRuns': false });
+      s.settings({ 'workbench.colorTheme': theme, 'overseer.followNewRuns': false, 'overseer.home.sendTo': 'agent' });
       const want = /Light/.test(theme) ? 'vs' : 'vs-dark';
       await cdp.waitFor(`(() => { const w = document.querySelector('.monaco-workbench'); return !!w && w.classList.contains(${JSON.stringify(want)}) && ${bg} !== ${JSON.stringify(before)}; })()`, 20000, 'theme ' + theme);
       await delay(1500);

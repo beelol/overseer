@@ -51,7 +51,7 @@ class CommandCenter {
     // The mark's layers for Voice Mode's stage (AC-227: the voice view is this view).
     const layer = name => panel.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'voice', name)).toString();
     const layers = JSON.stringify({ core: layer('overseer-logo-core.png'), swooshes: layer('overseer-logo-swooshes.png'), star: layer('overseer-logo-star.png'), flat: layer('overseer-logo-flat.png') }).replace(/'/g, '&#39;');
-    panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'Overseer', chat: true, css: ['dashboard.css', 'voice.css'], js: ['composer.js', 'voice-mark.js', 'voice.js', 'home.js', 'grid.js', 'dashboard.js'], bodyAttrs: `data-layers='${layers}'` });
+    panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'Overseer', chat: true, css: ['dashboard.css', 'voice.css'], js: ['composer.js', 'voice-mark.js', 'voice.js', 'rollup.js', 'home.js', 'grid.js', 'dashboard.js'], bodyAttrs: `data-layers='${layers}'` });
     const post = m => panel.webview.postMessage(m);
     this.chatFeed = new RunFeed(this.client, this.model, m => post({ ...m, channel: 'chat' }));
     this.gridFeed = new RunFeed(this.client, this.model, m => post({ ...m, channel: 'grid' }));
@@ -76,7 +76,7 @@ class CommandCenter {
     if (!m || typeof m !== 'object') return;
     const post = x => this.panel?.webview.postMessage(x);
     switch (m.type) {
-      case 'ready': await this.push(); await this.pushOverseer(); this.pushVoice(); this.voiceSource?.refresh(); this.pushActivity(); if (this.inDashboard) post({ type: 'dashboard', on: true }); if (this.aside) post({ type: 'aside', on: true }); return;
+      case 'ready': if (this.pendingTarget) post({ type: 'composerTarget', target: this.pendingTarget }); await this.push(); await this.pushOverseer(); this.pushVoice(); this.voiceSource?.refresh(); this.pushActivity(); if (this.inDashboard) post({ type: 'dashboard', on: true }); if (this.aside) post({ type: 'aside', on: true }); return;
       // Voice Mode's controls in the view (AC-227).
       case 'voiceMute': await vscode.commands.executeCommand('overseer.voice.mute'); return;
       case 'voiceToggle': await vscode.commands.executeCommand('overseer.voice.toggle'); return;
@@ -130,7 +130,10 @@ class CommandCenter {
         await this.gridFeed.set(ids, { limit: 400 });
         return;
       }
-      case 'composerData': post({ type: 'composerData', data: await this.handlers.launcher.data() }); return;
+      // Home talks to Overseer first (AC-236); "Start directly" is remembered for the owner.
+      case 'composerData': post({ type: 'composerData', data: { ...await this.handlers.launcher.data(), sendTo: vscode.workspace.getConfiguration('overseer').get('home.sendTo', 'overseer') === 'agent' ? 'agent' : 'overseer' } }); return;
+      case 'composerTargetSeen': this.pendingTarget = undefined; return;
+      case 'composerSendTo': await vscode.workspace.getConfiguration('overseer').update('home.sendTo', m.target === 'agent' ? 'agent' : 'overseer', vscode.ConfigurationTarget.Global); return;
       case 'composerDefaults': await this.handlers.launcher.saveDefaults(m.defaults || {}); return;
       case 'composerBrowse': { const repo = await this.handlers.launcher.browse(); if (repo) post({ type: 'notice', scope: 'composer', kind: 'repo', repo }); return; }
       // The repository chip's own picker (AC-260): a typed path, and its Tab completions; no dialog.
@@ -240,7 +243,7 @@ class CommandCenter {
   async push() {
     if (!this.panel) return;
     const { tasks, runs, workspaces, profiles } = this.model.state;
-    const state = { tasks, runs, workspaces, profiles, oversight: this.model.state.oversight || {}, overseer: this.model.state.overseer || {}, accounts: this.handlers.launcher.accounts(), attention: this.handlers.attention(), pinned: this.handlers.pinned(),
+    const state = { tasks, runs, workspaces, profiles, oversight: this.model.state.oversight || {}, overseer: this.model.state.overseer || {}, accounts: this.handlers.launcher.accounts(), attention: this.handlers.attention(), rollup: this.handlers.rollup?.(), pinned: this.handlers.pinned(),
       gridMax: Math.max(1, Math.min(16, vscode.workspace.getConfiguration('overseer').get('grid.maxTiles', 6))), archived: this.handlers.archived() };
     await this.panel.webview.postMessage({ type: 'state', state, selected: this.handlers.selected() });
     if (this.chatRun) { const msg = runMessage(this.model, this.chatRun, this.handlers.steering); if (msg) { this.chatFeed.refreshDescendants(); this.panel.webview.postMessage({ type: 'run', channel: 'chat', ...msg }); } }
@@ -268,6 +271,8 @@ class CommandCenter {
   }
   setMode(mode) { this.panel?.webview.postMessage({ type: 'mode', mode }); }
   focus(target) { this.panel?.webview.postMessage({ type: 'focus', target }); }
+  /** Where home's box sends this time (AC-236): kept until the view is ready to hear it. */
+  composerTarget(target) { this.pendingTarget = target; this.panel?.webview.postMessage({ type: 'composerTarget', target }); }
 
   async deserializeWebviewPanel(panel) {
     // One Overseer view per window: a second restored copy (from an earlier session) is closed.

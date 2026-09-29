@@ -1,0 +1,19 @@
+[2026-09-29T11:20:13.209Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-29T11:20:18.906Z] PASS a fresh profile's home sends to Overseer, and says so in words {"target":"overseer","label":"Overseer","hint":"Ask what your agents are doing, or say what to build: Overseer starts, steers and answers.","head":true,"placeholder":"Tell Overseer what to do, or ask what is going on","ariaLabel":"Message to Overseer","choices":["target"]}
+[2026-09-29T11:20:18.906Z] PASS home shows the conversation's head and a one-line hint of what to ask from the first visit {"target":"overseer","label":"Overseer","hint":"Ask what your agents are doing, or say what to build: Overseer starts, steers and answers.","head":true,"placeholder":"Tell Overseer what to do, or ask what is going on","ariaLabel":"Message to Overseer","choices":["target"]}
+[2026-09-29T11:20:18.906Z] PASS with Overseer as the target there is no repository, agent, model or workspace choice to make ["target"]
+[2026-09-29T11:20:19.102Z] screenshot docs/verification/evidence/ui/home-overseer/01-first-visit-overseer.png
+[2026-09-29T11:20:21.104Z] screenshot docs/verification/evidence/ui/home-overseer/02-first-visit-dark.png
+[2026-09-29T11:20:23.072Z] screenshot docs/verification/evidence/ui/home-overseer/03-first-visit-light.png
+[2026-09-29T11:20:27.459Z] PASS the first Enter on home reaches Overseer, which answers, and no agent is started {"said":["What is everyone doing?"],"agents":[]}
+[2026-09-29T11:20:27.460Z] PASS the box still sends to Overseer, and the hint gives way to the conversation {"target":"overseer","hint":false}
+[2026-09-29T11:20:27.647Z] screenshot docs/verification/evidence/ui/home-overseer/04-conversation-overseer.png
+[2026-09-29T11:20:29.621Z] screenshot docs/verification/evidence/ui/home-overseer/05-conversation-dark.png
+[2026-09-29T11:20:31.608Z] screenshot docs/verification/evidence/ui/home-overseer/06-conversation-light.png
+[2026-09-29T11:20:34.941Z] PASS the Send to menu offers Overseer and "Start an agent directly"; the direct choice brings back the repository, agent, model and workspace choices {"items":["Overseer","Start an agent directly"],"direct":{"target":"agent","label":"Start directly","choices":["repo","agent","model","mode","target"]}}
+[2026-09-29T11:20:35.119Z] screenshot docs/verification/evidence/ui/home-overseer/07-start-directly.png
+[2026-09-29T11:20:36.197Z] PASS "Start an agent directly" starts one as before {"started":"tidy the docs"}
+[2026-09-29T11:20:37.699Z] PASS the choice is remembered for the owner (overseer.home.sendTo in the user settings) {"sendTo":"agent"}
+[2026-09-29T11:20:40.654Z] PASS Talk to Overseer always talks to Overseer {"talk":"overseer"}
+[2026-09-29T11:20:42.884Z] PASS choosing Overseer again is remembered too {"sendTo":"overseer"}
+[2026-09-29T11:20:48.366Z] PASS New Agent starts one agent directly, then home sends to Overseer again (the remembered choice is unchanged) {"viaNew":"agent","second":"write the changelog","home":"overseer","sendTo":"overseer"}

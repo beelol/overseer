@@ -25,6 +25,7 @@ const features = require('./features');
 const { Voice } = require('./voice');
 const { agentsOnScreen, permissionTarget, commandTarget } = require('./on-screen');
 const { Notices, agentFromUri } = require('./notices');
+const Rollup = require('../media/rollup.js');
 
 let client;
 let centerRef;
@@ -72,7 +73,7 @@ async function activate(context) {
       .then(choice => choice === 'Stop Swarm'));
   // The side bar's agents list (Gate K): Needs you, then agents by repository.
   let voiceTargeted = () => new Set(); // set once Voice Mode is up (below)
-  const agents = new AgentsProvider(model, context.workspaceState, context.extensionUri, { attention: () => attention(), pinned: () => pinned(), voiceTargeted: () => voiceTargeted() });
+  const agents = new AgentsProvider(model, context.workspaceState, context.extensionUri, { attention: () => attention(), pinned: () => pinned(), voiceTargeted: () => voiceTargeted(), reviewed: () => reviewed });
   const accounts = new AccountsProvider(model, context.extensionUri);
   const agentsView = vscode.window.createTreeView('overseer.agents', { treeDataProvider: agents, showCollapseAll: true, dragAndDropController: agentDrag() });
   // The search field above the Agents list (AC-112): typing filters the list through the daemon's search.
@@ -80,7 +81,7 @@ async function activate(context) {
   /** The filter icon's menu (a native pick: a menu inside the short search pane would be clipped). */
   async function filterMenu() {
     const now = agents.showArchived ? 'archived' : agents.statusFilter;
-    const items = [['all', 'All', 'list-flat'], ['working', 'Working', 'sync'], ['needs', 'Needs you', 'bell'], ['done', 'Done', 'check'], ['failed', 'Failed', 'error'], ['archived', 'Archived', 'archive']]
+    const items = [['all', 'All', 'list-flat'], ['working', 'Working', 'sync'], ['needs', 'Needs you', 'bell'], ['review', 'To review', 'sparkle'], ['done', 'Done', 'check'], ['failed', 'Failed', 'error'], ['archived', 'Archived', 'archive']]
       .map(([value, label, icon]) => ({ value, label: `$(${icon}) ${label}`, description: value === now ? '✓' : '' }));
     const picked = await vscode.window.showQuickPick(items, { title: 'Show agents', placeHolder: 'Filter the Agents list' });
     if (!picked) return;
@@ -89,7 +90,7 @@ async function activate(context) {
   /** The search field's filters: All, Working, Needs you, Done, Failed, Archived. */
   function setStatusFilter(kind) {
     agents.showArchived = kind === 'archived';
-    agents.statusFilter = ['working', 'needs', 'done', 'failed'].includes(kind) ? kind : 'all';
+    agents.statusFilter = ['working', 'needs', 'review', 'done', 'failed'].includes(kind) ? kind : 'all';
     vscode.commands.executeCommand('setContext', 'overseer.showArchived', agents.showArchived);
     setAgentFilter(agents.filter);
   }
@@ -98,6 +99,9 @@ async function activate(context) {
   context.subscriptions.push(vscode.window.registerFileDecorationProvider(agents.decorations));
   const outputs = new OutputPanels(context, client, model);
   const review = new Review(context, client, model, say);
+  // Opening an agent's review clears its "to review" mark (AC-254), however it was opened.
+  const openReview = review.open.bind(review);
+  review.open = async (runId, opts) => { const r = await openReview(runId, opts); const root = model.run(runId) && model.rootRun(model.run(runId)); if (root && !ACTIVE.has(root.status)) markReviewed(root.id); return r; };
   let selectedRun;
   const launcher = new TaskLauncher(context, client, model, () => refreshAccounts());
   const steering = new Steering(client, model);
@@ -105,53 +109,41 @@ async function activate(context) {
   // Continuity (Gate L): the connection, its settings, and the agents that wait for it.
   const continuity = new Continuity(context, client, model, { say, views: () => { try { return { center: centerRef, outputs, agentsView, newTaskPanel }; } catch { return { center: centerRef, outputs, agentsView }; } } });
   launcher.continuity = () => continuity.snapshot(); steering.continuity = continuity; agents.continuity = continuity;
-  // Needs you (AC-61): waiting for a decision, failed, or finished with changes not yet reviewed.
-  const reviewed = new Map(Object.entries(context.workspaceState.get('overseer.reviewed', {})));
-  const markReviewed = runId => { if (!runId) return; reviewed.set(runId, Date.now()); context.workspaceState.update('overseer.reviewed', Object.fromEntries([...reviewed].slice(-800))); };
-  const changedRuns = new Map(); // run id -> changed files (finished runs)
-  const checkChanged = async run => {
-    if (!run || changedRuns.has(run.id) || run.parent_run_id) return;
-    changedRuns.set(run.id, 0);
-    try { const c = await client.request('workspace.changes', { workspace_id: run.workspace_id }); changedRuns.set(run.id, c.files || 0); if (c.files) model.emitter.fire(); } catch { /* removed worktree */ }
+  // Reviewed marks (AC-254): when each agent's review was last opened (or it was merged), for the
+  // owner across windows. An agent at its end with no mark since it ended is "to review".
+  const reviewed = new Map([...Object.entries(context.workspaceState.get('overseer.reviewed', {})), ...Object.entries(context.globalState.get('overseer.reviewed', {}))]);
+  const markReviewed = runId => {
+    if (!runId) return;
+    const run = model.run(runId);
+    if (run && reviewed.get(runId) >= (run.ended_ms || run.created_ms || 0) && !ACTIVE.has(run.status)) return;
+    reviewed.set(runId, Date.now());
+    context.globalState.update('overseer.reviewed', Object.fromEntries([...reviewed].slice(-2000)));
+    model.emitter.fire();
   };
   const archivedTasks = () => (model.state.tasks || []).filter(t => t.archived_ms).map(t => t.id);
+  // Needs you (AC-61, AC-246): what waits for the owner's answer, counted as the TUI and the phone
+  // count it (media/rollup.js); failed and finished agents carry the "to review" mark instead (AC-254).
   function attention() {
-    const archived = new Set(archivedTasks());
-    const out = [];
-    // Overseer needs the owner (AC-199): proposals waiting for a yes, conflicts needing a decision.
-    const ov = model.state.overseer || {};
-    if (ov.run_id && (ov.open_proposals || ov.conflicts_needing_decision)) {
-      const parts = [ov.open_proposals && `${ov.open_proposals} proposal${ov.open_proposals === 1 ? '' : 's'}`, ov.conflicts_needing_decision && `${ov.conflicts_needing_decision} conflict${ov.conflicts_needing_decision === 1 ? '' : 's'}`].filter(Boolean);
-      out.push({ run_id: 'overseer', overseer: true, rank: 0, label: 'Decide', detail: `Overseer: ${parts.join(', ')} waiting for you` });
-    }
-    // Only the 40 most recently finished runs are checked for unreviewed changes (large histories stay fast).
-    const recent = new Set((model.state.runs || []).filter(r => !r.parent_run_id && r.status === 'completed').sort((a, b) => (b.ended_ms || b.created_ms) - (a.ended_ms || a.created_ms)).slice(0, 40).map(r => r.id));
-    for (const r of (model.state.runs || []).filter(r => !r.parent_run_id)) {
-      if (archived.has(r.task_id)) continue;
-      const seen = reviewed.get(r.id) || 0;
-      if (r.status === 'waiting_for_user') out.push({ run_id: r.id, rank: 0, label: r.attention?.kind === 'permission' ? 'Approve' : 'Reply', detail: r.attention?.kind === 'permission' ? `Wants to use ${r.attention.tool}` : 'Waiting for your reply' });
-      else if (['failed', 'disconnected'].includes(r.status) && seen < (r.ended_ms || r.created_ms)) out.push({ run_id: r.id, rank: 1, label: 'Failed', detail: r.exit_reason || 'The agent failed' });
-      else if (r.status === 'completed' && recent.has(r.id) && seen < (r.ended_ms || r.created_ms) && Date.now() - (r.ended_ms || r.created_ms) < 7 * 86400000) {
-        if (!changedRuns.has(r.id)) checkChanged(r);
-        const n = changedRuns.get(r.id);
-        if (n) out.push({ run_id: r.id, rank: 2, label: 'Review', detail: `${n} file${n === 1 ? '' : 's'} changed` });
-      }
-    }
+    const out = Rollup.needsYou(model.state);
     const waiting = continuity.attention(); if (waiting) out.push(waiting);
     return out.sort((a, b) => a.rank - b.rank);
   }
+  /** The rollup by state (AC-255): the side bar and the grid show these same counts. */
+  const rollup = () => Rollup.counts(model.state, reviewed);
+  /** Agents at their end not reviewed yet, failed first, then the newest (⌥⌘J visits them after Needs you). */
+  const toReview = () => Rollup.agents(model.state).filter(r => Rollup.unreviewed(r, reviewed)).sort((a, b) => (Rollup.FAILED.has(b.status) - Rollup.FAILED.has(a.status)) || ((b.ended_ms || b.created_ms) - (a.ended_ms || a.created_ms)));
   const pinned = () => context.workspaceState.get('overseer.pinned', []).filter(id => model.run(id));
   const setPinned = (runId, on) => context.workspaceState.update('overseer.pinned', [...new Set([...pinned().filter(id => id !== runId), ...(on ? [runId] : [])])]);
   const search = async q => { try { return (await client.request('search', { query: q, limit: 200 })).task_ids || []; } catch { return []; } };
   // With the dashboard open, the chat stays inside it and reviews go to the column on its right.
-  const center = new CommandCenter(context, model, { select: (runId, opts) => selectRun(runId, opts), selected: () => selectedRun, client, model, launcher, attention, pinned, setPinned, archived: archivedTasks, search, steering,
+  const center = new CommandCenter(context, model, { select: (runId, opts) => selectRun(runId, opts), selected: () => selectedRun, client, model, launcher, attention, rollup, pinned, setPinned, archived: archivedTasks, search, steering,
     // A card, a request's stage or a Needs-you item opens its agent, or its finished work (AC-226).
     openAgent: (runId, opts) => openAgent(runId, opts),
     // The grid takes the editor area and gives it back as it was (AC-79).
     onMode: async (mode, was) => { if (mode === 'grid') await arrangement.enterGrid(); else if (was === 'grid') await arrangement.leaveGrid(); },
     // No empty grid (AC-113): when its last tile goes, the grid gives way to the home composer.
     track: runId => arrangement.track(runId), untrack: () => arrangement.untrack(),
-    gridEmpty: () => goHome('The grid is empty: no agent is working or pinned. Start one here.') });
+    gridEmpty: () => goHome(`The grid is empty: no agent is working or pinned.${rollupNote()} Start one here.`) });
   centerRef = center;
   const arrangement = new Arrangement({ context, center, review, model, client, log: say });
   outputs.column = () => vscode.ViewColumn.Beside;
@@ -187,7 +179,8 @@ async function activate(context) {
   let needsQueue = Promise.resolve();
   let atOverseer = false; // the last ⌥⌘J went to Overseer's open proposal: the next one moves on
   const nextNeedsYou = async () => {
-    const list = attention();
+    // Needs you first; then the agents at their end still to review (AC-254), failed first.
+    const list = [...attention(), ...toReview().map(r => ({ run_id: r.id, rank: 5 }))];
     if (!list.length) { vscode.window.setStatusBarMessage('$(check) Nothing needs you', 2500); return; }
     // The most urgent item that is not already open (approvals first, then failures, then reviews).
     const next = list.find(a => (a.overseer ? !atOverseer : a.run_id !== selectedRun)) || list[0];
@@ -278,6 +271,15 @@ async function activate(context) {
   model.onDidChange(updateStatus);
   // The Needs-you count on the Overseer activity icon (AC-70).
   model.onDidChange(() => { const n = client.connected ? attention().length : 0; agentsView.badge = n ? { value: n, tooltip: `${n} need${n === 1 ? 's' : ''} you` } : undefined; });
+  // The Agents view's own header says what is left to review (AC-254); a review open on screen as
+  // its agent finishes counts as reviewed.
+  model.onDidChange(() => {
+    for (const [session, panel] of review.manager?.panels || []) {
+      const run = session.overseer?.runId && model.run(session.overseer.runId);
+      if (run && panel.visible && Rollup.unreviewed(run, reviewed)) markReviewed(run.id);
+    }
+    agentsView.description = client.connected ? Rollup.reviewText(rollup()) : '';
+  });
   model.onDidChange(() => { autoArchive().catch(() => {}); });
   client.on('connected', () => { model.refresh(); updateStatus(); });
   client.on('disconnected', () => { model.error = 'daemon connection lost; reconnecting'; model.emitter.fire(); updateStatus(); });
@@ -328,6 +330,8 @@ async function activate(context) {
   }
 
   const gridHasAgents = () => (model.state.runs || []).some(r => !r.parent_run_id && ACTIVE.has(r.status)) || pinned().length > 0;
+  /** The rollup (AC-255) for a one-line note where the grid would be: " Of the rest: 6 to review · 3 reviewed." */
+  const rollupNote = () => { const t = Rollup.text({ ...rollup(), working: 0, needs: 0 }); return t ? ` Of the rest: ${t}.` : ''; };
   /** The home view: the composer alone in the middle, with an optional one-line note. */
   async function goHome(note) {
     await arrangement.chatOnly();
@@ -407,7 +411,7 @@ async function activate(context) {
     const picked = model.run(runId) || (await model.refresh(), model.run(runId));
     if (!picked) return;
     selectedRun = runId;
-    // Opening a failed or finished run counts as seeing it (it leaves Needs you).
+    // Opening an agent at its end opens its review when it has changes (Gate K): it is reviewed (AC-254).
     if (!ACTIVE.has(picked.status)) markReviewed(model.rootRun(picked)?.id || runId);
     context.workspaceState.update('overseer.selectedRun', runId);
     await arrangement.show(runId, { follow });
@@ -649,6 +653,7 @@ async function activate(context) {
     const ok = await vscode.window.showWarningMessage(`Merge ${plan.branch} into ${plan.target} in ${path.basename(plan.repo)}?`, { modal: true, detail }, 'Complete Merge Back');
     if (ok !== 'Complete Merge Back') return;
     const done = await client.request('workspace.merge_complete', { workspace_id: wsId });
+    markReviewed(run.id);
     await model.refresh();
     vscode.window.showInformationMessage(`Merged ${done.branch} into ${done.target} (${String(done.commit).slice(0, 10)}). The worktree and branch are kept; clean them up when you no longer need them.`);
   }
@@ -1008,7 +1013,8 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.exitDashboard', guard(() => dashboard.exit())),
     vscode.commands.registerCommand('overseer.toggleDashboard', guard(async () => { if (dashboard.inDashboard) await dashboard.exit(); else { await model.refresh(); await dashboard.enter(); } })),
     vscode.commands.registerCommand('overseer.openDashboardWindow', guard(() => dashboard.openWindow())),
-    vscode.commands.registerCommand('overseer.newAgent', guard(async () => { requireTrust(); await arrangement.chatOnly(); center.setMode('composer'); center.focus('composer'); })),
+    // New Agent starts one directly (AC-236): home's box takes the task for a new agent this time.
+    vscode.commands.registerCommand('overseer.newAgent', guard(async () => { requireTrust(); await arrangement.chatOnly(); center.setMode('composer'); center.composerTarget('agent'); center.focus('composer'); })),
     vscode.commands.registerCommand('overseer.whereAmI', guard(() => whereAmI())),
     // Talk to Overseer (AC-227): home, with the composer's target Overseer.
     vscode.commands.registerCommand('overseer.talk', guard(async () => { await arrangement.chatOnly(); center.setMode('composer'); center.panel?.webview.postMessage({ type: 'askOverseer', text: '' }); })),
@@ -1024,10 +1030,11 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.toggleGrid', guard(async () => {
       if (center.mode === 'grid') { center.setMode(selectedRun ? 'chat' : 'composer'); return; }
       // The grid opens only with something to show (AC-113); otherwise home, with a one-line note.
-      if (!gridHasAgents()) { await goHome('No agent is working or pinned yet, so the grid has nothing to show. Start one here.'); return; }
+      if (!gridHasAgents()) { await goHome(`No agent is working or pinned yet, so the grid has nothing to show.${rollupNote()} Start one here.`); return; }
       await arrangement.enterGrid(); center.setMode('grid');
     })),
     vscode.commands.registerCommand('overseer.searchAgents', guard(searchAgents)),
+    vscode.commands.registerCommand('overseer.filterAgents', guard(filterMenu)),
     vscode.commands.registerCommand('overseer.clearAgentSearch', guard(async () => { searchSeq++; setAgentFilter(undefined); searchView.clear(); })),
     vscode.commands.registerCommand('overseer.showArchived', guard(async () => { searchView.setFilter('archived'); setStatusFilter('archived'); vscode.commands.executeCommand('setContext', 'overseer.showArchived', true); })),
     vscode.commands.registerCommand('overseer.hideArchived', guard(async () => { searchView.setFilter('all'); setStatusFilter('all'); vscode.commands.executeCommand('setContext', 'overseer.showArchived', false); })),
