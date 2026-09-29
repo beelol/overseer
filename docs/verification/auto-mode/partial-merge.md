@@ -36,7 +36,7 @@ The packaged scenarios that exercise these features turn their setting on: `scen
 ## Criteria recorded
 
 - **Auto (docs/verification/auto-mode/README.md):** 23 of 40 core criteria verified: AUTO-AC-01, 02, 03, 07, 08, 09, 11, 12, 13, 16, 18, 19, 20, 22, 23, 26, 27, 28, 29, 36, 37, 40 and 41. AUTO-AC-19 and 36 were verified in this session at fixture scope. AUTO-AC-30 is conditionally deferred. The other 17 stay in progress or not started, each with its gap in the ledger and its class in `live-plan.md`.
-- **Swarm (docs/verification/swarm/coverage.json):** 45 of 64 verified at fixture scope. Left: live-account runs (SWARM-01, 13, 17, 25, 26, 27, 28, 31, 39, 52, 56, 63), an owner choice for a director whose draw is unknown or exceeds the allocation (SWARM-24/40), and packaged-UI scenarios (SWARM-18, 22, 23, 37); S0 to S5 partial.
+- **Swarm (docs/verification/swarm/coverage.json):** 46 of 64 verified at fixture scope. Left: live-account runs (SWARM-01, 13, 17, 25, 26, 27, 28, 31, 39, 52, 56, 63), an owner choice for a director whose draw is unknown or exceeds the allocation (SWARM-24/40), and packaged-UI scenarios (SWARM-18, 22, 23, 37); S0 to S5 partial.
 - **Contract (docs/rfcs/swarm-auto-contract.md):** CONTRACT-04 is partial (the Swarm side, fixtures): two attempts at most across routes and a restart, an uncertain effect pauses with no selection. CONTRACT-01, 02, 03 and 05 are unchanged.
 
 Every unfinished part keeps its gap in its own record; none is marked done by this merge.
