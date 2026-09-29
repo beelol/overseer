@@ -2390,7 +2390,7 @@ rec(231, "Agents start with what Overseer knows", "not started", date="—", com
 rec(232, "The review says what it shows", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
-rec(233, "Work in an agent's worktree from your window", "not started", date="—", commit="—",
+rec(233, "Clicking an agent puts you in its head", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
 

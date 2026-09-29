@@ -273,7 +273,7 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-230** Permission modes by conversation — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-230.md)
 - [ ] **AC-231** Agents start with what Overseer knows — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-231.md)
 - [ ] **AC-232** The review says what it shows — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-232.md)
-- [ ] **AC-233** Work in an agent's worktree from your window — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-233.md)
+- [ ] **AC-233** Clicking an agent puts you in its head — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-233.md)
 - [ ] **AC-234** Deploys follow merges by themselves — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-234.md)
 <!-- ac-list:end -->
 
@@ -813,7 +813,7 @@ the owner action or decision each one needs.
 - [ ] [AC-230](docs/verification/AC-230.md) (Permission modes by conversation): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-231](docs/verification/AC-231.md) (Agents start with what Overseer knows): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-232](docs/verification/AC-232.md) (The review says what it shows): To be built by its own agent after the Auto/Swarm merge.
-- [ ] [AC-233](docs/verification/AC-233.md) (Work in an agent's worktree from your window): To be built by its own agent after the Auto/Swarm merge.
+- [ ] [AC-233](docs/verification/AC-233.md) (Clicking an agent puts you in its head): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-234](docs/verification/AC-234.md) (Deploys follow merges by themselves): Its own agent; CI's required checks must be green first (the TUI t10 timing test on hosted runners is the owner's decision).
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
