@@ -18,7 +18,7 @@ Codex, Kilo and Claude all read this file (Claude through `CLAUDE.md`). The owne
 - Themes: Overseer Dark and Overseer Light, plus the bold "Overseer" theme of Gate M (AC-103). Colours come from the design tokens (`extension/design/tokens.js`), never hard-coded.
 
 ## Paid turns
-- ChatGPT accounts: only `gpt-5.6-luna` at low reasoning effort. Claude: light use (haiku). One attempt per step, no retry loops.
+- Only `gpt-5.6-luna` at low reasoning effort, for every paid turn Overseer runs (tests, live checks, dev daemons, the orchestrator's own run in a dev daemon). No Claude model for now, not even haiku (the owner, 2026-09-28). One attempt per step, no retry loops.
 - Never touch the owner's checkouts, logins or credentials; never sign anything out. Restart or reinstall on the owner's daemon only when no runs are active.
 
 ## Tests
