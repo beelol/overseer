@@ -756,6 +756,8 @@ function userNavigated(reason) {
   followState = 'paused'; followStatus.textContent = 'Follow paused by your navigation'; renderFollow();
   vscode.postMessage({ type: 'followPause', reason });
 }
+// AC-233: Diffs only → Follow, the agent's worktree in its real files.
+document.getElementById('head-follow')?.addEventListener('click', () => vscode.postMessage({ type: 'showHead' }));
 followButton.addEventListener('click', () => {
   if (followState === 'paused') vscode.postMessage({ type: 'followResume' });
   else vscode.postMessage({ type: 'follow', enabled: followState !== 'following' });

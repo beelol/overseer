@@ -143,6 +143,15 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 /* Needs you: a small badge with a count; the list pops out from it (ui.menu). */
 .home-needs { display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: var(--ov-font-xs); font-weight: var(--ov-weight-semibold); color: var(--ov-text); background: var(--ov-raised); border: 1px solid var(--ov-waiting); border-radius: var(--ov-radius-pill); padding: 0 var(--ov-space-2); height: 22px; cursor: pointer; }
 .home-needs[hidden] { display: none; }
+/* AC-257: back to the agent followed beside the conversation. */
+.home-back-agent { display: inline-flex; align-self: flex-start; align-items: center; gap: 6px; max-width: 100%; margin: 0; font: inherit; font-size: var(--ov-font-xs); color: var(--ov-text); background: var(--ov-raised); border: 1px solid var(--ov-border-strong); border-radius: var(--ov-radius-pill); padding: 0 var(--ov-space-2); height: 24px; cursor: pointer; }
+.home-back-agent-verb { color: var(--ov-muted); }
+.home-back-agent kbd { color: var(--ov-muted); font: inherit; font-size: var(--ov-font-xs); }
+.home-back-agent[hidden] { display: none; }
+.home-back-agent .codicon { color: var(--ov-accent); }
+.home-back-agent-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-back-agent:hover { border-color: var(--ov-accent); }
+.home-back-agent:focus-visible { outline: 1px solid var(--ov-focus); outline-offset: 2px; }
 .home-needs .codicon { color: var(--ov-waiting); }
 .home-needs-count { font-variant-numeric: tabular-nums; }
 .home-unaside { display: none; }

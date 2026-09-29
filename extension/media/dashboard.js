@@ -90,6 +90,7 @@
       case 'voice': home.voice(m.voice); grid.voiceTargets(m.targets || []); break;
       case 'voiceView': home.voiceView(m.m); break;
       case 'activity': home.activity(m.runs); break;
+      case 'headAgent': home.headAgent(m.agent); break;
       case 'aside': setAside(m.on); if (m.on && m.runId) selectRun(m.runId, { fromHost: true }); break;
       case 'overseerNotice': if (m.id) home.proposalStatus(m.id, m.message); else composer.notice({ message: m.message }); break;
       case 'composerTarget': setMode('composer'); composer.setTarget(m.target); post({ type: 'composerTargetSeen' }); break;

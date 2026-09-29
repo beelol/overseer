@@ -48,6 +48,7 @@
       "overseer": [
         { "type": "webview", "id": "overseer.search", "name": "Search", "initialSize": 1 },
         { "id": "overseer.agents", "name": "Agents", "initialSize": 14 },
+        { "id": "overseer.worktree", "name": "Worktree", "initialSize": 10, "when": "overseer.headOpen" },
         { "id": "overseer.accounts", "name": "Accounts", "initialSize": 5 },
         { "id": "overseer.devices", "name": "Devices", "visibility": "collapsed", "initialSize": 3 }
       ]
@@ -145,7 +146,16 @@
       { "command": "overseer.giveDeviceFullControl", "title": "Give Full Control", "category": "Overseer", "icon": "$(unlock)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.renameDevice", "title": "Rename…", "category": "Overseer", "icon": "$(edit)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.turnOffPhoneNotifications", "title": "Turn Off Notifications to Phones", "category": "Overseer", "icon": "$(bell-slash)", "enablement": "isWorkspaceTrusted" },
-      { "command": "overseer.turnOnPhoneNotifications", "title": "Turn On Notifications to Phones", "category": "Overseer", "icon": "$(bell)", "enablement": "isWorkspaceTrusted" }
+      { "command": "overseer.turnOnPhoneNotifications", "title": "Turn On Notifications to Phones", "category": "Overseer", "icon": "$(bell)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.head.toggleMode", "title": "Switch Between Follow and Diffs Only", "category": "Overseer", "icon": "$(eye)" },
+      { "command": "overseer.head.follow", "title": "Follow the Agent in Its Files", "category": "Overseer", "icon": "$(eye)" },
+      { "command": "overseer.head.diffsOnly", "title": "Diffs Only", "category": "Overseer", "icon": "$(diff-multiple)" },
+      { "command": "overseer.head.openFile", "title": "Open in the Agent's Worktree", "category": "Overseer" },
+      { "command": "overseer.head.refresh", "title": "Refresh the Worktree", "category": "Overseer", "icon": "$(refresh)" },
+      { "command": "overseer.head.catchUp", "title": "Go to the Agent's Latest Edit", "category": "Overseer" },
+      { "command": "overseer.backToOverseer", "title": "Back to Overseer's Conversation", "category": "Overseer", "icon": "$(comment-discussion)" },
+      { "command": "overseer.backToAgent", "title": "Back to the Agent", "category": "Overseer", "icon": "$(eye)" },
+      { "command": "overseer.switchAgentOverseer", "title": "Switch Between the Agent and Overseer", "category": "Overseer" }
     ],
     "keybindings": [
       { "command": "overseer.archiveAgent", "key": "delete", "mac": "cmd+backspace", "when": "focusedView == overseer.agents" },
@@ -160,6 +170,7 @@
       { "command": "overseer.voice.yes", "key": "ctrl+alt+shift+y", "mac": "cmd+alt+shift+y", "when": "overseer.voiceOn && overseer.voiceAsking" },
       { "command": "overseer.voice.no", "key": "ctrl+alt+shift+n", "mac": "cmd+alt+shift+n", "when": "overseer.voiceOn && overseer.voiceAsking" },
       { "command": "overseer.newAgent", "key": "ctrl+alt+n", "mac": "cmd+alt+n" },
+      { "command": "overseer.switchAgentOverseer", "key": "ctrl+alt+u", "mac": "cmd+alt+u" },
       { "command": "overseer.toggleGrid", "key": "ctrl+alt+g", "mac": "cmd+alt+g" },
       { "command": "overseer.whereAmI", "key": "ctrl+alt+m", "mac": "cmd+alt+m" },
       { "command": "overseer.switchAgent", "key": "ctrl+alt+a", "mac": "cmd+alt+a" },
@@ -191,6 +202,10 @@
         { "command": "overseer.showCapabilities", "when": "view == overseer.agents", "group": "4_info@1" },
         { "command": "overseer.audioMode", "when": "view == overseer.agents", "group": "5_audio@1" },
         { "command": "overseer.stopAll", "when": "view == overseer.agents", "group": "9_stop@1" },
+        { "command": "overseer.head.diffsOnly", "when": "view == overseer.worktree && overseer.headMode == follow", "group": "navigation@1" },
+        { "command": "overseer.head.follow", "when": "view == overseer.worktree && overseer.headMode == diffs", "group": "navigation@1" },
+        { "command": "overseer.backToOverseer", "when": "view == overseer.worktree", "group": "navigation@2" },
+        { "command": "overseer.head.refresh", "when": "view == overseer.worktree", "group": "navigation@3" },
         { "command": "overseer.addProfile", "when": "view == overseer.accounts", "group": "navigation@1" },
         { "command": "overseer.refreshAccounts", "when": "view == overseer.accounts", "group": "navigation@2" },
         { "command": "overseer.pairPhone", "when": "view == overseer.devices", "group": "navigation@1" },
@@ -237,8 +252,15 @@
         { "command": "overseer.renameDevice", "when": "view == overseer.devices && viewItem =~ /^device-(full|watch)/", "group": "2_edit@1" },
         { "command": "overseer.revokeDevice", "when": "view == overseer.devices && viewItem =~ /^device-(full|watch)/", "group": "9_remove@1" }
       ],
+      "editor/title": [
+        { "command": "overseer.head.diffsOnly", "when": "overseer.headEditor", "group": "navigation@90" },
+        { "command": "overseer.backToOverseer", "when": "overseer.headEditor", "group": "navigation@91" },
+        { "command": "overseer.head.follow", "when": "activeWebviewPanelId == 'overseer.review'", "group": "navigation@90" }
+      ],
       "commandPalette": [
         { "command": "overseer.openEdit", "when": "false" },
+        { "command": "overseer.head.openFile", "when": "false" },
+        { "command": "overseer.head.catchUp", "when": "false" },
         { "command": "overseer.startSwarm", "when": "config.overseer.experimental.swarm" },
         { "command": "overseer.filterSwarmJobs", "when": "config.overseer.experimental.swarm" },
         { "command": "overseer.pauseSwarm", "when": "config.overseer.experimental.swarm" },
@@ -297,6 +319,7 @@
         "overseer.devInstance": { "type": "string", "default": "", "markdownDescription": "Dev profiles only (written by `scripts/dev code`): the dev instance (`dev-<name>`) this window is pinned to; a daemon reporting another instance is refused. The installed extension ignores it.", "scope": "machine" },
         "overseer.review.enableEditing": { "type": "boolean", "default": true, "markdownDescription": "Edit working-tree text directly in the review. Undo/redo is available through Open in Native Diff." },
         "overseer.review.largeDiffThreshold": { "type": "integer", "minimum": 1, "default": 500, "markdownDescription": "Show a Load Diff card when additions + deletions exceed this count." },
+        "overseer.agent.openIn": { "type": "string", "enum": ["follow", "diffs"], "enumDescriptions": ["Follow: the agent's worktree in its real files, following the file it is editing, its changes shown inline. You can edit and save any file.", "Diffs only: the review of what the agent changed."], "default": "follow", "markdownDescription": "What opening an agent shows beside its chat. Each agent remembers the last choice you toggled (**Overseer: Switch Between Follow and Diffs Only**)." },
         "overseer.followNewRuns": { "type": "boolean", "default": true, "markdownDescription": "Turn Follow on for agents you start from this window. Opening an agent that already exists never turns Follow on." },
         "overseer.home.sendTo": { "type": "string", "enum": ["overseer", "agent"], "enumDescriptions": ["Overseer reads it and starts, steers or answers.", "Start an agent directly with the task (repository, agent, model and workspace choices)."], "default": "overseer", "scope": "application", "markdownDescription": "Where home's box sends what you type. Home's **Send to** choice changes it and remembers it." },
         "overseer.showStartedAgent": { "type": "boolean", "default": true, "markdownDescription": "**Show the agent I start.** When something you ask Overseer (typed or spoken) starts a single agent, the conversation slides aside, with the mark on the right, and shows that agent working beside it. Off: the conversation stays as it is." },
@@ -307,7 +330,7 @@
     }
   },
   "scripts": {
-    "check": "node --check src/extension.js && node --check src/daemon-client.js && node --check src/views.js && node --check src/swarm-controls.js && node --check src/review.js && node --check src/output-panel.js && node --check src/phone-access.js && node --check src/phone-text.js && node --check media/pairing.js && node --check branch-diff/review/panel.js && node --check src/arrangement.js && node --check src/dashboard-mode.js && node --check src/layout.js && node --check src/vscode-chat.js && node --check src/immersive.js",
+    "check": "node --check src/extension.js && node --check src/daemon-client.js && node --check src/views.js && node --check src/swarm-controls.js && node --check src/review.js && node --check src/agent-head.js && node --check src/line-diff.js && node --check src/output-panel.js && node --check src/phone-access.js && node --check src/phone-text.js && node --check media/pairing.js && node --check branch-diff/review/panel.js && node --check src/arrangement.js && node --check src/dashboard-mode.js && node --check src/layout.js && node --check src/vscode-chat.js && node --check src/immersive.js",
     "build:review": "node branch-diff/scripts/build-review.js",
     "package": "node scripts/package.js",
     "test": "node ../test/unit/run.js"
