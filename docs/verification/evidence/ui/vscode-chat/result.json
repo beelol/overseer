@@ -1,0 +1,52 @@
+{
+  "checks": [
+    {
+      "name": "at the start VS Code's own chat view is open (a fresh profile with AI features on)",
+      "ok": true
+    },
+    {
+      "name": "1440x900: starting an agent, following it and opening its review never shows VS Code's own chat view",
+      "ok": true,
+      "detail": [
+        {
+          "step": "start",
+          "chat": false
+        },
+        {
+          "step": "follow",
+          "chat": false
+        },
+        {
+          "step": "review",
+          "chat": false
+        }
+      ]
+    },
+    {
+      "name": "1920x1080: starting an agent, following it and opening its review never shows VS Code's own chat view",
+      "ok": true,
+      "detail": [
+        {
+          "step": "start",
+          "chat": false
+        },
+        {
+          "step": "follow",
+          "chat": false
+        },
+        {
+          "step": "review",
+          "chat": false
+        }
+      ]
+    },
+    {
+      "name": "the owner reopening VS Code's chat is left alone (it stays open while agents are selected and reviews open)",
+      "ok": true,
+      "detail": {
+        "reopened": true,
+        "still": true
+      }
+    }
+  ]
+}

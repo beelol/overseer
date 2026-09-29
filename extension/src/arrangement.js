@@ -15,8 +15,8 @@ const SPLIT = { orientation: 0, groups: [{ size: 0.66 }, { size: 0.34 }] };
 const SINGLE = { orientation: 0, groups: [{}] };
 
 class Arrangement {
-  constructor({ context, center, review, model, client, log }) {
-    Object.assign(this, { context, center, review, model, client, log });
+  constructor({ context, center, review, model, client, outputs, log }) {
+    Object.assign(this, { context, center, review, model, client, outputs, log });
     // 'auto': the review comes forward when the agent has changes. 'chat': the user closed it.
     this.preference = context.workspaceState.get('overseer.arrangement', 'auto');
     this.current = undefined; // 'chat' | 'split' | 'grid'
@@ -27,6 +27,7 @@ class Arrangement {
     this.quiet = 0; // > 0 while Overseer itself closes reviews
     this.popped = undefined; // { runId, group }: the review popped out into its own window (AC-251)
     this.workspaceChats = new Set(); // agents' chats the workspace opened in its third column
+    this.takeover = false; // the dashboard takes the whole editor area (and gives it back on exit)
     client.on('event', event => this.onEvent(event).catch(error => log('arrangement: ' + error.message)));
     review.onClosed = runId => this.onReviewClosed(runId);
   }
@@ -66,7 +67,7 @@ class Arrangement {
   }
 
   /** AC-244: the owner split the editor area; Overseer places its views beside their groups. */
-  beside() { return besideOwner(this.mainGroups()); }
+  beside() { return !this.takeover && besideOwner(this.mainGroups()); }
 
   /** The column for a new Overseer view beside the owner's groups: a new group on the right. */
   besideColumn() {
@@ -119,10 +120,14 @@ class Arrangement {
     await this.review.open(runId, { viewColumn: column, preserveFocus: true, follow });
     // The chat moves to a group of its own on the review's right (a moved tab stays pinned).
     const reviewTab = () => vscode.window.tabGroups.all.flatMap(g => g.tabs).find(t => t.input?.viewType?.endsWith('overseer.review'));
-    if (this.center.panel && chatTab()?.group === reviewTab()?.group) {
-      this.center.panel.reveal(chatTab().group.viewColumn, false);
-      for (let i = 0; i < 50 && !(this.center.panel?.active); i++) await new Promise(r => setTimeout(r, 10));
-      await vscode.commands.executeCommand('workbench.action.moveEditorToRightGroup');
+    for (let i = 0; i < 100 && !reviewTab(); i++) await new Promise(r => setTimeout(r, 10));
+    if (this.center.panel && chatTab() && chatTab().group.viewColumn === reviewTab()?.group.viewColumn) {
+      const col = chatTab().group.viewColumn;
+      this.center.panel.reveal(col, false);
+      const chatActive = () => { const g = vscode.window.tabGroups.activeTabGroup; return g.viewColumn === col && g.activeTab?.input?.viewType?.endsWith('overseer.center'); };
+      for (let i = 0; i < 100 && !chatActive(); i++) await new Promise(r => setTimeout(r, 10));
+      if (chatActive()) await vscode.commands.executeCommand('workbench.action.moveEditorToRightGroup');
+      else this.log('arrangement: the chat did not come forward to move beside the review');
     }
     this.current = 'split';
     this.persist();

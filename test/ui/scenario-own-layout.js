@@ -1,10 +1,13 @@
 // Packaged-UI scenario for AC-244 (opening an agent leaves your layout alone), fixture agents only.
 // The owner has two editor groups of their own files and the secondary side bar open. Selecting an
 // agent with no changes, then one with changes (review and chat), then home (New Agent) keeps both
-// groups with their tabs and the secondary side bar: Overseer opens beside them. Then the dashboard
-// in its own window (Open Dashboard in New Window) hides the tab strips there only: the first
-// window's tab strips stay, and user settings never change; leaving the dashboard removes the
-// settings from that window's workspace file.
+// groups with their tabs and the secondary side bar: Overseer opens beside them. Then, with a second
+// VS Code window open, the dashboard hides the tab strips in its own window only: this window is
+// opened on a workspace file (as the dashboard's own window, Open Dashboard in New Window, is), so
+// the settings go to that file; the second window keeps its tab strip and user settings never
+// change; leaving the dashboard takes the settings out of the file again.
+// (A window opened from inside a test window does not load the test's extensions, so the second
+// window has no Overseer and Open Dashboard in New Window itself is not driven here.)
 const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
@@ -19,10 +22,12 @@ const { Cdp } = require('./cdp');
   let cdp2;
   try {
     const repo = makeRepo(path.join(s.root, 'own-repo'), { dirty: false });
+    const wsFile = path.join(s.root, 'own.code-workspace');
+    fs.writeFileSync(wsFile, JSON.stringify({ folders: [{ path: repo }], settings: {} }, null, 2));
     s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'workbench.editor.enablePreview': false, 'workbench.editor.enablePreviewFromQuickOpen': false });
     const settingsFile = path.join(s.profile, 'User/settings.json');
     s.install(latestVsix());
-    s.launch(repo, { OVERSEER_CLAUDE_PATH: fx('claude-fixture.js'), OVERSEER_CODEX_PATH: '/nonexistent/codex', OVERSEER_OPENCODE_PATH: '/nonexistent/opencode', CLAUDE_FIXTURE_MODE_FILE: modeFile, OVERSEER_HARNESS_ENV_PASSTHROUGH: 'CLAUDE_FIXTURE_MODE_FILE' });
+    s.launch(wsFile, { OVERSEER_CLAUDE_PATH: fx('claude-fixture.js'), OVERSEER_CODEX_PATH: '/nonexistent/codex', OVERSEER_OPENCODE_PATH: '/nonexistent/opencode', CLAUDE_FIXTURE_MODE_FILE: modeFile, OVERSEER_HARNESS_ENV_PASSTHROUGH: 'CLAUDE_FIXTURE_MODE_FILE' });
     const cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
     const norm = text => { const o = JSON.parse(text); if (o['extensions.autoUpdate'] === false) o['extensions.autoUpdate'] = 'off'; return JSON.stringify(o); };
@@ -77,43 +82,46 @@ const { Cdp } = require('./cdp');
     check('opening home keeps them too (the review closes; the owner\'s groups stay)', kept(l3) && l3.groups.length === 3, l3);
     await s.screenshot('home-beside');
 
-    // The dashboard in its own window: its settings stay in that window (its workspace file).
+    // A second VS Code window of the same profile, with an editor open (so it has a tab strip).
     const { targetInfos: before } = await cdp.call('Target.getTargets');
     const known = new Set(before.filter(t => t.type === 'page').map(t => t.targetId));
-    await cdp.command('Overseer: Open Dashboard in New Window');
+    await cdp.focusWorkbench();
+    await cdp.key('n', { meta: true, shift: true }); // File: New Window
     let page;
     for (let i = 0; i < 80 && !page; i++) {
       const { targetInfos } = await cdp.call('Target.getTargets');
       page = targetInfos.find(t => t.type === 'page' && t.url.includes('workbench') && !known.has(t.targetId));
       if (!page) await delay(250);
     }
-    if (!page) throw new Error('the dashboard window did not open');
-    cdp2 = await Cdp.connect(s.profile).catch(() => null);
+    if (!page) throw new Error('the second window did not open');
+    cdp2 = await Cdp.connect(s.profile);
     const { sessionId } = await cdp2.call('Target.attachToTarget', { targetId: page.targetId, flatten: true });
     cdp2.workbench = sessionId;
     await cdp2.call('Runtime.enable', {}, sessionId); await cdp2.call('Page.enable', {}, sessionId);
     await cdp2.call('Emulation.setFocusEmulationEnabled', { enabled: true }, sessionId).catch(() => {});
-    await cdp2.waitFor(`!!document.querySelector('.monaco-workbench .part.activitybar')`, 60000, 'dashboard window');
-    await cdp2.waitFor(`[...document.querySelectorAll('.part.editor .editor-group-container')].some(g => g.offsetParent && g.querySelector('iframe'))`, 60000, 'dashboard in the new window');
-    await delay(3000);
-    const wsFile = path.join(s.profile, 'User/globalStorage/beelol.overseer/Overseer.code-workspace');
-    const wsSettings = () => { try { return JSON.parse(fs.readFileSync(wsFile, 'utf8')).settings || {}; } catch { return null; } };
-    const inDash = { first: await layout(), second: await layout(cdp2), user: norm(fs.readFileSync(settingsFile, 'utf8')) === settingsBefore, workspace: wsSettings() };
-    await cdp2.screenshot(path.join(s.evidence, `${String(++s.shot).padStart(2, '0')}-dashboard-window.png`));
-    await s.screenshot('first-window-while-dashboard-open');
-    check('Open Dashboard in New Window: the dashboard window hides its tab strips (its own workspace settings); the first window keeps its tab strips and user settings do not change',
-      inDash.second.tabStrips === 0 && inDash.first.tabStrips === inDash.first.groups.length && inDash.first.tabStrips > 0 && inDash.user && inDash.workspace && inDash.workspace['workbench.editor.showTabs'] === 'none',
-      { firstWindowTabStrips: `${inDash.first.tabStrips} of ${inDash.first.groups.length}`, secondWindowTabStrips: inDash.second.tabStrips, userSettingsUnchanged: inDash.user, workspaceSettings: inDash.workspace });
-    // Leaving the dashboard there.
+    await cdp2.waitFor(`!!document.querySelector('.monaco-workbench .part.activitybar')`, 60000, 'second window');
+    await delay(1500);
     await cdp2.focusWorkbench();
-    await cdp2.key('p', { meta: true, shift: true });
-    await cdp2.waitFor(`(() => { const i = document.querySelector('.quick-input-widget input'); return !!i && i === document.activeElement; })()`, 5000, 'palette in the dashboard window');
-    await cdp2.type('Overseer: Exit Dashboard');
-    await delay(800); await cdp2.key('Enter'); await delay(3000);
-    const left = { second: await layout(cdp2), first: await layout(), workspace: wsSettings(), user: norm(fs.readFileSync(settingsFile, 'utf8')) === settingsBefore };
-    check('leaving it: the settings leave that window\'s workspace file; the first window and user settings are unchanged throughout',
-      left.workspace && !('workbench.editor.showTabs' in left.workspace) && left.first.tabStrips === left.first.groups.length && left.user, left);
-    await s.quiet.main(`(() => { const ws = require('electron').BrowserWindow.getAllWindows().filter(w => /Overseer \\(Workspace\\)|Overseer.code-workspace|Dashboard/i.test(w.getTitle())); ws.forEach(w => w.close()); return ws.map(w => w.getTitle()); })()`).then(t => s.note('closed the dashboard window', t));
+    await cdp2.key('n', { meta: true });
+    await cdp2.waitFor(`[...document.querySelectorAll('.part.editor .tab')].length > 0`, 10000, 'an editor in the second window');
+    const wsSettings = () => { try { return JSON.parse(fs.readFileSync(wsFile, 'utf8')).settings || {}; } catch { return null; } };
+    const second0 = await layout(cdp2);
+    check('the second window shows its tab strip', second0.tabStrips === 1, second0);
+
+    await cdp.command('Overseer: Open Dashboard');
+    await s.editorView();
+    await delay(2500);
+    const inDash = { first: await layout(), second: await layout(cdp2), user: norm(fs.readFileSync(settingsFile, 'utf8')) === settingsBefore, workspace: wsSettings() };
+    await s.screenshot('dashboard-window');
+    await cdp2.screenshot(path.join(s.evidence, `${String(++s.shot).padStart(2, '0')}-second-window-while-dashboard-open.png`));
+    check('the dashboard hides the tab strips in its own window only (its workspace settings); the second window keeps its tab strip and user settings do not change',
+      inDash.first.tabStrips === 0 && inDash.second.tabStrips === 1 && inDash.user && inDash.workspace && inDash.workspace['workbench.editor.showTabs'] === 'none',
+      { dashboardWindowTabStrips: inDash.first.tabStrips, secondWindowTabStrips: inDash.second.tabStrips, userSettingsUnchanged: inDash.user, workspaceSettings: inDash.workspace });
+    await cdp.command('Overseer: Exit Dashboard'); await delay(3000);
+    const left = { first: await layout(), second: await layout(cdp2), workspace: wsSettings(), user: norm(fs.readFileSync(settingsFile, 'utf8')) === settingsBefore };
+    check('leaving it takes the settings out of the workspace file; the second window and user settings are unchanged throughout',
+      left.workspace && Object.keys(left.workspace).length === 0 && left.first.tabStrips === left.first.groups.length && left.second.tabStrips === 1 && left.user, left);
+    await s.quiet.main(`(() => { const ws = require('electron').BrowserWindow.getAllWindows(); const w = ws.filter(w => !/own/.test(w.getTitle())); w.forEach(x => x.close()); return w.map(x => x.getTitle()); })()`).then(t => s.note('closed the second window', t));
     await delay(1500);
     check('no user setting changed at any point', norm(fs.readFileSync(settingsFile, 'utf8')) === settingsBefore);
   } catch (error) {

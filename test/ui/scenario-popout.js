@@ -43,7 +43,7 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     const auxEval = async expr => (await cdp.call('Runtime.evaluate', { expression: expr, returnByValue: true }, auxSession)).result?.value;
     const auxShot = async label => { const { data } = await cdp.call('Page.captureScreenshot', { format: 'png' }, auxSession); const f = path.join(s.evidence, `${String(++s.shot).padStart(2, '0')}-${label}.png`); fs.writeFileSync(f, Buffer.from(data, 'base64')); s.note('screenshot ' + path.relative(path.resolve(__dirname, '../..'), f)); };
     const reviewOf = title => cdp.webview(`!!document.getElementById('diffs') && document.getElementById('comparison')?.textContent === ${JSON.stringify(title)}`, 20000).catch(() => null);
-    const steps = t => (String(t).match(/step \d+/g) || []).length;
+    const steps = t => (String(t).match(/step\s\d+/g) || []).length;
 
     await s.selectRun(live.run.id);
     await reviewOf('Live edits');

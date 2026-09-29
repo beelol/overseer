@@ -171,11 +171,13 @@ async function activate(context) {
     return roots[0]?.id;
   };
   const dashboard = new Dashboard(context, center, say, {
-    arrange: () => (selectedRun && model.run(selectedRun) ? arrangement.show(selectedRun) : arrangement.chatOnly()),
-    arrangeWorkspace: async sizes => { const id = focusedAgent(); if (id) { selectedRun = id; center.selected(id); } await arrangement.workspace(id, { sizes }); },
+    // The dashboard takes the whole editor area, the owner's groups included (it puts them back on exit).
+    arrange: () => { arrangement.takeover = true; return selectedRun && model.run(selectedRun) ? arrangement.show(selectedRun) : arrangement.chatOnly(); },
+    arrangeWorkspace: async sizes => { const id = focusedAgent(); if (id) selectedRun = id; await arrangement.workspace(id, { sizes }); },
     leaveWorkspace: () => arrangement.leaveWorkspace(),
     agentsVisible: () => agentsView.visible, immersive, vsChat });
   if (dashboard.inWorkspace) arrangement.current = 'workspace';
+  arrangement.takeover = dashboard.inDashboard;
   // Another dashboard window may have put the immersive settings back on its exit: apply them again here.
   context.subscriptions.push(vscode.window.onDidChangeWindowState(s => { if (s.focused && dashboard.inDashboard) immersive.apply().catch(() => {}); }));
   // AC-104: an agent dragged from the side bar onto the grid. VS Code's editor drop opens the agent's
@@ -285,7 +287,7 @@ async function activate(context) {
     workspaceButton.command = on ? 'overseer.closeWorkspace' : 'overseer.openWorkspace';
     workspaceButton.show();
   };
-  dashboard.onChange = updateWorkspaceButton;
+  dashboard.onChange = () => { arrangement.takeover = dashboard.inDashboard; updateWorkspaceButton(); };
   updateWorkspaceButton();
   context.subscriptions.push(workspaceButton);
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
@@ -433,7 +435,8 @@ async function activate(context) {
 
   /** The Overseer view shows the agent's chat; in the workspace it keeps Overseer's conversation (AC-250). */
   async function showInCenter(runId) {
-    if (arrangement.current === 'workspace') center.selected(runId); else await center.select(runId);
+    // (Telling the view which agent is selected would switch it to that agent's chat.)
+    if (arrangement.current !== 'workspace') await center.select(runId);
   }
 
   /** Shows an agent: its chat, and its review beside it when it has changes (Gate K). */

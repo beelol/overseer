@@ -86,7 +86,8 @@ class Dashboard {
         const columns = workspaceColumns(shown?.w, sideBarWidth || (size && shown ? Math.max(0, size.w - shown.w) : 0));
         if (columns.hideSideBar) await vscode.commands.executeCommand('workbench.action.closeSidebar').then(undefined, () => {});
         this.log(`workspace: editor ${shown?.w}px, side bar ${sideBarWidth}px → columns ${columns.sizes.map(x => x.toFixed(2)).join('/')}${columns.hideSideBar ? ', side bar hidden' : ''}`);
-        await this.arrangeWorkspace(columns.sizes);
+        // Whatever happens placing the views, the owner's layout is saved so Close Workspace puts it back.
+        try { await this.arrangeWorkspace(columns.sizes); } catch (error) { this.log('workspace: ' + (error.stack || error.message)); }
       } else await this.arrange();
       const saved = { editors, parts, overseerShown, overseerOpen, centerColumn, workspace, tabs, at: Date.now() };
       await this.context.workspaceState.update('overseer.dashboard.saved', saved);
