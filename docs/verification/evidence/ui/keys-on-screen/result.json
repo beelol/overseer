@@ -1,0 +1,70 @@
+{
+  "checks": [
+    {
+      "name": "⌥⌘Y with agent A on screen answers A and never B",
+      "ok": true,
+      "detail": {
+        "aDone": "completed",
+        "bStill": "waiting_for_user"
+      }
+    },
+    {
+      "name": "⌥⌘Y with no agent on screen first shows which agent asks for which tool, and answers nothing until one is picked",
+      "ok": true,
+      "detail": {
+        "pickState": {
+          "title": "Allow which request?",
+          "rows": [
+            "bell-dot  Write file B, wants to use Write, keys-repo"
+          ],
+          "value": ""
+        },
+        "whileAsking": "waiting_for_user",
+        "afterEscape": "waiting_for_user"
+      }
+    },
+    {
+      "name": "picking the request allows exactly that one",
+      "ok": true,
+      "detail": {
+        "bDone": "completed"
+      }
+    },
+    {
+      "name": "Merge Back, Stop, Clean Up and Send Follow-up from the palette with no agent on screen each show a picker (and do nothing until one is picked)",
+      "ok": true,
+      "detail": {
+        "pickers": {
+          "Overseer: Merge Back…": [
+            "check  Write file A, keys-repo · completed",
+            "check  Write file B, keys-repo · completed",
+            "check  API tests, keys-repo · completed"
+          ],
+          "Overseer: Stop Selected Agent": [
+            "sync  Long loop, keys-repo · running"
+          ],
+          "Overseer: Clean Up Worktree…": [
+            "check  Write file A, keys-repo · completed",
+            "check  Write file B, keys-repo · completed",
+            "check  API tests, keys-repo · completed"
+          ],
+          "Overseer: Send Follow-up…": [
+            "check  Write file A, keys-repo · completed",
+            "sync  Long loop, keys-repo · running",
+            "check  Write file B, keys-repo · completed",
+            "check  API tests, keys-repo · completed"
+          ]
+        },
+        "stillRunning": "running"
+      }
+    },
+    {
+      "name": "with Overseer's proposal open, ⌥⌘J reaches it (Talk to Overseer shows the proposal)",
+      "ok": true,
+      "detail": {
+        "open": 1,
+        "card": "Overseer will\nSend API tests: “Please add tests.”\nYes\nNo"
+      }
+    }
+  ]
+}

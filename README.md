@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **172 / 252** · **30** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-128, AC-129, AC-133, AC-135, AC-136, AC-137, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-183, AC-185, AC-186, AC-188, AC-189, AC-190, AC-192, AC-195, AC-196, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-210, AC-213, AC-216, AC-217, AC-218, AC-219, AC-220, AC-221, AC-222, AC-223, AC-224, AC-225, AC-226, AC-227, AC-228, AC-229, AC-230, AC-231, AC-232, AC-233, AC-234, AC-235, AC-236, AC-237, AC-238, AC-239, AC-240, AC-241, AC-242, AC-243, AC-244, AC-245, AC-246, AC-247, AC-248, AC-250, AC-251, AC-252. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+criteria: **179 / 261** · **32** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-128, AC-129, AC-133, AC-135, AC-136, AC-137, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-183, AC-185, AC-186, AC-188, AC-189, AC-190, AC-192, AC-195, AC-196, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-210, AC-213, AC-216, AC-217, AC-218, AC-219, AC-220, AC-221, AC-222, AC-223, AC-224, AC-225, AC-229, AC-230, AC-231, AC-232, AC-233, AC-234, AC-235, AC-236, AC-237, AC-238, AC-239, AC-240, AC-241, AC-243, AC-244, AC-245, AC-246, AC-247, AC-248, AC-250, AC-251, AC-252, AC-253, AC-254, AC-255, AC-256, AC-257, AC-258. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), Voice Mode (Gate R, AC-162 to AC-177, added by the owner on 2026-09-27: a voice to talk to constantly that redirects every agent from context, answers quickly and shows every word it sent, with audio collected on the Rust side and the animated mark in the middle moving with the voice; [design](docs/rfcs/voice-mode.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -176,7 +176,7 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-133** Phone session (owner-confirmed) — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-133.md)
 - [x] **AC-134** Platform behaviour behind generic interfaces — [evidence](docs/verification/AC-134.md)
 - [ ] **AC-135** Hyper fast — ◐ partial: release builds on both simulators: 20 cold starts with the door and 20 without, the baselines written and the last one-command run checked against them; on the iOS simulator every budget held; on the Android emulator every budget but the door's (see below); the app records every launch (the door, the first screen, the opening's frames on the UI thread) and every tap's response; an animation dropped no frame while the app's logic was held for 500 ms on both (the `busy` scenario); a seeded slow start fails the run / deferred: the owner's iPhone, where every budget is due; on the Android emulator the door drops frames in some launches: its baseline run dropped none (0 of 1,210), the last run 22 of 1,217 with one opening of 1,098 ms (limit 1,060), so the emulator did not stay within 10% of its own baseline for the door. The cause was found and fixed in pull request #24 (claude/android-door-frames, not merged yet): at load 8 to 10 the fix dropped 2 of 1,200 frames against 18 of 1,214 before; a clean 20-run check against the baseline (taken at load 3.4, 0 dropped) is still owed on a quiet machine, as every run since was at load 8 to 39 on this Mac; the display budget for scrolling a 5,000-item conversation while a fixture streams into it (the simulators carry no display budget; the app counts its frames, the run does not yet assert them) — [evidence](docs/verification/AC-135.md)
-- [ ] **AC-136** The door — ◐ partial: on both simulators in release builds: the closed door from the first frame the app draws (the same picture as the launch screen), its gradient and seam light, the diagonal split with the mark splitting, in recordings read frame by frame with a full-size frame of each opening, in dark and in light, with Reduce Motion (a fade: recording it found Reanimated skipping the app's fades, now kept) and on return from the background (no door); 20 launches per platform timed by the app with the frames counted on the UI thread; the door waits for the first screen to settle so nothing slides in under it / deferred: no dropped frame on the Android emulator, shown by recordings and by a clean 20-run check on a quiet machine (see below; the fix is pull request #24, not merged yet); the owner's iPhone recordings; the owner's marks on the look: the review page is published (https://claude.ai/artifact/FzD5ido4NdwX3annWoY9Uq, from the recordings in `evidence/phone/door`) and the owner has been asked; the owner asked for the same purple streak in the light theme, which this commit draws (accent laid thinly over the background) and the page shows again — [evidence](docs/verification/AC-136.md)
+- [ ] **AC-136** The door — ◐ partial: on both simulators in release builds: the closed door from the first frame the app draws (the same picture as the launch screen), its gradient and seam light, the diagonal split with the mark splitting, in recordings read frame by frame with a full-size frame of each opening, in dark and in light, with Reduce Motion (a fade: recording it found Reanimated skipping the app's fades, now kept) and on return from the background (no door); 20 launches per platform timed by the app with the frames counted on the UI thread; the door waits for the first screen to settle so nothing slides in under it / deferred: no dropped frame on the Android emulator, shown by recordings and by a clean 20-run check on a quiet machine (see below; the fix is pull request #24, merged as 88cd2779); the owner's iPhone recordings; the owner's marks on the look: the review page is published (https://claude.ai/artifact/FzD5ido4NdwX3annWoY9Uq, from the recordings in `evidence/phone/door`) and the owner has been asked; the owner asked for the same purple streak in the light theme, which this commit draws (accent laid thinly over the background) and the page shows again — [evidence](docs/verification/AC-136.md)
 - [ ] **AC-137** Motion throughout — ◐ partial: one motion system: every duration, distance, easing and spring is a token, and the lint fails on one written by hand (proven with seeded values); the door, screen transitions, arriving rows, the needs-you pulse, sheets, presses and the connection line all use it; with Reduce Motion movement becomes a fade (recorded for the door on both simulators); an animation drops no frame while the logic is held for 500 ms, on both simulators / deferred: a recording of each transition on both platforms with dropped frames counted per transition; the owner's marks on a review page — [evidence](docs/verification/AC-137.md)
 - [x] **AC-138** Permission modes carry over — [evidence](docs/verification/AC-138.md)
 - [x] **AC-139** OpenCode session transport spike — [evidence](docs/verification/AC-139.md)
@@ -257,7 +257,7 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-214** Deploy: the one path from dev to production (stage 4) — [evidence](docs/verification/AC-214.md)
 - [x] **AC-215** Guided owner tests in a dev daemon (stage 3) — [evidence](docs/verification/AC-215.md)
 - [ ] **AC-216** A conversation, not only requests, the same typed or spoken — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-216.md)
-- [ ] **AC-217** Turning it on is visible — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-217.md)
+- [ ] **AC-217** Turning it on is visible — ◐ partial: home's Voice button with its shortcut; home turning into the voice view with the mark's animation, before, during and after in the Overseer theme; the removed line absent / deferred: the frames during the animation in Overseer Dark and Overseer Light, and a recording rather than three screenshots — [evidence](docs/verification/AC-217.md)
 - [ ] **AC-218** A voice worth listening to — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-218.md)
 - [ ] **AC-219** No internal ids in front of the owner — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-219.md)
 - [ ] **AC-220** Dictation is not a call — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-220.md)
@@ -266,9 +266,9 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-223** Other audio keeps its volume — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-223.md)
 - [ ] **AC-224** Goals for an agent, at the harness level — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-224.md)
 - [ ] **AC-225** Goals for Overseer, at the global level — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-225.md)
-- [ ] **AC-226** Overseer moves you around VS Code — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-226.md)
-- [ ] **AC-227** One view for talking to Overseer; Needs you as a small notification — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-227.md)
-- [ ] **AC-228** You can always tell it is working — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-228.md)
+- [x] **AC-226** Overseer moves you around VS Code — [evidence](docs/verification/AC-226.md)
+- [x] **AC-227** One view for talking to Overseer; Needs you as a small notification — [evidence](docs/verification/AC-227.md)
+- [x] **AC-228** You can always tell it is working — [evidence](docs/verification/AC-228.md)
 - [ ] **AC-229** Heard right before it acts — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-229.md)
 - [ ] **AC-230** Permission modes by conversation — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-230.md)
 - [ ] **AC-231** Agents start with what Overseer knows — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-231.md)
@@ -280,9 +280,9 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-237** Overseer starts agents on the right harness, model and account — not started (the usability audit, 2026-09-28) — [evidence](docs/verification/AC-237.md)
 - [ ] **AC-238** Overseer checks finished work and offers the next step — not started (the usability audit, 2026-09-28) — [evidence](docs/verification/AC-238.md)
 - [ ] **AC-239** Stuck, failed and limited agents come back to Overseer — not started (the usability audit, 2026-09-28) — [evidence](docs/verification/AC-239.md)
-- [ ] **AC-240** You hear about it outside VS Code — not started (the usability audit, 2026-09-28) — [evidence](docs/verification/AC-240.md)
+- [ ] **AC-240** You hear about it outside VS Code — ◐ partial: while no VS Code window has the OS focus (each window reports it with `ui.window`), or VS Code is closed, an agent needing permission, asking a question, finishing or failing posts one notification titled with the agent, saying what it needs and in which repository, grouped per agent (the notifier's `--thread`), with a click URL for that agent (`vscode://beelol.overseer/open-agent?run=ID`); a focused window writes none; `overseer.notifications.needsYou`, `finished` and `failed` choose the kinds (`notices.set`); on a dev daemon a fixture permission, finish and failure each write one entry to the instance's `notifications.log` with the agent's title and its URL, and a focused window writes none; opening that URL in VS Code opens that agent's chat; the in-VS Code permission toast names the agent and shows while the Overseer view is open on another agent / deferred: a click with VS Code closed opens VS Code, not the TUI (a notification cannot focus a terminal app; the TUI is not reachable by URL); the real banner, its grouping by agent and a real click on the owner's Mac (owner-only, in a guided dev-daemon check) — [evidence](docs/verification/AC-240.md)
 - [ ] **AC-241** A waiting agent can always be answered — not started (the usability audit, 2026-09-28) — [evidence](docs/verification/AC-241.md)
-- [ ] **AC-242** Keys act only on what you can see — not started (the usability audit, 2026-09-28) — [evidence](docs/verification/AC-242.md)
+- [x] **AC-242** Keys act only on what you can see — [evidence](docs/verification/AC-242.md)
 - [ ] **AC-243** Merge from the agent, and it reads merged afterwards — not started (the usability audit, 2026-09-28) — [evidence](docs/verification/AC-243.md)
 - [ ] **AC-244** Opening an agent leaves your layout alone — not started (the usability audit, 2026-09-28) — [evidence](docs/verification/AC-244.md)
 - [ ] **AC-245** No internal words on any surface — not started (the usability audit, 2026-09-28) — [evidence](docs/verification/AC-245.md)
@@ -291,8 +291,17 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-248** Overseer's session never drops what it was told — not started (the usability audit, 2026-09-28) — [evidence](docs/verification/AC-248.md)
 - [x] **AC-249** Test windows never reach the owner's screen — [evidence](docs/verification/AC-249.md)
 - [ ] **AC-250** One command opens the whole Overseer layout — not started (the owner's zero-friction goal, 2026-09-28) — [evidence](docs/verification/AC-250.md)
-- [ ] **AC-251** Follow an agent on another screen — not started (the owner's zero-friction goal, 2026-09-28) — [evidence](docs/verification/AC-251.md)
+- [ ] **AC-251** Follow an agent on another screen — not started: blocked by VS Code (no API to float a webview, 1.139.1); skipped on the owner's instruction — [evidence](docs/verification/AC-251.md)
 - [ ] **AC-252** Zero-friction loop, measured — not started (the owner's zero-friction goal, 2026-09-28) — [evidence](docs/verification/AC-252.md)
+- [ ] **AC-253** Overseer leads with what happened while you were away — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-253.md)
+- [ ] **AC-254** Reviewed and unreviewed are never the same mark — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-254.md)
+- [ ] **AC-255** A state rollup between the list and the grid — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-255.md)
+- [ ] **AC-256** A repository's badge never goes quiet on finished work — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-256.md)
+- [ ] **AC-257** Following an agent sits beside Overseer's conversation, not on top of it — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-257.md)
+- [ ] **AC-258** VS Code's own chat panel stays out of Overseer's way all session, not only at first launch — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-258.md)
+- [x] **AC-259** Sending a task clears the box and says so — [evidence](docs/verification/AC-259.md)
+- [x] **AC-260** Starting an agent in another repository never needs a native dialog — [evidence](docs/verification/AC-260.md)
+- [x] **AC-261** One Sign In, clearly Overseer's or clearly not — [evidence](docs/verification/AC-261.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -815,7 +824,7 @@ the owner action or decision each one needs.
 - [ ] [AC-210](docs/verification/AC-210.md) (The phone simulators pinned to a dev daemon (after pull request #10)): After PR #10: the phone app and the gateway must be on main first.
 - [ ] [AC-213](docs/verification/AC-213.md) (The production phone app never pairs with a dev daemon (after pull request #10)): After PR #10: the phone app and the gateway must be on main first.
 - [ ] [AC-216](docs/verification/AC-216.md) (A conversation, not only requests, the same typed or spoken): To be built by its own agent after the Auto/Swarm merge.
-- [ ] [AC-217](docs/verification/AC-217.md) (Turning it on is visible): To be built by its own agent after the Auto/Swarm merge.
+- [ ] [AC-217](docs/verification/AC-217.md) (Turning it on is visible): not blocked
 - [ ] [AC-218](docs/verification/AC-218.md) (A voice worth listening to): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-219](docs/verification/AC-219.md) (No internal ids in front of the owner): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-220](docs/verification/AC-220.md) (Dictation is not a call): To be built by its own agent after the Auto/Swarm merge.
@@ -824,9 +833,6 @@ the owner action or decision each one needs.
 - [ ] [AC-223](docs/verification/AC-223.md) (Other audio keeps its volume): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-224](docs/verification/AC-224.md) (Goals for an agent, at the harness level): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-225](docs/verification/AC-225.md) (Goals for Overseer, at the global level): To be built by its own agent after the Auto/Swarm merge.
-- [ ] [AC-226](docs/verification/AC-226.md) (Overseer moves you around VS Code): To be built by its own agent after the Auto/Swarm merge.
-- [ ] [AC-227](docs/verification/AC-227.md) (One view for talking to Overseer; Needs you as a small notification): To be built by its own agent after the Auto/Swarm merge.
-- [ ] [AC-228](docs/verification/AC-228.md) (You can always tell it is working): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-229](docs/verification/AC-229.md) (Heard right before it acts): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-230](docs/verification/AC-230.md) (Permission modes by conversation): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-231](docs/verification/AC-231.md) (Agents start with what Overseer knows): To be built by its own agent after the Auto/Swarm merge.
@@ -838,9 +844,8 @@ the owner action or decision each one needs.
 - [ ] [AC-237](docs/verification/AC-237.md) (Overseer starts agents on the right harness, model and account): To be built by its own agent.
 - [ ] [AC-238](docs/verification/AC-238.md) (Overseer checks finished work and offers the next step): To be built by its own agent.
 - [ ] [AC-239](docs/verification/AC-239.md) (Stuck, failed and limited agents come back to Overseer): To be built by its own agent.
-- [ ] [AC-240](docs/verification/AC-240.md) (You hear about it outside VS Code): To be built by its own agent.
+- [ ] [AC-240](docs/verification/AC-240.md) (You hear about it outside VS Code): The TUI on click with VS Code closed has no route; the real banner and click are owner checks.
 - [ ] [AC-241](docs/verification/AC-241.md) (A waiting agent can always be answered): To be built by its own agent.
-- [ ] [AC-242](docs/verification/AC-242.md) (Keys act only on what you can see): To be built by its own agent.
 - [ ] [AC-243](docs/verification/AC-243.md) (Merge from the agent, and it reads merged afterwards): To be built by its own agent.
 - [ ] [AC-244](docs/verification/AC-244.md) (Opening an agent leaves your layout alone): To be built by its own agent.
 - [ ] [AC-245](docs/verification/AC-245.md) (No internal words on any surface): To be built by its own agent.
@@ -850,6 +855,12 @@ the owner action or decision each one needs.
 - [ ] [AC-250](docs/verification/AC-250.md) (One command opens the whole Overseer layout): Overnight goal.
 - [ ] [AC-251](docs/verification/AC-251.md) (Follow an agent on another screen): Overnight goal.
 - [ ] [AC-252](docs/verification/AC-252.md) (Zero-friction loop, measured): Overnight goal.
+- [ ] [AC-253](docs/verification/AC-253.md) (Overseer leads with what happened while you were away): Overnight build waves.
+- [ ] [AC-254](docs/verification/AC-254.md) (Reviewed and unreviewed are never the same mark): Overnight build waves.
+- [ ] [AC-255](docs/verification/AC-255.md) (A state rollup between the list and the grid): Overnight build waves.
+- [ ] [AC-256](docs/verification/AC-256.md) (A repository's badge never goes quiet on finished work): Overnight build waves.
+- [ ] [AC-257](docs/verification/AC-257.md) (Following an agent sits beside Overseer's conversation, not on top of it): Overnight build waves.
+- [ ] [AC-258](docs/verification/AC-258.md) (VS Code's own chat panel stays out of Overseer's way all session, not only at first launch): Overnight build waves.
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.

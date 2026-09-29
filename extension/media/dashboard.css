@@ -9,7 +9,8 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .view-chat .chat { height: 100vh; }
 
 /* ---- Composer view (new agent) ---- */
-.view-composer { overflow-y: auto; }
+.view-composer { display: flex; flex-direction: column; overflow: clip; }
+.view-composer > .composer-view { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .composer-view { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: var(--ov-space-10) var(--ov-chat-gutter); }
 .composer-hero { width: 100%; max-width: var(--ov-chat-column); display: flex; flex-direction: column; align-items: stretch; gap: var(--ov-space-3); }
 .hero-mark { align-self: center; }
@@ -22,6 +23,22 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .composer-foot { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; color: var(--ov-muted); font-size: var(--ov-font-sm); }
 .composer-note { display: flex; align-items: center; gap: 6px; }
 .composer-note .fix { margin-left: 4px; }
+/* AC-259: the moment a task is sent, the note says so beside the cleared field. */
+.composer-note.sent { color: var(--ov-text); }
+.composer-note.sent .codicon { color: var(--ov-done); }
+.composer.big[data-sent] textarea::placeholder { color: var(--ov-text); }
+/* AC-260: the repository chip's own picker (search, typed path, Tab completion). */
+.menu.repo-picker { display: flex; flex-direction: column; gap: 4px; max-width: none; max-height: 60vh; overflow: hidden; padding: 6px; }
+.repo-picker-input { width: 100%; height: 30px; padding: 0 10px; flex: none; }
+.repo-picker-list { overflow-y: auto; min-height: 0; }
+.repo-option { cursor: pointer; }
+.repo-option.active { background: var(--ov-selected); }
+.repo-option .menu-label { flex: 0 1 auto; }
+.repo-option .repo-option-path { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--ov-muted); font-size: var(--ov-font-xs); }
+.repo-picker-status { display: flex; align-items: center; gap: 6px; padding: 2px 8px; color: var(--ov-muted); font-size: var(--ov-font-sm); }
+.repo-picker-status[hidden] { display: none; }
+.repo-picker-status.repo-picker-error { color: var(--ov-failed); }
+.repo-picker-foot { padding: 2px 8px 0; color: var(--ov-muted); font-size: var(--ov-font-xs); border-top: 1px solid var(--ov-border); padding-top: 4px; }
 
 /* ---- Grid ---- */
 .view-grid { position: relative; display: flex; flex-direction: column; height: 100vh; min-height: 0; }
@@ -88,6 +105,9 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .home-msg.from-owner { align-self: flex-end; max-width: 80%; background: var(--ov-accent-soft); }
 .home-from { display: flex; align-items: center; gap: 6px; font-size: var(--ov-font-xs); color: var(--ov-muted); margin-bottom: 2px; }
 .home-text { white-space: pre-wrap; }
+.home-text.md { white-space: normal; }
+.home-text.md > :first-child { margin-top: 0; }
+.home-text.md > :last-child { margin-bottom: 0; }
 .home-msg .link, .home-card .link { margin-top: 4px; font-size: var(--ov-font-sm); }
 .home-empty { color: var(--ov-muted); font-size: var(--ov-font-sm); text-align: center; }
 .home-list .proposal { margin: 0; }
@@ -113,3 +133,69 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .home-msg.spoken .home-from .codicon-mic, .proposal.spoken .proposal-head .codicon-mic { color: var(--ov-accent); }
 .tile-voice { color: var(--ov-accent); flex: none; }
 .tile-voice[hidden] { display: none; }
+
+/* ---- One view for talking to Overseer (AC-227): home turns into the voice view ---- */
+.home-voice-toggle { display: inline-flex; align-items: center; gap: var(--ov-space-1); font: inherit; font-size: var(--ov-font-sm); color: var(--ov-text); background: var(--ov-raised); border: 1px solid var(--ov-border-strong); border-radius: var(--ov-radius-pill); padding: 1px var(--ov-space-2); cursor: pointer; white-space: nowrap; }
+.home-voice-toggle:hover { background: var(--ov-hover); }
+.home-voice-toggle.on { background: var(--ov-accent-bg); color: var(--ov-accent-fg); border-color: var(--ov-accent); }
+.home-voice-toggle kbd { font-family: var(--ov-font); font-size: var(--ov-font-xs); color: inherit; opacity: .8; background: none; border: 0; box-shadow: none; padding: 0; }
+.home-voice-toggle:focus-visible, .home-needs:focus-visible, .req-stage:focus-visible, .home-card.opens:focus-visible { outline: 1px solid var(--ov-focus); outline-offset: 2px; }
+/* Needs you: a small badge with a count; the list pops out from it (ui.menu). */
+.home-needs { display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: var(--ov-font-xs); font-weight: var(--ov-weight-semibold); color: var(--ov-text); background: var(--ov-raised); border: 1px solid var(--ov-waiting); border-radius: var(--ov-radius-pill); padding: 0 var(--ov-space-2); height: 22px; cursor: pointer; }
+.home-needs[hidden] { display: none; }
+.home-needs .codicon { color: var(--ov-waiting); }
+.home-needs-count { font-variant-numeric: tabular-nums; }
+.home-unaside { display: none; }
+body[data-aside="1"] .home-unaside { display: inline-flex; }
+/* The stage: the mark takes the top of the view while Voice Mode is on. */
+.home-stage { padding: var(--ov-space-2) 0 var(--ov-space-1); }
+.home-stage[hidden] { display: none; }
+body[data-voice="on"] .home-stage { animation: voice-in calc(var(--ov-motion-slow) * 2.5) var(--ov-ease) both; }
+body[data-voice="on"] .view-composer .hero-mark, body[data-voice="on"] .view-composer .hero-title { display: none; }
+@keyframes voice-in { from { opacity: 0; transform: scale(.72); } to { opacity: 1; transform: none; } }
+/* What the latest request is doing now (AC-228). */
+.home-progress { display: flex; align-items: center; gap: var(--ov-space-2); align-self: center; max-width: 100%; padding: 2px var(--ov-space-3); border-radius: var(--ov-radius-pill); background: var(--ov-raised); border: 1px solid var(--ov-border); color: var(--ov-text); font-size: var(--ov-font-sm); }
+.home-progress[hidden] { display: none; }
+.home-progress > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-progress[data-stage="working"] .codicon, .home-progress[data-stage="starting"] .codicon, .home-progress[data-stage="thinking"] .codicon { color: var(--ov-running); }
+.home-progress[data-stage="stuck"] .codicon { color: var(--ov-waiting); }
+.home-progress[data-stage="failed"] .codicon { color: var(--ov-failed); }
+.home-progress[data-stage="done"] .codicon { color: var(--ov-done); }
+/* A request's stage, on the owner's words (typed or spoken). */
+.req-stage { display: flex; align-items: center; gap: 6px; max-width: 100%; margin-top: 4px; padding: 0; font: inherit; font-size: var(--ov-font-xs); color: var(--ov-muted); background: none; border: 0; text-align: left; cursor: pointer; }
+.req-stage[hidden] { display: none; }
+.req-stage:disabled { cursor: default; }
+.req-stage:not(:disabled):hover .req-stage-text { color: var(--ov-link); text-decoration: underline; }
+.req-stage-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.req-stage[data-stage="working"] .codicon, .req-stage[data-stage="starting"] .codicon, .req-stage[data-stage="thinking"] .codicon { color: var(--ov-running); }
+.req-stage[data-stage="stuck"] .codicon { color: var(--ov-waiting); }
+.req-stage[data-stage="failed"] .codicon { color: var(--ov-failed); }
+.req-stage[data-stage="done"] .codicon { color: var(--ov-done); }
+/* Cards and their rows open their agent (AC-226). */
+.home-card.opens { cursor: pointer; }
+.home-card.opens:hover { background: var(--ov-hover); }
+.card-row-agent.link { font: inherit; background: none; border: 0; padding: 0; color: var(--ov-link); cursor: pointer; text-align: left; }
+.card-row-agent.link:disabled { color: var(--ov-text); cursor: default; }
+/* Beside the agent a request started (AC-226): its chat on the left, the view slid to the right. */
+body[data-aside="1"] .main > .view-composer { flex: 0 0 clamp(240px, 42%, 380px); order: 2; border-left: 1px solid var(--ov-border); animation: aside-in calc(var(--ov-motion-slow) * 2) var(--ov-ease) both; }
+body[data-aside="1"] .main > .view-chat { order: 1; }
+body[data-aside="1"] .view-composer .composer-view { display: none; }
+body[data-aside="1"] .home { padding: 0 var(--ov-space-3); }
+body[data-aside="1"] .home-list { max-height: none; }
+body[data-aside="1"] .voice-mark { width: min(200px, 60%); }
+body[data-aside="1"] .home-voice-heard, body[data-aside="1"] #home-fresh, body[data-aside="1"] .home-level { display: none; }
+@keyframes aside-in { from { transform: translateX(40%); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { body[data-voice="on"] .home-stage, body[data-aside="1"] .main > .view-composer { animation: none; } }
+.home-list[hidden] { display: none; }
+
+/* With a conversation, or Voice Mode on, home is the view: its head and (with Voice Mode) the mark
+   stay in place, the cards scroll, and the composer sits at the foot (AC-227). */
+.view-composer > .home { flex: 0 0 auto; margin-bottom: 0; }
+body[data-conversation="1"] .view-composer > .home, body[data-voice="on"] .view-composer > .home { flex: 1 1 auto; min-height: 0; padding: var(--ov-space-2) var(--ov-chat-gutter) 0; box-sizing: border-box; max-width: calc(760px + 2 * var(--ov-chat-gutter)); }
+body[data-conversation="1"] .view-composer > .home, body[data-voice="on"] .view-composer > .home { overflow: clip; }
+body[data-conversation="1"] .home-list, body[data-voice="on"] .home-list { flex: 1 1 auto; max-height: none; min-height: 96px; }
+body[data-conversation="1"] .view-composer > .composer-view, body[data-voice="on"] .view-composer > .composer-view { flex: 0 0 auto; min-height: 0; padding-top: var(--ov-space-3); padding-bottom: var(--ov-space-4); }
+body[data-conversation="1"] .view-composer .hero-mark, body[data-conversation="1"] .view-composer .hero-title { display: none; }
+/* With cards to read, the mark gives them room. */
+body[data-conversation="1"] .home-stage .voice-mark { width: min(220px, 50vw, 22vh); }
+.home[data-empty="1"] .home-title, .home[data-empty="1"] .home-level, .home[data-empty="1"] #home-fresh { display: none; }

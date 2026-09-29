@@ -1,0 +1,21 @@
+[2026-09-29T05:45:27.036Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-29T05:45:32.554Z] PASS the composer takes the keyboard when home opens
+[2026-09-29T05:45:33.153Z] screenshot docs/verification/evidence/ui/composer-friction/01-sent-confirmation.png
+[2026-09-29T05:45:39.022Z] PASS AC-259: Enter starts the agent {"id":"r-2014f272b020","title":"Tidy the pricing copy"}
+[2026-09-29T05:45:39.022Z] PASS AC-259: the field is empty within one second of Enter and stays empty {"cleared":8}
+[2026-09-29T05:45:39.022Z] PASS AC-259: a sent confirmation appears within one second {"t":8,"value":"","placeholder":"Sent ✓ — starting the agent…","note":"Sent “Tidy the pricing copy” — starting the agent…","sent":"sending"}
+[2026-09-29T05:45:39.022Z] PASS AC-259: the field then returns to "Send off a task" {"t":4224,"value":"","placeholder":"Send off a task","note":"","sent":""}
+[2026-09-29T05:45:41.494Z] PASS AC-260: Enter on the repository chip opens its own picker, typing goes to its search field ["friction-site/private/tmp/ovs-ui-VLtLetopen","Browse with the system dialog…"]
+[2026-09-29T05:45:41.494Z] PASS AC-260: the picker lists the recent repositories ["friction-site/private/tmp/ovs-ui-VLtLetopen","Browse with the system dialog…"]
+[2026-09-29T05:45:41.589Z] screenshot docs/verification/evidence/ui/composer-friction/02-repo-picker.png
+[2026-09-29T05:45:41.973Z] PASS AC-260: the search is fuzzy (frst finds friction-site) ["friction-site/private/tmp/ovs-ui-VLtLetopen","Browse with the system dialog…"]
+[2026-09-29T05:45:43.285Z] PASS AC-260: a typed folder that is not a Git repository is explained inside the picker "/private/tmp/ovs-ui-VLtLet/not-a-repo is not in a Git repository."
+[2026-09-29T05:45:43.756Z] PASS AC-260: Tab completes a typed path inside the picker "/private/tmp/ovs-ui-VLtLet/elsewhere/"
+[2026-09-29T05:45:44.247Z] screenshot docs/verification/evidence/ui/composer-friction/03-typed-path.png
+[2026-09-29T05:45:44.637Z] PASS AC-260: Enter adds the typed repository, the chip shows it and the keyboard is back in the task "Repository: notes-repo"
+[2026-09-29T05:45:46.274Z] PASS AC-260: the task starts in the repository that was not open "/private/tmp/ovs-ui-VLtLet/elsewhere/notes-repo"
+[2026-09-29T05:45:51.997Z] PASS AC-260: the added repository is now a known repository the search finds ["notes-repo/private/tmp/ovs-ui-VLtLet/elsewhererecent","Browse with the system dialog…"]
+[2026-09-29T05:45:52.185Z] PASS AC-260: Escape closes the picker and returns the keyboard to the chip
+[2026-09-29T05:45:52.558Z] PASS AC-260: the system folder dialog stays available, but only as a last option
+[2026-09-29T05:45:52.559Z] PASS AC-260: no folder dialog was opened at any point []
+[2026-09-29T05:45:52.656Z] screenshot docs/verification/evidence/ui/composer-friction/04-done.png

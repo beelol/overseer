@@ -1,15 +1,18 @@
-// Voice Mode in VS Code (Gate R, AC-174): the voice view with the mark in the middle, a status bar
-// item, toasts for what was answered by voice, and the commands. VS Code never listens and never
-// speaks: the daemon's listener does both, and this only shows what the daemon's live channel says.
+// Voice Mode in VS Code (Gate R, AC-174): a status bar item, toasts for what was answered by voice,
+// and the commands. Since AC-227 there is no voice view of its own: the conversation with Overseer
+// (home, in the Overseer view) turns into the voice view while Voice Mode is on, with the mark on top
+// and the same cards below. VS Code never listens and never speaks: the daemon's listener does both,
+// and this only passes on what the daemon's live channel says.
 const vscode = require('vscode');
-const { page, localRoots } = require('./webview-html');
 
 const LABEL = { off: 'Voice off', starting: 'Starting', listening: 'Listening', hearing: 'Hearing you', thinking: 'Thinking', speaking: 'Speaking', muted: 'Muted', paused: 'Paused for a call', failed: 'Voice stopped' };
 const ICON = { starting: 'loading~spin', listening: 'mic', hearing: 'record', thinking: 'loading~spin', speaking: 'unmute', muted: 'mute', paused: 'debug-pause', failed: 'warning' };
 
 class Voice {
-  constructor(context, client, { selectRun } = {}) {
+  constructor(context, client, { selectRun, view, showHome } = {}) {
     this.context = context; this.client = client; this.selectRun = selectRun;
+    // The Overseer view's webview (home is the voice view) and how to bring home forward.
+    this.view = view || (() => undefined); this.showHome = showHome || (async () => {});
     this.voice = null;
     this.targeted = new Set(); // agents that open spoken requests are for (a voice mark, AC-169)
     this.heard = '';
@@ -21,12 +24,6 @@ class Voice {
     this.status.command = 'overseer.voice.open';
     context.subscriptions.push(this.status);
     client.on('voice', m => this.live(m));
-    // A card's rows advance on its agents' turns (held → sent → delivered → picked up → answered).
-    this.cardsOfRun = new Map(); // run id -> proposal ids shown
-    client.on('event', ev => {
-      if (!ev || !['turn_started', 'turn_done', 'queued', 'status'].includes(ev.kind) || !this.panel) return;
-      for (const id of this.cardsOfRun.get(ev.run_id) || []) this.fetchCardSoon(id);
-    });
     client.on('connected', () => this.refresh());
     client.on('disconnected', () => { this.voice = null; this.render(); });
     // Reduced motion follows VS Code's own setting as well as the system's.
@@ -40,7 +37,8 @@ class Voice {
   /** What home's voice strip shows (AC-174): the state, the words as they are heard, mute. */
   summary() {
     const v = this.voice;
-    if (!v || !v.enabled) return { on: false };
+    // Off after it failed (four listener crashes): the view keeps the stage to say why (AC-175).
+    if (!v || !v.enabled) return { on: false, stopped: (v && v.reason) || '' };
     const state = v.state || 'starting';
     return { on: true, state, label: LABEL[state] || state, reason: v.reason || '', heard: this.heard, muted: !!v.muted, target: v.target_title || 'Overseer', asking: this.asking };
   }
@@ -64,7 +62,7 @@ class Voice {
     vscode.commands.executeCommand('setContext', 'overseer.voiceOn', !!this.voice?.enabled);
     this.render();
     this.post({ type: 'snapshot', voice: this.voice, reducedMotion: vscode.workspace.getConfiguration('workbench').get('reduceMotion') === 'on' });
-    if (this.panel) this.sendRequests();
+    if (this.view()) this.sendRequests();
     this.changed('targets');
   }
 
@@ -81,7 +79,7 @@ class Voice {
     if (!v || !v.enabled) { this.status.hide(); return; }
     const state = v.state || 'starting';
     this.status.text = `$(${ICON[state] || 'mic'}) ${LABEL[state] || state}`;
-    this.status.tooltip = `Voice Mode: ${LABEL[state] || state}${v.reason ? ` (${v.reason})` : ''} · talking to ${v.target_title || 'Overseer'}. Click to show.`;
+    this.status.tooltip = `Voice Mode: ${LABEL[state] || state}${v.reason ? ` (${v.reason})` : ''} · talking to ${v.target_title || 'Overseer'}. Click to show the conversation.`;
     this.status.accessibilityInformation = { label: `Voice Mode, ${LABEL[state] || state}` };
     this.status.show();
   }
@@ -102,7 +100,6 @@ class Voice {
     if (m.kind === 'toast') { if (m.cancel) { this.askReadBack = false; this.updateAsking(); } this.toast(m); }
     if (m.kind === 'open') this.openPlace(m.place);
     if (m.kind === 'download') this.downloadProgress?.(m.progress);
-    if (m.kind === 'request' && m.request?.proposal) this.fetchCard(m.request.proposal);
     this.post({ type: 'live', msg: m });
   }
 
@@ -134,78 +131,20 @@ class Voice {
     this.updateAsking();
   }
 
-  post(m) { this.panel?.webview.postMessage(m); }
+  /** To the voice stage in the Overseer view (home). */
+  post(m) { const panel = this.view(); if (panel) panel.webview.postMessage({ type: 'voiceView', m }); }
 
   async sendRequests() {
     try {
-      const { requests } = await this.client.request('voice.requests', { limit: 12 });
+      const { requests } = await this.client.request('voice.requests', { limit: 20 });
       this.post({ type: 'requests', list: requests });
-      for (const r of requests) if (r.proposal) this.fetchCard(r.proposal);
     } catch { /* the daemon is restarting */ }
   }
 
-  async fetchCard(id) {
-    try {
-      const card = await this.client.request('overseer.card', { id });
-      for (const row of card.rows || []) {
-        if (!row.run_id) continue;
-        const ids = this.cardsOfRun.get(row.run_id) || new Set();
-        ids.add(id); this.cardsOfRun.set(row.run_id, ids);
-      }
-      this.post({ type: 'card', card });
-    } catch { /* not a card yet */ }
-  }
-
-  fetchCardSoon(id) {
-    this.pendingCards ||= new Set();
-    this.pendingCards.add(id);
-    clearTimeout(this.cardTimer);
-    this.cardTimer = setTimeout(() => { const ids = [...this.pendingCards]; this.pendingCards.clear(); for (const x of ids) this.fetchCard(x); }, 250);
-  }
-
-  /** Shows the voice view: the mark in the middle of the editor area. */
+  /** Shows the voice view: home in the Overseer view, which is the voice view while Voice Mode is on. */
   async open() {
-    if (this.panel) { this.panel.reveal(); return this.panel; }
-    const panel = vscode.window.createWebviewPanel('overseer.voice', 'Voice', { viewColumn: vscode.ViewColumn.Active }, { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: localRoots(this.context.extensionUri) });
-    this.panel = panel;
-    panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'overseer-logo.png');
-    const uri = name => panel.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'voice', name)).toString();
-    const layers = JSON.stringify({ core: uri('overseer-logo-core.png'), swooshes: uri('overseer-logo-swooshes.png'), star: uri('overseer-logo-star.png'), flat: uri('overseer-logo-flat.png') }).replace(/'/g, '&#39;');
-    const body = `<main class="voice" data-layers='${layers}' data-state="off">
-  <header class="voice-strip" role="toolbar" aria-label="Voice Mode">
-    <span class="voice-state" id="voice-state" role="status">Off</span>
-    <button class="voice-target" id="voice-target" aria-label="Who you are talking to">Overseer</button>
-    <span class="grow"></span>
-    <button id="voice-yes" hidden title="Yes to what Overseer read back (⌥⌘⇧Y)">Yes</button>
-    <button id="voice-no" hidden title="No to what Overseer read back (⌥⌘⇧N)">No</button>
-    <button id="voice-cancel" hidden title="Cancel the open request (⌥⌘⇧.)">Cancel</button>
-    <button id="voice-mute" aria-pressed="false" aria-label="Mute"><i class="codicon codicon-mic" aria-hidden="true"></i></button>
-  </header>
-  <section class="voice-stage">
-    <div class="voice-mark"><canvas id="voice-canvas" role="img" aria-label="The Overseer mark: it moves when Overseer hears you"></canvas><div class="voice-sign" id="voice-sign" hidden></div></div>
-    <p class="voice-heard" id="voice-heard" aria-live="polite"></p>
-    <p class="voice-said" id="voice-said" aria-live="polite"></p>
-    <p class="voice-error" id="voice-error" role="alert" hidden></p>
-    <div class="voice-meter" id="voice-meter" hidden aria-hidden="true"><i></i></div>
-    <div class="voice-off" id="voice-off" hidden><span>Voice Mode is off.</span><span id="voice-off-reason"></span><button id="voice-on">Turn on</button></div>
-  </section>
-  <section class="voice-requests" id="voice-requests" aria-label="Spoken requests" hidden></section>
-</main>`;
-    panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'Voice', css: ['voice.css'], js: ['voice-mark.js', 'voice.js'], body });
-    panel.onDidDispose(() => { if (this.panel === panel) this.panel = undefined; });
-    panel.webview.onDidReceiveMessage(m => this.receive(m).catch(e => vscode.window.showErrorMessage(`Overseer: ${e.message}`)));
-    return panel;
-  }
-
-  async receive(m) {
-    if (!m || typeof m !== 'object') return;
-    if (m.type === 'ready') return this.refresh();
-    if (m.type === 'mute') return this.mute();
-    if (m.type === 'toggle') return this.toggle();
-    if (m.type === 'target') return this.talkTo();
-    if (m.type === 'cancel') return this.client.request('voice.cancel', { id: m.id });
-    if (m.type === 'answer') return this.answer(!!m.yes);
-    if (m.type === 'open' && m.run && this.selectRun) return this.selectRun(m.run, { reveal: true });
+    await this.showHome();
+    await this.refresh();
   }
 
   /** Turns Voice Mode on or off; the first time, the speech model is downloaded after a yes. */
@@ -229,6 +168,7 @@ class Voice {
     }
     await this.client.request('voice.set', { enabled: true });
     await this.refresh();
+    // The conversation with Overseer becomes the voice view; nothing opens anywhere else (AC-227).
     await this.open();
   }
 

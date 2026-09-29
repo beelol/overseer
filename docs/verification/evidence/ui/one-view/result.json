@@ -1,0 +1,430 @@
+{
+  "checks": [
+    {
+      "name": "Talk to Overseer opens home with the composer talking to Overseer, and no Overseer view is docked below",
+      "ok": true,
+      "detail": {
+        "target": "overseer",
+        "panelViews": []
+      }
+    },
+    {
+      "name": "home has a visible Voice Mode button with its shortcut shown (AC-217)",
+      "ok": true,
+      "detail": {
+        "text": "Voice⌥⌘⇧V",
+        "label": "Turn Voice Mode on (⌥⌘⇧V)",
+        "pressed": "false",
+        "visible": true
+      }
+    },
+    {
+      "name": "turning Voice Mode on turns the chat into the voice view (the mark on top, in the same view) and off returns to the chat, in the three themes",
+      "ok": true,
+      "detail": [
+        {
+          "tag": "overseer",
+          "mark": {
+            "w": 175.5546875,
+            "top": 94
+          },
+          "same": true,
+          "on": {
+            "stage": true,
+            "voice": "on",
+            "mode": "composer",
+            "pressed": "true",
+            "cards": 3,
+            "tabs": [
+              "Overseer"
+            ],
+            "panel": false
+          },
+          "off": {
+            "stage": false,
+            "cards": 7,
+            "tabs": [
+              "Overseer"
+            ],
+            "panel": false
+          },
+          "opened": 0,
+          "panelBefore": false
+        },
+        {
+          "tag": "dark",
+          "mark": {
+            "w": 175.5546875,
+            "top": 94
+          },
+          "same": true,
+          "on": {
+            "stage": true,
+            "voice": "on",
+            "mode": "composer",
+            "pressed": "true",
+            "cards": 7,
+            "tabs": [
+              "Overseer"
+            ],
+            "panel": false
+          },
+          "off": {
+            "stage": false,
+            "cards": 7,
+            "tabs": [
+              "Overseer"
+            ],
+            "panel": false
+          },
+          "opened": 0,
+          "panelBefore": false
+        },
+        {
+          "tag": "light",
+          "mark": {
+            "w": 175.5546875,
+            "top": 94
+          },
+          "same": true,
+          "on": {
+            "stage": true,
+            "voice": "on",
+            "mode": "composer",
+            "pressed": "true",
+            "cards": 7,
+            "tabs": [
+              "Overseer"
+            ],
+            "panel": false
+          },
+          "off": {
+            "stage": false,
+            "cards": 7,
+            "tabs": [
+              "Overseer"
+            ],
+            "panel": false
+          },
+          "opened": 0,
+          "panelBefore": false
+        }
+      ]
+    },
+    {
+      "name": "nothing opens below or beside: no new editor tab and no panel",
+      "ok": true,
+      "detail": [
+        {
+          "tag": "overseer",
+          "opened": 0,
+          "panel": false
+        },
+        {
+          "tag": "dark",
+          "opened": 0,
+          "panel": false
+        },
+        {
+          "tag": "light",
+          "opened": 0,
+          "panel": false
+        }
+      ]
+    },
+    {
+      "name": "the same cards throughout (chat, voice on, voice off), the spoken request among them",
+      "ok": true,
+      "detail": [
+        {
+          "tag": "overseer",
+          "same": true
+        },
+        {
+          "tag": "dark",
+          "same": true
+        },
+        {
+          "tag": "light",
+          "same": true
+        }
+      ]
+    },
+    {
+      "name": "the line \"Stop, mute and what's running still work\" is gone (AC-217)",
+      "ok": true
+    },
+    {
+      "name": "Needs you is a small badge with a count, and a click pops out the short list",
+      "ok": true,
+      "detail": {
+        "badge": {
+          "count": "1",
+          "label": "Needs you: 1",
+          "visible": true
+        },
+        "items": [
+          {
+            "label": "Sessions",
+            "hint": "Approve"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a click on a Needs-you item focuses that agent (its chat)",
+      "ok": true,
+      "detail": {
+        "selected": "r-1d92b8566803",
+        "mode": "chat"
+      }
+    },
+    {
+      "name": "\"handle what needs me\" asks about the waiting permission and the owner's yes answers it",
+      "ok": true,
+      "detail": {
+        "stillWaiting": "waiting_for_user",
+        "answered": 6
+      }
+    },
+    {
+      "name": "answering an agent's permission clears its Needs-you row within a second",
+      "ok": true,
+      "detail": {
+        "before": 2,
+        "after": 0,
+        "ms": 0
+      }
+    },
+    {
+      "name": "an agent finishing clears its Needs-you row within a second",
+      "ok": true,
+      "detail": {
+        "status": "interrupted",
+        "withWriter": 2,
+        "after": 1,
+        "ms": 53
+      }
+    },
+    {
+      "name": "a typed request's card passes through every stage in order: thinking, waiting for the yes, starting the agent, working, done",
+      "ok": true,
+      "detail": {
+        "seen": [
+          "thinking",
+          "waiting",
+          "sending",
+          "starting",
+          "working",
+          "done"
+        ],
+        "stages": [
+          {
+            "stage": "thinking",
+            "text": "Overseer is thinking",
+            "progress": "Overseer is thinking"
+          },
+          {
+            "stage": "waiting",
+            "text": "Waits for your yes",
+            "progress": "Waits for your yes"
+          },
+          {
+            "stage": "sending",
+            "text": "Going ahead",
+            "progress": "Going ahead"
+          },
+          {
+            "stage": "starting",
+            "text": "Starting draft the page",
+            "progress": "Starting draft the page"
+          },
+          {
+            "stage": "working",
+            "text": "draft the page is working · 0s",
+            "progress": "draft the page is working · 0s"
+          },
+          {
+            "stage": "working",
+            "text": "draft the page is working · 1s",
+            "progress": "draft the page is working · 1s"
+          },
+          {
+            "stage": "working",
+            "text": "draft the page is working · 1s · Drafting the page.",
+            "progress": "draft the page is working · 1s · Drafting the page."
+          },
+          {
+            "stage": "working",
+            "text": "draft the page is working · 2s · Drafting the page.",
+            "progress": "draft the page is working · 2s · Drafting the page."
+          },
+          {
+            "stage": "working",
+            "text": "draft the page is working · 3s · Drafting the page.",
+            "progress": "draft the page is working · 3s · Drafting the page."
+          },
+          {
+            "stage": "working",
+            "text": "draft the page is working · 3s · Write: draft.md",
+            "progress": "draft the page is working · 3s · Write: draft.md"
+          },
+          {
+            "stage": "working",
+            "text": "draft the page is working · 4s · Write: draft.md",
+            "progress": "draft the page is working · 4s · Write: draft.md"
+          },
+          {
+            "stage": "working",
+            "text": "draft the page is working · 5s · Write: draft.md",
+            "progress": "draft the page is working · 5s · Write: draft.md"
+          },
+          {
+            "stage": "working",
+            "text": "draft the page is working · 5s · Read: draft.md",
+            "progress": "draft the page is working · 5s · Read: draft.md"
+          },
+          {
+            "stage": "working",
+            "text": "draft the page is working · 6s · Read: draft.md",
+            "progress": "draft the page is working · 6s · Read: draft.md"
+          },
+          {
+            "stage": "working",
+            "text": "draft the page is working · 7s · Read: draft.md",
+            "progress": "draft the page is working · 7s · Read: draft.md"
+          },
+          {
+            "stage": "working",
+            "text": "draft the page is working · 8s · Read: draft.md",
+            "progress": "draft the page is working · 8s · Read: draft.md"
+          },
+          {
+            "stage": "working",
+            "text": "draft the page is working · 9s · Read: draft.md",
+            "progress": "draft the page is working · 9s · Read: draft.md"
+          },
+          {
+            "stage": "working",
+            "text": "draft the page is working · 10s · Read: draft.md",
+            "progress": "draft the page is working · 10s · Read: draft.md"
+          },
+          {
+            "stage": "done",
+            "text": "draft the page finished",
+            "progress": "draft the page finished"
+          }
+        ]
+      }
+    },
+    {
+      "name": "while working, the card and the view show the agent's live activity and the elapsed time",
+      "ok": true,
+      "detail": {
+        "stage": "working",
+        "text": "draft the page is working · 1s · Drafting the page.",
+        "progress": "draft the page is working · 1s · Drafting the page."
+      }
+    },
+    {
+      "name": "a request that starts a single agent slides the view aside: the agent's chat on the left, the view with the mark on the right",
+      "ok": true,
+      "detail": {
+        "aside": "1",
+        "selected": "r-76b780ed7fa6",
+        "mode": "chat",
+        "chatLeft": 0,
+        "chatWidth": 702,
+        "homeLeft": 702,
+        "homeWidth": 380,
+        "homeVisible": true
+      }
+    },
+    {
+      "name": "typed and spoken, \"show me the draft agent\", \"what did it make?\" and \"open the file it made\" focus or open the right thing",
+      "ok": true,
+      "detail": [
+        {
+          "how": "typed",
+          "say": "show me the draft agent",
+          "selected": "r-76b780ed7fa6",
+          "mode": "chat"
+        },
+        {
+          "how": "typed",
+          "say": "what did it make?",
+          "tabs": [
+            "Review, Editor Group 1",
+            "Overseer, Editor Group 2"
+          ]
+        },
+        {
+          "how": "typed",
+          "say": "open the file it made",
+          "tabs": [
+            "Overseer, Editor Group 2",
+            "draft.md, Editor Group 2"
+          ]
+        },
+        {
+          "how": "spoken",
+          "say": "show me the draft agent",
+          "selected": "r-76b780ed7fa6",
+          "mode": "chat"
+        },
+        {
+          "how": "spoken",
+          "say": "what did it make?",
+          "tabs": [
+            "Review, Editor Group 1",
+            "Overseer, Editor Group 2"
+          ]
+        },
+        {
+          "how": "spoken",
+          "say": "open the file it made",
+          "tabs": [
+            "Overseer, Editor Group 2",
+            "draft.md, Editor Group 2"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "these are Look actions: none of them waited for a yes",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "clicking a request card opens the agent it started",
+      "ok": true,
+      "detail": {
+        "selected": "r-76b780ed7fa6",
+        "mode": "chat"
+      }
+    },
+    {
+      "name": "with \"Show the agent I start\" off, the view does not slide aside",
+      "ok": true,
+      "detail": {
+        "aside": "",
+        "mode": "composer",
+        "selected": "r-76b780ed7fa6"
+      }
+    },
+    {
+      "name": "a request not for Overseer never says \"On it.\" and is kept as context in plain words",
+      "ok": true,
+      "detail": {
+        "said": []
+      }
+    },
+    {
+      "name": "no card shows an internal token (NOT_FOR_OVERSEER) or a raw error",
+      "ok": true,
+      "detail": {
+        "tokens": []
+      }
+    }
+  ]
+}

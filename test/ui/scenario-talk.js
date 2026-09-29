@@ -1,6 +1,6 @@
-// Packaged-UI scenario for AC-107 (Claude Code fixture, no paid tokens): Talk to Overseer. The chat
-// docked in the panel runs on the Claude harness as a task Overseer keeps for itself (hidden from the
-// side bar). "What is everyone doing?" gets a summary that matches the daemon's state; "tell API
+// Packaged-UI scenario for AC-107 (Claude Code fixture, no paid tokens): Talk to Overseer. Since
+// AC-227 it is home, the one view for talking to Overseer (nothing docks below); it runs on the
+// Claude harness as a task Overseer keeps for itself (hidden from the side bar). "What is everyone doing?" gets a summary that matches the daemon's state; "tell API
 // tests to add tests" gets a proposal, and on Yes that agent's chat shows the follow-up as coming from
 // Overseer; a declined proposal changes nothing. (The one live run on the Claude account waits for
 // the owner's Claude sign-in.)
@@ -29,26 +29,28 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     fs.writeFileSync(modeFile, 'overseer');
     const turns = id => s.ctl('run.turns', { run_id: id });
 
-    // Open the chat and ask.
+    // Open the chat (home, the composer talking to Overseer) and ask.
     await cdp.command('Overseer: Talk to Overseer'); await delay(2000);
-    const intro = await cdp.webview(`!!document.querySelector('.talk-intro')`, 20000);
-    { const p = await s.webviewPoint(intro, '#prompt'); await cdp.click(p.x, p.y); await delay(150); await cdp.click(p.x, p.y); }
+    const chat = await s.editorView(`!!document.getElementById('home-conv') && document.querySelector('#target')?.dataset.target === 'overseer'`);
+    const focusPrompt = async () => { if (!(await chat.eval(`document.activeElement?.id === 'task' && document.hasFocus()`))) { const p = await s.webviewPoint(chat, '#task'); await cdp.click(p.x, p.y); await delay(150); } };
+    await focusPrompt();
     await cdp.type('What is everyone doing?'); await cdp.key('Enter');
-    const chat = await cdp.webview(`!!document.querySelector('#conv') && /What is everyone doing/.test(document.querySelector('#conv').textContent)`, 30000);
-    await chat.waitFor(`/Here is what everyone is doing/.test(document.querySelector('#conv').textContent)`, 20000);
-    const summary = await chat.eval(`document.querySelector('#conv').innerText`);
+    await chat.waitFor(`/What is everyone doing/.test(document.getElementById('home-conv').textContent)`, 30000);
+    await chat.waitFor(`/Here is what everyone is doing/.test(document.getElementById('home-conv').textContent)`, 20000);
+    const summary = await chat.eval(`document.getElementById('home-conv').innerText`);
     const state = s.ctl('state');
     const wanted = [api, front, watch].map(t => { const r = state.runs.find(x => x.id === t.run.id); return { title: r.title, status: r.status }; });
     await s.screenshot('summary');
     check('"What is everyone doing?" gets a summary that matches the daemon\'s state (each agent and its status)', wanted.every(w => summary.includes(`${w.title}: ${w.status}`)), { wanted, summary: summary.slice(0, 600) });
-    const shared = await chat.eval(`[...document.querySelectorAll('.msg-context')].map(e => e.textContent)`);
-    check('the agents\' state goes with the message but is shown as one line, not as text', shared.some(t => /Shared the state of 3 agents/.test(t)) && !summary.includes('overseer-state'), shared);
+    // The agents' state goes with the message to Overseer's run, and is never shown as text.
+    const sent = s.ctl('run.turns', { run_id: s.ctl('overseer.session').run_id }).pop()?.prompt || '';
+    check('the agents\' state goes with the message but is not shown as text', sent.includes('<overseer-state>') && ['API tests', 'Frontend fixer', 'Build watcher'].every(t => sent.includes(t)) && !summary.includes('overseer-state'), { sent: sent.length });
     await s.openOverseerView(); await delay(1000);
     const sideBar = await cdp.evalWorkbench(`[...document.querySelectorAll('.part.sidebar .monaco-list-row .label-name')].map(e => e.textContent.trim())`);
     check('Overseer\'s own conversation is not listed as an agent', !sideBar.includes('Talk to Overseer') && sideBar.includes('API tests'), sideBar);
 
     // A proposal accepted.
-    const send = async text => { const p = await s.webviewPoint(chat, '#prompt'); await cdp.click(p.x, p.y); await delay(150); await cdp.click(p.x, p.y); await cdp.type(text); await delay(200); await cdp.key('Enter'); };
+    const send = async text => { await cdp.command('Overseer: Talk to Overseer'); await delay(900); await focusPrompt(); await cdp.type(text); await delay(200); await cdp.key('Enter'); };
     const before = { api: turns(api.run.id).length, front: turns(front.run.id).length };
     await send('Tell API tests to add tests');
     await chat.waitFor(`document.querySelectorAll('.proposal:not(.answered)').length === 1`, 20000);
@@ -58,7 +60,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await chat.eval(`document.querySelector('.proposal:not(.answered)').scrollIntoView({ block: 'center' })`); await delay(300);
     { const c = await s.webviewPoint(chat, '.proposal:not(.answered) .proposal-head'); await cdp.click(c.x, c.y); await delay(200);
       const p = await s.webviewPoint(chat, '.proposal:not(.answered) [data-proposal="yes"]'); await cdp.click(p.x, p.y); }
-    await chat.waitFor(`/Done: sent/.test(document.querySelector('.proposal.answered .proposal-status')?.textContent || '')`, 20000);
+    await chat.waitFor(`[...document.querySelectorAll('.proposal.answered .proposal-status')].some(e => /^Sent /.test(e.textContent))`, 20000);
     let t = []; for (let i = 0; i < 30 && t.length <= before.api; i++) { await delay(300); t = turns(api.run.id); }
     const last = t[t.length - 1];
     check('on Yes, the follow-up goes to that agent as coming from Overseer', t.length === before.api + 1 && /^From Overseer: Please add tests\./.test(last?.prompt || ''), { turns: t.length, prompt: last?.prompt });

@@ -1086,7 +1086,9 @@ fn ac45_no_notice_when_nothing_is_running() {
     d.wait_done(&done, 20);
     drop(vscode_window(&d));
     std::thread::sleep(Duration::from_millis(1200));
-    assert!(!log.exists(), "no notice when nothing is running");
+    // The agent's own finish is a notification (AC-240); none says agents are still running.
+    let text = std::fs::read_to_string(&log).unwrap_or_default();
+    assert!(!text.contains("still running"), "no background notice when nothing is running: {text}");
     assert!(notices(&d).is_empty());
     assert!(std::fs::read_to_string(d.home.path().join("overseerd.log")).unwrap_or_default().contains("no active agents, no notice"));
 }

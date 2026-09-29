@@ -4,10 +4,32 @@
 // not installed) appear inline with their fix. The full New Task form stays one click away.
 (function () {
   const ui = window.OverseerUI, el = ui.el;
+  /**
+   * The repository picker's fuzzy match (AC-260): 0 when the letters of `q` are not all in `text`
+   * in order, otherwise a score that ranks a prefix, then a contiguous run, then letters at word
+   * starts, above scattered letters. Case does not matter; an empty query matches everything.
+   */
+  function fuzzy(q, text) {
+    q = String(q || '').toLowerCase(); const t = String(text || '').toLowerCase();
+    if (!q) return 1;
+    let score = 1, from = 0, last = -2;
+    for (const ch of q) {
+      const at = t.indexOf(ch, from);
+      if (at < 0) return 0;
+      if (at === last + 1) score += 2;
+      if (at === 0 || /[-_./\s]/.test(t[at - 1])) score += 3;
+      last = at; from = at + 1;
+    }
+    if (t.startsWith(q)) score += 10; else if (t.includes(q)) score += 5;
+    return score;
+  }
   const MODELS = { claude: ['sonnet', 'opus', 'haiku'], codex: ['gpt-5.6-luna', 'gpt-5.6', 'gpt-5.6-codex'], 'codex-app': ['gpt-5.6-luna', 'gpt-5.6', 'gpt-5.6-codex'], opencode: [] };
 
   function create(host, { post, onStarted, agents = () => [] }) {
     let data, form = {}, starting = false, requested = false, target = 'agent';
+    // AC-259: what was just sent, while the field says so ({ phase: 'sending' | 'started', text }).
+    let sent = null, sentTimer = 0;
+    const PLACEHOLDER = 'Send off a task';
     const wrap = el('div', 'composer-view');
     const hero = el('div', 'composer-hero');
     // Overseer's mark in full colour (AC-142) and a short question.
@@ -117,7 +139,7 @@
       // Continuity (Gate L): a local agent's chips, and the offline line above the field.
       if (window.OverseerContinuity) window.OverseerContinuity.chips({ data, form: form.routing === 'auto' ? { ...form, harness: '' } : form, agentChip, modelChip, setChip });
       tools.refresh();
-      task.placeholder = form.routing !== 'auto' && form.harness === 'generic' ? 'Optional first line for the program' : 'Send off a task';
+      task.placeholder = sent ? sentPlaceholder() : form.routing !== 'auto' && form.harness === 'generic' ? 'Optional first line for the program' : PLACEHOLDER;
       validate();
     }
     function problem() {
@@ -125,7 +147,7 @@
       const continuity = form.routing !== 'auto' && window.OverseerContinuity && window.OverseerContinuity.problem({ data, form, save, task: task.value });
       if (continuity) return continuity;
       if (!data.trusted) return { text: 'Trust this workspace to start agents.', fix: 'Trust', command: 'workbench.trust.manage' };
-      if (!form.repo) return { text: 'Choose a repository.', fix: 'Choose…', action: () => post({ type: 'composerBrowse' }) };
+      if (!form.repo) return { text: 'Choose a repository.', fix: 'Choose…', action: () => openRepoPicker() };
       if (form.routing === 'auto') {
         const supported = data.accounts.filter(a => a.id !== 'local-ollama' && ((a.signedIn && (a.harnesses || []).some(h => ['codex', 'claude'].includes(h))) || (a.installed && (a.harnesses || []).includes('opencode'))));
         if (!supported.length) return { text: 'Connect Codex or Claude Code, or set up a project-local OpenCode route for Auto routing.', fix: 'Add account', command: 'overseer.addProfile' };
@@ -153,6 +175,7 @@
     function validate() {
       if (toOverseer()) { note.replaceChildren(); note.className = 'composer-note'; start.disabled = !task.value.trim(); return true; }
       const p = problem();
+      if (sent && (!p.text || p.soft || p.warn)) { showSentNote(); start.disabled = true; start.title = 'Describe the next task'; return false; }
       note.replaceChildren(); note.className = 'composer-note' + (p.text && !p.soft && !p.warn ? ' error' : p.warn ? ' warn' : '');
       if (p.text) {
         note.append(ui.icon(p.soft ? 'info' : 'warning', 'sm'), el('span', null, p.text));
@@ -163,10 +186,121 @@
       return (!p.text || p.warn) && !p.soft;
     }
 
-    function menuRepo() {
-      ui.menu(repoChip, [...data.repos.map(r => ({ label: r.name, icon: 'repo', hint: r.source === 'open folder' ? 'open' : '', checked: r.path === form.repo, title: r.path, run: () => { form.repo = r.path; save(); } })),
-        'sep', { label: 'Choose folder…', icon: 'folder-opened', run: () => post({ type: 'composerBrowse' }) }], { label: 'Repository' });
+    // The repository chip's own picker (AC-260), inside the webview: recent repositories, a fuzzy
+    // search over every known one (open, recent, and Git repositories beside an open one), and a
+    // typed path (`/…` or `~/…`, Tab completes a folder). The system folder dialog is its last
+    // option, never the only way. The keyboard stays in its search field throughout.
+    let picker = null, hintTimer = 0;
+    const isPath = q => /^(~$|~\/|\/)/.test(q);
+    function openRepoPicker() {
+      if (picker) { closeRepoPicker(); return; }
+      if (!data) return;
+      ui.closeMenu();
+      const m = el('div', 'menu repo-picker'); m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Repository');
+      const input = el('input', 'repo-picker-input'); input.id = 'repo-query'; input.type = 'text'; input.spellcheck = false; input.autocomplete = 'off';
+      input.placeholder = 'Search repositories, or type a path'; input.setAttribute('aria-label', 'Search repositories, or type a path (/ or ~)');
+      input.setAttribute('role', 'combobox'); input.setAttribute('aria-expanded', 'true'); input.setAttribute('aria-controls', 'repo-options'); input.setAttribute('aria-autocomplete', 'list');
+      const list = el('div', 'repo-picker-list'); list.id = 'repo-options'; list.setAttribute('role', 'listbox'); list.setAttribute('aria-label', 'Repositories');
+      const status = el('div', 'repo-picker-status'); status.setAttribute('role', 'status');
+      const foot = el('div', 'repo-picker-foot', '↑↓ choose · ⏎ use · ⇥ complete a path · esc close');
+      m.append(input, status, list, foot);
+      document.body.append(m);
+      picker = { el: m, input, list, status, active: 0, items: [], hints: [], hintsFor: '', busy: '', error: '' };
+      repoChip.setAttribute('aria-expanded', 'true');
+      input.addEventListener('input', () => { picker.active = 0; picker.error = ''; requestHints(); renderPicker(); });
+      input.addEventListener('keydown', pickerKey);
+      renderPicker();
+      input.focus();
     }
+    function closeRepoPicker({ focus = 'chip' } = {}) {
+      if (!picker) return;
+      picker.el.remove(); picker = null; clearTimeout(hintTimer);
+      repoChip.setAttribute('aria-expanded', 'false');
+      if (focus === 'task') task.focus(); else if (focus === 'chip') repoChip.focus();
+    }
+    function pickerItems() {
+      const q = picker.input.value.trim();
+      const items = [];
+      if (isPath(q)) {
+        items.push({ kind: 'path', path: q, label: `Use ${q}`, icon: 'folder', hint: 'add' });
+        if (picker.hintsFor === q) for (const h of picker.hints.filter(x => x.path !== q && x.path !== q + '/')) items.push({ kind: 'hint', path: h.path, label: h.path, icon: h.git ? 'repo' : 'folder', hint: h.git ? 'Git' : '', git: h.git });
+      } else {
+        // Nearby repositories come up only when searched for; with no search, open and recent ones.
+        const pool = data.repos.filter(r => q || r.source !== 'nearby');
+        const scored = pool.map((r, i) => ({ r, i, s: Math.max(fuzzy(q, r.name) * 2, fuzzy(q, r.path)) })).filter(x => x.s > 0);
+        if (q) scored.sort((a, b) => b.s - a.s || a.i - b.i);
+        for (const { r } of scored.slice(0, 30)) items.push({ kind: 'repo', path: r.path, label: r.name, detail: r.path, icon: 'repo', checked: r.path === form.repo,
+          hint: r.source === 'open folder' ? 'open' : r.source === 'nearby' ? 'nearby' : 'recent' });
+      }
+      items.push({ kind: 'browse', label: 'Browse with the system dialog…', icon: 'folder-opened' });
+      return items;
+    }
+    function renderPicker() {
+      if (!picker) return;
+      const q = picker.input.value.trim();
+      const items = picker.items = pickerItems();
+      picker.active = Math.max(0, Math.min(picker.active, items.length - 1));
+      picker.list.replaceChildren(...items.map((it, i) => {
+        const o = el('div', 'menu-item repo-option' + (i === picker.active ? ' active' : '')); o.id = `repo-option-${i}`;
+        o.setAttribute('role', 'option'); o.setAttribute('aria-selected', String(i === picker.active));
+        if (it.kind === 'hint') o.dataset.hint = it.path;
+        o.dataset.kind = it.kind; if (it.path) o.title = it.path;
+        o.append(ui.icon(it.checked ? 'check' : it.icon, 'sm menu-check'), el('span', 'menu-label', it.label));
+        if (it.detail) o.append(el('span', 'repo-option-path', it.detail.replace(/\/[^/]+$/, '')));
+        if (it.hint) o.append(el('span', 'menu-hint', it.hint));
+        o.addEventListener('mousedown', e => { e.preventDefault(); picker.active = i; choose(it); });
+        return o;
+      }));
+      picker.input.setAttribute('aria-activedescendant', `repo-option-${picker.active}`);
+      picker.list.querySelector('.active')?.scrollIntoView({ block: 'nearest' });
+      picker.status.className = 'repo-picker-status' + (picker.error ? ' repo-picker-error' : '');
+      const onlyBrowse = items.length === 1;
+      picker.status.replaceChildren(...(picker.error ? [ui.icon('warning', 'sm'), el('span', null, picker.error)]
+        : picker.busy ? [el('span', 'mini-dot'), el('span', null, `Adding ${picker.busy}…`)]
+        : onlyBrowse && q ? [ui.icon('info', 'sm'), el('span', null, 'No known repository matches. Type a path starting with / or ~.')] : []));
+      picker.status.hidden = !picker.status.childNodes.length;
+      placePicker();
+    }
+    function placePicker() {
+      const m = picker.el, r = repoChip.getBoundingClientRect();
+      const width = Math.min(Math.max(r.width, 380), innerWidth - 16);
+      m.style.width = width + 'px';
+      const h = m.getBoundingClientRect().height;
+      m.style.left = Math.max(8, Math.min(r.left, innerWidth - width - 8)) + 'px';
+      m.style.top = (r.bottom + 4 + h > innerHeight - 8 ? Math.max(8, r.top - h - 4) : r.bottom + 4) + 'px';
+    }
+    function requestHints() {
+      clearTimeout(hintTimer);
+      const q = picker.input.value.trim();
+      if (!isPath(q)) return;
+      hintTimer = setTimeout(() => post({ type: 'composerPathHints', input: q }), 60);
+    }
+    function addPath(p) { picker.busy = p; picker.error = ''; renderPicker(); post({ type: 'composerAddRepo', path: p }); }
+    function complete(to) { picker.input.value = to; picker.active = 0; picker.error = ''; requestHints(); renderPicker(); }
+    function choose(it) {
+      if (!it || picker.busy) return;
+      if (it.kind === 'repo') { form.repo = it.path; closeRepoPicker({ focus: 'task' }); save(); return; }
+      if (it.kind === 'path') { addPath(it.path); return; }
+      if (it.kind === 'hint') { if (it.git) addPath(it.path); else complete(it.path); return; }
+      if (it.kind === 'browse') { closeRepoPicker(); post({ type: 'composerBrowse' }); }
+    }
+    function pickerKey(e) {
+      const n = picker.items.length;
+      if (e.key === 'ArrowDown') { picker.active = (picker.active + 1) % n; renderPicker(); }
+      else if (e.key === 'ArrowUp') { picker.active = (picker.active - 1 + n) % n; renderPicker(); }
+      else if (e.key === 'Enter') choose(picker.items[picker.active]);
+      else if (e.key === 'Escape') closeRepoPicker();
+      else if (e.key === 'Tab' && !e.shiftKey && isPath(picker.input.value.trim())) {
+        const act = picker.items[picker.active];
+        const to = act && act.kind === 'hint' ? act : picker.items.find(x => x.kind === 'hint');
+        if (to) complete(to.path);
+      } else if (e.key === 'Tab') closeRepoPicker();
+      else return;
+      e.preventDefault(); e.stopPropagation();
+    }
+    document.addEventListener('mousedown', e => { if (picker && !picker.el.contains(e.target) && !repoChip.contains(e.target)) closeRepoPicker({ focus: 'none' }); });
+    window.addEventListener('blur', () => closeRepoPicker({ focus: 'none' }));
+    window.addEventListener('resize', () => picker && placePicker());
     function menuAgent() {
       // Auto routing is unfinished in this build: offered only when its setting is on (AC-204).
       const items = !data.autoRouting ? [] : [{ head: 'Automatic selection' },
@@ -218,14 +352,14 @@
       else if (e.key === 'Escape') { mentions.hidden = true; mentionAt = -1; e.preventDefault(); e.stopImmediatePropagation(); }
     }, true);
     task.addEventListener('blur', () => setTimeout(() => { mentions.hidden = true; }, 150));
-    repoChip.addEventListener('click', () => data && menuRepo());
+    repoChip.addEventListener('click', () => openRepoPicker());
     agentChip.addEventListener('click', () => data && menuAgent());
     modelChip.addEventListener('click', () => data && menuModel());
     modeChip.addEventListener('click', () => { if (!data) return; if (form.repo && (!data.branches || data.branches.repo !== form.repo)) post({ type: 'composerBranches', repo: form.repo }); menuMode(); });
     more.addEventListener('click', () => data && menuMore());
     full.addEventListener('click', () => post({ type: 'command', command: 'overseer.newTask' }));
     const grow = () => { task.style.height = 'auto'; task.style.height = Math.min(320, Math.max(66, task.scrollHeight)) + 'px'; };
-    task.addEventListener('input', () => { grow(); renderTarget(); renderMentions(); validate(); });
+    task.addEventListener('input', () => { if (sent && sent.phase === 'started' && task.value) endSent(); grow(); renderTarget(); renderMentions(); validate(); });
     program.addEventListener('input', validate);
     task.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); go(); } });
     start.addEventListener('click', go);
@@ -241,9 +375,36 @@
         return;
       }
       if (!validate() || starting) return;
-      starting = true; start.disabled = true; note.className = 'composer-note'; note.replaceChildren(el('span', 'mini-dot'), el('span', null, 'Starting…'));
+      starting = true; start.disabled = true;
       const { prompt, options } = tools.take();
+      // AC-259: the field clears the instant the task is sent, and says so until the agent starts
+      // (the words come back if it cannot start).
+      const text = task.value;
+      task.value = ''; grow();
+      showSent('sending', text);
       post({ type: 'start', form: { ...form, prompt, options: { effort: options.effort, permission_mode: options.permission_mode, images: options.images }, program: program.value.trim(), args: args.value.trim() || '[]' } });
+    }
+    const sentPlaceholder = () => (sent.phase === 'sending' ? 'Sent ✓ — starting the agent…' : 'Sent ✓ — the agent is starting');
+    function showSent(phase, text) {
+      clearTimeout(sentTimer);
+      sent = { phase, text: text ?? sent?.text ?? '' };
+      box.dataset.sent = phase;
+      // Back to "Send off a task" a moment after the agent started.
+      if (phase === 'started') sentTimer = setTimeout(endSent, 2500);
+      render();
+    }
+    function endSent() {
+      clearTimeout(sentTimer);
+      if (!sent) return;
+      sent = null; delete box.dataset.sent;
+      render();
+    }
+    function showSentNote() {
+      const words = sent.text.trim().split(/\s+/).join(' ');
+      const short = words.length > 60 ? words.slice(0, 59) + '…' : words;
+      note.className = 'composer-note sent';
+      note.replaceChildren(sent.phase === 'sending' ? el('span', 'mini-dot') : ui.icon('check', 'sm'),
+        el('span', null, sent.phase === 'sending' ? `Sent${short ? ` “${short}”` : ''} — starting the agent…` : `Sent${short ? ` “${short}”` : ''} — the agent is starting.`));
     }
     return {
       open(opts = {}) {
@@ -268,10 +429,17 @@
         render(); grow();
       },
       notice(m) {
-        if (m.kind === 'started') { starting = false; task.value = ''; program.value = ''; grow(); render(); onStarted(m.runId); return; }
-        if (m.kind === 'repo') { data.repos.unshift(m.repo); form.repo = m.repo.path; save(); return; }
+        // The field was cleared when the task was sent; anything typed since stays (AC-259).
+        if (m.kind === 'started') { starting = false; program.value = ''; showSent('started'); onStarted(m.runId); return; }
+        if (m.kind === 'repo') { data.repos = [m.repo, ...data.repos.filter(r => r.path !== m.repo.path)]; form.repo = m.repo.path; if (picker) closeRepoPicker({ focus: 'task' }); save(); return; }
+        if (m.kind === 'repoError') { if (picker) { picker.busy = ''; picker.error = m.message; renderPicker(); } return; }
+        if (m.kind === 'pathHints') { if (picker && picker.input.value.trim() === m.input) { picker.hints = m.hints || []; picker.hintsFor = m.input; renderPicker(); } return; }
         if (m.kind === 'branches') { data.branches = m.branches; menuMode(); return; }
         if (m.kind === 'model') { form.model = m.model; save(); return; }
+        // A start that failed puts the words back (unless something new was typed meanwhile).
+        const failedStart = starting && sent;
+        if (failedStart && !task.value) { task.value = sent.text; grow(); }
+        if (failedStart) { clearTimeout(sentTimer); sent = null; delete box.dataset.sent; render(); }
         starting = false; validate();
         if (m.kind === 'info') { note.className = 'composer-note'; note.replaceChildren(ui.icon('info', 'sm'), el('span', null, m.message)); return; }
         note.className = 'composer-note error'; note.replaceChildren(ui.icon('error', 'sm'), el('span', null, m.message));
@@ -281,8 +449,8 @@
       /** Starts an agent from words that went to Overseer by mistake (AC-182's correction). */
       startWith(text) { target = 'agent'; task.value = text; grow(); render(); go(); },
       /** Puts words back in the composer for Overseer (after an agent was started by mistake). */
-      askOverseer(text) { target = 'overseer'; task.value = text; grow(); render(); task.focus(); },
+      askOverseer(text) { endSent(); target = 'overseer'; task.value = text; grow(); render(); task.focus(); },
     };
   }
-  window.OverseerComposer = { create };
+  window.OverseerComposer = { create, fuzzy };
 })();

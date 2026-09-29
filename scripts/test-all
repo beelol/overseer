@@ -18,6 +18,28 @@ const path = require('path');
 const cp = require('child_process');
 
 const root = path.resolve(__dirname, '..');
+
+// One full run at a time on this machine: several agents running test-all at once load the Mac
+// until timing checks fail for everyone. A run waits for the lock; a lock whose process has died
+// is taken over. OVERSEER_TEST_LOCK=off skips it (a CI runner has the machine to itself).
+(function takeTheMachineLock() {
+  if (process.env.OVERSEER_TEST_LOCK === 'off') return;
+  const lock = path.join(require('os').tmpdir(), 'overseer-test-all.lock');
+  const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  let told = false;
+  for (;;) {
+    try { fs.mkdirSync(lock); fs.writeFileSync(path.join(lock, 'pid'), `${process.pid} ${root}\n`); break; } catch {}
+    let holder = '';
+    try { holder = fs.readFileSync(path.join(lock, 'pid'), 'utf8').trim(); } catch {}
+    const pid = parseInt(holder, 10);
+    if (!pid || !alive(pid)) { fs.rmSync(lock, { recursive: true, force: true }); continue; }
+    if (!told) { console.log(`waiting for another test-all run to finish (${holder})`); told = true; }
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 15000);
+  }
+  const release = () => { try { if (fs.readFileSync(path.join(lock, 'pid'), 'utf8').startsWith(`${process.pid} `)) fs.rmSync(lock, { recursive: true, force: true }); } catch {} };
+  process.on('exit', release);
+  for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => { release(); process.exit(130); });
+})();
 const args = process.argv.slice(2);
 const flag = f => args.includes(f);
 const only = (args.find(a => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean);

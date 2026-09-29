@@ -1,0 +1,16 @@
+0.1s  CDP attached to existing scripts/dev window (cold, as left by scripts/dev code)
+1.1s  opened Overseer side bar view
+3.4s  ran "Overseer: New Agent" from command palette
+3.5s  captured initial daemon state via scripts/dev ctl state
++0.4s  typed task 1 into composer (site repo, default chips)
++1.1s  pressed Enter to start task 1
++1.6s  task 1 run visible in daemon state: r-2193724becba status=queued
++4.1s  started task 2 (site repo, second agent) from home
++4.6s  task 2 run visible: r-a6107dc3ef46 status=queued
++2.3s  clicked repo chip
++2.3s  repo chip menu items: []
++3.0s  typed task 3 (permission-mode fixture, will pause for a Write approval)
++3.9s  started task 3
++4.3s  task3 run: {"id":"r-bc475565a653","status":"waiting_for_user"}
++4.3s  task3 status after wait: waiting_for_user
++5.9s  clicked agent row to follow it

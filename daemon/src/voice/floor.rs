@@ -31,6 +31,36 @@ pub fn is_command_verb(w: &str) -> bool {
     COMMAND_VERBS.contains(&w)
 }
 
+/// Whether words are surely meant for Overseer, with no model (AC-228): they name Overseer, lead
+/// with a command or a stop word, or answer a question Overseer asked. Such a request is taken with
+/// "On it." at once and Overseer is not asked whether it was meant for it; words that are only
+/// probably meant for it (a question about the agents, "someone should…", an agent's name) wait
+/// for Overseer's own judgement before anything is said (AC-228: decided before "On it").
+pub fn addressed_strongly(text: &str, awaiting_answer: bool) -> bool {
+    let words: Vec<String> = text
+        .to_lowercase()
+        .replace(['-', '’', '\''], " ")
+        .split_whitespace()
+        .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+        .filter(|w| !w.is_empty())
+        .collect();
+    if words.is_empty() {
+        return false;
+    }
+    if awaiting_answer
+        || words.iter().any(|w| w == "overseer")
+        || COMMAND_VERBS.contains(&words[0].as_str())
+        || (words.len() > 1 && words[0] == "please" && COMMAND_VERBS.contains(&words[1].as_str()))
+        || (words.len() > 1 && words[0] == "hold" && words[1] == "on")
+    {
+        return true;
+    }
+    // A question may be about something else ("are you done with the dishes?"): Overseer judges.
+    // New work and everyone told something ("someone should…", "everyone, pull main") are for it.
+    const QUESTION_FIRST: &[&str] = &["what", "whats", "who", "whos", "how", "hows", "is", "are", "did", "has", "have", "any", "where", "which", "why", "when", "whoever", "whichever", "do", "does", "can", "could"];
+    !QUESTION_FIRST.contains(&words[0].as_str()) && addressed(text, &[], false)
+}
+
 /// Whether words read as meant for Overseer, with no model (AC-164): they name Overseer or an
 /// agent, lead with a stop word or a command, or answer a question Overseer asked.
 pub fn addressed(text: &str, agent_names: &[String], awaiting_answer: bool) -> bool {
@@ -150,6 +180,12 @@ pub fn addressed(text: &str, agent_names: &[String], awaiting_answer: bool) -> b
         "merge",
         "status",
         "progress",
+        // What an agent made (AC-226: "what did it make?").
+        "make",
+        "made",
+        "built",
+        "wrote",
+        "changed",
     ];
     if QUESTION.contains(&words[0].as_str())
         && words.iter().any(|w| ABOUT_WORK.contains(&w.as_str()))

@@ -1,5 +1,24 @@
 # AC-146: merges
 
+## Pull request #27 (one view for talking to Overseer; it moves you around VS Code; you can tell it is working), 2026-09-29
+
+- **Finished:** marked ready by its agent (head `8d89b0e7`, main merged in). AC-226, AC-227 and AC-228 verified; AC-217 partial (the turn-on frames exist in the Overseer theme only, as stills). It removed the docked Talk to Overseer panel (home is the one view), made Needs you a badge, and fixed a daemon bug that kept stale proposals open (the stuck Needs you).
+- **Tests:** `scripts/test-all --jobs=3` under the machine lock: 64 of 65; the miss, protocol ac45, passes alone three times in a row at load 2.4 (a fixed 1.5 s wait under ~190 parallel tests). #30 then merged, so main was merged in again: `extension/package.json` conflicted (both added settings; all four kept). On that combination: one_view 7, overseer 34, voice 44, notices 8; unit 19 of 19; links; VSIX; UI one-view, home, voice, keys-on-screen, notify-agents, one-signin, keyboard and gallery passed, and talk passed on its rerun (a webview not ready in time on the first).
+- **Merged:** squash, `24c3c245`.
+
+## Pull request #30 (one Sign In, keys on what you see, notifications outside VS Code), 2026-09-29
+
+- **Finished:** AC-261 and AC-242 verified, AC-240 partial (a click cannot reach the TUI; the owner's real banner). Its agent finished with the final run queued; the coordinator saw it through.
+- **Tests:** `scripts/test-all --jobs=3` under the machine lock on the branch: 63 of 66. The misses are known and not this branch's: protocol ac45 (a load-timing test that passes alone), review-width (the flaky width check #28 fixes) and one link mid-rewrite during the run (0 broken after).
+- **Throwaway copy:** current main merged in (`ea1e2bdf`). Code merged cleanly; ledger files conflicted and were resolved by keeping each criterion's furthest record (#29's AC-259 and AC-260, this branch's AC-240, 242 and 261); the daemon builds, unit 18 of 18, 0 broken links, 178 verified.
+- **Merged:** squash, `5e7d4e54`.
+
+## Pull request #29 (the composer: sending clears the box, another repository without a native dialog), 2026-09-29
+
+- **Finished:** marked ready by its agent (head `acdd85f0`, main merged in): AC-259 and AC-260 each pass their whole Verify clause (a keyboard-only packaged scenario, 16 of 16, and a unit test, both failing on main first).
+- **Tests:** its `scripts/test-all --jobs=3` under the machine lock with main merged in: 62 of 64; the misses (protocol ac45, the learning sqlite-timeout test, audit's review budget) pass alone, and none is in its area. Main gained only ledger notes after that run.
+- **Merged:** squash, `3b7b397b`.
+
 ## Pull request #26 (Auto routing and Swarm, partial merge AC-204), 2026-09-28
 
 - **Finished:** built by the everything goal with a sub-agent on `claude/auto-swarm`, marked ready (head `6f78182e`). Unfinished VS Code surfaces stay behind `overseer.experimental.autoRouting` and `overseer.experimental.swarm` (both off); `swarm.native_director` is on by default (owner decision, 2026-09-28) but only acts on a confirmed `swarm.start`. Auto 23 of 40 and Swarm 45 of 64 verified at fixture scope; the rest need live runs on the owner's personal accounts, one owner choice (an unmetered director, SWARM-24/40) or packaged-UI scenarios.

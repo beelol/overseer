@@ -136,6 +136,48 @@ async function snapshot(socket) {
     for (const s of ['OVERSEER_INSTANCE=dev-a', `OVERSEER_CLAUDE_PATH=${path.join(rootA, 'a/bin/claude-fixture.js')}`, 'OVERSEER_CODEX_PATH=/nonexistent/', `OVERSEER_TEST_SYSTEM_HOME=${path.join(rootA, 'a/system')}`, 'OVERSEER_OLLAMA_URL=http://127.0.0.1:9', `OVERSEER_GATEWAY_PORT=${a.port}`, 'OVERSEER_GATEWAY_MDNS=off', 'OVERSEER_NOTIFY_COMMAND=']) assert.ok(e.includes(s), `environment has ${s}`);
   });
 
+  await check("AC-240: with an unfocused VS Code window, a fixture permission, finish and failure each write one entry to the instance's notifications.log with the agent's title and its click URL; a focused window writes none", async () => {
+    const log = path.join(rootA, 'a/notifications.log');
+    const entries = title => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '').split('\n').filter(l => l.split('\t')[1] === title);
+    // A VS Code window as the extension speaks: hello, then whether it has the OS focus.
+    const window = focused => new Promise((resolve, reject) => {
+      const c = net.createConnection(a.socket); let buf = '', n = 0;
+      c.setEncoding('utf8');
+      c.on('connect', () => c.write(JSON.stringify({ id: 1, method: 'hello', params: { client: 'vscode' } }) + '\n' + JSON.stringify({ id: 2, method: 'ui.window', params: { focused } }) + '\n'));
+      c.on('data', d => { buf += d; n = buf.split('\n').length - 1; if (n >= 2) resolve(c); });
+      c.on('error', reject);
+    });
+    const r = makeRepo(path.join(tmp, 'repo-notices'));
+    const mode = path.join(rootA, 'a/fixture-mode');
+    const wait = async (id, re) => { for (let i = 0; i < 100; i++) { const run = (await call(a.socket, 'state')).runs.find(x => x.id === id); if (re.test(run?.status || '')) return run.status; await delay(200); } throw new Error(`${id} never reached ${re}`); };
+    const focusedWindow = await window(true);
+    fs.writeFileSync(mode, 'echo');
+    const quiet = (await call(a.socket, 'task.create', { repo: r, harness: 'claude', prompt: 'hi', title: 'Finished while focused' })).run.id;
+    await wait(quiet, /completed/); await delay(800);
+    assert.deepStrictEqual(entries('Finished while focused'), [], 'a focused window writes none');
+    focusedWindow.destroy();
+    const background = await window(false);
+    fs.writeFileSync(mode, 'permission');
+    const asks = (await call(a.socket, 'task.create', { repo: r, harness: 'claude', prompt: 'write perm.txt', title: 'Write the changelog' })).run.id;
+    await wait(asks, /waiting_for_user/);
+    fs.writeFileSync(mode, 'echo');
+    const done = (await call(a.socket, 'task.create', { repo: r, harness: 'claude', prompt: 'hi', title: 'Summarise the notes' })).run.id;
+    await wait(done, /completed/);
+    const failed = (await call(a.socket, 'task.create', { repo: r, harness: 'generic', program: '/bin/sh', args: ['-c', 'exit 2'], prompt: '', title: 'Broken build' })).run.id;
+    await wait(failed, /failed/);
+    for (let i = 0; i < 30 && !entries('Broken build').length; i++) await delay(200);
+    await delay(800);
+    for (const [title, id, what] of [['Write the changelog', asks, 'Needs your permission to use Write'], ['Summarise the notes', done, 'Finished'], ['Broken build', failed, 'Stopped with an error']]) {
+      const got = entries(title);
+      assert.strictEqual(got.length, 1, `one entry for ${title}: ${JSON.stringify(got)}`);
+      const [, , body, url] = got[0].split('\t');
+      assert.ok(body.startsWith(what), `${title}: ${body}`);
+      assert.strictEqual(url, `vscode://beelol.overseer/open-agent?run=${id}`);
+    }
+    background.destroy();
+    await call(a.socket, 'run.interrupt', { run_id: asks });
+  });
+
   await check('AC-209: tui --dry-run resolves the instance; a stopped instance is refused', () => {
     const t = JSON.parse(dev(homeA, rootA, ['tui', '--name', 'a', '--dry-run']).stdout);
     assert.deepStrictEqual(t.command, [path.join(rootA, 'a/bin/overseer-tui'), '--daemon', path.join(rootA, 'a/bin/overseerd')]);

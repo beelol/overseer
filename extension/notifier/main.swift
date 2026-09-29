@@ -1,11 +1,12 @@
 // Overseer Notifier (AC-52): posts Overseer's macOS notifications under Overseer's own name
 // and icon, and opens VS Code at the Overseer view when a notification is clicked.
 //
-//   notifier --title T --body B [--open URL] [--result FILE]
+//   notifier --title T --body B [--open URL] [--thread ID] [--result FILE]
 //                                               post; exit 0 posted, 3 denied, 4 error, 5 no answer yet.
 //                                               The daemon launches it through LaunchServices (`open -W`),
 //                                               which hides the exit code, so the outcome is also written
-//                                               to FILE as "<code> <message>".
+//                                               to FILE as "<code> <message>". --thread groups the
+//                                               notification with others of the same agent (AC-240).
 //   notifier --status                           print notDetermined|denied|authorized|provisional
 //   (no arguments)                              launched by macOS for a click: open the URL, then quit
 //
@@ -24,7 +25,7 @@ func finish(_ code: Int32, _ message: String) -> Never {
 }
 
 enum Mode {
-    case post(title: String, body: String, open: String?)
+    case post(title: String, body: String, open: String?, thread: String?)
     case status
     case click
 }
@@ -36,7 +37,7 @@ func parse(_ args: [String]) -> Mode {
         return args[i + 1]
     }
     resultFile = value("--result")
-    if let title = value("--title") { return .post(title: title, body: value("--body") ?? "", open: value("--open")) }
+    if let title = value("--title") { return .post(title: title, body: value("--body") ?? "", open: value("--open"), thread: value("--thread")) }
     return .click
 }
 
@@ -61,7 +62,7 @@ final class Notifier: NSObject, NSApplicationDelegate, UNUserNotificationCenterD
                 print(s)
                 exit(0)
             }
-        case let .post(title, body, open):
+        case let .post(title, body, open, thread):
             // Never wait forever for the first-time permission prompt; the daemon falls back.
             DispatchQueue.main.asyncAfter(deadline: .now() + 20) { finish(5, "no answer to the permission prompt yet") }
             center.requestAuthorization(options: [.alert, .sound]) { granted, error in
@@ -70,6 +71,7 @@ final class Notifier: NSObject, NSApplicationDelegate, UNUserNotificationCenterD
                 content.title = title
                 content.body = body
                 if let open { content.userInfo = ["open": open] }
+                if let thread { content.threadIdentifier = thread }
                 let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
                 self.center.add(request) { error in
                     if let error { finish(4, "could not post: \(error.localizedDescription)") }

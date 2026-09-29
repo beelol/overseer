@@ -42,8 +42,7 @@
       "overseer-mark": { "description": "Overseer mark", "default": { "fontPath": "media/overseer-mark.woff", "fontCharacter": "\\E001" } }
     },
     "viewsContainers": {
-      "activitybar": [{ "id": "overseer", "title": "Overseer", "icon": "media/overseer.svg" }],
-      "panel": [{ "id": "overseer-talk", "title": "Overseer", "icon": "media/overseer.svg" }]
+      "activitybar": [{ "id": "overseer", "title": "Overseer", "icon": "media/overseer.svg" }]
     },
     "views": {
       "overseer": [
@@ -51,9 +50,6 @@
         { "id": "overseer.agents", "name": "Agents", "initialSize": 14 },
         { "id": "overseer.accounts", "name": "Accounts", "initialSize": 5 },
         { "id": "overseer.devices", "name": "Devices", "visibility": "collapsed", "initialSize": 3 }
-      ],
-      "overseer-talk": [
-        { "type": "webview", "id": "overseer.talk", "name": "Talk to Overseer" }
       ]
     },
     "viewsWelcome": [
@@ -247,6 +243,9 @@
         { "command": "overseer.renameDevice", "when": "false" }
       ]
     },
+    "configurationDefaults": {
+      "chat.titleBar.signIn.enabled": false
+    },
     "configuration": {
       "title": "Overseer",
       "properties": {
@@ -285,7 +284,11 @@
         "overseer.devInstance": { "type": "string", "default": "", "markdownDescription": "Dev profiles only (written by `scripts/dev code`): the dev instance (`dev-<name>`) this window is pinned to; a daemon reporting another instance is refused. The installed extension ignores it.", "scope": "machine" },
         "overseer.review.enableEditing": { "type": "boolean", "default": true, "markdownDescription": "Edit working-tree text directly in the review. Undo/redo is available through Open in Native Diff." },
         "overseer.review.largeDiffThreshold": { "type": "integer", "minimum": 1, "default": 500, "markdownDescription": "Show a Load Diff card when additions + deletions exceed this count." },
-        "overseer.followNewRuns": { "type": "boolean", "default": true, "markdownDescription": "Turn Follow on for runs you launch from this window. Selecting an existing run never turns Follow on." }
+        "overseer.followNewRuns": { "type": "boolean", "default": true, "markdownDescription": "Turn Follow on for runs you launch from this window. Selecting an existing run never turns Follow on." },
+        "overseer.showStartedAgent": { "type": "boolean", "default": true, "markdownDescription": "**Show the agent I start.** When something you ask Overseer (typed or spoken) starts a single agent, the conversation slides aside, with the mark on the right, and shows that agent working beside it. Off: the conversation stays as it is." },
+        "overseer.notifications.needsYou": { "type": "boolean", "default": true, "markdownDescription": "A Mac notification when an agent needs your permission or has a question, while VS Code is not focused or closed. Clicking it opens that agent." },
+        "overseer.notifications.finished": { "type": "boolean", "default": true, "markdownDescription": "A Mac notification when an agent finishes, while VS Code is not focused or closed." },
+        "overseer.notifications.failed": { "type": "boolean", "default": true, "markdownDescription": "A Mac notification when an agent stops with an error, while VS Code is not focused or closed." }
       }
     }
   },

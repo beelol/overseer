@@ -1358,7 +1358,7 @@ rec(114, "Gate K in the owner's VS Code (owner-confirmed)", "not started", date=
 # Gate N, phone remote on the same network (added by the owner on 2026-09-26; docs/rfcs/phone-remote.md). Not started; built in its own worktree and pull request.
 rec(115, 'Feasibility and reuse before lock-in', 'partial',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     proven="on both simulators in release builds, 20 cold starts each with the door and 20 without, recorded by the app itself (the door shown, the first screen, the opening timed and its frames counted on the UI thread) and the baselines written; the encrypted session (Noise IK) between the Rust daemon and the app, resumed on both after five minutes in the background with the daemon restarted half way; the shared test vectors passing in the daemon, in the app's library and in the extension's reference phone; the daemon's exact notification payload delivered to the iOS simulator by the daemon itself, tapped, and Allow on it; Happy inspected at a recorded revision and the decision written down",
@@ -1379,7 +1379,7 @@ rec(115, 'Feasibility and reuse before lock-in', 'partial',
     limits='No iPhone measurement yet; Flutter stays the fallback the RFC names if the iPhone misses the budget.')
 rec(116, 'A gateway switched on and off on the desktop', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd --test gateway` (ac116: refused by default, listens after enabling, sessions dropped and told on disabling, reconnect with no pairing, a phone's request to change the setting refused, a public address refused, unauthenticated and malformed input); the fuzz test (200,000 first frames, 100,000 transport frames).
@@ -1396,7 +1396,7 @@ rec(116, 'A gateway switched on and off on the desktop', 'verified',
     limits='macOS only.')
 rec(117, 'Pairing needs the Mac', 'partial',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     proven='protocol tests for every refusal and the lockout; the code and the confirmation in VS Code and the terminal, in screenshots; the simulator and the emulator pair by typing the code, and the Mac confirms',
@@ -1414,7 +1414,7 @@ rec(117, 'Pairing needs the Mac', 'partial',
     limits='Scanning waits for the iPhone; the camera path is tested against the fake.')
 rec(118, 'Encrypted and mutually authenticated', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd --test gateway` (ac118: a capture of a live session through a recording forwarder holds no method name, prompt or output; an unknown device key, a gateway with the wrong key, a tampered frame, a replayed frame and a replayed handshake are refused).
@@ -1430,7 +1430,7 @@ rec(118, 'Encrypted and mutually authenticated', 'verified',
     limits='macOS only.')
 rec(119, 'Devices, scopes and revoking', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd` (classes: every daemon method has a class and every class a method; the README table matches; a method added without a class fails; ac119 table-driven: a watch-only device refused on every control method, every device on every Mac-only method; revoke during a live stream; events name the device).
@@ -1447,7 +1447,7 @@ rec(119, 'Devices, scopes and revoking', 'verified',
     limits='macOS only.')
 rec(120, 'Found on the network', 'partial',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     proven="the daemon advertises `_overseer._tcp` with its key's fingerprint while phone access is on and withdraws it when off; an impostor with the same name and another key is refused by the handshake; both simulators connect through a typed address, with no pairing again, after the Mac moved to another port",
@@ -1463,7 +1463,7 @@ rec(120, 'Found on the network', 'partial',
     limits="The local network permission and Bonjour browsing are iPhone steps (the RFC's steps for the owner).")
 rec(121, 'Never lose the session', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd --test gateway` (ac121: a stream cut at 100 random points, with the daemon killed mid-stream, equals the daemon's log event for event; `history_truncated` after pruning); `phone/integration` (the same through the app's own library, 10 tests).
@@ -1479,7 +1479,7 @@ rec(121, 'Never lose the session', 'verified',
     limits='macOS only.')
 rec(122, 'Sent exactly once', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd --test gateway` (ac122: the same id three times at once runs once with three identical replies; a connection cut after the request was written and before the reply, then a retry, leaves one turn; a connection lost while sending; outcomes kept across a restart and 25 hours, and 7 days in the store; an interrupted request is not run again).
@@ -1492,7 +1492,7 @@ rec(122, 'Sent exactly once', 'verified',
     limits='macOS only.')
 rec(123, 'The Mac stays awake while it matters', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd --test gateway` (ac123: `pmset -g assertions` names Overseer's assertion during a fixture run and while an agent waits, not afterwards, and never with phone access off; both are events).
@@ -1507,7 +1507,7 @@ rec(123, 'The Mac stays awake while it matters', 'verified',
     limits='macOS only.')
 rec(124, 'See every agent', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cd phone/model && npm test` (149 tests: the store against the daemon's `state` at 111 recorded moments; the conversation of the same run against VS Code's own `conversation.js` in jsdom, item by item; the agents list against `views.js`; Markdown against marked with DOMPurify).
@@ -1522,7 +1522,7 @@ rec(124, 'See every agent', 'verified',
     limits="The delay has no budget of its own in this criterion; AC-58's 250 ms for a VS Code tile is the reference.")
 rec(125, 'Control every agent', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd --test gateway` (ac125: the phone and the Mac answer one permission request at the same moment, 100 rounds: the harness receives one answer each time, the other side gets `already_answered` with the first outcome) and `--test phone_methods` (launch records from the phone equal VS Code's for the same choices).
@@ -1538,7 +1538,7 @@ rec(125, 'Control every agent', 'verified',
     limits="The live turns ran on the iOS simulator only: one each is what the owner's rules allow.")
 rec(126, 'Review on the phone', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd --test phone_methods` (ac126: path escape, symlink, binary, oversized, `.git` in any case; marks made on each surface seen on the other; a hunk that changed since refused; the 10,000-file repository listed through the gateway).
@@ -1555,7 +1555,7 @@ rec(126, 'Review on the phone', 'verified',
     limits="The display budget (at most 1% of frames dropped) is held on the simulator; the emulator's figure is its own baseline.")
 rec(127, 'Everything else Overseer has', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd --test phone_methods` (ac127: device-code sign-in with the synthetic account CLI, the address and the code reach the phone and a credential never does; *Sign in on the Mac* for a provider without one; a pull request through a fake GitHub CLI and a local stand-in remote; merge back; cleanup that lists uncommitted files first; search, archive, stop all; everything the phone received, decrypted, holds no token).
@@ -1578,7 +1578,7 @@ rec(128, 'Talk to Overseer from the phone', 'not started',
     blocker="AC-107 (verified on main through pull request #11) and Overseer's session in the daemon (Gate S, pull request #14) reached main after this milestone was built; the phone half is the next piece of Gate N. Until it is built, Overseer's methods are Mac-only for phones and shown as not yet in the README's phone table.")
 rec(129, 'Needs-you notifications you can switch', 'partial',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     proven="on the iOS simulator: the daemon's exact payload, sent by the daemon itself to the simulator, shows the notification with the app's icon, title and body; a tap on it opens the agent; Allow on it unblocks the fixture; on the Android emulator the app's own banner while the app is open; the payload holds only the allowed fields; each switch off (phone, kind, the Mac) sends nothing and the log says why; a focused VS Code window suppresses the push; a switch changed on the phone reaches the Mac, kept and sent again until the Mac answers",
@@ -1596,7 +1596,7 @@ rec(129, 'Needs-you notifications you can switch', 'partial',
     limits="Apple's push service needs Overseer's own key in the Mac's Keychain (the RFC's steps for the owner).")
 rec(130, 'Safe without friction', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `node phone/e2e/measure.mjs` (part of `npm run e2e`): 40 cold starts per platform, none showing pairing or any question; the scenarios `reopen`, `restart` and `update`.
@@ -1615,7 +1615,7 @@ rec(130, 'Safe without friction', 'verified',
     limits="Simulators and the emulator; the iPhone's own keychain and Face ID are the owner's session (AC-133).")
 rec(131, 'One app, iOS and Android, that looks like Overseer', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cd phone && npm run tokens:check` (fails when a token differs from `extension/design/tokens.js`); `npm run check:token-rule` (ten seeded values written by hand fail the lint).
@@ -1635,7 +1635,7 @@ rec(131, 'One app, iOS and Android, that looks like Overseer', 'verified',
     limits='Speed is AC-135.')
 rec(132, 'Regression coverage for the phone', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. From a clean clone of the branch: `git clone`, `cd phone && npm ci && npm run prebuild`, then `npm run e2e` (`node e2e/run.mjs`): builds the daemon and both release apps, installs each app anew, starts the lab (`e2e/lab.mjs`), drives every scenario with Maestro (`e2e/flows`), asks the daemon what happened, measures 20 cold starts with the door and 20 without, and checks the budgets.
@@ -1655,7 +1655,7 @@ rec(133, 'Phone session (owner-confirmed)', 'not started',
     blocker="The owner's iPhone: the steps for the owner in the phone remote RFC (a new app identifier, a push key, signing, the local network and notification permissions, then pairing by scanning). The simulator milestone is in pull request #10.")
 rec(134, 'Platform behaviour behind generic interfaces', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cd phone && npm run check:platform-rule` (six seeded violations fail the lint outside the platform layer and in a package beside the app; the same code inside the layer is allowed; the clean tree passes).
@@ -1672,7 +1672,7 @@ rec(134, 'Platform behaviour behind generic interfaces', 'verified',
     limits='—')
 rec(135, 'Hyper fast', 'partial',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     proven="release builds on both simulators: 20 cold starts with the door and 20 without, the baselines written and the last one-command run checked against them; on the iOS simulator every budget held; on the Android emulator every budget but the door's (see below); the app records every launch (the door, the first screen, the opening's frames on the UI thread) and every tap's response; an animation dropped no frame while the app's logic was held for 500 ms on both (the `busy` scenario); a seeded slow start fails the run",
@@ -1693,11 +1693,11 @@ rec(135, 'Hyper fast', 'partial',
     limits='Simulators carry no display budget; the iPhone is where the budgets are due.')
 rec(136, 'The door', 'partial',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     proven="on both simulators in release builds: the closed door from the first frame the app draws (the same picture as the launch screen), its gradient and seam light, the diagonal split with the mark splitting, in recordings read frame by frame with a full-size frame of each opening, in dark and in light, with Reduce Motion (a fade: recording it found Reanimated skipping the app's fades, now kept) and on return from the background (no door); 20 launches per platform timed by the app with the frames counted on the UI thread; the door waits for the first screen to settle so nothing slides in under it",
-    deferred="no dropped frame on the Android emulator, shown by recordings and by a clean 20-run check on a quiet machine (see below; the fix is pull request #24, not merged yet); the owner's iPhone recordings; the owner's marks on the look: the review page is published (https://claude.ai/artifact/FzD5ido4NdwX3annWoY9Uq, from the recordings in `evidence/phone/door`) and the owner has been asked; the owner asked for the same purple streak in the light theme, which this commit draws (accent laid thinly over the background) and the page shows again",
+    deferred="no dropped frame on the Android emulator, shown by recordings and by a clean 20-run check on a quiet machine (see below; the fix is pull request #24, merged as 88cd2779); the owner's iPhone recordings; the owner's marks on the look: the review page is published (https://claude.ai/artifact/FzD5ido4NdwX3annWoY9Uq, from the recordings in `evidence/phone/door`) and the owner has been asked; the owner asked for the same purple streak in the light theme, which this commit draws (accent laid thinly over the background) and the page shows again",
     steps="""1. `node phone/e2e/measure.mjs`: the door's opening is timed by the app and its frames counted on the UI thread (`door.opening`, `door.frames`, `door.dropped`), for 20 cold starts with the door and 20 with it off (the test setting), taken in turn after one warm-up launch.
 2. Recordings of the simulators' screens at launch, in both themes, and with Reduce Motion (`docs/verification/evidence/phone/door/`).""",
     expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
@@ -1711,7 +1711,7 @@ rec(136, 'The door', 'partial',
     limits="The owner's marks are asked for on the published review page; the iPhone frame-by-frame recording is a device step.")
 rec(137, 'Motion throughout', 'partial',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     proven='one motion system: every duration, distance, easing and spring is a token, and the lint fails on one written by hand (proven with seeded values); the door, screen transitions, arriving rows, the needs-you pulse, sheets, presses and the connection line all use it; with Reduce Motion movement becomes a fade (recorded for the door on both simulators); an animation drops no frame while the logic is held for 500 ms, on both simulators',
@@ -1790,7 +1790,7 @@ rec(140, "Memory safety guard", "verified", commit="8639ebb", date="2026-09-26",
 # Gate N addition: pair once (the owner's decision of 2026-09-26).
 rec(141, 'Pair once', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd --test gateway` (ac141: reconnects by itself after 20 reopens, a daemon restart, a newer state version, phone access off and on, and thirty days; pairing was opened once).
@@ -2342,9 +2342,17 @@ rec(214, "Deploy: the one path from dev to production (stage 4)", "verified", co
 rec(216, "A conversation, not only requests, the same typed or spoken", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
-rec(217, "Turning it on is visible", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
-    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(217, "Turning it on is visible", "partial", commit="4832c5e0 (branch claude/one-conversation-view, pull request #27, merged as 24c3c245)", date="2026-09-29",
+    steps="""`node test/ui/scenario-one-view.js` (packaged VSIX, fixture Claude, simulated voice): home's head, the Voice button, then Voice Mode on and off in each theme.""",
+    expected="See the RFC criterion (Gate R).",
+    actual="""- Home has a visible **Voice** button with its shortcut (⌥⌘⇧V); pressed, home turns into the voice view with the mark's animation (the stage grows in; reduced motion: none). There is no separate "Show voice" any more.
+- The spoken line "Stop, mute and what's running still work" is gone from the daemon, and the scenario checks it is absent.
+- Screenshots of home before, during (three frames) and after turning it on in the Overseer theme, and before and after in Overseer Dark and Overseer Light.""",
+    evidence="[one-view](evidence/ui/one-view/) (01 to 13), pull request #27",
+    live="Fixtures and the simulated voice; no paid turn.",
+    proven="home's Voice button with its shortcut; home turning into the voice view with the mark's animation, before, during and after in the Overseer theme; the removed line absent",
+    deferred="the frames during the animation in Overseer Dark and Overseer Light, and a recording rather than three screenshots",
+    limits="The frames during the animation are only in the Overseer theme (not all three), and the animation is recorded as three screenshots, not a video. The voice strip's own on/off button is the view's head button (the strip has Turn on while off).")
 rec(218, "A voice worth listening to", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
@@ -2369,15 +2377,40 @@ rec(224, "Goals for an agent, at the harness level", "not started", date="—", 
 rec(225, "Goals for Overseer, at the global level", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate S, goals, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
-rec(226, "Overseer moves you around VS Code", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
-    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
-rec(227, "One view for talking to Overseer", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
-    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
-rec(228, "You can always tell it is working", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
-    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(226, "Overseer moves you around VS Code", "verified", commit="4832c5e0 (branch claude/one-conversation-view, pull request #27, merged as 24c3c245)", date="2026-09-29",
+    steps="""1. `cargo test -p overseerd --test one_view -- ac226`: typed "Show me the draft agent.", "What did it make?", "Open the file it made." at the Ask first level.
+2. `cargo test -p overseerd --test voice -- ac226_show_me_the_agent_by_voice`.
+3. `node test/ui/scenario-one-view.js`: the same three, typed (the composer) and spoken (simulated voice), each checked in the packaged UI; a click on a card row; a single start with "Show the agent I start" on and off.""",
+    expected="See the RFC criterion (Gate R).",
+    actual="""- New Look actions `focus`, `show_work`, `open_review`, `open_file` and `open_worktree` (action table, propose tool, plan lines). They happen at once at every level, typed or spoken (no settle window, no yes), and no proposal waits for them. `open_file` gives an absolute path inside the agent's worktree (the file it changed last when none is named), never a relative one.
+- In the packaged UI, typed and spoken: "show me the draft agent" focuses its chat, "what did it make?" opens its review, "open the file it made" opens `draft.md`. Only the window the owner is in acts.
+- Clicking a request card's row opens the agent it started; a card and a Needs-you item open the same way.
+- A request that starts a single agent slides the view aside: the agent's chat on the left, the conversation (with the mark while Voice Mode is on) on the right. With **Show the agent I start** (`overseer.showStartedAgent`) off, the view stays.""",
+    evidence="[one-view](evidence/ui/one-view/) (20 to 29), `daemon/tests/one_view.rs`, `daemon/tests/voice.rs`, pull request #27",
+    live="Fixtures and the simulated voice; no paid turn.",
+    limits="`open_worktree` opens the worktree's files in a pick list in this window (Manual edit in place is AC-233's). What \"it\" means comes from the model's memory of the conversation; the fixture keeps the agent last talked about.")
+rec(227, "One view for talking to Overseer; Needs you as a small notification", "verified", commit="4832c5e0 (branch claude/one-conversation-view, pull request #27, merged as 24c3c245)", date="2026-09-29",
+    steps="""1. `node test/ui/scenario-one-view.js` (packaged VSIX, fixture Claude, simulated voice): Talk to Overseer; a typed question; Voice Mode on with the Voice button, a spoken request, off, in the three themes; a waiting permission: the badge, its list, a click on the item; typed "Handle what needs me", then "yes"; typed "Tell it yes".
+2. `cargo test -p overseerd --test one_view -- ac227` and `cargo test -p overseerd --test voice -- ac227_handle_what_needs_me_by_voice`.
+3. `node test/ui/scenario-voice.js`, `scenario-home.js`, `scenario-talk.js`: the voice view's states and cards, home, and Talk to Overseer, now all home.""",
+    expected="See the RFC criterion (Gate R, corrected by the owner on 2026-09-28: Needs you is a small notification).",
+    actual="""- **One view.** Talk to Overseer is home; the chat docked below is gone. Turning Voice Mode on turns the chat into the voice view (the existing mark on top, the same cards below: a spoken request is an owner message with its card, like a typed one); turning it off returns to the chat. Nothing opens below or beside (no new tab, no panel), checked in the three themes with the same cards throughout.
+- **Needs you** is a small badge with a count in the view's head; a click pops out a short list (the agent and what it needs), and an item focuses that agent the same way a card does.
+- **"Handle what needs me"** asks the one question the waiting permission needs ("Sessions wants to change perm.txt. Allow it?", with a proposal) and the owner's "yes" answers it; **"tell it yes"** answers it at once; with nothing waiting it says so. The daemon does it with no model turn, typed or spoken, with the same cards; by voice the answer keeps the toast and its window (AC-171).""",
+    evidence="[one-view](evidence/ui/one-view/) (01 to 18), [voice](evidence/ui/voice/), [home](evidence/ui/home/), [talk](evidence/ui/talk/), pull request #27",
+    live="Fixtures and the simulated voice; no paid turn.",
+    limits="The waiting permission comes up by itself in the view and is read out under AC-230, not here.")
+rec(228, "You can always tell it is working", "verified", commit="4832c5e0 (branch claude/one-conversation-view, pull request #27, merged as 24c3c245)", date="2026-09-29",
+    steps="""1. `node test/ui/scenario-one-view.js`: a typed "Someone should draft the page" (a fixture agent that thinks, writes `draft.md` and reads it over 9 s), every stage of its card recorded as it changed; a spoken aside; Needs you timed after a permission answered and after an agent stopped; every card's text checked.
+2. `node test/ui/scenario-voice.js`: the same token and raw-error check over the voice scenario's cards.
+3. `cargo test -p overseerd --test voice -- ac228_a_request_not_for_overseer_never_says_on_it`; `cargo test -p overseerd --test one_view -- ac228`; `node test/unit/plain-words.js`.""",
+    expected="See the RFC criterion (Gate R).",
+    actual="""- **Stages.** Each request, typed or spoken, shows its stage on the owner's words and in the view: thinking, waiting for the yes (or going out), going ahead, starting the agent, working with the agent's live activity and the elapsed time ("draft the page is working · 3s · Write: draft.md"), then done, stuck (it needs you, no activity for 3 minutes, waits for a connection) or failed, in plain words. The recorded order: thinking, waiting, going ahead, starting, working, done.
+- **Decided before "On it."** A spoken request that is surely for Overseer (it names Overseer or gives a command) gets "On it." at once and Overseer is not offered a way out; one that is only probably for it gets no "On it.": Overseer judges first, and its "not for me" is kept as context. The token is stored as a plain "kept as context" card; no card shows it or a raw error (one plain-words filter; checked over both scenarios' cards).
+- **Needs you clears.** The stale Needs you was a daemon state bug: a proposal about an agent stayed open after the agent was answered elsewhere or finished. Such proposals now close themselves the moment the agent changes. Measured in the UI: after the permission was answered, its row and Overseer's went within a second; after a waiting agent was stopped, its row went within a second.""",
+    evidence="[one-view](evidence/ui/one-view/) (19 to 21, 30), [voice](evidence/ui/voice/), `daemon/tests/one_view.rs`, `test/unit/plain-words.js`, pull request #27",
+    live="Fixtures and the simulated voice; no paid turn.",
+    limits="An agent finishing was measured by stopping a waiting agent (a waiting agent cannot finish on its own); the daemon test covers a proposal closing when its agent completes.")
 rec(229, "Heard right before it acts", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
@@ -2414,15 +2447,30 @@ rec(238, "Overseer checks finished work and offers the next step", "not started"
 rec(239, "Stuck, failed and limited agents come back to Overseer", "not started", date="—", commit="—",
     expected="See the RFC criterion (the usability audit of 2026-09-28).",
     actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
-rec(240, "You hear about it outside VS Code", "not started", date="—", commit="—",
+rec(240, "You hear about it outside VS Code", "partial", commit="53c26853 (branch claude/signin-notify-keys, pull request #30)", date="2026-09-28",
+    harness="Claude fixture and generic programs on the daemon, a dev daemon (scripts/dev) and the packaged VSIX; the notification goes to a logging command, never a real banner; no paid tokens",
+    proven="while no VS Code window has the OS focus (each window reports it with `ui.window`), or VS Code is closed, an agent needing permission, asking a question, finishing or failing posts one notification titled with the agent, saying what it needs and in which repository, grouped per agent (the notifier's `--thread`), with a click URL for that agent (`vscode://beelol.overseer/open-agent?run=ID`); a focused window writes none; `overseer.notifications.needsYou`, `finished` and `failed` choose the kinds (`notices.set`); on a dev daemon a fixture permission, finish and failure each write one entry to the instance's `notifications.log` with the agent's title and its URL, and a focused window writes none; opening that URL in VS Code opens that agent's chat; the in-VS Code permission toast names the agent and shows while the Overseer view is open on another agent",
+    deferred="a click with VS Code closed opens VS Code, not the TUI (a notification cannot focus a terminal app; the TUI is not reachable by URL); the real banner, its grouping by agent and a real click on the owner's Mac (owner-only, in a guided dev-daemon check)",
+    steps="""1. `cargo test -p overseerd --test notices` (4 tests: unfocused window, focused window, VS Code closed, the setting) and the `notices::tests` unit tests.
+2. `node test/dev/run.js`: the AC-240 check on a dev daemon's notifications.log.
+3. `node test/unit/notices.js` (the window's focus and the kinds sent once per connection and on each change; the click URL).
+4. `node test/ui/scenario-notify-agents.js` ([evidence](evidence/ui/notify-agents/)): packaged VSIX; the window's blur and focus come from VS Code's main process with the test window kept behind the owner's apps.""",
     expected="See the RFC criterion (the usability audit of 2026-09-28).",
-    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+    actual="All pass. [notifications.log from the scenario](evidence/ui/notify-agents/notifications.log). The AC-45 background-notice tests still pass (`ac45_no_notice_when_nothing_is_running` now allows the finished run's own notification).",
+    evidence="[notify-agents scenario](evidence/ui/notify-agents/); `daemon/src/notices.rs`, `daemon/tests/notices.rs`, `extension/src/notices.js`, `test/dev/run.js`",
+    live="Fixtures only; no banner was shown.", blocker="The TUI on click with VS Code closed has no route; the real banner and click are owner checks.")
 rec(241, "A waiting agent can always be answered", "not started", date="—", commit="—",
     expected="See the RFC criterion (the usability audit of 2026-09-28).",
     actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
-rec(242, "Keys act only on what you can see", "not started", date="—", commit="—",
+rec(242, "Keys act only on what you can see", "verified", commit="13b71844 (branch claude/signin-notify-keys, pull request #30)", date="2026-09-28",
+    harness="Claude fixture (permission, echo, overseer modes) and generic programs on the packaged VSIX; no paid tokens",
+    steps="""1. `node test/unit/on-screen.js`: which agents are on screen (the Overseer view's chat, chats taken out, reviews); ⌥⌘Y's target; a palette command's target.
+2. `node test/ui/scenario-keys-on-screen.js` ([evidence](evidence/ui/keys-on-screen/)): two agents wait on a permission; with A's chat on screen ⌥⌘Y answers A and B still waits; from home ⌥⌘Y shows "Allow which request?" with B and its tool and answers nothing until it is picked; Merge Back, Stop Selected Agent, Clean Up Worktree and Send Follow-up from the palette on home each show a picker; with Overseer's proposal open ⌥⌘J reaches it in Talk to Overseer.
+3. `node test/ui/scenario-keyboard.js` still passes (⌥⌘J, ⌥⌘Y, ⌥⌘⌫, ⌥⌘A, ⌥⌘. with the agent on screen).""",
     expected="See the RFC criterion (the usability audit of 2026-09-28).",
-    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+    actual="All pass. The scenario failed on the previous VSIX at the which-request step (⌥⌘Y had answered the first waiting agent). Open Pull Request and Stop (overseer.interrupt) take the same picker.",
+    evidence="[keys-on-screen scenario](evidence/ui/keys-on-screen/); `extension/src/on-screen.js`, `test/unit/on-screen.js`",
+    live="Fixtures only.", limits="The picker lists agents the command applies to (Stop: running ones; Merge Back and Clean Up: finished ones with a worktree).")
 rec(243, "Merge from the agent, and it reads merged afterwards", "not started", date="—", commit="—",
     expected="See the RFC criterion (the usability audit of 2026-09-28).",
     actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
@@ -2462,6 +2510,58 @@ rec(251, "Follow an agent on another screen", "not started", date="—", commit=
 rec(252, "Zero-friction loop, measured", "not started", date="—", commit="—",
     expected="See the RFC criterion (the owner's zero-friction goal, 2026-09-28).",
     actual="Not started: added for the overnight zero-friction goal (docs/goals/zero-friction.md).", live="—", blocker="Overnight goal.")
+
+rec(253, "Overseer leads with what happened while you were away", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(254, "Reviewed and unreviewed are never the same mark", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(255, "A state rollup between the list and the grid", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(256, "A repository's badge never goes quiet on finished work", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(257, "Following an agent sits beside Overseer's conversation, not on top of it", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(258, "VS Code's own chat panel stays out of Overseer's way all session, not only at first launch", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(259, "Sending a task clears the box and says so", "verified",
+    date="2026-09-29 UTC",
+    commit="3b7b397b (pull request #29, merged; branch head acdd85f0)",
+    harness="Claude Code fixture harness only (fixtures/fake-harness/claude-fixture.js); no accounts, no paid turns",
+    proven="the whole Verify clause, on the branch: a packaged-UI scenario types a task, presses Enter, and the field is empty and says it was sent 12 ms after Enter; it is back to \"Send off a task\" at 3.8 s (16 of 16 checks)",
+    steps="""1. `node extension/scripts/package.js`, then `node test/ui/scenario-composer-friction.js` (isolated VS Code profile, fixture Claude harness, `overseer.followNewRuns` off).
+2. The scenario types "Tidy the pricing copy" at home and records the field every animation frame from just before Enter: its value, its placeholder, the note under it and its sent state.""",
+    expected="See the RFC criterion (the friction research of 2026-09-28, item 7).",
+    actual="""- **Before (main at ce426a04):** the field kept the text until the host said the agent had started: cleared at 1295 ms even with the fixture harness, with no sent confirmation (the same scenario, run on main before the change, failed those three checks).
+- **After:** Enter clears the field at once; the field reads "Sent ✓ — starting the agent…" and the note "Sent “Tidy the pricing copy” — starting the agent…" (12 ms after Enter); when the agent starts the note says so, and 2.5 s later the field is back to "Send off a task" (3838 ms). The field stays empty throughout. If the start fails or is cancelled, the words come back into the field; text typed while the agent is starting is kept.
+- Once the agent starts, the view moves to its chat as before (`followNewRuns` only decides Follow), so on screen the confirmation is seen while the agent is starting and when you come back home.""",
+    evidence=f"[scenario evidence](https://github.com/beelol/overseer/blob/acdd85f0/docs/verification/evidence/ui/composer-friction) (sent-confirmation screenshot, result.json, scenario.log), [the scenario](https://github.com/beelol/overseer/blob/acdd85f0/test/ui/scenario-composer-friction.js)",
+    live="Fixture harness; a real harness only lengthens the starting phase the confirmation covers.")
+rec(260, "Starting an agent in another repository never needs a native dialog", "verified",
+    date="2026-09-29 UTC",
+    commit="3b7b397b (pull request #29, merged; branch head acdd85f0)",
+    harness="Claude Code fixture harness only (fixtures/fake-harness/claude-fixture.js); no accounts, no paid turns",
+    proven="the whole Verify clause, on the branch: keyboard only from the composer, the repository chip's own picker adds a repository that is not open by its typed path and the task starts there; no folder dialog was opened (16 of 16 checks)",
+    steps="""1. `node test/unit/repo-picker.js`: typed paths and `~`, a folder inside a repository resolving to its root, refusals in plain words, Tab completion, remembered and nearby repositories, the fuzzy ranking; no dialog is called.
+2. `node test/ui/scenario-composer-friction.js`: the profile turns on `files.simpleDialog.enable`, so any folder dialog would open inside the window (never a native one) and a workbench observer records it. From the task field: Tab to the repository chip, Enter; type `frst` (fuzzy), a folder that is not a repository (refused in the picker), `<root>/elsew` then Tab (completes to `<root>/elsewhere/`), `notes-repo`, Enter; type a task, Enter.""",
+    expected="See the RFC criterion (the friction research of 2026-09-28, item 8).",
+    actual="""- **Before (main at ce426a04):** Enter on the chip opened a menu of open and recent repositories whose only way to add another was "Choose folder…", the native Open dialog; the same scenario failed from its first picker check.
+- **After:** the chip opens a picker inside the webview whose search field has the keyboard: open and recent repositories with nothing typed; a fuzzy search over every known repository (open, recent, added before, and Git repositories beside an open one); a path starting with `/` or `~` offers "Use <path>", Tab completes folders (Git repositories marked), a folder that is not a repository is explained in the picker. The typed `<root>/elsewhere/notes-repo` was added, the chip read "notes-repo", the keyboard went back to the task, and the task started in `<root>/elsewhere/notes-repo`. Next time the search found it as a recent repository. Escape closes the picker back to the chip. "Browse with the system dialog…" stays as the picker's last option. Folder dialogs recorded: none.""",
+    evidence=f"[scenario evidence](https://github.com/beelol/overseer/blob/acdd85f0/docs/verification/evidence/ui/composer-friction) (picker and typed-path screenshots, result.json, scenario.log), [unit test](https://github.com/beelol/overseer/blob/acdd85f0/test/unit/repo-picker.js)",
+    live="Fixture harness only; nothing here depends on the harness.",
+    limits="macOS only; Linux belongs to AC-41. Spoken repository choice is AC-216's; this criterion covers the keyboard.")
+rec(261, "One Sign In, clearly Overseer's or clearly not", "verified", commit="b6fa3617 (branch claude/signin-notify-keys, pull request #30)", date="2026-09-28",
+    harness="The packaged VSIX in a fresh VS Code 1.139.1 profile with VS Code's AI features left on; no account",
+    steps="""`node test/ui/scenario-one-signin.js` ([evidence](evidence/ui/one-signin/)): the first Overseer view in Overseer Dark, Overseer Light and Overseer; every visible title-bar and activity-bar control labelled Sign In is listed.""",
+    expected="See the RFC criterion (the friction research of 2026-09-28).",
+    actual="No competing Sign In in any of the three themes; Overseer's Accounts is the only sign-in shown. Overseer contributes the default `chat.titleBar.signIn.enabled: false` (VS Code's chat sign-in pill, `workbench.action.chat.signInIndicator`); nothing is written to the owner's settings, and turning it back on still works. On the previous VSIX the scenario found the pill in all three themes.",
+    evidence="[one-signin scenario](evidence/ui/one-signin/) (three screenshots, result.json)",
+    live="Fixtures only.", limits="VS Code's own Accounts icon in the activity bar stays (it is VS Code's menu, not a Sign In control).")
 
 SHORT_BLOCKERS = {
     154: "verified",
@@ -2631,9 +2731,9 @@ SHORT_BLOCKERS = {
     237: "not started (the usability audit, 2026-09-28)",
     238: "not started (the usability audit, 2026-09-28)",
     239: "not started (the usability audit, 2026-09-28)",
-    240: "not started (the usability audit, 2026-09-28)",
+    240: "partial: notifications while VS Code is unfocused or closed, a click opens the agent, the setting (pull request #30); the TUI on click and the owner's real banner remain",
     241: "not started (the usability audit, 2026-09-28)",
-    242: "not started (the usability audit, 2026-09-28)",
+    242: "verified",
     243: "not started (the usability audit, 2026-09-28)",
     244: "not started (the usability audit, 2026-09-28)",
     245: "not started (the usability audit, 2026-09-28)",
@@ -2642,8 +2742,17 @@ SHORT_BLOCKERS = {
     248: "not started (the usability audit, 2026-09-28)",
     249: "not started (the usability audit, 2026-09-28)",
     250: "not started (the owner's zero-friction goal, 2026-09-28)",
-    251: "not started (the owner's zero-friction goal, 2026-09-28)",
+    251: "not started: blocked by VS Code (no API to float a webview, 1.139.1); skipped on the owner's instruction",
     252: "not started (the owner's zero-friction goal, 2026-09-28)",
+    253: "not started (the friction research, 2026-09-28)",
+    254: "not started (the friction research, 2026-09-28)",
+    255: "not started (the friction research, 2026-09-28)",
+    256: "not started (the friction research, 2026-09-28)",
+    257: "not started (the friction research, 2026-09-28)",
+    258: "not started (the friction research, 2026-09-28)",
+    259: "verified",
+    260: "verified",
+    261: "verified",
 }
 TOTAL = 53
 

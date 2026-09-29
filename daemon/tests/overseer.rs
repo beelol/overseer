@@ -927,9 +927,17 @@ fn ac186_levels_decide_how_steer_actions_happen() {
     let p = d.call("overseer.propose", json!({"actions": [{"action": "message", "agent": e, "text": "hi"}], "source": "test"}));
     d.call("run.interrupt", json!({"run_id": e}));
     d.wait_status(&e, |s| s == "interrupted", 10);
-    let answer = d.call("overseer.answer", json!({"id": p["proposal"], "yes": true, "surface": "ctl", "by": "owner"}));
-    assert_eq!(answer["state"], "stale");
-    assert!(answer["result"].as_str().unwrap().contains("Ask again"));
+    // Since AC-228 the daemon closes it the moment the agent ends (Needs you clears), and a late
+    // yes gets that outcome: nothing is carried out.
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    while d.call("overseer.card", json!({"id": p["proposal"]}))["state"] != "stale" && std::time::Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let card = d.call("overseer.card", json!({"id": p["proposal"]}));
+    assert_eq!(card["state"], "stale", "{card}");
+    assert!(card["result"].as_str().unwrap().contains("Agent E is now interrupted"), "{card}");
+    let late = d.try_call("overseer.answer", json!({"id": p["proposal"], "yes": true, "surface": "ctl", "by": "owner"}));
+    assert!(late.as_ref().is_err_and(|e| e.contains("already_answered") && e.contains("stale")), "{late:?}");
     // Two clients answer one proposal within 50 ms of each other, 100 times: one outcome each time.
     let d = std::sync::Arc::new(d);
     for i in 0..100 {

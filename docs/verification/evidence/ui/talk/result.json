@@ -18,15 +18,15 @@
             "status": "running"
           }
         ],
-        "summary": "What is everyone doing?\nShared the state of 3 agents\nUsed\nmcp__overseer__roster\n\nHere is what everyone is doing:\n\nBuild watcher: running\nFrontend fixer: completed\nAPI tests: completed\nDone\n0s\n2 tokens"
+        "summary": "Started API tests (claude) in talk-repo\nwrite the API\nAsk Overseer instead\nStarted Frontend fixer (claude) in talk-repo\nfix the header\nAsk Overseer instead\nStarted Build watcher (generic) in talk-repo\nAsk Overseer instead\nYou\nWhat is everyone doing?\nOverseer is still thinking\nStart as an agent\nOverseer\n\nHere is what everyone is doing:\n\nBuild watcher: running\nFrontend fixer: completed\nAPI tests: completed"
       }
     },
     {
-      "name": "the agents' state goes with the message but is shown as one line, not as text",
+      "name": "the agents' state goes with the message but is not shown as text",
       "ok": true,
-      "detail": [
-        "Shared the state of 3 agents"
-      ]
+      "detail": {
+        "sent": 3816
+      }
     },
     {
       "name": "Overseer's own conversation is not listed as an agent",
