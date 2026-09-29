@@ -242,7 +242,8 @@
         case 'waiting_for_connection': return { stage: 'stuck', text: `${title} waits for a connection`, run: run.id };
         case 'waiting_for_memory': return { stage: 'stuck', text: `${title} waits for memory`, run: run.id };
         case 'completed': return { stage: 'done', text: row.action === 'start' ? `${title} finished` : row.state === 'answered' || row.state === 'picked_up' ? `${title} is done with it` : `${title} finished`, run: run.id };
-        case 'failed': case 'disconnected': return { stage: 'failed', text: `${title} failed${run.exit_reason ? ': ' + plain(run.exit_reason, 90) : ''}`, run: run.id };
+        // The daemon's plain reason follows the agent's name ("reached its account's usage limit", AC-239).
+        case 'failed': case 'disconnected': return { stage: 'failed', text: run.plain_reason ? `${title} ${run.plain_reason.charAt(0).toLowerCase()}${run.plain_reason.slice(1)}` : `${title} failed${run.exit_reason ? ': ' + plain(run.exit_reason, 90) : ''}`, run: run.id };
         case 'interrupted': return { stage: 'failed', text: `${title} was stopped`, run: run.id };
         default: return { stage: 'done', text: `${title}: ${ui.statusText(run.status)}`, run: run.id };
       }
@@ -379,10 +380,11 @@
         const open = ((s && s.proposals) || []).filter(p => p.state === 'open' || p.state === 'settling');
         level.textContent = s && s.level ? { ask_first: 'Ask first', steer: 'Steer', auto: 'Auto' }[s.level] || s.level : '';
         const keep = new Set();
+        let away = null;
         for (const m of messages) {
           keep.add(m.id);
           let e = shown.get(m.id);
-          if (!e) { e = row(m); shown.set(m.id, e); place(e); }
+          if (!e) { e = row(m); shown.set(m.id, e); place(e); if (m.card && m.card.kind === 'while_away') away = e; }
           else if (m.card && m.card.kind === 'ask' && e.dataset.answer !== String(m.card.answer || '')) { const n = row(m); e.replaceWith(n); shown.set(m.id, n); e = n; }
           if (m.card && m.card.kind === 'ask') e.dataset.answer = String(m.card.answer || '');
         }
@@ -404,6 +406,8 @@
         for (const [id, e] of shown) if (!keep.has(id) && !id.startsWith('v:')) { e.remove(); shown.delete(id); }
         renderStages();
         list.scrollTop = list.scrollHeight;
+        // What happened while the owner was away leads (AC-253): in view once the layout settles.
+        if (away) { const lead = away; requestAnimationFrame(() => lead.scrollIntoView({ block: 'end' })); setTimeout(() => lead.isConnected && lead.scrollIntoView({ block: 'end' }), 700); }
       },
       /** A message came back for a proposal card (an error, a state). */
       proposalStatus(id, text) { const e = shown.get('p:' + id); if (e) e.querySelector('.proposal-status').textContent = plain(text); },

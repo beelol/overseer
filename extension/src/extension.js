@@ -130,7 +130,7 @@ async function activate(context) {
       if (archived.has(r.task_id)) continue;
       const seen = reviewed.get(r.id) || 0;
       if (r.status === 'waiting_for_user') out.push({ run_id: r.id, rank: 0, label: r.attention?.kind === 'permission' ? 'Approve' : 'Reply', detail: r.attention?.kind === 'permission' ? `Wants to use ${r.attention.tool}` : 'Waiting for your reply' });
-      else if (['failed', 'disconnected'].includes(r.status) && seen < (r.ended_ms || r.created_ms)) out.push({ run_id: r.id, rank: 1, label: 'Failed', detail: r.exit_reason || 'The agent failed' });
+      else if (['failed', 'disconnected'].includes(r.status) && seen < (r.ended_ms || r.created_ms)) out.push({ run_id: r.id, rank: 1, label: 'Failed', detail: r.plain_reason || r.exit_reason || 'The agent failed' });
       else if (r.status === 'completed' && recent.has(r.id) && seen < (r.ended_ms || r.created_ms) && Date.now() - (r.ended_ms || r.created_ms) < 7 * 86400000) {
         if (!changedRuns.has(r.id)) checkChanged(r);
         const n = changedRuns.get(r.id);

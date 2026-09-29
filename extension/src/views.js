@@ -509,7 +509,7 @@ class AgentsProvider {
     const profile = run.profile_id ? m.profile(run.profile_id) : undefined;
     const ws = m.workspace(run.workspace_id);
     const status = STATUS_TEXT[run.status] || run.status;
-    item.tooltip = new vscode.MarkdownString([`**${task.title}**`, `${status}${run.exit_reason && !ACTIVE.has(run.status) ? ` — ${run.exit_reason}` : ''}`,
+    item.tooltip = new vscode.MarkdownString([`**${task.title}**`, `${status}${(run.plain_reason || run.exit_reason) && !ACTIVE.has(run.status) ? ` — ${run.plain_reason || run.exit_reason}` : ''}`,
       [run.harness, profile?.name, run.model].filter(Boolean).join(' · '), ws ? `${ws.kind === 'current' ? 'current checkout' : ws.branch} · ${path.basename(task.repo_root)}` : ''].filter(Boolean).join('\n\n'));
     item.accessibilityInformation = { label: `${task.title}, ${status}, ${run.harness}${profile ? ', ' + profile.name : ''}${marks.length ? ', ' + marks.map(x => x.replace(/^\S+ /, '')).join(', ') : ''}` };
     if (marks.length) item.tooltip.appendMarkdown(`\n\n${[voiced && 'A spoken request is for this agent', o.held && `Held: ${o.hold_reason || ''}`, o.watched && 'Watched by another agent', o.watching && o.watching.length && 'Watching another agent', o.conflicts && `${o.conflicts} open conflict${o.conflicts === 1 ? '' : 's'}`, o.area && o.area.length && `Area: ${o.area.join(', ')}`].filter(Boolean).join('\n\n')}`);
