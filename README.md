@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **195 / 261** · **34** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-128, AC-129, AC-133, AC-135, AC-136, AC-137, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-183, AC-185, AC-186, AC-188, AC-189, AC-190, AC-192, AC-195, AC-196, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-210, AC-213, AC-216, AC-218, AC-219, AC-220, AC-221, AC-222, AC-223, AC-224, AC-225, AC-229, AC-230, AC-231, AC-233, AC-234, AC-235, AC-239, AC-240, AC-241, AC-244, AC-246, AC-252, AC-257. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+criteria: **197 / 261** · **34** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-128, AC-129, AC-133, AC-135, AC-136, AC-137, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-183, AC-185, AC-186, AC-188, AC-189, AC-190, AC-192, AC-195, AC-196, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-210, AC-213, AC-216, AC-218, AC-219, AC-220, AC-221, AC-222, AC-223, AC-224, AC-225, AC-229, AC-230, AC-231, AC-234, AC-235, AC-239, AC-240, AC-241, AC-244, AC-246, AC-252. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), Voice Mode (Gate R, AC-162 to AC-177, added by the owner on 2026-09-27: a voice to talk to constantly that redirects every agent from context, answers quickly and shows every word it sent, with audio collected on the Rust side and the animated mark in the middle moving with the voice; [design](docs/rfcs/voice-mode.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -273,7 +273,7 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-230** Permission modes by conversation — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-230.md)
 - [ ] **AC-231** Agents start with what Overseer knows — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-231.md)
 - [x] **AC-232** The review says what it shows — [evidence](docs/verification/AC-232.md)
-- [ ] **AC-233** Clicking an agent puts you in its head — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-233.md)
+- [x] **AC-233** Clicking an agent puts you in its head — [evidence](docs/verification/AC-233.md)
 - [ ] **AC-234** Deploys follow merges by themselves — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-234.md)
 - [ ] **AC-235** You can always see which account an agent uses — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-235.md)
 - [x] **AC-236** Home talks to Overseer first — [evidence](docs/verification/AC-236.md)
@@ -297,7 +297,7 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-254** Reviewed and unreviewed are never the same mark — [evidence](docs/verification/AC-254.md)
 - [x] **AC-255** A state rollup between the list and the grid — [evidence](docs/verification/AC-255.md)
 - [x] **AC-256** A repository's badge never goes quiet on finished work — [evidence](docs/verification/AC-256.md)
-- [ ] **AC-257** Following an agent sits beside Overseer's conversation, not on top of it — not started (the friction research, 2026-09-28) — [evidence](docs/verification/AC-257.md)
+- [x] **AC-257** Following an agent sits beside Overseer's conversation, not on top of it — [evidence](docs/verification/AC-257.md)
 - [x] **AC-258** VS Code's own chat panel stays out of Overseer's way all session, not only at first launch — [evidence](docs/verification/AC-258.md)
 - [x] **AC-259** Sending a task clears the box and says so — [evidence](docs/verification/AC-259.md)
 - [x] **AC-260** Starting an agent in another repository never needs a native dialog — [evidence](docs/verification/AC-260.md)
@@ -838,7 +838,6 @@ the owner action or decision each one needs.
 - [ ] [AC-229](docs/verification/AC-229.md) (Heard right before it acts): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-230](docs/verification/AC-230.md) (Permission modes by conversation): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-231](docs/verification/AC-231.md) (Agents start with what Overseer knows): To be built by its own agent after the Auto/Swarm merge.
-- [ ] [AC-233](docs/verification/AC-233.md) (Clicking an agent puts you in its head): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-234](docs/verification/AC-234.md) (Deploys follow merges by themselves): Its own agent; CI's required checks must be green first (the TUI t10 timing test on hosted runners is the owner's decision).
 - [ ] [AC-235](docs/verification/AC-235.md) (You can always see which account an agent uses): With the account work after the one-view build.
 - [ ] [AC-239](docs/verification/AC-239.md) (Stuck, failed and limited agents come back to Overseer): No UI scenario yet checks the VS Code surfaces (tree tooltip, Needs you, chat status) for a raw error with a limited agent; they read `plain_reason` but that is unproven on screen.
@@ -847,7 +846,6 @@ the owner action or decision each one needs.
 - [ ] [AC-244](docs/verification/AC-244.md) (Opening an agent leaves your layout alone): The owner chooses what the dashboard does with its settings in a window opened on a folder (see deferred).
 - [ ] [AC-246](docs/verification/AC-246.md) (One name for each thing): not blocked
 - [ ] [AC-252](docs/verification/AC-252.md) (Zero-friction loop, measured): Overnight goal.
-- [ ] [AC-257](docs/verification/AC-257.md) (Following an agent sits beside Overseer's conversation, not on top of it): Overnight build waves.
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.
