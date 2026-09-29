@@ -257,7 +257,7 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-214** Deploy: the one path from dev to production (stage 4) — [evidence](docs/verification/AC-214.md)
 - [x] **AC-215** Guided owner tests in a dev daemon (stage 3) — [evidence](docs/verification/AC-215.md)
 - [ ] **AC-216** A conversation, not only requests, the same typed or spoken — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-216.md)
-- [ ] **AC-217** Turning it on is visible — ◐ partial: — / deferred: — — [evidence](docs/verification/AC-217.md)
+- [ ] **AC-217** Turning it on is visible — ◐ partial: home's Voice button with its shortcut; home turning into the voice view with the mark's animation, before, during and after in the Overseer theme; the removed line absent / deferred: the frames during the animation in Overseer Dark and Overseer Light, and a recording rather than three screenshots — [evidence](docs/verification/AC-217.md)
 - [ ] **AC-218** A voice worth listening to — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-218.md)
 - [ ] **AC-219** No internal ids in front of the owner — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-219.md)
 - [ ] **AC-220** Dictation is not a call — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-220.md)

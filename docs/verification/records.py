@@ -2350,6 +2350,8 @@ rec(217, "Turning it on is visible", "partial", commit="4832c5e0 (branch claude/
 - Screenshots of home before, during (three frames) and after turning it on in the Overseer theme, and before and after in Overseer Dark and Overseer Light.""",
     evidence="[one-view](evidence/ui/one-view/) (01 to 13), pull request #27",
     live="Fixtures and the simulated voice; no paid turn.",
+    proven="home's Voice button with its shortcut; home turning into the voice view with the mark's animation, before, during and after in the Overseer theme; the removed line absent",
+    deferred="the frames during the animation in Overseer Dark and Overseer Light, and a recording rather than three screenshots",
     limits="The frames during the animation are only in the Overseer theme (not all three), and the animation is recorded as three screenshots, not a video. The voice strip's own on/off button is the view's head button (the strip has Turn on while off).")
 rec(218, "A voice worth listening to", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
