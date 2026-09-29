@@ -23,6 +23,7 @@ const { Continuity } = require('./continuity');
 const { AutoUsage } = require('./auto-usage');
 const features = require('./features');
 const { Voice } = require('./voice');
+const { agentsOnScreen, permissionTarget, commandTarget } = require('./on-screen');
 
 let client;
 let centerRef;
@@ -181,11 +182,15 @@ async function activate(context) {
     return true;
   };
   let needsQueue = Promise.resolve();
+  let atOverseer = false; // the last ⌥⌘J went to Overseer's open proposal: the next one moves on
   const nextNeedsYou = async () => {
     const list = attention();
     if (!list.length) { vscode.window.setStatusBarMessage('$(check) Nothing needs you', 2500); return; }
     // The most urgent item that is not already open (approvals first, then failures, then reviews).
-    const next = list.find(a => a.run_id !== selectedRun) || list[0];
+    const next = list.find(a => (a.overseer ? !atOverseer : a.run_id !== selectedRun)) || list[0];
+    atOverseer = !!next.overseer;
+    // Overseer's open proposal (AC-242): its conversation, where the proposal waits for a yes.
+    if (next.overseer) { await vscode.commands.executeCommand('overseer.talk'); return; }
     await selectRun(next.run_id); center.focus('chat');
   };
   // AC-106: "Where am I": every Overseer view open in this window (the Overseer view as chat, grid
@@ -530,7 +535,7 @@ async function activate(context) {
    */
   async function mergeBack(arg) {
     requireTrust();
-    const picked = model.run(runArg(arg));
+    const picked = model.run(await pickAgent(arg, { title: 'Merge back which agent?', fits: r => hasWorktree(r) && !ACTIVE.has(r.status), none: 'No finished agent has a worktree to merge back.' }));
     if (!picked) return;
     const run = model.rootRun(picked);
     const wsId = run.workspace_id;
@@ -653,15 +658,46 @@ async function activate(context) {
     vscode.window.setStatusBarMessage(`$(trash) Removed ${removed} worktree${removed === 1 ? '' : 's'}; branches kept`, 4000);
   }
 
-  /** Allow or deny the pending permission of the selected agent, or of the first agent waiting. */
+  /** The agents whose chat or review is on screen in this window (AC-242). */
+  const onScreen = () => agentsOnScreen({ model, center, outputs, review });
+  const agentTitle = run => { const root = model.rootRun(run) || run; return model.task(root.task_id)?.title || root.title || 'an agent'; };
+  const repoName = run => path.basename(model.task((model.rootRun(run) || run).task_id)?.repo_root || '');
+
+  /**
+   * ⌥⌘Y / ⌥⌘⌫ (AC-242): answer the request of the agent on screen. With none on screen (or two),
+   * show which agent asks for which tool first, and answer only the one picked.
+   */
   async function answerPermission(allow) {
     requireTrust();
-    const waiting = (model.state.runs || []).filter(r => r.attention?.kind === 'permission');
-    const run = waiting.find(r => r.id === selectedRun || model.rootRun(r)?.id === selectedRun) || waiting[0];
-    if (!run) { vscode.window.setStatusBarMessage('$(check) No permission request is waiting', 2500); return; }
+    const verb = allow ? 'Allow' : 'Deny';
+    const target = permissionTarget(model.state.runs, onScreen(), r => (model.rootRun(r) || r).id);
+    if (target.none) { vscode.window.setStatusBarMessage('$(check) No permission request is waiting', 2500); return; }
+    let run = target.run;
+    if (!run) {
+      const pick = await vscode.window.showQuickPick(target.choose.map(r => ({ label: `$(bell-dot) ${agentTitle(r)}`, description: `wants to use ${r.attention.tool || 'a tool'}`, detail: repoName(r) || undefined, run: r })),
+        { title: `${verb} which request?`, placeHolder: `${target.choose.length === 1 ? 'This request is' : 'These requests are'} not on screen: pick the one to ${verb.toLowerCase()}`, matchOnDescription: true });
+      if (!pick) return;
+      run = pick.run;
+    }
     await client.request('run.permission', { run_id: run.id, request_id: String(run.attention.request_id), allow });
+    vscode.window.setStatusBarMessage(`$(${allow ? 'check' : 'circle-slash'}) ${allow ? 'Allowed' : 'Denied'} ${agentTitle(run)}: ${run.attention.tool || 'its request'}`, 4000);
     model.scheduleRefresh();
   }
+
+  /**
+   * The agent a palette command acts on (AC-242): the one it was given (a side bar row, a run id),
+   * else the one on screen, else the owner picks; never an empty id. `fits` limits the choice.
+   */
+  async function pickAgent(arg, { title, fits = () => true, none }) {
+    const target = commandTarget(arg, { runs: model.state.runs, onScreen: onScreen(), fits, selected: selectedRun && (model.rootRun(model.run(selectedRun) || {}) || {}).id });
+    if (target.id) return target.id;
+    if (!target.choose.length) { vscode.window.showInformationMessage(none); return undefined; }
+    const pick = await vscode.window.showQuickPick(target.choose.map(r => ({ label: `$(${{ waiting_for_user: 'bell-dot', running: 'sync', starting: 'sync', queued: 'clock', completed: 'check', failed: 'error', interrupted: 'circle-slash' }[r.status] || 'circle'}) ${agentTitle(r)}`,
+      description: [repoName(r), r.status.replace(/_/g, ' ')].filter(Boolean).join(' · '), id: r.id })), { title, placeHolder: 'No agent is on screen: pick one', matchOnDescription: true });
+    return pick?.id;
+  }
+  const hasWorktree = r => { const ws = model.workspace(r.workspace_id); return !!ws && ws.kind === 'worktree' && !ws.removed_ms; };
+  const takesFollowUps = r => !String(r.capabilities?.follow_up || '').startsWith('unsupported');
 
   async function refreshAccounts() {
     await model.refresh();
@@ -750,17 +786,18 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.openAgentToSide', guard(arg => outputs.show(runArg(arg), { preserveFocus: false }))),
     vscode.commands.registerCommand('overseer.followUp', guard(async arg => {
       requireTrust();
-      const runId = runArg(arg);
-      const text = await vscode.window.showInputBox({ title: 'Follow-up for this run only', ignoreFocusOut: true });
+      const runId = await pickAgent(arg, { title: 'Send a follow-up to which agent?', fits: takesFollowUps, none: 'No agent takes a follow-up.' });
+      if (!runId) return;
+      const text = await vscode.window.showInputBox({ title: `Follow-up for ${agentTitle(model.run(runId) || {})} only`, ignoreFocusOut: true });
       if (!text) return;
       await client.request('run.follow_up', { run_id: runId, prompt: text });
       await model.refresh();
     })),
-    vscode.commands.registerCommand('overseer.interrupt', guard(async arg => { requireTrust(); await client.request('run.interrupt', { run_id: runArg(arg) }); })),
+    vscode.commands.registerCommand('overseer.interrupt', guard(async arg => { requireTrust(); const id = await pickAgent(arg, { title: 'Stop which agent?', fits: r => ACTIVE.has(r.status), none: 'No agent is running.' }); if (id) await client.request('run.interrupt', { run_id: id }); })),
     vscode.commands.registerCommand('overseer.selectComparison', guard(arg => review.pickComparison(runArg(arg)))),
     vscode.commands.registerCommand('overseer.cleanupWorkspace', guard(async arg => {
       requireTrust();
-      const run = model.run(runArg(arg));
+      const run = model.run(await pickAgent(arg, { title: 'Clean up which agent\'s worktree?', fits: r => hasWorktree(r) && !ACTIVE.has(r.status), none: 'No finished agent has a worktree to clean up.' }));
       if (!run) return;
       const plan = await client.request('workspace.cleanup_plan', { workspace_id: run.workspace_id });
       if (!plan.removable) { vscode.window.showInformationMessage(`Not removing: ${plan.reason}.`); return; }
@@ -925,9 +962,9 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.allowPermission', guard(async () => answerPermission(true))),
     vscode.commands.registerCommand('overseer.denyPermission', guard(async () => answerPermission(false))),
     vscode.commands.registerCommand('overseer.cleanupArchived', guard(cleanupArchived)),
-    vscode.commands.registerCommand('overseer.stopSelected', guard(async () => { requireTrust(); const r = selectedRun && model.run(selectedRun); if (r && ACTIVE.has(r.status)) await client.request('run.interrupt', { run_id: model.rootRun(r).id }); })),
+    vscode.commands.registerCommand('overseer.stopSelected', guard(async () => { requireTrust(); const id = await pickAgent(undefined, { title: 'Stop which agent?', fits: r => ACTIVE.has(r.status), none: 'No agent is running.' }); if (id) await client.request('run.interrupt', { run_id: id }); })),
     vscode.commands.registerCommand('overseer.mergeBack', guard(mergeBack)),
-    vscode.commands.registerCommand('overseer.openPullRequest', guard(arg => pullRequests.open(runArg(arg)))),
+    vscode.commands.registerCommand('overseer.openPullRequest', guard(async arg => { const id = await pickAgent(arg, { title: 'Open a pull request for which agent?', fits: hasWorktree, none: 'No agent has a worktree to open a pull request from.' }); if (id) await pullRequests.open(id); })),
     vscode.commands.registerCommand('overseer.startDaemon', guard(async () => { client.disposed = false; await client.start(); await model.refresh(); updateStatus(); })),
     vscode.commands.registerCommand('overseer.showLog', () => log.show()),
     vscode.commands.registerCommand('overseer.restartDaemonConnection', guard(async () => { client.dispose(); client.disposed = false; await client.start(); })),
