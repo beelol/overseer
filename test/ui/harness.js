@@ -5,6 +5,7 @@ const path = require('path');
 const cp = require('child_process');
 const { Cdp, delay } = require('./cdp');
 const quiet = require('./quiet-launch');
+const processes = require('../processes');
 
 const repoRoot = path.resolve(__dirname, '../..');
 const CODE = process.env.OVERSEER_CODE || '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code';
@@ -50,11 +51,35 @@ function snapshotTree(dir) {
   return { files: out, status: git(dir, 'status', '--porcelain=v1'), stash: git(dir, 'stash', 'list'), head: git(dir, 'rev-parse', 'HEAD'), index: git(dir, 'diff', '--cached') };
 }
 
+// Whatever a scenario started goes when it ends, however it ends: normally, on an error, or
+// interrupted (Ctrl-C, a killed test-all). Its daemon, shims, harnesses and VS Code are found by
+// its temporary folder (test/processes.js); other children (the mock server) are listed here.
+const roots = new Set();
+const children = new Set();
+function reapAll() {
+  for (const child of children) { try { child.kill('SIGKILL'); } catch {} }
+  children.clear();
+  if (process.env.KEEP_OPEN || !roots.size) return;
+  const stopped = processes.reap([...roots]);
+  if (stopped.length) console.log(`stopped ${stopped.length} process(es) the scenario left: ${[...new Set(stopped.map(p => p.cmd.split(' ')[0].split('/').pop()))].join(', ')}`);
+}
+let hooked = false;
+function hookExit() {
+  if (hooked) return;
+  hooked = true;
+  process.on('exit', reapAll);
+  for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143], ['SIGHUP', 129]]) process.on(signal, () => { console.log(`${signal}: stopping what the scenario started`); process.exit(code); });
+}
+
 class Session {
   /** ownerDaemon: use the owner's own daemon and data (no OVERSEER_HOME) — live sessions only. */
   constructor(name, { ownerDaemon = false } = {}) {
     this.name = name;
     this.root = fs.realpathSync(fs.mkdtempSync('/tmp/ovs-ui-'));
+    processes.markFolder(this.root);
+    // On the owner's own daemon (live sessions) its runs are the owner's daemon's: never reaped here.
+    if (!ownerDaemon) roots.add(this.root);
+    hookExit();
     this.home = ownerDaemon ? null : path.join(this.root, 'overseer-home');
     this.profile = path.join(this.root, 'profile');
     this.extensions = path.join(this.root, 'extensions');
@@ -116,6 +141,7 @@ class Session {
 
   launch(folder, env = {}) {
     fs.rmSync(path.join(this.profile, 'DevToolsActivePort'), { force: true });
+    this.customDialogs();
     const args = ['--remote-debugging-port=0', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
       '--new-window', '--user-data-dir', this.profile, '--extensions-dir', this.extensions, '--skip-welcome', '--skip-release-notes', ...(env.OVERSEER_TEST_TRUST ? [] : ['--disable-workspace-trust']), ...(folder ? [folder] : [])];
     if (quiet.wanted(CODE)) {
@@ -129,6 +155,18 @@ class Session {
     }
     this.child = cp.spawn(CODE, args,
     { env: { ...this.baseEnv(), ...env }, stdio: ['ignore', fs.openSync(path.join(this.root, 'code-' + Date.now() + '.log'), 'a'), fs.openSync(path.join(this.root, 'code-err-' + Date.now() + '.log'), 'a')], detached: false });
+  }
+
+  /** Every test window draws its modal dialogs inside the window, never as a macOS alert on the owner's screen (AC-249). */
+  customDialogs() {
+    const file = path.join(this.profile, 'User/settings.json');
+    let settings = {};
+    try { settings = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
+    if (settings['window.dialogStyle'] === 'custom') return;
+    if ('window.dialogStyle' in settings) this.note(`window.dialogStyle was ${JSON.stringify(settings['window.dialogStyle'])}; a test window uses custom dialogs`);
+    settings['window.dialogStyle'] = 'custom';
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify(settings, null, 2));
   }
 
   async connect() {
@@ -183,6 +221,10 @@ class Session {
   }
 
   stopDaemon() {
+    // Runs outlive a daemon's shutdown (their shims keep them going for the next daemon): a
+    // scenario's runs end with it. A run left going also kept its harness retrying against a mock
+    // server that was gone (the `opencode run … sequence3 15` of scenario-follow, for days).
+    try { for (const r of this.ctl('run.active')) { try { this.ctl('run.interrupt', { run_id: r.id }); } catch {} } } catch {}
     try { this.ctl('daemon.shutdown'); } catch {}
   }
 
@@ -275,6 +317,8 @@ class Session {
 function startMock(root, env = {}) {
   const portFile = path.join(root, 'mock.port');
   const child = cp.spawn(process.execPath, [path.join(repoRoot, 'fixtures/mock-openai/server.js')], { env: { ...process.env, MOCK_PORT: '0', MOCK_PORT_FILE: portFile, MOCK_LOG: path.join(root, 'mock.log'), ...env }, stdio: 'ignore' });
+  children.add(child);
+  child.on('exit', () => children.delete(child));
   return { child, port: async () => { for (let i = 0; i < 50 && !fs.existsSync(portFile); i++) await delay(100); return Number(fs.readFileSync(portFile, 'utf8')); } };
 }
 

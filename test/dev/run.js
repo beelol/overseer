@@ -20,6 +20,7 @@ require('../../scripts/git-fallback').ensureGit('dev daemons'); // AC-159
 const DEV = path.join(repo, 'scripts/dev');
 const realHome = os.homedir();
 const tmp = fs.realpathSync(fs.mkdtempSync('/tmp/ovs-dvt-'));
+require('../processes').markFolder(tmp); // scripts/test-all's check for leftovers
 const results = [];
 let current = null;
 

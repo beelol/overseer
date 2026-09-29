@@ -453,6 +453,16 @@ function env(o) {
   for (const [k, v] of Object.entries({ OVERSEER_INSTANCE: i.id, OVERSEER_HOME: i.home, OVERSEER_SOCKET: i.socket, OVERSEERD: i.daemon })) console.log(`export ${k}=${shq(v)}`);
 }
 
+/** The extension's packaging tools, installed in a checkout the first time it packages (AC-249). */
+function packagingTools(repo) {
+  for (const tool of ['extension/tooling/vsce', 'extension/branch-diff/tooling/review']) {
+    if (exists(path.join(repo, tool, 'node_modules'))) continue;
+    process.stderr.write(`installing the packaging tools in ${tool} (first time in this checkout)\n`);
+    const r = cp.spawnSync('npm', ['ci', '--silent', '--prefix', tool, '--ignore-scripts'], { cwd: repo, stdio: ['ignore', process.stderr, process.stderr] });
+    if (r.status !== 0) die(`npm ci in ${tool} failed`);
+  }
+}
+
 async function code(o) {
   const i = instance(o['--name']);
   const st = await state(i);
@@ -461,9 +471,10 @@ async function code(o) {
   let vsix = o['--vsix'] && real(o['--vsix']);
   if (!vsix) {
     if (!o['--no-build']) {
+      packagingTools(st.repo);
       process.stderr.write(`packaging the extension in ${st.repo}\n`);
       const r = cp.spawnSync(process.execPath, [path.join(st.repo, 'extension/scripts/package.js')], { cwd: st.repo, stdio: ['ignore', process.stderr, process.stderr] });
-      if (r.status !== 0) die('packaging failed (first time in a checkout: npm ci --prefix extension/tooling/vsce --ignore-scripts and npm ci --prefix extension/branch-diff/tooling/review --ignore-scripts)');
+      if (r.status !== 0) die('packaging the extension failed (see above)');
     }
     const dir = path.join(st.repo, 'extension');
     const found = fs.readdirSync(dir).filter(f => f.endsWith('.vsix')).map(f => path.join(dir, f)).sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
@@ -482,6 +493,9 @@ async function code(o) {
     'workbench.startupEditor': 'none', 'workbench.tips.enabled': false, 'security.workspace.trust.enabled': false, 'window.restoreWindows': 'none',
     'window.title': `[${i.id}] \${rootName}\${separator}\${activeEditorShort}`,
     'overseer.daemonPath': i.daemon, 'overseer.daemonSocket': i.socket, 'overseer.devInstance': i.id,
+    // A modal from a dev or test window is drawn inside that window, never as a macOS alert on the
+    // owner's screen (AC-249). An owner check's window is the owner's to use: native dialogs.
+    ...(o.__owner ? {} : { 'window.dialogStyle': 'custom' }),
   }, o.__settings || {});
   fs.writeFileSync(file, JSON.stringify(settings, null, 2) + '\n');
   fs.rmSync(path.join(i.profile, 'DevToolsActivePort'), { force: true });
@@ -655,12 +669,7 @@ async function testStart(o, c) {
     const scratch = c.prepare.scratch_repo ? scratchRepo(path.join(i.dir, 'scratch')) : null;
     state.prepared = { scratch, agents: await prepareAgents(i, c, scratch || repo) };
     if (c.prepare.vscode) {
-      if (!o['--no-build'] && !exists(path.join(repo, 'extension/tooling/vsce/node_modules'))) {
-        for (const tool of ['extension/tooling/vsce', 'extension/branch-diff/tooling/review']) {
-          const r = cp.spawnSync('npm', ['ci', '--silent', '--prefix', tool, '--ignore-scripts'], { cwd: repo, stdio: ['ignore', process.stderr, process.stderr] });
-          if (r.status !== 0) die(`npm ci in ${tool} failed`);
-        }
-      }
+      if (!o['--no-build']) packagingTools(repo);
       await code({ '--name': i.name, _: ['code', ...(scratch ? [scratch] : [])], '--inspect': true, __owner: true, '--no-build': o['--no-build'], '--vsix': o['--vsix'], __settings: c.prepare.settings || {} });
       state.prepared.vscode = i.profile;
       if (c.prepare.command) {
