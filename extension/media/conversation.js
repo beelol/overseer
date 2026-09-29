@@ -440,7 +440,7 @@
           // The harness's words in plain words (AC-245): no raw [rate_limit], HTTP code or OS error.
           const plainWords = t => (window.OverseerPlain ? window.OverseerPlain.plain(t, 600) : t);
           e.append(head, el('div', 'text', plainWords(p.message || '')));
-          e.title = TITLES[p.class] || 'Error';
+          e.title = TITLES[p.class] || 'Error'; e.setAttribute('data-class', p.class || 'error');
           if (p.class === 'auth') {
             const b = el('button', 'btn sm sign-in-again', 'Sign in again'); b.type = 'button';
             b.setAttribute('aria-label', 'Sign in again with this agent\'s account');

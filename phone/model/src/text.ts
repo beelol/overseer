@@ -135,7 +135,7 @@ export const TEXT = {
     request: from(CONVERSATION, 'Request'),
     requestHint: from(CONVERSATION, 'The exact request the agent sent'),
     signInAgain: from(CONVERSATION, 'Sign in again'),
-    signInAgainLabel: shaped(CONVERSATION, "Sign in again with this run\\'s account", "Sign in again with this run's account"),
+    signInAgainLabel: shaped(CONVERSATION, "Sign in again with this agent\\'s account", "Sign in again with this agent's account"),
     done: from(CONVERSATION, 'Done'),
     stopped: from(CONVERSATION, 'Stopped'),
     failed: from(CONVERSATION, 'Failed'),
