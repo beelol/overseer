@@ -55,6 +55,7 @@
       "native_id": "string?",
       "status": "RunStatus",
       "exit_reason": "string?",
+      "plain_reason": "string?",
       "created_ms": "number",
       "ended_ms": "number?",
       "title": "string",
@@ -322,6 +323,10 @@
       "status": "json",
       "previous": "json",
       "first": "boolean?"
+    },
+    "trouble": {
+      "kind": "string",
+      "reason": "string"
     }
   },
   "methods": {
@@ -1703,6 +1708,14 @@
     "overseer.send": {
       "class": "mac_only",
       "summary": "Say something to Overseer",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "overseer.visit": {
+      "class": "mac_only",
+      "summary": "Open Talk to Overseer: what happened while you were away leads",
       "phone": "not_yet",
       "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
       "params": "json",
