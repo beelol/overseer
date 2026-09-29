@@ -52,13 +52,17 @@ class Review {
       restore: state => this.restore(state),
       reviewedKeys: runId => this.reviewedKeys(runId),
       reviewHunk: (session, message) => this.reviewHunk(session, message),
-      closed: runId => this.onClosed?.(runId),
+      // Switching an agent to Follow (AC-233) closes its review without closing the agent.
+      closed: runId => { if (!this.switching) this.onClosed?.(runId); },
+      // Diffs only → Follow, from the review's own header (AC-233).
+      showHead: runId => this.head?.setMode(runId, 'follow'),
       setScope: (runId, scope) => this.setScope(runId, scope),
     });
     context.subscriptions.push(this.manager,
       vscode.window.registerWebviewPanelSerializer('overseer.review', this.manager),
       vscode.workspace.registerTextDocumentContentProvider('overseer-git', { provideTextDocumentContent: uri => this.provideGitContent(uri) }),
-      vscode.workspace.onDidSaveTextDocument(doc => this.userSaves.set(doc.uri.fsPath, Date.now())),
+      // The owner's own save is not the agent's next edit: Follow compares the agent's writes with it.
+      vscode.workspace.onDidSaveTextDocument(doc => { this.userSaves.set(doc.uri.fsPath, Date.now()); if (this.observed.has(doc.uri.fsPath)) this.remember(doc.uri.fsPath, doc.getText()); }),
       vscode.workspace.onDidChangeTextDocument(e => { if (e.document.uri.scheme === 'file' && e.contentChanges.length) this.userSaves.set(e.document.uri.fsPath, Date.now()); }));
     client.on('event', event => this.onEvent(event).catch(error => this.log('follow: ' + error.message)));
   }
@@ -253,12 +257,26 @@ class Review {
     return lookup.then(() => {}, () => {});
   }
 
-  async open(runId, { preserveFocus = false, follow, viewColumn } = {}) {
+  /**
+   * Opens the agent's head (AC-233): Follow (its worktree's files, annotated, following it) or Diffs
+   * only (this review), as the agent was last toggled; `mode: 'diffs'` asks for the review itself.
+   */
+  async open(runId, { preserveFocus = false, follow, viewColumn, mode } = {}) {
     const run = this.model.run(runId);
     if (!run) throw new Error('Unknown run.');
     const ws = this.model.workspace(run.workspace_id);
     const why = this.unavailable(run, ws);
     if (why) throw new Error(why);
+    if (this.head && (mode || this.head.modeFor(runId)) === 'follow') {
+      if (follow !== undefined) { this.follow.set(runId, follow ? 'following' : 'off'); this.persistFollow(); }
+      const found = this.manager.panelFor(runId);
+      if (await this.head.open(runId, { viewColumn: viewColumn || found?.panel.viewColumn, preserveFocus })) {
+        // Its review, if open, gives way to its files (after they are open, so the group stays).
+        if (found) { this.switching = (this.switching || 0) + 1; try { found.panel.dispose(); } finally { this.switching--; } }
+        return undefined;
+      }
+      // No file to show (an empty worktree): the review says so.
+    }
     const ready = this.prepared?.runId === runId && this.prepared.path === ws.path && Date.now() - this.prepared.at < 60000 ? this.prepared.lookup.catch(() => null) : null;
     this.prepared = undefined;
     const [repo, comparison] = (ready && await ready) || [await this.repoFor(ws.path), await this.currentComparison(runId)];
@@ -269,7 +287,8 @@ class Review {
 
   /** Opens the run's review at the first changed hunk of `rel` (a file edit clicked in the conversation). */
   async revealEdit(runId, rel) {
-    await this.open(runId);
+    const inHead = this.head && this.head.modeFor(runId) === 'follow';
+    if (!inHead) await this.open(runId);
     const run = this.model.run(runId);
     const ws = this.model.workspace(run.workspace_id);
     const base = (await this.currentComparison(runId).catch(() => undefined))?.base;
@@ -283,6 +302,8 @@ class Review {
       }
     }
     const message = { path: rel, line, attribution: 'opened from the conversation', user: true };
+    // Follow (AC-233): the file itself, at the change.
+    if (inHead) { await this.open(runId); await this.head.openFile(runId, rel, { line, preserveFocus: false }); return message; }
     // A freshly opened review may not have its file list yet; the webview keeps it pending.
     this.manager.reveal(runId, message);
     return message;
@@ -430,6 +451,8 @@ class Review {
         this.followNotes.set(target, `Following agent edits (${attribution})`);
         if (this.follow.get(target) === 'following') this.manager.reveal(target, message);
       }
+      // Follow in the agent's files (AC-233).
+      this.head?.follow(root.id, message).catch(error => this.log('head follow: ' + error.message));
     }
   }
 }

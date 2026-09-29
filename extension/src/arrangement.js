@@ -146,6 +146,8 @@ class Arrangement {
   }
 
   async closeReviews(keepRunId) {
+    // The agent's head in Follow (AC-233): its files close too, remembering where the owner was.
+    this.review.head?.close(keepRunId);
     this.quiet++;
     try {
       for (const [session, panel] of [...this.review.manager.panels]) if (session.overseer?.runId !== keepRunId) panel.dispose();

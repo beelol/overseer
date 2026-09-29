@@ -10,6 +10,7 @@ const { OutputPanels } = require('./output-panel');
 const { Review } = require('./review');
 const { CommandCenter } = require('./command-center');
 const { Arrangement } = require('./arrangement');
+const { AgentHead } = require('./agent-head');
 const { NewTaskPanel } = require('./new-task');
 const { PullRequests } = require('./pull-request');
 const { TaskLauncher } = require('./task-launcher');
@@ -151,9 +152,17 @@ async function activate(context) {
     onMode: async (mode, was) => { if (mode === 'grid') await arrangement.enterGrid(); else if (was === 'grid') await arrangement.leaveGrid(); },
     // No empty grid (AC-113): when its last tile goes, the grid gives way to the home composer.
     track: runId => arrangement.track(runId), untrack: () => arrangement.untrack(),
-    gridEmpty: () => goHome('The grid is empty: no agent is working or pinned. Start one here.') });
+    gridEmpty: () => goHome('The grid is empty: no agent is working or pinned. Start one here.'),
+    // AC-257: from Overseer's conversation back to the agent it left.
+    backToAgent: runId => backToAgent(runId) });
   centerRef = center;
   const arrangement = new Arrangement({ context, center, review, model, client, log: say });
+  // The agent's head (AC-233): its worktree in this window, Follow or Diffs only. A file opened from
+  // the Worktree view while only the chat is shown brings the head in first.
+  const head = new AgentHead({ context, client, model, review, log: say, handlers: { ensureShown: runId => arrangement.openReview(runId) } });
+  review.head = head;
+  // The conversation's way back to the agent shown (AC-257).
+  head.onSelect = root => center.headAgent({ runId: root.id, title: model.task(root.task_id)?.title || root.title });
   outputs.column = () => vscode.ViewColumn.Beside;
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.center', center));
   const immersive = new Immersive(context, say);
@@ -341,19 +350,27 @@ async function activate(context) {
     const run = model.run(runId) || (await model.refresh(), model.run(runId));
     if (!run) return;
     const root = model.rootRun(run) || run;
-    if (work && !ACTIVE.has(root.status)) { await showWork(root.id); return; }
+    // From Overseer's conversation (AC-257): the agent's head opens beside it and the conversation
+    // keeps its tab; the agent's chat is one click away (its card, the side bar).
+    const fromConversation = center.mode === 'composer';
+    if (work && !ACTIVE.has(root.status)) { await showWork(root.id, { keepConversation: fromConversation }); return; }
+    if (fromConversation) {
+      try { await selectRun(root.id, { keepConversation: true, force: true }); await head.focus(root.id); }
+      catch (error) { say('open agent: ' + (error.stack || error.message)); throw error; }
+      return;
+    }
     await selectRun(root.id);
     center.focus('chat');
   }
 
   /** The finished work: the review when the agent changed files, else its chat. */
-  async function showWork(runId) {
+  async function showWork(runId, { keepConversation = false } = {}) {
     const run = model.run(runId);
     if (!run) return;
     let files = 0;
     try { files = (await client.request('workspace.changes', { workspace_id: run.workspace_id })).files || 0; } catch { /* removed worktree */ }
-    if (files) { selectedRun = runId; await arrangement.openReview(runId); await center.select(runId); }
-    else await selectRun(runId);
+    if (files) { selectedRun = runId; head.select(runId).catch(() => {}); await arrangement.openReview(runId); if (keepConversation) await head.focus(runId); else await center.select(runId); }
+    else await selectRun(runId, { keepConversation, force: keepConversation });
   }
 
   // Overseer moves the owner around VS Code (AC-226): Look actions the daemon carried out and asks
@@ -403,18 +420,58 @@ async function activate(context) {
   });
 
   /** Shows an agent: its chat, and its review beside it when it has changes (Gate K). */
-  async function selectRun(runId, { follow, reveal = true } = {}) {
+  async function selectRun(runId, { follow, reveal = true, keepConversation = false, force } = {}) {
     const picked = model.run(runId) || (await model.refresh(), model.run(runId));
     if (!picked) return;
     selectedRun = runId;
     // Opening a failed or finished run counts as seeing it (it leaves Needs you).
     if (!ACTIVE.has(picked.status)) markReviewed(model.rootRun(picked)?.id || runId);
     context.workspaceState.update('overseer.selectedRun', runId);
-    await arrangement.show(runId, { follow });
-    say(`selected ${runId} (${arrangement.current})`);
-    await center.select(runId);
+    // The Worktree view shows the selected agent's worktree (AC-233).
+    head.select(model.rootRun(picked)?.id || runId).catch(error => say('head: ' + error.message));
+    await arrangement.show(runId, { follow, force });
+    say(`selected ${runId} (${arrangement.current}${keepConversation ? ', beside the conversation' : ''})`);
+    // Opened from Overseer's conversation, the conversation keeps its tab (AC-257).
+    if (!keepConversation) await center.select(runId);
     if (reveal) revealInTree(runId);
     model.emitter.fire();
+  }
+
+  // AC-257: Overseer's conversation and the agent's head are one action apart. Going to the
+  // conversation leaves the agent's head as it is (its files, cursor and scroll stay open beside);
+  // going back focuses the head again and, when the Overseer tab showed the agent's chat, that chat.
+  let leftAgent; // { runId, chat }: the agent the owner left for the conversation
+  async function backToOverseer() {
+    const run = (head.runId && model.run(head.runId)) || (selectedRun && model.run(selectedRun));
+    const root = run && (model.rootRun(run) || run);
+    if (root) leftAgent = { runId: root.id, chat: center.mode === 'chat' && center.chatRun && (model.rootRun(model.run(center.chatRun) || {}) || {}).id === root.id };
+    await center.open({ column: center.panel?.viewColumn || vscode.ViewColumn.One });
+    if (center.aside) center.setAside(false);
+    center.setMode('composer');
+    center.focus('composer');
+    if (root) center.headAgent({ runId: root.id, title: agentTitle(root) });
+    say(`back to Overseer's conversation${root ? ` (from ${root.id})` : ''}`);
+  }
+  async function backToAgent(runId) {
+    const id = runId || leftAgent?.runId || head.runId || selectedRun;
+    const run = id && model.run(id);
+    if (!run) { vscode.window.showInformationMessage('No agent to go back to: open one from the side bar or the conversation.'); return; }
+    const root = model.rootRun(run) || run;
+    const chat = leftAgent?.runId === root.id && leftAgent.chat;
+    leftAgent = undefined;
+    if (chat) { selectedRun = root.id; await center.select(root.id); }
+    // Its head is still open: straight back there. Closed meanwhile: opened again where it was left.
+    if (!(await head.focus(root.id))) {
+      await selectRun(root.id, { keepConversation: !chat, force: true });
+      await head.focus(root.id);
+    }
+    say(`back to the agent ${root.id}`);
+  }
+  /** One key for both ways (⌥⌘U): in the conversation, back to the agent; anywhere else, to the conversation. */
+  async function switchAgentOverseer() {
+    const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
+    const inConversation = !!tab?.input?.viewType?.endsWith('overseer.center') && center.mode === 'composer';
+    if (inConversation) await backToAgent(); else await backToOverseer();
   }
 
   /** Marks the agent in the side bar without taking focus. */
@@ -862,6 +919,16 @@ async function activate(context) {
       vscode.window.showInformationMessage(`Swarm deadline extended until ${new Date(result.deadline_at_ms).toLocaleString()}. Account allocation is unchanged.`);
     }))),
     vscode.commands.registerCommand('overseer.selectRun', guard(runId => selectRun(runId))),
+    // The agent's head (AC-233) and the way between it and Overseer's conversation (AC-257).
+    vscode.commands.registerCommand('overseer.head.toggleMode', guard(() => head.toggleMode(head.runId || selectedRun))),
+    vscode.commands.registerCommand('overseer.head.follow', guard(() => head.setMode(head.runId || selectedRun, 'follow'))),
+    vscode.commands.registerCommand('overseer.head.diffsOnly', guard(() => head.setMode(head.runId || selectedRun, 'diffs'))),
+    vscode.commands.registerCommand('overseer.head.openFile', guard(rel => head.openFile(head.runId, typeof rel === 'string' ? rel : rel?.rel, { fromTree: true }))),
+    vscode.commands.registerCommand('overseer.head.refresh', guard(() => head.refresh())),
+    vscode.commands.registerCommand('overseer.head.catchUp', guard(() => head.catchUp())),
+    vscode.commands.registerCommand('overseer.backToOverseer', guard(() => backToOverseer())),
+    vscode.commands.registerCommand('overseer.backToAgent', guard(() => backToAgent())),
+    vscode.commands.registerCommand('overseer.switchAgentOverseer', guard(() => switchAgentOverseer())),
     vscode.commands.registerCommand('overseer.openReview', guard(async arg => { const id = runArg(arg); if (!id) return; selectedRun = id; await arrangement.openReview(id); await center.select(id); })),
     vscode.commands.registerCommand('overseer.openEdit', guard(async (runId, rel) => {
       const run = model.run(runId) || (await model.refresh(), model.run(runId));
