@@ -26,17 +26,34 @@ const root = path.resolve(__dirname, '..');
   if (process.env.OVERSEER_TEST_LOCK === 'off') return;
   const lock = path.join(require('os').tmpdir(), 'overseer-test-all.lock');
   const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  // Runs take the lock in the order they asked for it: each waiter holds a ticket, and only the
+  // oldest live ticket may take the lock, so a run started right after another can't jump the queue.
+  const queue = `${lock}.queue`;
+  fs.mkdirSync(queue, { recursive: true });
+  const ticket = path.join(queue, `${String(Date.now()).padStart(15, '0')}-${process.pid}`);
+  fs.writeFileSync(ticket, `${process.pid} ${root}\n`);
+  const dropTicket = () => { try { fs.rmSync(ticket, { force: true }); } catch {} };
+  const first = () => {
+    for (const name of fs.readdirSync(queue).sort()) {
+      if (alive(parseInt(name.split('-')[1], 10))) return path.join(queue, name) === ticket;
+      try { fs.rmSync(path.join(queue, name), { force: true }); } catch {}
+    }
+    return true;
+  };
   let told = false;
   for (;;) {
-    try { fs.mkdirSync(lock); fs.writeFileSync(path.join(lock, 'pid'), `${process.pid} ${root}\n`); break; } catch {}
+    if (first()) {
+      try { fs.mkdirSync(lock); fs.writeFileSync(path.join(lock, 'pid'), `${process.pid} ${root}\n`); break; } catch {}
+    }
     let holder = '';
     try { holder = fs.readFileSync(path.join(lock, 'pid'), 'utf8').trim(); } catch {}
     const pid = parseInt(holder, 10);
-    if (!pid || !alive(pid)) { fs.rmSync(lock, { recursive: true, force: true }); continue; }
-    if (!told) { console.log(`waiting for another test-all run to finish (${holder})`); told = true; }
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 15000);
+    if (holder && (!pid || !alive(pid))) { fs.rmSync(lock, { recursive: true, force: true }); continue; }
+    if (!told) { console.log(`waiting for another test-all run to finish (${holder || 'an earlier run in the queue'})`); told = true; }
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2000);
   }
-  const release = () => { try { if (fs.readFileSync(path.join(lock, 'pid'), 'utf8').startsWith(`${process.pid} `)) fs.rmSync(lock, { recursive: true, force: true }); } catch {} };
+  dropTicket();
+  const release = () => { dropTicket(); try { if (fs.readFileSync(path.join(lock, 'pid'), 'utf8').startsWith(`${process.pid} `)) fs.rmSync(lock, { recursive: true, force: true }); } catch {} };
   process.on('exit', release);
   for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => { release(); process.exit(130); });
 })();
