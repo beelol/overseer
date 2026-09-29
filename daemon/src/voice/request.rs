@@ -572,7 +572,9 @@ impl Voice {
         // model turn (AC-227); a permission is answered with the toast and its window (AC-171).
         // With a read-back waiting, a yes or a no is its answer (2, below).
         if let Some(ask) = crate::overseer::needs::ask(&text) {
-            let read_back_waits = req().lock().unwrap().read_back.as_ref().is_some_and(|rb| !newer_plan(rb.at));
+            // The lock is let go before newer_plan takes it again.
+            let pending = req().lock().unwrap().read_back.clone();
+            let read_back_waits = pending.is_some_and(|rb| !newer_plan(rb.at));
             if ask == crate::overseer::needs::Ask::Handle || !read_back_waits {
                 return self.needs(ask, &text, via);
             }

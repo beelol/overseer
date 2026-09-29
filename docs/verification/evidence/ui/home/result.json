@@ -11,7 +11,7 @@
       "name": "Enter at home starts an agent exactly as before, with no Overseer turn in the event log",
       "ok": true,
       "detail": {
-        "started": "r-c3f770c0369f",
+        "started": "r-ba115b4823e7",
         "overseerTurns": 0
       }
     },
@@ -44,7 +44,7 @@
       "ok": true,
       "detail": {
         "runs": 1,
-        "answer": "OverseerHere is what everyone is doing:\n\n- **tidy the docs**: completed"
+        "answer": "OverseerHere is what everyone is doing:\n\ntidy the docs: completed\n\n"
       }
     },
     {
@@ -65,14 +65,14 @@
       "name": "a named agent reaches Overseer as that agent's id",
       "ok": true,
       "detail": {
-        "sent": "Tell @tidy the docs (r-c3f770c0369f) to add a changelog"
+        "sent": "Tell @tidy the docs (r-ba115b4823e7) to add a changelog"
       }
     },
     {
       "name": "*Start as an agent* starts one from a message sent to Overseer",
       "ok": true,
       "detail": {
-        "corrected": "r-a2dafd9c2f02"
+        "corrected": "r-88391556648b"
       }
     },
     {
@@ -85,19 +85,19 @@
       }
     },
     {
-      "name": "the docked chat and home show the same conversation",
+      "name": "Talk to Overseer is home with the same conversation, and nothing is docked below",
       "ok": true,
       "detail": {
-        "docked": "What is everyone doing?\nShared the state of 1 agent\nUsed\nmcp__overseer__check_in\n\nHere is what everyone is doing:\n\ntidy the docs: completed\nDone\n0s\n2 tokens\nTell @tidy the docs (r-c3f770c0369f) to add a changelog\nShared the state of 1 agent\n\nI could not find an agent called @tidy the docs (r-c3f770c",
-        "home": "Started tidy the docs (claude) in home-repo\ntidy the docs\nAsk Overseer instead\nYou\nWhat is everyone doing?\nStart as an agent\nOverseer\nHere is what everyone is doing:\n\n- **tidy the docs**: completed\nYou\nTell @tidy the docs (r-c3f770c0369f) to add a changelog\nStart as an agent\nOverseer\nI could not fin"
+        "talk": "Started tidy the docs (claude) in home-repo\ntidy the docs\nAsk Overseer instead\nYou\nWhat is everyone doing?\nAnswered\nStart as an agent\nOverseer\n\nHere is what everyone is doing:\n\ntidy the docs: completed\nYou\nTell @tidy the docs (r-ba115b4823e7) to add a changelog\nAnswered\nStart as an agent\nOverseer\n\nI",
+        "panelViews": []
       }
     },
     {
       "name": "what Overseer did is a card with one row per agent: why, the delivery, the state and its time, the whole text in the tooltip",
       "ok": true,
       "detail": {
-        "text": "Tell @tidy the docs (r-c3f770c0369f) to add a changelog\nnamed · add\ndelivered\n07:10:41 AM",
-        "title": "Please add the release date too.\n\nWhy: named · delivery: add\nheld 07:10:41 AM · sent 07:10:41 AM · delivered 07:10:41 AM",
+        "text": "Tell @tidy the docs (r-ba115b4823e7) to add a changelog\nnamed · add\ndelivered\n10:13:29 PM",
+        "title": "Please add the release date too.\n\nWhy: named · delivery: add\nheld 10:13:29 PM · sent 10:13:29 PM · delivered 10:13:29 PM",
         "state": "delivered"
       }
     },
@@ -113,8 +113,8 @@
             "release_on": {
               "kind": "release"
             },
-            "run_id": "r-c3f770c0369f",
-            "set_ms": 1790604640217,
+            "run_id": "r-ba115b4823e7",
+            "set_ms": 1790658808055,
             "title": "tidy the docs"
           }
         ]
@@ -125,37 +125,37 @@
       "ok": true,
       "detail": {
         "Overseer@1280": {
-          "chars": 105,
+          "chars": 157,
           "longRuns": [],
           "overflow": 0,
           "unnamed": []
         },
         "Overseer@900": {
-          "chars": 105,
+          "chars": 157,
           "longRuns": [],
           "overflow": 0,
           "unnamed": []
         },
         "Overseer Dark@1280": {
-          "chars": 105,
+          "chars": 157,
           "longRuns": [],
           "overflow": 0,
           "unnamed": []
         },
         "Overseer Dark@900": {
-          "chars": 105,
+          "chars": 157,
           "longRuns": [],
           "overflow": 0,
           "unnamed": []
         },
         "Overseer Light@1280": {
-          "chars": 105,
+          "chars": 157,
           "longRuns": [],
           "overflow": 0,
           "unnamed": []
         },
         "Overseer Light@900": {
-          "chars": 105,
+          "chars": 157,
           "longRuns": [],
           "overflow": 0,
           "unnamed": []
@@ -165,37 +165,37 @@
   ],
   "textBudget": {
     "Overseer@1280": {
-      "chars": 105,
+      "chars": 157,
       "longRuns": [],
       "overflow": 0,
       "unnamed": []
     },
     "Overseer@900": {
-      "chars": 105,
+      "chars": 157,
       "longRuns": [],
       "overflow": 0,
       "unnamed": []
     },
     "Overseer Dark@1280": {
-      "chars": 105,
+      "chars": 157,
       "longRuns": [],
       "overflow": 0,
       "unnamed": []
     },
     "Overseer Dark@900": {
-      "chars": 105,
+      "chars": 157,
       "longRuns": [],
       "overflow": 0,
       "unnamed": []
     },
     "Overseer Light@1280": {
-      "chars": 105,
+      "chars": 157,
       "longRuns": [],
       "overflow": 0,
       "unnamed": []
     },
     "Overseer Light@900": {
-      "chars": 105,
+      "chars": 157,
       "longRuns": [],
       "overflow": 0,
       "unnamed": []

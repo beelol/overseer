@@ -1,12 +1,12 @@
-[2026-09-28T16:34:44.730Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-28T16:34:53.856Z] screenshot docs/verification/evidence/ui/talk/01-summary.png
-[2026-09-28T16:34:53.856Z] PASS "What is everyone doing?" gets a summary that matches the daemon's state (each agent and its status) {"wanted":[{"title":"API tests","status":"completed"},{"title":"Frontend fixer","status":"completed"},{"title":"Build watcher","status":"running"}],"summary":"What is everyone doing?\nShared the state of 3 agents\nUsed\nmcp__overseer__roster\n\nHere is what everyone is doing:\n\nBuild watcher: running\nFrontend fixer: completed\nAPI tests: completed\nDone\n0s\n2 tokens"}
-[2026-09-28T16:34:53.857Z] PASS the agents' state goes with the message but is shown as one line, not as text ["Shared the state of 3 agents"]
-[2026-09-28T16:34:55.762Z] PASS Overseer's own conversation is not listed as an agent ["talk-repo","Build watcher","Frontend fixer","API tests","Claude","Your login"]
-[2026-09-28T16:34:57.093Z] screenshot docs/verification/evidence/ui/talk/02-proposal.png
-[2026-09-28T16:34:57.102Z] PASS asking Overseer to act gets a proposal saying exactly what it will do, and nothing happens yet {"card":"Overseer will\nSend API tests: “Please add tests.”\nYes\nNo","turns":1}
-[2026-09-28T16:34:58.541Z] PASS on Yes, the follow-up goes to that agent as coming from Overseer {"turns":2,"prompt":"From Overseer: Please add tests."}
-[2026-09-28T16:35:01.386Z] screenshot docs/verification/evidence/ui/talk/03-agent-chat-from-overseer.png
-[2026-09-28T16:35:01.387Z] PASS the agent's chat shows the message as coming from Overseer {"who":"From Overseer","text":"Please add tests."}
-[2026-09-28T16:35:08.078Z] screenshot docs/verification/evidence/ui/talk/04-declined.png
-[2026-09-28T16:35:08.086Z] PASS a declined proposal changes nothing {"turns":1}
+[2026-09-29T04:39:00.386Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-29T04:39:11.346Z] screenshot docs/verification/evidence/ui/talk/01-summary.png
+[2026-09-29T04:39:11.347Z] PASS "What is everyone doing?" gets a summary that matches the daemon's state (each agent and its status) {"wanted":[{"title":"API tests","status":"completed"},{"title":"Frontend fixer","status":"completed"},{"title":"Build watcher","status":"running"}],"summary":"Started API tests (claude) in talk-repo\nwrite the API\nAsk Overseer instead\nStarted Frontend fixer (claude) in talk-repo\nfix the header\nAsk Overseer instead\nStarted Build watcher (generic) in talk-repo\nAsk Overseer instead\nYou\nWhat is everyone doing?\nOverseer is still thinking\nStart as an agent\nOverseer\n\nHere is what everyone is doing:\n\nBuild watcher: running\nFrontend fixer: completed\nAPI tests: completed"}
+[2026-09-29T04:39:11.361Z] PASS the agents' state goes with the message but is not shown as text {"sent":3816}
+[2026-09-29T04:39:13.276Z] PASS Overseer's own conversation is not listed as an agent ["talk-repo","Build watcher","Frontend fixer","API tests","Claude","Your login"]
+[2026-09-29T04:39:15.956Z] screenshot docs/verification/evidence/ui/talk/02-proposal.png
+[2026-09-29T04:39:15.968Z] PASS asking Overseer to act gets a proposal saying exactly what it will do, and nothing happens yet {"card":"Overseer will\nSend API tests: “Please add tests.”\nYes\nNo","turns":1}
+[2026-09-29T04:39:17.603Z] PASS on Yes, the follow-up goes to that agent as coming from Overseer {"turns":2,"prompt":"From Overseer: Please add tests."}
+[2026-09-29T04:39:20.567Z] screenshot docs/verification/evidence/ui/talk/03-agent-chat-from-overseer.png
+[2026-09-29T04:39:20.567Z] PASS the agent's chat shows the message as coming from Overseer {"who":"From Overseer","text":"Please add tests."}
+[2026-09-29T04:39:27.886Z] screenshot docs/verification/evidence/ui/talk/04-declined.png
+[2026-09-29T04:39:27.899Z] PASS a declined proposal changes nothing {"turns":1}

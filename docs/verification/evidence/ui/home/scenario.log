@@ -1,28 +1,28 @@
-[2026-09-28T14:09:34.853Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-28T14:09:40.901Z] PASS home shows the conversation with Overseer above the composer, whose target is New agent {"target":"agent"}
-[2026-09-28T14:09:41.516Z] PASS Enter at home starts an agent exactly as before, with no Overseer turn in the event log {"started":"r-c3f770c0369f","overseerTurns":0}
-[2026-09-28T14:09:41.724Z] screenshot docs/verification/evidence/ui/home/01-home-started.png
-[2026-09-28T14:09:41.724Z] PASS the start appears in the conversation as a card
-[2026-09-28T14:09:45.511Z] screenshot docs/verification/evidence/ui/home/02-home-target-overseer.png
-[2026-09-28T14:09:46.405Z] PASS the target chip's menu, by keyboard, offers New agent and Overseer and switches between them {"menuOpen":true,"items":["New agent","Overseer"],"viaMenu":"overseer","backToAgent":"agent"}
-[2026-09-28T14:09:48.544Z] PASS typing @overseer first switches the target chip to Overseer {"chip":"overseer"}
-[2026-09-28T14:09:49.221Z] PASS the same text sent to Overseer starts no agent and is answered in the conversation {"runs":1,"answer":"OverseerHere is what everyone is doing:\n\n- **tidy the docs**: completed"}
-[2026-09-28T14:09:49.375Z] screenshot docs/verification/evidence/ui/home/03-home-overseer.png
-[2026-09-28T14:09:49.861Z] PASS `@` offers the agents by name, narrowed as you type ["tidy the docscompleted"]
-[2026-09-28T14:09:50.127Z] PASS Enter inserts the named agent {"inserted":"@overseer Tell @tidy the docs "}
-[2026-09-28T14:09:50.480Z] PASS a named agent reaches Overseer as that agent's id {"sent":"Tell @tidy the docs (r-c3f770c0369f) to add a changelog"}
-[2026-09-28T14:10:31.552Z] PASS *Start as an agent* starts one from a message sent to Overseer {"corrected":"r-a2dafd9c2f02"}
-[2026-09-28T14:10:36.480Z] PASS *Ask Overseer instead* stops the agent just started, removes its untouched worktree, and puts the words back for Overseer {"gone":true,"back":"what is the plan for the docs?","chip2":"overseer"}
-[2026-09-28T14:10:40.019Z] PASS the docked chat and home show the same conversation {"docked":"What is everyone doing?\nShared the state of 1 agent\nUsed\nmcp__overseer__check_in\n\nHere is what everyone is doing:\n\ntidy the docs: completed\nDone\n0s\n2 tokens\nTell @tidy the docs (r-c3f770c0369f) to add a changelog\nShared the state of 1 agent\n\nI could not find an agent called @tidy the docs (r-c3f770c","home":"Started tidy the docs (claude) in home-repo\ntidy the docs\nAsk Overseer instead\nYou\nWhat is everyone doing?\nStart as an agent\nOverseer\nHere is what everyone is doing:\n\n- **tidy the docs**: completed\nYou\nTell @tidy the docs (r-c3f770c0369f) to add a changelog\nStart as an agent\nOverseer\nI could not fin"}
-[2026-09-28T14:10:40.210Z] screenshot docs/verification/evidence/ui/home/04-docked-same.png
-[2026-09-28T14:10:42.024Z] PASS what Overseer did is a card with one row per agent: why, the delivery, the state and its time, the whole text in the tooltip {"text":"Tell @tidy the docs (r-c3f770c0369f) to add a changelog\nnamed · add\ndelivered\n07:10:41 AM","title":"Please add the release date too.\n\nWhy: named · delivery: add\nheld 07:10:41 AM · sent 07:10:41 AM · delivered 07:10:41 AM","state":"delivered"}
-[2026-09-28T14:10:42.487Z] screenshot docs/verification/evidence/ui/home/05-home-card-rows.png
-[2026-09-28T14:10:43.439Z] PASS *Start fresh* begins a new conversation and leaves a hold in place {"holds":[{"by":"owner","card":null,"reason":"kept through a fresh start","release_on":{"kind":"release"},"run_id":"r-c3f770c0369f","set_ms":1790604640217,"title":"tidy the docs"}]}
-[2026-09-28T14:10:43.626Z] screenshot docs/verification/evidence/ui/home/06-home-fresh.png
-[2026-09-28T14:10:47.549Z] screenshot docs/verification/evidence/ui/home/07-home-overseer-1280.png
-[2026-09-28T14:10:49.226Z] screenshot docs/verification/evidence/ui/home/08-home-overseer-900.png
-[2026-09-28T14:10:52.719Z] screenshot docs/verification/evidence/ui/home/09-home-overseer-dark-1280.png
-[2026-09-28T14:10:54.315Z] screenshot docs/verification/evidence/ui/home/10-home-overseer-dark-900.png
-[2026-09-28T14:10:57.830Z] screenshot docs/verification/evidence/ui/home/11-home-overseer-light-1280.png
-[2026-09-28T14:10:59.414Z] screenshot docs/verification/evidence/ui/home/12-home-overseer-light-900.png
-[2026-09-28T14:10:59.429Z] PASS the text budget (AC-54) at 1280 and 900 px in the three themes: no overflow, no long runs, every icon-only control named, and at least 40% under the baseline new-agent view {"Overseer@1280":{"chars":105,"longRuns":[],"overflow":0,"unnamed":[]},"Overseer@900":{"chars":105,"longRuns":[],"overflow":0,"unnamed":[]},"Overseer Dark@1280":{"chars":105,"longRuns":[],"overflow":0,"unnamed":[]},"Overseer Dark@900":{"chars":105,"longRuns":[],"overflow":0,"unnamed":[]},"Overseer Light@1280":{"chars":105,"longRuns":[],"overflow":0,"unnamed":[]},"Overseer Light@900":{"chars":105,"longRuns":[],"overflow":0,"unnamed":[]}}
+[2026-09-29T05:12:11.413Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-29T05:12:18.517Z] PASS home shows the conversation with Overseer above the composer, whose target is New agent {"target":"agent"}
+[2026-09-29T05:12:19.679Z] PASS Enter at home starts an agent exactly as before, with no Overseer turn in the event log {"started":"r-ba115b4823e7","overseerTurns":0}
+[2026-09-29T05:12:19.932Z] screenshot docs/verification/evidence/ui/home/01-home-started.png
+[2026-09-29T05:12:19.933Z] PASS the start appears in the conversation as a card
+[2026-09-29T05:12:23.706Z] screenshot docs/verification/evidence/ui/home/02-home-target-overseer.png
+[2026-09-29T05:12:24.604Z] PASS the target chip's menu, by keyboard, offers New agent and Overseer and switches between them {"menuOpen":true,"items":["New agent","Overseer"],"viaMenu":"overseer","backToAgent":"agent"}
+[2026-09-29T05:12:26.384Z] PASS typing @overseer first switches the target chip to Overseer {"chip":"overseer"}
+[2026-09-29T05:12:27.678Z] PASS the same text sent to Overseer starts no agent and is answered in the conversation {"runs":1,"answer":"OverseerHere is what everyone is doing:\n\ntidy the docs: completed\n\n"}
+[2026-09-29T05:12:27.876Z] screenshot docs/verification/evidence/ui/home/03-home-overseer.png
+[2026-09-29T05:12:28.363Z] PASS `@` offers the agents by name, narrowed as you type ["tidy the docscompleted"]
+[2026-09-29T05:12:28.634Z] PASS Enter inserts the named agent {"inserted":"@overseer Tell @tidy the docs "}
+[2026-09-29T05:12:28.990Z] PASS a named agent reaches Overseer as that agent's id {"sent":"Tell @tidy the docs (r-ba115b4823e7) to add a changelog"}
+[2026-09-29T05:13:10.836Z] PASS *Start as an agent* starts one from a message sent to Overseer {"corrected":"r-88391556648b"}
+[2026-09-29T05:13:24.681Z] PASS *Ask Overseer instead* stops the agent just started, removes its untouched worktree, and puts the words back for Overseer {"gone":true,"back":"what is the plan for the docs?","chip2":"overseer"}
+[2026-09-29T05:13:27.840Z] PASS Talk to Overseer is home with the same conversation, and nothing is docked below {"talk":"Started tidy the docs (claude) in home-repo\ntidy the docs\nAsk Overseer instead\nYou\nWhat is everyone doing?\nAnswered\nStart as an agent\nOverseer\n\nHere is what everyone is doing:\n\ntidy the docs: completed\nYou\nTell @tidy the docs (r-ba115b4823e7) to add a changelog\nAnswered\nStart as an agent\nOverseer\n\nI","panelViews":[]}
+[2026-09-29T05:13:28.037Z] screenshot docs/verification/evidence/ui/home/04-talk-is-home.png
+[2026-09-29T05:13:29.906Z] PASS what Overseer did is a card with one row per agent: why, the delivery, the state and its time, the whole text in the tooltip {"text":"Tell @tidy the docs (r-ba115b4823e7) to add a changelog\nnamed · add\ndelivered\n10:13:29 PM","title":"Please add the release date too.\n\nWhy: named · delivery: add\nheld 10:13:29 PM · sent 10:13:29 PM · delivered 10:13:29 PM","state":"delivered"}
+[2026-09-29T05:13:30.423Z] screenshot docs/verification/evidence/ui/home/05-home-card-rows.png
+[2026-09-29T05:13:32.177Z] PASS *Start fresh* begins a new conversation and leaves a hold in place {"holds":[{"by":"owner","card":null,"reason":"kept through a fresh start","release_on":{"kind":"release"},"run_id":"r-ba115b4823e7","set_ms":1790658808055,"title":"tidy the docs"}]}
+[2026-09-29T05:13:32.451Z] screenshot docs/verification/evidence/ui/home/06-home-fresh.png
+[2026-09-29T05:13:36.096Z] screenshot docs/verification/evidence/ui/home/07-home-overseer-1280.png
+[2026-09-29T05:13:37.811Z] screenshot docs/verification/evidence/ui/home/08-home-overseer-900.png
+[2026-09-29T05:13:41.346Z] screenshot docs/verification/evidence/ui/home/09-home-overseer-dark-1280.png
+[2026-09-29T05:13:42.951Z] screenshot docs/verification/evidence/ui/home/10-home-overseer-dark-900.png
+[2026-09-29T05:13:46.486Z] screenshot docs/verification/evidence/ui/home/11-home-overseer-light-1280.png
+[2026-09-29T05:13:48.141Z] screenshot docs/verification/evidence/ui/home/12-home-overseer-light-900.png
+[2026-09-29T05:13:48.178Z] PASS the text budget (AC-54) at 1280 and 900 px in the three themes: no overflow, no long runs, every icon-only control named, and at least 40% under the baseline new-agent view {"Overseer@1280":{"chars":157,"longRuns":[],"overflow":0,"unnamed":[]},"Overseer@900":{"chars":157,"longRuns":[],"overflow":0,"unnamed":[]},"Overseer Dark@1280":{"chars":157,"longRuns":[],"overflow":0,"unnamed":[]},"Overseer Dark@900":{"chars":157,"longRuns":[],"overflow":0,"unnamed":[]},"Overseer Light@1280":{"chars":157,"longRuns":[],"overflow":0,"unnamed":[]},"Overseer Light@900":{"chars":157,"longRuns":[],"overflow":0,"unnamed":[]}}

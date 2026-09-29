@@ -147,14 +147,14 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await cdp.key('Escape');
     fs.writeFileSync(modeFile, 'overseer');
 
-    // The docked chat shows the same conversation.
+    // Talk to Overseer is this same conversation (AC-227: one view, nothing docked below).
     await cdp.command('Overseer: Talk to Overseer'); await delay(2500);
-    const docked = await cdp.webview(`!!document.querySelector('#conv') && /What is everyone doing/.test(document.querySelector('#conv').textContent)`, 30000);
-    const dockedText = await docked.eval(`document.querySelector('#conv').innerText`);
-    const homeText = await home.eval(`document.querySelector('#home-conv').innerText`);
-    const same = ['What is everyone doing?', 'add a changelog'].every(t => dockedText.includes(t) && homeText.includes(t));
-    check('the docked chat and home show the same conversation', same, { docked: dockedText.slice(0, 300), home: homeText.slice(0, 300) });
-    await s.screenshot('docked-same');
+    const talk = await s.editorView(`document.querySelector('#target')?.dataset.target === 'overseer' && document.body.dataset.mode === 'composer'`, 30000);
+    const talkText = await talk.eval(`document.querySelector('#home-conv').innerText`);
+    const panelViews = await cdp.evalWorkbench(`[...document.querySelectorAll('.part.panel .pane-header, .part.panel .composite-bar .action-label')].map(e => e.getAttribute('aria-label') || e.textContent.trim()).filter(t => /Overseer/.test(t))`);
+    const same = ['What is everyone doing?', 'add a changelog'].every(t => talkText.includes(t));
+    check('Talk to Overseer is home with the same conversation, and nothing is docked below', same && panelViews.length === 0, { talk: talkText.slice(0, 300), panelViews });
+    await s.screenshot('talk-is-home');
 
     // Start fresh archives the conversation; a hold stays.
     const held = runs().find(r => r.id === started.id);

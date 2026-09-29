@@ -12,9 +12,9 @@
       "name": "the mark is centred in the voice view (measured)",
       "ok": true,
       "detail": {
-        "cx": 540.99609375,
-        "w": 438.8984375,
-        "vw": 1082
+        "cx": 461,
+        "w": 223.4375,
+        "vw": 922
       }
     },
     {
@@ -29,9 +29,9 @@
       "name": "hearing: the star grows with the voice and swings with its syllables",
       "ok": true,
       "detail": {
-        "frames": 341,
-        "max": 1.8093715101641976,
-        "min": 1.436326747997423
+        "frames": 332,
+        "max": 1.7981690190669948,
+        "min": 1.4393070069778884
       }
     },
     {
@@ -39,7 +39,7 @@
       "ok": true,
       "detail": {
         "jumps": 74,
-        "spacing": 43
+        "spacing": 42.89999997615814
       }
     },
     {
@@ -48,7 +48,7 @@
       "detail": {
         "lag": 40,
         "r": 0.9,
-        "frames": 341,
+        "frames": 333,
         "levels": 74
       }
     },
@@ -56,8 +56,8 @@
       "name": "speaking: rings of light cross the core and the star stays under 1.3x",
       "ok": true,
       "detail": {
-        "scale": 1.2922794786821679,
-        "glow": 0.5179086041208923,
+        "scale": 1.2882883515919439,
+        "glow": 0.5140967887281618,
         "rings": 1,
         "still": false,
         "meter": null,
@@ -68,8 +68,8 @@
       "name": "thinking: the star turns, 12% larger",
       "ok": true,
       "detail": {
-        "scale": 1.147851824379607,
-        "glow": 0.2286794263082505,
+        "scale": 1.1731857654644906,
+        "glow": 0.28499773147436386,
         "rings": 0,
         "still": false,
         "meter": null,
@@ -80,17 +80,18 @@
       "name": "the request card shows the owner's words and the text sent to the agent",
       "ok": true,
       "detail": {
-        "words": "“Tell Phone to use the new wire format.”",
-        "row": "Phonenamed · adddeliveredFor you: Please use the new wire format.(voice, request V-0001) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.",
-        "full": "(voice, request V-0001) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format."
+        "words": "Tell Phone to use the new wire format.",
+        "stage": "Phone is working · 0s",
+        "row": "Phonenamed · adddelivered10:12:43 PM",
+        "full": "(voice, request V-0001) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.\n\nWhy: named · delivery: add\nheld 10:12:43 PM · sent 10:12:43 PM · delivered 10:12:43 PM"
       }
     },
     {
       "name": "muted: the mark is still with the mute sign, and no listener runs",
       "ok": true,
       "detail": {
-        "scale": 1.0004290022722273,
-        "glow": 0.18050049099964696,
+        "scale": 1.0005379648766048,
+        "glow": 0.18062743099687448,
         "rings": 0,
         "still": true,
         "meter": null,
@@ -105,32 +106,32 @@
       "name": "beside a streaming chat, the animation keeps up at 60 frames a second: work per frame p95 under 16 ms, and frames arrive at the display's rate",
       "ok": true,
       "detail": {
-        "n": 454,
+        "n": 486,
         "work_p95": 0.19999992847442627,
         "interval_median": 8.30000000000291,
-        "interval_p95": 9.10000000000582,
+        "interval_p95": 9.19999999999709,
         "dropped": 0,
         "groups": 2
       }
     },
     {
-      "name": "no frame is drawn while the view is behind another tab",
+      "name": "no frame is drawn while the stage is not shown (the view shows an agent)",
       "ok": true,
       "detail": {
-        "visibility": "visible",
-        "f1": 11679,
-        "f2": 11679
+        "visibility": "not shown",
+        "f1": 11345,
+        "f2": 11345
       }
     },
     {
       "name": "reduced motion: a still mark and a level meter",
       "ok": true,
       "detail": {
-        "scale": 1.676120859909245,
-        "glow": 0.8158034574155235,
+        "scale": 1.676011520325954,
+        "glow": 0.8172462703567596,
         "rings": 0,
         "still": true,
-        "meter": 0.7954363057755823,
+        "meter": 0.7953076709717106,
         "state": "hearing"
       }
     },
@@ -232,47 +233,47 @@
         "chats": [
           {
             "tag": "overseer",
-            "id": "r-999e3627f84f",
+            "id": "r-24d01f244f65",
             "shows": true
           },
           {
             "tag": "overseer",
-            "id": "r-6beecb748bfa",
+            "id": "r-23b996a412f6",
             "shows": true
           },
           {
             "tag": "overseer",
-            "id": "r-2b89e9f3ca64",
+            "id": "r-47072980a38e",
             "shows": true
           },
           {
             "tag": "dark",
-            "id": "r-999e3627f84f",
+            "id": "r-24d01f244f65",
             "shows": true
           },
           {
             "tag": "dark",
-            "id": "r-6beecb748bfa",
+            "id": "r-23b996a412f6",
             "shows": true
           },
           {
             "tag": "dark",
-            "id": "r-2b89e9f3ca64",
+            "id": "r-47072980a38e",
             "shows": true
           },
           {
             "tag": "light",
-            "id": "r-999e3627f84f",
+            "id": "r-24d01f244f65",
             "shows": true
           },
           {
             "tag": "light",
-            "id": "r-6beecb748bfa",
+            "id": "r-23b996a412f6",
             "shows": true
           },
           {
             "tag": "light",
-            "id": "r-2b89e9f3ca64",
+            "id": "r-47072980a38e",
             "shows": true
           }
         ]
@@ -286,7 +287,7 @@
         "description": "now",
         "level": 2,
         "expanded": null,
-        "selected": false,
+        "selected": true,
         "focused": false,
         "aria": "write the migration, done, claude, Your login"
       }
@@ -409,6 +410,13 @@
       "detail": {
         "view": 17,
         "home": 8
+      }
+    },
+    {
+      "name": "no card of the voice scenario shows an internal token or a raw error (AC-228)",
+      "ok": true,
+      "detail": {
+        "tokens": []
       }
     }
   ]
