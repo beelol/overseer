@@ -24,7 +24,7 @@ const PROMPT = 'Edit files one at a time, one patch per step, in exactly this or
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer [0-9]+ active/.test(e.textContent))`, 60000, 'status bar');
     await cdp.command('Overseer: Start an Agent with Quick Picks');
     await cdp.pick('New agent: repository');
-    await cdp.pick('New agent: harness', 'codex-app');
+    await cdp.pick('New agent: harness', 'Codex app-server');
     await cdp.pick('New agent: account for', 'Your login');
     await cdp.pick('New agent: workspace');
     await cdp.pick('Start the worktree from');

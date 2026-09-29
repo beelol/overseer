@@ -34,7 +34,7 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     // New task through the command palette and quick picks.
     await cdp.command('Overseer: Start an Agent with Quick Picks');
     await cdp.pick('New agent: repository');
-    await cdp.pick('New agent: harness', 'opencode');
+    await cdp.pick('New agent: harness', 'OpenCode');
     await cdp.pick('New agent: account for', 'OpenCode mock');
     // Not signed in (the mock needs no credentials): choose "Launch anyway" in the notification.
     await cdp.waitFor(`[...document.querySelectorAll('.notification-toast .monaco-button')].some(b => b.textContent.includes('Launch anyway'))`, 10000, 'launch anyway button');

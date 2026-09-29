@@ -25,7 +25,7 @@ const PROMPT = 'Run exactly this shell command in the workspace: touch approved.
     // Task 1 entirely through the UI.
     await cdp.command('Overseer: Start an Agent with Quick Picks');
     await cdp.pick('New agent: repository');
-    await cdp.pick('New agent: harness', 'codex-app');
+    await cdp.pick('New agent: harness', 'Codex app-server');
     await cdp.pick('New agent: account for', 'Your login');
     if (dry) {
       const b = await cdp.waitFor(`(() => { const b = [...document.querySelectorAll('.notification-toast .monaco-button')].find(b => b.textContent.includes('Launch anyway')); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`, 10000);

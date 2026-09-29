@@ -345,6 +345,14 @@ fn display_tool(name: &str) -> String {
         "shell" | "command_execution" | "commandExecution" => "Run".into(),
         "apply_patch" => "Patch".into(),
         n if n.starts_with("collab:") => "Agent".into(),
+        // A tool's internal name in words (AC-245): mcp__overseer__roster is "roster (Overseer)".
+        n if n.starts_with("mcp__") => {
+            let rest = &n[5..];
+            match rest.split_once("__") {
+                Some((server, tool)) => format!("{} ({})", tool.replace('_', " "), if server == "overseer" { "Overseer".to_string() } else { server.replace(['_', '-'], " ") }),
+                None => rest.replace('_', " "),
+            }
+        }
         n => n.to_string(),
     }
 }

@@ -54,7 +54,7 @@ const PROMPT = "Use the Agent tool to launch one general-purpose subagent with t
     check('Claude profile signed in with a claude.ai account', status.logged_in && status.method === 'claude.ai', { version: status.version, plan: status.identity && status.identity.plan, id: status.identity && status.identity.fingerprint });
     await cdp.command('Overseer: Start an Agent with Quick Picks');
     await cdp.pick('New agent: repository');
-    await cdp.pick('New agent: harness', 'claude');
+    await cdp.pick('New agent: harness', 'Claude Code');
     await cdp.pick('New agent: account for', 'Your login');
     await cdp.pick('New agent: workspace');
     await cdp.pick('Start the worktree from');

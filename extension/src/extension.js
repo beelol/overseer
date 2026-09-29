@@ -518,10 +518,12 @@ async function activate(context) {
     }
     // Harness
     const harnesses = await client.request('harness.list');
-    const hPick = await vscode.window.showQuickPick(harnesses.map(h => ({ label: h.harness, description: h.installed ? (h.version || 'installed') : 'not installed', detail: `children: ${h.capabilities.children}`, h })), { title: 'New agent: harness' });
+    // Harnesses by name (AC-245), never their ids.
+    const NAME = { claude: 'Claude Code', codex: 'Codex', 'codex-app': 'Codex app-server', opencode: 'OpenCode', generic: 'Program' };
+    const hPick = await vscode.window.showQuickPick(harnesses.map(h => ({ label: NAME[h.harness] || Plain.harness(h.harness), description: h.installed ? (h.version || 'installed') : 'not installed', detail: `Sub-agents: ${String(h.capabilities.children || 'unknown').replace(/_/g, ' ')}`, h })), { title: 'New agent: harness' });
     if (!hPick) return;
     const harness = hPick.h.harness;
-    if (!hPick.h.installed) throw new Error(`${harness} is not installed.`);
+    if (!hPick.h.installed) throw new Error(`${hPick.label} is not installed.`);
     // Account profile
     let profileId, program, args = [];
     if (harness === 'generic') {
@@ -536,7 +538,7 @@ async function activate(context) {
       const compatible = (model.accounts || []).filter(a => (a.harnesses || []).includes(harness));
       const statuses = compatible.map(a => model.profileStatus.get(a.id));
       const pPick = await vscode.window.showQuickPick(compatible.map((a, i) => ({ label: a.name, description: `${statuses[i]?.logged_in ? 'signed in' : 'not signed in'}${statuses[i]?.identity?.plan ? ' · ' + statuses[i].identity.plan : ''} · ${a.kind === 'follows-app' ? 'follows the desktop app (can change)' : 'fixed account'}`, detail: statuses[i]?.detail, p: model.profile(a.id) || { id: a.id, name: a.name }, ok: statuses[i]?.logged_in })),
-        { title: `New agent: account for ${harness} (only compatible accounts; account login only, no API keys)` });
+        { title: `New agent: account for ${hPick.label} (only compatible accounts; account login only, no API keys)` });
       if (!pPick) return;
       if (!pPick.ok) {
         const choice = await vscode.window.showWarningMessage(`${pPick.p.name} is not signed in.`, 'Sign In', 'Launch anyway');

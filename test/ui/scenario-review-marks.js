@@ -89,7 +89,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     check('notes\'s badge counts down as its agents are archived and is empty when none is left to review', oneLeft === '1 to review' && repoRow(v, 'notes')?.description === '', { oneLeft, after: repoRow(v, 'notes')?.description });
 
     // ---------- AC-255: 11 agents at their end, none working: the rollup still counts them.
-    const more = ['Site blog', 'Site search', 'Notes tags', 'Notes sync', 'Site docs', 'Notes print', 'Site legal'].map((t, i) => agent(i % 2 ? notes : site, t));
+    const more = [[site, 'Site blog'], [notes, 'Notes tags'], [site, 'Site docs'], [notes, 'Notes sync'], [site, 'Site legal'], [notes, 'Notes print'], [site, 'Site search']].map(([r, t]) => agent(r, t));
     for (const id of more) await waitStatus(id, /completed/);
     const failedId = s.ctl('task.create', { repo: notes, harness: 'generic', program: '/bin/sh', args: ['-c', 'exit 3'], prompt: '', title: 'Notes backup' }).run.id;
     await waitStatus(failedId, /failed/);
