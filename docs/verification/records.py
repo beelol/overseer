@@ -2447,15 +2447,30 @@ rec(238, "Overseer checks finished work and offers the next step", "not started"
 rec(239, "Stuck, failed and limited agents come back to Overseer", "not started", date="—", commit="—",
     expected="See the RFC criterion (the usability audit of 2026-09-28).",
     actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
-rec(240, "You hear about it outside VS Code", "not started", date="—", commit="—",
+rec(240, "You hear about it outside VS Code", "partial", commit="53c26853 (branch claude/signin-notify-keys, pull request #30)", date="2026-09-28",
+    harness="Claude fixture and generic programs on the daemon, a dev daemon (scripts/dev) and the packaged VSIX; the notification goes to a logging command, never a real banner; no paid tokens",
+    proven="while no VS Code window has the OS focus (each window reports it with `ui.window`), or VS Code is closed, an agent needing permission, asking a question, finishing or failing posts one notification titled with the agent, saying what it needs and in which repository, grouped per agent (the notifier's `--thread`), with a click URL for that agent (`vscode://beelol.overseer/open-agent?run=ID`); a focused window writes none; `overseer.notifications.needsYou`, `finished` and `failed` choose the kinds (`notices.set`); on a dev daemon a fixture permission, finish and failure each write one entry to the instance's `notifications.log` with the agent's title and its URL, and a focused window writes none; opening that URL in VS Code opens that agent's chat; the in-VS Code permission toast names the agent and shows while the Overseer view is open on another agent",
+    deferred="a click with VS Code closed opens VS Code, not the TUI (a notification cannot focus a terminal app; the TUI is not reachable by URL); the real banner, its grouping by agent and a real click on the owner's Mac (owner-only, in a guided dev-daemon check)",
+    steps="""1. `cargo test -p overseerd --test notices` (4 tests: unfocused window, focused window, VS Code closed, the setting) and the `notices::tests` unit tests.
+2. `node test/dev/run.js`: the AC-240 check on a dev daemon's notifications.log.
+3. `node test/unit/notices.js` (the window's focus and the kinds sent once per connection and on each change; the click URL).
+4. `node test/ui/scenario-notify-agents.js` ([evidence](evidence/ui/notify-agents/)): packaged VSIX; the window's blur and focus come from VS Code's main process with the test window kept behind the owner's apps.""",
     expected="See the RFC criterion (the usability audit of 2026-09-28).",
-    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+    actual="All pass. [notifications.log from the scenario](evidence/ui/notify-agents/notifications.log). The AC-45 background-notice tests still pass (`ac45_no_notice_when_nothing_is_running` now allows the finished run's own notification).",
+    evidence="[notify-agents scenario](evidence/ui/notify-agents/); `daemon/src/notices.rs`, `daemon/tests/notices.rs`, `extension/src/notices.js`, `test/dev/run.js`",
+    live="Fixtures only; no banner was shown.", blocker="The TUI on click with VS Code closed has no route; the real banner and click are owner checks.")
 rec(241, "A waiting agent can always be answered", "not started", date="—", commit="—",
     expected="See the RFC criterion (the usability audit of 2026-09-28).",
     actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
-rec(242, "Keys act only on what you can see", "not started", date="—", commit="—",
+rec(242, "Keys act only on what you can see", "verified", commit="13b71844 (branch claude/signin-notify-keys, pull request #30)", date="2026-09-28",
+    harness="Claude fixture (permission, echo, overseer modes) and generic programs on the packaged VSIX; no paid tokens",
+    steps="""1. `node test/unit/on-screen.js`: which agents are on screen (the Overseer view's chat, chats taken out, reviews); ⌥⌘Y's target; a palette command's target.
+2. `node test/ui/scenario-keys-on-screen.js` ([evidence](evidence/ui/keys-on-screen/)): two agents wait on a permission; with A's chat on screen ⌥⌘Y answers A and B still waits; from home ⌥⌘Y shows "Allow which request?" with B and its tool and answers nothing until it is picked; Merge Back, Stop Selected Agent, Clean Up Worktree and Send Follow-up from the palette on home each show a picker; with Overseer's proposal open ⌥⌘J reaches it in Talk to Overseer.
+3. `node test/ui/scenario-keyboard.js` still passes (⌥⌘J, ⌥⌘Y, ⌥⌘⌫, ⌥⌘A, ⌥⌘. with the agent on screen).""",
     expected="See the RFC criterion (the usability audit of 2026-09-28).",
-    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+    actual="All pass. The scenario failed on the previous VSIX at the which-request step (⌥⌘Y had answered the first waiting agent). Open Pull Request and Stop (overseer.interrupt) take the same picker.",
+    evidence="[keys-on-screen scenario](evidence/ui/keys-on-screen/); `extension/src/on-screen.js`, `test/unit/on-screen.js`",
+    live="Fixtures only.", limits="The picker lists agents the command applies to (Stop: running ones; Merge Back and Clean Up: finished ones with a worktree).")
 rec(243, "Merge from the agent, and it reads merged afterwards", "not started", date="—", commit="—",
     expected="See the RFC criterion (the usability audit of 2026-09-28).",
     actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
@@ -2532,9 +2547,13 @@ rec(260, "Starting an agent in another repository never needs a native dialog", 
     evidence=f"[scenario evidence](https://github.com/beelol/overseer/blob/acdd85f0/docs/verification/evidence/ui/composer-friction) (picker and typed-path screenshots, result.json, scenario.log), [unit test](https://github.com/beelol/overseer/blob/acdd85f0/test/unit/repo-picker.js)",
     live="Fixture harness only; nothing here depends on the harness.",
     limits="macOS only; Linux belongs to AC-41. Spoken repository choice is AC-216's; this criterion covers the keyboard.")
-rec(261, "One Sign In, clearly Overseer's or clearly not", "not started", date="—", commit="—",
+rec(261, "One Sign In, clearly Overseer's or clearly not", "verified", commit="b6fa3617 (branch claude/signin-notify-keys, pull request #30)", date="2026-09-28",
+    harness="The packaged VSIX in a fresh VS Code 1.139.1 profile with VS Code's AI features left on; no account",
+    steps="""`node test/ui/scenario-one-signin.js` ([evidence](evidence/ui/one-signin/)): the first Overseer view in Overseer Dark, Overseer Light and Overseer; every visible title-bar and activity-bar control labelled Sign In is listed.""",
     expected="See the RFC criterion (the friction research of 2026-09-28).",
-    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+    actual="No competing Sign In in any of the three themes; Overseer's Accounts is the only sign-in shown. Overseer contributes the default `chat.titleBar.signIn.enabled: false` (VS Code's chat sign-in pill, `workbench.action.chat.signInIndicator`); nothing is written to the owner's settings, and turning it back on still works. On the previous VSIX the scenario found the pill in all three themes.",
+    evidence="[one-signin scenario](evidence/ui/one-signin/) (three screenshots, result.json)",
+    live="Fixtures only.", limits="VS Code's own Accounts icon in the activity bar stays (it is VS Code's menu, not a Sign In control).")
 
 SHORT_BLOCKERS = {
     154: "verified",
@@ -2704,9 +2723,9 @@ SHORT_BLOCKERS = {
     237: "not started (the usability audit, 2026-09-28)",
     238: "not started (the usability audit, 2026-09-28)",
     239: "not started (the usability audit, 2026-09-28)",
-    240: "not started (the usability audit, 2026-09-28)",
+    240: "partial: notifications while VS Code is unfocused or closed, a click opens the agent, the setting (pull request #30); the TUI on click and the owner's real banner remain",
     241: "not started (the usability audit, 2026-09-28)",
-    242: "not started (the usability audit, 2026-09-28)",
+    242: "verified",
     243: "not started (the usability audit, 2026-09-28)",
     244: "not started (the usability audit, 2026-09-28)",
     245: "not started (the usability audit, 2026-09-28)",
@@ -2725,7 +2744,7 @@ SHORT_BLOCKERS = {
     258: "not started (the friction research, 2026-09-28)",
     259: "verified",
     260: "verified",
-    261: "not started (the friction research, 2026-09-28)",
+    261: "verified",
 }
 TOTAL = 53
 

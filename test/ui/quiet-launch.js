@@ -156,6 +156,12 @@ function launchQuiet({ code, args, env, root, note }) {
       }
       try { socket?.close(); } catch {}
     },
+    /** Evaluates an expression in VS Code's main process (for example, a window's focus events, AC-240). */
+    main: async expression => {
+      await ready;
+      const r = call && await call('Runtime.evaluate', { expression, includeCommandLineAPI: true, returnByValue: true }).catch(() => null);
+      return r?.result?.value;
+    },
     close: () => { try { socket?.close(); } catch {} },
   };
 }

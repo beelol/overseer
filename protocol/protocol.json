@@ -1154,6 +1154,30 @@
       "params": "json",
       "result": "json"
     },
+    "ui.window": {
+      "class": "mac_only",
+      "summary": "Whether a VS Code window on the Mac has the focus",
+      "phone": "mac_only",
+      "reason": "It describes the Mac's own windows",
+      "params": "json",
+      "result": "json"
+    },
+    "notices.get": {
+      "class": "mac_only",
+      "summary": "Which agent moments become Mac notifications",
+      "phone": "mac_only",
+      "reason": "It belongs to the Mac's own notifications",
+      "params": "json",
+      "result": "json"
+    },
+    "notices.set": {
+      "class": "mac_only",
+      "summary": "Choose which agent moments become Mac notifications",
+      "phone": "mac_only",
+      "reason": "It belongs to the Mac's own notifications",
+      "params": "json",
+      "result": "json"
+    },
     "ui.focus": {
       "class": "mac_only",
       "summary": "Which agent a window on the Mac is looking at",
