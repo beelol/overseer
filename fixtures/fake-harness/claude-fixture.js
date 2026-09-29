@@ -498,13 +498,23 @@ async function mcpClient() {
         const outside = it.area && it.area.length ? it.changed.filter(p => !it.area.some(a => p === a || p.startsWith(a.replace(/\/$/, '') + '/'))) : [];
         const leftOut = (it.asked.join(' ').match(/\[leave out: ([^\]]+)\]/) || [])[1];
         const tripped = it.reasons.some(r => /guardrail|outside|circles|collides/.test(r));
-        let result, reason;
+        let result, reason, didIt, next;
         // Drifting first: an agent that left its area is drifting even when it has stopped.
         if (outside.length || tripped) { result = 'drifting'; reason = outside.length ? `wrote outside its area: ${outside.join(', ')}` : it.reasons.join('; '); }
+        else if (it.finished && it.finished.tests) {
+          // AC-238: the verdict from its final message, its diff and its test output, cited.
+          const t = it.finished.tests;
+          const lines = t.output.split('\n').map(l => l.trim()).filter(Boolean);
+          result = 'done';
+          didIt = t.ok;
+          if (t.ok) { reason = `It added what was asked (${it.changed.length} file changed) and \`${t.command}\` passes: "${lines[lines.length - 1]}".`; next = { action: 'merge_back', agent: it.id }; }
+          else { const why = lines.find(l => /Error/.test(l)) || lines.find(l => /not ok|failing/.test(l)) || lines[lines.length - 1]; reason = `\`${t.command}\` fails: "${why}".`; next = { action: 'message', agent: it.id, text: `\`${t.command}\` fails: ${why}. Please fix it and run the tests again.` }; }
+        }
         else if (it.status === 'completed' || it.status === 'failed') { result = 'done'; reason = `finished with ${it.changed.length} files changed`; }
         else { result = 'on_task'; reason = 'its changes stay within its task'; }
-        await call('check_in', { agent: it.id, result, reason, left_out: result === 'done' && leftOut ? leftOut : '' });
-        lines.push(`${it.title}: ${result}`);
+        await call('check_in', { agent: it.id, result, reason, left_out: result === 'done' && leftOut ? leftOut : '', ...(didIt === undefined ? {} : { did_it: didIt }) });
+        lines.push(didIt === undefined ? `${it.title}: ${result}` : `${it.title}: ${reason}`);
+        if (next) lines.push(await call('propose', { actions: [next] }).catch(e => 'refused: ' + e.message));
         if (result === 'drifting') {
           const action = level === 'auto' ? { action: 'redirect', agent: it.id, text: 'Back to your task; leave the other files alone.' }
             : level === 'steer' ? { action: 'hold', agent: it.id, reason: 'drifting: ' + reason }
@@ -902,6 +912,22 @@ async function mcpClient() {
       result(false, `submitted ${job}`);
     }
     if (mcp) mcp.close();
+  } else if (mode === 'tested' || mode === 'tested-fail') {
+    // AC-238: an agent that writes a function, runs its tests (passing, or one failing) and says so.
+    const pass = mode === 'tested';
+    const file = path.join(process.cwd(), 'src', 'total.js');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, 'module.exports = (a, b) => a + b;\n');
+    assistant([{ type: 'tool_use', id: 'toolu_write_1', name: 'Write', input: { file_path: file, content: 'module.exports = (a, b) => a + b;\n' } }]);
+    user([{ type: 'tool_result', tool_use_id: 'toolu_write_1', content: 'File created successfully' }]);
+    assistant([{ type: 'tool_use', id: 'toolu_test_1', name: 'Bash', input: { command: 'npm test' } }]);
+    const output = pass
+      ? '> total@1.0.0 test\n> node --test\n\n  ok adds two numbers\n  ok adds zero\n  ok adds negatives\n\n3 passing'
+      : '> total@1.0.0 test\n> node --test\n\n  ok adds two numbers\n  not ok adds negatives\n    AssertionError: expected -1 to equal 1\n\n1 passing\n1 failing';
+    user([{ type: 'tool_result', tool_use_id: 'toolu_test_1', content: output, is_error: !pass }]);
+    const said = pass ? 'Added total() in src/total.js with three tests; npm test passes.' : 'Added total() in src/total.js; the negatives test still fails.';
+    assistant([{ type: 'text', text: said }]);
+    result(false, said);
   } else if (mode === 'circles') {
     // The same command failing three times in a row (a free check of AC-189).
     for (let i = 1; i <= 3; i++) {

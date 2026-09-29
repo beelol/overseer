@@ -334,6 +334,9 @@ impl Daemon {
         let mut findings = Vec::new();
         let mut troubles = Vec::new();
         let mut texts = Vec::new();
+        // What each finished agent's work may take of the turn (AC-238).
+        let finishing = per.iter().filter(|(_, reasons)| reasons.iter().any(|r| r == "finished")).count().max(1);
+        let work_room = (TURN_BYTES / 2) / finishing;
         for (run, reasons) in per {
             let d = self.digest(run)?;
             let last_check = d.last_check_in.clone();
@@ -369,13 +372,19 @@ impl Daemon {
                 }
             }
             if !plain.is_empty() {
-                items.push(json!({"id": d.id, "title": d.title, "status": d.status, "reasons": plain, "area": d.area, "changed": d.changed.iter().map(|c| c.path.clone()).collect::<Vec<_>>(), "asked": d.asked.iter().map(|a| a.text.clone()).collect::<Vec<_>>(), "last_check_in": last_check}));
+                let mut item = json!({"id": d.id, "title": d.title, "status": d.status, "reasons": plain, "area": d.area, "changed": d.changed.iter().map(|c| c.path.clone()).collect::<Vec<_>>(), "asked": d.asked.iter().map(|a| a.text.clone()).collect::<Vec<_>>(), "last_check_in": last_check});
+                // A finished agent's work in full (AC-238): its final message, its whole diff and
+                // its last test run.
+                if d.status == "completed" && plain.iter().any(|r| r.as_str() == "finished") {
+                    item["finished"] = self.finished_work(run, work_room)?;
+                }
+                items.push(item);
             }
             texts.push(self.digest_text(run)?);
         }
         let mut out = format!("{}\n", super::session::OPEN);
         if !items.is_empty() {
-            out.push_str(&format!("Check-in. For each agent below, decide whether it is doing what was asked (its task, the owner's later messages, your directions, its guardrails and its area) and answer with the check_in tool once per agent: result on_task, drifting or done, with a reason; for done, also what was left out, if anything. An agent that is on task hears nothing from you. For one that is drifting, use propose: at the Steer level a message or a hold, at the Auto level a redirect; at Ask first the owner decides. Judge what the agent is doing, not how. The level is {level}.\n\nCheck-in (JSON):\n{}\n\n", serde_json::to_string_pretty(&items)?));
+            out.push_str(&format!("Check-in. For each agent below, decide whether it is doing what was asked (its task, the owner's later messages, your directions, its guardrails and its area) and answer with the check_in tool once per agent: result on_task, drifting or done, with a reason; for done, also what was left out, if anything. An agent that is on task hears nothing from you. For one that is drifting, use propose: at the Steer level a message or a hold, at the Auto level a redirect; at Ask first the owner decides. Judge what the agent is doing, not how. An agent with `finished` has stopped: read its final message, its diff and its test output, and say in one or two sentences, citing the test output, whether it did what was asked (check_in with did_it). Then propose the next step: merge_back (or pull_request) when it did it and its tests pass, else a message to the agent with the fix; the owner says yes to either. The level is {level}.\n\nCheck-in (JSON):\n{}\n\n", serde_json::to_string_pretty(&items)?));
         }
         if !questions.is_empty() {
             out.push_str(&format!("Questions from agents. Answer each with the answer tool (its id and your text) from what you know: the roster, the digests, the other agents' reports and files; if only another agent can answer, ask it with propose (a message) and answer once it replies. The level is {level}.\n\nQuestions (JSON):\n{}\n\n", serde_json::to_string_pretty(&questions)?));
@@ -395,7 +404,7 @@ impl Daemon {
     }
 
     /// The check_in tool: Overseer's result for one agent, recorded on that agent.
-    pub fn record_check_in(self: &Arc<Self>, agent: &str, result: &str, reason: &str, left_out: &str) -> Result<Value> {
+    pub fn record_check_in(self: &Arc<Self>, agent: &str, result: &str, reason: &str, left_out: &str, did_it: Option<bool>) -> Result<Value> {
         if !["on_task", "drifting", "done"].contains(&result) {
             bail!("a check-in result is on_task, drifting or done");
         }
@@ -407,8 +416,11 @@ impl Daemon {
             let session = self.overseer_session()?;
             let sid = session["id"].as_str().unwrap().to_string();
             let asked: Vec<String> = self.digest(agent)?.asked.iter().map(|a| a.text.clone()).collect();
-            let card = json!({"kind": "done", "agent": agent, "title": run.title, "asked": asked, "done": reason, "left_out": left_out});
-            self.append_session_message(&sid, "card", None, &format!("{} is done: {}{}", run.title, reason, if left_out.is_empty() { String::new() } else { format!(" Left out: {left_out}.") }), Some(&card))?;
+            // The verdict on finished work (AC-238), with the daemon's own record of its last test run.
+            let tests = if run.status == "completed" { self.last_test_run(agent)? } else { None };
+            let card = json!({"kind": "done", "agent": agent, "title": run.title, "asked": asked, "done": reason, "left_out": left_out, "did_it": did_it, "tests": tests});
+            let head = match did_it { Some(true) => "did it", Some(false) => "is not done yet", None => "is done" };
+            self.append_session_message(&sid, "card", None, &format!("{} {head}: {}{}", run.title, reason, if left_out.is_empty() { String::new() } else { format!(" Left out: {left_out}.") }), Some(&card))?;
         }
         Ok(json!({"agent": agent, "result": result, "recorded": true}))
     }

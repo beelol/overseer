@@ -8,6 +8,7 @@ pub mod checkin;
 pub mod conflicts;
 pub mod control;
 pub mod digest;
+pub mod finished;
 pub mod mcp;
 pub mod needs;
 pub mod session;
@@ -90,8 +91,8 @@ pub(crate) fn tool_list(role: &str) -> Vec<Value> {
         }
         tools.push(json!({
             "name": "check_in",
-            "description": "Your result of a check-in on one agent: on_task (nothing is sent to it), drifting (say why; then use propose for what to do), or done (what it did, and what it left out if anything).",
-            "inputSchema": {"type": "object", "properties": {"agent": {"type": "string"}, "result": {"type": "string", "enum": ["on_task", "drifting", "done"]}, "reason": {"type": "string"}, "left_out": {"type": "string"}}, "required": ["agent", "result", "reason"], "additionalProperties": false}
+            "description": "Your result of a check-in on one agent: on_task (nothing is sent to it), drifting (say why; then use propose for what to do), or done (what it did, and what it left out if anything). For an agent that finished, did_it says whether it did what was asked, from its final message, its diff and its test output; the reason says so in one or two sentences and cites the test output.",
+            "inputSchema": {"type": "object", "properties": {"agent": {"type": "string"}, "result": {"type": "string", "enum": ["on_task", "drifting", "done"]}, "reason": {"type": "string"}, "left_out": {"type": "string"}, "did_it": {"type": "boolean"}}, "required": ["agent", "result", "reason"], "additionalProperties": false}
         }));
         tools.push(json!({
             "name": "rally",
@@ -193,7 +194,7 @@ impl Daemon {
                 let id = arguments["id"].as_str().unwrap_or_default();
                 self.digest_text(id)?
             }
-            "check_in" => match self.record_check_in(arguments["agent"].as_str().unwrap_or(""), arguments["result"].as_str().unwrap_or(""), arguments["reason"].as_str().unwrap_or(""), arguments["left_out"].as_str().unwrap_or("")) {
+            "check_in" => match self.record_check_in(arguments["agent"].as_str().unwrap_or(""), arguments["result"].as_str().unwrap_or(""), arguments["reason"].as_str().unwrap_or(""), arguments["left_out"].as_str().unwrap_or(""), arguments["did_it"].as_bool()) {
                 Ok(_) => "Recorded.".to_string(),
                 Err(e) => return Ok(json!({"text": format!("refused: {e}"), "is_error": true})),
             },

@@ -397,3 +397,84 @@ fn ac239_stuck_failed_and_limited_agents_come_back_to_overseer() {
         assert!(plain.iter().all(|p| !p.contains(raw)), "{raw} in a plain reason: {plain:?}");
     }
 }
+
+// ---------------------------------------------------------------------- AC-238
+
+fn done_card(d: &Daemon, agent: &str) -> Value {
+    wait_message(d, "a done card", 60, |m| m["card"]["kind"] == "done" && m["card"]["agent"] == agent)
+}
+
+fn open_proposal_for(d: &Daemon, action: &str, agent: &str) -> Value {
+    let deadline = Instant::now() + Duration::from_secs(40);
+    loop {
+        let s = wait_overseer_idle(d, 60);
+        if let Some(p) = s["proposals"].as_array().unwrap().iter().find(|p| p["actions"][0]["action"] == action && p["actions"][0]["agent"] == agent) {
+            return p.clone();
+        }
+        assert!(Instant::now() < deadline, "no open {action} proposal for {agent}: {s}\n{}", overseer_trace(d));
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
+/// AC-238: when an agent finishes, Overseer reads its final message, whole diff and test output,
+/// says whether it did what was asked (citing the tests) and proposes the next step from a turn
+/// the owner did not start: the merge when the tests pass, a fix message when one fails. Neither
+/// happens without the owner's yes at Ask first.
+#[test]
+fn ac238_overseer_checks_finished_work_and_offers_the_next_step() {
+    let _one = heavy();
+    let r = tmp();
+    let checkout = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file, &[]);
+    sql(&d, "INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.grace_ms', '500')");
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    let head_before = git(&checkout, &["rev-parse", "HEAD"]);
+
+    // Finished with passing tests: "did it", the test output cited, a merge proposed.
+    let good = claude_task(&d, &checkout, &mode_file, "tested", "Totals", "add a total() function with tests");
+    assert_eq!(d.wait_done(&good, 30)["status"], "completed");
+    let card = done_card(&d, &good);
+    let text = card["text"].as_str().unwrap();
+    assert!(text.starts_with("Totals did it: ") && text.contains("npm test") && text.contains("3 passing"), "{card}");
+    assert_eq!(card["card"]["did_it"], true);
+    assert_eq!(card["card"]["tests"]["ok"], true, "{card}");
+    assert_eq!(card["card"]["tests"]["command"], "npm test");
+    let merge = open_proposal_for(&d, "merge_back", &good);
+    assert_eq!(merge["cause"], "check_in", "from a turn the owner did not start: {merge}");
+    // What Overseer read: the final message in full, the whole diff and the test output.
+    let overseer = session(&d)["run_id"].as_str().unwrap().to_string();
+    let prompt = turns(&d, &overseer).iter().map(|t| t["prompt"].as_str().unwrap_or("").to_string()).find(|p| p.contains("\"finished\"")).expect("a check-in with the finished work");
+    for seen in ["Added total() in src/total.js with three tests; npm test passes.", "+module.exports = (a, b) => a + b;", "3 passing"] {
+        assert!(prompt.contains(seen), "the check-in carries {seen:?}: {prompt}");
+    }
+
+    // Finished with a failing test: "not yet", the failure cited, a fix message proposed.
+    let bad = claude_task(&d, &checkout, &mode_file, "tested-fail", "Negatives", "make total() handle negatives");
+    assert_eq!(d.wait_done(&bad, 30)["status"], "completed");
+    let card = done_card(&d, &bad);
+    let text = card["text"].as_str().unwrap();
+    assert!(text.starts_with("Negatives is not done yet: ") && text.contains("AssertionError"), "{card}");
+    assert_eq!(card["card"]["did_it"], false);
+    let fix = open_proposal_for(&d, "message", &bad);
+    assert!(fix["actions"][0]["text"].as_str().unwrap().contains("npm test` fails"), "{fix}");
+
+    // Nothing happened without a yes: no merge, no message.
+    std::thread::sleep(Duration::from_secs(2));
+    assert_eq!(git(&checkout, &["rev-parse", "HEAD"]), head_before, "not merged");
+    assert_eq!(turns(&d, &bad).len(), 1, "no fix message sent");
+    let s = session(&d);
+    for p in [&merge, &fix] {
+        assert!(s["proposals"].as_array().unwrap().iter().any(|o| o["id"] == p["id"] && o["state"] == "open"), "still waiting: {p}");
+    }
+    // The owner's yes sends the fix.
+    std::fs::write(&mode_file, "echo").unwrap();
+    let yes = d.call("overseer.answer", json!({"id": fix["id"], "yes": true, "surface": "ctl", "by": "owner"}));
+    assert_eq!(yes["state"], "yes", "{yes}");
+    assert!(turns(&d, &bad).last().unwrap()["prompt"].as_str().unwrap().contains("Please fix it"));
+    // An archive stays the owner's own to ask for: a check-in cannot propose it.
+    sql(&d, "UPDATE overseer_sessions SET last_cause='check_in'");
+    let refused = d.try_call("overseer.propose", json!({"actions": [{"action": "archive", "agent": good}], "source": "ctl"})).unwrap_err();
+    assert!(refused.contains("only when the owner asks"), "{refused}");
+}

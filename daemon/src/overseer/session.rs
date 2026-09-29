@@ -716,7 +716,10 @@ impl Daemon {
             if kind == "swarm" {
                 class = self.swarm_action_class(a)?;
             }
-            if class == super::control::CONFIRM && !owner_asked {
+            // The next step for finished work (AC-238): a check-in may propose the merge or a pull
+            // request for an agent that finished; like every Confirm action it waits for a yes.
+            let next_step = cause == "check_in" && matches!(kind, "merge_back" | "pull_request") && a["agent"].as_str().and_then(|id| self.run(id).ok()).is_some_and(|r| r.status == "completed");
+            if class == super::control::CONFIRM && !owner_asked && !next_step {
                 bail!("{kind} happens only when the owner asks for it; this turn was started by {cause}");
             }
             if kind == "cadence" && a["agent"].as_str().unwrap_or("").is_empty() {
