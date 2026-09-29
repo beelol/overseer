@@ -273,6 +273,12 @@ function daemonEnv(i, meta) {
     OVERSEER_GATEWAY_PORT: String(meta.port), OVERSEER_NOTIFY_COMMAND: path.join(i.bin, 'notify'),
   });
   if (!meta.mdns) env.OVERSEER_GATEWAY_MDNS = 'off';
+  // Owner logins from chosen folders (CLAUDE_CONFIG_DIR, CODEX_HOME): the daemon passes only an
+  // allow-list to harnesses, so name them, or the harness falls back to the Mac's default login.
+  if (meta.logins === 'owner') {
+    const dirs = ['CLAUDE_CONFIG_DIR', 'CODEX_HOME'].filter(k => process.env[k]);
+    if (dirs.length) env.OVERSEER_HARNESS_ENV_PASSTHROUGH = dirs.join(',');
+  }
   if (meta.logins !== 'owner') {
     Object.assign(env, {
       OVERSEER_CLAUDE_PATH: path.join(i.bin, 'claude-fixture.js'),
@@ -369,6 +375,19 @@ async function up(o) {
   install(path.join(from, 'overseerd'), i.daemon);
   install(path.join(from, 'overseer-tui'), i.tui);
   install(path.join(repo, 'fixtures/fake-harness/claude-fixture.js'), path.join(i.bin, 'claude-fixture.js'));
+  // Voice Mode's listener (Gate R): the daemon looks for it next to itself, so each instance gets
+  // the checkout's own Overseer Listener.app (built here unless --no-build).
+  if (process.platform === 'darwin') {
+    const app = path.join(repo, 'extension/bin/Overseer Listener.app');
+    if (!o['--no-build']) {
+      const r = cp.spawnSync(process.execPath, ['extension/listener/build.js'], { cwd: repo, stdio: ['ignore', process.stderr, process.stderr] });
+      if (r.status !== 0) die(`the listener build failed in ${repo} (node extension/listener/build.js)`);
+    }
+    if (exists(app)) {
+      fs.rmSync(path.join(i.bin, 'Overseer Listener.app'), { recursive: true, force: true });
+      fs.cpSync(app, path.join(i.bin, 'Overseer Listener.app'), { recursive: true });
+    }
+  }
   fs.writeFileSync(path.join(i.bin, MARKER), i.id + '\n');
   fs.writeFileSync(path.join(i.bin, 'notify'), `#!/bin/sh\nprintf '%s\\t%s\\t%s\\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$1" "$2" >> ${shq(i.notifications)}\n`);
   fs.chmodSync(path.join(i.bin, 'notify'), 0o755);
@@ -469,7 +488,8 @@ async function code(o) {
   const folder = o._[1] ? real(o._[1]) : null;
   const codeArgs = ['--new-window', '--user-data-dir', i.profile, '--extensions-dir', i.extensions, '--skip-welcome', '--skip-release-notes', ...(o['--inspect'] ? ['--remote-debugging-port=0'] : []), ...(folder ? [folder] : [])];
   const quiet = require(path.join(__dirname, '../test/ui/quiet-launch'));
-  if (o['--inspect'] && quiet.wanted(CODE)) {
+  // An owner check's window is for the owner to use: never the transparent, click-through background launch.
+  if (o['--inspect'] && !o.__owner && quiet.wanted(CODE)) {
     // A UI scenario's window (--inspect) opens behind the owner's apps on macOS and never takes focus.
     const q = quiet.launchQuiet({ code: CODE, args: codeArgs, env: clientEnv(i), root: path.join(i.dir, 'vscode'), note: msg => process.stderr.write(msg + '\n') });
     await q.detachAfterFirstWindow();
@@ -641,7 +661,7 @@ async function testStart(o, c) {
           if (r.status !== 0) die(`npm ci in ${tool} failed`);
         }
       }
-      await code({ '--name': i.name, _: ['code', ...(scratch ? [scratch] : [])], '--inspect': true, '--no-build': o['--no-build'], '--vsix': o['--vsix'], __settings: c.prepare.settings || {} });
+      await code({ '--name': i.name, _: ['code', ...(scratch ? [scratch] : [])], '--inspect': true, __owner: true, '--no-build': o['--no-build'], '--vsix': o['--vsix'], __settings: c.prepare.settings || {} });
       state.prepared.vscode = i.profile;
       if (c.prepare.command) {
         try {
