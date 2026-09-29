@@ -2398,6 +2398,10 @@ rec(234, "Deploys follow merges by themselves", "not started", date="—", commi
     expected="See the RFC criterion (Gate T, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28; the first manual deploys (87aa4f87, cc5e5463) were run by the coordinator with the owner's yes.", live="—", blocker="Its own agent; CI's required checks must be green first (the TUI t10 timing test on hosted runners is the owner's decision).")
 
+rec(235, "You can always see which account an agent uses", "not started", date="—", commit="—",
+    expected="See the RFC criterion (added by the owner on 2026-09-28).",
+    actual="Not started: the agent header shows only \"Your login\" (the owner's voice session, 2026-09-28).", live="—", blocker="With the account work after the one-view build.")
+
 SHORT_BLOCKERS = {
     154: "verified",
     155: "verified",
@@ -2561,6 +2565,7 @@ SHORT_BLOCKERS = {
     232: "not started (added by the owner on 2026-09-28)",
     233: "not started (added by the owner on 2026-09-28)",
     234: "not started (added by the owner on 2026-09-28)",
+    235: "not started (added by the owner on 2026-09-28)",
 }
 TOTAL = 53
 
