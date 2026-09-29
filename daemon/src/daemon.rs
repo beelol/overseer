@@ -3469,7 +3469,7 @@ impl Daemon {
         match turns.last().and_then(|t| t.snapshot_id.as_deref().and_then(snap_info).map(|s| (t.clone(), s))) {
             Some((turn, snap)) => options.push(json!({
                 "mode": "latest_run", "label": "Latest run", "base": snap.commit_sha, "available": true, "default": true,
-                "detail": format!("the snapshot taken as turn {} started, including uncommitted and untracked files", turn.n),
+                "detail": format!("snapshot {} taken as turn {} started, including uncommitted and untracked files", snap.id, turn.n),
                 "provenance": "recorded", "snapshot": snap,
                 "inherited": run.parent_run_id.is_some(),
             })),
@@ -3478,7 +3478,7 @@ impl Daemon {
         for turn in turns.iter().rev().skip(1) {
             if let Some(snap) = turn.snapshot_id.as_deref().and_then(snap_info) {
                 options.push(json!({"mode": format!("turn:{}", turn.n), "label": format!("Since turn {}", turn.n), "base": snap.commit_sha, "available": true,
-                    "detail": format!("the snapshot taken as turn {} started", turn.n), "provenance": "recorded"}));
+                    "detail": format!("snapshot {} taken as turn {} started", snap.id, turn.n), "provenance": "recorded"}));
             }
         }
         match task.start_snapshot.as_deref().and_then(snap_info) {
