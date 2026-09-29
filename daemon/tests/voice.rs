@@ -795,6 +795,40 @@ fn ac175_built_in_phrases_work_with_no_model() {
     });
 }
 
+/// AC-248: a spoken request closed as "Not sent … Nothing will be sent later" (Overseer did not
+/// answer in time) withdraws what its turn proposes afterwards: nothing reaches the agent.
+#[test]
+fn ac248_a_proposal_after_its_spoken_request_closed_is_withdrawn() {
+    let env = voice_daemon(&[
+        ("OVERSEER_VOICE_ANSWER_S", "2"),
+        ("FIXTURE_OVERSEER_DELAY_MS", "9000"),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE,FIXTURE_OVERSEER_DELAY_MS"),
+    ]);
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let phone = agent(&env.d, &repo, "Phone");
+    let live = listening(&env);
+    let said = env.d.call("voice.say", json!({"text": "Tell Phone to wait for the review."}));
+    let id = said["request"].as_str().unwrap().to_string();
+    wait_state(&live, &id, "not_sent");
+    // Overseer's slow turn ends with a proposal for Phone after the request closed.
+    let deadline = Instant::now() + Duration::from_secs(40);
+    let withdrawn = loop {
+        let cards = env.d.call("overseer.session", json!({}))["cards"].as_array().cloned().unwrap_or_default();
+        if let Some(c) = cards.into_iter().find(|c| c["result"].as_str().unwrap_or("").starts_with("Withdrawn")) {
+            break c;
+        }
+        assert!(Instant::now() < deadline, "no withdrawn proposal: {}", env.d.call("overseer.session", json!({})));
+        std::thread::sleep(Duration::from_millis(200));
+    };
+    assert_eq!(withdrawn["state"], "cancelled", "{withdrawn}");
+    assert!(withdrawn["actions"].as_array().unwrap().iter().any(|a| a["agent"] == phone.as_str()), "{withdrawn}");
+    std::thread::sleep(Duration::from_secs(3));
+    assert_eq!(env.d.call("run.queued", json!({"run_id": phone}))["queued"].as_array().unwrap().len(), 0, "nothing queued for Phone");
+    assert_eq!(env.d.call("run.turns", json!({"run_id": phone})).as_array().unwrap().len(), 1, "nothing sent to Phone");
+    assert_eq!(request(&env.d, &id)["state"], "not_sent");
+}
+
 // ---------------------------------------------------------------------- more of Gate R
 
 /// AC-164: speaking over Overseer to someone else lowers its voice and it goes on; words meant

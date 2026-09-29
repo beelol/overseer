@@ -28,6 +28,28 @@ pub const OPEN: &str = "<overseer-state>";
 pub const NOT_FOR_OVERSEER: &str = "NOT_FOR_OVERSEER";
 pub const CLOSE: &str = "</overseer-state>";
 
+/// Owner messages kept because their turn could not start: when to try again (AC-248).
+struct Retry {
+    attempts: u32,
+    next_ms: i64,
+}
+static RETRY: std::sync::Mutex<Retry> = std::sync::Mutex::new(Retry { attempts: 0, next_ms: 0 });
+const RETRY_FIRST_MS: i64 = 2000;
+const RETRY_MAX_MS: i64 = 15_000;
+
+/// Why a turn could not start, in the owner's words: the daemon's own reason, without the
+/// plumbing around it.
+fn plain_start_failure(why: &str) -> String {
+    let w = why.trim().trim_start_matches("Error: ");
+    let w = w.split("\n\nCaused by").next().unwrap_or(w);
+    match w {
+        w if w.contains("workspace was removed") => "its folder is gone".to_string(),
+        w if w.contains("still working") => "it is still answering".to_string(),
+        w if w.contains("not installed") || w.contains("No such file") => "its harness is not installed".to_string(),
+        w => w.chars().take(200).collect(),
+    }
+}
+
 const INSTRUCTIONS: &str = "You are Overseer, the orchestrator of the coding agents listed below. You read the agents through your tools (roster, agent, conflicts) when you have them, and through the state sent with each message. Answer the owner's questions about the agents from that state; be brief and concrete. You never write code, edit files or run commands: agents do the work, you orchestrate them.\n\
 To act, use the propose tool with a JSON array of actions, or, if you have no tools, say in plain words exactly what you will do and end your reply with one fenced block tagged overseer-actions holding that JSON array:\n\
 {\"action\":\"message\",\"agent\":\"<run id>\",\"text\":\"<message>\"} sends a message to an agent (it waits for the end of the agent's turn); {\"action\":\"stop\",\"agent\":\"<run id>\"} stops it; {\"action\":\"pin\",\"agent\":\"<run id>\"} pins it to the grid; to show the owner something in VS Code (no yes needed): {\"action\":\"focus\",\"agent\":\"<run id>\"} shows the agent's chat (\"show me the draft agent\"), {\"action\":\"show_work\",\"agent\":\"<run id>\"} shows its finished work (\"what did it make?\"), {\"action\":\"open_review\",\"agent\":\"<run id>\"} opens its review, {\"action\":\"open_file\",\"agent\":\"<run id>\",\"path\":\"<file in its worktree, or empty for the one it changed last>\"} opens a file it made, {\"action\":\"open_worktree\",\"agent\":\"<run id>\"} opens its worktree; {\"action\":\"start\",\"repo\":\"<repository path>\",\"title\":\"<short title>\",\"prompt\":\"<task>\"} starts a new agent; {\"action\":\"report\",\"agent\":\"<run id>\"} asks an agent for a report; {\"action\":\"area\",\"agent\":\"<run id>\",\"paths\":[\"<path>\"]} sets its area; {\"action\":\"share\",\"to\":\"<run id>\",\"from\":\"<run id>\",\"what\":\"diff|report|messages\",\"path\":\"<file>\"} or {\"action\":\"share\",\"to\":\"<run id>\",\"what\":\"note\",\"text\":\"<note>\"} passes context from one agent to another; {\"action\":\"answer\",\"ask\":\"<ask id>\",\"text\":\"<answer>\"} answers an agent's question. Rally (the rally tool) gives you the map of a repository's agents; ask only the agents whose digests cannot answer for a report, say what that costs, and propose the areas in one proposal.\n\
@@ -372,8 +394,59 @@ impl Daemon {
             return Ok(json!({"message": msg, "queued": true, "run_id": run_id}));
         }
         let cause = if surface == "voice" { "voice" } else { "owner" };
-        let turn = self.overseer_turn(&session, &[text.to_string()], &harness, model, cause)?;
-        Ok(json!({"message": msg, "queued": false, "run_id": turn["run_id"], "turn": turn["turn"]}))
+        match self.overseer_turn(&session, &[text.to_string()], &harness, model, cause) {
+            Ok(turn) => Ok(json!({"message": msg, "queued": false, "run_id": turn["run_id"], "turn": turn["turn"]})),
+            // Overseer's run exists but this turn could not start: the words are kept and sent
+            // again once a turn can start (AC-248). A first run that cannot launch says why at
+            // once instead, and the next message tries again from the start.
+            Err(e) if run_id.is_some() => {
+                self.store.lock().unwrap().conn.execute("INSERT INTO overseer_pending(session_id, message_id, ts, text) VALUES(?1, ?2, ?3, ?4)", rusqlite::params![sid, msg["id"].as_str(), crate::daemon::now(), text])?;
+                self.turn_start_failed(&sid, &e.to_string())?;
+                Ok(json!({"message": msg, "queued": true, "run_id": run_id, "retrying": plain_start_failure(&e.to_string())}))
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    /// A turn of Overseer's could not start: the next try waits a little longer each time, and the
+    /// conversation says once, in plain words, that the owner's words are kept (AC-248).
+    fn turn_start_failed(&self, sid: &str, why: &str) -> Result<()> {
+        let first = {
+            let mut r = RETRY.lock().unwrap_or_else(|e| e.into_inner());
+            r.attempts += 1;
+            r.next_ms = crate::daemon::now() + (RETRY_FIRST_MS << (r.attempts - 1).min(8)).min(RETRY_MAX_MS);
+            r.attempts == 1
+        };
+        crate::log(&format!("overseer: a turn could not start: {why}"));
+        if first {
+            let reason = plain_start_failure(why);
+            let text = format!("Overseer could not start its turn: {reason}. Your words are kept and sent again when it can.");
+            self.append_session_message(sid, "system", None, &text, Some(&json!({"kind": "cannot_answer", "reason": reason, "waiting": true})))?;
+        }
+        Ok(())
+    }
+
+    /// Kept owner messages whose turn could not start: tried again when the wait is over, and
+    /// whenever Overseer is idle with words still kept (a lost end of turn strands none).
+    pub(crate) fn retry_kept_messages(self: &Arc<Self>) -> Result<()> {
+        if crate::daemon::now() < RETRY.lock().unwrap_or_else(|e| e.into_inner()).next_ms {
+            return Ok(());
+        }
+        // Read cheaply: this runs on every tick.
+        let kept: Option<(i64, Option<String>)> = {
+            let store = self.store.lock().unwrap();
+            store.conn.query_row("SELECT (SELECT COUNT(*) FROM overseer_pending p WHERE p.session_id=s.id), s.run_id FROM overseer_sessions s WHERE s.archived_ms IS NULL ORDER BY s.started_ms DESC LIMIT 1", [], |r| Ok((r.get(0)?, r.get(1)?))).ok()
+        };
+        let Some((count, run)) = kept else { return Ok(()) };
+        if count == 0 {
+            RETRY.lock().unwrap_or_else(|e| e.into_inner()).attempts = 0;
+            return Ok(());
+        }
+        let Some(run) = run else { return Ok(()) };
+        if self.run(&run).map(|r| ACTIVE.contains(&r.status.as_str())).unwrap_or(true) {
+            return Ok(());
+        }
+        self.overseer_turn_ended(&run)
     }
 
     /// A turn Overseer starts by itself, with a prompt the daemon composed (a check-in, a
@@ -452,7 +525,11 @@ impl Daemon {
             let store = self.store.lock().unwrap();
             store.conn.query_row("SELECT COUNT(*) FROM overseer_pending p JOIN overseer_messages m ON m.id=p.message_id WHERE p.session_id=?1 AND m.surface='voice'", [&sid], |r| r.get::<_, i64>(0)).unwrap_or(0) > 0
         };
-        self.overseer_turn(&session, &texts, &harness, session["model"].as_str(), if spoken { "voice" } else { "owner" })?;
+        if let Err(e) = self.overseer_turn(&session, &texts, &harness, session["model"].as_str(), if spoken { "voice" } else { "owner" }) {
+            // Kept, and tried again by the session's ticker (AC-248).
+            return self.turn_start_failed(&sid, &e.to_string());
+        }
+        RETRY.lock().unwrap_or_else(|e| e.into_inner()).attempts = 0;
         let store = self.store.lock().unwrap();
         for (rowid, _) in pending {
             store.conn.execute("DELETE FROM overseer_pending WHERE rowid=?1", [rowid])?;
@@ -697,6 +774,13 @@ impl Daemon {
                 bail!("the owner denied {tool} {detail} to {title}; Overseer does not have another agent do it");
             }
         }
+        // A spoken request closed as not sent before its turn proposed anything: the owner was
+        // told nothing will be sent later, so what the turn proposes now is withdrawn (AC-248).
+        if voice {
+            if let Some(requests) = crate::voice::request::turn_requests_not_sent(self) {
+                return self.withdraw_proposal(&sid, &checked, source, &cause, &format!("Withdrawn: the spoken request {} was closed as not sent, so nothing was sent.", requests.join(", ")));
+            }
+        }
         // A spoken request (Gate R): the owner's words quoted in each message, the delivery setting,
         // more new agents than the owner's limit wait for a yes.
         let mut needs_yes = false;
@@ -898,6 +982,23 @@ impl Daemon {
         let run_id: Option<String> = self.overseer_session().ok().and_then(|s| s["run_id"].as_str().map(str::to_string));
         self.emit(None, run_id.as_deref(), "proposal_answered", by, "exact", json!({"id": id, "state": "cancelled", "result": "Cancelled: nothing was sent.", "by": by}))?;
         Ok(json!({"id": id, "state": "cancelled"}))
+    }
+
+    /// A proposal recorded as already withdrawn: shown on its card with the reason, never carried
+    /// out and never waiting for a yes.
+    fn withdraw_proposal(&self, sid: &str, actions: &[Value], source: &str, cause: &str, why: &str) -> Result<Value> {
+        let actions: Vec<Value> = actions.iter().map(|a| serde_json::from_str(&crate::redact::redact(&a.to_string())).unwrap_or_else(|_| a.clone())).collect();
+        let id = format!("p-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
+        let now = crate::daemon::now();
+        let lines: Vec<String> = actions.iter().map(|a| self.describe(a)).collect();
+        self.store.lock().unwrap().conn.execute(
+            "INSERT INTO overseer_proposals(id, session_id, ts, actions, state, source, cause, answered_by, answered_ms, result) VALUES(?1, ?2, ?3, ?4, 'cancelled', ?5, ?6, 'the daemon', ?3, ?7)",
+            rusqlite::params![id, sid, now, serde_json::to_string(&actions)?, source, cause, why],
+        )?;
+        let run_id: Option<String> = self.overseer_session().ok().and_then(|s| s["run_id"].as_str().map(str::to_string));
+        self.emit(None, run_id.as_deref(), "proposal", "overseer", "exact", json!({"id": id, "actions": actions, "lines": lines, "state": "cancelled", "via": source, "cause": cause, "confirm": false, "note": why}))?;
+        self.emit(None, run_id.as_deref(), "proposal_answered", "daemon", "exact", json!({"id": id, "state": "cancelled", "result": why, "by": "the daemon"}))?;
+        Ok(json!({"proposal": id, "state": "cancelled", "done": false, "result": why}))
     }
 
     /// Settled proposals whose window has passed go out.
@@ -1368,6 +1469,9 @@ pub fn start(daemon: Arc<Daemon>) {
                 }
                 if let Err(e) = d.finish_ended_watches() {
                     crate::log(&format!("watches: {e:#}"));
+                }
+                if let Err(e) = d.retry_kept_messages() {
+                    crate::log(&format!("overseer: {e:#}"));
                 }
             })
             .await;

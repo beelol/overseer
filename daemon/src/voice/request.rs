@@ -2185,6 +2185,14 @@ fn turn_requests(d: &Daemon, ended: bool) -> Vec<String> {
     turn_requests_known(d, ended).unwrap_or_default()
 }
 
+/// The spoken requests Overseer's current turn is about, when every one of them was closed as not
+/// sent ("Nothing will be sent later"): what that turn proposes afterwards is withdrawn (AC-248).
+pub fn turn_requests_not_sent(d: &Daemon) -> Option<Vec<String>> {
+    let ids = turn_requests_known(d, false)?;
+    let closed = !ids.is_empty() && ids.iter().all(|id| row(d, id).is_some_and(|r| r["state"] == "not_sent"));
+    closed.then_some(ids)
+}
+
 /// The same, or `None` when there is no Overseer turn to read (then the caller may fall back).
 fn turn_requests_known(d: &Daemon, ended: bool) -> Option<Vec<String>> {
     let session = d.overseer_session().ok()?;
