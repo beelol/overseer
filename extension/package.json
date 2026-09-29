@@ -247,6 +247,9 @@
         { "command": "overseer.renameDevice", "when": "false" }
       ]
     },
+    "configurationDefaults": {
+      "chat.titleBar.signIn.enabled": false
+    },
     "configuration": {
       "title": "Overseer",
       "properties": {
