@@ -88,6 +88,9 @@ class AgentHead {
     this.context.workspaceState.update('overseer.head.modes', Object.fromEntries([...this.modes].slice(-300)));
     this.updateContext(vscode.window.activeTextEditor);
     if (was === mode && (mode === 'diffs' ? this.review.manager.panelFor(runId) : this.tabs(this.openRoots.get(runId) || this.rootOf(runId)).length)) return;
+    // Neither view is on screen (the chat alone): the arrangement brings the head in, in the new mode.
+    const shown = this.review.manager.panelFor(runId) || this.tabs(this.openRoots.get(runId)).length;
+    if (!shown && this.handlers.ensureShown) { await this.handlers.ensureShown(runId); this.updateStatus(); return; }
     // The new view opens in the old one's group before the old one closes, so the group (and the
     // layout around it) stays.
     if (mode === 'diffs') {
