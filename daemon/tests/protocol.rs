@@ -1059,19 +1059,26 @@ fn ac45_one_notice_per_quit_a_brief_reconnect_does_not_repeat_it() {
     let run = run_id(&sh(&d, &repo, "worktree", "sleep 30"));
     d.wait_status(&run, |s| s == "running", 20);
     let count = || std::fs::read_to_string(&log).map(|t| t.lines().count()).unwrap_or(0);
+    // Under a loaded machine (the whole suite at once) a notice can take longer than a fixed
+    // wait: wait for it, up to 10 s.
+    let wait_for = |n: usize| {
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        while count() < n && std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        count()
+    };
     drop(vscode_window(&d));
-    std::thread::sleep(Duration::from_millis(1500));
-    assert_eq!(count(), 1, "the quit notifies once");
+    assert_eq!(wait_for(1), 1, "the quit notifies once");
     // Something connects as VS Code for a moment and leaves (shorter than the grace period).
     drop(vscode_window(&d));
     std::thread::sleep(Duration::from_millis(1500));
     assert_eq!(count(), 1, "a brief reconnect must not repeat the notice");
-    // A real session (open longer than the grace period) then quitting notifies again.
+    // A real session (open well beyond the 600 ms grace period) then quitting notifies again.
     let w = vscode_window(&d);
-    std::thread::sleep(Duration::from_millis(900));
+    std::thread::sleep(Duration::from_millis(2000));
     drop(w);
-    std::thread::sleep(Duration::from_millis(1500));
-    assert_eq!(count(), 2, "a new VS Code session's quit notifies again");
+    assert_eq!(wait_for(2), 2, "a new VS Code session's quit notifies again");
     d.call("run.interrupt", json!({"run_id": run}));
     d.wait_done(&run, 20);
 }
