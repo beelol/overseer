@@ -1,5 +1,11 @@
 # AC-146: merges
 
+## Pull request #29 (the composer: sending clears the box, another repository without a native dialog), 2026-09-29
+
+- **Finished:** marked ready by its agent (head `acdd85f0`, main merged in): AC-259 and AC-260 each pass their whole Verify clause (a keyboard-only packaged scenario, 16 of 16, and a unit test, both failing on main first).
+- **Tests:** its `scripts/test-all --jobs=3` under the machine lock with main merged in: 62 of 64; the misses (protocol ac45, the learning sqlite-timeout test, audit's review budget) pass alone, and none is in its area. Main gained only ledger notes after that run.
+- **Merged:** squash, `3b7b397b`.
+
 ## Pull request #26 (Auto routing and Swarm, partial merge AC-204), 2026-09-28
 
 - **Finished:** built by the everything goal with a sub-agent on `claude/auto-swarm`, marked ready (head `6f78182e`). Unfinished VS Code surfaces stay behind `overseer.experimental.autoRouting` and `overseer.experimental.swarm` (both off); `swarm.native_director` is on by default (owner decision, 2026-09-28) but only acts on a confirmed `swarm.start`. Auto 23 of 40 and Swarm 45 of 64 verified at fixture scope; the rest need live runs on the owner's personal accounts, one owner choice (an unmetered director, SWARM-24/40) or packaged-UI scenarios.

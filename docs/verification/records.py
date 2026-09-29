@@ -2342,9 +2342,17 @@ rec(214, "Deploy: the one path from dev to production (stage 4)", "verified", co
 rec(216, "A conversation, not only requests, the same typed or spoken", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
-rec(217, "Turning it on is visible", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
-    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(217, "Turning it on is visible", "partial", commit="4832c5e0 (branch claude/one-conversation-view, pull request #27, not merged yet)", date="2026-09-29",
+    steps="""`node test/ui/scenario-one-view.js` (packaged VSIX, fixture Claude, simulated voice): home's head, the Voice button, then Voice Mode on and off in each theme.""",
+    expected="See the RFC criterion (Gate R).",
+    actual="""- Home has a visible **Voice** button with its shortcut (⌥⌘⇧V); pressed, home turns into the voice view with the mark's animation (the stage grows in; reduced motion: none). There is no separate "Show voice" any more.
+- The spoken line "Stop, mute and what's running still work" is gone from the daemon, and the scenario checks it is absent.
+- Screenshots of home before, during (three frames) and after turning it on in the Overseer theme, and before and after in Overseer Dark and Overseer Light.""",
+    evidence="[one-view](evidence/ui/one-view/) (01 to 13), pull request #27",
+    live="Fixtures and the simulated voice; no paid turn.",
+    proven="home's Voice button with its shortcut; home turning into the voice view with the mark's animation, before, during and after in the Overseer theme; the removed line absent",
+    deferred="the frames during the animation in Overseer Dark and Overseer Light, and a recording rather than three screenshots",
+    limits="The frames during the animation are only in the Overseer theme (not all three), and the animation is recorded as three screenshots, not a video. The voice strip's own on/off button is the view's head button (the strip has Turn on while off).")
 rec(218, "A voice worth listening to", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
@@ -2369,15 +2377,40 @@ rec(224, "Goals for an agent, at the harness level", "not started", date="—", 
 rec(225, "Goals for Overseer, at the global level", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate S, goals, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
-rec(226, "Overseer moves you around VS Code", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
-    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
-rec(227, "One view for talking to Overseer", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
-    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
-rec(228, "You can always tell it is working", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
-    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(226, "Overseer moves you around VS Code", "verified", commit="4832c5e0 (branch claude/one-conversation-view, pull request #27, not merged yet)", date="2026-09-29",
+    steps="""1. `cargo test -p overseerd --test one_view -- ac226`: typed "Show me the draft agent.", "What did it make?", "Open the file it made." at the Ask first level.
+2. `cargo test -p overseerd --test voice -- ac226_show_me_the_agent_by_voice`.
+3. `node test/ui/scenario-one-view.js`: the same three, typed (the composer) and spoken (simulated voice), each checked in the packaged UI; a click on a card row; a single start with "Show the agent I start" on and off.""",
+    expected="See the RFC criterion (Gate R).",
+    actual="""- New Look actions `focus`, `show_work`, `open_review`, `open_file` and `open_worktree` (action table, propose tool, plan lines). They happen at once at every level, typed or spoken (no settle window, no yes), and no proposal waits for them. `open_file` gives an absolute path inside the agent's worktree (the file it changed last when none is named), never a relative one.
+- In the packaged UI, typed and spoken: "show me the draft agent" focuses its chat, "what did it make?" opens its review, "open the file it made" opens `draft.md`. Only the window the owner is in acts.
+- Clicking a request card's row opens the agent it started; a card and a Needs-you item open the same way.
+- A request that starts a single agent slides the view aside: the agent's chat on the left, the conversation (with the mark while Voice Mode is on) on the right. With **Show the agent I start** (`overseer.showStartedAgent`) off, the view stays.""",
+    evidence="[one-view](evidence/ui/one-view/) (20 to 29), `daemon/tests/one_view.rs`, `daemon/tests/voice.rs`, pull request #27",
+    live="Fixtures and the simulated voice; no paid turn.",
+    limits="`open_worktree` opens the worktree's files in a pick list in this window (Manual edit in place is AC-233's). What \"it\" means comes from the model's memory of the conversation; the fixture keeps the agent last talked about.")
+rec(227, "One view for talking to Overseer; Needs you as a small notification", "verified", commit="4832c5e0 (branch claude/one-conversation-view, pull request #27, not merged yet)", date="2026-09-29",
+    steps="""1. `node test/ui/scenario-one-view.js` (packaged VSIX, fixture Claude, simulated voice): Talk to Overseer; a typed question; Voice Mode on with the Voice button, a spoken request, off, in the three themes; a waiting permission: the badge, its list, a click on the item; typed "Handle what needs me", then "yes"; typed "Tell it yes".
+2. `cargo test -p overseerd --test one_view -- ac227` and `cargo test -p overseerd --test voice -- ac227_handle_what_needs_me_by_voice`.
+3. `node test/ui/scenario-voice.js`, `scenario-home.js`, `scenario-talk.js`: the voice view's states and cards, home, and Talk to Overseer, now all home.""",
+    expected="See the RFC criterion (Gate R, corrected by the owner on 2026-09-28: Needs you is a small notification).",
+    actual="""- **One view.** Talk to Overseer is home; the chat docked below is gone. Turning Voice Mode on turns the chat into the voice view (the existing mark on top, the same cards below: a spoken request is an owner message with its card, like a typed one); turning it off returns to the chat. Nothing opens below or beside (no new tab, no panel), checked in the three themes with the same cards throughout.
+- **Needs you** is a small badge with a count in the view's head; a click pops out a short list (the agent and what it needs), and an item focuses that agent the same way a card does.
+- **"Handle what needs me"** asks the one question the waiting permission needs ("Sessions wants to change perm.txt. Allow it?", with a proposal) and the owner's "yes" answers it; **"tell it yes"** answers it at once; with nothing waiting it says so. The daemon does it with no model turn, typed or spoken, with the same cards; by voice the answer keeps the toast and its window (AC-171).""",
+    evidence="[one-view](evidence/ui/one-view/) (01 to 18), [voice](evidence/ui/voice/), [home](evidence/ui/home/), [talk](evidence/ui/talk/), pull request #27",
+    live="Fixtures and the simulated voice; no paid turn.",
+    limits="The waiting permission comes up by itself in the view and is read out under AC-230, not here.")
+rec(228, "You can always tell it is working", "verified", commit="4832c5e0 (branch claude/one-conversation-view, pull request #27, not merged yet)", date="2026-09-29",
+    steps="""1. `node test/ui/scenario-one-view.js`: a typed "Someone should draft the page" (a fixture agent that thinks, writes `draft.md` and reads it over 9 s), every stage of its card recorded as it changed; a spoken aside; Needs you timed after a permission answered and after an agent stopped; every card's text checked.
+2. `node test/ui/scenario-voice.js`: the same token and raw-error check over the voice scenario's cards.
+3. `cargo test -p overseerd --test voice -- ac228_a_request_not_for_overseer_never_says_on_it`; `cargo test -p overseerd --test one_view -- ac228`; `node test/unit/plain-words.js`.""",
+    expected="See the RFC criterion (Gate R).",
+    actual="""- **Stages.** Each request, typed or spoken, shows its stage on the owner's words and in the view: thinking, waiting for the yes (or going out), going ahead, starting the agent, working with the agent's live activity and the elapsed time ("draft the page is working · 3s · Write: draft.md"), then done, stuck (it needs you, no activity for 3 minutes, waits for a connection) or failed, in plain words. The recorded order: thinking, waiting, going ahead, starting, working, done.
+- **Decided before "On it."** A spoken request that is surely for Overseer (it names Overseer or gives a command) gets "On it." at once and Overseer is not offered a way out; one that is only probably for it gets no "On it.": Overseer judges first, and its "not for me" is kept as context. The token is stored as a plain "kept as context" card; no card shows it or a raw error (one plain-words filter; checked over both scenarios' cards).
+- **Needs you clears.** The stale Needs you was a daemon state bug: a proposal about an agent stayed open after the agent was answered elsewhere or finished. Such proposals now close themselves the moment the agent changes. Measured in the UI: after the permission was answered, its row and Overseer's went within a second; after a waiting agent was stopped, its row went within a second.""",
+    evidence="[one-view](evidence/ui/one-view/) (19 to 21, 30), [voice](evidence/ui/voice/), `daemon/tests/one_view.rs`, `test/unit/plain-words.js`, pull request #27",
+    live="Fixtures and the simulated voice; no paid turn.",
+    limits="An agent finishing was measured by stopping a waiting agent (a waiting agent cannot finish on its own); the daemon test covers a proposal closing when its agent completes.")
 rec(229, "Heard right before it acts", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
@@ -2473,12 +2506,32 @@ rec(257, "Following an agent sits beside Overseer's conversation, not on top of 
 rec(258, "VS Code's own chat panel stays out of Overseer's way all session, not only at first launch", "not started", date="—", commit="—",
     expected="See the RFC criterion (the friction research of 2026-09-28).",
     actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
-rec(259, "Sending a task clears the box and says so", "not started", date="—", commit="—",
-    expected="See the RFC criterion (the friction research of 2026-09-28).",
-    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
-rec(260, "Starting an agent in another repository never needs a native dialog", "not started", date="—", commit="—",
-    expected="See the RFC criterion (the friction research of 2026-09-28).",
-    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(259, "Sending a task clears the box and says so", "verified",
+    date="2026-09-29 UTC",
+    commit="3b7b397b (pull request #29, merged; branch head acdd85f0)",
+    harness="Claude Code fixture harness only (fixtures/fake-harness/claude-fixture.js); no accounts, no paid turns",
+    proven="the whole Verify clause, on the branch: a packaged-UI scenario types a task, presses Enter, and the field is empty and says it was sent 12 ms after Enter; it is back to \"Send off a task\" at 3.8 s (16 of 16 checks)",
+    steps="""1. `node extension/scripts/package.js`, then `node test/ui/scenario-composer-friction.js` (isolated VS Code profile, fixture Claude harness, `overseer.followNewRuns` off).
+2. The scenario types "Tidy the pricing copy" at home and records the field every animation frame from just before Enter: its value, its placeholder, the note under it and its sent state.""",
+    expected="See the RFC criterion (the friction research of 2026-09-28, item 7).",
+    actual="""- **Before (main at ce426a04):** the field kept the text until the host said the agent had started: cleared at 1295 ms even with the fixture harness, with no sent confirmation (the same scenario, run on main before the change, failed those three checks).
+- **After:** Enter clears the field at once; the field reads "Sent ✓ — starting the agent…" and the note "Sent “Tidy the pricing copy” — starting the agent…" (12 ms after Enter); when the agent starts the note says so, and 2.5 s later the field is back to "Send off a task" (3838 ms). The field stays empty throughout. If the start fails or is cancelled, the words come back into the field; text typed while the agent is starting is kept.
+- Once the agent starts, the view moves to its chat as before (`followNewRuns` only decides Follow), so on screen the confirmation is seen while the agent is starting and when you come back home.""",
+    evidence=f"[scenario evidence](https://github.com/beelol/overseer/blob/acdd85f0/docs/verification/evidence/ui/composer-friction) (sent-confirmation screenshot, result.json, scenario.log), [the scenario](https://github.com/beelol/overseer/blob/acdd85f0/test/ui/scenario-composer-friction.js)",
+    live="Fixture harness; a real harness only lengthens the starting phase the confirmation covers.")
+rec(260, "Starting an agent in another repository never needs a native dialog", "verified",
+    date="2026-09-29 UTC",
+    commit="3b7b397b (pull request #29, merged; branch head acdd85f0)",
+    harness="Claude Code fixture harness only (fixtures/fake-harness/claude-fixture.js); no accounts, no paid turns",
+    proven="the whole Verify clause, on the branch: keyboard only from the composer, the repository chip's own picker adds a repository that is not open by its typed path and the task starts there; no folder dialog was opened (16 of 16 checks)",
+    steps="""1. `node test/unit/repo-picker.js`: typed paths and `~`, a folder inside a repository resolving to its root, refusals in plain words, Tab completion, remembered and nearby repositories, the fuzzy ranking; no dialog is called.
+2. `node test/ui/scenario-composer-friction.js`: the profile turns on `files.simpleDialog.enable`, so any folder dialog would open inside the window (never a native one) and a workbench observer records it. From the task field: Tab to the repository chip, Enter; type `frst` (fuzzy), a folder that is not a repository (refused in the picker), `<root>/elsew` then Tab (completes to `<root>/elsewhere/`), `notes-repo`, Enter; type a task, Enter.""",
+    expected="See the RFC criterion (the friction research of 2026-09-28, item 8).",
+    actual="""- **Before (main at ce426a04):** Enter on the chip opened a menu of open and recent repositories whose only way to add another was "Choose folder…", the native Open dialog; the same scenario failed from its first picker check.
+- **After:** the chip opens a picker inside the webview whose search field has the keyboard: open and recent repositories with nothing typed; a fuzzy search over every known repository (open, recent, added before, and Git repositories beside an open one); a path starting with `/` or `~` offers "Use <path>", Tab completes folders (Git repositories marked), a folder that is not a repository is explained in the picker. The typed `<root>/elsewhere/notes-repo` was added, the chip read "notes-repo", the keyboard went back to the task, and the task started in `<root>/elsewhere/notes-repo`. Next time the search found it as a recent repository. Escape closes the picker back to the chip. "Browse with the system dialog…" stays as the picker's last option. Folder dialogs recorded: none.""",
+    evidence=f"[scenario evidence](https://github.com/beelol/overseer/blob/acdd85f0/docs/verification/evidence/ui/composer-friction) (picker and typed-path screenshots, result.json, scenario.log), [unit test](https://github.com/beelol/overseer/blob/acdd85f0/test/unit/repo-picker.js)",
+    live="Fixture harness only; nothing here depends on the harness.",
+    limits="macOS only; Linux belongs to AC-41. Spoken repository choice is AC-216's; this criterion covers the keyboard.")
 rec(261, "One Sign In, clearly Overseer's or clearly not", "not started", date="—", commit="—",
     expected="See the RFC criterion (the friction research of 2026-09-28).",
     actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
@@ -2670,8 +2723,8 @@ SHORT_BLOCKERS = {
     256: "not started (the friction research, 2026-09-28)",
     257: "not started (the friction research, 2026-09-28)",
     258: "not started (the friction research, 2026-09-28)",
-    259: "not started (the friction research, 2026-09-28)",
-    260: "not started (the friction research, 2026-09-28)",
+    259: "verified",
+    260: "verified",
     261: "not started (the friction research, 2026-09-28)",
 }
 TOTAL = 53
