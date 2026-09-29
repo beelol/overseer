@@ -297,7 +297,7 @@ class AgentsProvider {
     item.iconPath = new vscode.ThemeIcon('organization');
     item.description = `${working} working · ${counts.ready || 0} ready · ${counts.blocked || 0} blocked` +
       (run.unconfirmed_exit_count ? ` · ${unconfirmedExitLabel(run.unconfirmed_exit_count)}` : '');
-    item.tooltip = `${run.objective}\n${run.status} · ${run.job_counts?.total || 0} jobs\n${item.description}\nProvider usage ${run.capacity?.provider_usage_state || 'unknown'}`;
+    item.tooltip = `${run.objective}\n${plainStatus(run.status)} · ${run.job_counts?.total || 0} jobs\n${item.description}\nProvider usage ${run.capacity?.provider_usage_state || 'unknown'}`;
     item.accessibilityInformation = { label: `${run.category} swarm, ${run.status}, ${item.description}` };
     item.contextValue = 'swarm-run-' + run.status;
     return { item, swarm: run, parent };
@@ -310,7 +310,7 @@ class AgentsProvider {
       const item = new vscode.TreeItem('Director');
       item.id = 'swarm-director:' + run.id;
       item.iconPath = new vscode.ThemeIcon('account');
-      item.description = run.director?.process_status || run.director?.owner_status || 'not started';
+      item.description = plainStatus(run.director?.process_status || run.director?.owner_status || 'not started');
       item.contextValue = 'swarm-director';
       rows.push({ item, parent });
       const capacity = new vscode.TreeItem('Capacity', vscode.TreeItemCollapsibleState.Collapsed);
@@ -338,7 +338,7 @@ class AgentsProvider {
         ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
       item.id = `swarm-job:${run.id}:${job.id}`;
       item.iconPath = statusIcon(active?.status || job.status);
-      item.description = active?.status === 'running' ? 'working' : active?.status || job.status;
+      item.description = plainStatus(active?.status === 'running' ? 'working' : active?.status || job.status);
       item.tooltip = `${job.acceptance}\n${item.description} · ${job.attempt_count} attempts`;
       item.accessibilityInformation = { label: `${job.title}, ${item.description}, ${job.attempt_count} attempts` };
       item.contextValue = 'swarm-job';
@@ -456,7 +456,7 @@ class AgentsProvider {
     const item = new vscode.TreeItem('Worker');
     item.id = `swarm-worker:${worker.overseer_run_id}`;
     item.iconPath = this.logo(worker.harness);
-    item.description = worker.status === 'running' ? 'working' : worker.status;
+    item.description = plainStatus(worker.status === 'running' ? 'working' : worker.status);
     const profile = worker.profile_id ? this.model.profile(worker.profile_id) : undefined;
     item.tooltip = [worker.harness, profile?.name, worker.model, worker.status].filter(Boolean).join(' · ');
     item.accessibilityInformation = { label: `Worker, ${item.tooltip}` };
