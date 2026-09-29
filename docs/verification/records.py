@@ -2473,12 +2473,34 @@ rec(257, "Following an agent sits beside Overseer's conversation, not on top of 
 rec(258, "VS Code's own chat panel stays out of Overseer's way all session, not only at first launch", "not started", date="—", commit="—",
     expected="See the RFC criterion (the friction research of 2026-09-28).",
     actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
-rec(259, "Sending a task clears the box and says so", "not started", date="—", commit="—",
-    expected="See the RFC criterion (the friction research of 2026-09-28).",
-    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
-rec(260, "Starting an agent in another repository never needs a native dialog", "not started", date="—", commit="—",
-    expected="See the RFC criterion (the friction research of 2026-09-28).",
-    actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
+rec(259, "Sending a task clears the box and says so", "partial",
+    date="2026-09-29 UTC",
+    commit="acdd85f0 (branch claude/composer-friction, pull request #29, not merged yet)",
+    harness="Claude Code fixture harness only (fixtures/fake-harness/claude-fixture.js); no accounts, no paid turns",
+    proven="the whole Verify clause, on the branch: a packaged-UI scenario types a task, presses Enter, and the field is empty and says it was sent 12 ms after Enter; it is back to \"Send off a task\" at 3.8 s (16 of 16 checks)",
+    deferred="the merge of pull request #29 into main (the merge monitor, AC-146); the box is checked once it is merged",
+    steps="""1. `node extension/scripts/package.js`, then `node test/ui/scenario-composer-friction.js` (isolated VS Code profile, fixture Claude harness, `overseer.followNewRuns` off).
+2. The scenario types "Tidy the pricing copy" at home and records the field every animation frame from just before Enter: its value, its placeholder, the note under it and its sent state.""",
+    expected="See the RFC criterion (the friction research of 2026-09-28, item 7).",
+    actual="""- **Before (main at ce426a04):** the field kept the text until the host said the agent had started: cleared at 1295 ms even with the fixture harness, with no sent confirmation (the same scenario, run on main before the change, failed those three checks).
+- **After:** Enter clears the field at once; the field reads "Sent ✓ — starting the agent…" and the note "Sent “Tidy the pricing copy” — starting the agent…" (12 ms after Enter); when the agent starts the note says so, and 2.5 s later the field is back to "Send off a task" (3838 ms). The field stays empty throughout. If the start fails or is cancelled, the words come back into the field; text typed while the agent is starting is kept.
+- Once the agent starts, the view moves to its chat as before (`followNewRuns` only decides Follow), so on screen the confirmation is seen while the agent is starting and when you come back home.""",
+    evidence=f"[scenario evidence](https://github.com/beelol/overseer/blob/acdd85f0/docs/verification/evidence/ui/composer-friction) (sent-confirmation screenshot, result.json, scenario.log), [the scenario](https://github.com/beelol/overseer/blob/acdd85f0/test/ui/scenario-composer-friction.js)",
+    live="Fixture harness; a real harness only lengthens the starting phase the confirmation covers.")
+rec(260, "Starting an agent in another repository never needs a native dialog", "partial",
+    date="2026-09-29 UTC",
+    commit="acdd85f0 (branch claude/composer-friction, pull request #29, not merged yet)",
+    harness="Claude Code fixture harness only (fixtures/fake-harness/claude-fixture.js); no accounts, no paid turns",
+    proven="the whole Verify clause, on the branch: keyboard only from the composer, the repository chip's own picker adds a repository that is not open by its typed path and the task starts there; no folder dialog was opened (16 of 16 checks)",
+    deferred="the merge of pull request #29 into main (the merge monitor, AC-146); the box is checked once it is merged",
+    steps="""1. `node test/unit/repo-picker.js`: typed paths and `~`, a folder inside a repository resolving to its root, refusals in plain words, Tab completion, remembered and nearby repositories, the fuzzy ranking; no dialog is called.
+2. `node test/ui/scenario-composer-friction.js`: the profile turns on `files.simpleDialog.enable`, so any folder dialog would open inside the window (never a native one) and a workbench observer records it. From the task field: Tab to the repository chip, Enter; type `frst` (fuzzy), a folder that is not a repository (refused in the picker), `<root>/elsew` then Tab (completes to `<root>/elsewhere/`), `notes-repo`, Enter; type a task, Enter.""",
+    expected="See the RFC criterion (the friction research of 2026-09-28, item 8).",
+    actual="""- **Before (main at ce426a04):** Enter on the chip opened a menu of open and recent repositories whose only way to add another was "Choose folder…", the native Open dialog; the same scenario failed from its first picker check.
+- **After:** the chip opens a picker inside the webview whose search field has the keyboard: open and recent repositories with nothing typed; a fuzzy search over every known repository (open, recent, added before, and Git repositories beside an open one); a path starting with `/` or `~` offers "Use <path>", Tab completes folders (Git repositories marked), a folder that is not a repository is explained in the picker. The typed `<root>/elsewhere/notes-repo` was added, the chip read "notes-repo", the keyboard went back to the task, and the task started in `<root>/elsewhere/notes-repo`. Next time the search found it as a recent repository. Escape closes the picker back to the chip. "Browse with the system dialog…" stays as the picker's last option. Folder dialogs recorded: none.""",
+    evidence=f"[scenario evidence](https://github.com/beelol/overseer/blob/acdd85f0/docs/verification/evidence/ui/composer-friction) (picker and typed-path screenshots, result.json, scenario.log), [unit test](https://github.com/beelol/overseer/blob/acdd85f0/test/unit/repo-picker.js)",
+    live="Fixture harness only; nothing here depends on the harness.",
+    limits="macOS only; Linux belongs to AC-41. Spoken repository choice is AC-216's; this criterion covers the keyboard.")
 rec(261, "One Sign In, clearly Overseer's or clearly not", "not started", date="—", commit="—",
     expected="See the RFC criterion (the friction research of 2026-09-28).",
     actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
