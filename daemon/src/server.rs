@@ -162,6 +162,7 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
         }
     });
     crate::gateway::start(&daemon);
+    crate::notices::watch(daemon.clone());
     let uid = unsafe { libc::getuid() };
     // Test-only: pretend the owner is another uid. It can only reject more peers (a peer must
     // still be this process's own uid), so it lets a test observe a "foreign" connection being
@@ -204,6 +205,7 @@ async fn connection(daemon: Arc<Daemon>, stream: UnixStream) -> Result<()> {
     let connection_id = CONNECTIONS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     let result = connection_loop(&daemon, &mut reader, &mut buf, &tx, &mut ui, connection_id).await;
     daemon.gateway.focus.lock().unwrap().remove(&connection_id);
+    daemon.windows.lock().unwrap().remove(&connection_id);
     if ui {
         daemon.ui_disconnected();
     }
@@ -260,6 +262,13 @@ async fn connection_loop(
                     None => focus.remove(&connection_id),
                 };
             }
+            let _ = tx.send(json!({"id": id, "result": {"ok": true}})).await;
+            continue;
+        }
+        if method == "ui.window" {
+            // Whether this VS Code window has the OS focus: agents' moments become Mac
+            // notifications only while no window has it (AC-240).
+            daemon.windows.lock().unwrap().insert(connection_id, params["focused"].as_bool() == Some(true));
             let _ = tx.send(json!({"id": id, "result": {"ok": true}})).await;
             continue;
         }
@@ -3203,6 +3212,8 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "daemon.shutdown" => json!({"ok": true}),
         "daemon.stop_all" => d.stop_all()?,
         "daemon.background_notice" => json!({"notice": d.background_notice()?}),
+        "notices.get" => crate::notices::get(d)?,
+        "notices.set" => crate::notices::set(d, p)?,
         "daemon.test_notice" => {
             let via = crate::background::notify("Overseer notifications are on", "This is how Overseer tells you agents are still running after VS Code closes.");
             crate::log(&format!("test notice ({via})"));

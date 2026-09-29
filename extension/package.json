@@ -288,7 +288,10 @@
         "overseer.devInstance": { "type": "string", "default": "", "markdownDescription": "Dev profiles only (written by `scripts/dev code`): the dev instance (`dev-<name>`) this window is pinned to; a daemon reporting another instance is refused. The installed extension ignores it.", "scope": "machine" },
         "overseer.review.enableEditing": { "type": "boolean", "default": true, "markdownDescription": "Edit working-tree text directly in the review. Undo/redo is available through Open in Native Diff." },
         "overseer.review.largeDiffThreshold": { "type": "integer", "minimum": 1, "default": 500, "markdownDescription": "Show a Load Diff card when additions + deletions exceed this count." },
-        "overseer.followNewRuns": { "type": "boolean", "default": true, "markdownDescription": "Turn Follow on for runs you launch from this window. Selecting an existing run never turns Follow on." }
+        "overseer.followNewRuns": { "type": "boolean", "default": true, "markdownDescription": "Turn Follow on for runs you launch from this window. Selecting an existing run never turns Follow on." },
+        "overseer.notifications.needsYou": { "type": "boolean", "default": true, "markdownDescription": "A Mac notification when an agent needs your permission or has a question, while VS Code is not focused or closed. Clicking it opens that agent." },
+        "overseer.notifications.finished": { "type": "boolean", "default": true, "markdownDescription": "A Mac notification when an agent finishes, while VS Code is not focused or closed." },
+        "overseer.notifications.failed": { "type": "boolean", "default": true, "markdownDescription": "A Mac notification when an agent stops with an error, while VS Code is not focused or closed." }
       }
     }
   },

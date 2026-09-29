@@ -24,6 +24,7 @@ const { AutoUsage } = require('./auto-usage');
 const features = require('./features');
 const { Voice } = require('./voice');
 const { agentsOnScreen, permissionTarget, commandTarget } = require('./on-screen');
+const { Notices, agentFromUri } = require('./notices');
 
 let client;
 let centerRef;
@@ -292,8 +293,12 @@ async function activate(context) {
     if (event.kind === 'profile') accountsSoon();
     if (event.kind === 'permission') {
       if (event.payload?.auto_allowed) return; // the daemon allowed its own tool (Overseer's reads): nothing waits
-      if (center.panel?.visible) return; // the dashboard's Needs you shows it
-      vscode.window.showWarningMessage(`An agent is waiting for permission to use ${event.payload.tool}.`, 'Show').then(choice => { if (!choice) return; if (center.active) { center.open(); selectRun(model.rootRun(model.run(event.run_id) || {})?.id || event.run_id); } else outputs.show(event.run_id, { preserveFocus: false }); });
+      // The toast names the agent (AC-240); it stays quiet only when that agent is on screen.
+      const run = model.run(event.run_id); const root = (run && model.rootRun(run)) || run;
+      if (root && onScreen().includes(root.id)) return;
+      const who = root ? `“${agentTitle(root)}”` : 'An agent';
+      const what = event.payload?.kind === 'question' ? 'has a question for you' : `is waiting for permission to use ${event.payload?.tool || 'a tool'}`;
+      vscode.window.showWarningMessage(`${who} ${what}.`, 'Show').then(choice => { if (!choice) return; if (center.active) { center.open(); selectRun(root?.id || event.run_id); } else outputs.show(event.run_id, { preserveFocus: false }); });
     }
   });
 
@@ -658,6 +663,17 @@ async function activate(context) {
     vscode.window.setStatusBarMessage(`$(trash) Removed ${removed} worktree${removed === 1 ? '' : 's'}; branches kept`, 4000);
   }
 
+  /** A notification's click (AC-52, AC-240): the Overseer view, or that agent. */
+  async function openUri(uri) {
+    if (uri.path === '/open-center') return vscode.commands.executeCommand('overseer.openCenter');
+    const runId = agentFromUri(uri);
+    if (!runId) return undefined;
+    await model.refresh();
+    if (!model.run(runId)) { vscode.window.showInformationMessage('That agent is no longer in Overseer.'); return undefined; }
+    await selectRun(runId); center.focus('chat');
+    return runId;
+  }
+
   /** The agents whose chat or review is on screen in this window (AC-242). */
   const onScreen = () => agentsOnScreen({ model, center, outputs, review });
   const agentTitle = run => { const root = model.rootRun(run) || run; return model.task(root.task_id)?.title || root.title || 'an agent'; };
@@ -914,8 +930,9 @@ async function activate(context) {
         : `Sent a test notification, but not as Overseer: ${via}. Allow Overseer in System Settings → Notifications to get Overseer-branded banners.`);
       return via;
     })),
-    // Notification clicks open vscode://beelol.overseer/open-center (AC-52).
-    vscode.window.registerUriHandler({ handleUri: uri => { if (uri.path === '/open-center') vscode.commands.executeCommand('overseer.openCenter'); } }),
+    // Notification clicks open vscode://beelol.overseer/open-center (AC-52), or an agent's own
+    // open-agent?run=<id> (AC-240): that agent's chat.
+    vscode.window.registerUriHandler({ handleUri: uri => openUri(uri) }),
     vscode.commands.registerCommand('overseer.openCenter', guard(async () => { await model.refresh(); if (selectedRun && model.run(selectedRun)) await selectRun(selectedRun); else { await arrangement.chatOnly(); center.setMode('composer'); } })),
     vscode.commands.registerCommand('overseer.openDashboard', guard(async () => { await model.refresh(); await dashboard.enter(); if (selectedRun && model.run(selectedRun)) await selectRun(selectedRun); })),
     vscode.commands.registerCommand('overseer.exitDashboard', guard(() => dashboard.exit())),
@@ -971,6 +988,9 @@ async function activate(context) {
     vscode.workspace.onDidGrantWorkspaceTrust(() => model.emitter.fire()),
   );
 
+  // Mac notifications outside VS Code (AC-240): this window's focus and the chosen kinds.
+  new Notices(context, client, { say });
+
   // Phone access (Gate N): its own status bar item, the Devices view and pairing.
   const phoneAccess = new PhoneAccess(context, client, { say, guard, requireTrust, looking: { model, center, outputs, selected: () => selectedRun } });
 
@@ -999,7 +1019,7 @@ async function activate(context) {
     // A pinned dev window says it once ('unreachable') and keeps waiting for its instance.
     if (pin && !client.refusal) { updateStatus(); client.reconnectLater(); } else vscode.window.showErrorMessage(`Overseer could not start its daemon: ${error.message}`);
   }
-  return { client, model, review, outputs, selectRun, agents, agentsView, center, dashboard, arrangement, attention, phoneAccess, voice, selectedRun: () => selectedRun }; // exported for UI tests
+  return { client, model, review, outputs, selectRun, agents, agentsView, center, dashboard, arrangement, attention, phoneAccess, voice, openUri, selectedRun: () => selectedRun }; // exported for UI tests
 }
 
 function deactivate() { if (centerRef) centerRef.shuttingDown = true; client?.dispose(); }

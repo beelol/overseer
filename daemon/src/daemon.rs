@@ -9,7 +9,7 @@ use crate::store::{self, DirectorOwnerLink, Event, Profile, Run, Snapshot, Store
 use anyhow::{anyhow, bail, Context, Result};
 use rusqlite::OptionalExtension;
 use serde_json::{json, Value};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{Read, Seek, SeekFrom};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
@@ -383,6 +383,9 @@ pub struct Daemon {
     /// When VS Code windows went from none to some, and the runs the last background notice named:
     /// a brief reconnect after a notice (a probe, a crash-restart) does not repeat it.
     pub ui_session: Mutex<(Option<std::time::Instant>, Option<Vec<String>>)>,
+    /// Whether each VS Code window (by connection) has the OS focus (`ui.window`): an agent's
+    /// moments become Mac notifications only while none has it (AC-240).
+    pub windows: Mutex<HashMap<u64, bool>>,
     /// The phone gateway (Gate N). Off until the owner turns phone access on.
     pub gateway: crate::gateway::Gateway,
     /// What Overseer coordinates with no model: pending conflict scans and their caches.
@@ -445,7 +448,7 @@ impl Daemon {
             learning_usage_paused: std::sync::atomic::AtomicBool::new(false), learning_work_paused: std::sync::atomic::AtomicBool::new(false),
             learning_thread_paused: std::sync::atomic::AtomicBool::new(false), learning_account_paused: std::sync::atomic::AtomicBool::new(false),
             learning_maintenance_paused: std::sync::atomic::AtomicBool::new(false),
-            ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0), ui_session: Mutex::new((None, None)), gateway: crate::gateway::Gateway::new(),
+            ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0), ui_session: Mutex::new((None, None)), windows: Mutex::new(HashMap::new()), gateway: crate::gateway::Gateway::new(),
             coord: crate::overseer::conflicts::Coordination::default() });
         daemon.ensure_system_profiles()?;
         {
