@@ -367,6 +367,15 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
         Some(Line::from(vec![Span::styled(" ◆ ", Style::new().fg(waiting())), Span::styled(fit(&what, (area.width as usize).saturating_sub(24)), Style::new().fg(waiting()).add_modifier(Modifier::BOLD)), Span::styled("  a", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(" allow ", Style::new().fg(MUTED)), Span::styled("d", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(" deny ", Style::new().fg(MUTED))]))
     } else if app.drafts.get(&run.id).is_some_and(|d| !d.trim().is_empty()) && !matches!(app.mode, Mode::Compose) {
         Some(Line::from(Span::styled(" ✎ draft ", Style::new().fg(accent()))))
+    } else if let Some(landed) = app.state.landing_text(&run.workspace_id).filter(|_| !run.active()) {
+        // AC-243: what the work became, "Merged into main (1a2b3c4)"; C cleans the worktree up.
+        let merged = landed.starts_with("Merged");
+        let mut spans = vec![Span::styled(format!(" {} {landed} ", if merged { "✓" } else if landed.starts_with("Merge stopped") { "⚠" } else { "↗" }), Style::new().fg(if merged { color } else { waiting() }))];
+        if merged && app.state.workspace(&run.workspace_id).is_some_and(|w| w.kind == "worktree" && w.removed_ms.is_none()) {
+            spans.push(Span::styled("C", Style::new().fg(accent()).add_modifier(Modifier::BOLD)));
+            spans.push(Span::styled(" clean up ", Style::new().fg(MUTED)));
+        }
+        Some(Line::from(spans))
     } else if !run.active() {
         // "interrupted · by user (exit signal 2)": the reason without repeating the status.
         let word = run.exit_reason.as_deref().filter(|_| run.status != "completed").map(|r| {

@@ -68,6 +68,8 @@ pub struct Workspace {
     pub path: String,
     pub kind: String,
     pub branch: Option<String>,
+    #[serde(default)]
+    pub removed_ms: Option<i64>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -95,6 +97,9 @@ pub struct State {
     /// Overseer's own summary: the level, what waits for the owner.
     #[serde(default)]
     pub overseer: Value,
+    /// What each workspace's work became (AC-243): merged, stopped on conflicts, or a pull request.
+    #[serde(default)]
+    pub landings: Value,
 }
 
 impl State {
@@ -123,6 +128,27 @@ impl State {
 }
 
 impl State {
+    /// What an agent's work became, in the words every surface uses (extension/media/landing-text.js):
+    /// "Merged into main (1a2b3c4)", "Merge stopped: conflicts in a.txt", "Pull request open".
+    pub fn landing_text(&self, workspace_id: &str) -> Option<String> {
+        let l = &self.landings[workspace_id];
+        match l["state"].as_str()? {
+            "merged" => {
+                let commit: String = l["commit"].as_str().unwrap_or_default().chars().take(7).collect();
+                Some(format!("Merged into {}{}", l["target"].as_str().unwrap_or("main"), if commit.is_empty() { String::new() } else { format!(" ({commit})") }))
+            }
+            "conflicts" => {
+                let files: Vec<&str> = l["files"].as_array().map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+                Some(if files.is_empty() { "Merge stopped: conflicts".to_string() } else { format!("Merge stopped: conflicts in {}", files.join(", ")) })
+            }
+            "pr" => Some(match l["url"].as_str().and_then(|u| u.rsplit('/').next()).filter(|n| n.chars().all(|c| c.is_ascii_digit()) && !n.is_empty()) {
+                Some(n) => format!("Pull request #{n} open"),
+                None => "Pull request open".to_string(),
+            }),
+            _ => None,
+        }
+    }
+
     pub fn run(&self, id: &str) -> Option<&Run> {
         self.runs.iter().find(|r| r.id == id)
     }
@@ -168,5 +194,25 @@ impl State {
         let mut roots: Vec<&Run> = self.runs.iter().filter(|r| r.parent_run_id.is_none()).collect();
         roots.sort_by(|a, b| b.created_ms.cmp(&a.created_ms).then_with(|| b.id.cmp(&a.id)));
         roots
+    }
+}
+
+#[cfg(test)]
+mod landing {
+    use super::*;
+    use serde_json::json;
+
+    /// AC-243: the words for what an agent's work became are the extension's.
+    #[test]
+    fn merged_conflicts_and_pull_request_read_as_everywhere() {
+        let state: State = serde_json::from_value(json!({ "landings": {
+            "w1": { "state": "merged", "target": "main", "commit": "1a2b3c4d5e6f" },
+            "w2": { "state": "conflicts", "files": ["a.txt", "b.txt"] },
+            "w3": { "state": "pr", "url": "https://github.com/o/r/pull/7" }
+        } })).unwrap();
+        assert_eq!(state.landing_text("w1").as_deref(), Some("Merged into main (1a2b3c4)"));
+        assert_eq!(state.landing_text("w2").as_deref(), Some("Merge stopped: conflicts in a.txt, b.txt"));
+        assert_eq!(state.landing_text("w3").as_deref(), Some("Pull request #7 open"));
+        assert_eq!(state.landing_text("w4"), None);
     }
 }
