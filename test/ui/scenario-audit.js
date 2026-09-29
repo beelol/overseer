@@ -113,7 +113,8 @@ const HEIGHT = 860;
       // Gate M (AC-100): the chat has no Files pane; the review's navigator lists the files.
       const tagged = await cdp.evalWorkbench(`(() => { const pane = [...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || '')); if (!pane) return false; pane.dataset.audit = 'agents'; return true; })()`);
       views.dashboard = { frame: dash, opts: { root: 'body' } };
-      views.agents = tagged ? { frame: null, opts: { root: '[data-audit="agents"]', nativeHover: true } } : undefined;
+      // The rollup row and the header's count (AC-254, AC-255, added after Gate J) are measured on their own.
+      views.agents = tagged ? { frame: null, opts: { root: '[data-audit="agents"]', nativeHover: true, exclude: ['[data-audit="agents"] .monaco-list-row[aria-label^="Agents: "]', '[data-audit="agents"] .pane-header .description'] } } : undefined;
       // VS Code's managed hover really shows the name of a title action (checked once by pointer).
       const act = await cdp.evalWorkbench(`(() => { const a = document.querySelector('[data-audit="agents"] .pane-header .action-label[aria-label^="Search Agents"]'); if (!a) return null; const r = a.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
       if (act) { await cdp.move(act.x, act.y); await delay(300); await cdp.move(act.x + 1, act.y); }
@@ -124,7 +125,7 @@ const HEIGHT = 860;
       views.review = { frame: await cdp.webview(`!!document.getElementById('diffs') && document.body.dataset.runId === ${JSON.stringify(runs.showcase.run.id)} && !(document.getElementById('loading-stage')?.textContent || '').trim()`, 30000), opts: { root: 'body' } };
       if (!views.agents) delete views.agents;
     } else {
-      await cdp.command('Overseer: Open Dashboard');
+      await cdp.command('Overseer: Enter Focus Mode');
       const dash = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('[data-audit-view="agents"]')`, 30000);
       const id = runs.showcase.run.id;
       await dash.eval(`(() => { const r = document.querySelector('[data-run=${JSON.stringify(id)}]'); r.scrollIntoView(); r.id = 'pick'; return true; })()`);
@@ -161,7 +162,8 @@ const HEIGHT = 860;
         for (const w of WIDTHS) {
           await setWidth(w);
           await s.screenshot(`grid-${theme.replace(/\s+/g, '-').toLowerCase()}-${w}`);
-          record('grid', `${theme}@${w}`, await audit(dash, { root: '[data-audit-view="grid"]' }));
+          record('grid', `${theme}@${w}`, await audit(dash, { root: '[data-audit-view="grid"]', exclude: ['#grid-rollup'] }));
+          record('grid-rollup', `${theme}@${w}`, await audit(dash, { root: '#grid-rollup' }));
         }
       }
       await toggleGrid();
@@ -169,7 +171,7 @@ const HEIGHT = 860;
     }
 
     // New agent: the New Task form (baseline) or the composer shown with no agent selected (new).
-    if (UI === 'baseline') await cdp.command('Overseer: New Task');
+    if (UI === 'baseline') await cdp.command('Overseer: Start an Agent with the Full Form');
     else if (UI === 'gatek') await cdp.command('Overseer: New Agent');
     else await views.dashboard.frame.eval(`document.querySelector('[data-action="new-agent"]').click()`);
     const composer = UI === 'baseline'

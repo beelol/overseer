@@ -3,6 +3,7 @@
 // to git only as an in-memory http header via environment variables, and never reaches the
 // daemon, events or logs. Never automatic, and nothing is merged.
 const vscode = require('vscode');
+const Plain = require('../media/plain-words.js');
 const path = require('path');
 const { execFile } = require('child_process');
 
@@ -54,10 +55,10 @@ class PullRequests {
   async pick() {
     const runs = this.model.state.runs.filter(r => !r.parent_run_id && this.model.workspace(r.workspace_id)?.kind === 'worktree' && !this.model.workspace(r.workspace_id)?.removed_ms)
       .sort((a, b) => b.created_ms - a.created_ms);
-    if (!runs.length) { vscode.window.showInformationMessage('No run to open a pull request from.', { modal: true, detail: 'Open PR works on a run in its own worktree, and there are none yet. Start a task in a new worktree first.' }); return undefined; }
+    if (!runs.length) { vscode.window.showInformationMessage('No agent to open a pull request from.', { modal: true, detail: 'Open PR works on an agent in its own worktree, and there are none yet. Start an agent in a new worktree first.' }); return undefined; }
     const choice = await vscode.window.showQuickPick(runs.map(r => {
       const task = this.model.task(r.task_id), ws = this.model.workspace(r.workspace_id);
-      return { label: task?.title || r.title, description: `${path.basename(task?.repo_root || '')} · ${ws.branch}`, detail: `${r.harness}${r.model ? ' · ' + r.model : ''} · ${r.status}`, run: r };
+      return { label: task?.title || r.title, description: `${path.basename(task?.repo_root || '')} · ${ws.branch}`, detail: `${Plain.harness(r.harness)}${r.model ? ' · ' + r.model : ''} · ${Plain.plain(r.status)}`, run: r };
     }), { title: 'Open a pull request for which run?', matchOnDescription: true });
     return choice?.run;
   }

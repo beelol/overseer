@@ -700,7 +700,7 @@ rec(61, "Needs-you inbox and keyboard control", "verified", commit="3f8c0f9", da
 - **Fixed on the way:** ⌥⌘J now goes to the most urgent item that is not already open (it used to cycle past items).""",
     evidence="[keyboard scenario](evidence/ui/keyboard/)",
     live="Fixture runs; permissions from live Claude and Codex app-server use the same path (AC-43).",
-    limits="The follow-up step focuses the chat's prompt field from the test before typing (keyboard focus lands there after switching in normal use) Since AC-246 and AC-254 (pull request #31, not merged yet) Needs you is what waits for the owner's answer; a failure and finished work carry the to-review mark instead, and ⌥⌘J goes to them after Needs you (the keyboard scenario checks this).",
+    limits="The follow-up step focuses the chat's prompt field from the test before typing (keyboard focus lands there after switching in normal use) Since AC-246 and AC-254 (pull request #31, merged as b2c186fb) Needs you is what waits for the owner's answer; a failure and finished work carry the to-review mark instead, and ⌥⌘J goes to them after Needs you (the keyboard scenario checks this).",
     blocker="not blocked")
 
 rec(63, "History that stays tidy", "verified", commit="3f8c0f9", date="2026-09-26",
@@ -2342,7 +2342,7 @@ rec(214, "Deploy: the one path from dev to production (stage 4)", "verified", co
 rec(216, "A conversation, not only requests, the same typed or spoken", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
-rec(217, "Turning it on is visible", "verified", date="2026-09-29", commit="c8e87a21 (branch claude/views-polish, pull request #31, not merged yet); earlier 4832c5e0 (pull request #27, merged as 24c3c245)",
+rec(217, "Turning it on is visible", "verified", date="2026-09-29", commit="c8e87a21 (branch claude/views-polish, pull request #31, merged as b2c186fb); earlier 4832c5e0 (pull request #27, merged as 24c3c245)",
     harness="Simulated voice and the Claude fixture as Overseer's model, packaged VSIX; no paid turn",
     proven="the whole Verify clause: home's Voice button with its shortcut; home before, during and after turning it on in the three themes; the animation recorded; the removed line absent",
     steps="""1. `node test/ui/scenario-one-view.js` (pull request #27): the Voice button with ⌥⌘⇧V, Voice Mode on and off in each theme, the removed line.
@@ -2432,7 +2432,7 @@ rec(232, "The review says what it shows", "verified", date="2026-09-29", commit=
     evidence="[review-merge scenario](https://github.com/beelol/overseer/blob/401a3acc/docs/verification/evidence/ui/review-merge), [pr scenario](https://github.com/beelol/overseer/blob/401a3acc/docs/verification/evidence/ui/pr), `daemon/tests/review_merge.rs`; `daemon/src/daemon.rs` (`comparisons`), `extension/src/landing.js`, `extension/branch-diff/review/browser.js`, `extension/branch-diff/review/editing-client.js`",
     live="Fixture agents only.",
     limits="Publish to GitHub runs VS Code's own Publish to GitHub after a yes; it is offered and asked, not driven end to end (it would create a real repository).")
-rec(233, "Clicking an agent puts you in its head", "verified", commit="7b4a6829 (branch claude/agent-head, pull request #34, not merged yet)", date="2026-09-29",
+rec(233, "Clicking an agent puts you in its head", "verified", commit="7b4a6829 (branch claude/agent-head, pull request #34, merged as 38919c1b)", date="2026-09-29",
     harness="Claude Code fixture harness (fixtures/fake-harness/claude-fixture.js, its new `editor` mode: an Edit tool call per step, each step released by the scenario) on the packaged VSIX in an isolated VS Code 1.139.1 profile (background test window); no accounts, no paid turns",
     proven="the whole Verify clause: opening the fixture agent shows its worktree's file tree (the Worktree view) and follows the file it edits with inline diffs; the toggle switches to Diffs only and back to the same file, line and scroll; a line typed and saved in its worktree lands there; the window's folder, title folder and window count are unchanged; screenshots in Overseer Dark, Overseer Light and Overseer",
     steps="""1. `node extension/scripts/package.js`, then `node test/ui/scenario-agent-head.js` ([evidence](https://github.com/beelol/overseer/blob/7b4a6829/docs/verification/evidence/ui/agent-head), [the scenario](https://github.com/beelol/overseer/blob/7b4a6829/test/ui/scenario-agent-head.js)); 13 of 13 checks; also in `scripts/test-all --jobs=3` at the merged branch (68 of 70: the two failures, the review scenario's conflict check and the Rust test ac189, pass when rerun alone and fail the same way in other branches' runs; [log](https://github.com/beelol/overseer/blob/7b4a6829/docs/verification/evidence/agent-head/test-all-jobs3.txt)).
@@ -2455,7 +2455,7 @@ rec(235, "You can always see which account an agent uses", "not started", date="
     expected="See the RFC criterion (added by the owner on 2026-09-28).",
     actual="Not started: the agent header shows only \"Your login\" (the owner's voice session, 2026-09-28).", live="—", blocker="With the account work after the one-view build.")
 
-rec(236, "Home talks to Overseer first", "verified", date="2026-09-29", commit="c8e87a21 (branch claude/views-polish, pull request #31, not merged yet)",
+rec(236, "Home talks to Overseer first", "verified", date="2026-09-29", commit="c8e87a21 (branch claude/views-polish, pull request #31, merged as b2c186fb)",
     harness="Claude fixture as Overseer's model and as the agents, packaged VSIX; no paid turns",
     proven="the whole Verify clause: a fresh profile's first Enter on home reaches Overseer and starts no agent; \"Start an agent directly\" starts one as before and is remembered; screenshots in the three themes",
     steps="""1. `node test/ui/scenario-home-overseer.js` (fresh profile, no setting): Overseer: Open Overseer View, then keyboard only.
@@ -2469,7 +2469,7 @@ rec(236, "Home talks to Overseer first", "verified", date="2026-09-29", commit="
     evidence="`test/ui/scenario-home-overseer.js` and its evidence folder `docs/verification/evidence/ui/home-overseer/` on the branch, pull request #31",
     live="Fixtures only; no paid turn.",
     limits="Existing scenarios that start agents by typing at home choose \"Start directly\" (`overseer.home.sendTo: agent`) in their profile.")
-rec(237, "Overseer starts agents on the right harness, model and account", "verified", date="2026-09-29", commit="fdac4335 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(237, "Overseer starts agents on the right harness, model and account", "verified", date="2026-09-29", commit="a89b754f (branch claude/overseer-brain, pull request #32, not merged yet)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the whole Verify clause with the fixture as Overseer's model: starts on a named model, a named account and a named harness, each confirmed on the run; an unnamed start on Auto's route pick with its reason on the card; the tool schema's fields",
     steps="""1. `cargo test --test overseer_brain ac237` (3 tests, real daemon binary, Claude fixture as Overseer and agents, Codex app-server fixture with listed models).
@@ -2477,14 +2477,14 @@ rec(237, "Overseer starts agents on the right harness, model and account", "veri
 3. With Auto routing on, "start an agent to tidy the readme" names nothing; with it off, "start an agent to tidy the changelog".""",
     expected="See the RFC criterion (the usability audit of 2026-09-28, findings 2, 8 and 9).",
     actual="""- `propose`'s start takes harness (claude, codex, opencode), model, profile (an account id or name), effort and permission_mode; a new `accounts` tool lists the accounts, whether Auto routing picks and which harnesses are installed. A name that is no account is refused with the accounts there are.
-- Named: the card reads "Start “write the notes” in … on Claude Code · opus-fixture: as asked"; the run's arguments carry `--model opus-fixture`; the account start runs on the Work profile; the Codex start runs on `codex-app` with `system-codex`. Overseer's reply is one line with the pick.
+- Named: the card reads "Start “write the notes” in … on Claude Code · opus-fixture" and Overseer's reply adds "(as asked)"; the run's arguments carry `--model opus-fixture`; the account start runs on the Work profile; the Codex start runs on `codex-app` with `system-codex`. Overseer's reply is one line with the pick.
 - Unnamed, Auto routing on: the daemon asks Auto (`auto.root.preview`) when the start is proposed and the yes starts it through `auto.start` pinned to that route, so Auto's booking and admission apply. Card: "… on Codex · gpt-6-sol · medium: Auto's pick: the recommended default for this kind of work; how much it will use is not known yet"; the run has exactly that harness, model and account.
-- Auto routing off (or no route fits): Overseer's own harness on the default account, and the card says so.
+- Auto routing off (or no route fits): Overseer's own harness on the default account; the card names the harness and the reply says why ("Auto routing is off"). A spoken start keeps the composer's remembered harness, account and model (AC-168), shown as "your composer's choice".
 - An Auto-routed start Overseer makes on its own waits for the owner's yes (the Auto contract: Overseer's level grants no route).""",
-    evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/fdac4335/daemon/tests/overseer_brain.rs) (`ac237_*`)",
+    evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/a89b754f/daemon/tests/overseer_brain.rs) (`ac237_*`)",
     live="Fixtures only; a live model choosing the fields from free wording was not exercised.",
     limits="Auto routing is used when Auto Mode is on; Auto Mode stays off by default until its own checks pass (docs/rfcs/auto-mode.md), which is the owner's switch. Within the owner's allowed accounts means Auto's allowed set (the default accounts) or an account the owner names; there is no separate allowed-accounts setting for Overseer yet.")
-rec(238, "Overseer checks finished work and offers the next step", "verified", date="2026-09-29", commit="fdac4335 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(238, "Overseer checks finished work and offers the next step", "verified", date="2026-09-29", commit="a89b754f (branch claude/overseer-brain, pull request #32, not merged yet)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the whole Verify clause with the fixture as Overseer's model",
     steps="""1. `cargo test --test overseer_brain ac238_overseer_checks_finished_work_and_offers_the_next_step`.
@@ -2494,9 +2494,9 @@ rec(238, "Overseer checks finished work and offers the next step", "verified", d
 - Passing: the card reads "Totals did it: It added what was asked (1 file changed) and `npm test` passes: "3 passing"." with the daemon's own test record; a merge_back proposal comes from the check-in turn (cause `check_in`).
 - Failing: "Negatives is not done yet: `npm test` fails: "AssertionError: expected -1 to equal 1"."; a message with the fix is proposed.
 - Nothing happened without a yes: the repository's HEAD did not move and the failing agent got no turn; the owner's yes sent the fix. A check-in may propose merge_back or pull_request only for a finished agent and they always wait for a yes; archive and the other Confirm actions stay the owner's own to ask for.""",
-    evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/fdac4335/daemon/tests/overseer_brain.rs) (`ac238_*`)",
+    evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/a89b754f/daemon/tests/overseer_brain.rs) (`ac238_*`)",
     live="Fixtures only: the verdict's quality with a live model is not judged here.")
-rec(239, "Stuck, failed and limited agents come back to Overseer", "partial", date="2026-09-29", commit="fdac4335 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(239, "Stuck, failed and limited agents come back to Overseer", "partial", date="2026-09-29", commit="a89b754f (branch claude/overseer-brain, pull request #32, not merged yet)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the daemon side of the Verify clause: ratelimit, failed-reason and a silent agent each give one Overseer turn and a card with a plain reason; continuing on the other account carries the work on a second fixture profile in the same worktree; neither the conversation nor the daemon's state shows an error class or HTTP code",
     steps="""1. `cargo test --test overseer_brain ac239_stuck_failed_and_limited_agents_come_back_to_overseer`, plus the unit test `overseer::trouble::tests::reasons_are_plain`.
@@ -2506,7 +2506,7 @@ rec(239, "Stuck, failed and limited agents come back to Overseer", "partial", da
 - Overseer proposed continue on Work, a retry, and (at Auto) stopped the silent agent itself. The yes on continue ended the limited run as handed off and started its successor on the Work profile in the same task and worktree, through Continuity's handoff with the permission mode carried; the retry sent the unfinished turn again.
 - At Auto a failing agent is retried once by Overseer; the second retry waits for the owner's yes, so a repeating failure is not a loop.
 - The daemon's state gives failed runs a `plain_reason` ("Reached its account's usage limit"); the conversation holds no `[rate_limit]`, `429` or "turn reported failure". The agents tree tooltip, Needs you, home's stage line and the chat's status now show `plain_reason` first.""",
-    evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/fdac4335/daemon/tests/overseer_brain.rs) (`ac239_*`), [trouble.rs](https://github.com/beelol/overseer/blob/fdac4335/daemon/src/overseer/trouble.rs)",
+    evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/a89b754f/daemon/tests/overseer_brain.rs) (`ac239_*`), [trouble.rs](https://github.com/beelol/overseer/blob/a89b754f/daemon/src/overseer/trouble.rs)",
     live="Fixtures only.",
     limits="Another account cannot resume a harness's own session (its session store is per account), so the work continues as a successor run with a handoff prompt in the same worktree, as Continuity does. `exit_reason` keeps the daemon's record, including the error class, for AC-16.",
     blocker="No UI scenario yet checks the VS Code surfaces (tree tooltip, Needs you, chat status) for a raw error with a limited agent; they read `plain_reason` but that is unproven on screen.")
@@ -2546,7 +2546,7 @@ rec(243, "Merge from the agent, and it reads merged afterwards", "verified", dat
     evidence="[review-merge scenario](https://github.com/beelol/overseer/blob/401a3acc/docs/verification/evidence/ui/review-merge), [TUI screen](https://github.com/beelol/overseer/blob/401a3acc/docs/verification/evidence/tui/ac243-merged.txt), `daemon/tests/review_merge.rs`, `tui/tests/merged.rs`; `daemon/src/merge.rs`, `daemon/src/pr.rs`, `extension/src/landing.js`, `extension/media/chat.js`, `extension/media/landing-text.js`",
     live="Fixture agents only.",
     limits="A merge still needs the owner's checkout clean and on the target branch (audit finding 43); the confirmation says so instead of merging. The agent asked to combine conflicts is a paid-turn path covered by the LIVE scenario-merge, updated to this flow but not run here.")
-rec(244, "Opening an agent leaves your layout alone", "partial", commit="7b6af3bf (branch claude/layout, pull request #33, not merged yet)", date="2026-09-29",
+rec(244, "Opening an agent leaves your layout alone", "partial", commit="7b6af3bf (branch claude/layout, pull request #33, merged as 50a6d041)", date="2026-09-29",
     harness="Generic fixture programs and the Claude Code fixture harness on the packaged VSIX in isolated VS Code 1.139.1 profiles (background, transparent test windows); no accounts, no paid turns",
     proven="with two editor groups of the owner's files and the secondary side bar open, selecting an agent, then one with changes (review and chat), then home, keeps both groups with their tabs and the secondary side bar: Overseer opens beside them. With a second VS Code window open, the dashboard in a window opened on a workspace file (as Open Dashboard in New Window now opens its window) hides the tab strips in its own window only: the settings go to that window's workspace file, the second window keeps its tab strip, user settings never change, and leaving takes them out again",
     deferred="the dashboard entered in a window opened on a single folder, or on nothing, still writes its three immersive settings to user settings (so other windows lose their tab strips while it is open): VS Code's only window-level settings there are the folder's .vscode/settings.json in the owner's repository, often a tracked file that agents working in the checkout would see and commit. The owner decides: write .vscode/settings.json anyway, open the dashboard only in its own window, or drop tab hiding there",
@@ -2561,7 +2561,7 @@ rec(244, "Opening an agent leaves your layout alone", "partial", commit="7b6af3b
     live="Fixture agents only.",
     limits="A window opened from inside a test window does not load the test's extensions, so Open Dashboard in New Window is not driven end to end; the scenario uses a window opened on a workspace file, which is what that command now opens.",
     blocker="The owner chooses what the dashboard does with its settings in a window opened on a folder (see deferred).")
-rec(245, "No internal words on any surface", "verified", date="2026-09-29", commit="c8e87a21 (branch claude/views-polish, pull request #31, not merged yet)",
+rec(245, "No internal words on any surface", "verified", date="2026-09-29", commit="c8e87a21 (branch claude/views-polish, pull request #31, merged as b2c186fb)",
     harness="Every fixture packaged-UI scenario and every TUI test's evidence screen; no paid turns",
     proven="the whole Verify clause: a text check over every fixture scenario's owner-facing text and every TUI evidence screen fails on each listed pattern; home and the TUI draw Overseer's Markdown lists",
     steps="""1. `scripts/test-all --jobs=3`: the UI harness reads the owner-facing text of the window at every screenshot of every scenario (test/ui/plain-words.js: the side bar's rows and header, the status bar, toasts, dialogs, quick picks, and in every Overseer webview its text, tooltips, accessible names and placeholders; agents' titles and prompts, messages, Markdown, code, diffs, typed input and the raw Event log and Raw output views are the owner's or the agents' own) and fails the scenario on any listed pattern; the result is each scenario's `plain-words.json`.
@@ -2574,7 +2574,7 @@ rec(245, "No internal words on any surface", "verified", date="2026-09-29", comm
     evidence="`test/ui/plain-words.js`, `extension/media/plain-words.js`, `tui/src/words.rs`, `tui/tests/words.rs` and the scenarios' `plain-words.json` on the branch, pull request #31",
     live="Fixtures only.",
     limits="What the owner and the agents wrote (titles, prompts, messages, Markdown, code, diffs, program output) and the raw Event log and Raw output views are left out of the check; Overseer's own replies are its model's words (state names in them are put in words). The phone was not checked (it is not listed in the criterion); its list and chat say what VS Code says.")
-rec(246, "One name for each thing", "partial", date="2026-09-29", commit="c8e87a21 (branch claude/views-polish, pull request #31, not merged yet)",
+rec(246, "One name for each thing", "partial", date="2026-09-29", commit="c8e87a21 (branch claude/views-polish, pull request #31, merged as b2c186fb)",
     harness="Unit checks over the extension's words; the daemon's recording of nine agents (phone/model/test/fixtures/nine-agents.json) read by the extension's, the TUI's and the phone's tests; no paid turns",
     proven="\"agent\" everywhere in package.json and the extension's words (checked); New Agent the one start command with the full form reachable from it; the dashboard renamed Focus Mode; the same recorded state gives the same Needs-you count in the extension, the TUI and the phone",
     steps="""1. `node test/unit/one-name.js`: package.json's command titles, setting descriptions, view names and welcome text, and every string the extension's sources show, against the banned names (a task or a run for an agent; Dashboard).
@@ -2586,7 +2586,7 @@ rec(246, "One name for each thing", "partial", date="2026-09-29", commit="c8e87a
     evidence="`test/unit/one-name.js`, `test/unit/rollup.js`, `tui/src/model.rs` (tests `needs_you`), `phone/src/screens/__tests__/AgentsScreen.test.tsx` on the branch, pull request #31",
     live="Fixtures only.",
     deferred="the phone counting Overseer's proposals and conflicts in Needs you: the phone does not receive them (Gate N's gateway), so with a proposal waiting VS Code and the TUI say one more than the phone; the TUI's own words were not swept for task and run")
-rec(247, "Home's input is always on screen", "verified", date="2026-09-29", commit="c8e87a21 (branch claude/views-polish, pull request #31, not merged yet)",
+rec(247, "Home's input is always on screen", "verified", date="2026-09-29", commit="c8e87a21 (branch claude/views-polish, pull request #31, merged as b2c186fb)",
     harness="Claude fixture as Overseer's model, packaged VSIX; no paid turns",
     proven="the whole Verify clause: a 20-message conversation at 1280×800 and 1440×900 with `#task` and its choices inside the view, and Continuity's one-time notice one line",
     steps="""1. `node test/ui/scenario-home-input.js`: ten questions to Overseer (20 messages), Talk to Overseer, the workbench sized to 1280×800 and 1440×900 (CDP device metrics), with Continuity's first-use notice showing.""",
@@ -2595,7 +2595,7 @@ rec(247, "Home's input is always on screen", "verified", date="2026-09-29", comm
 - Continuity's notice, folded, is one compact line (44 px at most; it was 51 px on main, which the scenario failed first). One view for talking to Overseer (#27) had already pinned the box to the foot.""",
     evidence="`test/ui/scenario-home-input.js` and `docs/verification/evidence/ui/home-input/` on the branch, pull request #31",
     live="Fixtures only.")
-rec(248, "Overseer's session never drops what it was told", "verified", date="2026-09-29", commit="fdac4335 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(248, "Overseer's session never drops what it was told", "verified", date="2026-09-29", commit="a89b754f (branch claude/overseer-brain, pull request #32, not merged yet)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the whole Verify clause: a forced Lagged error, an ask before Overseer's first turn, a failed turn start, a proposal after its spoken request closed",
     steps="""1. From pull request #28 (merged): `cargo test --test overseer ac181_the_session_loop_catches_up_after_falling_behind` (a 64-event bus flooded with 800,000 output events) and `ac190_a_question_waits_for_overseers_first_turn_and_survives_start_fresh`.
@@ -2606,7 +2606,7 @@ rec(248, "Overseer's session never drops what it was told", "verified", date="20
 - An ask before Overseer's run exists, or after Start fresh, is kept and answered by the first turn Overseer takes once its run exists (#28); a question at the daily cap is kept and answered when the cap allows.
 - A turn that cannot start (Overseer's folder taken away): `overseer.send` answers queued, the conversation says once "Overseer could not start its turn: its folder is gone. Your words are kept and sent again when it can.", the session ticker tries again (2 s doubling to 15 s), and the kept message is sent and answered once the folder is back. On main the send returned the error and the message was lost.
 - A spoken request closed "Not sent … Nothing will be sent later": the proposal its slow turn made 9 s later is recorded cancelled ("Withdrawn: the spoken request V-… was closed as not sent, so nothing was sent.") and the agent got nothing. On main it settled and went out.""",
-    evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/fdac4335/daemon/tests/overseer_brain.rs) (`ac248_*`), [voice test](https://github.com/beelol/overseer/blob/fdac4335/daemon/tests/voice.rs), pull request #28",
+    evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/a89b754f/daemon/tests/overseer_brain.rs) (`ac248_*`), [voice test](https://github.com/beelol/overseer/blob/a89b754f/daemon/tests/voice.rs), pull request #28",
     live="Fixtures only.",
     limits="An ask made before Overseer's first turn is answered by the check-in turn that follows the owner's first message, not inside that first turn.")
 rec(249, "Test windows never reach the owner's screen", "verified", commit="c3becdd7 (branch claude/audit-correctness, pull request #28)", date="2026-09-28",
@@ -2621,7 +2621,7 @@ rec(249, "Test windows never reach the owner's screen", "verified", commit="c3be
     evidence="[dev-instance scenario](evidence/ui/dev-instance/), [fresh worktree](evidence/ac249/fresh-worktree.txt)",
     live="Fixture harnesses; no paid turns. Background windows only; the owner's daemon, VS Code, data and logins were never involved.")
 
-rec(250, "One command opens the whole Overseer layout", "verified", commit="7b6af3bf (branch claude/layout, pull request #33, not merged yet)", date="2026-09-29",
+rec(250, "One command opens the whole Overseer layout", "verified", commit="7b6af3bf (branch claude/layout, pull request #33, merged as 50a6d041)", date="2026-09-29",
     harness="Generic fixture programs and the Claude Code fixture harness on the packaged VSIX in isolated VS Code 1.139.1 profiles (background, transparent test windows); no accounts, no paid turns",
     steps="""1. `node test/unit/layout.js`: what the workspace keeps of the owner's tabs (order, active tab, pinned, unsaved ones never closed) and its three columns for 1440 and 1920 px windows.
 2. `node test/ui/scenario-workspace.js` ([evidence](https://github.com/beelol/overseer/blob/7b6af3bf/docs/verification/evidence/ui/workspace)): a cluttered window (Explorer side bar, the terminal panel, two editor groups with six tabs of five files), one working agent editing a file and one finished; at 1440×900 and at 1920×1080: one click on the status bar's Workspace button, then the same button (now Close Workspace); then Overseer: Open Workspace twice from the palette.""",
@@ -2631,7 +2631,7 @@ rec(250, "One command opens the whole Overseer layout", "verified", commit="7b6a
     evidence="[workspace scenario](https://github.com/beelol/overseer/blob/7b6af3bf/docs/verification/evidence/ui/workspace) (cluttered, workspace and restored screenshots at both sizes, result.json), [unit test](https://github.com/beelol/overseer/blob/7b6af3bf/test/unit/layout.js); `extension/src/dashboard-mode.js`, `extension/src/arrangement.js`, `extension/src/layout.js`",
     live="Fixture agents only; nothing here depends on the harness.",
     limits="Unsaved tabs are never closed: they stay open behind the workspace's columns and, if they were in another group, come back in the first one. Pages VS Code does not describe to extensions (Welcome, Settings, release notes) are closed and not reopened. The side bar comes back on Explorer or Overseer's view (VS Code does not tell extensions which view it showed). Whether it feels better than arranging VS Code by hand is the owner's call.")
-rec(251, "Follow an agent on another screen", "verified", commit="7b6af3bf (branch claude/layout, pull request #33, not merged yet)", date="2026-09-29",
+rec(251, "Follow an agent on another screen", "verified", commit="7b6af3bf (branch claude/layout, pull request #33, merged as 50a6d041)", date="2026-09-29",
     harness="Generic fixture programs and the Claude Code fixture harness on the packaged VSIX in isolated VS Code 1.139.1 profiles (background, transparent test windows); no accounts, no paid turns",
     steps="""1. Probe on the installed VS Code 1.139.1: an agent's review (a webview editor) focused, then **View: Move Editor into New Window** (`workbench.action.moveEditorToNewWindow`, VS Code's floating editor windows): a second OS window titled "Review: …" held the review and it kept updating as the agent wrote (+6 then +8 lines).
 2. `node test/ui/scenario-popout.js` ([evidence](https://github.com/beelol/overseer/blob/7b6af3bf/docs/verification/evidence/ui/popout)): an agent appends a line every second; its review sits beside its chat; **Overseer: Pop Out Follow into Its Own Window**; two screenshots of the separate window 4 s apart; another agent selected; **Overseer: Return Follow to the Main Window**; pop out again and close the separate window with its close button (the main process's `BrowserWindow.close()`).
@@ -2648,7 +2648,7 @@ rec(252, "Zero-friction loop, measured", "not started", date="—", commit="—"
     expected="See the RFC criterion (the owner's zero-friction goal, 2026-09-28).",
     actual="Not started: added for the overnight zero-friction goal (docs/goals/zero-friction.md).", live="—", blocker="Overnight goal.")
 
-rec(253, "Overseer leads with what happened while you were away", "verified", date="2026-09-29", commit="fdac4335 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(253, "Overseer leads with what happened while you were away", "verified", date="2026-09-29", commit="a89b754f (branch claude/overseer-brain, pull request #32, not merged yet)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the whole Verify clause: a packaged-UI scenario and a daemon test",
     steps="""1. `cargo test --test overseer_brain ac253_overseer_leads_with_what_happened_while_you_were_away`.
@@ -2656,11 +2656,11 @@ rec(253, "Overseer leads with what happened while you were away", "verified", da
     expected="See the RFC criterion (the friction research of 2026-09-28, finding 3).",
     actual="""- Opening home or Talk to Overseer calls `overseer.visit`: the daemon compares the agents' ends since the owner's last visit or last words and adds one line grouped by repository and outcome, busiest first: "While you were away: 4 finished and 1 failed in site; 3 finished in notes."
 - Reopened, home shows that line as the conversation's newest message, in view above the composer, instead of the empty "What's next?" hero (the scenario measures it inside the conversation's visible box; before the scroll fix it rendered just below it and the check failed).
-- Asked, the daemon answers with the same line from the same window, with no model turn. A second surface opening at the same moment adds nothing.""",
-    evidence=f"[scenario evidence](https://github.com/beelol/overseer/blob/fdac4335/docs/verification/evidence/ui/away) (screenshots, result.json), [the scenario](https://github.com/beelol/overseer/blob/fdac4335/test/ui/scenario-away.js), [daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/fdac4335/daemon/tests/overseer_brain.rs)",
+- Asked, the daemon answers with the same line from the same window, with no model turn. A second surface opening at the same moment adds nothing; the very first visit only records the time. Before the owner's first word home shows only this line, not every agent's Started card.""",
+    evidence=f"[scenario evidence](https://github.com/beelol/overseer/blob/a89b754f/docs/verification/evidence/ui/away) (screenshots, result.json), [the scenario](https://github.com/beelol/overseer/blob/a89b754f/test/ui/scenario-away.js), [daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/a89b754f/daemon/tests/overseer_brain.rs)",
     live="Fixtures only; no model is involved in the summary.",
     limits="Agents started by hand still add their own \"Started\" cards above the line.")
-rec(254, "Reviewed and unreviewed are never the same mark", "verified", date="2026-09-29", commit="c8e87a21 (branch claude/views-polish, pull request #31, not merged yet)",
+rec(254, "Reviewed and unreviewed are never the same mark", "verified", date="2026-09-29", commit="c8e87a21 (branch claude/views-polish, pull request #31, merged as b2c186fb)",
     harness="Generic fixture programs on the packaged VSIX; no paid turns",
     proven="the whole Verify clause: six agents finish across two repositories with none reviewed; counts per repository and overall; opening one review clears only its own mark; screenshots at 6 and at 3",
     steps="""1. `node test/ui/scenario-review-marks.js`: six programs that edit a file in their worktree finish, three in `site` and three in `notes`.
@@ -2675,7 +2675,7 @@ rec(254, "Reviewed and unreviewed are never the same mark", "verified", date="20
     evidence="`test/ui/scenario-review-marks.js`, `docs/verification/evidence/ui/review-marks/` (01-six-to-review, 02-three-to-review), `extension/media/rollup.js`, `test/unit/rollup.js` on the branch, pull request #31",
     live="Fixtures only.",
     limits="AC-61's Needs you no longer lists failed and finished agents: they are to review (this criterion and AC-246 define Needs you as action, not review). The TUI and the phone show Needs you the same way; the to-review mark is in VS Code only.")
-rec(255, "A state rollup between the list and the grid", "verified", date="2026-09-29", commit="c8e87a21 (branch claude/views-polish, pull request #31, not merged yet)",
+rec(255, "A state rollup between the list and the grid", "verified", date="2026-09-29", commit="c8e87a21 (branch claude/views-polish, pull request #31, merged as b2c186fb)",
     harness="Generic fixture programs on the packaged VSIX; no paid turns",
     proven="the whole Verify clause: 12 agents at their end (11 finished, 1 failed) across two repositories; the rollup reads nonzero counts while the grid shows no tile; the side bar and the grid's header give the same numbers",
     steps="""1. `node test/ui/scenario-review-marks.js` (continued): seven more agents finish and one fails, none working.
@@ -2686,7 +2686,7 @@ rec(255, "A state rollup between the list and the grid", "verified", date="2026-
     evidence="`test/ui/scenario-review-marks.js`, `docs/verification/evidence/ui/review-marks/` (03-grid-has-nothing-rollup, 04-grid-header-rollup) on the branch, pull request #31",
     live="Fixtures only.",
     limits="AC-113 keeps the grid from opening with no tile, so the grid-with-no-tile moment is the note where the grid would be; the header is compared with one tile pinned.")
-rec(256, "A repository's badge never goes quiet on finished work", "verified", date="2026-09-29", commit="c8e87a21 (branch claude/views-polish, pull request #31, not merged yet)",
+rec(256, "A repository's badge never goes quiet on finished work", "verified", date="2026-09-29", commit="c8e87a21 (branch claude/views-polish, pull request #31, merged as b2c186fb)",
     harness="Generic fixture programs on the packaged VSIX; no paid turns",
     proven="the whole Verify clause: nonzero before and after the last working agent finishes unreviewed; nothing only once every agent is reviewed or archived",
     steps="""1. `node test/ui/scenario-review-marks.js`: `notes`'s only agent works four seconds and finishes; later every `site` agent is opened, and `notes`'s last two are archived.""",
@@ -2695,7 +2695,7 @@ rec(256, "A repository's badge never goes quiet on finished work", "verified", d
 - `site` read "3 to review", then "2 to review" after one review, then nothing once all three were reviewed; `notes` counted down "1 to review" as its agents were archived and read nothing once none was left to review. A failed agent not looked at counts as "1 failed".""",
     evidence="`test/ui/scenario-review-marks.js` and `docs/verification/evidence/ui/review-marks/` on the branch, pull request #31",
     live="Fixtures only.")
-rec(257, "Following an agent sits beside Overseer's conversation, not on top of it", "verified", commit="7b4a6829 (branch claude/agent-head, pull request #34, not merged yet)", date="2026-09-29",
+rec(257, "Following an agent sits beside Overseer's conversation, not on top of it", "verified", commit="7b4a6829 (branch claude/agent-head, pull request #34, merged as 38919c1b)", date="2026-09-29",
     harness="Claude Code fixture harness (the agent and Overseer's own turns) on the packaged VSIX in an isolated VS Code 1.139.1 profile (background test window); no accounts, no paid turns",
     proven="the whole Verify clause: the agent opened from Overseer's conversation opens beside it and the conversation keeps its tab; ⌥⌘U returns to the conversation with the agent's head as left; one click on the conversation's \"Back to\" chip returns to the agent at the same file, line and scroll, with the conversation's history intact; screenshots of both states in sequence (also for an agent opened from the side bar)",
     steps="""1. `node test/ui/scenario-agent-head.js` ([evidence](https://github.com/beelol/overseer/blob/7b4a6829/docs/verification/evidence/ui/agent-head)): Overseer's conversation holds a question, Overseer's answer and the agent's card; the card is clicked.
@@ -2709,7 +2709,7 @@ rec(257, "Following an agent sits beside Overseer's conversation, not on top of 
     evidence="[agent-head scenario](https://github.com/beelol/overseer/blob/7b4a6829/docs/verification/evidence/ui/agent-head) (01 opened from the conversation, 07 back in the conversation, 08 back to the agent, 09-10 the same from the side bar; result.json), `extension/src/extension.js` (backToOverseer, backToAgent), `extension/media/home.js`",
     live="Fixture agents only.",
     limits="Opened from the conversation, the agent's chat is not shown (the conversation keeps the Overseer tab); its card, the side bar or ⌥⌘U from the conversation after a side-bar opening shows it. A Needs-you item in the conversation still opens the agent's chat (it is there to be answered). Pull request #33 (the Overseer workspace, AC-250) also keeps the conversation in its own column; the two are reconciled when both are merged.")
-rec(258, "VS Code's own chat panel stays out of Overseer's way all session, not only at first launch", "verified", commit="7b6af3bf (branch claude/layout, pull request #33, not merged yet)", date="2026-09-29",
+rec(258, "VS Code's own chat panel stays out of Overseer's way all session, not only at first launch", "verified", commit="7b6af3bf (branch claude/layout, pull request #33, merged as 50a6d041)", date="2026-09-29",
     harness="Generic fixture programs and the Claude Code fixture harness on the packaged VSIX in isolated VS Code 1.139.1 profiles (background, transparent test windows); no accounts, no paid turns; the profile has VS Code's AI features on and its secondary side bar shown by default",
     steps="""`node test/ui/scenario-vscode-chat.js` ([evidence](https://github.com/beelol/overseer/blob/7b6af3bf/docs/verification/evidence/ui/vscode-chat)): the window starts with VS Code's own chat view ("Build with Agent") open; at 1440×900 and at 1920×1080: New Agent (home), an agent started, followed (its chat) and its review opened, a screenshot at each step; then the owner opens VS Code's chat (Chat: Open Chat), selects an agent and opens a review.""",
     expected="See the RFC criterion (the friction research of 2026-09-28, item 6).",

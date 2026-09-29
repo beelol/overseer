@@ -256,6 +256,27 @@ pub fn buffer_text(buf: &Buffer) -> String {
     out
 }
 
+/// AC-245: whatever a screen shows that the owner must never read (the same list as test/ui/plain-words.js).
+pub fn leaks(screen: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for line in screen.lines() {
+        for w in line.split(|c: char| c.is_whitespace() || "·›│┃║|()[],:;\"'".contains(c)) {
+            let w = w.trim_matches(|c: char| c == '.' || c == '…');
+            let snake = w.contains('_') && w.split('_').all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase()));
+            let id = w.split_once('-').is_some_and(|(p, r)| matches!(p, "r" | "p" | "sh" | "w") && r.len() >= 8 && r.chars().all(|c| c.is_ascii_hexdigit()));
+            if snake || id || w.starts_with("mcp__") || matches!(w, "claude" | "codex" | "opencode" | "tool-input" | "rate_limit") {
+                out.push(format!("{w:?} in {line:?}"));
+            }
+        }
+        for raw in ["os error", "Connection refused", "API Error", "turn reported failure", "(429)", "HTTP 4", "HTTP 5", "owner · vscode"] {
+            if line.contains(raw) {
+                out.push(format!("{raw:?} in {line:?}"));
+            }
+        }
+    }
+    out
+}
+
 /// Writes a snapshot of the screen as text and as a colored SVG under
 /// docs/verification/evidence/tui/ (evidence for the pull request).
 pub fn snapshot(buf: &Buffer, name: &str) {
@@ -266,6 +287,9 @@ pub fn snapshot(buf: &Buffer, name: &str) {
     std::fs::write(dir.join(format!("{name}.svg")), overseer_tui_svg(buf, false)).unwrap();
     // The same screen in a light terminal (terminal default colors flip; accents stay).
     std::fs::write(dir.join(format!("{name}-light.svg")), overseer_tui_svg(buf, true)).unwrap();
+    // Every screen kept as evidence is checked for internal words (AC-245), as the UI scenarios' are.
+    let found = leaks(&buffer_text(buf));
+    assert!(found.is_empty(), "internal words on the screen {name}: {found:?}\n{}", buffer_text(buf));
 }
 
 fn overseer_tui_svg(buf: &Buffer, light: bool) -> String {

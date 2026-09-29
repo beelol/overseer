@@ -14,6 +14,7 @@ const REVIEW = 'extension/src/review.js';
 const BROWSER = 'extension/branch-diff/review/browser.js';
 const PHONE_TEXT = 'extension/src/phone-text.js';
 const DAEMON = 'daemon/src/daemon.rs';
+const ROLLUP = 'extension/media/rollup.js';
 
 export interface Copied {
   /** The words, as they stand in the file. */
@@ -76,22 +77,18 @@ export const TEXT = {
     title: from(PACKAGE, 'Agents'),
     needsYou: from(VIEWS, 'Needs you'),
     needsYouCount: shaped(VIEWS, '`Needs you, ${list.length}`', (n: number) => `Needs you, ${n}`),
-    empty: from(PACKAGE, 'No agent tasks yet.'),
+    empty: from(PACKAGE, 'No agents yet.'),
     emptyMore: from(PACKAGE, 'Overseer runs agents through a local daemon; closing VS Code does not stop them.'),
-    newTask: from(PACKAGE, 'New Task'),
+    newTask: from(PACKAGE, 'New Agent'),
     unavailable: shaped(VIEWS, '`Daemon unavailable: ${m.error}`', (error: string) => `Daemon unavailable: ${error}`),
     nativeChild: from(VIEWS, 'native child'),
     inferred: from(VIEWS, ' (inferred)'),
     currentCheckout: from(VIEWS, 'current checkout'),
     repoLabel: shaped(VIEWS, "agent${tasks.length === 1 ? '' : 's'}${active ? `, ${active} active` : ''}", (name: string, agents: number, active: number) => `${name}, ${agents} agent${plural(agents)}${active ? `, ${active} active` : ''}`),
-    approve: from(EXTENSION, 'Approve'),
-    reply: from(EXTENSION, 'Reply'),
-    failed: from(EXTENSION, 'Failed'),
-    review: from(EXTENSION, 'Review'),
-    wantsToUse: shaped(EXTENSION, '`Wants to use ${r.attention.tool}`', (tool: string) => `Wants to use ${tool}`),
-    waitingForReply: from(EXTENSION, 'Waiting for your reply'),
-    agentFailed: from(EXTENSION, 'The agent failed'),
-    filesChanged: shaped(EXTENSION, "`${n} file${n === 1 ? '' : 's'} changed`", (n: number) => `${n} file${plural(n)} changed`),
+    approve: from(ROLLUP, 'Approve'),
+    reply: from(ROLLUP, 'Reply'),
+    wantsToUse: shaped(ROLLUP, "`Wants to use ${r.attention.tool || 'a tool'}`", (tool: string) => `Wants to use ${tool}`),
+    waitingForReply: from(ROLLUP, 'Waiting for your reply'),
     needYou: shaped(EXTENSION, "`${n} need${n === 1 ? 's' : ''} you`", (n: number) => `${n} need${n === 1 ? 's' : ''} you`),
     search: from(PACKAGE, 'Search Agents'),
     searchHint: from(EXTENSION, 'Title, message, file, repository, account or status'),
@@ -138,7 +135,7 @@ export const TEXT = {
     request: from(CONVERSATION, 'Request'),
     requestHint: from(CONVERSATION, 'The exact request the agent sent'),
     signInAgain: from(CONVERSATION, 'Sign in again'),
-    signInAgainLabel: shaped(CONVERSATION, "Sign in again with this run\\'s account", "Sign in again with this run's account"),
+    signInAgainLabel: shaped(CONVERSATION, "Sign in again with this agent\\'s account", "Sign in again with this agent's account"),
     done: from(CONVERSATION, 'Done'),
     stopped: from(CONVERSATION, 'Stopped'),
     failed: from(CONVERSATION, 'Failed'),
@@ -199,7 +196,7 @@ export const TEXT = {
     openPullRequest: from(CHAT, 'Open pull request…'),
     rawOutput: from(CHAT, 'Raw output'),
     details: from(CHAT, 'Details'),
-    copyRunId: from(CHAT, 'Copy run ID'),
+    copyRunId: from(CHAT, 'Copy agent ID'),
     archive: from(CHAT, 'Archive'),
     restore: from(CHAT, 'Restore from archive'),
     removeWorktree: from(CHAT, 'Remove worktree…'),

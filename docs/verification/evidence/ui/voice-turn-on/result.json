@@ -1,0 +1,126 @@
+{
+  "checks": [
+    {
+      "name": "Overseer: the mark's stage grows in when Voice Mode is turned on (opacity and scale move to rest)",
+      "ok": true,
+      "detail": [
+        {
+          "opacity": 0.827791,
+          "scale": 0.951782
+        },
+        {
+          "opacity": 0.989381,
+          "scale": 0.997027
+        },
+        {
+          "opacity": 1,
+          "scale": 1
+        },
+        {
+          "opacity": 1,
+          "scale": 1
+        }
+      ]
+    },
+    {
+      "name": "Overseer: turning it on is recorded (87 frames), with frames before, during and after",
+      "ok": true,
+      "detail": {
+        "frames": 87,
+        "seconds": 3.33,
+        "gif": "docs/verification/evidence/ui/voice-turn-on/turning-on-overseer.gif"
+      }
+    },
+    {
+      "name": "Overseer: the line \"Stop, mute and what's running still work\" is absent",
+      "ok": true
+    },
+    {
+      "name": "Overseer Dark: the mark's stage grows in when Voice Mode is turned on (opacity and scale move to rest)",
+      "ok": true,
+      "detail": [
+        {
+          "opacity": 0.793636,
+          "scale": 0.942218
+        },
+        {
+          "opacity": 0.968577,
+          "scale": 0.991202
+        },
+        {
+          "opacity": 0.999882,
+          "scale": 0.999967
+        },
+        {
+          "opacity": 1,
+          "scale": 1
+        }
+      ]
+    },
+    {
+      "name": "Overseer Dark: turning it on is recorded (199 frames), with frames before, during and after",
+      "ok": true,
+      "detail": {
+        "frames": 199,
+        "seconds": 3.12,
+        "gif": "docs/verification/evidence/ui/voice-turn-on/turning-on-dark.gif"
+      }
+    },
+    {
+      "name": "Overseer Dark: the line \"Stop, mute and what's running still work\" is absent",
+      "ok": true
+    },
+    {
+      "name": "Overseer Light: the mark's stage grows in when Voice Mode is turned on (opacity and scale move to rest)",
+      "ok": true,
+      "detail": [
+        {
+          "opacity": 0.766253,
+          "scale": 0.934551
+        },
+        {
+          "opacity": 0.955461,
+          "scale": 0.987529
+        },
+        {
+          "opacity": 0.997806,
+          "scale": 0.999386
+        },
+        {
+          "opacity": 1,
+          "scale": 1
+        }
+      ]
+    },
+    {
+      "name": "Overseer Light: turning it on is recorded (208 frames), with frames before, during and after",
+      "ok": true,
+      "detail": {
+        "frames": 208,
+        "seconds": 3.12,
+        "gif": "docs/verification/evidence/ui/voice-turn-on/turning-on-light.gif"
+      }
+    },
+    {
+      "name": "Overseer Light: the line \"Stop, mute and what's running still work\" is absent",
+      "ok": true
+    }
+  ],
+  "recordings": {
+    "overseer": {
+      "frames": 87,
+      "seconds": 3.33,
+      "gif": "docs/verification/evidence/ui/voice-turn-on/turning-on-overseer.gif"
+    },
+    "dark": {
+      "frames": 199,
+      "seconds": 3.12,
+      "gif": "docs/verification/evidence/ui/voice-turn-on/turning-on-dark.gif"
+    },
+    "light": {
+      "frames": 208,
+      "seconds": 3.12,
+      "gif": "docs/verification/evidence/ui/voice-turn-on/turning-on-light.gif"
+    }
+  }
+}

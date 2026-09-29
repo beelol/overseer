@@ -89,7 +89,15 @@
     // The name and count are the header's label and tooltip: the grid's visible text stays within
     // the AC-54 budget (the tiles already name every agent).
     head.setAttribute('role', 'toolbar'); head.setAttribute('aria-label', 'Agent grid');
-    head.append(ui.icon('layout', 'sm'), el('span', 'spacer'), whereBtn, resetBtn);
+    // The rollup by state (AC-255): the same counts as the side bar's summary row, whatever the tiles show.
+    const rollupEl = el('span', 'grid-rollup'); rollupEl.id = 'grid-rollup'; rollupEl.setAttribute('role', 'status');
+    head.append(ui.icon('layout', 'sm'), rollupEl, el('span', 'spacer'), whereBtn, resetBtn);
+    function renderRollup(state) {
+      const parts = window.OverseerRollup && state.rollup ? window.OverseerRollup.parts(state.rollup) : [];
+      rollupEl.replaceChildren(...parts.map((p, i) => { const e = el('span', `grid-rollup-part rollup-${p.key}`, p.text); e.dataset.key = p.key; e.dataset.n = String(p.n); return i ? [el('span', 'grid-rollup-dot', '·'), e] : [e]; }).flat());
+      rollupEl.setAttribute('aria-label', parts.length ? `Agents: ${parts.map(p => p.text).join(', ')}` : 'No agents');
+      rollupEl.dataset.text = parts.map(p => p.text).join(' · ');
+    }
     host.append(head, board, preview, full, trackBar, empty);
 
     /** Pinned (placed) agents always, up to 16; running agents fill up to the configured maximum. */
@@ -303,7 +311,7 @@
     return {
       open() { visible = true; layout(getState()); setTimeout(() => (tiles.get(order[0])?.el || startBtn).focus(), 0); },
       close() { if (!visible) return; visible = false; post({ type: 'gridSubscribe', runIds: [] }); },
-      onState(state) { ready = true; if (visible) layout(state); },
+      onState(state) { ready = true; renderRollup(state); if (visible) layout(state); },
       setTracked(runId) {
         tracked = runId || undefined;
         for (const [id, t] of tiles) { t.el.classList.toggle('tracked', id === tracked); t.el.setAttribute('aria-current', String(id === tracked)); }

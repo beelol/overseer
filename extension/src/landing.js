@@ -6,6 +6,7 @@
 const vscode = require('vscode');
 const path = require('path');
 const Text = require('../media/landing-text.js');
+const Plain = require('../media/plain-words.js');
 
 const ACTIVE = new Set(['queued', 'starting', 'running', 'waiting_for_user', 'waiting_for_connection', 'waiting_for_memory']);
 const HARNESS = { claude: 'Claude Code', codex: 'Codex', 'codex-app': 'Codex', opencode: 'OpenCode', 'opencode-serve': 'the local model', generic: 'the program' };
@@ -66,7 +67,7 @@ class Landing {
       canMerge: !active && !!plan?.ok, target: plan?.target || landing?.target || 'main',
       files: plan?.ok ? (plan.files || []).length : 0,
       github: !!plan?.remote?.github, remote: plan?.remote ? plan.remote.name : plan ? null : undefined,
-      why: plan && !plan.ok ? plan.reason : '',
+      why: plan && !plan.ok ? Plain.plain(plan.reason, 300) : '',
     };
   }
 
@@ -87,8 +88,8 @@ class Landing {
     let plan = await this.plan(wsId);
     if (!plan.ok) {
       const landed = Text.text(plan.landing);
-      this.say(run.id, plan.landing?.state === 'merged' ? `${landed}. Nothing new to merge.` : `Nothing to merge: ${plan.reason}`);
-      vscode.window.showInformationMessage(plan.landing?.state === 'merged' ? `“${run.title}” is already ${landed.replace(/^M/, 'm')}.` : `Nothing to merge: ${plan.reason}`);
+      this.say(run.id, plan.landing?.state === 'merged' ? `${landed}. Nothing new to merge.` : `Nothing to merge: ${Plain.plain(plan.reason, 300)}`);
+      vscode.window.showInformationMessage(plan.landing?.state === 'merged' ? `“${run.title}” is already ${landed.replace(/^M/, 'm')}.` : `Nothing to merge: ${Plain.plain(plan.reason, 300)}`);
       return undefined;
     }
     // A merge that stopped on conflicts: finish it once the files are resolved.
@@ -103,7 +104,7 @@ class Landing {
     }
     if (plan.blockers.length) {
       // Answers a click, so a dialog (Do Not Disturb hides toasts).
-      await vscode.window.showWarningMessage(`Cannot merge into ${plan.target} yet.`, { modal: true, detail: plan.blockers.join('\n\n') });
+      await vscode.window.showWarningMessage(`Cannot merge into ${plan.target} yet.`, { modal: true, detail: plan.blockers.map(b => Plain.plain(b, 300)).join('\n\n') });
       return undefined;
     }
     const label = Text.mergeLabel(plan.target);
@@ -163,7 +164,7 @@ class Landing {
       { label: `$(git-merge) ${Text.mergeLabel(target)}`, detail: `Merge the agent's work into ${target} in this repository, on this Mac. Nothing is pushed.`, act: 'merge' },
       ...(noRemote ? [{ label: '$(github) Publish to GitHub…', detail: 'Create a GitHub repository for it first; you are asked before anything is created.', act: 'publish' }] : []),
     ];
-    const title = noRemote ? 'This repository has no GitHub remote, so there is no pull request to open' : `No pull request: ${reason || 'the remote is not on GitHub'}`;
+    const title = noRemote ? 'This repository has no GitHub remote, so there is no pull request to open' : `No pull request: ${Plain.plain(reason || 'the remote is not on GitHub', 200)}`;
     const pick = await vscode.window.showQuickPick(items, { title, placeHolder: 'Choose what to do with the agent\'s work' });
     if (pick?.act === 'merge') return this.merge(run.id);
     if (pick?.act === 'publish') return this.publish(run.id);

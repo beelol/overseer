@@ -155,7 +155,8 @@
         // a lost connection is not a failure, and the real Codex words each reconnect attempt
         // differently (six red blocks in the live offline session). The latest message is its tooltip.
         if (!mine || p.class !== 'network') return false;
-        const text = String(p.message || '').trim();
+        // The harness's words in plain words (AC-245) for the tooltip.
+        const text = window.OverseerPlain ? window.OverseerPlain.plain(String(p.message || ''), 400) : String(p.message || '').trim();
         if (!text) return true;
         if (c.netLine && c.netLine.isConnected) {
           if (c.netLast !== text) { c.netCount += 1; c.netLast = text; }
@@ -189,7 +190,7 @@
         drawBack(conv);
         return true;
       case 'attention':
-        if (mine && p.kind && p.reason) last(conv).append(note('cloud', `${String(p.reason).replace(/^./, m => m.toUpperCase())}. Your message is kept.`));
+        if (mine && p.kind && p.reason) last(conv).append(note('cloud', `${(window.OverseerPlain ? window.OverseerPlain.plain(String(p.reason), 400) : String(p.reason)).replace(/^./, m => m.toUpperCase()).replace(/\.$/, '')}. Your message is kept.`));
         return true;
       case 'local_load': case 'local_queue': case 'local_download': case 'ollama_install': case 'ollama_server': case 'connection': case 'continuity_settings':
         return true;

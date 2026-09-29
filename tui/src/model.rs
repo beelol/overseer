@@ -60,6 +60,8 @@ pub struct Task {
     pub prompt: String,
     #[serde(default)]
     pub created_ms: i64,
+    #[serde(default)]
+    pub archived_ms: Option<i64>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -189,6 +191,26 @@ impl State {
         out
     }
 
+    /// Needs you, counted as the extension and the phone count it (AC-246, extension/media/rollup.js):
+    /// each non-archived task's newest top-level run that waits on a permission or a question, and
+    /// one more while Overseer has proposals or conflicts waiting for a decision.
+    pub fn needs_you_count(&self) -> usize {
+        let mut newest: std::collections::HashMap<&str, &Run> = std::collections::HashMap::new();
+        for r in self.runs.iter().filter(|r| r.parent_run_id.is_none()) {
+            if self.task(&r.task_id).is_some_and(|t| t.archived_ms.is_some()) {
+                continue;
+            }
+            let keep = newest.get(r.task_id.as_str()).is_none_or(|cur| r.created_ms > cur.created_ms);
+            if keep {
+                newest.insert(r.task_id.as_str(), r);
+            }
+        }
+        let waiting = newest.values().filter(|r| r.status == "waiting_for_user").count();
+        let o = &self.overseer;
+        let decide = !o["run_id"].is_null() && (o["open_proposals"].as_i64().unwrap_or(0) > 0 || o["conflicts_needing_decision"].as_i64().unwrap_or(0) > 0);
+        waiting + usize::from(decide)
+    }
+
     /// Top-level agents, newest first (a stable order: tiles do not jump when statuses change).
     pub fn agents(&self) -> Vec<&Run> {
         let mut roots: Vec<&Run> = self.runs.iter().filter(|r| r.parent_run_id.is_none()).collect();
@@ -214,5 +236,45 @@ mod landing {
         assert_eq!(state.landing_text("w2").as_deref(), Some("Merge stopped: conflicts in a.txt, b.txt"));
         assert_eq!(state.landing_text("w3").as_deref(), Some("Pull request #7 open"));
         assert_eq!(state.landing_text("w4"), None);
+    }
+}
+
+#[cfg(test)]
+mod needs_you {
+    use super::*;
+    use serde_json::json;
+
+    /// AC-246: the header's Needs-you count is the extension's (extension/media/rollup.js): waiting
+    /// agents of tasks that are not archived, each task's newest run, plus Overseer's decisions.
+    #[test]
+    fn counts_as_the_extension_does() {
+        let state: State = serde_json::from_value(json!({
+            "tasks": [
+                { "id": "t1", "repo_root": "/r", "workspace_id": "w", "title": "a" },
+                { "id": "t2", "repo_root": "/r", "workspace_id": "w", "title": "b" },
+                { "id": "t3", "repo_root": "/r", "workspace_id": "w", "title": "c", "archived_ms": 5 },
+                { "id": "t4", "repo_root": "/r", "workspace_id": "w", "title": "d" }
+            ],
+            "runs": [
+                { "id": "r1", "task_id": "t1", "harness": "claude", "workspace_id": "w", "status": "waiting_for_user", "created_ms": 1, "title": "a", "attention": { "kind": "permission" } },
+                { "id": "r2", "task_id": "t2", "harness": "claude", "workspace_id": "w", "status": "failed", "created_ms": 1, "title": "b" },
+                { "id": "r3", "task_id": "t3", "harness": "claude", "workspace_id": "w", "status": "waiting_for_user", "created_ms": 1, "title": "c" },
+                { "id": "r4-old", "task_id": "t4", "harness": "claude", "workspace_id": "w", "status": "waiting_for_user", "created_ms": 1, "title": "d" },
+                { "id": "r4", "task_id": "t4", "harness": "claude", "workspace_id": "w", "status": "completed", "created_ms": 2, "title": "d" }
+            ],
+            "overseer": { "run_id": "ov", "open_proposals": 1 }
+        }))
+        .unwrap();
+        assert_eq!(state.needs_you_count(), 2, "the waiting agent and Overseer's proposal; not the failed, archived or superseded ones");
+    }
+
+    /// The same recorded state the extension's and the phone's tests read gives the same count.
+    #[test]
+    fn the_nine_agents_recording_counts_as_everywhere() {
+        let recorded: serde_json::Value = serde_json::from_str(include_str!("../../phone/model/test/fixtures/nine-agents.json")).unwrap();
+        let mut state: State = serde_json::from_value(recorded["final"].clone()).unwrap();
+        assert_eq!(state.needs_you_count(), 1);
+        state.overseer = json!({ "run_id": "ov", "open_proposals": 2 });
+        assert_eq!(state.needs_you_count(), 2);
     }
 }

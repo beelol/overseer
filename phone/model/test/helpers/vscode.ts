@@ -138,7 +138,7 @@ function walk(p: Page, container: Element, depth: number, turn: string, out: Lin
       });
     } else if (has(el, 'error-block')) {
       const button = el.querySelector(':scope > button.sign-in-again');
-      out.push({ depth, turn, kind: 'error', icon: icon(el.querySelector('.error-head')), class: attr(el, 'title'), title: text(el.querySelector('.error-head strong')), message: el.querySelector(':scope > .text')?.textContent ?? '', signIn: button ? { label: text(button), says: attr(button, 'aria-label') } : null });
+      out.push({ depth, turn, kind: 'error', icon: icon(el.querySelector('.error-head')), class: attr(el, 'data-class') || attr(el, 'title'), title: text(el.querySelector('.error-head strong')), message: el.querySelector(':scope > .text')?.textContent ?? '', signIn: button ? { label: text(button), says: attr(button, 'aria-label') } : null });
     } else if (el.matches('details.child')) {
       const sum = el.querySelector(':scope > summary') as HTMLElement;
       out.push({ depth, turn, kind: 'child', icon: icon(sum), run: (el as HTMLElement).dataset['run'], title: text(sum.querySelector('.child-title')), status: attr(sum.querySelector('.status'), 'aria-label'), tooltip: attr(sum, 'title') });

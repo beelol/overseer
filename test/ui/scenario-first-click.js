@@ -80,13 +80,13 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     await cdp.command('Overseer: Toggle Agent Grid'); await delay(1500);
 
     // The dashboard (immersive): the chat's More after focus in the side bar.
-    await cdp.command('Overseer: Open Dashboard'); await delay(3000);
+    await cdp.command('Overseer: Enter Focus Mode'); await delay(3000);
     await s.selectAgent('Click target', { settle: 2500 });
     const dchat = await s.editorView(`!!document.querySelector('.view-chat') && !document.querySelector('.view-chat').hidden`);
     await focusSideBar();
     check('dashboard: after focus in the side bar, one click on the chat\'s More opens its menu', await once('dashboard chat more', dchat, '#more', `document.querySelector('.menu')?.remove()`, `!!document.querySelector('.menu')`), result.clicks.at(-1));
     await cdp.key('Escape');
-    await cdp.command('Overseer: Exit Dashboard'); await delay(1500);
+    await cdp.command('Overseer: Exit Focus Mode'); await delay(1500);
     await s.screenshot('after');
     s.ctl('run.interrupt', { run_id: s.ctl('state').runs.find(r => r.title === 'Busy agent').id });
   } catch (error) {

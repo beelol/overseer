@@ -13,6 +13,9 @@
   const HARNESS = { claude: 'Claude Code', codex: 'Codex', 'codex-app': 'Codex', opencode: 'OpenCode', 'opencode-serve': 'Local model' };
   const MODE = { plan: 'Plan only', manual: 'Ask first', acceptEdits: 'Accept edits', auto: 'Auto', 'read-only': 'Read only', 'workspace-write': 'Can edit' };
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many || one + 's'}`;
+  // Reasons from the daemon and the harnesses in plain words (AC-245: no raw request errors or harness ids).
+  const Plain = typeof require === 'function' ? require('./plain-words.js') : (typeof self !== 'undefined' ? self.OverseerPlain : undefined);
+  const why = r => { if (!r || !Plain) return r || ''; const out = Plain.plain(r, 400); return out && /^[a-z]/.test(r) ? out[0].toLowerCase() + out.slice(1) : out; };
 
   /** Run states Continuity adds: the word, the icon, and whether the agent still holds its work. */
   const STATES = {
@@ -27,14 +30,14 @@
     const c = (data && data.connection) || null;
     const on = !data || !data.settings || data.settings.enabled !== false;
     if (!c) return { state: 'unknown', label: 'Connection unknown', short: '', sentence: 'Overseer has not checked the connection yet.', lines: ['Overseer has not checked the connection yet.'], icon: 'cloud' };
-    const label = c.state === 'online' ? 'Online' : c.state === 'offline' ? 'Offline' : c.reason.replace(/^./, m => m.toUpperCase());
-    const why = c.state === 'online' ? '' : c.reason;
+    const label = c.state === 'online' ? 'Online' : c.state === 'offline' ? 'Offline' : why(c.reason).replace(/^./, m => m.toUpperCase());
+    const reason = c.state === 'online' ? '' : why(c.reason);
     const sentence = c.state === 'online' ? 'Overseer is online.'
-      : c.state === 'offline' ? `Overseer is offline: ${why}.`
-        : `${why.replace(/^./, m => m.toUpperCase())}. The internet works.`;
+      : c.state === 'offline' ? `Overseer is offline: ${reason}.`
+        : `${reason.replace(/^./, m => m.toUpperCase())}. The internet works.`;
     const lines = [sentence];
     if (c.system && c.system.detail) lines.push(`The system says: ${c.system.detail}.`);
-    const providers = Object.entries(c.providers || {}).map(([id, h]) => `${PROVIDER[id] || id} ${h.reachable === true ? 'reachable' : h.reachable === false ? `unreachable (${h.reason})` : 'not checked'}`);
+    const providers = Object.entries(c.providers || {}).map(([id, h]) => `${PROVIDER[id] || id} ${h.reachable === true ? 'reachable' : h.reachable === false ? `unreachable (${why(h.reason)})` : 'not checked'}`);
     if (providers.length && c.state !== 'offline') lines.push(providers.join(' · '));
     lines.push(policy(data));
     return { state: c.state, label, short: c.state === 'online' ? '' : label, sentence, lines, icon: 'cloud', since_ms: c.since_ms, on };
@@ -102,7 +105,7 @@
     const memory = wait.kind === 'memory';
     const title = memory ? 'Waiting for memory' : 'Waiting for a connection';
     const line = memory ? 'The system ran short of memory, so the local model was unloaded. Your message is kept.'
-      : `${wait.reason ? wait.reason.replace(/^./, m => m.toUpperCase()) + '. ' : ''}Your message is kept.`;
+      : `${wait.reason ? why(wait.reason).replace(/^./, m => m.toUpperCase()).replace(/\.$/, '') + '. ' : ''}Your message is kept.`;
     const next = wait.next_ms ? `Next check ${until(wait.next_ms, now)}` : '';
     const waited = wait.since_ms ? `waiting ${since(wait.since_ms, now)}` : '';
     const hours = (data && data.settings && data.settings.retryForHours) || 36;
@@ -150,7 +153,8 @@
       default: badge = 'not checked'; tone = 'off'; detail = '';
     }
     const mark = model.verified === 'passed' ? '' : model.verified === 'failed' ? 'failed its check' : 'unverified';
-    if (mark) detail = `${detail} ${model.note ? model.note.replace(/^./, m => m.toUpperCase()) + '.' : mark.replace(/^./, m => m.toUpperCase()) + '.'}`.trim();
+    if (mark) detail = `${detail} ${model.note ? why(model.note).replace(/^./, m => m.toUpperCase()) + '.' : mark.replace(/^./, m => m.toUpperCase()) + '.'}`.trim();
+    detail = why(detail) || detail;
     return { badge, tone, mark, detail, usable: f.status === 'fits' };
   }
 
@@ -189,7 +193,7 @@
   function download(d) {
     const of = typeof d.total === 'number' && d.total > 0 ? `${gib(d.completed || 0)} of ${gib(d.total)} GiB` : '';
     const verb = { starting: 'Downloading', downloading: 'Downloading', done: 'Downloaded', cancelled: 'Download cancelled', failed: 'Download failed' }[d.status] || 'Downloading';
-    return { text: [`${verb} ${d.tag}`, d.status === 'failed' ? d.reason : of].filter(Boolean).join(' · '), percent: typeof d.percent === 'number' ? d.percent : undefined, active: d.status === 'downloading' || d.status === 'starting' };
+    return { text: [`${verb} ${d.tag}`, d.status === 'failed' ? why(d.reason) : of].filter(Boolean).join(' · '), percent: typeof d.percent === 'number' ? d.percent : undefined, active: d.status === 'downloading' || d.status === 'starting' };
   }
 
   /** The settings VS Code edits, with the ranges the daemon enforces. */

@@ -44,7 +44,7 @@ const G = 2 ** 30;
   const setTheme = async theme => { const cur = JSON.parse(fs.readFileSync(settingsFile, 'utf8')); cur['workbench.colorTheme'] = theme; fs.writeFileSync(settingsFile, JSON.stringify(cur, null, 2)); await delay(2500); };
   try {
     const repo = makeRepo(path.join(s.root, 'continuity-repo'), { dirty: false });
-    s.settings({ 'workbench.colorTheme': 'Overseer Dark' });
+    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'overseer.home.sendTo': 'agent' });
     s.install(process.env.CONTINUITY_VSIX || latestVsix());
     const env = {
       OVERSEER_CODEX_PATH: fx('continuity-harness.js'), OVERSEER_CLAUDE_PATH: fx('continuity-harness.js'), OVERSEER_OPENCODE_PATH: fx('opencode-serve-fixture.js'),

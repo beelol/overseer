@@ -6,6 +6,7 @@ const cp = require('child_process');
 const { Cdp, delay } = require('./cdp');
 const quiet = require('./quiet-launch');
 const processes = require('../processes');
+const plainWords = require('./plain-words');
 
 const repoRoot = path.resolve(__dirname, '../..');
 const CODE = process.env.OVERSEER_CODE || '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code';
@@ -64,9 +65,20 @@ function reapAll() {
   if (stopped.length) console.log(`stopped ${stopped.length} process(es) the scenario left: ${[...new Set(stopped.map(p => p.cmd.split(' ')[0].split('/').pop()))].join(', ')}`);
 }
 let hooked = false;
+const sessions = new Set();
+/** AC-245: a scenario that showed an internal word fails, whatever its own checks said. */
+function plainWordsVerdict() {
+  if (process.env.OVERSEER_PLAIN_WORDS === 'off' || process.env.OVERSEER_PLAIN_WORDS === 'report') return;
+  const hits = [...sessions].flatMap(s => [...s.words.values()]);
+  if (!hits.length) return;
+  console.log(`PLAIN WORDS FAILED: ${hits.length} owner-facing text(s) showed internal words (plain-words.json in the evidence)`);
+  for (const h of hits.slice(0, 8)) console.log(`  FAIL ${h.where}: ${h.leaks.map(l => l.why + ' "' + l.match + '"').join(', ')} in ${JSON.stringify(h.text.slice(0, 120))}`);
+  process.exitCode = 1;
+}
 function hookExit() {
   if (hooked) return;
   hooked = true;
+  process.on('exit', plainWordsVerdict);
   process.on('exit', reapAll);
   for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143], ['SIGHUP', 129]]) process.on(signal, () => { console.log(`${signal}: stopping what the scenario started`); process.exit(code); });
 }
@@ -88,6 +100,9 @@ class Session {
     fs.mkdirSync(this.evidence, { recursive: true });
     this.log = [];
     this.shot = 0;
+    // AC-245: the owner-facing text read at each screenshot; any internal word fails the scenario.
+    this.words = new Map();
+    sessions.add(this);
   }
 
   baseEnv() {
@@ -128,7 +143,10 @@ class Session {
       'git.autofetch': false, 'git.openRepositoryInParentFolders': 'always', 'workbench.startupEditor': 'none',
       'security.workspace.trust.enabled': false, 'files.autoSave': 'off', 'update.mode': 'none',
       'workbench.tips.enabled': false, 'overseer.sideBar.openOnStartup': false, 'chat.disableAIFeatures': true, 'window.restoreWindows': 'none',
-      'editor.minimap.enabled': false, 'workbench.secondarySideBar.defaultVisibility': 'hidden', 'window.dialogStyle': 'custom', ...extra,
+      'editor.minimap.enabled': false, 'workbench.secondarySideBar.defaultVisibility': 'hidden', 'window.dialogStyle': 'custom',
+      // Opening an agent defaults to Follow (AC-233); the scenarios written for the review (Diffs
+      // only) keep opening it. scenario-agent-head drops this to test the default.
+      'overseer.agent.openIn': 'diffs', ...extra,
     }, null, 2));
   }
 
@@ -181,7 +199,20 @@ class Session {
     const file = path.join(this.evidence, `${String(++this.shot).padStart(2, '0')}-${label}.png`);
     await this.cdp.screenshot(file, clip);
     this.note('screenshot ' + path.relative(repoRoot, file));
+    await this.checkWords(label);
     return file;
+  }
+
+  /** AC-245: reads the owner-facing text of the window and keeps what shows an internal word. */
+  async checkWords(label) {
+    if (process.env.OVERSEER_PLAIN_WORDS === 'off' || !this.cdp) return;
+    // Agents' titles and prompts are the owner's words, not Overseer's.
+    let owned = [];
+    try { const st = this.home ? this.ctl('state', {}, { wait: false }) : null; if (st) owned = [...(st.tasks || []).flatMap(t => [t.title, t.prompt]), ...(st.runs || []).map(r => r.title)]; } catch { /* no daemon */ }
+    for (const hit of await plainWords.collect(this.cdp, owned)) {
+      const key = hit.where + '|' + hit.text;
+      if (!this.words.has(key)) { this.words.set(key, { ...hit, at: label }); this.note('PLAIN WORDS: internal words on screen', hit); }
+    }
   }
 
   ctl(method, params = {}, { wait = true } = {}) {
@@ -239,6 +270,7 @@ class Session {
 
   writeLog() {
     fs.writeFileSync(path.join(this.evidence, 'scenario.log'), this.log.join('\n') + '\n');
+    if (process.env.OVERSEER_PLAIN_WORDS !== 'off') fs.writeFileSync(path.join(this.evidence, 'plain-words.json'), JSON.stringify({ checked: this.shot, leaks: [...this.words.values()] }, null, 2) + '\n');
   }
 
   /** Shows the Overseer view container (clicking the activity icon only when it is not already visible). */

@@ -26,15 +26,23 @@
   const MODELS = { claude: ['sonnet', 'opus', 'haiku'], codex: ['gpt-5.6-luna', 'gpt-5.6', 'gpt-5.6-codex'], 'codex-app': ['gpt-5.6-luna', 'gpt-5.6', 'gpt-5.6-codex'], opencode: [] };
 
   function create(host, { post, onStarted, agents = () => [] }) {
-    let data, form = {}, starting = false, requested = false, target = 'agent';
+    // AC-236: home talks to Overseer first. `remembered` is the owner's choice (overseer.home.sendTo);
+    // New Agent and "Start as an agent" send one task straight to a new agent without changing it.
+    let data, form = {}, starting = false, requested = false, remembered = 'overseer', target = 'overseer', explicit = false;
     // AC-259: what was just sent, while the field says so ({ phase: 'sending' | 'started', text }).
     let sent = null, sentTimer = 0;
+    // A one-line note from the host ("the grid has nothing to show…") stays until the owner types or sends.
+    let info = '';
+    const showInfo = () => { note.className = 'composer-note'; note.replaceChildren(ui.icon('info', 'sm'), el('span', null, info)); };
     const PLACEHOLDER = 'Send off a task';
+    const TO_OVERSEER = 'Tell Overseer what to do, or ask what is going on';
     const wrap = el('div', 'composer-view');
     const hero = el('div', 'composer-hero');
     // Overseer's mark in full colour (AC-142) and a short question.
     const mark = ui.mark('xl hero-mark', 'Overseer');
     const h = el('h1', 'hero-title', "What's next?");
+    // The one-line hint of what to ask (AC-236), while the conversation is empty.
+    const hint = el('p', 'composer-hint', 'Ask what your agents are doing, or say what to build: Overseer starts, steers and answers.'); hint.id = 'composer-hint';
     const box = el('div', 'composer big');
     const task = el('textarea'); task.id = 'task'; task.rows = 3; task.placeholder = 'Send off a task'; task.setAttribute('aria-label', 'Task for the new agent');
     const generic = el('div', 'generic-fields'); generic.hidden = true;
@@ -56,9 +64,9 @@
     const tools = window.OverseerPromptTools.create(task, toolsBar, tray, { post, noModel: true, harness: () => form.routing === 'auto' ? 'auto' : form.harness, target: () => form.repo ? { repo: form.repo } : null, notice: t => { note.className = 'composer-note error'; note.replaceChildren(ui.icon('warning', 'sm'), el('span', null, t)); }, onChange: () => {} });
     const note = el('div', 'composer-note'); note.setAttribute('role', 'status');
     const foot = el('div', 'composer-foot');
-    const full = el('button', 'link', 'Full form'); full.type = 'button'; full.title = 'Open the New Task form with every option';
+    const full = el('button', 'link', 'Full form'); full.type = 'button'; full.title = 'Open the full form with every option';
     foot.append(el('span', 'kbd-hint', '⏎ start · ⇧⏎ new line'), full);
-    hero.append(mark, h, box, chips, note, foot);
+    hero.append(mark, h, hint, box, chips, note, foot);
     wrap.append(hero);
     host.append(wrap);
 
@@ -76,19 +84,32 @@
     const toOverseer = () => target === 'overseer' || /^@overseer\b/i.test(task.value.trim());
     function renderTarget() {
       const ov = toOverseer();
-      setChip(targetChip, ov ? ui.mark('sm') : 'rocket', ov ? 'Overseer' : 'New agent', ov ? 'Enter sends this to Overseer (the conversation above)' : 'Enter starts a new agent with this task; @overseer sends it to Overseer instead');
-      // Icon only for the default (the view's text budget, AC-81); the words appear when it matters.
-      targetChip.querySelector('.chip-label').hidden = !ov;
+      setChip(targetChip, ov ? ui.mark('sm') : 'rocket', ov ? 'Overseer' : 'Start directly', ov ? 'Enter sends this to Overseer, which starts, steers or answers' : 'Enter starts a new agent with this task; @overseer sends it to Overseer instead');
       targetChip.dataset.target = ov ? 'overseer' : 'agent';
-      for (const c of [repoChip, agentChip, modelChip, modeChip]) c.hidden = ov && c !== repoChip ? true : c.hidden && !ov ? false : c.hidden;
-      if (!ov) { repoChip.hidden = false; agentChip.hidden = false; modelChip.hidden = form.harness === 'generic'; modeChip.hidden = false; }
+      // Starting directly, the chip is its rocket alone (its name is its label and tooltip), so the
+      // new-agent view keeps Gate J's text budget (AC-81); the words show for Overseer.
+      targetChip.querySelector('.chip-label').hidden = !ov;
+      // To Overseer the box needs no choices: Overseer picks where and how an agent runs.
+      for (const c of [repoChip, agentChip, modeChip]) c.hidden = ov;
+      modelChip.hidden = ov || form.routing === 'auto' || form.harness === 'generic';
+      hint.hidden = !ov;
       start.title = ov ? 'Send to Overseer (Enter)' : start.title;
       start.setAttribute('aria-label', ov ? 'Send to Overseer' : 'Start agent');
+      task.setAttribute('aria-label', ov ? 'Message to Overseer' : 'Task for the new agent');
+      if (!sent) task.placeholder = ov ? TO_OVERSEER : form.routing !== 'auto' && form.harness === 'generic' ? 'Optional first line for the program' : PLACEHOLDER;
+      box.dataset.target = ov ? 'overseer' : 'agent';
       foot.firstChild.textContent = ov ? '⏎ send to Overseer · ⇧⏎ new line' : '⏎ start · ⇧⏎ new line';
     }
+    /** Where Enter sends: Overseer, or straight to a new agent. `remember` makes it the owner's default. */
+    function setTarget(t, { remember = false } = {}) {
+      target = t === 'agent' ? 'agent' : 'overseer';
+      if (target === 'overseer') task.value = task.value.replace(/^@overseer\s*/i, '');
+      if (remember && target !== remembered) { remembered = target; post({ type: 'composerSendTo', target }); }
+      render();
+    }
     function menuTarget() {
-      ui.menu(targetChip, [{ label: 'New agent', icon: 'rocket', checked: !toOverseer(), title: 'Enter starts an agent with the task', run: () => { target = 'agent'; task.value = task.value.replace(/^@overseer\s*/i, ''); render(); } },
-        { label: 'Overseer', icon: 'comment-discussion', checked: toOverseer(), title: 'Enter sends the message to Overseer', run: () => { target = 'overseer'; render(); } }], { label: 'Send to' });
+      ui.menu(targetChip, [{ label: 'Overseer', icon: 'comment-discussion', checked: toOverseer(), title: 'Enter sends the message to Overseer, which starts, steers or answers', run: () => setTarget('overseer', { remember: true }) },
+        { label: 'Start an agent directly', icon: 'rocket', checked: !toOverseer(), title: 'Enter starts an agent with the task, with the repository, agent, model and workspace choices', run: () => setTarget('agent', { remember: true }) }], { label: 'Send to' });
     }
     // `@` offers the agents by name in a list under the text that never takes the keyboard: typing
     // narrows it, arrows move, Enter or Tab inserts, Escape closes; a named agent reaches Overseer
@@ -132,14 +153,14 @@
       const hx = harness(), a = account();
       const agentLabel = form.routing === 'auto' ? `Auto routing${form.preferredHarness ? ' · prefer ' + (ui.HARNESS[form.preferredHarness] || form.preferredHarness) : ''}` : form.harness === 'generic' ? 'Program' : `${ui.HARNESS[form.harness] || form.harness || 'Agent'}${a ? ' · ' + a.name : ''}`;
       setChip(agentChip, form.routing === 'auto' ? 'sparkle' : ui.harnessMark(form.harness, 14), agentLabel, form.routing === 'auto' ? 'Selects an eligible account, agent, model and effort for each work unit' : [hx && `${ui.HARNESS[hx.harness]} ${hx.version || ''}`, a && `${a.name}: ${a.signedIn ? 'signed in' + (a.plan ? ' · ' + a.plan : '') : 'not signed in'}`, a && ui.usageDetail(a.usage)].filter(Boolean).join('\n'));
-      modelChip.hidden = form.routing === 'auto' || form.harness === 'generic';
+      modelChip.hidden = toOverseer() || form.routing === 'auto' || form.harness === 'generic';
       setChip(modelChip, 'sparkle', form.model || 'Default model', form.model ? `Model: ${form.model}` : 'The harness default model');
       setChip(modeChip, form.mode === 'current' ? 'repo' : 'git-branch', form.mode === 'current' ? 'Current checkout' : 'New worktree', form.mode === 'current' ? 'Works directly in your checkout' : `A new branch and worktree${form.ref ? ' from ' + form.ref : ''}; your checkout is untouched`);
-      generic.hidden = form.routing === 'auto' || form.harness !== 'generic';
+      generic.hidden = toOverseer() || form.routing === 'auto' || form.harness !== 'generic';
       // Continuity (Gate L): a local agent's chips, and the offline line above the field.
       if (window.OverseerContinuity) window.OverseerContinuity.chips({ data, form: form.routing === 'auto' ? { ...form, harness: '' } : form, agentChip, modelChip, setChip });
       tools.refresh();
-      task.placeholder = sent ? sentPlaceholder() : form.routing !== 'auto' && form.harness === 'generic' ? 'Optional first line for the program' : PLACEHOLDER;
+      task.placeholder = sent ? sentPlaceholder() : toOverseer() ? TO_OVERSEER : form.routing !== 'auto' && form.harness === 'generic' ? 'Optional first line for the program' : PLACEHOLDER;
       validate();
     }
     function problem() {
@@ -173,10 +194,11 @@
       return {};
     }
     function validate() {
-      if (toOverseer()) { note.replaceChildren(); note.className = 'composer-note'; start.disabled = !task.value.trim(); return true; }
+      if (toOverseer()) { if (info) showInfo(); else { note.replaceChildren(); note.className = 'composer-note'; } start.disabled = !task.value.trim(); return true; }
       const p = problem();
       if (sent && (!p.text || p.soft || p.warn)) { showSentNote(); start.disabled = true; start.title = 'Describe the next task'; return false; }
       note.replaceChildren(); note.className = 'composer-note' + (p.text && !p.soft && !p.warn ? ' error' : p.warn ? ' warn' : '');
+      if (info && (!p.text || p.soft)) showInfo();
       if (p.text) {
         note.append(ui.icon(p.soft ? 'info' : 'warning', 'sm'), el('span', null, p.text));
         if (p.fix) { const b = el('button', 'link fix', p.fix); b.type = 'button'; b.addEventListener('click', () => { if (p.action) p.action(); else if (p.url) post({ type: 'openExternal', url: p.url }); else post({ type: 'command', command: p.command, args: p.args }); }); note.append(b); }
@@ -337,7 +359,7 @@
       ui.menu(modeChip, items, { label: 'Workspace' });
     }
     function menuMore() {
-      const items = [{ label: 'Full New Task form', icon: 'window', run: () => post({ type: 'command', command: 'overseer.newTask' }) }];
+      const items = [{ label: 'Full form', icon: 'window', run: () => post({ type: 'command', command: 'overseer.newTask' }) }];
       if (form.harness === 'codex-app') for (const p of ['on-request', 'untrusted', 'never']) items.push({ label: `Approvals: ${p}`, icon: 'shield', checked: (form.approval || 'on-request') === p, run: () => { form.approval = p; save(); } });
       ui.menu(more, items, { label: 'More options' });
     }
@@ -359,7 +381,7 @@
     more.addEventListener('click', () => data && menuMore());
     full.addEventListener('click', () => post({ type: 'command', command: 'overseer.newTask' }));
     const grow = () => { task.style.height = 'auto'; task.style.height = Math.min(320, Math.max(66, task.scrollHeight)) + 'px'; };
-    task.addEventListener('input', () => { if (sent && sent.phase === 'started' && task.value) endSent(); grow(); renderTarget(); renderMentions(); validate(); });
+    task.addEventListener('input', () => { info = ''; if (sent && sent.phase === 'started' && task.value) endSent(); grow(); renderTarget(); renderMentions(); validate(); });
     program.addEventListener('input', validate);
     task.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); go(); } });
     start.addEventListener('click', go);
@@ -367,11 +389,12 @@
     // Choices become the defaults only when an agent starts with them (the launcher saves them then).
     function save() { render(); }
     function go() {
+      info = '';
       if (toOverseer()) {
         const text = forOverseer(task.value.trim());
         if (!text) return;
         post({ type: 'overseerSend', text });
-        task.value = ''; grow(); render();
+        task.value = ''; target = remembered; explicit = false; grow(); render();
         return;
       }
       if (!validate() || starting) return;
@@ -415,6 +438,7 @@
       data(d) {
         data = d;
         const def = d.defaults || {};
+        if (d.sendTo) { remembered = d.sendTo === 'agent' ? 'agent' : 'overseer'; if (!explicit && !task.value) target = remembered; }
         form = { repo: form.repo || def.repo || d.repos[0]?.path, routing: d.autoRouting ? (form.routing || def.routing || 'manual') : 'manual', preferredHarness: form.preferredHarness ?? def.preferredHarness ?? '', harness: form.harness || def.harness, account: form.account || def.account, model: form.model ?? def.model ?? '', mode: form.mode || def.mode || 'worktree', approval: form.approval || def.approval, ref: form.ref || '' };
         if (form.repo && !d.repos.some(r => r.path === form.repo)) form.repo = d.repos[0]?.path;
         // No remembered agent: prefer an installed harness with a signed-in account.
@@ -430,7 +454,7 @@
       },
       notice(m) {
         // The field was cleared when the task was sent; anything typed since stays (AC-259).
-        if (m.kind === 'started') { starting = false; program.value = ''; showSent('started'); onStarted(m.runId); return; }
+        if (m.kind === 'started') { starting = false; program.value = ''; target = remembered; explicit = false; showSent('started'); onStarted(m.runId); return; }
         if (m.kind === 'repo') { data.repos = [m.repo, ...data.repos.filter(r => r.path !== m.repo.path)]; form.repo = m.repo.path; if (picker) closeRepoPicker({ focus: 'task' }); save(); return; }
         if (m.kind === 'repoError') { if (picker) { picker.busy = ''; picker.error = m.message; renderPicker(); } return; }
         if (m.kind === 'pathHints') { if (picker && picker.input.value.trim() === m.input) { picker.hints = m.hints || []; picker.hintsFor = m.input; renderPicker(); } return; }
@@ -441,13 +465,15 @@
         if (failedStart && !task.value) { task.value = sent.text; grow(); }
         if (failedStart) { clearTimeout(sentTimer); sent = null; delete box.dataset.sent; render(); }
         starting = false; validate();
-        if (m.kind === 'info') { note.className = 'composer-note'; note.replaceChildren(ui.icon('info', 'sm'), el('span', null, m.message)); return; }
+        if (m.kind === 'info') { info = m.message; showInfo(); return; }
         note.className = 'composer-note error'; note.replaceChildren(ui.icon('error', 'sm'), el('span', null, m.message));
       },
       onState(s) { if (data && s.accounts) { data.accounts = s.accounts; render(); } },
       mentionFiles(m) { tools.files(m); },
       /** Starts an agent from words that went to Overseer by mistake (AC-182's correction). */
       startWith(text) { target = 'agent'; task.value = text; grow(); render(); go(); },
+      /** Where Enter sends this time (New Agent: straight to a new agent), not remembered. */
+      setTarget(t) { explicit = true; setTarget(t); setTimeout(() => task.focus(), 0); },
       /** Puts words back in the composer for Overseer (after an agent was started by mistake). */
       askOverseer(text) { endSent(); target = 'overseer'; task.value = text; grow(); render(); task.focus(); },
     };
