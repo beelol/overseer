@@ -2445,6 +2445,16 @@ rec(249, "Test windows never reach the owner's screen", "not started", date="—
     expected="See the RFC criterion (the usability audit of 2026-09-28).",
     actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
 
+rec(250, "One command opens the whole Overseer layout", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the owner's zero-friction goal, 2026-09-28).",
+    actual="Not started: added for the overnight zero-friction goal (docs/goals/zero-friction.md).", live="—", blocker="Overnight goal.")
+rec(251, "Follow an agent on another screen", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the owner's zero-friction goal, 2026-09-28).",
+    actual="Not started: added for the overnight zero-friction goal (docs/goals/zero-friction.md).", live="—", blocker="Overnight goal.")
+rec(252, "Zero-friction loop, measured", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the owner's zero-friction goal, 2026-09-28).",
+    actual="Not started: added for the overnight zero-friction goal (docs/goals/zero-friction.md).", live="—", blocker="Overnight goal.")
+
 SHORT_BLOCKERS = {
     154: "verified",
     155: "verified",
@@ -2623,6 +2633,9 @@ SHORT_BLOCKERS = {
     247: "not started (the usability audit, 2026-09-28)",
     248: "not started (the usability audit, 2026-09-28)",
     249: "not started (the usability audit, 2026-09-28)",
+    250: "not started (the owner's zero-friction goal, 2026-09-28)",
+    251: "not started (the owner's zero-friction goal, 2026-09-28)",
+    252: "not started (the owner's zero-friction goal, 2026-09-28)",
 }
 TOTAL = 53
 
