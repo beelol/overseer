@@ -3,6 +3,7 @@
 //! agents) and the conversation with Overseer. The model never touches an agent, a worktree or a
 //! shell directly: it reads through `overseer.tool` and asks the daemon to act.
 
+pub mod away;
 pub mod channel;
 pub mod checkin;
 pub mod conflicts;

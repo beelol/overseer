@@ -393,6 +393,11 @@ impl Daemon {
             if let Some(handled) = self.needs_handle(text, surface, None, true)? {
                 return Ok(handled);
             }
+            // "What happened while I was away?": the daemon's own summary, the same line the
+            // visit led with (AC-253).
+            if super::away::asks_what_happened(text) {
+                return self.answer_what_happened(text, surface);
+            }
         }
         let session = self.overseer_session()?;
         let sid = session["id"].as_str().unwrap().to_string();

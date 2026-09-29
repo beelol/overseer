@@ -9,7 +9,7 @@
 // (AC-226).
 (function () {
   const ui = window.OverseerUI, el = ui.el;
-  const CARD_ICON = { started: 'rocket', report: 'note', ask: 'question', answer: 'comment', claim: 'symbol-folder', done: 'check', finding: 'eye', watch: 'eye', watch_ended: 'eye-closed', withdrawn: 'discard', cannot_answer: 'warning', hold: 'debug-pause', release: 'debug-continue', conflict: 'warning', check_in: 'checklist', aside: 'comment-discussion', needs: 'bell' };
+  const CARD_ICON = { started: 'rocket', report: 'note', ask: 'question', answer: 'comment', claim: 'symbol-folder', done: 'check', trouble: 'warning', while_away: 'history', finding: 'eye', watch: 'eye', watch_ended: 'eye-closed', withdrawn: 'discard', cannot_answer: 'warning', hold: 'debug-pause', release: 'debug-continue', conflict: 'warning', check_in: 'checklist', aside: 'comment-discussion', needs: 'bell' };
   const ACTIVE = new Set(['queued', 'starting', 'running', 'waiting_for_user', 'waiting_for_connection', 'waiting_for_memory']);
   const STAGE_ICON = { thinking: 'loading~spin', sending: 'send', waiting: 'question', starting: 'rocket', working: 'sync~spin', stuck: 'bell-dot', done: 'check', failed: 'error', aside: 'comment-discussion' };
   const STUCK_MS = 3 * 60 * 1000;
@@ -340,7 +340,8 @@
       const open = ((session && session.proposals) || []).filter(p => p.state === 'open' || p.state === 'settling');
       // Until the owner has spoken to Overseer (its run exists), home is the composer alone, with
       // only the Voice button and Needs you in its head; Voice Mode on shows the conversation.
-      const talked = !!(session && session.run_id) || voiceOn || voiceReqs.size > 0;
+      // What happened while the owner was away, and an agent in trouble, lead even before the first word (AC-253, AC-239).
+      const talked = !!(session && session.run_id) || voiceOn || voiceReqs.size > 0 || messages.some(m => m.card && (m.card.kind === 'while_away' || m.card.kind === 'trouble'));
       const empty = !talked || (messages.length === 0 && open.length === 0 && !((session && session.cards) || []).length && !voiceReqs.size);
       // The head (voice on and off, Needs you) is always there; the conversation once there is one.
       list.hidden = empty;

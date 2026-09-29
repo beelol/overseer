@@ -478,3 +478,51 @@ fn ac238_overseer_checks_finished_work_and_offers_the_next_step() {
     let refused = d.try_call("overseer.propose", json!({"actions": [{"action": "archive", "agent": good}], "source": "ctl"})).unwrap_err();
     assert!(refused.contains("only when the owner asks"), "{refused}");
 }
+
+// ---------------------------------------------------------------------- AC-253
+
+/// AC-253: eight agents finish across two repositories while Talk to Overseer is closed; opening
+/// it leads with one line grouped by repository and outcome, as the newest message; asking
+/// "what happened while I was away" gives the same line with no model turn; a visit with nothing
+/// new adds nothing.
+#[test]
+fn ac253_overseer_leads_with_what_happened_while_you_were_away() {
+    let r = tmp();
+    let site = repo(&r.path().join("site"));
+    let notes = repo(&r.path().join("notes"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file, &[]);
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    // The owner looks, then closes it.
+    let first = d.call("overseer.visit", json!({"surface": "vscode"}));
+    assert!(first["message"].is_null(), "nothing to say yet: {first}");
+    std::thread::sleep(Duration::from_millis(50));
+    let mut runs = Vec::new();
+    for i in 0..4 {
+        runs.push(run_id(&d.generic(&site, "worktree", "/bin/sh", &["-c", &format!("echo site {i}")])));
+    }
+    runs.push(run_id(&d.generic(&site, "worktree", "/bin/sh", &["-c", "exit 3"])));
+    for i in 0..3 {
+        runs.push(run_id(&d.generic(&notes, "worktree", "/bin/sh", &["-c", &format!("echo notes {i}")])));
+    }
+    for run in &runs {
+        d.wait_done(run, 30);
+    }
+    // Reopened: the line leads.
+    let visit = d.call("overseer.visit", json!({"surface": "vscode"}));
+    let line = "While you were away: 4 finished and 1 failed in site; 3 finished in notes.";
+    assert_eq!(visit["summary"]["text"], line, "{visit}");
+    let messages = d.call("overseer.messages", json!({"after": 0, "limit": 500}))["messages"].as_array().unwrap().clone();
+    let newest = messages.last().unwrap();
+    assert_eq!(newest["text"], line);
+    assert_eq!(newest["card"]["kind"], "while_away");
+    assert_eq!(newest["card"]["groups"].as_array().unwrap().len(), 2, "{newest}");
+    // A second surface opening it now: nothing new, nothing added.
+    let again = d.call("overseer.visit", json!({"surface": "phone"}));
+    assert!(again["message"].is_null(), "{again}");
+    assert_eq!(d.call("overseer.messages", json!({"after": 0, "limit": 500}))["messages"].as_array().unwrap().len(), messages.len());
+    // Asked: the same line, from the daemon, no model turn.
+    let asked = d.call("overseer.send", json!({"text": "What happened while I was away?", "surface": "vscode", "harness": "claude"}));
+    assert_eq!(asked["reply"]["text"], line, "{asked}");
+    assert!(session(&d)["run_id"].is_null(), "no model turn");
+}
