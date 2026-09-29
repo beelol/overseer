@@ -151,25 +151,25 @@
       "detail": {
         "events": [
           {
-            "ms": 163,
+            "ms": 156,
             "what": "window created",
             "show": true
           },
           {
-            "ms": 8666,
+            "ms": 8515,
             "what": "floating window opened hidden"
           },
           {
-            "ms": 8678,
+            "ms": 8529,
             "what": "window created",
             "show": true
           },
           {
-            "ms": 19046,
+            "ms": 19160,
             "what": "floating window opened hidden"
           },
           {
-            "ms": 19056,
+            "ms": 19169,
             "what": "window created",
             "show": true
           }
@@ -178,6 +178,6 @@
     }
   ],
   "frontmost": {
-    "loginwindow": 81
+    "loginwindow": 86
   }
 }

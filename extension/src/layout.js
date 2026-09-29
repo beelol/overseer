@@ -21,11 +21,13 @@ function ownerGroups(groups) {
 
 /**
  * Overseer opens beside the owner's editors (AC-244) when rebuilding the editor layout would merge
- * or collapse groups the owner arranged: two or more groups, one of them the owner's. `groups` are
- * the main window's (a review popped out into its own window is not counted).
+ * or collapse groups the owner arranged: two or more groups, one of them holding only the owner's
+ * editors. A file opened from the review into the review's own group leaves that group Overseer's
+ * (the usual arrangement goes on). `groups` are the main window's (a review popped out into its own
+ * window is not counted).
  */
 function besideOwner(groups) {
-  return groups.length >= 2 && ownerGroups(groups).length >= 1;
+  return groups.length >= 2 && groups.some(g => g.tabs.length > 0 && g.tabs.every(t => !isOurs(t)));
 }
 
 /**

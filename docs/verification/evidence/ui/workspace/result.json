@@ -46,7 +46,7 @@
       "name": "1440x900: one click gives the three-part layout: Overseer's conversation, the agent's review, the agent's chat",
       "ok": true,
       "detail": {
-        "took": 1914,
+        "took": 1911,
         "groups": [
           {
             "width": 380,
@@ -110,7 +110,7 @@
       "ok": true,
       "detail": {
         "before": 17,
-        "after": 21
+        "after": 20
       }
     },
     {
@@ -232,7 +232,7 @@
       "name": "1920x1080: one click gives the three-part layout: Overseer's conversation, the agent's review, the agent's chat",
       "ok": true,
       "detail": {
-        "took": 1703,
+        "took": 1701,
         "groups": [
           {
             "width": 406,

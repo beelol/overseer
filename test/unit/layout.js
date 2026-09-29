@@ -41,6 +41,10 @@ test('AC-244: one group, or only Overseer\'s own views: the usual arrangement (n
   assert.strictEqual(besideOwner([{ viewColumn: 1, tabs: [] }]), false);
 });
 
+test('AC-244: a file opened from the review into the review\'s group keeps the usual arrangement', () => {
+  assert.strictEqual(besideOwner([{ viewColumn: 1, tabs: [review, file('a.txt')] }, { viewColumn: 2, tabs: [chat] }]), false);
+});
+
 test('AC-244: once Overseer sits beside two owner groups, it stays beside them (review and chat added)', () => {
   const groups = [{ viewColumn: 1, tabs: [file('a.txt')] }, { viewColumn: 2, tabs: [file('b.txt')] }, { viewColumn: 3, tabs: [review] }, { viewColumn: 4, tabs: [chat] }];
   assert.strictEqual(besideOwner(groups), true);
