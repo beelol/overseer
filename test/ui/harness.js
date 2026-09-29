@@ -184,9 +184,18 @@ class Session {
     return file;
   }
 
-  ctl(method, params = {}) {
+  ctl(method, params = {}, { wait = true } = {}) {
     const bin = path.join(this.extensions, fs.readdirSync(this.extensions).find(d => d.startsWith('beelol.overseer')), 'bin', `overseerd-${process.platform}-${process.arch}`);
-    const out = cp.execFileSync(bin, ['ctl', method, JSON.stringify(params)], { env: this.baseEnv(), encoding: 'utf8' });
+    // The status bar can read "Overseer" before the daemon listens (a loaded Mac starts it slowly):
+    // a request that cannot reach the socket yet waits for it, up to 30 s.
+    let out;
+    for (const end = Date.now() + (wait ? 30000 : 0); ;) {
+      try { out = cp.execFileSync(bin, ['ctl', method, JSON.stringify(params)], { env: this.baseEnv(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); break; }
+      catch (e) {
+        if (!/cannot connect to .*overseerd\.sock/.test(String(e.stderr || '') + String(e.stdout || '') + e.message) || Date.now() > end) throw e;
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
+      }
+    }
     const msg = JSON.parse(out.split('\n')[0]);
     if (msg.error) throw new Error(msg.error.message);
     return msg.result;
@@ -224,8 +233,8 @@ class Session {
     // Runs outlive a daemon's shutdown (their shims keep them going for the next daemon): a
     // scenario's runs end with it. A run left going also kept its harness retrying against a mock
     // server that was gone (the `opencode run … sequence3 15` of scenario-follow, for days).
-    try { for (const r of this.ctl('run.active')) { try { this.ctl('run.interrupt', { run_id: r.id }); } catch {} } } catch {}
-    try { this.ctl('daemon.shutdown'); } catch {}
+    try { for (const r of this.ctl('run.active', {}, { wait: false })) { try { this.ctl('run.interrupt', { run_id: r.id }, { wait: false }); } catch {} } } catch {}
+    try { this.ctl('daemon.shutdown', {}, { wait: false }); } catch {}
   }
 
   writeLog() {
