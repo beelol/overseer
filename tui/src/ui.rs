@@ -343,13 +343,14 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     let focused = app.focus.as_deref() == Some(run.id.as_str());
     let (glyph, color) = status_mark(&run.status);
     let border = if focused { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else { Style::new().fg(MUTED) };
-    // The account it runs on, always (AC-235): provider and plan, the shortened email.
-    let account = run.profile_id.as_deref().and_then(|p| app.state.profile(p)).map(|p| p.short()).unwrap_or_default();
+    // The account it runs on (AC-235): provider and plan, the shortened email; on the bottom
+    // border, so the title keeps its room.
+    let profile = run.profile_id.as_deref().and_then(|p| app.state.profile(p));
+    let account = profile.map(|p| p.short()).unwrap_or_default();
+    // Where the whole of it does not fit, the email alone still says which account.
+    let email = profile.and_then(|p| p.account.as_ref()).and_then(|a| a.email.clone()).unwrap_or_default();
     let harness = crate::words::harness(&run.harness);
     let mut meta = vec![harness.clone()];
-    if !account.is_empty() {
-        meta.push(account);
-    }
     if let Some(m) = run.model.as_deref().filter(|m| !m.is_empty()) {
         meta.push(m.to_string());
     }
@@ -388,8 +389,12 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     } else {
         feed.filter(|f| f.tokens_in + f.tokens_out > 0).map(|f| Line::from(Span::styled(format!(" {} in / {} out ", compact(f.tokens_in), compact(f.tokens_out)), Style::new().fg(MUTED))))
     };
+    let used = bottom.as_ref().map(|b| b.width()).unwrap_or(0);
     if let Some(b) = bottom {
         block = block.title_bottom(b);
+    }
+    if let Some(said) = [&account, &email].into_iter().find(|a| !a.is_empty() && (area.width as usize) >= used + a.width() + 6) {
+        block = block.title_bottom(Line::from(Span::styled(format!(" {said} "), Style::new().fg(MUTED))).right_aligned());
     }
     let inner = block.inner(area);
     f.render_widget(Clear, area);
