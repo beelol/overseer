@@ -182,3 +182,4 @@ body[data-conversation="1"] .view-composer > .composer-view, body[data-voice="on
 body[data-conversation="1"] .view-composer .hero-mark, body[data-conversation="1"] .view-composer .hero-title { display: none; }
 /* With cards to read, the mark gives them room. */
 body[data-conversation="1"] .home-stage .voice-mark { width: min(220px, 50vw, 22vh); }
+.home[data-empty="1"] .home-title, .home[data-empty="1"] .home-level, .home[data-empty="1"] #home-fresh { display: none; }

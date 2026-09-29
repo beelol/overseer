@@ -47,11 +47,18 @@ pub fn addressed_strongly(text: &str, awaiting_answer: bool) -> bool {
     if words.is_empty() {
         return false;
     }
-    awaiting_answer
+    if awaiting_answer
         || words.iter().any(|w| w == "overseer")
         || COMMAND_VERBS.contains(&words[0].as_str())
         || (words.len() > 1 && words[0] == "please" && COMMAND_VERBS.contains(&words[1].as_str()))
         || (words.len() > 1 && words[0] == "hold" && words[1] == "on")
+    {
+        return true;
+    }
+    // A question may be about something else ("are you done with the dishes?"): Overseer judges.
+    // New work and everyone told something ("someone should…", "everyone, pull main") are for it.
+    const QUESTION_FIRST: &[&str] = &["what", "whats", "who", "whos", "how", "hows", "is", "are", "did", "has", "have", "any", "where", "which", "why", "when", "whoever", "whichever", "do", "does", "can", "could"];
+    !QUESTION_FIRST.contains(&words[0].as_str()) && addressed(text, &[], false)
 }
 
 /// Whether words read as meant for Overseer, with no model (AC-164): they name Overseer or an

@@ -338,7 +338,10 @@
     function refreshVisibility() {
       const messages = (session && session.messages) || [];
       const open = ((session && session.proposals) || []).filter(p => p.state === 'open' || p.state === 'settling');
-      const empty = messages.length === 0 && open.length === 0 && !((session && session.cards) || []).length && !voiceReqs.size;
+      // Until the owner has spoken to Overseer (its run exists), home is the composer alone, with
+      // only the Voice button and Needs you in its head; Voice Mode on shows the conversation.
+      const talked = !!(session && session.run_id) || voiceOn || voiceReqs.size > 0;
+      const empty = !talked || (messages.length === 0 && open.length === 0 && !((session && session.cards) || []).length && !voiceReqs.size);
       // The head (voice on and off, Needs you) is always there; the conversation once there is one.
       list.hidden = empty;
       wrap.dataset.empty = empty ? '1' : '';
@@ -411,6 +414,7 @@
           voiceOn = on;
           document.body.dataset.voice = on ? 'on' : 'off';
           if (on && voiceStage) voiceStage.wake();
+          refreshVisibility();
         }
         // Stopped by failures: the stage stays to say why, with Turn on.
         stage.hidden = !(on || (v && v.stopped));
