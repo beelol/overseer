@@ -2506,12 +2506,11 @@ rec(257, "Following an agent sits beside Overseer's conversation, not on top of 
 rec(258, "VS Code's own chat panel stays out of Overseer's way all session, not only at first launch", "not started", date="—", commit="—",
     expected="See the RFC criterion (the friction research of 2026-09-28).",
     actual="Not started: proposed by the friction research (docs/audits/2026-09-28-friction-research.md).", live="—", blocker="Overnight build waves.")
-rec(259, "Sending a task clears the box and says so", "partial",
+rec(259, "Sending a task clears the box and says so", "verified",
     date="2026-09-29 UTC",
-    commit="acdd85f0 (branch claude/composer-friction, pull request #29, not merged yet)",
+    commit="3b7b397b (pull request #29, merged; branch head acdd85f0)",
     harness="Claude Code fixture harness only (fixtures/fake-harness/claude-fixture.js); no accounts, no paid turns",
     proven="the whole Verify clause, on the branch: a packaged-UI scenario types a task, presses Enter, and the field is empty and says it was sent 12 ms after Enter; it is back to \"Send off a task\" at 3.8 s (16 of 16 checks)",
-    deferred="the merge of pull request #29 into main (the merge monitor, AC-146); the box is checked once it is merged",
     steps="""1. `node extension/scripts/package.js`, then `node test/ui/scenario-composer-friction.js` (isolated VS Code profile, fixture Claude harness, `overseer.followNewRuns` off).
 2. The scenario types "Tidy the pricing copy" at home and records the field every animation frame from just before Enter: its value, its placeholder, the note under it and its sent state.""",
     expected="See the RFC criterion (the friction research of 2026-09-28, item 7).",
@@ -2520,12 +2519,11 @@ rec(259, "Sending a task clears the box and says so", "partial",
 - Once the agent starts, the view moves to its chat as before (`followNewRuns` only decides Follow), so on screen the confirmation is seen while the agent is starting and when you come back home.""",
     evidence=f"[scenario evidence](https://github.com/beelol/overseer/blob/acdd85f0/docs/verification/evidence/ui/composer-friction) (sent-confirmation screenshot, result.json, scenario.log), [the scenario](https://github.com/beelol/overseer/blob/acdd85f0/test/ui/scenario-composer-friction.js)",
     live="Fixture harness; a real harness only lengthens the starting phase the confirmation covers.")
-rec(260, "Starting an agent in another repository never needs a native dialog", "partial",
+rec(260, "Starting an agent in another repository never needs a native dialog", "verified",
     date="2026-09-29 UTC",
-    commit="acdd85f0 (branch claude/composer-friction, pull request #29, not merged yet)",
+    commit="3b7b397b (pull request #29, merged; branch head acdd85f0)",
     harness="Claude Code fixture harness only (fixtures/fake-harness/claude-fixture.js); no accounts, no paid turns",
     proven="the whole Verify clause, on the branch: keyboard only from the composer, the repository chip's own picker adds a repository that is not open by its typed path and the task starts there; no folder dialog was opened (16 of 16 checks)",
-    deferred="the merge of pull request #29 into main (the merge monitor, AC-146); the box is checked once it is merged",
     steps="""1. `node test/unit/repo-picker.js`: typed paths and `~`, a folder inside a repository resolving to its root, refusals in plain words, Tab completion, remembered and nearby repositories, the fuzzy ranking; no dialog is called.
 2. `node test/ui/scenario-composer-friction.js`: the profile turns on `files.simpleDialog.enable`, so any folder dialog would open inside the window (never a native one) and a workbench observer records it. From the task field: Tab to the repository chip, Enter; type `frst` (fuzzy), a folder that is not a repository (refused in the picker), `<root>/elsew` then Tab (completes to `<root>/elsewhere/`), `notes-repo`, Enter; type a task, Enter.""",
     expected="See the RFC criterion (the friction research of 2026-09-28, item 8).",
@@ -2725,8 +2723,8 @@ SHORT_BLOCKERS = {
     256: "not started (the friction research, 2026-09-28)",
     257: "not started (the friction research, 2026-09-28)",
     258: "not started (the friction research, 2026-09-28)",
-    259: "not started (the friction research, 2026-09-28)",
-    260: "not started (the friction research, 2026-09-28)",
+    259: "verified",
+    260: "verified",
     261: "not started (the friction research, 2026-09-28)",
 }
 TOTAL = 53
