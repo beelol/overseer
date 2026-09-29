@@ -51,7 +51,7 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     ("events.subscribe", "read"), ("comparison.options", "read"), ("workspace.diff", "read"), ("workspace.status", "read"),
     ("workspace.cleanup_plan", "read"), ("account.usage", "read"), ("search", "read"), ("repo.files", "read"), ("workspace.changes", "read"),
     ("workspace.tree", "read"), ("account.list", "read"), ("workspace.pr_plan", "read"), ("workspace.merge_plan", "read"),
-    ("daemon.background_notice", "read"), ("daemon.last_notice", "read"), ("daemon.clients", "read"), ("audio.get", "read"), ("audio.voices", "read"),
+    ("daemon.background_notice", "read"), ("daemon.last_notice", "read"), ("daemon.clients", "read"), ("audio.get", "read"), ("audio.voices", "read"), ("notices.get", "read"),
     ("agent.digest", "read"), ("agents.roster", "read"), ("conflicts.list", "read"), ("overseer.session", "read"), ("overseer.messages", "read"), ("agent.check_ins", "read"),
     ("overseer.tools", "read"), ("overseer.tool", "read"), ("run.queued", "read"), ("overseer.card", "read"), ("agent.holds", "read"), ("agent.guardrails", "read"),
     ("channel.messages", "read"), ("agent.briefings", "read"), ("overseer.rally", "read"), ("share.list", "read"), ("watch.list", "read"), ("watch.findings", "read"),
@@ -67,7 +67,7 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     // Not from the conversation.
     ("profile.create", NEVER), ("profile.rename", NEVER), ("profile.login_command", NEVER), ("profile.logout", NEVER),
     ("account.create", NEVER), ("account.remove", NEVER), ("workspace.cleanup", NEVER), ("audio.set", NEVER), ("audio.preview", NEVER),
-    ("audio.import_commander", NEVER), ("daemon.shutdown", NEVER), ("daemon.stop_all", NEVER), ("daemon.test_notice", NEVER),
+    ("audio.import_commander", NEVER), ("daemon.shutdown", NEVER), ("daemon.stop_all", NEVER), ("daemon.test_notice", NEVER), ("notices.set", NEVER),
     // Voice Mode (Gate R): the owner's own, never from the conversation.
     ("voice.get", "read"), ("voice.requests", "read"), ("voice.subscribe", "read"), ("voice.set", NEVER), ("voice.say", NEVER), ("voice.simulate", NEVER),
     ("voice.speak", NEVER), ("voice.focus", NEVER), ("voice.download", NEVER), ("voice.cancel", NEVER), ("voice.read_back", NEVER), ("voice.answer", NEVER),
