@@ -2,7 +2,9 @@
 // voice (OVERSEER_VOICE_SIMULATE=1): the real listener in its simulated room, a made-up voice for
 // Overseer, and the Claude fixture as Overseer's model. No microphone and no paid turn.
 // The voice view shows the Overseer mark in the middle; it is driven by the daemon's live levels
-// and state. Screenshots of every state in the three Overseer themes and in grayscale.
+// and state. Since AC-227 the voice view is home (the conversation with Overseer) with Voice Mode
+// on: the mark on top and the same cards as typed ones below. Screenshots of every state in the
+// three Overseer themes and in grayscale.
 const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
@@ -110,8 +112,9 @@ const { auditExpression } = require('./audit');
     const th = await pose();
     await s.screenshot('thinking-overseer');
     check('thinking: the star turns, 12% larger', th.state === 'thinking' || th.state === 'speaking', th);
-    await view.waitFor(`[...document.querySelectorAll('.vreq')].some(c => /Sent/.test(c.querySelector('.vreq-state')?.textContent || '') && c.querySelector('.vreq-rows li'))`, 60000);
-    const card = await view.eval(`(() => { const c = document.querySelector('.vreq'); return { words: c.querySelector('.vreq-words').textContent, row: c.querySelector('.vreq-rows li')?.textContent, full: c.querySelector('.vreq-rows pre')?.textContent }; })()`);
+    // The spoken request's card is the conversation's card: the owner's words, then what was done.
+    await view.waitFor(`[...document.querySelectorAll('#home-conv .home-msg.spoken')].some(m => /use the new wire format/.test(m.textContent)) && [...document.querySelectorAll('#home-conv .done-card .card-row')].some(r => /Phone/.test(r.textContent))`, 60000);
+    const card = await view.eval(`(() => { const m = [...document.querySelectorAll('#home-conv .home-msg.spoken')].filter(m => /use the new wire format/.test(m.textContent)).pop(); const r = [...document.querySelectorAll('#home-conv .done-card .card-row')].filter(r => /Phone/.test(r.textContent)).pop(); return { words: m.querySelector('.home-text').textContent, stage: m.querySelector('.req-stage')?.textContent, row: r.textContent, full: r.title }; })()`);
     check('the request card shows the owner\'s words and the text sent to the agent', /Tell Phone to use the new wire format/.test(card.words) && /Phone/.test(card.row) && /The owner said: “Tell Phone to use the new wire format\.”/.test(card.full || ''), card);
     await s.screenshot('request-card-overseer');
 
@@ -173,8 +176,9 @@ const { auditExpression } = require('./audit');
     const streamer = s.ctl('task.create', { repo, harness: 'generic', workspace_mode: 'worktree', program: '/bin/sh', args: ['-c', 'for i in $(seq 1 900); do echo "streaming line $i: the agent writes beside the voice view"; sleep 0.015; done'], prompt: '', title: 'Streamer' });
     await s.selectRun(streamer.run.id).catch(e => s.note('select streamer: ' + e.message));
     await delay(1500);
-    await cdp.command('Overseer: Voice Mode: Show'); await delay(800);
-    await cdp.command('View: Move Editor into Right Group'); await delay(1500);
+    // The streamer's chat taken out to the side, and the voice view (home) in the Overseer view.
+    await cdp.command('Overseer: Open to the Side'); await delay(1200);
+    await cdp.command('Overseer: Voice Mode: Show'); await delay(1500);
     const groups = await cdp.evalWorkbench(`document.querySelectorAll('.editor-group-container').length`);
     s.note('editor groups', groups);
     await view.eval(`window.__voice.mark.stats.frameMs.length = 0; window.__voice.mark.stats.workMs.length = 0`);
@@ -190,13 +194,13 @@ const { auditExpression } = require('./audit');
     })()`);
     check('beside a streaming chat, the animation keeps up at 60 frames a second: work per frame p95 under 16 ms, and frames arrive at the display\'s rate', frames.work_p95 < 16 && frames.n >= 150 && groups >= 2, { ...frames, groups });
 
-    // Hidden: nothing is drawn.
-    // One group again, with the Overseer view in front: the voice view is behind its tab.
+    // Hidden: nothing is drawn. The Overseer view shows an agent's chat, so the stage is not shown.
     await cdp.command('View: Join All Editor Groups'); await delay(800);
-    await cdp.command('Overseer: Open Overseer View'); await delay(1500);
-    const hidden = await view.eval(`document.visibilityState`);
+    await s.selectRun(streamer.run.id).catch(e => s.note('select streamer: ' + e.message));
+    await delay(1500);
+    const hidden = await view.eval(`document.getElementById('voice-stage').checkVisibility() ? 'shown' : 'not shown'`);
     const f1 = await view.eval(`window.__voice.mark.stats.frames`); await delay(2000); const f2 = await view.eval(`window.__voice.mark.stats.frames`);
-    check('no frame is drawn while the view is behind another tab', f1 === f2, { visibility: hidden, f1, f2 });
+    check('no frame is drawn while the stage is not shown (the view shows an agent)', f1 === f2 && hidden === 'not shown', { visibility: hidden, f1, f2 });
     await cdp.command('Overseer: Voice Mode: Show'); await delay(1000);
 
     // Reduced motion: a still mark and a level meter.
@@ -350,7 +354,7 @@ const { auditExpression } = require('./audit');
     await cdp.command('Overseer: Voice Mode: Show'); await delay(800);
     await untilState(homeId, ['sent'], 30000);
     s.ctl('voice.set', { settle_seconds: 2 });
-    const rowState = () => view.eval(`(() => { const c = [...document.querySelectorAll('.vreq')].find(c => /add a changelog/.test(c.textContent)); return c && c.querySelector('.vreq-row-state')?.textContent; })()`);
+    const rowState = () => view.eval(`(() => { const c = [...document.querySelectorAll('#home-conv .done-card')].filter(c => /changelog/.test(c.textContent)).pop(); return c && c.querySelector('.card-row-state')?.textContent; })()`);
     const seen = [];
     for (let i = 0; i < 40; i++) { const st = await rowState(); if (st && !seen.includes(st)) seen.push(st); if (st === 'held') break; await delay(250); }
     await s.screenshot('card-held');
@@ -373,7 +377,7 @@ const { auditExpression } = require('./audit');
     const evCard = s.ctl('overseer.card', { id: evReq.proposal });
     const newRun = (evCard.rows || []).find(r => r.action === 'start')?.run_id;
     await cdp.command('Overseer: Voice Mode: Show'); await delay(1200);
-    await view.waitFor(`[...document.querySelectorAll('.vreq')].some(c => /migration note/.test(c.textContent) && c.querySelectorAll('.vreq-rows li').length === 3)`, 20000).catch(() => {});
+    await view.waitFor(`[...document.querySelectorAll('#home-conv .done-card')].some(c => /migration note/.test(c.textContent) && c.querySelectorAll('.card-row').length === 3)`, 20000).catch(() => {});
     const sideRow = (await s.agentRows()).find(r => /write the migration/.test(r.label || ''));
     const chats = [];
     for (const [theme, tag] of [['Overseer', 'overseer'], ['Overseer Dark', 'dark'], ['Overseer Light', 'light']]) {
@@ -422,8 +426,8 @@ const { auditExpression } = require('./audit');
       for (const w of [360, 900, 1280]) {
         await cdp.call('Emulation.setDeviceMetricsOverride', { width: w, height: 820, deviceScaleFactor: 0, mobile: false }, cdp.workbench);
         await delay(1500);
-        const whole = await view.eval(auditExpression({ root: 'main.voice' }));
-        const chrome = await view.eval(auditExpression({ root: 'main.voice', exclude: ['.voice-requests', '#voice-heard', '#voice-said', '#voice-error'] }));
+        const whole = await view.eval(auditExpression({ root: '#voice-stage' }));
+        const chrome = await view.eval(auditExpression({ root: '#voice-stage', exclude: ['#voice-heard', '#voice-said', '#voice-error'] }));
         audits.push({ tag, w, viewWidth: whole.width, overflow: whole.overflow.length, unnamed: whole.unnamed.length, chrome: chrome.chars, longRuns: whole.longRuns.length });
         await s.screenshot(`width-${w}-${tag}`);
       }
@@ -435,6 +439,10 @@ const { auditExpression } = require('./audit');
     check('no horizontal overflow and no long unbroken runs at 360, 900 and 1280 px in the three themes', audits.every(a => a.overflow === 0 && a.longRuns === 0), audits);
     check('the accessible-name audit: every control has a name and a tooltip (the voice view and home’s strip)', audits.every(a => a.unnamed === 0) && homeAudit.unnamed.length === 0, { view: audits.map(a => a.unnamed), home: homeAudit.unnamed });
     check('the visible-text audit: the voice view’s own text stays within 60 characters, and home’s strip within 60', audits.every(a => a.chrome <= 60) && homeAudit.chars > 0 && homeAudit.chars <= 60, { view: Math.max(...audits.map(a => a.chrome)), home: homeAudit.chars });
+    // AC-228: over every card of this scenario, no internal token (NOT_FOR_OVERSEER) and no raw error.
+    const cardsText = await view.eval(`document.getElementById('home-conv').innerText`);
+    const tokens = cardsText.match(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b[a-z]+_[a-z_]+\b|\b(?:Error|panicked|anyhow)\b|Caused by/g) || [];
+    check('no card of the voice scenario shows an internal token or a raw error (AC-228)', tokens.length === 0, { tokens: [...new Set(tokens)] });
     void continuity;
     void phone;
   } catch (e) {

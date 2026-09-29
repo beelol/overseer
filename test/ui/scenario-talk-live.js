@@ -23,12 +23,13 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     await delay(2000);
 
     await cdp.command('Overseer: Talk to Overseer'); await delay(1500);
-    const intro = await cdp.webview(`!!document.querySelector('.talk-intro')`, 20000);
-    { const p = await s.webviewPoint(intro, '#prompt'); await cdp.click(p.x, p.y); }
+    // Talk to Overseer is home (AC-227): the composer talks to Overseer.
+    const chat = await s.editorView(`!!document.getElementById('home-conv') && document.querySelector('#target')?.dataset.target === 'overseer'`, 20000);
+    if (!(await chat.eval(`document.activeElement?.id === 'task' && document.hasFocus()`))) { const p = await s.webviewPoint(chat, '#task'); await cdp.click(p.x, p.y); }
     await cdp.type('What is everyone doing? One short sentence per agent.'); await cdp.key('Enter');
-    const chat = await cdp.webview(`!!document.querySelector('#conv') && /What is everyone doing/.test(document.querySelector('#conv').textContent)`, 40000);
-    const done = await chat.waitFor(`!!document.querySelector('#conv .turn-foot:not([hidden])')`, 120000).then(() => true, () => false);
-    const text = await chat.eval(`document.querySelector('#conv').innerText`);
+    await chat.waitFor(`/What is everyone doing/.test(document.getElementById('home-conv').textContent)`, 40000);
+    const done = await chat.waitFor(`!!document.querySelector('#home-conv .home-msg.from-overseer')`, 120000).then(() => true, () => false);
+    const text = await chat.eval(`document.getElementById('home-conv').innerText`);
     // The run's status can lag the turn's footer by a moment.
     let run; for (let i = 0; i < 40; i++) { run = s.ctl('state').runs.find(r => r.title === 'Talk to Overseer'); if (run?.status === 'completed') break; await delay(250); }
     await s.screenshot('live-answer');

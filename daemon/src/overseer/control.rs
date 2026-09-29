@@ -17,6 +17,12 @@ pub const NEVER: &str = "never";
 /// agents are Confirm at the call site.
 pub const ACTION_CLASSES: &[(&str, &str)] = &[
     ("pin", LOOK),
+    // Overseer moves the owner around VS Code (AC-226): shown in the owner's window, never a yes.
+    ("focus", LOOK),
+    ("open_review", LOOK),
+    ("open_file", LOOK),
+    ("open_worktree", LOOK),
+    ("show_work", LOOK),
     ("message", STEER),
     ("share", STEER),
     ("report", STEER),
@@ -109,6 +115,10 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     ("review.accept", NEVER), ("review.unaccept", NEVER), ("review.import", NEVER), ("review.reject", NEVER),
     ("workspace.pr_open", NEVER), ("profile.device_login", NEVER), ("runs.stop_all", NEVER),
 ];
+
+/// The Look actions that only move the owner around VS Code (AC-226): they change nothing, so they
+/// happen at once at every level, typed or spoken, and never wait for a yes.
+pub const NAVIGATE: &[&str] = &["focus", "open_review", "open_file", "open_worktree", "show_work"];
 
 pub fn action_class(action: &str) -> Option<&'static str> {
     ACTION_CLASSES.iter().find(|(a, _)| *a == action).map(|(_, c)| *c)

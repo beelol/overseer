@@ -19,8 +19,13 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-/// What Overseer is told about a spoken request, the first time and with each one.
+/// What Overseer is told about a spoken request that may not have been meant for it: it judges,
+/// and nothing has been said yet (AC-228).
 const VOICE_NOTE: &str = "(Spoken aloud to you in Voice Mode. Answer in one or two short sentences: they are read out. If this was not meant for you, reply exactly NOT_FOR_OVERSEER and propose nothing. When you message agents, write only what each should do; the daemon adds the owner's words. Give each action a confidence of high, medium or low; when low, ask one short question instead of proposing.)";
+/// What Overseer is told about a spoken request that was surely for it (it names Overseer or gives
+/// a command): the daemon has already said "On it.", so Overseer answers or acts, and asks one
+/// short question when it cannot place what is meant (AC-228, AC-229).
+const VOICE_NOTE_TAKEN: &str = "(Spoken aloud to you in Voice Mode, and meant for you: answer it or act on it. Answer in one or two short sentences: they are read out. When you message agents, write only what each should do; the daemon adds the owner's words. Give each action a confidence of high, medium or low; when low, ask one short question instead of proposing.)";
 
 /// The rolling context: words heard that were not a request, kept in memory for ten minutes.
 struct Heard {
@@ -47,6 +52,8 @@ pub struct Open {
     pub direct: bool,
     /// The sent request this one corrects (a correction after the send, AC-170).
     pub replaces_sent: Option<String>,
+    /// Only probably meant for Overseer: nothing was said, and Overseer judges (AC-228).
+    pub weak: bool,
 }
 
 /// A permission read back and waiting for the owner's yes or no.
@@ -88,6 +95,8 @@ struct Requests {
     waiting: VecDeque<(String, String, String)>,
     /// A follow-up's id and the sent request it replaces, until it begins.
     replaces_pending: std::collections::HashMap<String, String>,
+    /// Requests taken with no "On it." (only probably meant for Overseer), until they begin.
+    weak_pending: std::collections::HashSet<String>,
 }
 
 /// At most four open requests at once (AC-173).
@@ -131,6 +140,9 @@ const YES: &[&str] = &[
     "approve",
     "approve it",
     "yes approve",
+    "tell it yes",
+    "tell it to go ahead",
+    "say yes",
 ];
 const NO: &[&str] = &[
     "no",
@@ -143,6 +155,8 @@ const NO: &[&str] = &[
     "do not allow it",
     "reject",
     "reject it",
+    "tell it no",
+    "say no",
 ];
 
 /// A plan read back and waiting for a yes more recently than `than` (the answer is for it).
@@ -554,6 +568,17 @@ impl Voice {
             );
             return json!({"taken": false, "why": "all at once is refused"});
         }
+        // What needs the owner ("handle what needs me", "tell it yes"): the same as typed, with no
+        // model turn (AC-227); a permission is answered with the toast and its window (AC-171).
+        // With a read-back waiting, a yes or a no is its answer (2, below).
+        if let Some(ask) = crate::overseer::needs::ask(&text) {
+            // The lock is let go before newer_plan takes it again.
+            let pending = req().lock().unwrap().read_back.clone();
+            let read_back_waits = pending.is_some_and(|rb| !newer_plan(rb.at));
+            if ask == crate::overseer::needs::Ask::Handle || !read_back_waits {
+                return self.needs(ask, &text, via);
+            }
+        }
         // A short reply that is neither a yes, a no nor a command ("maybe") is no answer; a command
         // said meanwhile ("stop Phone", "talk to Continuity") is still taken.
         let short_unclear = p.split(' ').count() <= 4
@@ -723,6 +748,9 @@ impl Voice {
             && agents_for(&self.d).iter().any(|a| a.just_asked);
         let meant =
             floor::addressed(&text, &self.agent_names(), awaiting) || to_agent || answers_an_agent;
+        // Surely meant for the one spoken to: "On it." at once. Only probably: Overseer decides
+        // first, and says nothing until it has (AC-228).
+        let strong = floor::addressed_strongly(&text, awaiting) || to_agent || answers_an_agent || s.target != "overseer";
         if !meant {
             let mut r = req().lock().unwrap();
             r.context.push_back(Heard {
@@ -733,11 +761,16 @@ impl Voice {
             self.emit(json!({"kind": "not_meant", "text": text}));
             return json!({"taken": false, "why": "not meant for Overseer"});
         }
-        self.request(&text, via, None)
+        self.request_as(&text, via, None, strong)
     }
 
     /// A request: recorded, taken with a quick answer, and sent to Overseer (or to the agent).
     fn request(self: &Arc<Self>, words: &str, via: &str, replaces: Option<&str>) -> Value {
+        self.request_as(words, via, replaces, true)
+    }
+
+    /// A request, said "On it." to at once only when it was surely meant for Overseer (`strong`).
+    fn request_as(self: &Arc<Self>, words: &str, via: &str, replaces: Option<&str>, strong: bool) -> Value {
         let d = self.d.clone();
         let s = match settings(&d) {
             Ok(s) => s,
@@ -767,7 +800,7 @@ impl Voice {
                 say
             };
             if say {
-                speak_when_free(self, "That's this hour's limit for spoken requests. Stop, mute and what's running still work.");
+                speak_when_free(self, "That's this hour's limit for spoken requests.");
             }
             return json!({"taken": false, "why": "the hour's limit"});
         }
@@ -781,8 +814,13 @@ impl Voice {
             announce(self, old);
         }
         heard_signal(self);
-        // The quick answer: at once, with no model (AC-165).
-        self.say_line("On it.");
+        // The quick answer: at once, with no model (AC-165), once it is decided the request is
+        // Overseer's (AC-228). Otherwise Overseer's own answer or plan is the first thing said.
+        if strong {
+            self.say_line("On it.");
+        } else {
+            req().lock().unwrap().weak_pending.insert(id.clone());
+        }
         // At most four open requests; a fifth waits for one to close (AC-173).
         let waiting_behind = {
             let mut r = req().lock().unwrap();
@@ -823,6 +861,7 @@ impl Voice {
         };
         let found = candidates_for(words, &ctx);
         let replaces_sent = req().lock().unwrap().replaces_pending.remove(&id);
+        let weak = req().lock().unwrap().weak_pending.remove(&id);
         let direct = target != "overseer" && !plain(words).split(' ').any(|w| w == "overseer");
         req().lock().unwrap().open.push(Open {
             id: id.clone(),
@@ -836,6 +875,7 @@ impl Voice {
             turn_seen: None,
             direct,
             replaces_sent,
+            weak,
         });
         self.st.lock().unwrap().thinking += 1;
         self.refresh();
@@ -898,7 +938,7 @@ impl Voice {
                 .collect();
             message.push_str(&format!("(Candidates from the daemon: {}. Choose among them; anyone else waits longer and is named aloud.)\n", list.join("; ")));
         }
-        message.push_str(&format!("{VOICE_NOTE}\nRequest {id}: {words}"));
+        message.push_str(&format!("{}\nRequest {id}: {words}", if weak { VOICE_NOTE } else { VOICE_NOTE_TAKEN }));
         update(&d, &id, "state", "thinking");
         announce(self, &id);
         match d.overseer_send(&message, "voice", None, None) {
@@ -1192,6 +1232,47 @@ impl Voice {
         json!({"read_back": {"agent": run, "request": request, "said": line}})
     }
 
+    /// "Handle what needs me", "tell it yes" by voice (AC-227): the conversation gets the same
+    /// cards as typed; the one permission waiting is read back (handle) or answered (yes, no).
+    fn needs(self: &Arc<Self>, ask: crate::overseer::needs::Ask, text: &str, via: &str) -> Value {
+        use crate::overseer::needs::Ask;
+        heard_signal(self);
+        let d = self.d.clone();
+        let id = next_id(&d);
+        let _ = record(&d, &id, text, via, "overseer", "answered", "needs");
+        let waiting = d.needs_waiting();
+        let pending = req().lock().unwrap().read_back.clone();
+        let reply = d.needs_handle(text, "voice", Some(&format!("Request {id}: {text}")), false).ok().flatten();
+        let line = reply.as_ref().and_then(|r| r["reply"].as_str().map(str::to_string)).unwrap_or_default();
+        let one = pending.clone().or_else(|| match waiting.as_slice() {
+            [w] => Some(ReadBack { run: w.run.clone(), request: w.request.clone(), title: w.title.clone(), at: Instant::now() }),
+            _ => None,
+        });
+        let answered = match (ask, one) {
+            (Ask::Handle, Some(rb)) => {
+                // Read back: the next yes or no answers it.
+                let s = settings(&d).unwrap_or_default();
+                if s.permission_answers {
+                    req().lock().unwrap().read_back = Some(ReadBack { at: Instant::now(), ..rb.clone() });
+                    self.st.lock().unwrap().awaiting_answer = true;
+                    self.emit(json!({"kind": "read_back", "agent": rb.run, "title": rb.title, "what": waiting.iter().find(|w| w.run == rb.run).map(|w| w.what.clone()).unwrap_or_default()}));
+                }
+                speak_when_free(self, &line);
+                Value::Null
+            }
+            (Ask::Yes | Ask::No, Some(rb)) => self.answer_permission(&rb, ask == Ask::Yes),
+            _ => {
+                if !line.is_empty() {
+                    speak_when_free(self, &line);
+                }
+                Value::Null
+            }
+        };
+        update(&d, &id, "done", &line);
+        announce(self, &id);
+        json!({"taken": true, "request": id, "needs": true, "said": line, "answer": answered})
+    }
+
     fn answer_permission(self: &Arc<Self>, rb: &ReadBack, allow: bool) -> Value {
         let d = self.d.clone();
         let s = settings(&d).unwrap_or_default();
@@ -1255,13 +1336,13 @@ fn summarize(att: &Value) -> String {
         .as_str()
         .or(input["file_path"].as_str())
         .or(input["path"].as_str())
-        .map(|s| s.chars().take(80).collect::<String>());
+        .map(|s| s.to_string());
     match (tool, detail) {
-        ("Bash" | "bash" | "shell" | "exec_command" | "command", Some(c)) => format!("run {c}"),
+        ("Bash" | "bash" | "shell" | "exec_command" | "command", Some(c)) => format!("run {}", c.chars().take(80).collect::<String>()),
         ("Edit" | "Write" | "edit" | "write" | "apply_patch", Some(p)) => {
             format!("change {}", p.rsplit('/').next().unwrap_or(&p))
         }
-        (t, Some(x)) => format!("use {t} on {x}"),
+        (t, Some(x)) => format!("use {t} on {}", x.rsplit('/').next().unwrap_or(&x).chars().take(80).collect::<String>()),
         (t, None) => format!("use {t}"),
     }
 }
@@ -1310,7 +1391,7 @@ fn tick(v: &Arc<Voice>) {
         r.open
             .iter_mut()
             .filter(|o| {
-                o.proposal.is_none() && !o.holding_said && o.at.elapsed() >= holding_after()
+                o.proposal.is_none() && !o.weak && !o.holding_said && o.at.elapsed() >= holding_after()
             })
             .map(|o| {
                 o.holding_said = true;
@@ -1377,7 +1458,7 @@ fn tick(v: &Arc<Voice>) {
             say
         };
         if say {
-            speak_when_free(v, "Overseer isn't answering, so nothing was sent. Stop, mute and what's running still work.");
+            speak_when_free(v, "Overseer isn't answering, so nothing was sent.");
         }
     }
     let due = {
@@ -1534,7 +1615,10 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
                         }
                     }
                 }
+                // Showing something (AC-226) was said as the plan: no "Sent." after it.
+                let nav_only = v.d.card(id).ok().and_then(|c| c["actions"].as_array().cloned()).is_some_and(|a| !a.is_empty() && a.iter().all(|x| crate::overseer::control::NAVIGATE.contains(&x["action"].as_str().unwrap_or(""))));
                 let (req_state, line) = match state {
+                    "yes" if nav_only && !result.contains("failed") => ("sent", ""),
                     "yes" if result.contains("failed") => (
                         "partly_sent",
                         "Some of it could not be sent; the card says what.",
@@ -1570,8 +1654,14 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
             let Some(o) = o else { return };
             update(&v.d, &o.id, "answer", &text);
             // Only the exact reply counts: a reply that quotes the instruction is still an answer.
-            if text.trim_matches(|c: char| !c.is_alphanumeric() && c != '_') == "NOT_FOR_OVERSEER" {
-                v.close(&o.id, "not_for_overseer", None);
+            // The daemon stores it in plain words, as an aside card (AC-228).
+            if m["card"]["kind"] == "aside" || text.trim_matches(|c: char| !c.is_alphanumeric() && c != '_') == crate::overseer::session::NOT_FOR_OVERSEER {
+                if o.weak {
+                    v.close(&o.id, "not_for_overseer", None);
+                } else {
+                    // "On it." was said: it stays Overseer's, answered with nothing to do.
+                    v.close(&o.id, "answered", Some("Overseer found nothing to do for this."));
+                }
                 return;
             }
             if o.proposal.is_none() {
@@ -1637,7 +1727,7 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
                         say
                     };
                     if say {
-                        speak_when_free(v, "Overseer can't work on requests right now, so nothing was sent. Stop, mute and what's running still work.");
+                        speak_when_free(v, "Overseer can't work on requests right now, so nothing was sent.");
                     }
                 } else {
                     v.close(&o.id, "answered", None);
@@ -1694,6 +1784,11 @@ fn plan_line(d: &Daemon, p: &Value) -> String {
             "report" => "Asking for a report from",
             "answer" => "Answering",
             "pin" => "Pinning",
+            "focus" => "Showing",
+            "show_work" => "Showing the work of",
+            "open_review" => "Opening the review of",
+            "open_file" => "Opening the file from",
+            "open_worktree" => "Opening the worktree of",
             "watch" => "Setting a watch on",
             "archive" => "Archiving",
             "start" => {

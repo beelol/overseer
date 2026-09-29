@@ -45,12 +45,11 @@ const slug = t => t.toLowerCase().replace(/\s+/g, '-');
     const setTheme = async theme => { const cur = JSON.parse(fs.readFileSync(settingsFile, 'utf8')); cur['workbench.colorTheme'] = theme; fs.writeFileSync(settingsFile, JSON.stringify(cur, null, 2)); await delay(2000); };
     const reached = (view, theme, ok) => { (result.reached[view] ||= {})[theme] = !!ok; };
 
-    // Talk to Overseer: one question, answered by the fixture (the panel keeps it for every theme).
+    // Talk to Overseer: one question, answered by the fixture (home keeps it for every theme, AC-227).
     await cdp.command('Overseer: Talk to Overseer'); await delay(1500);
-    const intro = await cdp.webview(`!!document.querySelector('.talk-intro')`, 20000);
-    await intro.eval(`(() => { document.getElementById('prompt').value = 'What is everyone doing?'; document.getElementById('first').requestSubmit(); return true; })()`);
-    const talk = await cdp.webview(`!!document.querySelector('#conv') && /Here is what everyone is doing/.test(document.querySelector('#conv').textContent)`, 40000);
-    await cdp.command('View: Hide Panel'); await delay(800);
+    const talk = await s.editorView(`!!document.getElementById('home-conv')`, 20000);
+    await talk.eval(`(() => { window.overseerApi.postMessage({ type: 'overseerSend', text: 'What is everyone doing?' }); return true; })()`);
+    await talk.waitFor(`/Here is what everyone is doing/.test(document.getElementById('home-conv').textContent)`, 40000);
 
     for (const theme of THEMES) {
       await setTheme(theme);
@@ -86,8 +85,7 @@ const slug = t => t.toLowerCase().replace(/\s+/g, '-');
       await s.screenshot(`composer-${t}`); reached('composer', theme, !!(await s.editorView(`document.body.dataset.mode === 'composer'`).catch(() => null)));
       // Talk to Overseer.
       await cdp.command('Overseer: Talk to Overseer'); await delay(1500);
-      await s.screenshot(`talk-${t}`); reached('talk to Overseer', theme, await talk.eval(`!!document.querySelector('#conv')`).catch(() => false));
-      await cdp.command('View: Hide Panel'); await delay(600);
+      await s.screenshot(`talk-${t}`); reached('talk to Overseer', theme, await talk.eval(`document.body.dataset.mode === 'composer' && /Here is what everyone is doing/.test(document.getElementById('home-conv').innerText)`).catch(() => false));
       // Where am I.
       await s.selectAgent('Refresh sessions once', { settle: 2000 });
       await cdp.command('Overseer: Where Am I'); await delay(800);

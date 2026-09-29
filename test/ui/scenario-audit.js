@@ -157,7 +157,10 @@ const HEIGHT = 860;
       for (const w of WIDTHS) {
         await setWidth(w);
         await s.screenshot(`new-agent-${theme.replace(/\s+/g, '-').toLowerCase()}-${w}`);
-        record('new-agent', `${theme}@${w}`, await audit(composer, { root: UI === 'baseline' ? 'body' : '[data-audit-view="composer"]' }));
+        // Home's head (the Voice button with its shortcut and the Needs-you count, AC-217 and
+        // AC-227, added after Gate J) is measured on its own, so the composer's budget stays Gate J's.
+        record('new-agent', `${theme}@${w}`, await audit(composer, { root: UI === 'baseline' ? 'body' : '[data-audit-view="composer"]', exclude: UI === 'baseline' ? [] : ['.home-head'] }));
+        if (UI !== 'baseline') record('home-head', `${theme}@${w}`, await audit(composer, { root: '.home-head' }));
       }
     }
 
@@ -201,6 +204,7 @@ const HEIGHT = 860;
         s.note('text: Gate J → Gate K', rows);
         check('agents: the side bar stays within the Gate J agents budget (238 characters)', (summary.agents?.chars ?? Infinity) <= 238, summary.agents?.chars);
         for (const r of rows.filter(r => r.gatej != null && r.view !== 'agents' && r.view !== 'dashboard')) check(`${r.view}: no more visible text than Gate J (${r.gatej} → ${r.gatek})`, r.gatek <= r.gatej, r);
+        check('home\'s head: the Voice button with its shortcut and the Needs-you count stay within 24 characters (AC-217, AC-227)', (summary['home-head']?.chars ?? Infinity) <= 24, summary['home-head']?.chars);
       }
     }
   } catch (error) {
