@@ -78,7 +78,7 @@ class CommandCenter {
     const post = x => this.panel?.webview.postMessage(x);
     switch (m.type) {
       // Opening home is a visit: what happened while the owner was away leads (AC-253).
-      case 'ready': if (this.pendingTarget) post({ type: 'composerTarget', target: this.pendingTarget }); await this.push(); await this.client.request('overseer.visit', { surface: 'vscode' }).catch(() => undefined); await this.pushOverseer(); this.pushVoice(); this.voiceSource?.refresh(); this.pushActivity(); if (this.inDashboard) post({ type: 'dashboard', on: true }); if (this.aside) post({ type: 'aside', on: true }); return;
+      case 'ready': if (this.pendingTarget) post({ type: 'composerTarget', target: this.pendingTarget }); await this.push(); await this.client.request('overseer.visit', { surface: 'vscode' }).catch(() => undefined); await this.pushOverseer(); this.pushVoice(); this.voiceSource?.refresh(); this.pushActivity(); if (this.inDashboard) post({ type: 'dashboard', on: true }); if (this.aside) post({ type: 'aside', on: true }); if (this.head) post({ type: 'headAgent', agent: this.head }); return;
       // Voice Mode's controls in the view (AC-227).
       case 'voiceMute': await vscode.commands.executeCommand('overseer.voice.mute'); return;
       case 'voiceToggle': await vscode.commands.executeCommand('overseer.voice.toggle'); return;
@@ -87,6 +87,8 @@ class CommandCenter {
       case 'voiceAnswer': await this.voiceSource?.answer(!!m.yes); return;
       // A card, a stage or a Needs-you item opens its agent or its work (AC-226, AC-227).
       case 'openAgent': if (typeof m.runId === 'string' && m.runId) await this.handlers.openAgent?.(m.runId, { work: !!m.work, from: m.from }); return;
+      // AC-257: the conversation's way back to the agent shown beside it.
+      case 'backToAgent': await this.handlers.backToAgent?.(typeof m.runId === 'string' ? m.runId : undefined); return;
       case 'aside': this.aside = !!m.on; if (!m.on) post({ type: 'aside', on: false }); return;
       case 'asideShown': this.aside = !!m.on; return;
       // Home (AC-182): the one conversation with Overseer, from the daemon.
@@ -183,6 +185,9 @@ class CommandCenter {
 
   /** Voice Mode's stage in the view (the mark, the words, the spoken requests' states). */
   postVoice(m) { this.panel?.webview.postMessage({ type: 'voiceView', m }); }
+
+  /** The agent whose head is shown (AC-257): the conversation offers one click back to it. */
+  headAgent(agent) { this.head = agent || undefined; this.panel?.webview.postMessage({ type: 'headAgent', agent: this.head }); }
 
   /** Beside the agent a request started (AC-226): its chat on the left, the view slid right. */
   setAside(on, runId) { this.aside = !!on; this.panel?.webview.postMessage({ type: 'aside', on: !!on, runId }); }

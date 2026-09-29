@@ -14,6 +14,7 @@
 //   native-quota-block-invalid: a malformed follow-up cannot clear a scoped rejection
 //   overseer:    answers as Talk to Overseer (AC-107) from the agents' state in the prompt: a summary
 //                for "what is everyone doing?", and for "tell <agent> to <task>" a proposal block
+//   editor:      edits files one step at a time as its prompt lists them (AC-233's Follow)
 //   swarm:       a Swarm member on the proposed native path (swarm.native_director): with the
 //                director's tools it follows CLAUDE_FIXTURE_SWARM_SCRIPT, with a worker's tools
 //                CLAUDE_FIXTURE_SWARM_WORKERS; every step goes through the daemon's MCP tools and is
@@ -668,6 +669,33 @@ async function mcpClient() {
     assistant([{ type: 'text', text: reply }]);
     result(false, reply);
     if (mcp) mcp.close();
+  } else if (mode === 'editor') {
+    // An agent editing files one at a time (AC-233's Follow): its prompt lists the steps, "edit
+    // a.txt:40" (append to lines), "add a.txt:10" (two new lines before line 10), "remove
+    // a.txt:5-7". Each is an Edit tool call, written to disk as reported. With FIXTURE_EDIT_BARRIER
+    // (a folder), step i waits for <folder>/go-<i>; otherwise FIXTURE_EDIT_GAP_MS (1.5 s) apart.
+    const steps = [...firstText.matchAll(/\b(edit|add|remove) ([\w./-]+):(\d+)(?:-(\d+))?/g)];
+    const barrier = process.env.FIXTURE_EDIT_BARRIER;
+    let i = 0;
+    for (const [, op, rel, from, to] of steps) {
+      i++;
+      if (barrier) { const go = path.join(barrier, `go-${i}`); const deadline = Date.now() + 120000; while (!fs.existsSync(go) && Date.now() < deadline) await sleep(50); }
+      else await sleep(Number(process.env.FIXTURE_EDIT_GAP_MS || 1500));
+      const file = path.join(process.cwd(), rel);
+      const lines = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n') : [''];
+      const a = Number(from) - 1, b = Number(to || from) - 1;
+      const oldText = lines.slice(a, b + 1).join('\n');
+      if (op === 'edit') for (let k = a; k <= b; k++) lines[k] = lines[k] + ' (edited by the agent)';
+      else if (op === 'add') lines.splice(a, 0, 'added by the agent 1', 'added by the agent 2');
+      else lines.splice(a, b - a + 1);
+      const newText = op === 'remove' ? '' : op === 'add' ? ['added by the agent 1', 'added by the agent 2', lines[a + 2]].join('\n') : lines.slice(a, b + 1).join('\n');
+      const id = `toolu_e_${i}`;
+      assistant([{ type: 'tool_use', id, name: 'Edit', input: { file_path: file, old_string: op === 'add' ? lines[a + 2] : oldText, new_string: newText } }]);
+      fs.writeFileSync(file, lines.join('\n'));
+      user([{ type: 'tool_result', tool_use_id: id, content: 'The file ' + file + ' has been updated.' }]);
+    }
+    assistant([{ type: 'text', text: `Made ${steps.length} edits.` }]);
+    result(false, `Made ${steps.length} edits.`);
   } else if (mode === 'channel') {
     // An agent with Overseer's channel (AC-190): it writes the files its prompt names (write:),
     // claims, reports and asks as the prompt says (claim:, report:, ask:; "report x3:" repeats),

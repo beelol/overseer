@@ -178,7 +178,7 @@ test('the manifest has the phone access commands, trusted-only where they change
   }
   assert.ok(by['Show Devices'] && !by['Show Devices'].enablement);
   const views = manifest.contributes.views.overseer.map(v => v.name);
-  assert.deepStrictEqual(views, ['Search', 'Agents', 'Accounts', 'Devices']);
+  assert.deepStrictEqual(views, ['Search', 'Agents', 'Worktree', 'Accounts', 'Devices']); // Worktree: the agent's head (AC-233)
   const inline = manifest.contributes.menus['view/item/context'].filter(m => /overseer\.devices/.test(m.when) && /^inline/.test(m.group)).map(m => m.command);
   assert.deepStrictEqual([...new Set(inline)].sort(), ['overseer.giveDeviceFullControl', 'overseer.makeDeviceWatchOnly', 'overseer.renameDevice', 'overseer.revokeDevice']);
 });

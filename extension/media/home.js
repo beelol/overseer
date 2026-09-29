@@ -49,6 +49,11 @@
     // Beside the agent it started (AC-226): back to the view alone.
     const unaside = ui.iconButton('layout-sidebar-right-off', 'Back to the conversation alone', { cls: 'sm home-unaside' }); unaside.id = 'home-unaside';
     unaside.addEventListener('click', () => post({ type: 'aside', on: false }));
+    // The agent followed beside the conversation (AC-257): one click back into its head.
+    const backAgent = el('button', 'home-back-agent'); backAgent.type = 'button'; backAgent.id = 'home-back-agent'; backAgent.hidden = true;
+    const backLabel = el('span', 'home-back-agent-label');
+    backAgent.append(ui.icon('eye', 'sm'), el('span', 'home-back-agent-verb', 'Back to'), backLabel, el('kbd', null, '⌥⌘U'));
+    backAgent.addEventListener('click', () => post({ type: 'backToAgent', runId: backAgent.dataset.run }));
     head.append(vToggle, vstrip, el('span', 'spacer'), needs, level, fresh, unaside);
     // The voice view's stage: the mark, the words heard and said, and the strip's controls.
     const stage = el('section', 'home-stage'); stage.id = 'voice-stage'; stage.hidden = true; stage.setAttribute('aria-label', 'Voice Mode');
@@ -56,7 +61,7 @@
     // What the latest request is doing now, in plain words (AC-228).
     const progress = el('div', 'home-progress'); progress.id = 'home-progress'; progress.setAttribute('role', 'status'); progress.hidden = true;
     const list = el('div', 'home-list'); list.id = 'home-conv'; list.setAttribute('role', 'log'); list.setAttribute('aria-live', 'polite'); list.setAttribute('aria-label', 'Conversation with Overseer');
-    wrap.append(head, stage, progress, list);
+    wrap.append(head, backAgent, stage, progress, list);
     host.prepend(wrap);
     let session, voiceOn = false, activity = {};
     const shown = new Map(); // message id -> element
@@ -436,6 +441,15 @@
         else if (m.type === 'live' && m.msg && m.msg.kind === 'request' && m.msg.request) { voiceReqs.set(m.msg.request.id, m.msg.request); renderStages(); }
         const open = [...voiceReqs.values()].sort((a, b) => b.ts - a.ts).find(r => ['settling', 'thinking', 'taken'].includes(r.state));
         if (voiceStage) voiceStage.setOpen(open);
+      },
+      /** The agent whose head is shown beside the conversation (AC-257), or none. */
+      headAgent(agent) {
+        backAgent.hidden = !(agent && agent.runId);
+        if (!agent || !agent.runId) return;
+        backAgent.dataset.run = agent.runId;
+        backLabel.textContent = agent.title || 'the agent';
+        const label = `Back to ${agent.title || 'the agent'} (⌥⌘U)`;
+        backAgent.title = label; backAgent.setAttribute('aria-label', label);
       },
       /** What each agent is doing right now (its last tool or words), for the working stage. */
       activity(map) { activity = map || {}; renderStages(); },
