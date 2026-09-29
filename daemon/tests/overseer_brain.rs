@@ -209,7 +209,8 @@ fn ac237_named_harness_model_and_account_start_there() {
     // A named model.
     let p = ask_overseer(&d, "start an agent to write the notes with the model opus-fixture");
     let line = p["lines"][0].as_str().unwrap();
-    assert!(line.contains("opus-fixture") && line.contains("as asked"), "{line}");
+    assert!(line.contains("on Claude Code · opus-fixture"), "{line}");
+    assert_eq!(p["actions"][0]["route"]["why"], "as asked");
     let run = yes_start(&d, &p);
     assert_eq!(run["harness"], "claude");
     assert_eq!(run["model"], "opus-fixture");
@@ -218,7 +219,7 @@ fn ac237_named_harness_model_and_account_start_there() {
     let said = d.events(run["id"].as_str().unwrap()).iter().find(|e| e["kind"] == "output" && e["payload"]["text"].as_str().unwrap_or("").starts_with("ECHO ")).map(|e| e["payload"]["text"].as_str().unwrap().to_string()).unwrap();
     assert!(said.contains("\"--model\",\"opus-fixture\""), "the run's arguments: {said}");
     let reply = replies(&d).last().cloned().unwrap();
-    assert!(reply.contains("opus-fixture") && reply.lines().count() == 1, "one line says the pick: {reply}");
+    assert!(reply.contains("opus-fixture") && reply.contains("as asked") && reply.lines().count() == 1, "one line says the pick and why: {reply}");
 
     // A named account ("my other account": Overseer lists the accounts and picks the other one).
     let p = ask_overseer(&d, "start an agent to draft the plan on my other account");
@@ -267,8 +268,9 @@ fn ac237_an_unnamed_start_follows_the_route_pick() {
     d.call("auto.mode.set", json!({"enabled": false}));
     let p = ask_overseer(&d, "start an agent to tidy the changelog");
     assert_eq!(p["actions"][0]["route"]["how"], "default", "{p}");
-    let line = p["lines"][0].as_str().unwrap();
-    assert!(line.contains("Auto routing is off"), "{line}");
+    assert_eq!(p["actions"][0]["route"]["why"], "Auto routing is off", "{p}");
+    assert!(p["lines"][0].as_str().unwrap().ends_with("on Claude Code"), "{p}");
+    assert!(replies(&d).last().unwrap().contains("Auto routing is off"), "the reply says why");
     let run = yes_start(&d, &p);
     assert_eq!(run["harness"], "claude");
     assert_eq!(run["profile_id"], "system-claude");

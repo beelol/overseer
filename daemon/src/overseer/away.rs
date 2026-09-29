@@ -98,9 +98,11 @@ impl Daemon {
         let sid = session["id"].as_str().unwrap_or_default().to_string();
         // The owner's own words count as being here too.
         let spoke: Option<i64> = self.store.lock().unwrap().conn.query_row("SELECT MAX(ts) FROM overseer_messages WHERE source='owner'", [], |r| r.get(0)).ok().flatten();
-        let last = self.meta_ms(LAST_VISIT).into_iter().chain(spoke).max().unwrap_or(0);
-        let summary = self.away_summary(last, now)?;
+        let seen = self.meta_ms(LAST_VISIT).into_iter().chain(spoke).max();
         self.set_meta_ms(LAST_VISIT, now)?;
+        // The first visit ever only marks the time: nobody was away yet.
+        let Some(last) = seen else { return Ok(json!({"summary": null, "message": null, "first": true})) };
+        let summary = self.away_summary(last, now)?;
         if summary["count"].as_u64().unwrap_or(0) == 0 {
             return Ok(json!({"summary": summary, "message": null}));
         }

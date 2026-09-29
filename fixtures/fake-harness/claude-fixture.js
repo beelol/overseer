@@ -642,7 +642,9 @@ async function mcpClient() {
       start.prompt = `Please ${task}.`;
       remember(start.title);
       const outcome = await call('propose', { actions: [start] }).catch(e => 'refused: ' + e.message);
-      reply = `Starting one agent to ${task}. ${outcome}`;
+      // One line: where it runs and why, from the daemon's pick (AC-237).
+      const where = (/\) Start “[^”]*” in \S+ on (.+?)\.?$/.exec(outcome) || [])[1];
+      reply = /^refused/.test(outcome) ? `I could not start it: ${outcome}` : `Starting one agent to ${task}${where ? ' on ' + where : ''}.${/^Done/.test(outcome) ? '' : ' Say yes to go ahead.'}`;
       assistant([{ type: 'text', text: reply }]);
       result(false, reply);
       mcp.close();

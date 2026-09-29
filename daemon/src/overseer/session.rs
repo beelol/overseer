@@ -586,8 +586,12 @@ impl Daemon {
                         line.push_str(&format!(", account {}", p.name));
                     }
                 }
-                if let Some(why) = a["route"]["why"].as_str() {
-                    line.push_str(&format!(": {why}"));
+                // Auto's pick says why on the card (AC-237); what was named or the default is plain
+                // from the line itself, and the reply says why.
+                if a["route"]["how"] == "auto" {
+                    if let Some(why) = a["route"]["why"].as_str() {
+                        line.push_str(&format!(": {why}"));
+                    }
                 }
                 line
             }
@@ -906,7 +910,7 @@ impl Daemon {
         let run_id = session["run_id"].as_str().map(str::to_string);
         self.emit(None, run_id.as_deref(), "proposal", "overseer", "exact", card.clone())?;
         // Where each new agent runs and why, for Overseer's one line to the owner (AC-237).
-        let starts: Vec<String> = checked.iter().zip(&lines).filter(|(a, _)| a["action"] == "start").map(|(_, l)| format!("{l}.")).collect();
+        let starts: Vec<String> = checked.iter().zip(&lines).filter(|(a, _)| a["action"] == "start").map(|(a, l)| match a["route"]["why"].as_str().filter(|_| a["route"]["how"] != "auto") { Some(why) => format!("{l} ({why})."), None => format!("{l}.") }).collect();
         let mut out = if at_once {
             let result = self.overseer_answer(&id, true, "overseer", &format!("the {} level", level.replace('_', " ")))?;
             json!({"proposal": id, "state": result["state"], "done": true, "result": result["result"]})
@@ -977,15 +981,16 @@ impl Daemon {
                     a["route"] = json!({"how": "auto", "why": format!("Auto's pick: {}", plain_route_reason(preview["decision"]["reason"].as_str().unwrap_or(""))), "route_id": r["id"], "work_unit": unit});
                     return Ok(());
                 }
-                Ok(preview) => format!("Auto found no account that fits ({})", plain_route_reason(preview["decision"]["reason"].as_str().unwrap_or(""))),
-                Err(e) => format!("Auto could not pick ({})", plain_start_failure(&e.to_string())),
+                Ok(preview) => format!("Auto found no account that fits: {}", plain_route_reason(preview["decision"]["reason"].as_str().unwrap_or(""))),
+                Err(e) => format!("Auto could not pick: {}", plain_start_failure(&e.to_string())),
             };
+            // Overseer's own harness on the default account; the line says which harness.
             a["harness"] = json!(own());
-            a["route"] = json!({"how": "default", "why": format!("{why_not}, so it runs on Overseer's own harness and the default account")});
+            a["route"] = json!({"how": "default", "why": why_not});
             return Ok(());
         }
         a["harness"] = json!(own());
-        a["route"] = json!({"how": "default", "why": "Auto routing is off, so it runs on Overseer's own harness and the default account"});
+        a["route"] = json!({"how": "default", "why": "Auto routing is off"});
         Ok(())
     }
 

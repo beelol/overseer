@@ -341,8 +341,8 @@
       const open = ((session && session.proposals) || []).filter(p => p.state === 'open' || p.state === 'settling');
       // Until the owner has spoken to Overseer (its run exists), home is the composer alone, with
       // only the Voice button and Needs you in its head; Voice Mode on shows the conversation.
-      // What happened while the owner was away, and an agent in trouble, lead even before the first word (AC-253, AC-239).
-      const talked = !!(session && session.run_id) || voiceOn || voiceReqs.size > 0 || messages.some(m => m.card && (m.card.kind === 'while_away' || m.card.kind === 'trouble'));
+      // What happened while the owner was away leads even before the first word (AC-253).
+      const talked = !!(session && session.run_id) || voiceOn || voiceReqs.size > 0 || messages.some(m => m.card && m.card.kind === 'while_away');
       const empty = !talked || (messages.length === 0 && open.length === 0 && !((session && session.cards) || []).length && !voiceReqs.size);
       // The head (voice on and off, Needs you) is always there; the conversation once there is one.
       list.hidden = empty;
@@ -377,6 +377,8 @@
       session(s) {
         session = s;
         const messages = (s && s.messages) || [];
+        // Before the owner's first word only the away line shows, not every agent's start (AC-253).
+        const before = !!s && !s.run_id && !voiceOn;
         const open = ((s && s.proposals) || []).filter(p => p.state === 'open' || p.state === 'settling');
         level.textContent = s && s.level ? { ask_first: 'Ask first', steer: 'Steer', auto: 'Auto' }[s.level] || s.level : '';
         const keep = new Set();
@@ -387,6 +389,7 @@
           if (!e) { e = row(m); shown.set(m.id, e); place(e); if (m.card && m.card.kind === 'while_away') away = e; }
           else if (m.card && m.card.kind === 'ask' && e.dataset.answer !== String(m.card.answer || '')) { const n = row(m); e.replaceWith(n); shown.set(m.id, n); e = n; }
           if (m.card && m.card.kind === 'ask') e.dataset.answer = String(m.card.answer || '');
+          e.hidden = before && !(m.card && m.card.kind === 'while_away');
         }
         for (const p of open) {
           const id = 'p:' + p.id; keep.add(id);
@@ -419,7 +422,8 @@
           voiceOn = on;
           document.body.dataset.voice = on ? 'on' : 'off';
           if (on && voiceStage) voiceStage.wake();
-          refreshVisibility();
+          // Before the first word the list held only the away line: redraw it whole or back again.
+          if (session && !session.run_id) this.session(session); else refreshVisibility();
         }
         // Stopped by failures: the stage stays to say why, with Turn on.
         stage.hidden = !(on || (v && v.stopped));
