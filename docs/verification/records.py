@@ -2469,7 +2469,7 @@ rec(236, "Home talks to Overseer first", "verified", date="2026-09-29", commit="
     evidence="`test/ui/scenario-home-overseer.js` and its evidence folder `docs/verification/evidence/ui/home-overseer/` on the branch, pull request #31",
     live="Fixtures only; no paid turn.",
     limits="Existing scenarios that start agents by typing at home choose \"Start directly\" (`overseer.home.sendTo: agent`) in their profile.")
-rec(237, "Overseer starts agents on the right harness, model and account", "verified", date="2026-09-29", commit="fdac4335 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(237, "Overseer starts agents on the right harness, model and account", "verified", date="2026-09-29", commit="a89b754f (branch claude/overseer-brain, pull request #32, not merged yet)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the whole Verify clause with the fixture as Overseer's model: starts on a named model, a named account and a named harness, each confirmed on the run; an unnamed start on Auto's route pick with its reason on the card; the tool schema's fields",
     steps="""1. `cargo test --test overseer_brain ac237` (3 tests, real daemon binary, Claude fixture as Overseer and agents, Codex app-server fixture with listed models).
@@ -2477,14 +2477,14 @@ rec(237, "Overseer starts agents on the right harness, model and account", "veri
 3. With Auto routing on, "start an agent to tidy the readme" names nothing; with it off, "start an agent to tidy the changelog".""",
     expected="See the RFC criterion (the usability audit of 2026-09-28, findings 2, 8 and 9).",
     actual="""- `propose`'s start takes harness (claude, codex, opencode), model, profile (an account id or name), effort and permission_mode; a new `accounts` tool lists the accounts, whether Auto routing picks and which harnesses are installed. A name that is no account is refused with the accounts there are.
-- Named: the card reads "Start “write the notes” in … on Claude Code · opus-fixture: as asked"; the run's arguments carry `--model opus-fixture`; the account start runs on the Work profile; the Codex start runs on `codex-app` with `system-codex`. Overseer's reply is one line with the pick.
+- Named: the card reads "Start “write the notes” in … on Claude Code · opus-fixture" and Overseer's reply adds "(as asked)"; the run's arguments carry `--model opus-fixture`; the account start runs on the Work profile; the Codex start runs on `codex-app` with `system-codex`. Overseer's reply is one line with the pick.
 - Unnamed, Auto routing on: the daemon asks Auto (`auto.root.preview`) when the start is proposed and the yes starts it through `auto.start` pinned to that route, so Auto's booking and admission apply. Card: "… on Codex · gpt-6-sol · medium: Auto's pick: the recommended default for this kind of work; how much it will use is not known yet"; the run has exactly that harness, model and account.
-- Auto routing off (or no route fits): Overseer's own harness on the default account, and the card says so.
+- Auto routing off (or no route fits): Overseer's own harness on the default account; the card names the harness and the reply says why ("Auto routing is off"). A spoken start keeps the composer's remembered harness, account and model (AC-168), shown as "your composer's choice".
 - An Auto-routed start Overseer makes on its own waits for the owner's yes (the Auto contract: Overseer's level grants no route).""",
-    evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/fdac4335/daemon/tests/overseer_brain.rs) (`ac237_*`)",
+    evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/a89b754f/daemon/tests/overseer_brain.rs) (`ac237_*`)",
     live="Fixtures only; a live model choosing the fields from free wording was not exercised.",
     limits="Auto routing is used when Auto Mode is on; Auto Mode stays off by default until its own checks pass (docs/rfcs/auto-mode.md), which is the owner's switch. Within the owner's allowed accounts means Auto's allowed set (the default accounts) or an account the owner names; there is no separate allowed-accounts setting for Overseer yet.")
-rec(238, "Overseer checks finished work and offers the next step", "verified", date="2026-09-29", commit="fdac4335 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(238, "Overseer checks finished work and offers the next step", "verified", date="2026-09-29", commit="a89b754f (branch claude/overseer-brain, pull request #32, not merged yet)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the whole Verify clause with the fixture as Overseer's model",
     steps="""1. `cargo test --test overseer_brain ac238_overseer_checks_finished_work_and_offers_the_next_step`.
@@ -2494,9 +2494,9 @@ rec(238, "Overseer checks finished work and offers the next step", "verified", d
 - Passing: the card reads "Totals did it: It added what was asked (1 file changed) and `npm test` passes: "3 passing"." with the daemon's own test record; a merge_back proposal comes from the check-in turn (cause `check_in`).
 - Failing: "Negatives is not done yet: `npm test` fails: "AssertionError: expected -1 to equal 1"."; a message with the fix is proposed.
 - Nothing happened without a yes: the repository's HEAD did not move and the failing agent got no turn; the owner's yes sent the fix. A check-in may propose merge_back or pull_request only for a finished agent and they always wait for a yes; archive and the other Confirm actions stay the owner's own to ask for.""",
-    evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/fdac4335/daemon/tests/overseer_brain.rs) (`ac238_*`)",
+    evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/a89b754f/daemon/tests/overseer_brain.rs) (`ac238_*`)",
     live="Fixtures only: the verdict's quality with a live model is not judged here.")
-rec(239, "Stuck, failed and limited agents come back to Overseer", "partial", date="2026-09-29", commit="fdac4335 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(239, "Stuck, failed and limited agents come back to Overseer", "partial", date="2026-09-29", commit="a89b754f (branch claude/overseer-brain, pull request #32, not merged yet)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the daemon side of the Verify clause: ratelimit, failed-reason and a silent agent each give one Overseer turn and a card with a plain reason; continuing on the other account carries the work on a second fixture profile in the same worktree; neither the conversation nor the daemon's state shows an error class or HTTP code",
     steps="""1. `cargo test --test overseer_brain ac239_stuck_failed_and_limited_agents_come_back_to_overseer`, plus the unit test `overseer::trouble::tests::reasons_are_plain`.
@@ -2506,7 +2506,7 @@ rec(239, "Stuck, failed and limited agents come back to Overseer", "partial", da
 - Overseer proposed continue on Work, a retry, and (at Auto) stopped the silent agent itself. The yes on continue ended the limited run as handed off and started its successor on the Work profile in the same task and worktree, through Continuity's handoff with the permission mode carried; the retry sent the unfinished turn again.
 - At Auto a failing agent is retried once by Overseer; the second retry waits for the owner's yes, so a repeating failure is not a loop.
 - The daemon's state gives failed runs a `plain_reason` ("Reached its account's usage limit"); the conversation holds no `[rate_limit]`, `429` or "turn reported failure". The agents tree tooltip, Needs you, home's stage line and the chat's status now show `plain_reason` first.""",
-    evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/fdac4335/daemon/tests/overseer_brain.rs) (`ac239_*`), [trouble.rs](https://github.com/beelol/overseer/blob/fdac4335/daemon/src/overseer/trouble.rs)",
+    evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/a89b754f/daemon/tests/overseer_brain.rs) (`ac239_*`), [trouble.rs](https://github.com/beelol/overseer/blob/a89b754f/daemon/src/overseer/trouble.rs)",
     live="Fixtures only.",
     limits="Another account cannot resume a harness's own session (its session store is per account), so the work continues as a successor run with a handoff prompt in the same worktree, as Continuity does. `exit_reason` keeps the daemon's record, including the error class, for AC-16.",
     blocker="No UI scenario yet checks the VS Code surfaces (tree tooltip, Needs you, chat status) for a raw error with a limited agent; they read `plain_reason` but that is unproven on screen.")
@@ -2595,7 +2595,7 @@ rec(247, "Home's input is always on screen", "verified", date="2026-09-29", comm
 - Continuity's notice, folded, is one compact line (44 px at most; it was 51 px on main, which the scenario failed first). One view for talking to Overseer (#27) had already pinned the box to the foot.""",
     evidence="`test/ui/scenario-home-input.js` and `docs/verification/evidence/ui/home-input/` on the branch, pull request #31",
     live="Fixtures only.")
-rec(248, "Overseer's session never drops what it was told", "verified", date="2026-09-29", commit="fdac4335 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(248, "Overseer's session never drops what it was told", "verified", date="2026-09-29", commit="a89b754f (branch claude/overseer-brain, pull request #32, not merged yet)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the whole Verify clause: a forced Lagged error, an ask before Overseer's first turn, a failed turn start, a proposal after its spoken request closed",
     steps="""1. From pull request #28 (merged): `cargo test --test overseer ac181_the_session_loop_catches_up_after_falling_behind` (a 64-event bus flooded with 800,000 output events) and `ac190_a_question_waits_for_overseers_first_turn_and_survives_start_fresh`.
@@ -2606,7 +2606,7 @@ rec(248, "Overseer's session never drops what it was told", "verified", date="20
 - An ask before Overseer's run exists, or after Start fresh, is kept and answered by the first turn Overseer takes once its run exists (#28); a question at the daily cap is kept and answered when the cap allows.
 - A turn that cannot start (Overseer's folder taken away): `overseer.send` answers queued, the conversation says once "Overseer could not start its turn: its folder is gone. Your words are kept and sent again when it can.", the session ticker tries again (2 s doubling to 15 s), and the kept message is sent and answered once the folder is back. On main the send returned the error and the message was lost.
 - A spoken request closed "Not sent … Nothing will be sent later": the proposal its slow turn made 9 s later is recorded cancelled ("Withdrawn: the spoken request V-… was closed as not sent, so nothing was sent.") and the agent got nothing. On main it settled and went out.""",
-    evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/fdac4335/daemon/tests/overseer_brain.rs) (`ac248_*`), [voice test](https://github.com/beelol/overseer/blob/fdac4335/daemon/tests/voice.rs), pull request #28",
+    evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/a89b754f/daemon/tests/overseer_brain.rs) (`ac248_*`), [voice test](https://github.com/beelol/overseer/blob/a89b754f/daemon/tests/voice.rs), pull request #28",
     live="Fixtures only.",
     limits="An ask made before Overseer's first turn is answered by the check-in turn that follows the owner's first message, not inside that first turn.")
 rec(249, "Test windows never reach the owner's screen", "verified", commit="c3becdd7 (branch claude/audit-correctness, pull request #28)", date="2026-09-28",
@@ -2648,7 +2648,7 @@ rec(252, "Zero-friction loop, measured", "not started", date="—", commit="—"
     expected="See the RFC criterion (the owner's zero-friction goal, 2026-09-28).",
     actual="Not started: added for the overnight zero-friction goal (docs/goals/zero-friction.md).", live="—", blocker="Overnight goal.")
 
-rec(253, "Overseer leads with what happened while you were away", "verified", date="2026-09-29", commit="fdac4335 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(253, "Overseer leads with what happened while you were away", "verified", date="2026-09-29", commit="a89b754f (branch claude/overseer-brain, pull request #32, not merged yet)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the whole Verify clause: a packaged-UI scenario and a daemon test",
     steps="""1. `cargo test --test overseer_brain ac253_overseer_leads_with_what_happened_while_you_were_away`.
@@ -2656,8 +2656,8 @@ rec(253, "Overseer leads with what happened while you were away", "verified", da
     expected="See the RFC criterion (the friction research of 2026-09-28, finding 3).",
     actual="""- Opening home or Talk to Overseer calls `overseer.visit`: the daemon compares the agents' ends since the owner's last visit or last words and adds one line grouped by repository and outcome, busiest first: "While you were away: 4 finished and 1 failed in site; 3 finished in notes."
 - Reopened, home shows that line as the conversation's newest message, in view above the composer, instead of the empty "What's next?" hero (the scenario measures it inside the conversation's visible box; before the scroll fix it rendered just below it and the check failed).
-- Asked, the daemon answers with the same line from the same window, with no model turn. A second surface opening at the same moment adds nothing.""",
-    evidence=f"[scenario evidence](https://github.com/beelol/overseer/blob/fdac4335/docs/verification/evidence/ui/away) (screenshots, result.json), [the scenario](https://github.com/beelol/overseer/blob/fdac4335/test/ui/scenario-away.js), [daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/fdac4335/daemon/tests/overseer_brain.rs)",
+- Asked, the daemon answers with the same line from the same window, with no model turn. A second surface opening at the same moment adds nothing; the very first visit only records the time. Before the owner's first word home shows only this line, not every agent's Started card.""",
+    evidence=f"[scenario evidence](https://github.com/beelol/overseer/blob/a89b754f/docs/verification/evidence/ui/away) (screenshots, result.json), [the scenario](https://github.com/beelol/overseer/blob/a89b754f/test/ui/scenario-away.js), [daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/a89b754f/daemon/tests/overseer_brain.rs)",
     live="Fixtures only; no model is involved in the summary.",
     limits="Agents started by hand still add their own \"Started\" cards above the line.")
 rec(254, "Reviewed and unreviewed are never the same mark", "verified", date="2026-09-29", commit="c8e87a21 (branch claude/views-polish, pull request #31, not merged yet)",
