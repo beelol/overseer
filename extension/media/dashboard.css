@@ -199,3 +199,8 @@ body[data-conversation="1"] .view-composer .hero-mark, body[data-conversation="1
 /* With cards to read, the mark gives them room. */
 body[data-conversation="1"] .home-stage .voice-mark { width: min(220px, 50vw, 22vh); }
 .home[data-empty="1"] .home-title, .home[data-empty="1"] .home-level, .home[data-empty="1"] #home-fresh { display: none; }
+
+/* AC-247: home's input is always on screen. A one-time notice (Continuity) above the box is one
+   compact line while folded, so it never pushes the input off. */
+.view-composer .cont-notice:not(:has(details[open])) { align-items: center; padding: var(--ov-space-1) var(--ov-space-3); margin-bottom: var(--ov-space-2); }
+.view-composer .cont-notice:not(:has(details[open])) .cont-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

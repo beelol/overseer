@@ -1,0 +1,194 @@
+{
+  "checks": [
+    {
+      "name": "the conversation has at least 20 messages",
+      "ok": true,
+      "detail": {
+        "messages": 20
+      }
+    },
+    {
+      "name": "at 1280×800 home's text box and its choices are fully on screen with a 20-message conversation",
+      "ok": true,
+      "detail": {
+        "vh": 698,
+        "vw": 922,
+        "task": {
+          "top": 506,
+          "bottom": 573,
+          "height": 67
+        },
+        "box": {
+          "top": 491,
+          "bottom": 620,
+          "height": 129
+        },
+        "chips": [
+          654,
+          654,
+          654
+        ],
+        "choices": {
+          "top": 628,
+          "bottom": 654,
+          "height": 26
+        },
+        "notice": 35,
+        "list": {
+          "scrolls": true,
+          "top": 1020,
+          "height": 351,
+          "full": 1526,
+          "bottom": 425
+        }
+      }
+    },
+    {
+      "name": "at 1280×800 the conversation scrolls above the input",
+      "ok": true,
+      "detail": {
+        "scrolls": true,
+        "top": 1020,
+        "height": 351,
+        "full": 1526,
+        "bottom": 425
+      }
+    },
+    {
+      "name": "at 1280×800 the Continuity notice (when shown) is one line",
+      "ok": true,
+      "detail": {
+        "notice": 35
+      }
+    },
+    {
+      "name": "at 1440×900 home's text box and its choices are fully on screen with a 20-message conversation",
+      "ok": true,
+      "detail": {
+        "vh": 798,
+        "vw": 1082,
+        "task": {
+          "top": 606,
+          "bottom": 673,
+          "height": 67
+        },
+        "box": {
+          "top": 591,
+          "bottom": 720,
+          "height": 129
+        },
+        "chips": [
+          754,
+          754,
+          754
+        ],
+        "choices": {
+          "top": 728,
+          "bottom": 754,
+          "height": 26
+        },
+        "notice": 35,
+        "list": {
+          "scrolls": true,
+          "top": 1020,
+          "height": 451,
+          "full": 1526,
+          "bottom": 525
+        }
+      }
+    },
+    {
+      "name": "at 1440×900 the conversation scrolls above the input",
+      "ok": true,
+      "detail": {
+        "scrolls": true,
+        "top": 1020,
+        "height": 451,
+        "full": 1526,
+        "bottom": 525
+      }
+    },
+    {
+      "name": "at 1440×900 the Continuity notice (when shown) is one line",
+      "ok": true,
+      "detail": {
+        "notice": 35
+      }
+    },
+    {
+      "name": "scrolling the conversation to its top leaves the input on screen",
+      "ok": true,
+      "detail": {
+        "top": 606,
+        "bottom": 673,
+        "height": 67
+      }
+    }
+  ],
+  "sizes": {
+    "1280x800": {
+      "vh": 698,
+      "vw": 922,
+      "task": {
+        "top": 506,
+        "bottom": 573,
+        "height": 67
+      },
+      "box": {
+        "top": 491,
+        "bottom": 620,
+        "height": 129
+      },
+      "chips": [
+        654,
+        654,
+        654
+      ],
+      "choices": {
+        "top": 628,
+        "bottom": 654,
+        "height": 26
+      },
+      "notice": 35,
+      "list": {
+        "scrolls": true,
+        "top": 1020,
+        "height": 351,
+        "full": 1526,
+        "bottom": 425
+      }
+    },
+    "1440x900": {
+      "vh": 798,
+      "vw": 1082,
+      "task": {
+        "top": 606,
+        "bottom": 673,
+        "height": 67
+      },
+      "box": {
+        "top": 591,
+        "bottom": 720,
+        "height": 129
+      },
+      "chips": [
+        754,
+        754,
+        754
+      ],
+      "choices": {
+        "top": 728,
+        "bottom": 754,
+        "height": 26
+      },
+      "notice": 35,
+      "list": {
+        "scrolls": true,
+        "top": 1020,
+        "height": 451,
+        "full": 1526,
+        "bottom": 525
+      }
+    }
+  }
+}
