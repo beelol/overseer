@@ -631,7 +631,8 @@ class AccountsProvider {
       let detail = 'status not checked';
       if (st) {
         if (!st.installed) detail = 'harness not installed';
-        else if (st.logged_in) detail = st.identity?.plan || 'signed in';
+        // The plan and the identity's short fingerprint tell two accounts of one plan apart (not an internal id).
+        else if (st.logged_in) detail = [st.identity?.plan, (st.identity?.account_fingerprint || st.identity?.fingerprint || '').slice(0, 8)].filter(Boolean).join(' · ') || 'signed in';
         else detail = 'signed out';
       }
       // Local models run through Ollama on this machine: there is no account to sign in to (AC-95).

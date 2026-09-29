@@ -85,7 +85,7 @@
       if (failed) words = `I couldn't do that${failed[1] ? ': ' + plain(failed[1]) : '.'}`;
       const text = el('div', 'home-text', words);
       // Overseer's replies are Markdown, as in an agent's chat (lists, code, a quoted diff).
-      if (src === 'overseer' && !failed && window.OverseerMarkdown) { text.classList.add('md'); window.OverseerMarkdown.render(text, words, { post }); }
+      if (src === 'overseer' && !failed && window.OverseerMarkdown) { text.classList.add('md'); window.OverseerMarkdown.render(text, window.OverseerPlain.states(words), { post }); }
       r.append(who, text);
       if (src === 'owner') {
         const st = el('button', 'req-stage'); st.type = 'button'; st.hidden = true;

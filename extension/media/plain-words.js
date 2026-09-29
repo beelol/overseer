@@ -52,6 +52,9 @@
     return t.length > max ? t.slice(0, max - 1).trimEnd() + '…' : t;
   }
 
+  /** An agent's state words in Overseer's own replies (it reads the daemon's roster): "waiting for you", not waiting_for_user. */
+  const states = text => String(text || '').replace(/\b(waiting_for_user|waiting_for_connection|waiting_for_memory|handed_off|cancel_requested|not_for_overseer)\b/g, m => TOKENS[m]);
+
   /** Who answered and where, in words: "You, in VS Code". */
   function answeredBy(by, surface) {
     const who = { owner: 'You', overseer: 'Overseer', agent: 'An agent', ctl: 'You' }[by] || '';
@@ -59,5 +62,5 @@
     return [who, where === undefined ? '' : where].filter(Boolean).join(', ');
   }
 
-  return { plain, harness, tool, answeredBy, HARNESS, TOKENS };
+  return { plain, states, harness, tool, answeredBy, HARNESS, TOKENS };
 });

@@ -161,11 +161,21 @@ fn overseer_view(f: &mut Frame, app: &App, area: Rect) {
         let text = m["text"].as_str().unwrap_or("");
         match source {
             "owner" => wrap(text, " you › ", Style::new().add_modifier(Modifier::BOLD), &mut lines),
-            "overseer" => wrap(text, " ◆ ", Style::new(), &mut lines),
+            // Overseer's replies are Markdown (AC-245): bullets, bold and headings as a terminal draws them.
+            "overseer" => {
+                let mut first = true;
+                for raw in text.split('\n') {
+                    let (line, heading) = crate::words::markdown_line(&crate::words::states(raw));
+                    let style = if heading { Style::new().add_modifier(Modifier::BOLD) } else { Style::new() };
+                    wrap(&line, if first { " ◆ " } else { "   " }, style, &mut lines);
+                    first = false;
+                }
+            }
+            // A card: its mark and its words, never its internal kind.
             _ => {
                 let kind = m["card"]["kind"].as_str().unwrap_or(source);
                 let mark = match kind { "finding" | "cannot_answer" => " ⚠ ", "done" => " ✓ ", "started" => " ▶ ", _ => " · " };
-                wrap(&format!("{kind}: {text}"), mark, Style::new().fg(MUTED), &mut lines);
+                wrap(&crate::words::plain(text), mark, Style::new().fg(MUTED), &mut lines);
             }
         }
     }
@@ -334,10 +344,10 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     let (glyph, color) = status_mark(&run.status);
     let border = if focused { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else { Style::new().fg(MUTED) };
     let account = run.profile_id.as_deref().and_then(|p| app.state.profile(p)).map(|p| p.name.replace(" (existing login)", "")).unwrap_or_default();
-    let harness = run.harness.replace("codex-app", "codex");
+    let harness = crate::words::harness(&run.harness);
     let mut meta = vec![harness.clone()];
     // The desktop login is implied; name other accounts.
-    if !account.is_empty() && account != harness {
+    if !account.is_empty() && account != harness && account != run.harness.replace("codex-app", "codex") {
         meta.push(account);
     }
     if let Some(m) = run.model.as_deref().filter(|m| !m.is_empty()) {
@@ -370,7 +380,8 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     } else if !run.active() {
         // "interrupted · by user (exit signal 2)": the reason without repeating the status.
         let word = run.exit_reason.as_deref().filter(|_| run.status != "completed").map(|r| {
-            let r = r.strip_prefix(status_word(&run.status)).map(str::trim_start).unwrap_or(r);
+            let r = crate::words::plain(r);
+            let r = r.strip_prefix(status_word(&run.status)).map(str::trim_start).unwrap_or(&r);
             format!(" {} · {} ", status_word(&run.status), short(r, 40))
         }).unwrap_or_else(|| format!(" {} ", status_word(&run.status)));
         Some(Line::from(Span::styled(word, Style::new().fg(color))))
@@ -971,7 +982,8 @@ pub fn render_item_ex(item: &Item, width: usize, out: &mut Vec<Line<'static>>, e
         },
         Kind::Error => {
             prefix.push(Span::styled("✖ ", Style::new().fg(Color::Red)));
-            wrap(prefix, &[(text.to_string(), Style::new().fg(Color::Red))], width, out);
+            // A failure's words in plain words (AC-245): no raw [rate_limit] or HTTP code.
+            wrap(prefix, &[(crate::words::plain(text), Style::new().fg(Color::Red))], width, out);
         }
         Kind::Child => {
             prefix.push(Span::styled("↳ ", Style::new().fg(accent())));
@@ -980,11 +992,11 @@ pub fn render_item_ex(item: &Item, width: usize, out: &mut Vec<Line<'static>>, e
         Kind::TurnDone { ok } => {
             let c = if *ok { Color::Green } else { Color::Red };
             prefix.push(Span::styled("■ ", Style::new().fg(c)));
-            wrap(prefix, &[(text.to_string(), if *ok { muted } else { Style::new().fg(c) })], width, out);
+            wrap(prefix, &[(if *ok { text.to_string() } else { crate::words::plain(text) }, if *ok { muted } else { Style::new().fg(c) })], width, out);
         }
         Kind::Note => {
             prefix.push(Span::styled("· ", muted));
-            wrap(prefix, &[(text.to_string(), muted.add_modifier(Modifier::ITALIC))], width, out);
+            wrap(prefix, &[(crate::words::plain(text), muted.add_modifier(Modifier::ITALIC))], width, out);
         }
     }
 }
