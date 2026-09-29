@@ -597,9 +597,24 @@ async function mcpClient() {
     const someoneTyped = /^(?:someone should|start an agent to|start one agent to) (.+?)[.!?]*$/i.exec(said);
     const typedRepo = stateAgents.find(a => a.repo)?.repo;
     if (mcp && someoneTyped && typedRepo) {
-      const task = someoneTyped[1];
-      remember(task.split(' ').slice(0, 3).join(' '));
-      const outcome = await call('propose', { actions: [{ action: 'start', repo: typedRepo, title: task.split(' ').slice(0, 3).join(' '), prompt: `Please ${task}.`, confidence: 'high' }] }).catch(e => 'refused: ' + e.message);
+      // AC-237: where it runs, when the owner names it: "with the model X", "on codex", "on the
+      // account X", "on my other account" (the accounts tool names the other one).
+      let task = someoneTyped[1];
+      const start = { action: 'start', repo: typedRepo, confidence: 'high' };
+      let m;
+      if ((m = /\s+with (?:the )?model (\S+)/i.exec(task))) { start.model = m[1]; task = task.replace(m[0], ''); }
+      if ((m = /\s+(?:on|using|with) (codex|claude|opencode)\b/i.exec(task))) { start.harness = m[1].toLowerCase(); task = task.replace(m[0], ''); }
+      if ((m = /\s+on (?:the )?account (\S+)/i.exec(task))) { start.profile = m[1]; task = task.replace(m[0], ''); }
+      if ((m = /\s+on my other account/i.exec(task))) {
+        task = task.replace(m[0], '');
+        const accounts = (await call('accounts', {})).split('\n').map(l => l.split(' · ')).filter(p => p.length >= 4);
+        const other = accounts.find(p => p[2] === (start.harness || 'claude') && p[3] !== 'default');
+        if (other) start.profile = other[0];
+      }
+      start.title = task.split(' ').slice(0, 3).join(' ');
+      start.prompt = `Please ${task}.`;
+      remember(start.title);
+      const outcome = await call('propose', { actions: [start] }).catch(e => 'refused: ' + e.message);
       reply = `Starting one agent to ${task}. ${outcome}`;
       assistant([{ type: 'text', text: reply }]);
       result(false, reply);

@@ -3786,7 +3786,7 @@ fn find_in_tree(store: &Store, root: &str, native: &str) -> Result<Option<Run>> 
 }
 
 /// Account profiles belong to the harness family (codex-app shares Codex logins).
-fn profile_harness(harness: &str) -> &str {
+pub(crate) fn profile_harness(harness: &str) -> &str {
     match harness {
         "codex-app" => "codex",
         "opencode-serve" => "opencode",

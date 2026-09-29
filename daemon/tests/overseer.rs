@@ -61,7 +61,7 @@ fn ac180_mcp_shim_serves_overseers_tools_from_the_daemon() {
     assert_eq!(replies[0]["result"]["serverInfo"]["name"], "overseer");
     assert_eq!(replies[0]["result"]["capabilities"]["tools"]["listChanged"], false);
     let tools: Vec<&str> = replies[1]["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
-    assert_eq!(tools, ["roster", "agent", "conflicts", "conversation", "changes", "diff", "file", "search", "usage", "check_in", "rally", "answer", "propose"]);
+    assert_eq!(tools, ["roster", "agent", "conflicts", "conversation", "changes", "diff", "file", "search", "usage", "accounts", "check_in", "rally", "answer", "propose"]);
     let roster = replies[2]["result"]["content"][0]["text"].as_str().unwrap();
     assert!(roster.contains(&run) && roster.contains("completed"), "roster names the run: {roster}");
     assert_eq!(replies[2]["result"]["isError"], false);

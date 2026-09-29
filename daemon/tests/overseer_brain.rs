@@ -129,3 +129,148 @@ fn ac248_a_failed_turn_start_is_retried() {
     assert_eq!(replies(&d).len(), 2, "and was answered\n{}", overseer_trace(&d));
     assert!(turns(&d, &run).iter().any(|t| t["prompt"].as_str().unwrap_or("").ends_with("Anything new?")));
 }
+
+// ---------------------------------------------------------------------- AC-237
+
+/// Overseer's own tools, as a harness would list them.
+fn overseer_tools(d: &Daemon) -> Vec<Value> {
+    let token = d.call("overseer.token", json!({"run_id": "t-overseer", "role": "overseer"}))["token"].as_str().unwrap().to_string();
+    d.call("overseer.tools", json!({"token": token}))["tools"].as_array().unwrap().clone()
+}
+
+/// Sends the owner's words and waits for Overseer's answer; returns the open proposal it made.
+fn ask_overseer(d: &Daemon, text: &str) -> Value {
+    d.call("overseer.send", json!({"text": text, "surface": "ctl", "harness": "claude"}));
+    std::thread::sleep(Duration::from_millis(200));
+    let s = wait_overseer_idle(d, 60);
+    s["proposals"].as_array().unwrap().last().cloned().unwrap_or_else(|| panic!("no proposal for {text:?}: {s}\n{}", overseer_trace(d)))
+}
+
+/// Says yes to a proposal and returns the agent it started.
+fn yes_start(d: &Daemon, proposal: &Value) -> Value {
+    let before: Vec<String> = d.runs().iter().map(|r| r["id"].as_str().unwrap().to_string()).collect();
+    let answer = d.call("overseer.answer", json!({"id": proposal["id"], "yes": true, "surface": "ctl", "by": "owner"}));
+    assert_eq!(answer["state"], "yes", "{answer}");
+    assert!(answer["result"].as_str().unwrap().contains("started"), "{answer}");
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        if let Some(r) = d.runs().into_iter().find(|r| !before.contains(&r["id"].as_str().unwrap().to_string())) {
+            return r;
+        }
+        assert!(Instant::now() < deadline, "no new agent after {answer}");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+/// A daemon with Claude (the fixture) and Codex (the app-server fixture, with models to list),
+/// and one agent in a repository so Overseer knows where to start new ones.
+fn routing_daemon(r: &tempfile::TempDir) -> (Daemon, std::path::PathBuf, std::path::PathBuf) {
+    let checkout = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let codex = codex_app_fixture();
+    let d = overseer_daemon(&mode_file, &[("OVERSEER_CODEX_PATH", &codex), ("FIXTURE_MODE", "managed-models"), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE,FIXTURE_MODE")]);
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    let seed = claude_task(&d, &checkout, &mode_file, "echo", "Seed", "look around");
+    d.wait_done(&seed, 30);
+    std::fs::write(&mode_file, "overseer").unwrap();
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    (d, checkout, mode_file)
+}
+
+/// AC-237: the tool schema lists what a start can name (harness, model, account, effort,
+/// permission mode) and Overseer can list the accounts to name one.
+#[test]
+fn ac237_the_start_schema_names_harness_model_account_effort_and_mode() {
+    let d = Daemon::start(&[]);
+    let tools = overseer_tools(&d);
+    let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
+    assert!(names.contains(&"accounts"), "{names:?}");
+    let propose = tools.iter().find(|t| t["name"] == "propose").unwrap();
+    let fields = &propose["inputSchema"]["properties"]["actions"]["items"]["properties"];
+    for f in ["harness", "model", "profile", "effort", "permission_mode"] {
+        assert!(fields.get(f).is_some(), "propose's start takes {f}: {fields}");
+    }
+    assert_eq!(fields["harness"]["enum"], json!(["claude", "codex", "opencode"]));
+    let text = propose["description"].as_str().unwrap();
+    assert!(text.contains("harness") && text.contains("Auto routing"), "{text}");
+}
+
+/// AC-237: the owner names the model, the account or the harness; the card says what was picked
+/// and why, the reply says it in one line, and the run starts on exactly that.
+#[test]
+fn ac237_named_harness_model_and_account_start_there() {
+    let _one = heavy();
+    let r = tmp();
+    let (d, _checkout, mode_file) = routing_daemon(&r);
+    let work = d.call("profile.create", json!({"name": "Work", "harness": "claude"}))["id"].as_str().unwrap().to_string();
+    std::fs::write(&mode_file, "echo").unwrap();
+
+    // A named model.
+    let p = ask_overseer(&d, "start an agent to write the notes with the model opus-fixture");
+    let line = p["lines"][0].as_str().unwrap();
+    assert!(line.contains("opus-fixture") && line.contains("as asked"), "{line}");
+    let run = yes_start(&d, &p);
+    assert_eq!(run["harness"], "claude");
+    assert_eq!(run["model"], "opus-fixture");
+    let echo = d.wait_done(run["id"].as_str().unwrap(), 30);
+    let _ = echo;
+    let said = d.events(run["id"].as_str().unwrap()).iter().find(|e| e["kind"] == "output" && e["payload"]["text"].as_str().unwrap_or("").starts_with("ECHO ")).map(|e| e["payload"]["text"].as_str().unwrap().to_string()).unwrap();
+    assert!(said.contains("\"--model\",\"opus-fixture\""), "the run's arguments: {said}");
+    let reply = replies(&d).last().cloned().unwrap();
+    assert!(reply.contains("opus-fixture") && reply.lines().count() == 1, "one line says the pick: {reply}");
+
+    // A named account ("my other account": Overseer lists the accounts and picks the other one).
+    let p = ask_overseer(&d, "start an agent to draft the plan on my other account");
+    assert!(p["lines"][0].as_str().unwrap().contains("Work"), "{p}");
+    let run = yes_start(&d, &p);
+    assert_eq!(run["profile_id"], work.as_str());
+    assert_eq!(run["harness"], "claude");
+    d.wait_done(run["id"].as_str().unwrap(), 30);
+
+    // A named harness.
+    let p = ask_overseer(&d, "start an agent to fix the tests on codex");
+    assert!(p["lines"][0].as_str().unwrap().contains("Codex"), "{p}");
+    let run = yes_start(&d, &p);
+    assert_eq!(run["harness"], "codex-app");
+    assert_eq!(run["profile_id"], "system-codex");
+    let reply = replies(&d).last().cloned().unwrap();
+    assert!(reply.contains("Codex"), "{reply}");
+    d.wait_done(run["id"].as_str().unwrap(), 30);
+
+    // A name that is not an account: refused with the accounts there are, nothing proposed.
+    let refused = d.try_call("overseer.propose", json!({"actions": [{"action": "start", "repo": _checkout, "prompt": "x", "profile": "Nope"}], "source": "ctl"})).unwrap_err();
+    assert!(refused.contains("no account named Nope") && refused.contains("Work"), "{refused}");
+}
+
+/// AC-237: a start that names nothing follows Auto's route pick when Auto routing is on, and its
+/// reason is on the card; with Auto routing off it runs on Overseer's own harness and says so.
+#[test]
+fn ac237_an_unnamed_start_follows_the_route_pick() {
+    let _one = heavy();
+    let r = tmp();
+    let (d, _checkout, mode_file) = routing_daemon(&r);
+    std::fs::write(&mode_file, "echo").unwrap();
+    let p = ask_overseer(&d, "start an agent to tidy the readme");
+    let action = &p["actions"][0];
+    assert_eq!(action["route"]["how"], "auto", "{p}");
+    let line = p["lines"][0].as_str().unwrap();
+    assert!(line.contains("Auto's pick"), "the reason is on the card: {line}");
+    assert!(!line.contains('_'), "in plain words: {line}");
+    let run = yes_start(&d, &p);
+    assert_eq!(run["harness"], action["harness"], "{run}");
+    assert_eq!(run["model"], action["model"], "{run}");
+    assert_eq!(run["profile_id"], action["profile_id"], "{run}");
+    assert!(d.call("auto.usage.list", json!({"limit": 50})).is_object());
+    d.wait_status(run["id"].as_str().unwrap(), |s| !["queued", "starting", "running"].contains(&s), 30);
+
+    d.call("auto.mode.set", json!({"enabled": false}));
+    let p = ask_overseer(&d, "start an agent to tidy the changelog");
+    assert_eq!(p["actions"][0]["route"]["how"], "default", "{p}");
+    let line = p["lines"][0].as_str().unwrap();
+    assert!(line.contains("Auto routing is off"), "{line}");
+    let run = yes_start(&d, &p);
+    assert_eq!(run["harness"], "claude");
+    assert_eq!(run["profile_id"], "system-claude");
+    d.wait_done(run["id"].as_str().unwrap(), 30);
+}
