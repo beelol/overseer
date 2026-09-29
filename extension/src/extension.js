@@ -160,9 +160,14 @@ async function activate(context) {
   const immersive = new Immersive(context, say);
   // AC-258: VS Code's own chat view is closed the first time Overseer's view is on screen here.
   const vsChat = new VsCodeChat(center, say);
-  let vsChatTimer;
-  const checkVsChat = () => { if (vsChat.done) return; clearTimeout(vsChatTimer); vsChatTimer = setTimeout(() => { if (center.panel?.visible) vsChat.check().catch(error => say('vscode chat: ' + error.message)); }, 1200); };
-  context.subscriptions.push(vscode.window.tabGroups.onDidChangeTabs(checkVsChat), vscode.window.tabGroups.onDidChangeTabGroups(checkVsChat));
+  // It runs as Overseer's view comes on screen (part of the action that showed it), not later, when
+  // the owner may already be typing somewhere else.
+  const checkVsChat = e => {
+    if (vsChat.done) return;
+    if (![...e.opened, ...e.changed].some(t => t.isActive && t.input?.viewType?.endsWith('overseer.center'))) return;
+    setTimeout(() => { if (center.panel?.visible) vsChat.check().catch(error => say('vscode chat: ' + error.message)); }, 300);
+  };
+  context.subscriptions.push(vscode.window.tabGroups.onDidChangeTabs(checkVsChat));
   // The agent the workspace shows (AC-250): the selected one, else the most recent working one, else the most recent.
   const focusedAgent = () => {
     if (selectedRun && model.run(selectedRun)) return (model.rootRun(model.run(selectedRun)) || model.run(selectedRun)).id;

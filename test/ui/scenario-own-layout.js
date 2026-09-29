@@ -108,7 +108,8 @@ const { Cdp } = require('./cdp');
     const second0 = await layout(cdp2);
     check('the second window shows its tab strip', second0.tabStrips === 1, second0);
 
-    await cdp.command('Overseer: Open Dashboard');
+    // ⌥⌘O toggles the dashboard (its palette title is being renamed on another branch).
+    await cdp.focusWorkbench(); await cdp.key('o', { meta: true, alt: true });
     await s.editorView();
     await delay(2500);
     const inDash = { first: await layout(), second: await layout(cdp2), user: norm(fs.readFileSync(settingsFile, 'utf8')) === settingsBefore, workspace: wsSettings() };
@@ -117,7 +118,7 @@ const { Cdp } = require('./cdp');
     check('the dashboard hides the tab strips in its own window only (its workspace settings); the second window keeps its tab strip and user settings do not change',
       inDash.first.tabStrips === 0 && inDash.second.tabStrips === 1 && inDash.user && inDash.workspace && inDash.workspace['workbench.editor.showTabs'] === 'none',
       { dashboardWindowTabStrips: inDash.first.tabStrips, secondWindowTabStrips: inDash.second.tabStrips, userSettingsUnchanged: inDash.user, workspaceSettings: inDash.workspace });
-    await cdp.command('Overseer: Exit Dashboard'); await delay(3000);
+    await cdp.focusWorkbench(); await cdp.key('o', { meta: true, alt: true }); await delay(3000);
     const left = { first: await layout(), second: await layout(cdp2), workspace: wsSettings(), user: norm(fs.readFileSync(settingsFile, 'utf8')) === settingsBefore };
     check('leaving it takes the settings out of the workspace file; the second window and user settings are unchanged throughout',
       left.workspace && Object.keys(left.workspace).length === 0 && left.first.tabStrips === left.first.groups.length && left.second.tabStrips === 1 && left.user, left);
