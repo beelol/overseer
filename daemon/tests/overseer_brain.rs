@@ -526,3 +526,44 @@ fn ac253_overseer_leads_with_what_happened_while_you_were_away() {
     assert_eq!(asked["reply"]["text"], line, "{asked}");
     assert!(session(&d)["run_id"].is_null(), "no model turn");
 }
+
+/// AC-248: an agent's question asked while Overseer is at its daily cap is kept, not deleted, and
+/// answered once Overseer may take a turn again.
+#[test]
+fn ac248_a_question_at_the_daily_cap_is_kept() {
+    let _one = heavy();
+    let r = tmp();
+    let checkout = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file, &[]);
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call("overseer.level", json!({"level": "steer"}));
+    d.call("agent.channel", json!({"default": "on", "by": "owner"}));
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    let s = wait_overseer_idle(&d, 30);
+    // At the cap: one turn a day, and one already taken by itself.
+    d.call("overseer.cap", json!({"cap": 1}));
+    sql(&d, &format!("INSERT INTO overseer_turns(ts, session_id, cause, turn_id) VALUES({}, '{}', 'check_in', NULL)", now_ms(), s["id"].as_str().unwrap()));
+    let asker = claude_task(&d, &checkout, &mode_file, "channel", "Asker", "ask: which port does the API use?");
+    d.wait_done(&asker, 40);
+    let answered = || d.call("channel.messages", json!({"run_id": asker}))["messages"].as_array().unwrap().iter().find(|m| m["kind"] == "ask").and_then(|m| m["answer"].as_str().map(str::to_string));
+    std::thread::sleep(Duration::from_secs(8));
+    assert!(answered().is_none(), "no turn at the cap");
+    wait_message(&d, "the cap is said", 10, |m| m["text"].as_str().unwrap_or("").starts_with("At the cap"));
+    let kept: usize = {
+        let out = Command::new("sqlite3").arg(d.home.path().join("overseer.sqlite")).arg("SELECT COUNT(*) FROM check_in_queue WHERE reason LIKE 'ask:%'").output().unwrap();
+        String::from_utf8_lossy(&out.stdout).trim().parse().unwrap()
+    };
+    assert_eq!(kept, 1, "the question is kept at the cap");
+    // The cap is raised: the question gets its turn.
+    d.call("overseer.cap", json!({"cap": 10}));
+    let deadline = Instant::now() + Duration::from_secs(40);
+    while answered().is_none() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(250));
+    }
+    assert!(answered().is_some_and(|a| a.contains("From the roster")), "answered once Overseer may take a turn\n{}", overseer_trace(&d));
+}
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64
+}
