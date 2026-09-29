@@ -47,6 +47,10 @@ impl Daemon {
         if !env.iter().any(|(k, _)| k == "OVERSEER_TEST_NET" || k == "OVERSEER_CONTINUITY_PROBES") {
             env.push(("OVERSEER_CONTINUITY_PROBES".to_string(), "off".to_string()));
         }
+        // Nor the providers' public status pages: a real outage must not pick the fixtures' routes.
+        if !env.iter().any(|(k, _)| k == "OVERSEER_PUBLIC_STATUS") {
+            env.push(("OVERSEER_PUBLIC_STATUS".to_string(), "off".to_string()));
+        }
         // OVERSEER_TEST_PHONE_ACCESS=on runs a whole suite with phone access turned on (AC-116):
         // what passed with it off must pass with it on.
         // The suites that switch phone access themselves (gateway, phone_methods) start from
