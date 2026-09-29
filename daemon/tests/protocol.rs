@@ -1580,6 +1580,54 @@ fn ac50_pr_plan_explains_refusals_and_prepares_a_github_branch_without_merging()
     assert!(d.call("workspace.pr_plan", json!({"workspace_id": ws_id(&cur)}))["reason"].as_str().unwrap().contains("current checkout"));
 }
 
+/// Audit 2026-09-28, finding 40: a merge back that stopped on conflicts leaves the worktree
+/// mid-merge. Open PR must not commit that state (conflict markers and all) and push it.
+#[test]
+fn ac50_open_pr_refuses_a_worktree_left_mid_merge_with_conflicts() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let bare = r.path().join("remote.git");
+    std::process::Command::new("git").args(["init", "-q", "--bare", bare.to_str().unwrap()]).status().unwrap();
+    git(&repo, &["remote", "add", "origin", "https://github.com/test-owner/test-repo.git"]);
+    git(&repo, &["config", &format!("url.{}.insteadOf", bare.display()), "https://github.com/test-owner/test-repo.git"]);
+    // Never the owner's GitHub CLI.
+    let d = Daemon::start(&[("OVERSEER_GH", "/usr/bin/false")]);
+    let created = sh(&d, &repo, "worktree", "printf 'agent version\\n' > a.txt");
+    d.wait_done(&run_id(&created), 20);
+    // The target moved on meanwhile: the same line of a.txt, and another file.
+    std::fs::write(repo.join("a.txt"), "main version\n").unwrap();
+    std::fs::write(repo.join("b.txt"), "b from main\n").unwrap();
+    git(&repo, &["commit", "-qam", "main edit"]);
+    let id = ws_id(&created);
+    let prep = d.call("workspace.merge_prepare", json!({"workspace_id": id}));
+    assert_eq!(prep["state"], "conflicts", "{prep}");
+    let ws = ws_path(&d, &created);
+    let head_before = git(&ws, &["rev-parse", "HEAD"]);
+    // The plan says why, and preparing the pull request commits nothing.
+    let plan = d.call("workspace.pr_plan", json!({"workspace_id": id}));
+    assert_eq!(plan["ok"], false, "a worktree mid-merge is not offered for a pull request: {plan}");
+    assert!(plan["reason"].as_str().unwrap().contains("a.txt"), "the reason names the conflicted file: {plan}");
+    assert!(d.try_call("workspace.pr_prepare", json!({"workspace_id": id})).is_err());
+    assert!(d.try_call("workspace.pr_open", json!({"workspace_id": id})).is_err());
+    assert_eq!(git(&ws, &["rev-parse", "HEAD"]), head_before, "nothing was committed");
+    assert!(std::fs::read_to_string(ws.join("a.txt")).unwrap().contains("<<<<<<< "), "the conflict is left as it was, for the resolver");
+    assert_eq!(git(&bare, &["for-each-ref", "--format=%(refname)"]), "", "nothing was pushed");
+    // A file resolved with its markers still in it is refused too.
+    git(&ws, &["add", "a.txt"]);
+    let plan = d.call("workspace.pr_plan", json!({"workspace_id": id}));
+    assert_eq!(plan["ok"], false, "markers staged as if resolved: {plan}");
+    assert!(d.try_call("workspace.pr_prepare", json!({"workspace_id": id})).is_err());
+    assert_eq!(git(&ws, &["rev-parse", "HEAD"]), head_before);
+    // Resolved for real: the pull request carries the finished merge and no markers.
+    std::fs::write(ws.join("a.txt"), "main version\nagent version\n").unwrap();
+    let plan = d.call("workspace.pr_plan", json!({"workspace_id": id}));
+    assert_eq!(plan["ok"], true, "{plan}");
+    let prep = d.call("workspace.pr_prepare", json!({"workspace_id": id}));
+    assert_eq!(prep["committed"], true, "{prep}");
+    assert_eq!(git(&ws, &["show", "HEAD:a.txt"]), "main version\nagent version");
+    assert_eq!(git(&ws, &["rev-list", "--parents", "-n", "1", "HEAD"]).split(' ').count(), 3, "the merge commit is finished");
+}
+
 #[test]
 fn ac50_pr_plan_targets_the_branch_name_in_a_fresh_clone() {
     // Found live: in a fresh clone the default branch is the remote-tracking `origin/master`, and the
