@@ -48,7 +48,10 @@ const client = { request: async (method, params) => { requests.push([method, par
   assert.ok(!report({ ...record, usage: null }).includes('0 reported tokens'));
   const manifest = require('../../extension/package.json');
   assert.ok(manifest.contributes.commands.some(command => command.command === 'overseer.autoUsage'));
-  assert.ok(manifest.contributes.menus['view/title'].some(item => item.command === 'overseer.autoUsage' && item.when.includes('overseer.accounts')));
+  // In the command palette (not hidden there), not in the Accounts header: an overflow menu in
+  // that header sits where the side bar's first-click checks put focus (scenario-first-click).
+  assert.ok(!(manifest.contributes.menus.commandPalette || []).some(item => item.command === 'overseer.autoUsage'));
+  assert.ok(!manifest.contributes.menus['view/title'].some(item => item.command === 'overseer.autoUsage'));
 
   const context = { subscriptions: [] };
   const usage = new AutoUsage(client, context);

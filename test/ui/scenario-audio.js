@@ -46,7 +46,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     // The title bar is the one from Gate K; Audio Mode is in the overflow menu.
     await cdp.command('View: Show Overseer');
     await delay(2500);
-    await cdp.command('View: Focus on Agents View'); await delay(800);
+    await cdp.command('Focus on Agents View'); await delay(800);
     const paneHeader = `[...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || ''))?.querySelector('.pane-header')`;
     const title = await cdp.evalWorkbench(`(() => { const b = ${paneHeader}.querySelector('.title').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
     await cdp.move(title.x, title.y); await delay(400); await cdp.move(title.x + 1, title.y); await delay(400);
