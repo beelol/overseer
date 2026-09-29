@@ -17,6 +17,8 @@ use std::sync::Arc;
 pub const DEFAULT_SILENCE_MS: i64 = 10 * 60 * 1000;
 /// The queue reason's prefix: kept until a turn of Overseer's can take it.
 pub const REASON: &str = "trouble:";
+/// How often the silence check reads the store (a test with a short limit is still found).
+const SILENCE_EVERY_MS: i64 = 15_000;
 
 fn ensure(conn: &rusqlite::Connection) -> Result<()> {
     conn.execute_batch("CREATE TABLE IF NOT EXISTS overseer_trouble(run_id TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, ts INTEGER NOT NULL, reason TEXT NOT NULL, PRIMARY KEY(run_id, kind, key));")?;
@@ -38,6 +40,15 @@ pub fn plain(class: Option<&str>, message: &str, exit_reason: &str) -> (&'static
     }
     let cleaned = clean(text);
     ("failed", if cleaned.is_empty() { "failed".to_string() } else { format!("failed: {cleaned}") })
+}
+
+/// The same from a run's recorded end reason alone ("turn reported failure; last error [class]: message").
+pub fn plain_from_exit(exit_reason: &str) -> (&'static str, String) {
+    let class = exit_reason.find("last error [").and_then(|at| {
+        let rest = &exit_reason[at + "last error [".len()..];
+        rest.find(']').map(|end| rest[..end].to_string())
+    });
+    plain(class.as_deref(), "", exit_reason)
 }
 
 /// "Your limit will reset at 5pm." → "at 5pm".
@@ -129,12 +140,29 @@ impl Daemon {
             let store = self.store.lock().unwrap();
             store.conn.query_row("SELECT value FROM meta WHERE key='overseer.silence_ms'", [], |r| r.get::<_, String>(0)).optional()?.and_then(|v| v.parse::<i64>().ok()).unwrap_or(DEFAULT_SILENCE_MS)
         };
+        // Not on every tick: a silence is minutes long, and this reads the store.
+        {
+            static LAST: std::sync::Mutex<i64> = std::sync::Mutex::new(0);
+            let now = crate::daemon::now();
+            let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
+            if now - *last < SILENCE_EVERY_MS.min(limit / 3) {
+                return Ok(());
+            }
+            *last = now;
+        }
         let now = crate::daemon::now();
         let quiet: Vec<(String, i64, i64)> = {
             let store = self.store.lock().unwrap();
-            let mut stmt = store.conn.prepare("SELECT r.id, COALESCE((SELECT MAX(ts) FROM events e WHERE e.run_id=r.id), r.created_ms), COALESCE((SELECT MAX(seq) FROM events e WHERE e.run_id=r.id), 0) FROM runs r WHERE r.status='running' AND r.parent_run_id IS NULL")?;
-            let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<rusqlite::Result<Vec<_>>>()?;
-            rows
+            // The newest event by its number (the run's index), then its time by the key.
+            let mut stmt = store.conn.prepare("SELECT r.id, r.created_ms, (SELECT MAX(seq) FROM events e WHERE e.run_id=r.id) FROM runs r WHERE r.status='running' AND r.parent_run_id IS NULL")?;
+            let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?, r.get::<_, Option<i64>>(2)?)))?.collect::<rusqlite::Result<Vec<_>>>()?;
+            drop(stmt);
+            let mut out = Vec::new();
+            for (id, created, seq) in rows {
+                let ts = match seq { Some(seq) => store.conn.query_row("SELECT ts FROM events WHERE seq=?1", [seq], |r| r.get::<_, i64>(0)).optional()?.unwrap_or(created), None => created };
+                out.push((id, ts, seq.unwrap_or(0)));
+            }
+            out
         };
         for (id, last_ms, last_seq) in quiet {
             if now - last_ms < limit {
@@ -240,6 +268,8 @@ mod tests {
         assert!(!r.contains("OAuth"), "{r}");
         let (k, r) = plain(None, "", "turn reported failure; last error [turn_failed]: Migration failed: relation users_v2 does not exist");
         assert_eq!((k, r.as_str()), ("failed", "failed: Migration failed: relation users_v2 does not exist"));
+        assert_eq!(plain_from_exit("turn reported failure; last error [rate_limit]: API Error: Request rejected (429) · rate limited").1, "reached its account's usage limit");
+        assert_eq!(plain_from_exit("exit code 3").1, "failed: exit code 3");
         assert_eq!(clean("HTTP 503 Service Unavailable {\"type\":\"error\"}"), "Service Unavailable");
         assert_eq!(clean("stream error: 500 Internal Server Error"), "stream error: Internal Server Error");
     }
