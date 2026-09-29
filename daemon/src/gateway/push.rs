@@ -238,7 +238,7 @@ mod tests {
 
     fn run(title: &str) -> crate::store::Run {
         crate::store::Run {
-            id: "r-1".into(), task_id: "t-1".into(), parent_run_id: None, harness: "claude".into(), harness_version: None, profile_id: None, model: None,
+            id: "r-1".into(), task_id: "t-1".into(), parent_run_id: None, harness: "claude".into(), harness_version: None, profile_id: None, model: None, effort: None,
             workspace_id: "w-1".into(), native_id: None, status: "waiting_for_user".into(), exit_reason: None, created_ms: 0, ended_ms: None, title: title.into(),
             relation_source: None, relation_confidence: None, capabilities: Value::Null, process_generation: 1, attention: None,
         }

@@ -18,7 +18,10 @@ const { Dashboard } = require('./dashboard-mode');
 const { PhoneAccess } = require('./phone-access');
 const { Immersive } = require('./immersive');
 const { OverseerChat } = require('./overseer-chat');
+const { SwarmControls } = require('./swarm-controls');
 const { Continuity } = require('./continuity');
+const { AutoUsage } = require('./auto-usage');
+const features = require('./features');
 const { Voice } = require('./voice');
 
 let client;
@@ -60,6 +63,11 @@ async function activate(context) {
   client = new DaemonClient(binary, say, { production, pin });
   const devLabel = pin ? ` ${pin.instance || 'dev'}` : '';
   const model = new Model(client);
+  const autoUsage = new AutoUsage(client, context);
+  const swarmControls = new SwarmControls(client, () => model.refresh(true), run =>
+    vscode.window.showWarningMessage(`Stop ${run.category} swarm?`, { modal: true,
+      detail: 'Queued jobs will be cancelled and active workers asked to stop. Unconfirmed exits remain visible.' }, 'Stop Swarm')
+      .then(choice => choice === 'Stop Swarm'));
   // The side bar's agents list (Gate K): Needs you, then agents by repository.
   let voiceTargeted = () => new Set(); // set once Voice Mode is up (below)
   const agents = new AgentsProvider(model, context.workspaceState, context.extensionUri, { attention: () => attention(), pinned: () => pinned(), voiceTargeted: () => voiceTargeted() });
@@ -291,6 +299,20 @@ async function activate(context) {
     try { return await fn(...args); } catch (error) { vscode.window.showErrorMessage(`Overseer: ${error.message}`); say('error: ' + (error.stack || error.message)); }
   };
   const runArg = arg => (typeof arg === 'string' ? arg : arg?.run?.id) || selectedRun;
+  // Unfinished features stay hidden until their setting is on (AC-204); a command run anyway says so.
+  const whenOn = (feature, fn) => async (...args) => {
+    if (!features.enabled(vscode, feature)) { vscode.window.showInformationMessage(features.offMessage(feature)); return undefined; }
+    return fn(...args);
+  };
+  async function swarmId(arg, statuses) {
+    if (arg?.swarm?.id) return arg.swarm.id;
+    if (typeof arg === 'string') return arg;
+    await model.refresh(true);
+    const choices = model.swarms.filter(run => statuses.includes(run.status))
+      .map(run => ({ id: run.id, label: run.category, description: run.status }));
+    if (!choices.length) { vscode.window.showInformationMessage('No Swarm run is available for this action.'); return undefined; }
+    return (await vscode.window.showQuickPick(choices, { title: 'Choose a Swarm' }))?.id;
+  }
 
   const gridHasAgents = () => (model.state.runs || []).some(r => !r.parent_run_id && ACTIVE.has(r.status)) || pinned().length > 0;
   /** The home view: the composer alone in the middle, with an optional one-line note. */
@@ -654,7 +676,69 @@ async function activate(context) {
   context.subscriptions.push(
     vscode.commands.registerCommand('overseer.newTask', guard(async () => { requireTrust(); await model.refresh(); await newTaskPanel.open(); })),
     vscode.commands.registerCommand('overseer.newTaskQuick', guard(newTask)),
-    vscode.commands.registerCommand('overseer.refresh', guard(async () => { await model.refresh(); })),
+    vscode.commands.registerCommand('overseer.refresh', guard(async () => { await model.refresh(true); })),
+    vscode.commands.registerCommand('overseer.filterSwarmJobs', guard(whenOn('swarm', async () => {
+      const choices = [['all', 'All jobs'], ['ready', 'Ready'], ['running', 'Running'],
+        ['submitted', 'Awaiting review'], ['blocked', 'Blocked'], ['accepted', 'Accepted'], ['failed', 'Failed']]
+        .map(([value, label]) => ({ value, label, description: agents.swarmStatusFilter === value ? '✓' : '' }));
+      const picked = await vscode.window.showQuickPick(choices, { title: 'Show Swarm jobs' });
+      if (picked) agents.setSwarmStatusFilter(picked.value);
+    }))),
+    vscode.commands.registerCommand('overseer.startSwarm', guard(whenOn('swarm', async () => {
+      requireTrust();
+      const folders = vscode.workspace.workspaceFolders || [];
+      const roots = [...new Set((await Promise.all(folders.map(f => gitRoot(f.uri.fsPath)))).filter(Boolean))];
+      if (!roots.length) throw new Error('Open a Git repository to start a swarm.');
+      const repo = roots.length === 1 ? roots[0] : (await vscode.window.showQuickPick(
+        roots.map(r => ({ label: path.basename(r), description: r, root: r })), { title: 'Start swarm: repository' }))?.root;
+      if (!repo) return;
+      const category = await vscode.window.showInputBox({ title: 'Start swarm: category', placeHolder: 'Backend security' });
+      if (!category) return;
+      const objective = await vscode.window.showInputBox({ title: `Start swarm: ${category}`, placeHolder: 'What should this swarm achieve?' });
+      if (!objective) return;
+      const result = await swarmControls.start({ category, objective, repositories: [repo] }, {
+        pickAccounts: async () => {
+          const profiles = await client.request('profile.list');
+          const picked = await vscode.window.showQuickPick(profiles.map(p => ({ label: p.name, description: p.harness, id: p.id })),
+            { title: `Accounts ${category} may use (asked once)`, canPickMany: true });
+          return picked?.map(p => p.id);
+        },
+        confirm: async (readback, text) => (await vscode.window.showInformationMessage(readback.summary,
+          { modal: true, detail: text }, 'Start swarm')) === 'Start swarm'
+      });
+      if (result.status === 'started') vscode.window.showInformationMessage(`${category} swarm started: ${result.run.start?.summary || ''}`);
+      else if (result.status === 'blocked') vscode.window.showWarningMessage(`The ${category} swarm cannot start: ${result.reason}.`);
+      else if (result.status === 'needs_account_selection') vscode.window.showWarningMessage('Choose at least one account for this category.');
+      else if (result.status === 'readback_changed') vscode.window.showWarningMessage('The accounts or limits changed twice while confirming; nothing was started.');
+    }))),
+    vscode.commands.registerCommand('overseer.pauseSwarm', guard(whenOn('swarm', async arg => {
+      requireTrust(); const id = await swarmId(arg, ['planning', 'running']);
+      if (id) await swarmControls.pause(id);
+    }))),
+    vscode.commands.registerCommand('overseer.resumeSwarm', guard(whenOn('swarm', async arg => {
+      requireTrust(); const id = await swarmId(arg, ['paused']);
+      if (id) await swarmControls.resume(id);
+    }))),
+    vscode.commands.registerCommand('overseer.stopSwarm', guard(whenOn('swarm', async arg => {
+      requireTrust(); const id = await swarmId(arg, ['planning', 'running', 'paused', 'stalled', 'draining', 'stopping']);
+      if (id) await swarmControls.stop(id);
+    }))),
+    vscode.commands.registerCommand('overseer.turnSwarmOff', guard(whenOn('swarm', async arg => {
+      requireTrust(); const id = await swarmId(arg, ['planning', 'running', 'paused', 'stalled']);
+      if (id) await swarmControls.off(id);
+    }))),
+    vscode.commands.registerCommand('overseer.extendSwarmDeadline', guard(whenOn('swarm', async arg => {
+      requireTrust(); const id = await swarmId(arg, ['planning', 'running', 'paused', 'stalled', 'draining']);
+      if (!id) return;
+      const choice = await vscode.window.showQuickPick([
+        { label: '30 minutes', additionalMs: 30 * 60 * 1000 },
+        { label: '1 hour', additionalMs: 60 * 60 * 1000 },
+        { label: '2 hours', additionalMs: 2 * 60 * 60 * 1000 }
+      ], { title: 'Extend Swarm deadline', placeHolder: 'Choose how much time to add' });
+      if (!choice) return;
+      const result = await swarmControls.extendDeadline(id, choice.additionalMs);
+      vscode.window.showInformationMessage(`Swarm deadline extended until ${new Date(result.deadline_at_ms).toLocaleString()}. Account allocation is unchanged.`);
+    }))),
     vscode.commands.registerCommand('overseer.selectRun', guard(runId => selectRun(runId))),
     vscode.commands.registerCommand('overseer.openReview', guard(async arg => { const id = runArg(arg); if (!id) return; selectedRun = id; await arrangement.openReview(id); await center.select(id); })),
     vscode.commands.registerCommand('overseer.openEdit', guard(async (runId, rel) => {
@@ -728,6 +812,10 @@ async function activate(context) {
       await model.refresh();
     })),
     vscode.commands.registerCommand('overseer.refreshAccounts', guard(refreshAccounts)),
+    vscode.workspace.onDidChangeConfiguration(e => {
+      if (e.affectsConfiguration('overseer.experimental')) model.refresh(true);
+    }),
+    vscode.commands.registerCommand('overseer.autoUsage', guard(() => autoUsage.show())),
     vscode.commands.registerCommand('overseer.showCapabilities', guard(async () => {
       const list = await client.request('harness.list');
       const doc = await vscode.workspace.openTextDocument({ language: 'markdown', content: '# Harness capabilities (reported by this Overseer build)\n\n' + list.map(h =>

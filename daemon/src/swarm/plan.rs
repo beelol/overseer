@@ -1,0 +1,272 @@
+use anyhow::{bail, Result};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use std::collections::{HashMap, HashSet};
+
+#[derive(Clone, Deserialize, PartialEq, Eq)]
+pub struct JobSpec {
+    pub id: String,
+    pub title: String,
+    pub acceptance: String,
+    #[serde(default)]
+    pub deps: Vec<String>,
+    #[serde(default)]
+    pub resource_claims: Vec<ResourceClaim>,
+    #[serde(default)]
+    pub required_capabilities: Vec<String>,
+    #[serde(default = "worker_budget_role")]
+    pub budget_role: String,
+}
+
+fn worker_budget_role() -> String { "worker".to_string() }
+
+#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub struct ResourceClaim {
+    pub resource: String,
+    pub mode: String,
+}
+
+/// Keep only independent valid components when the director explicitly opts into a partial
+/// initial plan. Every omitted job is reported; no invalid dependency can be dispatched.
+pub fn select_valid(raw: &Value, limit: usize) -> Result<(Vec<JobSpec>, Vec<Value>)> {
+    let items = raw
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("jobs must be an array"))?;
+    if items.len() > limit {
+        bail!("job backlog exceeds configured backlog limit");
+    }
+    let mut candidates: Vec<Option<JobSpec>> = Vec::with_capacity(items.len());
+    let mut errors: Vec<Option<String>> = Vec::with_capacity(items.len());
+    for item in items {
+        match serde_json::from_value::<JobSpec>(item.clone()) {
+            Ok(job) => {
+                let error = basic_error(&job);
+                candidates.push(Some(job));
+                errors.push(error);
+            }
+            Err(error) => {
+                candidates.push(None);
+                errors.push(Some(format!("invalid job: {error}")));
+            }
+        }
+    }
+    let mut counts = HashMap::new();
+    for (candidate, error) in candidates.iter().zip(&errors) {
+        if error.is_none() {
+            if let Some(job) = candidate {
+                *counts.entry(job.id.as_str()).or_insert(0usize) += 1;
+            }
+        }
+    }
+    for (candidate, error) in candidates.iter().zip(&mut errors) {
+        if let Some(job) = candidate {
+            if counts.get(job.id.as_str()).copied().unwrap_or(0) > 1 {
+                *error = Some(format!("duplicate job id {}", job.id));
+            }
+        }
+    }
+    loop {
+        let active: HashSet<&str> = candidates
+            .iter()
+            .zip(&errors)
+            .filter_map(|(candidate, error)| {
+                if error.is_none() {
+                    candidate.as_ref().map(|job| job.id.as_str())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let mut changed = false;
+        for (candidate, error) in candidates.iter().zip(&mut errors) {
+            if error.is_some() {
+                continue;
+            }
+            if let Some(job) = candidate {
+                if let Some(dep) = job.deps.iter().find(|dep| !active.contains(dep.as_str())) {
+                    *error = Some(format!("unavailable dependency {dep}"));
+                    changed = true;
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    let mut sortable = HashSet::new();
+    loop {
+        let before = sortable.len();
+        for (candidate, error) in candidates.iter().zip(&errors) {
+            if error.is_none() {
+                if let Some(job) = candidate {
+                    if job.deps.iter().all(|dep| sortable.contains(dep)) {
+                        sortable.insert(job.id.clone());
+                    }
+                }
+            }
+        }
+        if sortable.len() == before {
+            break;
+        }
+    }
+    for (candidate, error) in candidates.iter().zip(&mut errors) {
+        if error.is_none() {
+            if let Some(job) = candidate {
+                if !sortable.contains(&job.id) {
+                    *error = Some("dependency cycle or dependent on cycle".to_string());
+                }
+            }
+        }
+    }
+    let jobs = candidates
+        .iter()
+        .zip(&errors)
+        .filter_map(|(candidate, error)| {
+            if error.is_none() {
+                candidate.clone()
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    if jobs.is_empty() {
+        bail!("partial plan has no valid independent jobs");
+    }
+    let rejected = items
+        .iter()
+        .enumerate()
+        .filter_map(|(index, item)| {
+            errors[index]
+                .as_ref()
+                .map(|reason| json!({"index":index,
+                    "id":item["id"].as_str().map(crate::redact::redact),"reason":reason}))
+        })
+        .collect();
+    Ok((jobs, rejected))
+}
+
+fn basic_error(job: &JobSpec) -> Option<String> {
+    if !["worker", "finishing"].contains(&job.budget_role.as_str()) {
+        return Some(format!("job {} has an invalid budget role", job.id));
+    }
+    if [job.id.as_str(), job.title.as_str(), job.acceptance.as_str()]
+        .into_iter()
+        .chain(job.resource_claims.iter().map(|claim| claim.resource.as_str()))
+        .chain(job.required_capabilities.iter().map(String::as_str))
+        .any(|text| crate::redact::redact(text) != text)
+    {
+        return Some("job contains sensitive text".to_string());
+    }
+    if job.id.is_empty()
+        || job.id.len() > 100
+        || !job
+            .id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b))
+    {
+        return Some("invalid job id".to_string());
+    }
+    if job.title.trim().is_empty() || job.title.len() > 200 {
+        return Some(format!(
+            "job {} requires a title of at most 200 characters",
+            job.id
+        ));
+    }
+    if job.acceptance.trim().is_empty() || job.acceptance.len() > 4000 {
+        return Some(format!("job {} requires an acceptance check", job.id));
+    }
+    if job.resource_claims.len() > 32 {
+        return Some(format!("job {} has too many resource claims", job.id));
+    }
+    if job.required_capabilities.len() > 32 {
+        return Some(format!("job {} has too many required capabilities", job.id));
+    }
+    let mut capabilities = HashSet::new();
+    for capability in &job.required_capabilities {
+        if capability.is_empty() || capability.trim() != capability
+            || capability.len() > 128 || capability.chars().any(char::is_control)
+            || !capabilities.insert(capability.as_str()) {
+            return Some(format!("job {} has an invalid required capability", job.id));
+        }
+    }
+    let mut resources = HashSet::new();
+    for claim in &job.resource_claims {
+        if claim.resource.is_empty()
+            || claim.resource.trim() != claim.resource
+            || claim.resource.len() > 512
+            || claim.resource.chars().any(char::is_control)
+            || !resources.insert(claim.resource.as_str())
+            || (claim.mode != "read" && claim.mode != "write")
+        {
+            return Some(format!("job {} has an invalid resource claim", job.id));
+        }
+    }
+    None
+}
+
+pub fn validate(jobs: &[JobSpec], limit: usize) -> Result<()> {
+    if jobs.len() > limit {
+        bail!("job backlog exceeds configured backlog limit");
+    }
+    let mut ids = HashSet::new();
+    for job in jobs {
+        if let Some(error) = basic_error(job) {
+            bail!(error);
+        }
+        if !ids.insert(job.id.as_str()) {
+            bail!("duplicate job id {}", job.id);
+        }
+    }
+    for job in jobs {
+        for dep in &job.deps {
+            if !ids.contains(dep.as_str()) {
+                bail!("unknown dependency {dep} in job {}", job.id);
+            }
+        }
+    }
+    let by_id: HashMap<&str, &JobSpec> = jobs.iter().map(|j| (j.id.as_str(), j)).collect();
+    let mut visited = HashSet::new();
+    let mut active = HashSet::new();
+    fn visit<'a>(
+        id: &'a str,
+        by_id: &HashMap<&'a str, &'a JobSpec>,
+        visited: &mut HashSet<&'a str>,
+        active: &mut HashSet<&'a str>,
+    ) -> Result<()> {
+        if visited.contains(id) {
+            return Ok(());
+        }
+        if !active.insert(id) {
+            bail!("dependency cycle at {id}");
+        }
+        for dep in &by_id[id].deps {
+            visit(dep, by_id, visited, active)?;
+        }
+        active.remove(id);
+        visited.insert(id);
+        Ok(())
+    }
+    for job in jobs {
+        visit(&job.id, &by_id, &mut visited, &mut active)?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::select_valid;
+    use serde_json::json;
+
+    #[test]
+    fn partial_plan_rejects_secret_job_and_redacts_its_reported_id() {
+        let secret = "sk-abcdefghijklmnopqrstuv";
+        let (jobs, rejected) = select_valid(&json!([
+            {"id":secret,"title":"Hidden","acceptance":"evidence"},
+            {"id":"safe","title":"Inspect","acceptance":"evidence"}
+        ]), 1000).unwrap();
+        assert_eq!(jobs.len(), 1);
+        assert_eq!(jobs[0].id, "safe");
+        assert_eq!(rejected[0]["id"], "[redacted]");
+        assert_eq!(rejected[0]["reason"], "job contains sensitive text");
+    }
+}

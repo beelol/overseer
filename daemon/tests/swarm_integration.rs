@@ -1,0 +1,1833 @@
+mod common;
+
+use common::*;
+use serde_json::json;
+use std::os::unix::fs::PermissionsExt;
+
+fn accepted_patch(d: &Daemon, run: &str, job: &str, artifact: &str, patch: &str) {
+    accepted_patch_at(d,run,job,artifact,patch,1);
+}
+
+fn accepted_patch_at(d: &Daemon, run: &str, job: &str, artifact: &str, patch: &str, revision: i64) {
+    let attempt = d.call(
+        "swarm.attempt.register",
+        json!({
+            "run_id":run,"generation":1,"revision":revision,"job_id":job
+        }),
+    );
+    d.call(
+        "swarm.artifact.put",
+        json!({
+            "run_id":run,"job_id":job,"attempt_id":attempt["id"],"token":attempt["token"],
+            "artifact_id":artifact,"source_revision":revision,"kind":"patch","content":patch
+        }),
+    );
+    d.call(
+        "swarm.report",
+        json!({
+            "run_id":run,"job_id":job,"attempt_id":attempt["id"],"token":attempt["token"],
+            "message_id":if revision==1 { format!("result-{job}") }
+                else { format!("result-{job}-{revision}") },
+            "type":"result","revision":revision,
+            "payload":{"artifact_ids":[artifact]}
+        }),
+    );
+    d.call(
+        "swarm.decide",
+        json!({
+            "run_id":run,"generation":1,"revision":revision,"job_id":job,
+            "decision":"accept","evidence":[artifact]
+        }),
+    );
+    d.call(
+        "swarm.attempt.confirm_exit",
+        json!({
+            "run_id":run,"generation":1,"revision":revision,"job_id":job,
+            "attempt_id":attempt["id"]
+        }),
+    );
+}
+
+#[test]
+fn acknowledged_dependent_patch_holds_later_integration_after_conflict() {
+    let d=Daemon::start(&[]);
+    let t=tmp();
+    let checkout=repo(&t.path().join("acknowledged-conflict-source"));
+    let base=git(&checkout,&["rev-parse","HEAD"]);
+    std::fs::write(checkout.join("a.txt"),"changed\n").unwrap();
+    let first_patch=format!("{}\n",git(&checkout,&["diff","--","a.txt"]));
+    std::fs::write(checkout.join("a.txt"),"a\n").unwrap();
+    std::fs::write(checkout.join("b.txt"),"changed\n").unwrap();
+    let second_patch=format!("{}\n",git(&checkout,&["diff","--","b.txt"]));
+    std::fs::write(checkout.join("b.txt"),"b\n").unwrap();
+    let source_before=fingerprint(&checkout);
+    let made=d.call("swarm.create",json!({"category":"Integrated contradiction",
+        "objective":"Change two files after route review","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let run=made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"left","title":"Left route","acceptance":"route evidence"},
+        {"id":"right","title":"Right route","acceptance":"route evidence"},
+        {"id":"dependent","title":"Change a.txt","acceptance":"patch","deps":["right"]},
+        {"id":"unrelated","title":"Change b.txt","acceptance":"patch"}
+    ]}));
+    for (job,accepted,content) in [
+        ("right",true,"guarded route returned 403"),
+        ("left",false,"unguarded route returned 200")
+    ] {
+        let attempt=d.call("swarm.attempt.register",json!({"run_id":run,
+            "generation":1,"revision":1,"job_id":job}));
+        d.call("swarm.artifact.put",json!({"run_id":run,"job_id":job,
+            "attempt_id":attempt["id"],"token":attempt["token"],
+            "artifact_id":format!("{job}-evidence"),"source_revision":1,
+            "kind":"finding","content":content}));
+        d.call("swarm.report",json!({"run_id":run,"job_id":job,
+            "attempt_id":attempt["id"],"token":attempt["token"],
+            "message_id":format!("{job}-result"),"type":"result","revision":1,
+            "payload":{"artifact_ids":[format!("{job}-evidence")]}}));
+        if accepted {
+            d.call("swarm.decide",json!({"run_id":run,"generation":1,
+                "revision":1,"job_id":job,"decision":"accept",
+                "evidence":[format!("{job}-evidence")]}));
+            d.call("swarm.attempt.confirm_exit",json!({"run_id":run,
+                "generation":1,"revision":1,"job_id":job,"attempt_id":attempt["id"]}));
+        }
+    }
+    accepted_patch(&d,run,"dependent","dependent-patch",&first_patch);
+    let integrated=d.call("swarm.integrate",json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"dependent",
+        "artifact_id":"dependent-patch","repo":checkout,"base_revision":base}));
+    let branch=integrated["workspace_path"].as_str().unwrap();
+    let first_commit=integrated["commit"].as_str().unwrap();
+    accepted_patch(&d,run,"unrelated","unrelated-patch",&second_patch);
+    let request=json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"unrelated","artifact_id":"unrelated-patch","repo":checkout,
+        "base_revision":base,"fixture_delay_before_commit_ms":2000});
+    let interrupted=std::thread::scope(|scope| {
+        let worker=scope.spawn(||d.try_call("swarm.integrate",request));
+        let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+        let until=std::time::Instant::now()+std::time::Duration::from_secs(5);
+        loop {
+            let count:i64=db.query_row("SELECT COUNT(*) FROM swarm_integration_intents
+                WHERE run_id=?1",[run],|r|r.get(0)).unwrap();
+            if count==1 { break; }
+            assert!(std::time::Instant::now()<until,"integration intent did not persist");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        d.call("swarm.conflict.open",json!({"run_id":run,"generation":1,
+            "revision":1,"conflict_id":"late-route","left_job_id":"left",
+            "left_artifact_id":"left-evidence","right_job_id":"right",
+            "right_artifact_id":"right-evidence","reason":"Route evidence disagrees"}));
+        let early_revision=d.try_call("swarm.revise",json!({"id":run,
+            "generation":1,"expected_revision":1,"reason":"Recheck integrated patch",
+            "jobs":[
+                {"id":"left","title":"Left route","acceptance":"route evidence"},
+                {"id":"right","title":"Right route","acceptance":"route evidence"},
+                {"id":"dependent","title":"Change a.txt",
+                    "acceptance":"fresh patch","deps":["right"]},
+                {"id":"unrelated","title":"Change b.txt","acceptance":"patch"}
+            ]})).unwrap_err();
+        assert!(early_revision.contains("integration intent requires reconciliation"),
+            "{early_revision}");
+        worker.join().unwrap()
+    }).unwrap_err();
+    assert!(interrupted.contains("disputed integrated patch"),"{interrupted}");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let until=std::time::Instant::now()+std::time::Duration::from_secs(5);
+    loop {
+        let count:i64=db.query_row("SELECT COUNT(*) FROM swarm_integration_intents
+            WHERE run_id=?1",[run],|r|r.get(0)).unwrap();
+        if count==0 { break; }
+        assert!(std::time::Instant::now()<until,"disputed branch intent was not reconciled");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    let rows=d.call("swarm.jobs",json!({"id":run}));
+    assert_eq!(rows["jobs"].as_array().unwrap().iter()
+        .find(|j|j["id"]=="dependent").unwrap()["status"],"blocked");
+    let verify=d.try_call("swarm.verify",json!({"run_id":run,
+        "generation":1,"revision":1,"request_id":"disputed-branch-check"}))
+        .unwrap_err();
+    assert!(verify.contains("disputed integrated patch"),"{verify}");
+    let held=d.try_call("swarm.integrate",json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"unrelated",
+        "artifact_id":"unrelated-patch","repo":checkout,"base_revision":base}))
+        .unwrap_err();
+    assert!(held.contains("disputed integrated patch"),"{held}");
+    assert_eq!(git(std::path::Path::new(branch),&["rev-parse","HEAD"]),first_commit);
+    assert_eq!(fingerprint(&checkout),source_before);
+
+    d.call("swarm.revise",json!({"id":run,"generation":1,
+        "expected_revision":1,"reason":"Recheck the integrated patch after route disagreement",
+        "jobs":[
+            {"id":"left","title":"Left route","acceptance":"route evidence"},
+            {"id":"right","title":"Right route","acceptance":"route evidence"},
+            {"id":"dependent","title":"Change a.txt",
+                "acceptance":"fresh patch","deps":["right"]},
+            {"id":"unrelated","title":"Change b.txt","acceptance":"patch"},
+            {"id":"repro","title":"Reproduce route behavior","acceptance":"fresh route proof"}
+        ]}));
+    let premature=d.try_call("swarm.integrate",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"unrelated",
+        "artifact_id":"unrelated-patch","repo":checkout,"base_revision":base}))
+        .unwrap_err();
+    assert!(premature.contains("disputed integrated patch"),"{premature}");
+    let repro=d.call("swarm.attempt.register",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"repro"}));
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"repro",
+        "attempt_id":repro["id"],"token":repro["token"],
+        "artifact_id":"repro-proof","source_revision":2,"kind":"reproduction",
+        "content":"fresh guarded route returns 403"}));
+    d.call("swarm.report",json!({"run_id":run,"job_id":"repro",
+        "attempt_id":repro["id"],"token":repro["token"],
+        "message_id":"repro-result","type":"result","revision":2,
+        "payload":{"artifact_ids":["repro-proof"]}}));
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":2,
+        "job_id":"repro","decision":"accept","evidence":["repro-proof"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"repro","attempt_id":repro["id"]}));
+    d.call("swarm.conflict.resolve",json!({"run_id":run,
+        "generation":1,"revision":2,"conflict_id":"late-route",
+        "outcome":"supports_right","reproduction_job_id":"repro",
+        "reproduction_artifact_id":"repro-proof"}));
+    let before_repair=d.try_call("swarm.integrate",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"unrelated",
+        "artifact_id":"unrelated-patch","repo":checkout,"base_revision":base}))
+        .unwrap_err();
+    assert!(before_repair.contains("disputed integrated patch"),"{before_repair}");
+    assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
+        .iter().find(|j|j["id"]=="dependent").unwrap()["status"],"ready");
+    assert_eq!(std::fs::read_to_string(std::path::Path::new(branch).join("a.txt")).unwrap(),
+        "changed\n");
+    let repair_patch="diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-changed\n+repaired\n";
+    let repair=d.call("swarm.attempt.register",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"dependent"}));
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"dependent",
+        "attempt_id":repair["id"],"token":repair["token"],
+        "artifact_id":"repair-patch","source_revision":2,"kind":"patch",
+        "content":repair_patch}));
+    d.call("swarm.report",json!({"run_id":run,"job_id":"dependent",
+        "attempt_id":repair["id"],"token":repair["token"],
+        "message_id":"repair-result","type":"result","revision":2,
+        "payload":{"artifact_ids":["repair-patch"]}}));
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":2,
+        "job_id":"dependent","decision":"accept","evidence":["repair-patch"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"dependent","attempt_id":repair["id"]}));
+    let repaired=d.call("swarm.integrate",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"dependent",
+        "artifact_id":"repair-patch","repo":checkout,"base_revision":base}));
+    assert_eq!(repaired["status"],"integrated");
+    assert_eq!(git(std::path::Path::new(branch),&["rev-list","--parents","-n","1","HEAD"]),
+        format!("{} {}",repaired["commit"].as_str().unwrap(),first_commit));
+    let later=d.call("swarm.integrate",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"unrelated",
+        "artifact_id":"unrelated-patch","repo":checkout,"base_revision":base}));
+    assert_eq!(later["status"],"integrated");
+    assert_eq!(fingerprint(&checkout),source_before);
+}
+
+#[test]
+fn two_acknowledged_dependents_repair_in_dependency_order_after_conflict() {
+    let d=Daemon::start(&[]);
+    let t=tmp();
+    let checkout=repo(&t.path().join("two-integrated-dependents"));
+    let base=git(&checkout,&["rev-parse","HEAD"]);
+    std::fs::write(checkout.join("a.txt"),"changed-a\n").unwrap();
+    let patch_a=format!("{}\n",git(&checkout,&["diff","--","a.txt"]));
+    std::fs::write(checkout.join("a.txt"),"a\n").unwrap();
+    std::fs::write(checkout.join("b.txt"),"changed-b\n").unwrap();
+    let patch_b=format!("{}\n",git(&checkout,&["diff","--","b.txt"]));
+    std::fs::write(checkout.join("b.txt"),"b\n").unwrap();
+    let source_before=fingerprint(&checkout);
+    let made=d.call("swarm.create",json!({"category":"Two integrated dependents",
+        "objective":"Repair both modules after route review",
+        "allowed_targets":["system-codex"],"source_change_permission":"isolated"}));
+    let run=made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"left","title":"Left route","acceptance":"route evidence"},
+        {"id":"right","title":"Right route","acceptance":"route evidence"},
+        {"id":"patch-a","title":"Change a.txt","acceptance":"patch","deps":["right"]},
+        {"id":"patch-b","title":"Change b.txt","acceptance":"patch","deps":["patch-a"]}
+    ]}));
+    for (job,accepted,content) in [
+        ("right",true,"guarded route returned 403"),
+        ("left",false,"unguarded route returned 200")
+    ] {
+        let attempt=d.call("swarm.attempt.register",json!({"run_id":run,
+            "generation":1,"revision":1,"job_id":job}));
+        d.call("swarm.artifact.put",json!({"run_id":run,"job_id":job,
+            "attempt_id":attempt["id"],"token":attempt["token"],
+            "artifact_id":format!("{job}-evidence"),"source_revision":1,
+            "kind":"finding","content":content}));
+        d.call("swarm.report",json!({"run_id":run,"job_id":job,
+            "attempt_id":attempt["id"],"token":attempt["token"],
+            "message_id":format!("{job}-result"),"type":"result","revision":1,
+            "payload":{"artifact_ids":[format!("{job}-evidence")]}}));
+        if accepted {
+            d.call("swarm.decide",json!({"run_id":run,"generation":1,
+                "revision":1,"job_id":job,"decision":"accept",
+                "evidence":[format!("{job}-evidence")]}));
+            d.call("swarm.attempt.confirm_exit",json!({"run_id":run,
+                "generation":1,"revision":1,"job_id":job,"attempt_id":attempt["id"]}));
+        }
+    }
+    accepted_patch(&d,run,"patch-a","patch-a-v1",&patch_a);
+    let first=d.call("swarm.integrate",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"patch-a","artifact_id":"patch-a-v1",
+        "repo":checkout,"base_revision":base}));
+    accepted_patch(&d,run,"patch-b","patch-b-v1",&patch_b);
+    let second=d.call("swarm.integrate",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"patch-b","artifact_id":"patch-b-v1",
+        "repo":checkout,"base_revision":base}));
+    let branch=first["workspace_path"].as_str().unwrap();
+    d.call("swarm.conflict.open",json!({"run_id":run,"generation":1,
+        "revision":1,"conflict_id":"two-patch-route","left_job_id":"left",
+        "left_artifact_id":"left-evidence","right_job_id":"right",
+        "right_artifact_id":"right-evidence","reason":"Route evidence disagrees"}));
+    let rows=d.call("swarm.jobs",json!({"id":run}));
+    for job in ["patch-a","patch-b"] {
+        assert_eq!(rows["jobs"].as_array().unwrap().iter()
+            .find(|j|j["id"]==job).unwrap()["status"],"blocked");
+    }
+    d.call("swarm.revise",json!({"id":run,"generation":1,
+        "expected_revision":1,"reason":"Recheck both integrated patches",
+        "jobs":[
+            {"id":"left","title":"Left route","acceptance":"route evidence"},
+            {"id":"right","title":"Right route","acceptance":"route evidence"},
+            {"id":"patch-a","title":"Change a.txt","acceptance":"repair a","deps":["right"]},
+            {"id":"patch-b","title":"Change b.txt","acceptance":"repair b","deps":["patch-a"]},
+            {"id":"repro","title":"Reproduce route","acceptance":"fresh route proof"}
+        ]}));
+    let repro=d.call("swarm.attempt.register",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"repro"}));
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"repro",
+        "attempt_id":repro["id"],"token":repro["token"],
+        "artifact_id":"repro-proof","source_revision":2,"kind":"reproduction",
+        "content":"fresh guarded route returns 403"}));
+    d.call("swarm.report",json!({"run_id":run,"job_id":"repro",
+        "attempt_id":repro["id"],"token":repro["token"],
+        "message_id":"repro-result","type":"result","revision":2,
+        "payload":{"artifact_ids":["repro-proof"]}}));
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":2,
+        "job_id":"repro","decision":"accept","evidence":["repro-proof"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"repro","attempt_id":repro["id"]}));
+    d.call("swarm.conflict.resolve",json!({"run_id":run,"generation":1,
+        "revision":2,"conflict_id":"two-patch-route","outcome":"supports_right",
+        "reproduction_job_id":"repro","reproduction_artifact_id":"repro-proof"}));
+    assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
+        .iter().find(|j|j["id"]=="patch-a").unwrap()["status"],"ready");
+    assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
+        .iter().find(|j|j["id"]=="patch-b").unwrap()["status"],"planned");
+    let repair_a="diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-changed-a\n+repaired-a\n";
+    accepted_patch_at(&d,run,"patch-a","patch-a-v2",repair_a,2);
+    let repaired_a=d.call("swarm.integrate",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"patch-a","artifact_id":"patch-a-v2",
+        "repo":checkout,"base_revision":base}));
+    assert_eq!(git(std::path::Path::new(branch),&["rev-list","--parents","-n","1","HEAD"]),
+        format!("{} {}",repaired_a["commit"].as_str().unwrap(),
+            second["commit"].as_str().unwrap()));
+    assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
+        .iter().find(|j|j["id"]=="patch-b").unwrap()["status"],"ready");
+    let repair_b="diff --git a/b.txt b/b.txt\n--- a/b.txt\n+++ b/b.txt\n@@ -1 +1 @@\n-changed-b\n+repaired-b\n";
+    accepted_patch_at(&d,run,"patch-b","patch-b-v2",repair_b,2);
+    let repaired_b=d.call("swarm.integrate",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"patch-b","artifact_id":"patch-b-v2",
+        "repo":checkout,"base_revision":base}));
+    assert_eq!(git(std::path::Path::new(branch),&["rev-list","--parents","-n","1","HEAD"]),
+        format!("{} {}",repaired_b["commit"].as_str().unwrap(),
+            repaired_a["commit"].as_str().unwrap()));
+    assert_eq!(fingerprint(&checkout),source_before);
+}
+
+#[test]
+fn exhausted_integrated_patch_stays_incomplete_after_late_conflict() {
+    let mut d=Daemon::start(&[]);
+    let t=tmp();
+    let checkout=repo(&t.path().join("exhausted-integrated-patch"));
+    let base=git(&checkout,&["rev-parse","HEAD"]);
+    std::fs::write(checkout.join("a.txt"),"changed\n").unwrap();
+    let patch=format!("{}\n",git(&checkout,&["diff","--","a.txt"]));
+    std::fs::write(checkout.join("a.txt"),"a\n").unwrap();
+    let source_before=fingerprint(&checkout);
+    let made=d.call("swarm.create",json!({"category":"Exhausted integrated repair",
+        "objective":"Review route and patch","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let run=made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"left","title":"Left route","acceptance":"route proof"},
+        {"id":"right","title":"Right route","acceptance":"route proof"},
+        {"id":"patch","title":"Change a.txt","acceptance":"patch","deps":["right"]}
+    ]}));
+    for (job,accepted,content) in [
+        ("right",true,"guarded route returned 403"),
+        ("left",false,"unguarded route returned 200")
+    ] {
+        let attempt=d.call("swarm.attempt.register",json!({"run_id":run,
+            "generation":1,"revision":1,"job_id":job}));
+        d.call("swarm.artifact.put",json!({"run_id":run,"job_id":job,
+            "attempt_id":attempt["id"],"token":attempt["token"],
+            "artifact_id":format!("{job}-evidence"),"source_revision":1,
+            "kind":"finding","content":content}));
+        d.call("swarm.report",json!({"run_id":run,"job_id":job,
+            "attempt_id":attempt["id"],"token":attempt["token"],
+            "message_id":format!("{job}-result"),"type":"result","revision":1,
+            "payload":{"artifact_ids":[format!("{job}-evidence")]}}));
+        if accepted {
+            d.call("swarm.decide",json!({"run_id":run,"generation":1,
+                "revision":1,"job_id":job,"decision":"accept",
+                "evidence":[format!("{job}-evidence")]}));
+            d.call("swarm.attempt.confirm_exit",json!({"run_id":run,
+                "generation":1,"revision":1,"job_id":job,"attempt_id":attempt["id"]}));
+        }
+    }
+    let first=d.call("swarm.attempt.register",json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"patch"}));
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"patch",
+        "attempt_id":first["id"],"token":first["token"],
+        "artifact_id":"failed-proof","source_revision":1,"kind":"finding",
+        "content":"first patch failed its local check"}));
+    d.call("swarm.report",json!({"run_id":run,"job_id":"patch",
+        "attempt_id":first["id"],"token":first["token"],
+        "message_id":"first-patch-result","type":"result","revision":1,
+        "payload":{"artifact_ids":["failed-proof"]}}));
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"patch","decision":"reject","evidence":["failed-proof"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"patch","attempt_id":first["id"]}));
+    accepted_patch(&d,run,"patch","accepted-patch",&patch);
+    let integrated=d.call("swarm.integrate",json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"patch",
+        "artifact_id":"accepted-patch","repo":checkout,"base_revision":base}));
+    let branch=integrated["workspace_path"].as_str().unwrap();
+    let commit=integrated["commit"].as_str().unwrap();
+    d.call("swarm.conflict.open",json!({"run_id":run,"generation":1,
+        "revision":1,"conflict_id":"exhausted-route","left_job_id":"left",
+        "left_artifact_id":"left-evidence","right_job_id":"right",
+        "right_artifact_id":"right-evidence","reason":"Route evidence disagrees"}));
+    d.call("swarm.revise",json!({"id":run,"generation":1,
+        "expected_revision":1,"reason":"Repair the invalidated patch",
+        "jobs":[
+            {"id":"left","title":"Left route","acceptance":"route proof"},
+            {"id":"right","title":"Right route","acceptance":"route proof"},
+            {"id":"patch","title":"Change a.txt","acceptance":"fresh patch","deps":["right"]},
+            {"id":"repro","title":"Independent route probe","acceptance":"fresh route proof"}
+        ]}));
+    let row=d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
+        .iter().find(|j|j["id"]=="patch").unwrap().clone();
+    assert_eq!(row["attempt_count"],2);
+    assert_eq!(row["status"],"failed");
+    assert_eq!(row["stop_reason"],"attempts_exhausted");
+    let coverage=d.call("swarm.coverage",json!({"run_id":run}));
+    let patch_row=coverage["rows"].as_array().unwrap().iter()
+        .find(|j|j["job_id"]=="patch").unwrap();
+    assert_eq!(patch_row["coverage_state"],"attempts_exhausted", "{patch_row}");
+    assert_eq!(patch_row["attempt_count"],2);
+    assert!(d.try_call("swarm.attempt.register",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"patch"})).unwrap_err()
+        .contains("job is not ready"));
+    let repro=d.call("swarm.attempt.register",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"repro"}));
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"repro",
+        "attempt_id":repro["id"],"token":repro["token"],
+        "artifact_id":"repro-proof","source_revision":2,"kind":"reproduction",
+        "content":"fresh guarded route returns 403"}));
+    d.call("swarm.report",json!({"run_id":run,"job_id":"repro",
+        "attempt_id":repro["id"],"token":repro["token"],
+        "message_id":"repro-result","type":"result","revision":2,
+        "payload":{"artifact_ids":["repro-proof"]}}));
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":2,
+        "job_id":"repro","decision":"accept","evidence":["repro-proof"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"repro","attempt_id":repro["id"]}));
+    d.call("swarm.conflict.resolve",json!({"run_id":run,"generation":1,
+        "revision":2,"conflict_id":"exhausted-route","outcome":"supports_right",
+        "reproduction_job_id":"repro","reproduction_artifact_id":"repro-proof"}));
+    let verification=d.try_call("swarm.verify",json!({"run_id":run,
+        "generation":1,"revision":2,"request_id":"exhausted-branch-check"}))
+        .unwrap_err();
+    assert!(verification.contains("disputed integrated patch"),"{verification}");
+    let current=d.call("swarm.coverage",json!({"run_id":run}));
+    assert_eq!(current["rows"].as_array().unwrap().iter()
+        .find(|j|j["job_id"]=="patch").unwrap()["coverage_state"],"attempts_exhausted");
+    assert_eq!(git(std::path::Path::new(branch),&["rev-parse","HEAD"]),commit);
+    assert_eq!(fingerprint(&checkout),source_before);
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let left_attempt:String=db.query_row(
+        "SELECT id FROM swarm_attempts WHERE run_id=?1 AND job_id='left' ORDER BY created_ms LIMIT 1",
+        [run],|r|r.get(0)).unwrap();
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":2,"job_id":"left","attempt_id":left_attempt}));
+    let inbox=d.call("swarm.messages",json!({"run_id":run,"recipient":"director",
+        "limit":100}));
+    for message in inbox["messages"].as_array().unwrap() {
+        d.call("swarm.ack",json!({"run_id":run,"message_id":message["message_id"],
+            "recipient":"director","generation":1,"revision":message["revision"],
+            "phase":"applied"}));
+    }
+    let before=d.call("swarm.get",json!({"id":run}));
+    let report=json!({"run_id":run,"generation":1,"revision":2,
+        "expected_revision":2,"expected_control_revision":before["control_revision"],
+        "request_id":"close-exhausted-patch","incomplete_reason":"attempts_exhausted",
+        "summary":"The route was reproduced, but the accepted patch cannot be repaired",
+        "limitations":"Two patch attempts were spent; the private branch still contains the invalidated commit"});
+    let closed=d.call("swarm.partial",report.clone());
+    assert_eq!(closed["status"],"stopped","{closed}");
+    assert_eq!(closed["stop_reason"],"attempts_exhausted");
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.partial",report)["duplicate"],true);
+    let terminal=d.call("swarm.coverage",json!({"run_id":run}));
+    assert_eq!(terminal["outcome"],"incomplete","{terminal}");
+    assert_eq!(terminal["partial_report"]["reason"],"attempts_exhausted");
+    assert_eq!(terminal["partial_report"]["finalized"],true);
+    assert_eq!(terminal["rows"].as_array().unwrap().iter()
+        .find(|j|j["job_id"]=="patch").unwrap()["coverage_state"],"attempts_exhausted");
+    assert_eq!(git(std::path::Path::new(branch),&["rev-parse","HEAD"]),commit);
+    assert_eq!(fingerprint(&checkout),source_before);
+}
+
+#[test]
+fn narrowing_scope_refuses_to_hide_an_already_integrated_patch() {
+    let d = Daemon::start(&[]);
+    let t = tmp();
+    let checkout = repo(&t.path().join("integrated-scope-source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "changed\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call("swarm.create",json!({"category":"Integrated scope",
+        "objective":"Change two modules","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let run = made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"keep","title":"Keep","acceptance":"proof","deps":[]},
+        {"id":"omit","title":"Change a.txt","acceptance":"patch","deps":[]}
+    ]}));
+    accepted_patch(&d,run,"omit","omit-patch",&patch);
+    d.call("swarm.integrate",json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"omit","artifact_id":"omit-patch","repo":checkout,
+        "base_revision":base}));
+    let error=d.try_call("swarm.revise",json!({"id":run,"generation":1,
+        "expected_revision":1,"reason":"Owner narrowed scope",
+        "jobs":[{"id":"keep","title":"Keep","acceptance":"proof","deps":[]}]}))
+        .unwrap_err();
+    assert!(error.contains("integrated or in-flight patch"),"{error}");
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["revision"],1);
+    assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap().iter()
+        .find(|job|job["id"]=="omit").unwrap()["status"],"accepted");
+}
+
+#[test]
+fn accepting_an_unrelated_job_does_not_unlock_a_pending_patch_dependency() {
+    let d = Daemon::start(&[]);
+    let t = tmp();
+    let checkout = repo(&t.path().join("pending-patch-source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "changed\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call("swarm.create", json!({"category":"Pending patch dependency",
+        "objective":"Change a.txt and inspect b.txt","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let run = made["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"patch","title":"Change a.txt","acceptance":"patch","deps":[]},
+        {"id":"other","title":"Inspect b.txt","acceptance":"evidence","deps":[]},
+        {"id":"dependent","title":"Use both","acceptance":"result","deps":["patch","other"]}
+    ]}));
+    accepted_patch(&d, run, "patch", "pending-patch", &patch);
+    let attempt = d.call("swarm.attempt.register", json!({"run_id":run,"job_id":"other",
+        "generation":1,"revision":1}));
+    d.call("swarm.artifact.put", json!({"run_id":run,"job_id":"other",
+        "attempt_id":attempt["id"],"token":attempt["token"],"artifact_id":"other-proof",
+        "source_revision":1,"kind":"finding","content":"b.txt inspected"}));
+    d.call("swarm.report", json!({"run_id":run,"job_id":"other",
+        "attempt_id":attempt["id"],"token":attempt["token"],"message_id":"other-result",
+        "type":"result","revision":1,"payload":{"artifact_ids":["other-proof"]}}));
+    d.call("swarm.decide", json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"other","decision":"accept","evidence":["other-proof"]}));
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"other","attempt_id":attempt["id"]}));
+    let jobs = d.call("swarm.jobs", json!({"id":run}));
+    let dependent = jobs["jobs"].as_array().unwrap().iter()
+        .find(|job| job["id"] == "dependent").unwrap();
+    assert_eq!(dependent["status"], "planned", "{jobs}");
+    d.call("swarm.integrate", json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"patch","artifact_id":"pending-patch","repo":checkout,
+        "base_revision":base}));
+    let jobs = d.call("swarm.jobs", json!({"id":run}));
+    let dependent = jobs["jobs"].as_array().unwrap().iter()
+        .find(|job| job["id"] == "dependent").unwrap();
+    assert_eq!(dependent["status"], "ready", "{jobs}");
+}
+
+#[test]
+fn revision_does_not_ready_new_or_changed_dependents_of_an_unintegrated_patch() {
+    let d = Daemon::start(&[]);
+    let t = tmp();
+    let checkout = repo(&t.path().join("revised-patch-source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "changed\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call("swarm.create", json!({"category":"Revised patch dependency",
+        "objective":"Change a.txt","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let run = made["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"patch","title":"Change a.txt","acceptance":"patch","deps":[]},
+        {"id":"existing","title":"Existing follow-up","acceptance":"result","deps":[]}
+    ]}));
+    accepted_patch(&d, run, "patch", "revised-patch", &patch);
+    d.call("swarm.revise", json!({"id":run,"generation":1,"expected_revision":1,
+        "reason":"Add post-integration checks","jobs":[
+        {"id":"patch","title":"Change a.txt","acceptance":"patch","deps":[]},
+        {"id":"existing","title":"Existing follow-up","acceptance":"result","deps":["patch"]},
+        {"id":"added","title":"New follow-up","acceptance":"result","deps":["patch"]}
+    ]}));
+    let jobs = d.call("swarm.jobs", json!({"id":run}));
+    for id in ["existing", "added"] {
+        let dependent = jobs["jobs"].as_array().unwrap().iter()
+            .find(|job| job["id"] == id).unwrap();
+        assert_eq!(dependent["status"], "planned", "{id}: {jobs}");
+    }
+    d.call("swarm.integrate", json!({"run_id":run,"generation":1,"revision":2,
+        "job_id":"patch","artifact_id":"revised-patch","repo":checkout,
+        "base_revision":base}));
+    let jobs = d.call("swarm.jobs", json!({"id":run}));
+    for id in ["existing", "added"] {
+        let dependent = jobs["jobs"].as_array().unwrap().iter()
+            .find(|job| job["id"] == id).unwrap();
+        assert_eq!(dependent["status"], "ready", "{id}: {jobs}");
+    }
+}
+
+#[test]
+fn audit_only_run_cannot_integrate_a_worker_patch() {
+    let mut d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("audit-source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "unauthorized change\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let before = fingerprint(&checkout);
+    assert!(d
+        .try_call(
+            "swarm.create",
+            json!({"category":"Invalid source permission",
+        "objective":"Audit", "allowed_targets":["system-codex"],
+        "source_change_permission":"current_checkout"})
+        )
+        .unwrap_err()
+        .contains("invalid source change permission"));
+    let made = d.call(
+        "swarm.create",
+        json!({"category":"Audit-only source guard",
+        "objective":"Audit a.txt without changing application code",
+        "allowed_targets":["system-codex"]}),
+    );
+    let run = made["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,
+        "source_change_permission":"isolated",
+        "jobs":[{"id":"audit","title":"Inspect a.txt","acceptance":"finding","deps":[]}]}),
+    );
+    accepted_patch(&d, run, "audit", "unauthorized-patch", &patch);
+    d.kill9();
+    d.spawn();
+    let error = d
+        .try_call(
+            "swarm.integrate",
+            json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"audit","artifact_id":"unauthorized-patch",
+        "repo":checkout,"base_revision":base}),
+        )
+        .unwrap_err();
+    assert!(
+        error.contains("source changes are not permitted"),
+        "{error}"
+    );
+    assert_eq!(fingerprint(&checkout), before);
+    assert_eq!(
+        d.call("swarm.get", json!({"id":run}))["source_change_permission"],
+        "none"
+    );
+}
+
+#[test]
+fn accepted_patch_integrates_in_isolated_workspace_without_touching_checkout() {
+    let d = Daemon::start(&[]);
+    let t = tmp();
+    let checkout = repo(&t.path().join("source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "changed\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    std::fs::write(checkout.join("b.txt"), "user edit\n").unwrap();
+    let original = fingerprint(&checkout);
+
+    let made = d.call(
+        "swarm.create",
+        json!({
+            "category":"Integration fixture","objective":"Change a.txt",
+            "allowed_targets":["system-codex"],"source_change_permission":"isolated"
+        }),
+    );
+    let run = made["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,
+            "jobs":[{"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}]
+        }),
+    );
+    accepted_patch(&d, run, "writer", "writer-patch", &patch);
+    let request = json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"writer","artifact_id":"writer-patch", "repo":checkout,
+        "base_revision":base});
+    let integrated = d.call("swarm.integrate", request.clone());
+    assert_eq!(integrated["status"], "integrated", "{integrated}");
+    let workspace = std::path::PathBuf::from(integrated["workspace_path"].as_str().unwrap());
+    assert!(workspace.starts_with(std::fs::canonicalize(d.home.path()).unwrap()));
+    assert_eq!(
+        std::fs::read_to_string(workspace.join("a.txt")).unwrap(),
+        "changed\n"
+    );
+    assert_eq!(fingerprint(&checkout), original);
+    let replay = d.call("swarm.integrate", request);
+    assert_eq!(replay["duplicate"], true);
+    assert_eq!(replay["commit"], integrated["commit"]);
+}
+
+#[test]
+fn unrelated_plan_revision_preserves_an_accepted_patch_for_integration() {
+    let d = Daemon::start(&[]);
+    let t = tmp();
+    let checkout = repo(&t.path().join("revised-source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "accepted change\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call("swarm.create", json!({"category":"Unrelated plan change",
+        "objective":"Change a.txt and inspect b.txt","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let run = made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]},
+        {"id":"other","title":"Inspect b.txt","acceptance":"finding","deps":[]}
+    ]}));
+    accepted_patch(&d, run, "writer", "writer-patch", &patch);
+    let revised = d.call("swarm.revise",json!({"id":run,"generation":1,
+        "expected_revision":1,"reason":"Clarify unrelated audit","jobs":[
+        {"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]},
+        {"id":"other","title":"Inspect b.txt","acceptance":"check missing indexes","deps":[]}
+    ]}));
+    assert_eq!(revised["revision"], 2);
+    let jobs = d.call("swarm.jobs",json!({"id":run}));
+    let writer = jobs["jobs"].as_array().unwrap().iter().find(|j|j["id"]=="writer").unwrap();
+    assert_eq!(writer["status"],"accepted");
+    assert_eq!(writer["plan_revision"],1);
+    let request = json!({"run_id":run,"generation":1,"revision":2,"job_id":"writer",
+        "artifact_id":"writer-patch","repo":checkout,"base_revision":base});
+    let integrated = d.call("swarm.integrate",request.clone());
+    assert_eq!(integrated["status"],"integrated","{integrated}");
+    assert_eq!(d.call("swarm.integrate",request)["duplicate"],true);
+    let stale_request = json!({"run_id":run,"generation":1,"revision":1,"job_id":"writer",
+        "artifact_id":"writer-patch","repo":checkout,"base_revision":base});
+    assert!(d.try_call("swarm.integrate",stale_request).unwrap_err().contains("stale plan revision"));
+
+    let changed = d.call("swarm.create",json!({"category":"Changed patch requirement",
+        "objective":"Change a.txt again","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let changed_run = changed["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":changed_run,"generation":1,"revision":0,
+        "jobs":[{"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}]}));
+    accepted_patch(&d,changed_run,"writer","superseded-patch",&patch);
+    d.call("swarm.revise",json!({"id":changed_run,"generation":1,
+        "expected_revision":1,"reason":"Change writer acceptance","jobs":[
+        {"id":"writer","title":"Change a.txt","acceptance":"patch plus new check","deps":[]}
+    ]}));
+    let stale_artifact = d.try_call("swarm.integrate",json!({"run_id":changed_run,
+        "generation":1,"revision":2,"job_id":"writer","artifact_id":"superseded-patch",
+        "repo":checkout,"base_revision":base})).unwrap_err();
+    assert!(stale_artifact.contains("job is not accepted"),"{stale_artifact}");
+}
+
+#[test]
+fn stop_remains_responsive_during_slow_integration_and_cannot_ack_its_patch() {
+    use std::time::{Duration, Instant};
+
+    let d = Daemon::start(&[]);
+    let t = tmp();
+    let checkout = repo(&t.path().join("slow-integration"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "changed\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call("swarm.create", json!({"category":"Stop during integration",
+        "objective":"Change a.txt","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let run = made["id"].as_str().unwrap().to_string();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,
+        "jobs":[{"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}]}));
+    accepted_patch(&d, &run, "writer", "slow-patch", &patch);
+    let request = json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"writer","artifact_id":"slow-patch","repo":checkout,
+        "base_revision":base,"fixture_delay_before_commit_ms":2000});
+    let integration = std::thread::scope(|scope| {
+        let worker = scope.spawn(|| d.try_call("swarm.integrate", request));
+        let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            let started: i64 = db.query_row(
+                "SELECT COUNT(*) FROM swarm_integration_intents WHERE run_id=?1",
+                [&run], |row| row.get(0)).unwrap();
+            if started == 1 { break; }
+            assert!(Instant::now() < deadline, "integration did not reach intent");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let begin = Instant::now();
+        let stopped = d.call("swarm.stop",json!({"run_id":run,"generation":1,"revision":1}));
+        assert!(begin.elapsed() < Duration::from_secs(1), "Stop waited for Git integration");
+        assert!(["stopping","stopped"].contains(&stopped["status"].as_str().unwrap()));
+        worker.join().unwrap()
+    });
+    let error = integration.unwrap_err();
+    assert!(error.contains("run cannot integrate"), "{error}");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let committed: i64 = db.query_row(
+        "SELECT COUNT(*) FROM swarm_integrated_artifacts WHERE run_id=?1",
+        [&run], |row| row.get(0)).unwrap();
+    assert_eq!(committed, 0);
+    let workspace: String = db.query_row(
+        "SELECT workspace_path FROM swarm_integrations WHERE run_id=?1",
+        [&run], |row| row.get(0)).unwrap();
+    assert_eq!(git(std::path::Path::new(&workspace), &["rev-parse", "HEAD"]), base);
+    let pending: i64 = db.query_row(
+        "SELECT COUNT(*) FROM swarm_integration_intents WHERE run_id=?1",
+        [&run], |row| row.get(0)).unwrap();
+    assert_eq!(pending, 1, "a stopped integration retains its recovery intent");
+}
+
+#[test]
+fn late_dependency_conflict_cannot_commit_an_in_flight_patch() {
+    use std::time::{Duration, Instant};
+
+    let d=Daemon::start(&[]);
+    let t=tmp();
+    let checkout=repo(&t.path().join("conflict-during-integration"));
+    let base=git(&checkout,&["rev-parse","HEAD"]);
+    std::fs::write(checkout.join("a.txt"),"changed\n").unwrap();
+    let patch=format!("{}\n",git(&checkout,&["diff","--","a.txt"]));
+    std::fs::write(checkout.join("a.txt"),"a\n").unwrap();
+    let source_before=fingerprint(&checkout);
+    let made=d.call("swarm.create",json!({"category":"Conflict during integration",
+        "objective":"Update a.txt after route check","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let run=made["id"].as_str().unwrap().to_string();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"left","title":"Left probe","acceptance":"route proof"},
+        {"id":"right","title":"Right probe","acceptance":"route proof"},
+        {"id":"patch","title":"Change a.txt","acceptance":"patch","deps":["right"]}
+    ]}));
+    for (job,content,accepted) in [
+        ("right","guarded route returned 403",true),
+        ("left","unguarded route returned 200",false)
+    ] {
+        let attempt=d.call("swarm.attempt.register",json!({"run_id":run,
+            "generation":1,"revision":1,"job_id":job}));
+        d.call("swarm.artifact.put",json!({"run_id":run,"job_id":job,
+            "attempt_id":attempt["id"],"token":attempt["token"],
+            "artifact_id":format!("{job}-evidence"),"source_revision":1,
+            "kind":"finding","content":content}));
+        d.call("swarm.report",json!({"run_id":run,"job_id":job,
+            "attempt_id":attempt["id"],"token":attempt["token"],
+            "message_id":format!("{job}-result"),"type":"result","revision":1,
+            "payload":{"artifact_ids":[format!("{job}-evidence")]}}));
+        if accepted {
+            d.call("swarm.decide",json!({"run_id":run,"generation":1,
+                "revision":1,"job_id":job,"decision":"accept",
+                "evidence":[format!("{job}-evidence")]}));
+            d.call("swarm.attempt.confirm_exit",json!({"run_id":run,
+                "generation":1,"revision":1,"job_id":job,"attempt_id":attempt["id"]}));
+        }
+    }
+    accepted_patch(&d,&run,"patch","dependent-patch",&patch);
+    let request=json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"patch","artifact_id":"dependent-patch","repo":checkout,
+        "base_revision":base,"fixture_delay_before_commit_ms":2000});
+    let outcome=std::thread::scope(|scope| {
+        let worker=scope.spawn(||d.try_call("swarm.integrate",request));
+        let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+        let until=Instant::now()+Duration::from_secs(5);
+        loop {
+            let pending:i64=db.query_row("SELECT COUNT(*) FROM swarm_integration_intents
+                WHERE run_id=?1",[&run],|r|r.get(0)).unwrap();
+            if pending==1 { break; }
+            assert!(Instant::now()<until,"integration did not reach intent");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let start=Instant::now();
+        d.call("swarm.conflict.open",json!({"run_id":run,"generation":1,
+            "revision":1,"conflict_id":"route-disagreement","left_job_id":"left",
+            "left_artifact_id":"left-evidence","right_job_id":"right",
+            "right_artifact_id":"right-evidence","reason":"Route results disagree"}));
+        assert!(start.elapsed()<Duration::from_secs(1),"conflict waited for integration");
+        worker.join().unwrap()
+    });
+    let error=outcome.unwrap_err();
+    assert!(error.contains("job is not accepted"),"{error}");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let integrated:i64=db.query_row("SELECT COUNT(*) FROM swarm_integrated_artifacts
+        WHERE run_id=?1",[&run],|r|r.get(0)).unwrap();
+    assert_eq!(integrated,0);
+    let workspace:String=db.query_row("SELECT workspace_path FROM swarm_integrations
+        WHERE run_id=?1",[&run],|r|r.get(0)).unwrap();
+    assert_eq!(git(std::path::Path::new(&workspace),&["rev-parse","HEAD"]),base);
+    let until=Instant::now()+Duration::from_secs(5);
+    loop {
+        let pending:i64=db.query_row("SELECT COUNT(*) FROM swarm_integration_intents
+            WHERE run_id=?1",[&run],|r|r.get(0)).unwrap();
+        if pending==0 { break; }
+        assert!(Instant::now()<until,"staged invalidated patch was not reconciled");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert!(git(std::path::Path::new(&workspace),&["status","--porcelain=v1"]).is_empty());
+    assert_eq!(fingerprint(&checkout),source_before);
+}
+
+#[test]
+fn late_conflict_reconciles_an_unacknowledged_isolated_commit_after_restart() {
+    use std::time::{Duration,Instant};
+
+    let mut d=Daemon::start(&[]);
+    let t=tmp();
+    let checkout=repo(&t.path().join("post-commit-conflict"));
+    let base=git(&checkout,&["rev-parse","HEAD"]);
+    std::fs::write(checkout.join("a.txt"),"changed\n").unwrap();
+    let patch=format!("{}\n",git(&checkout,&["diff","--","a.txt"]));
+    std::fs::write(checkout.join("a.txt"),"a\n").unwrap();
+    let source_before=fingerprint(&checkout);
+    let made=d.call("swarm.create",json!({"category":"Post-commit conflict",
+        "objective":"Update a.txt after route check","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let run=made["id"].as_str().unwrap().to_string();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"left","title":"Left probe","acceptance":"route proof"},
+        {"id":"right","title":"Right probe","acceptance":"route proof"},
+        {"id":"patch","title":"Change a.txt","acceptance":"patch","deps":["right"]}
+    ]}));
+    for (job,content,accepted) in [
+        ("right","guarded route returned 403",true),
+        ("left","unguarded route returned 200",false)
+    ] {
+        let attempt=d.call("swarm.attempt.register",json!({"run_id":run,
+            "generation":1,"revision":1,"job_id":job}));
+        d.call("swarm.artifact.put",json!({"run_id":run,"job_id":job,
+            "attempt_id":attempt["id"],"token":attempt["token"],
+            "artifact_id":format!("{job}-evidence"),"source_revision":1,
+            "kind":"finding","content":content}));
+        d.call("swarm.report",json!({"run_id":run,"job_id":job,
+            "attempt_id":attempt["id"],"token":attempt["token"],
+            "message_id":format!("{job}-result"),"type":"result","revision":1,
+            "payload":{"artifact_ids":[format!("{job}-evidence")]}}));
+        if accepted {
+            d.call("swarm.decide",json!({"run_id":run,"generation":1,
+                "revision":1,"job_id":job,"decision":"accept",
+                "evidence":[format!("{job}-evidence")]}));
+            d.call("swarm.attempt.confirm_exit",json!({"run_id":run,
+                "generation":1,"revision":1,"job_id":job,"attempt_id":attempt["id"]}));
+        }
+    }
+    accepted_patch(&d,&run,"patch","dependent-patch",&patch);
+    let interrupted=d.try_call("swarm.integrate",json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"patch",
+        "artifact_id":"dependent-patch","repo":checkout,"base_revision":base,
+        "fixture_fault":"after_commit"})).unwrap_err();
+    assert!(interrupted.contains("fixture interruption"),"{interrupted}");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let workspace:String=db.query_row("SELECT workspace_path FROM swarm_integrations
+        WHERE run_id=?1",[&run],|r|r.get(0)).unwrap();
+    assert_ne!(git(std::path::Path::new(&workspace),&["rev-parse","HEAD"]),base);
+    d.call("swarm.conflict.open",json!({"run_id":run,"generation":1,
+        "revision":1,"conflict_id":"late-route-disagreement","left_job_id":"left",
+        "left_artifact_id":"left-evidence","right_job_id":"right",
+        "right_artifact_id":"right-evidence","reason":"Route results disagree"}));
+    d.kill9();
+    d.spawn();
+    let until=Instant::now()+Duration::from_secs(5);
+    loop {
+        let pending:i64=db.query_row("SELECT COUNT(*) FROM swarm_integration_intents
+            WHERE run_id=?1",[&run],|r|r.get(0)).unwrap();
+        if pending==0 { break; }
+        assert!(Instant::now()<until,"invalidated integration intent was not reconciled");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert_eq!(git(std::path::Path::new(&workspace),&["rev-parse","HEAD"]),base);
+    let integrated:i64=db.query_row("SELECT COUNT(*) FROM swarm_integrated_artifacts
+        WHERE run_id=?1",[&run],|r|r.get(0)).unwrap();
+    assert_eq!(integrated,0);
+    assert_eq!(fingerprint(&checkout),source_before);
+    assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
+        .iter().find(|j|j["id"]=="patch").unwrap()["status"],"blocked");
+}
+
+#[test]
+fn invalidated_integration_recovery_preserves_an_unexpected_workspace_edit() {
+    let mut d=Daemon::start(&[]);
+    let t=tmp();
+    let checkout=repo(&t.path().join("tampered-conflict-integration"));
+    let base=git(&checkout,&["rev-parse","HEAD"]);
+    std::fs::write(checkout.join("a.txt"),"changed\n").unwrap();
+    let patch=format!("{}\n",git(&checkout,&["diff","--","a.txt"]));
+    std::fs::write(checkout.join("a.txt"),"a\n").unwrap();
+    let source_before=fingerprint(&checkout);
+    let made=d.call("swarm.create",json!({"category":"Tampered invalidated integration",
+        "objective":"Update a.txt","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let run=made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,
+        "jobs":[{"id":"patch","title":"Change a.txt","acceptance":"patch"}]}));
+    accepted_patch(&d,run,"patch","patch-proof",&patch);
+    let interrupted=d.try_call("swarm.integrate",json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"patch","artifact_id":"patch-proof",
+        "repo":checkout,"base_revision":base,"fixture_fault":"after_apply"})).unwrap_err();
+    assert!(interrupted.contains("fixture interruption"),"{interrupted}");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let workspace:String=db.query_row("SELECT workspace_path FROM swarm_integrations
+        WHERE run_id=?1",[run],|r|r.get(0)).unwrap();
+    std::fs::write(std::path::Path::new(&workspace).join("a.txt"),"unrelated edit\n").unwrap();
+    db.execute("UPDATE swarm_jobs SET status='blocked',stop_reason='evidence_conflict'
+        WHERE run_id=?1 AND id='patch'",[run]).unwrap();
+    d.kill9();
+    d.spawn();
+    std::thread::sleep(std::time::Duration::from_millis(1500));
+    let pending:i64=db.query_row("SELECT COUNT(*) FROM swarm_integration_intents
+        WHERE run_id=?1",[run],|r|r.get(0)).unwrap();
+    assert_eq!(pending,1,"unexpected worktree edit must retain reconciliation intent");
+    assert_eq!(std::fs::read_to_string(std::path::Path::new(&workspace).join("a.txt")).unwrap(),
+        "unrelated edit\n");
+    assert_eq!(git(std::path::Path::new(&workspace),&["rev-parse","HEAD"]),base);
+    assert_eq!(fingerprint(&checkout),source_before);
+    let revision=d.try_call("swarm.revise",json!({"id":run,"generation":1,
+        "expected_revision":1,"reason":"Recheck invalidated patch","jobs":[
+            {"id":"patch","title":"Change a.txt","acceptance":"recheck patch"}
+        ]})).unwrap_err();
+    assert!(revision.contains("integration intent requires reconciliation"),"{revision}");
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["revision"],1);
+}
+
+#[test]
+fn source_commit_change_blocks_stale_patch_integration() {
+    let d = Daemon::start(&[]);
+    let t = tmp();
+    let checkout = repo(&t.path().join("source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "worker change\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call(
+        "swarm.create",
+        json!({
+            "category":"Stale integration fixture","objective":"Change a.txt",
+            "allowed_targets":["system-codex"],"source_change_permission":"isolated"
+        }),
+    );
+    let run = made["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,
+            "jobs":[{"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}]
+        }),
+    );
+    accepted_patch(&d, run, "writer", "writer-patch", &patch);
+    std::fs::write(checkout.join("a.txt"), "upstream change\n").unwrap();
+    git(&checkout, &["add", "a.txt"]);
+    git(&checkout, &["commit", "-q", "-m", "upstream change"]);
+    let current = git(&checkout, &["rev-parse", "HEAD"]);
+    let error = d
+        .try_call(
+            "swarm.integrate",
+            json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"writer","artifact_id":"writer-patch",
+        "repo":checkout,"base_revision":base}),
+        )
+        .unwrap_err();
+    assert!(error.contains("source commit changed"), "{error}");
+    assert_eq!(git(&checkout, &["rev-parse", "HEAD"]), current);
+    assert_eq!(
+        std::fs::read_to_string(checkout.join("a.txt")).unwrap(),
+        "upstream change\n"
+    );
+}
+
+#[test]
+fn dependent_job_waits_for_accepted_patch_to_integrate() {
+    let d = Daemon::start(&[]);
+    let t = tmp();
+    let checkout = repo(&t.path().join("source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "contract v2\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call(
+        "swarm.create",
+        json!({
+            "category":"Dependency integration fixture","objective":"Change contract",
+            "allowed_targets":["system-codex"],"source_change_permission":"isolated"
+        }),
+    );
+    let run = made["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,
+            "jobs":[
+                {"id":"contract","title":"Change contract","acceptance":"patch","deps":[]},
+                {"id":"consumer","title":"Use contract","acceptance":"test","deps":["contract"]}
+            ]
+        }),
+    );
+    accepted_patch(&d, run, "contract", "contract-patch", &patch);
+    let before = d.call("swarm.jobs", json!({"id":run}));
+    let consumer_before = before["jobs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|j| j["id"] == "consumer")
+        .unwrap();
+    assert_eq!(consumer_before["status"], "planned", "{before}");
+    let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+        .unwrap().as_millis() as i64;
+    let blocked = d.call("swarm.admit",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"consumer","target_id":"system-codex",
+        "request_id":"before-contract-integration","now_ms":at,
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"system-codex","account_id":"fixture","pool_ids":["pool"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"pool","windows":[{"id":"week","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":1000},
+        "purpose":"worker"}));
+    assert_eq!(blocked["reason"],"dependency_pending","{blocked}");
+    assert_eq!(blocked["waiting_on"],json!(["contract"]));
+    d.call(
+        "swarm.integrate",
+        json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"contract","artifact_id":"contract-patch","repo":checkout,
+        "base_revision":base}),
+    );
+    let after = d.call("swarm.jobs", json!({"id":run}));
+    let consumer_after = after["jobs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|j| j["id"] == "consumer")
+        .unwrap();
+    assert_eq!(consumer_after["status"], "ready", "{after}");
+}
+
+#[test]
+fn completion_rejects_an_accepted_but_unintegrated_patch() {
+    let d = Daemon::start(&[]);
+    let t = tmp();
+    let checkout = repo(&t.path().join("source"));
+    std::fs::write(checkout.join("a.txt"), "new\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call(
+        "swarm.create",
+        json!({
+            "category":"Completion integration fixture","objective":"Change a.txt",
+            "allowed_targets":["system-codex"],"source_change_permission":"isolated"
+        }),
+    );
+    let run = made["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,
+            "jobs":[{"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}]
+        }),
+    );
+    accepted_patch(&d, run, "writer", "writer-patch", &patch);
+    d.call(
+        "swarm.ack",
+        json!({"run_id":run,"message_id":"result-writer",
+        "recipient":"director","generation":1,"revision":1,"phase":"applied"}),
+    );
+    rusqlite::Connection::open(d.home.path().join("overseer.sqlite"))
+        .unwrap()
+        .execute("UPDATE swarm_runs SET status='running' WHERE id=?1", [run])
+        .unwrap();
+    let error = d
+        .try_call(
+            "swarm.complete",
+            json!({
+                "run_id":run,"generation":1,"revision":1,"request_id":"finish-before-integration",
+                "summary":"Change complete","verification":"fixture",
+                "checks":[{"job_id":"writer","outcome":"passed","evidence":["writer-patch"]}]
+            }),
+        )
+        .unwrap_err();
+    assert!(error.contains("unintegrated patch"), "{error}");
+}
+
+#[test]
+fn conflicting_accepted_patches_preserve_first_commit_and_second_artifact() {
+    let d = Daemon::start(&[]);
+    let t = tmp();
+    let checkout = repo(&t.path().join("source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    let make_patch = |value: &str| {
+        std::fs::write(checkout.join("a.txt"), format!("{value}\n")).unwrap();
+        let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+        std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+        patch
+    };
+    let first_patch = make_patch("first");
+    let second_patch = make_patch("second");
+    let original = fingerprint(&checkout);
+    let made = d.call(
+        "swarm.create",
+        json!({"category":"Conflict integration fixture",
+        "objective":"Change a.txt","allowed_targets":["system-codex"],"source_change_permission":"isolated"}),
+    );
+    let run = made["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,"jobs":[
+            {"id":"one","title":"First change","acceptance":"patch","deps":[]},
+            {"id":"two","title":"Second change","acceptance":"patch","deps":[]}
+        ]}),
+    );
+    accepted_patch(&d, run, "one", "patch-one", &first_patch);
+    accepted_patch(&d, run, "two", "patch-two", &second_patch);
+    let request = |job: &str, artifact: &str| {
+        json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":job,"artifact_id":artifact,"repo":checkout,
+        "base_revision":base})
+    };
+    let first = d.call("swarm.integrate", request("one", "patch-one"));
+    let error = d
+        .try_call("swarm.integrate", request("two", "patch-two"))
+        .unwrap_err();
+    assert!(error.contains("git apply"), "{error}");
+    let workspace = std::path::PathBuf::from(first["workspace_path"].as_str().unwrap());
+    assert_eq!(
+        std::fs::read_to_string(workspace.join("a.txt")).unwrap(),
+        "first\n"
+    );
+    assert_eq!(git(&workspace, &["rev-parse", "HEAD"]), first["commit"]);
+    assert_eq!(fingerprint(&checkout), original);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let remaining: i64 = db
+        .query_row(
+            "SELECT COUNT(*) FROM swarm_integrated_artifacts
+        WHERE run_id=?1",
+            [run],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(remaining, 1);
+    let saved: i64 = db
+        .query_row(
+            "SELECT COUNT(*) FROM swarm_artifacts WHERE run_id=?1
+        AND id='patch-two'",
+            [run],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(saved, 1);
+}
+
+#[test]
+fn active_repository_commit_hook_blocks_integration_without_running() {
+    let d = Daemon::start(&[]);
+    let t = tmp();
+    let checkout = repo(&t.path().join("source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "new\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call(
+        "swarm.create",
+        json!({"category":"Commit hook fixture",
+        "objective":"Change a.txt","allowed_targets":["system-codex"],"source_change_permission":"isolated"}),
+    );
+    let run = made["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,"jobs":[
+            {"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}
+        ]}),
+    );
+    accepted_patch(&d, run, "writer", "writer-patch", &patch);
+    let hook_marker = t.path().join("hook-fired");
+    let hook = checkout.join(".git/hooks/pre-commit");
+    std::fs::write(
+        &hook,
+        format!("#!/bin/sh\nprintf invoked > '{}'\n", hook_marker.display()),
+    )
+    .unwrap();
+    std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let error = d
+        .try_call(
+            "swarm.integrate",
+            json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"writer","artifact_id":"writer-patch",
+        "repo":checkout,"base_revision":base}),
+        )
+        .unwrap_err();
+    assert!(error.contains("commit hook"), "{error}");
+    assert!(!hook_marker.exists());
+    assert_eq!(
+        std::fs::read_to_string(checkout.join("a.txt")).unwrap(),
+        "a\n"
+    );
+}
+
+#[test]
+fn interrupted_integration_recovers_without_a_second_commit() {
+    for fault in ["after_apply", "after_commit"] {
+        let mut d = Daemon::start(&[]);
+        let t = tmp();
+        let checkout = repo(&t.path().join("source"));
+        let base = git(&checkout, &["rev-parse", "HEAD"]);
+        std::fs::write(checkout.join("a.txt"), "recovered\n").unwrap();
+        let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+        std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+        let made = d.call(
+            "swarm.create",
+            json!({
+                "category":"Recovery fixture", "objective":"Change a.txt",
+                "allowed_targets":["system-codex"],"source_change_permission":"isolated"
+            }),
+        );
+        let run = made["id"].as_str().unwrap();
+        d.call(
+            "swarm.plan",
+            json!({"id":run,"generation":1,"revision":0,
+                "jobs":[{"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}]
+            }),
+        );
+        accepted_patch(&d, run, "writer", "writer-patch", &patch);
+        let request = json!({"run_id":run,"generation":1,"revision":1,
+            "job_id":"writer","artifact_id":"writer-patch","repo":checkout,
+            "base_revision":base});
+        let mut interrupted = request.clone();
+        interrupted["fixture_fault"] = json!(fault);
+        let error = d.try_call("swarm.integrate", interrupted).unwrap_err();
+        assert!(error.contains("fixture interruption"), "{fault}: {error}");
+        let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+        let workspace: String = db
+            .query_row(
+                "SELECT workspace_path FROM swarm_integrations WHERE run_id=?1",
+                [run],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let workspace = std::path::PathBuf::from(workspace);
+        let commit_before = git(&workspace, &["rev-parse", "HEAD"]);
+        if fault == "after_commit" {
+            std::fs::write(checkout.join("a.txt"), "upstream after integration\n").unwrap();
+            git(&checkout, &["add", "a.txt"]);
+            git(
+                &checkout,
+                &["commit", "-q", "-m", "upstream after integration"],
+            );
+        }
+        let source_before_replay = fingerprint(&checkout);
+        d.kill9();
+        d.spawn();
+        let integrated = d.call("swarm.integrate", request.clone());
+        assert_eq!(integrated["status"], "integrated", "{fault}: {integrated}");
+        let commit_after = git(&workspace, &["rev-parse", "HEAD"]);
+        if fault == "after_commit" {
+            assert_eq!(commit_before, commit_after);
+        } else {
+            assert_ne!(commit_before, commit_after);
+        }
+        assert_eq!(integrated["commit"], commit_after);
+        assert_eq!(
+            git(
+                &workspace,
+                &["rev-list", "--count", &format!("{base}..HEAD")]
+            ),
+            "1"
+        );
+        assert_eq!(fingerprint(&checkout), source_before_replay);
+        let duplicate = d.call("swarm.integrate", request);
+        assert_eq!(duplicate["duplicate"], true);
+        let count: i64 = db
+            .query_row(
+                "SELECT COUNT(*) FROM swarm_integrated_artifacts WHERE run_id=?1",
+                [run],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+}
+
+#[test]
+fn interrupted_integration_rejects_unexpected_workspace_edits() {
+    let mut d = Daemon::start(&[]);
+    let t = tmp();
+    let checkout = repo(&t.path().join("source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "reviewed\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call(
+        "swarm.create",
+        json!({"category":"Tamper fixture",
+        "objective":"Change a.txt","allowed_targets":["system-codex"],"source_change_permission":"isolated"}),
+    );
+    let run = made["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,
+        "jobs":[{"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}]}),
+    );
+    accepted_patch(&d, run, "writer", "writer-patch", &patch);
+    let request = json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"writer","artifact_id":"writer-patch","repo":checkout,
+        "base_revision":base});
+    let mut interrupted = request.clone();
+    interrupted["fixture_fault"] = json!("after_apply");
+    assert!(d
+        .try_call("swarm.integrate", interrupted)
+        .unwrap_err()
+        .contains("fixture interruption"));
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let workspace: String = db
+        .query_row(
+            "SELECT workspace_path FROM swarm_integrations WHERE run_id=?1",
+            [run],
+            |r| r.get(0),
+        )
+        .unwrap();
+    std::fs::write(std::path::Path::new(&workspace).join("a.txt"), "intruder\n").unwrap();
+    d.kill9();
+    d.spawn();
+    let error = d.try_call("swarm.integrate", request).unwrap_err();
+    assert!(error.contains("requires reconciliation"), "{error}");
+    assert_eq!(
+        git(std::path::Path::new(&workspace), &["rev-parse", "HEAD"]),
+        base
+    );
+    let count: i64 = db
+        .query_row(
+            "SELECT COUNT(*) FROM swarm_integrated_artifacts WHERE run_id=?1",
+            [run],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(count, 0);
+}
+
+#[test]
+fn individually_accepted_patches_cannot_complete_after_combined_check_fails() {
+    let t = tmp();
+    let verifier = t.path().join("verify-combination.py");
+    std::fs::write(&verifier, "#!/usr/bin/env python3\nfrom pathlib import Path\na = Path('a.txt').read_text().strip()\nb = Path('b.txt').read_text().strip()\nraise SystemExit(1 if a == 'first' and b == 'second' else 0)\n").unwrap();
+    std::fs::set_permissions(&verifier, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let d = Daemon::start(&[("OVERSEER_SWARM_VERIFIER_PATH", verifier.to_str().unwrap())]);
+    let checkout = repo(&t.path().join("source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    let make_patch = |name: &str, content: &str, original: &str| {
+        std::fs::write(checkout.join(name), content).unwrap();
+        assert!(
+            std::process::Command::new(&verifier)
+                .current_dir(&checkout)
+                .status()
+                .unwrap()
+                .success(),
+            "individual module check failed for {name}"
+        );
+        let patch = format!("{}\n", git(&checkout, &["diff", "--", name]));
+        std::fs::write(checkout.join(name), original).unwrap();
+        patch
+    };
+    let first_patch = make_patch("a.txt", "first\n", "a\n");
+    let second_patch = make_patch("b.txt", "second\n", "b\n");
+    let source_before = fingerprint(&checkout);
+    let made = d.call(
+        "swarm.create",
+        json!({"category":"Combined verification fixture",
+        "objective":"Change two modules", "allowed_targets":["system-codex"],"source_change_permission":"isolated"}),
+    );
+    let run = made["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,"jobs":[
+            {"id":"one","title":"Module one","acceptance":"patch","deps":[]},
+            {"id":"two","title":"Module two","acceptance":"patch","deps":[]}
+        ]}),
+    );
+    accepted_patch(&d, run, "one", "patch-one", &first_patch);
+    accepted_patch(&d, run, "two", "patch-two", &second_patch);
+    let integrate = |job: &str, artifact: &str| {
+        json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":job,"artifact_id":artifact,"repo":checkout,
+        "base_revision":base})
+    };
+    let first = d.call("swarm.integrate", integrate("one", "patch-one"));
+    let before = d.call(
+        "swarm.verify",
+        json!({"run_id":run,"generation":1,"revision":1,
+        "request_id":"check-first-commit"}),
+    );
+    assert_eq!(before["status"], "passed", "{before}");
+    assert_eq!(before["commit"], first["commit"]);
+    let second = d.call("swarm.integrate", integrate("two", "patch-two"));
+    let after = d.call(
+        "swarm.verify",
+        json!({"run_id":run,"generation":1,"revision":1,
+        "request_id":"check-second-commit"}),
+    );
+    assert_eq!(after["status"], "failed", "{after}");
+    assert_eq!(after["commit"], second["commit"]);
+    for message in ["result-one", "result-two"] {
+        d.call(
+            "swarm.ack",
+            json!({"run_id":run,"message_id":message,
+            "recipient":"director","generation":1,"revision":1,"phase":"applied"}),
+        );
+    }
+    rusqlite::Connection::open(d.home.path().join("overseer.sqlite"))
+        .unwrap()
+        .execute("UPDATE swarm_runs SET status='running' WHERE id=?1", [run])
+        .unwrap();
+    let error = d
+        .try_call(
+            "swarm.complete",
+            json!({"run_id":run,"generation":1,
+            "revision":1,"request_id":"complete-combined", "summary":"Both modules updated",
+            "verification":"Combined check", "checks":[
+                {"job_id":"one","outcome":"passed","evidence":["patch-one"]},
+                {"job_id":"two","outcome":"passed","evidence":["patch-two"]}
+            ]}),
+        )
+        .unwrap_err();
+    assert!(error.contains("combined verification"), "{error}");
+    assert_eq!(fingerprint(&checkout), source_before);
+    assert_eq!(d.call("swarm.get", json!({"id":run}))["status"], "running");
+}
+
+#[test]
+fn completion_requires_a_current_passed_combined_check() {
+    let t = tmp();
+    let verifier = t.path().join("verify-module.py");
+    let script = "#!/usr/bin/env python3\nfrom pathlib import Path\nraise SystemExit(0 if Path('a.txt').read_text() == 'changed\\n' else 1)\n";
+    std::fs::write(&verifier, script).unwrap();
+    std::fs::set_permissions(&verifier, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let d = Daemon::start(&[("OVERSEER_SWARM_VERIFIER_PATH", verifier.to_str().unwrap())]);
+    let checkout = repo(&t.path().join("source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "changed\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call(
+        "swarm.create",
+        json!({"category":"Passing combined check",
+        "objective":"Change a.txt", "allowed_targets":["system-codex"],"source_change_permission":"isolated"}),
+    );
+    let run = made["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,
+        "jobs":[{"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}]}),
+    );
+    accepted_patch(&d, run, "writer", "writer-patch", &patch);
+    d.call(
+        "swarm.integrate",
+        json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"writer","artifact_id":"writer-patch","repo":checkout,
+        "base_revision":base}),
+    );
+    d.call(
+        "swarm.ack",
+        json!({"run_id":run,"message_id":"result-writer",
+        "recipient":"director","generation":1,"revision":1,"phase":"applied"}),
+    );
+    rusqlite::Connection::open(d.home.path().join("overseer.sqlite"))
+        .unwrap()
+        .execute("UPDATE swarm_runs SET status='running' WHERE id=?1", [run])
+        .unwrap();
+    let secret = "sk-abcdefghijklmnopqrstuv";
+    let completion = json!({"run_id":run,"generation":1,"revision":1,
+    "request_id":"finish-verified-patch","summary":format!("Patch verified {secret}"),
+    "verification":"Combined a.txt check passed with Bearer abcdefghijklmnopqrstuvwxyz","checks":[
+        {"job_id":"writer","outcome":"passed","evidence":["writer-patch"]}
+    ]});
+    assert!(d
+        .try_call("swarm.complete", completion.clone())
+        .unwrap_err()
+        .contains("combined verification"));
+    let request = json!({"run_id":run,"generation":1,"revision":1,
+        "request_id":"check-current-commit"});
+    let result = d.call("swarm.verify", request.clone());
+    assert_eq!(result["status"], "passed", "{result}");
+    assert_eq!(d.call("swarm.verify", request)["duplicate"], true);
+    std::fs::write(&verifier, format!("{script}# changed verifier\n")).unwrap();
+    assert!(d
+        .try_call("swarm.complete", completion.clone())
+        .unwrap_err()
+        .contains("combined verification"));
+    std::fs::write(&verifier, script).unwrap();
+    assert_eq!(d.call("swarm.complete", completion)["status"], "completed");
+    let saved = d.call("swarm.get", json!({"id":run}))["completion"].clone();
+    assert_eq!(saved["summary"], "Patch verified [redacted]");
+    assert_eq!(saved["verification"], "Combined a.txt check passed with [redacted]");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let stored: (String, String) = db.query_row(
+        "SELECT summary,verification FROM swarm_completions WHERE run_id=?1", [run],
+        |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
+    assert!(!stored.0.contains(secret) && !stored.1.contains("abcdefghijklmnopqrstuvwxyz"));
+}
+
+#[test]
+fn stop_remains_responsive_while_combined_checker_is_running() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+    use std::time::{Duration, Instant};
+
+    let t = tmp();
+    let verifier = t.path().join("slow-check.py");
+    std::fs::write(
+        &verifier,
+        "#!/usr/bin/env python3\nimport time\ntime.sleep(2)\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&verifier, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let d = Daemon::start(&[("OVERSEER_SWARM_VERIFIER_PATH", verifier.to_str().unwrap())]);
+    let checkout = repo(&t.path().join("source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "changed\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call(
+        "swarm.create",
+        json!({"category":"Responsive verification",
+        "objective":"Check a.txt", "allowed_targets":["system-codex"],"source_change_permission":"isolated"}),
+    );
+    let run = made["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,
+        "jobs":[{"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}]}),
+    );
+    accepted_patch(&d, run, "writer", "writer-patch", &patch);
+    d.call(
+        "swarm.integrate",
+        json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"writer","artifact_id":"writer-patch","repo":checkout,
+        "base_revision":base}),
+    );
+    let socket = d.socket();
+    let run_owned = run.to_string();
+    let checker = std::thread::spawn(move || {
+        let mut conn = UnixStream::connect(socket).unwrap();
+        conn.set_read_timeout(Some(Duration::from_secs(10)))
+            .unwrap();
+        writeln!(
+            conn,
+            "{}",
+            json!({"id":1,"method":"swarm.verify","params":{
+            "run_id":run_owned,"generation":1,"revision":1,"request_id":"slow-check"}})
+        )
+        .unwrap();
+        let mut line = String::new();
+        BufReader::new(conn).read_line(&mut line).unwrap();
+        serde_json::from_str::<serde_json::Value>(&line).unwrap()
+    });
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        let started: i64 = db
+            .query_row(
+                "SELECT COUNT(*) FROM swarm_verifications WHERE run_id=?1 AND status='running'",
+                [run],
+                |r| r.get(0),
+            )
+            .unwrap();
+        if started == 1 {
+            break;
+        }
+        assert!(Instant::now() < deadline, "verifier did not start");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let overlapping = d
+        .try_call(
+            "swarm.verify",
+            json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"overlapping-check"}),
+        )
+        .unwrap_err();
+    assert!(overlapping.contains("already running"), "{overlapping}");
+    let begin = Instant::now();
+    let stopped = d.call(
+        "swarm.stop",
+        json!({"run_id":run,"generation":1,"revision":1}),
+    );
+    assert!(
+        begin.elapsed() < Duration::from_secs(2),
+        "Stop waited for checker"
+    );
+    assert_eq!(stopped["status"], "stopping");
+    let result = checker.join().unwrap();
+    assert_eq!(result["result"]["status"], "interrupted", "{result}");
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["status"],"stopped");
+}
+
+#[test]
+fn stopped_run_recovers_after_orphaned_checker_exits() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+    use std::time::{Duration, Instant};
+
+    let t = tmp();
+    let verifier = t.path().join("orphan-check.py");
+    let entered = t.path().join("orphan-entered");
+    let release = t.path().join("orphan-release");
+    std::fs::write(&verifier,format!(
+        "#!/usr/bin/env python3\nimport pathlib,time\npathlib.Path({:?}).write_text('started')\nfor _ in range(500):\n    if pathlib.Path({:?}).exists():\n        raise SystemExit(0)\n    time.sleep(0.02)\nraise SystemExit(1)\n",
+        entered.to_string_lossy(),release.to_string_lossy())).unwrap();
+    std::fs::set_permissions(&verifier,std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut d=Daemon::start(&[("OVERSEER_SWARM_VERIFIER_PATH",verifier.to_str().unwrap())]);
+    let checkout=repo(&t.path().join("source"));
+    let base=git(&checkout,&["rev-parse","HEAD"]);
+    std::fs::write(checkout.join("a.txt"),"changed\n").unwrap();
+    let patch=format!("{}\n",git(&checkout,&["diff","--","a.txt"]));
+    std::fs::write(checkout.join("a.txt"),"a\n").unwrap();
+    let made=d.call("swarm.create",json!({"category":"Orphan checker stop",
+        "objective":"Check a.txt","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let run=made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,
+        "jobs":[{"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}]}));
+    accepted_patch(&d,run,"writer","writer-patch",&patch);
+    d.call("swarm.integrate",json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"writer","artifact_id":"writer-patch","repo":checkout,
+        "base_revision":base}));
+    let socket=d.socket();
+    let old_run=run.to_string();
+    let pending=std::thread::spawn(move||{
+        let mut conn=UnixStream::connect(socket).unwrap();
+        writeln!(conn,"{}",json!({"id":1,"method":"swarm.verify","params":{
+            "run_id":old_run,"generation":1,"revision":1,"request_id":"before-stop"}})).unwrap();
+        let mut line=String::new();
+        let _=BufReader::new(conn).read_line(&mut line);
+    });
+    let deadline=Instant::now()+Duration::from_secs(3);
+    while !entered.exists() {
+        assert!(Instant::now()<deadline,"verifier never started");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(d.call("swarm.stop",json!({"run_id":run,"generation":1,
+        "revision":1}))["status"],"stopping");
+    d.kill9();
+    pending.join().unwrap();
+    d.spawn();
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["status"],"stopping");
+    std::fs::write(&release,"go").unwrap();
+    let deadline=Instant::now()+Duration::from_secs(5);
+    while d.call("swarm.get",json!({"id":run}))["status"]!="stopped" {
+        assert!(Instant::now()<deadline,"orphaned checker kept run stopping");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let status:String=db.query_row("SELECT status FROM swarm_verifications WHERE run_id=?1",
+        [run],|r|r.get(0)).unwrap();
+    assert_eq!(status,"interrupted");
+}
+
+#[test]
+fn restart_waits_for_orphaned_verifier_then_retries_without_reusing_its_pass() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+    use std::time::{Duration, Instant};
+
+    let t = tmp();
+    let verifier = t.path().join("restart-check.py");
+    let entered = t.path().join("checker-entered");
+    let release = t.path().join("checker-release");
+    std::fs::write(&verifier, format!(
+        "#!/usr/bin/env python3\nimport pathlib, time\npathlib.Path({:?}).write_text('started')\nfor _ in range(250):\n    if pathlib.Path({:?}).exists():\n        raise SystemExit(0)\n    time.sleep(0.02)\nraise SystemExit(1)\n",
+        entered.to_string_lossy(), release.to_string_lossy()
+    )).unwrap();
+    std::fs::set_permissions(&verifier, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut d = Daemon::start(&[("OVERSEER_SWARM_VERIFIER_PATH", verifier.to_str().unwrap())]);
+    let checkout = repo(&t.path().join("source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "changed\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call(
+        "swarm.create",
+        json!({"category":"Verifier restart fixture",
+        "objective":"Check a.txt", "allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}),
+    );
+    let run = made["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,
+        "jobs":[{"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}]}),
+    );
+    accepted_patch(&d, run, "writer", "writer-patch", &patch);
+    d.call(
+        "swarm.integrate",
+        json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"writer","artifact_id":"writer-patch","repo":checkout,
+        "base_revision":base}),
+    );
+
+    let socket = d.socket();
+    let old_run = run.to_string();
+    let pending = std::thread::spawn(move || {
+        let mut conn = UnixStream::connect(socket).unwrap();
+        writeln!(
+            conn,
+            "{}",
+            json!({"id":1,"method":"swarm.verify","params":{
+            "run_id":old_run,"generation":1,"revision":1,"request_id":"before-crash"}})
+        )
+        .unwrap();
+        let mut line = String::new();
+        let _ = BufReader::new(conn).read_line(&mut line);
+    });
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while !entered.exists() {
+        assert!(Instant::now() < deadline, "verifier never started");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    d.kill9();
+    pending.join().unwrap();
+    d.spawn();
+    let next = json!({"run_id":run,"generation":1,"revision":1,"request_id":"after-crash"});
+    let blocked = d.try_call("swarm.verify", next.clone()).unwrap_err();
+    assert!(blocked.contains("already running"), "{blocked}");
+    std::fs::write(&release, "go").unwrap();
+    let deadline = Instant::now() + Duration::from_secs(4);
+    let passed = loop {
+        match d.try_call("swarm.verify", next.clone()) {
+            Ok(result) => break result,
+            Err(error) if error.contains("already running") && Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            Err(error) => panic!("retry failed: {error}"),
+        }
+    };
+    assert_eq!(passed["status"], "passed", "{passed}");
+    let old = d.call(
+        "swarm.verify",
+        json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"before-crash"}),
+    );
+    assert_eq!(old["status"], "interrupted", "{old}");
+    assert_eq!(old["duplicate"], true);
+}

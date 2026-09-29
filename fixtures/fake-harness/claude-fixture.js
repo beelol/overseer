@@ -9,14 +9,55 @@
 //   background:  interim result while a background Agent runs, then a Write permission request
 //   background-early: the background Agent finishes before the interim result; Claude then
 //                continues with a new turn that asks for Write permission (live 2.1.x order)
+//   native-quota: emits scoped structured rate-limit windows and a model-family rejection
+//   native-quota-invalid: a newer malformed meter must invalidate older apparent capacity
+//   native-quota-block-invalid: a malformed follow-up cannot clear a scoped rejection
 //   overseer:    answers as Talk to Overseer (AC-107) from the agents' state in the prompt: a summary
 //                for "what is everyone doing?", and for "tell <agent> to <task>" a proposal block
+//   swarm:       a Swarm member on the proposed native path (swarm.native_director): with the
+//                director's tools it follows CLAUDE_FIXTURE_SWARM_SCRIPT, with a worker's tools
+//                CLAUDE_FIXTURE_SWARM_WORKERS; every step goes through the daemon's MCP tools and is
+//                written to the script's trace file. Scripted choices, not model reasoning.
+// `--version` prints CLAUDE_FIXTURE_VERSION as Claude Code does when it is set; `--help` lists the
+// flags the daemon's director qualification looks for unless CLAUDE_FIXTURE_HELP=bare.
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
-// A profile folder holding a `signed-out` file reads as signed out (Voice Mode's problem rows, AC-168).
-if (process.argv.includes('auth') && process.argv.includes('status')) { console.log(JSON.stringify({ loggedIn: !(process.env.CLAUDE_CONFIG_DIR && fs.existsSync(path.join(process.env.CLAUDE_CONFIG_DIR, 'signed-out'))), authMethod: 'claude.ai', email: 'fixture@example.invalid', subscriptionType: 'max' })); process.exit(0); }
-if (!process.argv.includes('-p')) { console.log('claude-fixture 0.0.0 (synthetic)'); process.exit(0); }
+if (process.argv.includes('auth') && process.argv.includes('status')) {
+  let email = 'fixture@example.test';
+  if (process.env.CLAUDE_FIXTURE_AUTH_COUNTER_FILE || process.env.CLAUDE_FIXTURE_AUTH_PER_PROFILE === '1') {
+    const marker = process.env.CLAUDE_FIXTURE_AUTH_PER_PROFILE === '1'
+      ? path.join(process.env.CLAUDE_CONFIG_DIR, 'fixture-auth-count')
+      : process.env.CLAUDE_FIXTURE_AUTH_COUNTER_FILE;
+    const count = Number(fs.existsSync(marker) ? fs.readFileSync(marker, 'utf8') : '0');
+    fs.writeFileSync(marker, String(count + 1));
+    const switchAfter = Number(process.env.CLAUDE_FIXTURE_AUTH_SWITCH_AFTER || '1');
+    if (count >= switchAfter) email = 'switched@example.test';
+    const delay = Number(count === 0 ? process.env.CLAUDE_FIXTURE_AUTH_INITIAL_DELAY_MS || 0
+      : process.env.CLAUDE_FIXTURE_AUTH_PREFLIGHT_DELAY_MS || 0);
+    if (delay > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delay);
+  }
+  // A profile folder holding a `signed-out` file reads as signed out (Voice Mode's problem rows, AC-168).
+  console.log(JSON.stringify({ loggedIn: !(process.env.CLAUDE_CONFIG_DIR && fs.existsSync(path.join(process.env.CLAUDE_CONFIG_DIR, 'signed-out'))),
+    authMethod: process.env.CLAUDE_FIXTURE_AUTH_MODE === 'api-key' ? 'api-key' : 'claude.ai',
+    email, orgId: 'fixture-org',
+    // CLAUDE_FIXTURE_PLAN_FILE: the reported plan, so a test can change it between identity reads.
+    subscriptionType: (process.env.CLAUDE_FIXTURE_PLAN_FILE && fs.existsSync(process.env.CLAUDE_FIXTURE_PLAN_FILE)
+      && fs.readFileSync(process.env.CLAUDE_FIXTURE_PLAN_FILE, 'utf8').trim()) || 'fixture' }));
+  process.exit(0);
+}
+if (process.argv.includes('--help')) {
+  const flags = process.env.CLAUDE_FIXTURE_HELP === 'bare' ? ['-p, --print', '--output-format <format>']
+    : ['-p, --print', '--output-format <format>', '--input-format <format>', '--mcp-config <configs...>',
+      '--strict-mcp-config', '--allowedTools <tools...>', '--disallowedTools <tools...>',
+      '--permission-prompt-tool <tool>', '--model <model>'];
+  console.log('Usage: claude [options] [prompt]\n\nOptions:\n' + flags.map(f => '  ' + f).join('\n'));
+  process.exit(0);
+}
+if (!process.argv.includes('-p')) {
+  console.log(process.env.CLAUDE_FIXTURE_VERSION ? `${process.env.CLAUDE_FIXTURE_VERSION} (Claude Code)` : 'claude-fixture 0.0.0 (synthetic)');
+  process.exit(0);
+}
 // CLAUDE_FIXTURE_MODE_FILE lets one test session give each task its own mode (read at start).
 const modeFile = process.env.CLAUDE_FIXTURE_MODE_FILE;
 // Overseer's own run is the one whose prompt carries the agents' state: it is always Overseer,
@@ -26,7 +67,23 @@ const sid = 'fixture-session-1';
 const out = o => process.stdout.write(JSON.stringify(o) + '\n');
 const assistant = (content, parent = null) => out({ type: 'assistant', session_id: sid, parent_tool_use_id: parent, message: { role: 'assistant', content } });
 const user = (content, parent = null) => out({ type: 'user', session_id: sid, parent_tool_use_id: parent, message: { role: 'user', content } });
-const result = (isError, text) => out({ type: 'result', subtype: isError ? 'error_during_execution' : 'success', is_error: isError, result: text, session_id: sid, usage: { input_tokens: 1, output_tokens: 1 }, num_turns: 1 });
+// CLAUDE_FIXTURE_METER_FILE: an account meter shared by every run of this fixture (JSON
+// {used, weekly, resets_at, first, last, step}: fractions of each window and the 5-hour reset in
+// epoch seconds). Each turn emits a native rate_limit_event after its first model response
+// (used + first) and another before its result (used + last); the turn's whole draw (step) is
+// added afterwards. As with live Claude Code, neither in-run reading brackets the turn: part of
+// its draw lands before the first and after the last.
+const meterFile = process.env.CLAUDE_FIXTURE_METER_FILE;
+const meterEvent = part => {
+  if (!meterFile) return;
+  const m = JSON.parse(fs.readFileSync(meterFile, 'utf8'));
+  const five = Math.min(1, m.used + m[part]);
+  out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed', resetsAt: m.resets_at, rateLimitType: 'five_hour',
+    unifiedWindows: { five_hour: { utilization: five, resetsAt: m.resets_at }, seven_day: { utilization: m.weekly, resetsAt: m.resets_at + 6 * 86400 } } },
+    uuid: 'fixture-meter-' + part, session_id: sid });
+  if (part === 'last') { m.used = Math.min(1, m.used + m.step); fs.writeFileSync(meterFile, JSON.stringify(m)); }
+};
+const result = (isError, text) => { meterEvent('last'); out({ type: 'result', subtype: isError ? 'error_during_execution' : 'success', is_error: isError, result: text, session_id: sid, usage: { input_tokens: 1, output_tokens: 1 }, num_turns: 1 }); };
 const rl = readline.createInterface({ input: process.stdin });
 const lines = [];
 let waiting;
@@ -66,6 +123,7 @@ async function mcpClient() {
     mode = (forced && fs.existsSync(forced) && fs.readFileSync(forced, 'utf8').trim()) || 'overseer';
   }
   out({ type: 'system', subtype: 'init', session_id: sid, model: 'fixture', cwd: process.cwd(), tools: ['Agent', 'Write'] });
+  meterEvent('first');
   if (mode === 'nested') {
     // Grandchild traffic arrives before the child's Agent tool_use is reported (delayed parent).
     assistant([{ type: 'tool_use', id: 'toolu_grand', name: 'Agent', input: { description: 'grandchild task', prompt: 'hi' } }], 'toolu_child');
@@ -125,6 +183,9 @@ async function mcpClient() {
     const decision = reply.response.response;
     if (decision.behavior === 'allow') fs.writeFileSync(file, decision.updatedInput.content);
     result(false, 'done');
+  } else if (mode === 'ordinary-failure') {
+    assistant([{ type: 'text', text: 'The requested check failed.' }]);
+    result(true, 'fixture assertion failed during requested work');
   } else if (mode === 'background-nested') {
     // As a live Claude Code 2.1.246 run: a foreground subagent launches its own child in the
     // background (spawn depth 2), is told when it finishes, and returns; the main agent then
@@ -239,6 +300,49 @@ async function mcpClient() {
   } else if (mode === 'ratelimit') {
     out({ type: 'assistant', session_id: sid, error: 'rate_limit', message: { role: 'assistant', content: [{ type: 'text', text: 'API Error: Request rejected (429) · rate limited' }] } });
     result(true, 'API Error: Request rejected (429) · rate limited');
+  } else if (mode === 'native-quota') {
+    const hourly = Math.floor(Date.now() / 1000) + 3600;
+    const weekly = Math.floor(Date.now() / 1000) + 7 * 86400;
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'rejected',
+      rateLimitType: 'seven_day_opus', resetsAt: weekly,
+      unifiedWindows: { five_hour: { utilization: 0.2, resetsAt: hourly },
+        seven_day: { utilization: 0.3, resetsAt: weekly } },
+      providerNote: 'secret-quota-sentinel' } });
+    result(false, 'native quota observation emitted');
+  } else if (mode === 'native-quota-invalid') {
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed',
+      rateLimitType: 'five_hour', utilization: 0.2 } });
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed',
+      rateLimitType: 'five_hour', utilization: 1.2, providerNote: 'secret-invalid-meter' } });
+    result(false, 'invalid meter observed');
+  } else if (mode === 'native-quota-regressed') {
+    const reset = Math.floor(Date.now() / 1000) + 3600;
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed',
+      rateLimitType: 'five_hour', utilization: 0.8, resetsAt: reset } });
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed',
+      rateLimitType: 'five_hour', utilization: 0.2, resetsAt: reset,
+      providerNote: 'secret-regressed-meter' } });
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed',
+      rateLimitType: 'five_hour', utilization: 0.25, resetsAt: reset } });
+    result(false, 'native meter decreased without a reset');
+  } else if (mode === 'native-quota-partial') {
+    const hourly = Math.floor(Date.now() / 1000) + 3600;
+    const weekly = Math.floor(Date.now() / 1000) + 7 * 86400;
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed',
+      rateLimitType: 'five_hour', utilization: 0.2, resetsAt: hourly,
+      unifiedWindows: { seven_day: { utilization: 0.4, resetsAt: weekly } } } });
+    await sleep(20);
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed',
+      rateLimitType: 'five_hour', utilization: 0.3, resetsAt: hourly,
+      providerNote: 'secret-partial-meter' } });
+    result(false, 'partial native meter observed');
+  } else if (mode === 'native-quota-block-invalid') {
+    const weekly = Math.floor(Date.now() / 1000) + 7 * 86400;
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'rejected',
+      rateLimitType: 'seven_day_opus', resetsAt: weekly } });
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed',
+      rateLimitType: 'five_hour', utilization: 1.2 } });
+    result(false, 'later meter malformed');
   } else if (mode === 'quota') {
     result(true, "Claude usage limit reached. Your limit will reset at 5pm.");
   } else if (mode === 'auth') {
@@ -536,6 +640,169 @@ async function mcpClient() {
     const reply = `finding: ${finding.result} (${outcome})`;
     assistant([{ type: 'text', text: reply }]);
     result(false, reply);
+    if (mcp) mcp.close();
+  } else if (mode === 'swarm') {
+    const mcp = await mcpClient();
+    let n = 0;
+    const call = async (name, args) => {
+      const id = `toolu_mcp_${++n}`;
+      assistant([{ type: 'tool_use', id, name: `mcp__overseer__${name}`, input: args }]);
+      out({ type: 'control_request', request_id: `req-mcp-${n}`, request: { subtype: 'can_use_tool', tool_name: `mcp__overseer__${name}`, input: args } });
+      const reply = await next(m => m.type === 'control_response' && m.response?.request_id === `req-mcp-${n}`);
+      if (reply.response.response.behavior !== 'allow') throw new Error('tool refused');
+      let r;
+      for (let tries = 0; ; tries++) {
+        // The shim reaches the daemon per call; while the daemon restarts a call fails and is retried.
+        r = await mcp.call(name, args);
+        const text = r.content.map(c => c.text || '').join('');
+        if (!(r.isError && /cannot reach overseerd/.test(text)) || tries > 150) break;
+        await sleep(200);
+      }
+      user([{ type: 'tool_result', tool_use_id: id, content: r.content, is_error: !!r.isError }]);
+      const text = r.content.map(c => c.text || '').join('');
+      if (r.isError) return { error: text };
+      try { return JSON.parse(text); } catch { return { text }; }
+    };
+    // The member's own token, read from its MCP configuration only to show it is not in the prompt.
+    const ownToken = () => { const at = process.argv.indexOf('--mcp-config'); return JSON.parse(fs.readFileSync(process.argv[at + 1], 'utf8')).mcpServers.overseer.env.OVERSEER_MCP_TOKEN; };
+    const waitFile = async (file, ms) => { const end = Date.now() + ms; while (!fs.existsSync(file)) { if (Date.now() > end) throw new Error('timed out waiting for ' + file); await sleep(50); } };
+    if (!mcp || !mcp.tools.length) {
+      assistant([{ type: 'text', text: 'no swarm tools' }]);
+      result(false, 'no swarm tools');
+    } else if (mcp.tools.includes('swarm_plan')) {
+      const script = JSON.parse(fs.readFileSync(process.env.CLAUDE_FIXTURE_SWARM_SCRIPT, 'utf8'));
+      const trace = (step, fields = {}) => fs.appendFileSync(script.trace, JSON.stringify({ step, role: 'director', ...fields }) + '\n');
+      trace('started', { tools: mcp.tools, delegation_denied: process.argv.join(' ').includes('--disallowedTools Agent,Task'), token_in_prompt: firstText.includes(ownToken()) });
+      const planned = await call('swarm_plan', { jobs: script.jobs, estimate: script.estimate });
+      if (planned.error) throw new Error('plan: ' + planned.error);
+      trace('planned', { revision: planned.revision, benefit: planned.benefit });
+      if (script.wait_before_offers) await waitFile(script.wait_before_offers, 60000);
+      for (const offer of script.offers || []) {
+        const offered = { job_id: offer.job, brief: offer.brief || `Job ${offer.job}: ${offer.job}` };
+        if (offer.target) offered.target = offer.target;
+        if (offer.requirements) offered.requirements = offer.requirements;
+        const r = await call('swarm_dispatch', offered);
+        trace('offered', { job: offer.job, target: offer.target || r.target, status: r.status, reason: r.reason, error: r.error, decision: r.decision });
+      }
+      const accepted = {};
+      for (const job of script.dispatch) {
+        // The director states requirements; Auto's selector chooses the account (a fixture target is named).
+        const args = { job_id: job.job, brief: job.brief || `Job ${job.job}: ${job.job}` };
+        if (job.target) args.target = job.target;
+        if (job.requirements) args.requirements = job.requirements;
+        const r = await call('swarm_dispatch', args);
+        trace('launched', { job: job.job, target: job.target || r.target, route: r.route, status: r.status, reason: r.reason, error: r.error, attempt: r.attempt_id, worker: r.worker_run_id, shared_booking: r.shared_booking });
+        if (r.status !== 'launched') throw new Error('dispatch ' + job.job + ': ' + JSON.stringify(r));
+      }
+      trace('dispatched', { active: (await call('swarm_status', {})).app_slots_in_use });
+      if (script.gate) await waitFile(script.gate, 120000);
+      const routed = new Set();
+      const refused = {};
+      const pendingResults = {};
+      const deadline = Date.now() + 90000;
+      let done = false;
+      while (Date.now() < deadline && !done) {
+        const inbox = await call('swarm_inbox', {});
+        for (const m of inbox.messages || []) {
+          const route = (script.route || {})[m.message_id];
+          if (route && !routed.has(m.message_id)) {
+            const sent = await call('swarm_message', { job_id: route.job, type: 'advisory', message_id: route.message_id, payload: route.payload });
+            routed.add(m.message_id);
+            trace('routed', { message: m.message_id, to: route.job, error: sent.error });
+          }
+          if (m.type === 'question') {
+            const sent = await call('swarm_message', { job_id: m.job_id, attempt_id: m.attempt_id, type: 'advisory', payload: { answer: script.answer || 'yes' } });
+            trace('answered', { job: m.job_id, question: m.payload.question, error: sent.error });
+          }
+          if (m.type === 'result' && !accepted[m.job_id] && !refused[m.job_id]) pendingResults[m.job_id] = m;
+        }
+        for (const m of Object.values(pendingResults)) {
+          const evidence = m.payload.artifact_ids;
+          const decision = await call('swarm_decide', { job_id: m.job_id, decision: 'accept', evidence });
+          // An audit worker's result waits for the daemon's source check after it exits.
+          if (decision.error && /audit_source_check_pending/.test(decision.error)) { trace('pending', { job: m.job_id }); continue; }
+          delete pendingResults[m.job_id];
+          if (decision.error && /audit_source_changed/.test(decision.error)) {
+            refused[m.job_id] = true;
+            trace('refused', { job: m.job_id, error: decision.error, from: m.attempt_id });
+            continue;
+          }
+          if (decision.error || decision.status !== 'accepted') throw new Error('decide ' + m.job_id + ': ' + JSON.stringify(decision));
+          accepted[m.job_id] = evidence;
+          trace('accepted', { job: m.job_id, evidence, from: m.attempt_id });
+        }
+        const state = await call('swarm_status', {});
+        if (!script.complete && Object.keys(accepted).length + Object.keys(refused).length === script.dispatch.length
+            && state.registered_attempts === 0) {
+          // Without a completion in the script the director only decides.
+          trace('decided', { accepted: Object.keys(accepted), refused: Object.keys(refused) });
+          done = true;
+        } else if (Object.keys(accepted).length === script.dispatch.length && state.registered_attempts === 0 && inbox.status === 'idle') {
+          const checks = script.dispatch.map(j => ({ job_id: j.job, outcome: 'passed', evidence: accepted[j.job] }));
+          const completed = await call('swarm_complete', { summary: script.complete.summary, verification: script.complete.verification, checks });
+          trace('completed', { status: completed.status, error: completed.error });
+          done = true;
+        } else await sleep(150);
+      }
+      if (!done) throw new Error('director timed out: ' + JSON.stringify(Object.keys(accepted)));
+      assistant([{ type: 'text', text: 'Swarm complete.' }]);
+      result(false, 'Swarm complete.');
+    } else {
+      const script = JSON.parse(fs.readFileSync(process.env.CLAUDE_FIXTURE_SWARM_WORKERS, 'utf8'));
+      const job = (/Job ([A-Za-z0-9_-]+):/.exec(firstText) || [])[1];
+      const plan = script.jobs[job];
+      const trace = (step, fields = {}) => fs.appendFileSync(script.trace, JSON.stringify({ step, role: 'worker', job, ...fields }) + '\n');
+      const argv = process.argv.join(' ');
+      trace('started', { tools: mcp.tools, delegation_denied: argv.includes('--disallowedTools Agent,Task'), token_in_prompt: firstText.includes(ownToken()),
+        permission_mode: (/--permission-mode (\S+)/.exec(argv) || [])[1] || null,
+        denied: ((/--disallowedTools (\S+)/.exec(argv) || [])[1] || '').split(',') });
+      if (script.gate) await waitFile(script.gate, 120000);
+      if (plan.write) {
+        // A worker that writes source directly (as if it slipped past its permission mode).
+        fs.mkdirSync(path.dirname(path.join(process.cwd(), plan.write.path)), { recursive: true });
+        fs.writeFileSync(path.join(process.cwd(), plan.write.path), plan.write.content);
+        trace('wrote', { path: plan.write.path });
+      }
+      if (plan.command) {
+        // A shell command, as Claude's Bash tool runs it in the worker's workspace.
+        const r = require('child_process').spawnSync('sh', ['-c', plan.command], { cwd: process.cwd() });
+        trace('ran', { command: plan.command, status: r.status });
+      }
+      for (const probe of plan.probe || []) {
+        const r = await call(probe.tool, probe.args || {});
+        trace('probed', { tool: probe.tool, error: r.error, status: r.status });
+      }
+      await call('swarm_progress', { text: `working on ${job}` });
+      if (plan.discovery) {
+        const r = await call('swarm_discovery', plan.discovery);
+        trace('discovered', { message: plan.discovery.message_id, error: r.error });
+      }
+      const awaitMessage = async pred => {
+        const end = Date.now() + 60000;
+        while (Date.now() < end) {
+          const inbox = await call('swarm_inbox', {});
+          const found = (inbox.messages || []).find(pred);
+          if (found) return found;
+          await sleep(150);
+        }
+        throw new Error('no director message for ' + job);
+      };
+      if (plan.ask) {
+        await call('swarm_ask', { question: plan.ask });
+        const answer = await awaitMessage(m => m.payload && m.payload.answer);
+        const applied = await call('swarm_applied', { message_id: answer.message_id });
+        trace('answer', { answer: answer.payload.answer, applied: applied.phase, error: applied.error });
+      }
+      if (plan.wait_for) {
+        const got = await awaitMessage(m => m.message_id === plan.wait_for);
+        const applied = await call('swarm_applied', { message_id: got.message_id });
+        trace('received', { message: got.message_id, applied: applied.phase, error: applied.error });
+      }
+      const submitted = await call('swarm_result', { summary: plan.summary || `${job} done`, evidence: plan.evidence, ...(plan.audit_outcome ? { audit_outcome: plan.audit_outcome } : {}) });
+      trace('submitted', { artifact_ids: submitted.artifact_ids, error: submitted.error });
+      assistant([{ type: 'text', text: `submitted ${job}` }]);
+      result(false, `submitted ${job}`);
+    }
     if (mcp) mcp.close();
   } else if (mode === 'circles') {
     // The same command failing three times in a row (a free check of AC-189).

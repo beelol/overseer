@@ -49,6 +49,9 @@ pub struct Digest {
     pub guardrails: Vec<Value>,
     pub watches: Vec<Value>,
     pub conflicts: Vec<Value>,
+    /// A Swarm audit worker whose source check found a change (Swarm decision 3).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub audit_boundary: Option<Value>,
     /// Continuity: the runs this agent's work came from (oldest first), and the run that carries
     /// it on when this one was handed off. One agent to Overseer (AC-197).
     pub continued_from: Vec<String>,
@@ -178,6 +181,7 @@ impl Daemon {
         let mut changed: BTreeMap<String, String> = BTreeMap::new();
         let mut usage = Value::Null;
         let mut last_check_in = None;
+        let mut audit_boundary = None;
         let mut updated_ms = run.created_ms;
         for e in &events {
             updated_ms = updated_ms.max(e.ts);
@@ -191,6 +195,7 @@ impl Daemon {
                         }
                     }
                 }
+                "swarm_audit_source_changed" => audit_boundary = Some(e.payload["check"].clone()),
                 "file_activity" => {
                     let kind = e.payload["kind"].as_str().unwrap_or("edit").to_string();
                     for p in e.payload["paths"].as_array().cloned().unwrap_or_default() {
@@ -250,6 +255,7 @@ impl Daemon {
             guardrails: self.guardrails_of(run_id).unwrap_or_default().into_iter().map(|g| json!({"id": g["id"], "words": redact(g["words"].as_str().unwrap_or("")), "allow": g["allow"], "deny": g["deny"], "hold_on_cross": g["hold_on_cross"], "enforcement": g["enforcement"], "by": g["by"]})).collect(),
             watches: self.watches_of(run_id),
             conflicts: self.open_conflicts_of(run_id).unwrap_or_default(),
+            audit_boundary,
             continued_from,
             handed_off_to,
             updated_ms,
@@ -317,6 +323,10 @@ impl Daemon {
         }
         if !d.conflicts.is_empty() {
             lines.push(format!("open conflicts: {}", d.conflicts.iter().map(|c| format!("{} with {} on {}", c["kind"].as_str().unwrap_or("?"), c["other_title"].as_str().unwrap_or("?"), c["paths"].as_array().map(|p| p.len()).unwrap_or(0))).collect::<Vec<_>>().join("; ")));
+        }
+        if let Some(check) = &d.audit_boundary {
+            lines.push(format!("audit boundary: source changed ({} files) in a read-only Swarm audit; the attempt failed; evidence {}",
+                check["changed_count"], check["evidence_ref"].as_str().unwrap_or("not pinned")));
         }
         Ok(super::bound(&crate::redact::redact(&lines.join("\n")), DIGEST_BYTES))
     }

@@ -1,0 +1,15 @@
+{
+  "fixture": "catalog-cursor-migration",
+  "version": 1,
+  "runtime": "Node.js 24 with native TypeScript stripping",
+  "resource_modules": [
+    "accounts", "addresses", "auditEvents", "badges", "carts", "categories",
+    "comments", "coupons", "customers", "deliveries", "discounts", "documents",
+    "invoices", "items", "labels", "locations", "orders", "payments",
+    "products", "returns", "reviews", "shipments", "suppliers", "warehouses"
+  ],
+  "documented_response": {
+    "top_level_keys": ["data", "meta"],
+    "meta_keys": ["hasMore", "limit", "nextCursor"]
+  }
+}

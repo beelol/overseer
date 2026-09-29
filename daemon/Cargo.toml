@@ -20,6 +20,8 @@ libc = "0.2"
 regex = "1"
 base64 = "0.22"
 sha2 = "0.10"
+# Swarm's integration scratch files and verification output capture.
+tempfile = "3"
 # Gate N, the phone gateway: Noise handshake and transport, WebSocket listener.
 snow = "0.10"
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
@@ -29,6 +31,5 @@ getrandom = "0.3"
 ureq = { version = "2", default-features = false, features = ["tls"] }
 
 [dev-dependencies]
-tempfile = "3"
 # The reference phone client of the gateway tests.
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "handshake"] }

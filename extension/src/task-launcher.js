@@ -3,6 +3,8 @@
 // daemon request that creates a task.
 const vscode = require('vscode');
 const path = require('path');
+const crypto = require('crypto');
+const features = require('./features');
 const { execFile } = require('child_process');
 
 const INSTALL = { claude: 'https://docs.anthropic.com/en/docs/claude-code/setup', codex: 'https://developers.openai.com/codex/cli', opencode: 'https://opencode.ai/docs' };
@@ -42,7 +44,7 @@ class TaskLauncher {
   accounts() {
     return (this.model.accounts || []).map(a => {
       const st = this.model.profileStatus.get(a.id);
-      return { ...a, signedIn: !!st?.logged_in, plan: st?.identity?.plan, fingerprint: (st?.identity?.account_fingerprint || st?.identity?.fingerprint || '').slice(0, 8), usage: this.model.accountUsage?.get(a.id) };
+      return { ...a, signedIn: !!st?.logged_in, installed: st?.installed === true, plan: st?.identity?.plan, fingerprint: (st?.identity?.account_fingerprint || st?.identity?.fingerprint || '').slice(0, 8), usage: this.model.accountUsage?.get(a.id) };
     });
   }
 
@@ -51,6 +53,7 @@ class TaskLauncher {
     await this.refreshAccounts();
     return { repos: await this.repos(), harnesses, accounts: this.accounts(), trusted: vscode.workspace.isTrusted, defaults: this.defaults(),
       showAppServer: vscode.workspace.getConfiguration('overseer').get('showCodexAppServer', false),
+      autoRouting: features.enabled(vscode, 'autoRouting'),
       continuity: this.continuity ? this.continuity() : undefined };
   }
 
@@ -74,7 +77,11 @@ class TaskLauncher {
     const repo = String(f.repo || ''); const harness = String(f.harness || '');
     if (!repo) throw new Error('Choose a repository.');
     let program, args = [];
-    if (harness === 'generic') {
+    if (f.routing === 'auto' && !features.enabled(vscode, 'autoRouting')) throw new Error(features.offMessage('autoRouting'));
+    if (f.routing === 'auto') {
+      if (!String(f.prompt || '').trim()) throw new Error('Describe the task.');
+      if (f.options?.images?.length) throw new Error('Auto starts cannot include images yet. Choose a manual agent for this task.');
+    } else if (harness === 'generic') {
       program = String(f.program || '');
       if (!path.isAbsolute(program)) throw new Error('Use an absolute path for the program.');
       try { args = JSON.parse(f.args || '[]'); } catch { throw new Error('Arguments must be a JSON array of strings.'); }
@@ -86,15 +93,54 @@ class TaskLauncher {
       if (choice !== 'Continue') return undefined;
     }
     const prompt = String(f.prompt || '');
+    if (f.routing === 'auto') return this.startAuto(f, repo, prompt);
     const created = await this.client.request('task.create', { repo, harness, profile_id: harness === 'generic' ? undefined : f.account, workspace_mode: f.mode === 'current' ? 'current' : 'worktree',
       target_ref: f.mode !== 'current' && f.ref ? f.ref : undefined, model: f.model || undefined, prompt, title: titleFor(prompt, program), program, args,
       approval_policy: harness === 'codex-app' ? (f.approval || 'on-request') : undefined, unsaved: unsaved.map(d => path.relative(repo, d.uri.fsPath)),
       effort: f.options?.effort, permission_mode: f.options?.permission_mode, images: f.options?.images });
     if (created.launch_error) throw new Error(`Could not start ${harness}: ${created.launch_error}`);
-    await this.saveDefaults({ repo, harness, account: f.account, model: f.model || '', mode: f.mode === 'current' ? 'current' : 'worktree', ...(f.approval ? { approval: f.approval } : {}) });
+    await this.saveDefaults({ repo, routing: 'manual', harness, account: f.account, model: f.model || '', mode: f.mode === 'current' ? 'current' : 'worktree', ...(f.approval ? { approval: f.approval } : {}) });
     await this.model.refresh();
     return created.run.id;
   }
+
+  async startAuto(f, repo, prompt) {
+    // Continuity's isolated Ollama profile needs its own verified Auto route
+    // adapter and memory admission; project-configured OpenCode already has one.
+    const accounts = this.accounts().filter(a => a.id !== 'local-ollama' && ((a.signedIn &&
+      (a.harnesses || []).some(h => ['codex', 'claude'].includes(h))) ||
+      (a.installed && (a.harnesses || []).includes('opencode'))));
+    if (!accounts.length) throw new Error('Connect Codex or Claude Code, or set up a project-local OpenCode route for Auto routing.');
+    if (accounts.length > 8) throw new Error('Auto routing currently supports up to eight signed-in accounts.');
+    const preferred = String(f.preferredHarness || '');
+    if (preferred && !['codex-app', 'claude', 'opencode'].includes(preferred)) throw new Error('Unsupported Auto harness preference.');
+    const request = { repo, prompt, title: titleFor(prompt),
+      workspace_mode: f.mode === 'current' ? 'current' : 'worktree',
+      ...(f.mode !== 'current' && f.ref ? { target_ref: f.ref } : {}),
+      allowed_profiles: accounts.map(a => a.id),
+      ...(preferred ? { preferred_harness: preferred } : {}),
+      approval_policy: 'on-request' };
+    const hash = crypto.createHash('sha256').update(JSON.stringify(request)).digest('hex');
+    const previous = this.context.globalState.get('overseer.autoPendingStart');
+    const workUnitId = previous?.hash === hash ? previous.workUnitId : `ui-${crypto.randomUUID()}`;
+    await this.context.globalState.update('overseer.autoPendingStart', { hash, workUnitId });
+    await this.client.request('auto.mode.set', { enabled: true });
+    const created = await this.client.request('auto.start', { ...request, work_unit_id: workUnitId });
+    if (!created.run?.id) throw new Error(autoPauseMessage(created));
+    await this.context.globalState.update('overseer.autoPendingStart', undefined);
+    await this.saveDefaults({ repo, routing: 'auto', preferredHarness: preferred,
+      mode: f.mode === 'current' ? 'current' : 'worktree' });
+    await this.model.refresh();
+    return created.run.id;
+  }
+}
+
+function autoPauseMessage(created) {
+  const reasons = (created.decision?.exclusions || []).map(x => x.reason);
+  if (reasons.length && reasons.every(x => x === 'quota_exhausted')) return 'Auto routing paused: available account allowance is exhausted. Choose a manual agent or wait for a reset.';
+  if (reasons.length && reasons.every(x => x === 'pool_in_flight_unknown_draw')) return 'Auto routing paused: an agent is already using the available account. Try again when it finishes.';
+  if (created.discovery_failures?.length && !reasons.length) return 'Auto routing paused: account or model availability could not be checked. Refresh and try again, or choose a manual agent.';
+  return 'Auto routing paused: no eligible route. Refresh account usage or choose a manual agent.';
 }
 
 /** A short title from the first line of the prompt (the full prompt stays on the task). */

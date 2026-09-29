@@ -351,11 +351,11 @@ pub fn evidence(d: &Daemon) -> Evidence {
         }
     }
     let since = now() - 120_000;
-    if let Ok(mut stmt) = store.conn.prepare("SELECT r.harness, e.payload, e.ts FROM events e JOIN runs r ON r.id = e.run_id WHERE e.kind='error' AND e.ts > ?1 AND e.payload LIKE '%\"network\"%'") {
+    if let Ok(mut stmt) = store.conn.prepare("SELECT r.harness, e.payload, e.ts FROM events e JOIN runs r ON r.id = e.run_id WHERE e.kind='error' AND e.ts > ?1 AND (e.payload LIKE '%\"network\"%' OR e.payload LIKE '%\"service_unavailable\"%')") {
         let rows = stmt.query_map([since], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, i64>(2)?)));
         for (harness, payload, ts) in rows.into_iter().flatten().flatten() {
             let v: Value = serde_json::from_str(&payload).unwrap_or(Value::Null);
-            if v["class"] != "network" {
+            if v["class"] != "network" && v["class"] != "service_unavailable" {
                 continue;
             }
             let p = provider_of(&harness).to_string();

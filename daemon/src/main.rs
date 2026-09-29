@@ -1,7 +1,22 @@
 mod accounts;
+mod account_booking;
+mod upper_draw;
+mod auto_telemetry;
+mod auto_quota;
+mod auto_route;
+mod auto_opencode;
+mod auto_collect;
+mod auto_consumption;
+mod auto_fit;
+mod auto_select;
+mod auto_health;
+mod auto_maintenance;
+mod auto_mcp;
 mod audio;
 mod adapters;
 mod background;
+mod broker;
+mod claims;
 mod continuity;
 mod daemon;
 mod device_login;
@@ -25,6 +40,7 @@ mod review;
 mod server;
 mod shim;
 mod store;
+mod swarm;
 mod sys;
 
 use std::io::{BufRead, BufReader, Write};
@@ -40,7 +56,7 @@ pub fn log(msg: &str) {
 }
 
 fn usage() -> ! {
-    eprintln!("usage: overseerd serve | overseerd ctl <method> [json-params] | overseerd shim <run-dir> | overseerd mcp [--socket <path>] | overseerd version");
+    eprintln!("usage: overseerd serve | overseerd ctl <method> [json-params] | overseerd shim <run-dir> | overseerd auto-mcp <run-id> <capability-file> <socket> | overseerd mcp [--socket <path>] | overseerd version");
     std::process::exit(2);
 }
 
@@ -80,6 +96,15 @@ fn main() {
                 std::process::exit(1);
             }
         }
+        Some("auto-mcp") => {
+            let run_id = args.get(2).unwrap_or_else(|| usage());
+            let capability = args.get(3).unwrap_or_else(|| usage());
+            let socket = args.get(4).unwrap_or_else(|| usage());
+            if let Err(error) = auto_mcp::run(run_id, std::path::Path::new(capability), std::path::Path::new(socket)) {
+                eprintln!("Auto tool server stopped: {error:#}");
+                std::process::exit(1);
+            }
+        }
         Some("mcp") => {
             if let Err(e) = overseer::mcp::run(&args[2..]) {
                 eprintln!("mcp error: {e:#}");
@@ -111,6 +136,12 @@ fn main() {
                 log(&format!("overseerd {} starting, data dir {}{instance}", env!("CARGO_PKG_VERSION"), paths::data_dir().display()));
                 let report = d.reconcile()?;
                 log(&format!("reconcile: {report}"));
+                match swarm::recover_proven_no_spawn(&mut d.store.lock().unwrap()) {
+                    Ok(count) => log(&format!("swarm unspawned director recovery: {count}")),
+                    Err(error) => log(&format!("swarm unspawned director recovery deferred: {error:#}")),
+                }
+                let dispatches = swarm::recover_pending_dispatches(&d)?;
+                log(&format!("swarm dispatch recovery: {dispatches}"));
                 if let Err(e) = continuity::start(d.clone()) {
                     log(&format!("continuity did not start: {e:#}"));
                 }

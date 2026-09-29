@@ -203,7 +203,7 @@
   // ---- The composer ----
   const current = d => data || (d && d.continuity) || null;
   const isLocal = form => form.harness === LOCAL;
-  function useLocal(form, tag) { form.harness = LOCAL; form.account = LOCAL_ACCOUNT; form.model = tag || ''; }
+  function useLocal(form, tag) { form.routing = 'manual'; form.harness = LOCAL; form.account = LOCAL_ACCOUNT; form.model = tag || ''; }
   function badge(b, markToo) {
     const out = [Object.assign(el('span', `cont-badge ${b.tone}`, b.badge), { title: b.detail })];
     if (markToo && b.mark) out.push(Object.assign(el('span', 'cont-badge mark', b.mark), { title: b.detail }));

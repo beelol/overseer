@@ -87,7 +87,7 @@
     constructor(root, opts) {
       this.root = root; this.opts = opts || {};
       this.seen = new Set(); this.turns = []; this.tools = new Map(); this.perms = new Map(); this.children = new Map();
-      this.childInfo = new Map(); this.rootId = undefined; this.attention = undefined; this.active = false;
+      this.childInfo = new Map(); this.childUsage = new Map(); this.rootId = undefined; this.attention = undefined; this.active = false;
       this.banner = el('div', 'conv-banner'); this.banner.hidden = true; this.banner.setAttribute('role', 'status');
       this.list = el('div', 'conv-turns');
       this.working = el('div', 'working'); this.working.hidden = true; this.working.setAttribute('aria-live', 'polite');
@@ -209,8 +209,10 @@
       const info = this.childInfo.get(runId) || {};
       const st = info.status || 'unknown';
       const title = el('span', 'child-title', info.title || 'Sub-agent');
-      block.summary.replaceChildren(ui.icon('type-hierarchy-sub', 'sm child-mark'), title, ui.status(st));
-      block.summary.title = [info.title, ui.statusText(st), info.evidence || info.relation_source].filter(Boolean).join('\n');
+      const usage = this.childUsage.get(runId);
+      block.summary.replaceChildren(ui.icon('type-hierarchy-sub', 'sm child-mark'), title,
+        ...(usage ? [el('span', 'child-usage', usage.label)] : []), ui.status(st));
+      block.summary.title = [info.title, ui.statusText(st), usage?.detail, info.evidence || info.relation_source].filter(Boolean).join('\n');
     }
 
     toolCard(ev, id, name) {
@@ -297,6 +299,57 @@
       if (this.active) this.list.after(this.working);
     }
 
+    autoDecision(p, ev) {
+      const decision = p.decision || {};
+      const route = p.selected_route || (p.selection_input?.routes || []).find(r => r.id === decision.selected);
+      const card = el('div', 'auto-decision');
+      const head = el('div', 'auto-decision-head');
+      head.append(ui.icon(route ? 'sparkle' : 'warning', 'sm'),
+        el('strong', null, route ? `Auto chose ${route.model || 'a model'} · ${route.effort || 'default effort'}` : 'Auto paused'));
+      card.append(head);
+      const details = [];
+      if (route) {
+        const harness = { 'codex-app': 'Codex', claude: 'Claude Code', opencode: 'OpenCode' }[route.harness] || route.harness;
+        details.push(`${harness || 'Agent'}${route.provider ? ` · ${route.provider}` : ''}`);
+        const quota = { observed_non_exhausted: 'reported available', not_applicable: 'not applicable for this local route', exhausted: 'exhausted', unknown: 'unknown' }[route.quota] || 'unknown';
+        details.push(`Allowance: ${quota}`);
+        const fit = { fits: 'bounded estimate fits', unaffordable: 'estimated draw exceeds allowance', unknown: 'uncalibrated' }[route.fit] || 'uncalibrated';
+        details.push(`Expected use: ${fit}`);
+      }
+      const reasons = {
+        cold_start_allowance_unknown: 'Selected an eligible default; the account balance has not been verified.',
+        cold_start_consumption_unknown: 'Selected an eligible default; expected subscription use is not yet calibrated.',
+        eligible_task_suitable_default: 'Selected for the work unit’s capability and account constraints.',
+        no_eligible_route: 'No route met the current account, capability, and availability constraints.'
+      };
+      if (reasons[decision.reason]) details.push(reasons[decision.reason]);
+      card.append(el('div', 'auto-decision-detail', details.join(' · ')));
+      const excluded = Array.isArray(decision.exclusions) ? decision.exclusions : [];
+      if (excluded.length) {
+        const why = {
+          pinned_elsewhere: 'a different route was pinned', account_not_allowed: 'account not allowed',
+          route_unavailable: 'service unavailable', unresolved_quota_pool_identity: 'shared account allowance could not be verified',
+          quota_exhausted: 'account allowance exhausted', pool_in_flight_unknown_draw: 'account already has an active Auto unit',
+          estimated_draw_exceeds_allowance: 'expected use exceeds available allowance',
+          insufficient_capability: 'below the required capability', missing_tool: 'required tool unavailable',
+          context_unavailable: 'required context unavailable', approvals_unsupported: 'required approvals unsupported',
+          sandbox_incompatible: 'requested permissions unsupported'
+        };
+        const alternatives = el('details', 'auto-decision-alternatives');
+        alternatives.append(el('summary', null, `${excluded.length} alternative${excluded.length === 1 ? '' : 's'} excluded`));
+        const list = el('ul');
+        for (const item of excluded.slice(0, 8)) {
+          const candidate = (p.selection_input?.routes || []).find(r => r.id === item.route_id);
+          const label = candidate?.model ? `${candidate.model}${candidate.effort ? ` · ${candidate.effort}` : ''}` : 'Another route';
+          list.append(el('li', null, `${label}: ${why[item.reason] || 'not eligible for this work unit'}`));
+        }
+        if (excluded.length > 8) list.append(el('li', null, `${excluded.length - 8} more alternatives`));
+        alternatives.append(list);
+        card.append(alternatives);
+      }
+      this.container(ev).append(card);
+    }
+
     add(ev) {
       if (this.seen.has(ev.seq)) return;
       this.seen.add(ev.seq);
@@ -305,6 +358,7 @@
       // Continuity (Gate L) draws its own events: transitions, waiting, the way back.
       if (window.OverseerContinuity && window.OverseerContinuity.event(this, ev)) return;
       switch (ev.kind) {
+        case 'auto_decision': this.autoDecision(p, ev); break;
         case 'turn_started': if (!child) { this.stopping = false; this.newTurn(p.turn || { n: this.turns.length + 1, prompt: '' }, false, ev); this.active = true; this.updateWorking('Working…'); } break;
         case 'interrupt_requested': if (!child) this.stopping = true; break;
         case 'output': {
@@ -495,11 +549,24 @@
     }
 
     usage_(ev, p, child) {
-      if (child) return;
-      const t = this.turn();
       const u = p.usage || p.total || p.tokens || p;
       const pick = (...keys) => keys.map(k => u && u[k]).find(v => typeof v === 'number');
       const input = pick('input_tokens', 'inputTokens', 'input'), output = pick('output_tokens', 'outputTokens', 'output');
+      if (child) {
+        const counts = [input, output];
+        if (counts.every(v => v === undefined) || counts.some(v => v !== undefined && (!Number.isSafeInteger(v) || v < 0))) return;
+        const total = (input || 0) + (output || 0);
+        if (!Number.isSafeInteger(total)) return;
+        const label = input !== undefined && output !== undefined
+          ? `${ui.compact(total)} reported tokens`
+          : `${ui.compact(total)} reported ${input !== undefined ? 'input' : 'output'} tokens`;
+        const detail = [input !== undefined && `${input.toLocaleString()} input`, output !== undefined && `${output.toLocaleString()} output`,
+          'activity, not subscription allowance'].filter(Boolean).join(' · ');
+        this.childUsage.set(ev.run_id, { label, detail });
+        this.renderChildHeader(ev.run_id, this.childBlock(ev.run_id));
+        return;
+      }
+      const t = this.turn();
       const cached = pick('cache_read_input_tokens', 'cached_input_tokens', 'cachedInputTokens');
       const cost = typeof p.total_cost_usd === 'number' ? p.total_cost_usd : typeof p.cost === 'number' ? p.cost : undefined;
       if (input === undefined && output === undefined && cost === undefined) { if (p.rate_limits) t.limits = p.rate_limits; return; }
@@ -537,7 +604,7 @@
       card.el.replaceChildren(...kids);
     }
   }
-  Conversation.KNOWN = new Set(['turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed', 'proposal', 'proposal_answered', 'queued', 'briefing', 'overseer_message', 'redirect', 'hold', 'release', 'guardrail', 'guardrail_crossed', 'check_in', 'report', 'ask', 'claim', 'share', 'share_withdrawn', 'finding', 'watch_started', 'watch_ended', 'handoff', 'remote_command']);
+  Conversation.KNOWN = new Set(['auto_decision', 'turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed', 'proposal', 'proposal_answered', 'queued', 'briefing', 'overseer_message', 'redirect', 'hold', 'release', 'guardrail', 'guardrail_crossed', 'check_in', 'report', 'ask', 'claim', 'share', 'share_withdrawn', 'finding', 'watch_started', 'watch_ended', 'handoff', 'remote_command']);
   Conversation.describe = describe;
 
   window.OverseerConversation = Conversation;

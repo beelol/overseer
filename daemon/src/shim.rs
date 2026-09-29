@@ -5,13 +5,14 @@
 //! daemon can reattach by reading the run directory.
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
+use std::sync::mpsc::{self, Sender};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub const SEGMENT_BYTES: u64 = 8 * 1024 * 1024;
@@ -30,6 +31,10 @@ pub struct LaunchFile {
     #[serde(default)]
     pub close_stdin: bool,
     pub control_socket: String,
+    /// Absolute deadline for an Auto-managed child. The supervisor enforces it
+    /// even when its owning daemon is unavailable.
+    #[serde(default)]
+    pub auto_execution_deadline_ms: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -112,7 +117,86 @@ fn write_json(path: &Path, value: &impl Serialize) {
     }
 }
 
-fn pump<R: Read + Send + 'static>(reader: R, stream: &'static str, out: Arc<Mutex<SegmentWriter>>) -> std::thread::JoinHandle<()> {
+type MetadataReplies = Arc<Mutex<HashMap<String, Sender<Result<serde_json::Value, String>>>>>;
+
+fn private_metadata_response(line: &[u8], pending: &MetadataReplies) -> bool {
+    const PREFIX: &str = "ovs-auto-meta-";
+    // A timed-out response is still private. Never let a late metadata frame
+    // enter the append-only transcript just because its waiter has gone away.
+    if !line.windows(PREFIX.len()).any(|window| window == PREFIX.as_bytes()) {
+        return false;
+    }
+    let parsed = if line.len() <= 1024 * 1024 {
+        serde_json::from_slice::<serde_json::Value>(line).ok()
+    } else { None };
+    if let Some(id) = parsed.as_ref().and_then(|value| value["id"].as_str()).map(str::to_owned) {
+        if id.starts_with(PREFIX) {
+            if let Some(sender) = pending.lock().unwrap().remove(&id) {
+                let answer = parsed.ok_or_else(|| "metadata response exceeded its bound".to_string());
+                let _ = sender.send(answer);
+            }
+            return true;
+        }
+    }
+    // Malformed private output is discarded as well; the waiting request
+    // expires at its bounded deadline and cannot leak account data to logs.
+    true
+}
+
+/// The daemon's own Codex account reads (`ovs-account`, `ovs-auto-quota`)
+/// travel on the harness's stdout, so their replies would enter the
+/// append-only transcript verbatim: the login e-mail, the raw account id and
+/// the credit balance. Before recording, keep only what the daemon uses: the
+/// account type and plan, the rate-limit windows and a domain-separated
+/// account fingerprint in place of the raw id. A fingerprint supplied by the
+/// harness itself is discarded; only one computed here from the id is kept.
+fn redact_account_reply(line: &[u8]) -> Option<Vec<u8>> {
+    const IDS: [&str; 2] = ["\"ovs-account\"", "\"ovs-auto-quota\""];
+    if !IDS.iter().any(|id| line.windows(id.len()).any(|window| window == id.as_bytes())) {
+        return None;
+    }
+    let mut value: serde_json::Value = if line.len() <= 1024 * 1024 {
+        serde_json::from_slice(line).ok()?
+    } else { return Some(b"{\"id\":\"ovs-account-redacted\"}\n".to_vec()) };
+    match value["id"].as_str() {
+        Some("ovs-account") => {
+            if let Some(account) = value.pointer_mut("/result/account").and_then(|a| a.as_object_mut()) {
+                account.retain(|key, _| matches!(key.as_str(), "type" | "planType"));
+            }
+        }
+        Some("ovs-auto-quota") => {
+            if let Some(result) = value.get_mut("result").and_then(|r| r.as_object_mut()) {
+                result.remove(crate::auto_quota::ACCOUNT_FINGERPRINT_FIELD);
+                let fingerprint = crate::auto_quota::account_fingerprint(
+                    &serde_json::Value::Object(result.clone())).ok();
+                result.remove("accountId");
+                result.remove("credits");
+                if let Some(fingerprint) = fingerprint {
+                    result.insert(crate::auto_quota::ACCOUNT_FINGERPRINT_FIELD.into(),
+                        serde_json::Value::String(fingerprint));
+                }
+                for key in ["rateLimitsByLimitId", "rateLimits"] {
+                    match result.get_mut(key) {
+                        Some(serde_json::Value::Object(limits)) if key == "rateLimitsByLimitId" => {
+                            for limit in limits.values_mut() {
+                                if let Some(limit) = limit.as_object_mut() { limit.remove("credits"); }
+                            }
+                        }
+                        Some(serde_json::Value::Object(limit)) => { limit.remove("credits"); }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        _ => return None,
+    }
+    let mut out = serde_json::to_vec(&value).ok()?;
+    out.push(b'\n');
+    Some(out)
+}
+
+fn pump<R: Read + Send + 'static>(reader: R, stream: &'static str,
+    out: Arc<Mutex<SegmentWriter>>, pending: Option<MetadataReplies>) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let mut reader = BufReader::new(reader);
         let mut buf = Vec::new();
@@ -120,10 +204,46 @@ fn pump<R: Read + Send + 'static>(reader: R, stream: &'static str, out: Arc<Mute
             buf.clear();
             match reader.read_until(b'\n', &mut buf) {
                 Ok(0) | Err(_) => break,
-                Ok(_) => out.lock().unwrap().record(stream, &buf),
+                Ok(_) => {
+                    if pending.as_ref().is_some_and(|pending|
+                        private_metadata_response(&buf, pending)) { continue; }
+                    if stream == "o" {
+                        if let Some(redacted) = redact_account_reply(&buf) {
+                            out.lock().unwrap().record(stream, &redacted);
+                            continue;
+                        }
+                    }
+                    out.lock().unwrap().record(stream, &buf);
+                }
             }
         }
     })
+}
+
+fn watch_auto_deadline(dir: PathBuf, child_pid: u32, deadline_ms: u64,
+    out: Arc<Mutex<SegmentWriter>>) -> std::sync::mpsc::Sender<()> {
+    use std::sync::mpsc::{channel, RecvTimeoutError};
+    let (done, stopped) = channel();
+    std::thread::spawn(move || {
+        let wait_ms = deadline_ms.saturating_sub(now_ms());
+        if !matches!(stopped.recv_timeout(Duration::from_millis(wait_ms)), Err(RecvTimeoutError::Timeout)) {
+            return;
+        }
+        // The marker is written before the signal so a daemon that reattaches
+        // can distinguish this stop from a user interrupt or harness failure.
+        let _ = std::fs::write(dir.join("auto-budget.requested"), deadline_ms.to_string());
+        out.lock().unwrap().record("x", b"auto execution budget elapsed");
+        for (signal, next_wait) in [(libc::SIGINT, Some(10_000)),
+            (libc::SIGTERM, Some(5_000)), (libc::SIGKILL, None)] {
+            let _ = unsafe { libc::kill(-(child_pid as i32), signal) };
+            if let Some(wait_ms) = next_wait {
+                if !matches!(stopped.recv_timeout(Duration::from_millis(wait_ms)), Err(RecvTimeoutError::Timeout)) {
+                    return;
+                }
+            }
+        }
+    });
+    done
 }
 
 /// Entry point for `overseerd shim <run-dir>`.
@@ -162,9 +282,12 @@ pub fn run(dir: PathBuf) -> anyhow::Result<()> {
     };
     let child_pid = child.id();
     write_json(&dir.join("shim.json"), &ShimInfo { shim_pid: std::process::id(), child_pid, started_ms: now_ms() });
+    let deadline_watch = launch.auto_execution_deadline_ms.map(|deadline|
+        watch_auto_deadline(dir.clone(), child_pid, deadline, out.clone()));
     let stdin = Arc::new(Mutex::new(child.stdin.take()));
-    let t_out = pump(child.stdout.take().unwrap(), "o", out.clone());
-    let t_err = pump(child.stderr.take().unwrap(), "e", out.clone());
+    let metadata_replies: MetadataReplies = Arc::new(Mutex::new(HashMap::new()));
+    let t_out = pump(child.stdout.take().unwrap(), "o", out.clone(), Some(metadata_replies.clone()));
+    let t_err = pump(child.stderr.take().unwrap(), "e", out.clone(), None);
     if let Some(text) = &launch.initial_stdin {
         if let Some(pipe) = stdin.lock().unwrap().as_mut() {
             let _ = pipe.write_all(text.as_bytes());
@@ -187,6 +310,7 @@ pub fn run(dir: PathBuf) -> anyhow::Result<()> {
     {
         let stdin = stdin.clone();
         let out = out.clone();
+        let metadata_replies = metadata_replies.clone();
         std::thread::spawn(move || {
             for conn in listener.incoming().flatten() {
                 if peer_uid(&conn) != Some(uid) {
@@ -194,12 +318,14 @@ pub fn run(dir: PathBuf) -> anyhow::Result<()> {
                 }
                 let stdin = stdin.clone();
                 let out = out.clone();
-                std::thread::spawn(move || handle_control(conn, stdin, out, child_pid));
+                let metadata_replies = metadata_replies.clone();
+                std::thread::spawn(move || handle_control(conn, stdin, out, metadata_replies, child_pid));
             }
         });
     }
 
     let status = child.wait();
+    if let Some(done) = deadline_watch { let _ = done.send(()); }
     // Grandchildren may keep the pipes open; do not block exit on them forever.
     let deadline = std::time::Instant::now() + Duration::from_secs(3);
     while (!t_out.is_finished() || !t_err.is_finished()) && std::time::Instant::now() < deadline {
@@ -239,7 +365,8 @@ pub fn peer_uid_fd(fd: i32) -> Option<u32> {
     if rc == 0 { Some(cred.uid) } else { None }
 }
 
-fn handle_control(conn: UnixStream, stdin: Arc<Mutex<Option<std::process::ChildStdin>>>, out: Arc<Mutex<SegmentWriter>>, child_pid: u32) {
+fn handle_control(conn: UnixStream, stdin: Arc<Mutex<Option<std::process::ChildStdin>>>,
+    out: Arc<Mutex<SegmentWriter>>, pending: MetadataReplies, child_pid: u32) {
     let mut writer = match conn.try_clone() {
         Ok(w) => w,
         Err(_) => return,
@@ -250,6 +377,59 @@ fn handle_control(conn: UnixStream, stdin: Arc<Mutex<Option<std::process::ChildS
         let reply = match serde_json::from_str::<serde_json::Value>(&line) {
             Ok(msg) => match msg["op"].as_str() {
                 Some("ping") => serde_json::json!({"ok": true, "child_pid": child_pid}),
+                Some("metadata_rpc") => {
+                    let method = msg["method"].as_str().unwrap_or_default();
+                    let params = &msg["params"];
+                    let allowed = match method {
+                        "account/read" => params == &serde_json::json!({"refreshToken":false}),
+                        "account/rateLimits/read" => params == &serde_json::json!({}),
+                        "model/list" => params == &serde_json::json!({})
+                            || params["cursor"].as_str().is_some_and(|cursor|
+                                !cursor.is_empty() && cursor.len() <= 512
+                                    && cursor.bytes().all(|byte| byte.is_ascii_graphic())
+                                    && params.as_object().is_some_and(|object| object.len() == 1)),
+                        "mcpServerStatus/list" => params == &serde_json::json!({"detail":"toolsAndAuthOnly"})
+                            || params["cursor"].as_str().is_some_and(|cursor|
+                                !cursor.is_empty() && cursor.len() <= 512
+                                    && cursor.bytes().all(|byte| byte.is_ascii_graphic())
+                                    && params["detail"] == "toolsAndAuthOnly"
+                                    && params.as_object().is_some_and(|object| object.len() == 2)),
+                        _ => false,
+                    };
+                    let timeout_ms = msg["timeout_ms"].as_u64().unwrap_or(0);
+                    if !allowed || !(1..=4000).contains(&timeout_ms) {
+                        serde_json::json!({"ok":false,"error":"unsupported metadata request"})
+                    } else {
+                        let id = format!("ovs-auto-meta-{}", uuid::Uuid::new_v4().simple());
+                        let (sender, receiver) = mpsc::channel();
+                        let registered = {
+                            let mut waiting = pending.lock().unwrap();
+                            if waiting.len() >= 8 { false } else {
+                                waiting.insert(id.clone(), sender);
+                                true
+                            }
+                        };
+                        if !registered {
+                            serde_json::json!({"ok":false,"error":"metadata request limit reached"})
+                        } else {
+                            let request = serde_json::json!({"id":id,"method":method,"params":params});
+                            let written = stdin.lock().unwrap().as_mut().is_some_and(|pipe|
+                                pipe.write_all(format!("{request}\n").as_bytes())
+                                    .and_then(|_| pipe.flush()).is_ok());
+                            let response = if written {
+                                receiver.recv_timeout(Duration::from_millis(timeout_ms)).ok()
+                            } else { None };
+                            pending.lock().unwrap().remove(&id);
+                            match response {
+                                Some(Ok(value)) if value["error"].is_null() && !value["result"].is_null() =>
+                                    serde_json::json!({"ok":true,"result":value["result"]}),
+                                Some(Ok(_)) => serde_json::json!({"ok":false,"error":"metadata method failed"}),
+                                Some(Err(_)) => serde_json::json!({"ok":false,"error":"metadata response invalid"}),
+                                None => serde_json::json!({"ok":false,"error":"metadata response unavailable"}),
+                            }
+                        }
+                    }
+                }
                 Some("stdin") => {
                     let data = msg["data"].as_str().unwrap_or_default();
                     let mut guard = stdin.lock().unwrap();
@@ -293,8 +473,13 @@ fn handle_control(conn: UnixStream, stdin: Arc<Mutex<Option<std::process::ChildS
 
 /// Client helper used by the daemon.
 pub fn control(socket: &Path, msg: &serde_json::Value) -> anyhow::Result<serde_json::Value> {
+    control_with_timeout(socket, msg, Duration::from_secs(5))
+}
+
+pub fn control_with_timeout(socket: &Path, msg: &serde_json::Value, timeout: Duration) -> anyhow::Result<serde_json::Value> {
     let mut conn = UnixStream::connect(socket)?;
-    conn.set_read_timeout(Some(Duration::from_secs(5)))?;
+    conn.set_read_timeout(Some(timeout))?;
+    conn.set_write_timeout(Some(timeout))?;
     let mut text = msg.to_string();
     text.push('\n');
     conn.write_all(text.as_bytes())?;
@@ -302,4 +487,35 @@ pub fn control(socket: &Path, msg: &serde_json::Value) -> anyhow::Result<serde_j
     let mut line = String::new();
     reader.read_line(&mut line)?;
     Ok(serde_json::from_str(&line)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn account_replies_are_recorded_without_identity_or_balance() {
+        let quota = serde_json::json!({"id":"ovs-auto-quota","result":{"accountId":"acct-raw-1",
+            "overseerAccountFingerprint":"f".repeat(64),"credits":{"balance":"9"},
+            "rateLimitsByLimitId":{"codex":{"limitId":"codex","planType":"pro",
+                "primary":{"usedPercent":35},"credits":{"balance":"secret"}}}}});
+        let line = format!("{quota}\n");
+        let redacted: serde_json::Value = serde_json::from_slice(&redact_account_reply(line.as_bytes()).unwrap()).unwrap();
+        let text = redacted.to_string();
+        assert!(!text.contains("acct-raw-1") && !text.contains("secret") && !text.contains("\"9\""), "{text}");
+        let expected = crate::auto_quota::account_fingerprint(&serde_json::json!({"accountId":"acct-raw-1"})).unwrap();
+        assert_eq!(crate::auto_quota::account_fingerprint(&redacted["result"]).unwrap(), expected,
+            "the recorded reply keeps the same account identity, not the forged one");
+        assert_eq!(redacted["result"]["rateLimitsByLimitId"]["codex"]["primary"]["usedPercent"], 35);
+        // A forged fingerprint with no id is dropped: identity unavailable.
+        let forged = format!("{}\n", serde_json::json!({"id":"ovs-auto-quota","result":{
+            "overseerAccountFingerprint":"f".repeat(64)}}));
+        let forged: serde_json::Value = serde_json::from_slice(&redact_account_reply(forged.as_bytes()).unwrap()).unwrap();
+        assert!(crate::auto_quota::account_fingerprint(&forged["result"]).is_err());
+        let account = format!("{}\n", serde_json::json!({"id":"ovs-account","result":{"requiresOpenaiAuth":true,
+            "account":{"type":"chatgpt","email":"private@example.invalid","planType":"pro"}}}));
+        let account = String::from_utf8(redact_account_reply(account.as_bytes()).unwrap()).unwrap();
+        assert!(!account.contains("private@example.invalid") && account.contains("chatgpt") && account.contains("pro"));
+        assert!(redact_account_reply(b"{\"id\":\"ovs-turn\",\"result\":{}}\n").is_none());
+    }
 }

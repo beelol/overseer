@@ -5,8 +5,11 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde::Serialize;
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::io::Write;
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 const SNAPSHOT_IDENTITY: [(&str, &str); 4] = [
     ("GIT_AUTHOR_NAME", "Overseer Snapshot"),
@@ -35,6 +38,59 @@ pub fn git_env(cwd: &Path, args: &[&str], env: &[(&str, &str)]) -> Result<Vec<u8
 
 pub fn git(cwd: &Path, args: &[&str]) -> Result<String> {
     Ok(String::from_utf8_lossy(&git_env(cwd, args, &[])?).trim_end_matches('\n').to_string())
+}
+
+/// Auto's external worktree effect must settle even when Git or a hook stalls.
+/// Output is discarded because this command only needs a success status.
+fn bounded_git_effect(cwd: &Path, args: &[&str], timeout: Duration) -> Result<()> {
+    let mut cmd = Command::new("git");
+    cmd.current_dir(cwd).args(args).stdin(Stdio::null()).stdout(Stdio::null())
+        .stderr(Stdio::null()).process_group(0);
+    for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR"] {
+        cmd.env_remove(var);
+    }
+    cmd.env("GIT_OPTIONAL_LOCKS", "0").env("GIT_TERMINAL_PROMPT", "0");
+    let mut child = cmd.spawn().context("starting bounded Git worktree effect")?;
+    let deadline = Instant::now() + timeout;
+    loop {
+        if let Some(status) = child.try_wait()? {
+            if status.success() { return Ok(()); }
+            bail!("bounded Git worktree effect failed with {status}");
+        }
+        if Instant::now() >= deadline {
+            // The launched Git process leads a separate group, so a helper or
+            // hook cannot keep changing the worktree after this timeout.
+            let _ = unsafe { libc::kill(-(child.id() as i32), libc::SIGKILL) };
+            let _ = child.kill();
+            let _ = child.wait();
+            bail!("bounded Git worktree effect timed out");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+/// Run Git with bytes on stdin, used for an already-reviewed patch without a disk copy.
+pub fn git_stdin(cwd: &Path, args: &[&str], input: &[u8]) -> Result<String> {
+    git_stdin_env(cwd, args, input, &[])
+}
+
+pub fn git_stdin_env(cwd: &Path, args: &[&str], input: &[u8], env: &[(&str, &str)]) -> Result<String> {
+    let mut cmd = Command::new("git");
+    cmd.current_dir(cwd).args(args).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR"] {
+        cmd.env_remove(var);
+    }
+    cmd.env("GIT_OPTIONAL_LOCKS", "0").env("GIT_TERMINAL_PROMPT", "0");
+    for (k, v) in env {
+        cmd.env(k, v);
+    }
+    let mut child = cmd.spawn().with_context(|| format!("running git {}", args.join(" ")))?;
+    child.stdin.take().ok_or_else(|| anyhow!("git stdin unavailable"))?.write_all(input)?;
+    let out = child.wait_with_output()?;
+    if !out.status.success() {
+        bail!("git {} failed: {}", args.join(" "), String::from_utf8_lossy(&out.stderr).trim());
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).trim_end_matches('\n').to_string())
 }
 
 pub fn toplevel(path: &Path) -> Result<PathBuf> {
@@ -93,7 +149,7 @@ fn valid_branch_name(path: &Path, name: &str) -> bool {
 
 /// Create a new worktree on a new branch. Existing branches and paths are never reused
 /// or deleted: a numeric suffix is appended until both are free.
-pub fn worktree_add(repo: &Path, parent_dir: &Path, name: &str, start: &str) -> Result<(PathBuf, String)> {
+pub fn plan_worktree_add(repo: &Path, parent_dir: &Path, name: &str) -> Result<(PathBuf, String)> {
     let slug: String = name
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c.to_ascii_lowercase() } else { '-' })
@@ -103,7 +159,6 @@ pub fn worktree_add(repo: &Path, parent_dir: &Path, name: &str, start: &str) -> 
         .take(40)
         .collect();
     let slug = if slug.is_empty() { "task".to_string() } else { slug };
-    std::fs::create_dir_all(parent_dir)?;
     for n in 0..100 {
         let suffix = if n == 0 { String::new() } else { format!("-{}", n + 1) };
         let branch = format!("overseer/{slug}{suffix}");
@@ -111,11 +166,38 @@ pub fn worktree_add(repo: &Path, parent_dir: &Path, name: &str, start: &str) -> 
         if path.exists() || rev_parse(repo, &format!("refs/heads/{branch}")).is_some() || !valid_branch_name(repo, &branch) {
             continue;
         }
-        let path_str = path.to_str().ok_or_else(|| anyhow!("non-UTF-8 path"))?;
-        git(repo, &["worktree", "add", "-b", &branch, path_str, start])?;
-        return Ok((std::fs::canonicalize(&path)?, branch));
+        return Ok((path, branch));
     }
     bail!("could not find a free branch/path name for {slug}")
+}
+
+/// Perform only the exact branch/path that was selected before the external Git
+/// effect. Auto journals this plan first, so recovery never guesses a suffix.
+pub fn worktree_add_planned(repo: &Path, path: &Path, branch: &str, start: &str) -> Result<(PathBuf, String)> {
+    worktree_add_planned_inner(repo, path, branch, start, false)
+}
+
+pub fn worktree_add_planned_auto(repo: &Path, path: &Path, branch: &str, start: &str) -> Result<(PathBuf, String)> {
+    worktree_add_planned_inner(repo, path, branch, start, true)
+}
+
+fn worktree_add_planned_inner(repo: &Path, path: &Path, branch: &str, start: &str,
+    auto: bool) -> Result<(PathBuf, String)> {
+    if path.exists() || rev_parse(repo, &format!("refs/heads/{branch}")).is_some()
+        || !valid_branch_name(repo, branch) {
+        bail!("planned worktree branch or path is no longer free");
+    }
+    std::fs::create_dir_all(path.parent().ok_or_else(|| anyhow!("worktree parent unavailable"))?)?;
+    let path_str = path.to_str().ok_or_else(|| anyhow!("non-UTF-8 path"))?;
+    let args = ["worktree", "add", "-b", branch, path_str, start];
+    if auto { bounded_git_effect(repo, &args, Duration::from_secs(20))?; }
+    else { git(repo, &args)?; }
+    Ok((std::fs::canonicalize(path)?, branch.to_string()))
+}
+
+pub fn worktree_add(repo: &Path, parent_dir: &Path, name: &str, start: &str) -> Result<(PathBuf, String)> {
+    let (path, branch) = plan_worktree_add(repo, parent_dir, name)?;
+    worktree_add_planned(repo, &path, &branch, start)
 }
 
 #[derive(Debug, Clone, Serialize)]

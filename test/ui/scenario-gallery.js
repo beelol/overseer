@@ -50,7 +50,7 @@ const slug = t => t.toLowerCase().replace(/\s+/g, '-');
     const intro = await cdp.webview(`!!document.querySelector('.talk-intro')`, 20000);
     await intro.eval(`(() => { document.getElementById('prompt').value = 'What is everyone doing?'; document.getElementById('first').requestSubmit(); return true; })()`);
     const talk = await cdp.webview(`!!document.querySelector('#conv') && /Here is what everyone is doing/.test(document.querySelector('#conv').textContent)`, 40000);
-    await cdp.command('View: Close Panel'); await delay(800);
+    await cdp.command('View: Hide Panel'); await delay(800);
 
     for (const theme of THEMES) {
       await setTheme(theme);
@@ -87,7 +87,7 @@ const slug = t => t.toLowerCase().replace(/\s+/g, '-');
       // Talk to Overseer.
       await cdp.command('Overseer: Talk to Overseer'); await delay(1500);
       await s.screenshot(`talk-${t}`); reached('talk to Overseer', theme, await talk.eval(`!!document.querySelector('#conv')`).catch(() => false));
-      await cdp.command('View: Close Panel'); await delay(600);
+      await cdp.command('View: Hide Panel'); await delay(600);
       // Where am I.
       await s.selectAgent('Refresh sessions once', { settle: 2000 });
       await cdp.command('Overseer: Where Am I'); await delay(800);

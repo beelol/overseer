@@ -40,7 +40,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await cdp.type('Refresh sessions once'); await delay(400); await cdp.key('Enter'); await delay(2500);
     const labels = () => cdp.evalWorkbench(`(() => { const pane = [...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || ''));
       return [...pane.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.getAttribute('aria-level') === '2').map(r => r.querySelector('.label-name')?.textContent.trim()); })()`);
-    const selectedLabel = () => cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-list-row.selected')].map(r => r.querySelector('.label-name')?.textContent.trim()).filter(Boolean).pop()`);
+    // The side bar's selection; the command palette's last chosen row keeps its own `.selected`.
+    const selectedLabel = () => cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-list-row.selected')].filter(r => !r.closest('.quick-input-widget')).map(r => r.querySelector('.label-name')?.textContent.trim()).filter(Boolean).pop()`);
     const before = await labels(); const selBefore = await selectedLabel();
     // What the filtered list shows is said in the search field ("N matches").
     const message = () => s.searchFrame().then(f => f.eval(`window.__overseerSearch.count()`)).catch(() => '');

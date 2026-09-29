@@ -22,8 +22,14 @@ pub enum Norm {
     /// result whose tool_use id may not belong to a delegation).
     Child { native_id: String, parent_native: Option<String>, title: Option<String>, status: Option<String>, text: Option<String>, only_if_known: bool, evidence: String },
     Usage(Value),
+    /// A native provider quota frame. The daemon validates and stores only
+    /// normalized scoped fields, never this raw event payload.
+    Quota(Value),
     Permission { request_id: String, tool: String, input: Value },
     Error { class: String, message: String },
+    /// Only an explicit, bounded numeric native field can extend the
+    /// transient health cooldown; prose is never parsed as Retry-After.
+    ErrorRetryAfter { class: String, message: String, retry_after_ms: i64 },
     TurnDone { ok: bool, summary: Option<String> },
     /// JSON-RPC response to one of Overseer's requests (app-server transport).
     RpcResult { id: String, result: Value, error: Option<Value> },
@@ -51,18 +57,34 @@ pub struct LaunchReq<'a> {
     pub cwd: &'a Path,
     pub prompt: &'a str,
     pub model: Option<&'a str>,
+    /// Reasoning effort for this turn (AC-60), validated by `check_turn_options`.
+    pub effort: Option<&'a str>,
+    pub sandbox: Option<&'a str>,
     pub profile_env: BTreeMap<String, String>,
     pub resume_session: Option<&'a str>,
     pub program_override: Option<&'a str>,
     pub args_override: Option<&'a [String]>,
     /// Extra harness arguments chosen for the task (e.g. `-c agents.max_depth=2`).
     pub extra_args: &'a [String],
-    /// Reasoning effort for this turn (AC-60), validated by `check_turn_options`.
-    pub effort: Option<&'a str>,
     /// Permission / sandbox mode for this turn (AC-60).
     pub permission_mode: Option<&'a str>,
     /// Images attached to this turn's prompt (private files in the run folder).
     pub images: &'a [(String, PathBuf)],
+    /// Swarm workers must not start unaccounted native subagents. This is
+    /// daemon-owned launch metadata, never a caller-supplied target capability.
+    pub swarm_worker: bool,
+    /// The daemon's per-run Swarm tools over MCP (the proposed native
+    /// director and worker path, `swarm.native_director`): daemon-owned
+    /// launch metadata, like `swarm_worker`, never caller-supplied arguments.
+    pub swarm_tools: Option<SwarmTools<'a>>,
+}
+
+/// A Swarm member's MCP configuration (a private file in the run's folder
+/// naming `overseerd mcp` and the member's token) and the tools it may call.
+#[derive(Clone, Copy)]
+pub struct SwarmTools<'a> {
+    pub config: &'a Path,
+    pub allowed: &'a [String],
 }
 
 pub struct Launch {
@@ -76,6 +98,14 @@ pub struct Launch {
 pub enum InterruptPlan {
     Signal,
     StdinThenSignal(String),
+}
+
+/// This is a launch-time restriction, not live qualification under SWARM-17.
+/// Generic is available only through the fixture API; Claude is launched with
+/// Agent/Task denied. Other transports currently have no established way to
+/// prevent an unaccounted native child in a Swarm worker.
+pub fn swarm_worker_launch_supported(harness: &str) -> bool {
+    matches!(harness, "generic" | "claude")
 }
 
 /// Environment variables forwarded to harnesses. Everything else (notably API keys
@@ -193,7 +223,7 @@ pub fn capabilities(harness: &str) -> Value {
             "approvals": "supported (command/file-change approval requests answered Allow/Deny in Overseer; never auto-approved)",
             "file_activity": "supported (fileChange items)", "children": "supported (collabAgentToolCall spawnAgent/wait)",
             "usage": "supported (thread/tokenUsage/updated)", "quota": "partial (account/rateLimits/updated when the server sends it)",
-            "model": "supported (at start)", "effort": "unsupported in Overseer's app-server transport", "permission_mode": "supported (approval policy at start)", "images": "unsupported in Overseer's app-server transport",
+            "model": "supported (at start)", "effort": "supported (turn/start effort, per turn)", "permission_mode": "supported (approval policy at start)", "images": "unsupported in Overseer's app-server transport",
             "account_login": "ChatGPT account via codex login (CODEX_HOME per profile)",
             "verification": "live-verified on macOS: approvals Allow/Deny/Interrupt with one ChatGPT account (codex 0.155)"
         }),
@@ -240,7 +270,37 @@ pub fn capabilities(harness: &str) -> Value {
     }
 }
 
+pub fn validate_effort(harness: &str, effort: Option<&str>) -> Result<()> {
+    let Some(value) = effort else { return Ok(()); };
+    if harness == "generic" {
+        bail!("generic harness does not expose a reasoning effort");
+    }
+    if value.is_empty() || value.len() > 32 || !value.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_') {
+        bail!("effort must be a short lowercase variant name");
+    }
+    Ok(())
+}
+
 pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
+    validate_effort(harness, req.effort)?;
+    if req.swarm_worker {
+        if !req.extra_args.is_empty() {
+            bail!("Swarm worker cannot override native delegation controls");
+        }
+        if !swarm_worker_launch_supported(harness) {
+            bail!("Swarm worker native delegation is not controlled for {harness}");
+        }
+    }
+    if req.swarm_tools.is_some() {
+        // Only Claude Code has the MCP configuration, tool allow-list and
+        // delegation deny this path relies on (Gate S's spike, AC-180).
+        if harness != "claude" {
+            bail!("Swarm tools over MCP are not supported for {harness}");
+        }
+        if !req.extra_args.is_empty() {
+            bail!("a Swarm member cannot override its tools with extra arguments");
+        }
+    }
     let program = match req.program_override {
         Some(p) => PathBuf::from(p),
         None => resolve_program(harness).ok_or_else(|| anyhow::anyhow!("{harness} executable not found"))?,
@@ -254,6 +314,7 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
         env.insert(k.clone(), v.clone());
     }
     let model = req.model.filter(|m| !m.is_empty());
+    let effort = req.effort;
     for a in req.extra_args {
         let lower = a.to_ascii_lowercase();
         if lower.contains("api-key") || lower.contains("api_key") || lower.contains("access-token") {
@@ -262,27 +323,29 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
     }
     let (mut args, initial_stdin, close_stdin) = match harness {
         "codex" => {
+            let sandbox = match if req.permission_mode == Some("read-only") {
+                "read-only"
+            } else { req.sandbox.unwrap_or("workspace-write") } {
+                "read-only" => "read-only",
+                "workspace-write" => "workspace-write",
+                _ => bail!("unsupported Codex CLI sandbox"),
+            };
             let mut args = vec!["exec".to_string()];
             if let Some(session) = req.resume_session {
                 args.extend(["resume".into(), session.into()]);
             }
             args.extend(["--json".into(), "--skip-git-repo-check".into()]);
             if req.resume_session.is_none() {
-                args.extend(["-s".into(), "workspace-write".into(), "-C".into(), req.cwd.display().to_string()]);
+                args.extend(["-s".into(), sandbox.into(), "-C".into(), req.cwd.display().to_string()]);
             } else {
                 // `exec resume` has no -s/-C; keep the same sandbox (cwd comes from the supervisor).
-                args.extend(["-c".into(), "sandbox_mode=\"workspace-write\"".into()]);
+                args.extend(["-c".into(), format!("sandbox_mode=\"{sandbox}\"")]);
             }
             if let Some(m) = model {
                 args.extend(["-m".into(), m.into()]);
             }
-            if let Some(e) = req.effort {
-                args.extend(["-c".into(), format!("model_reasoning_effort=\"{e}\"")]);
-            }
-            if req.permission_mode == Some("read-only") {
-                // Read-only sandbox: the agent can look and plan but not write.
-                if let Some(i) = args.iter().position(|a| a == "workspace-write") { args[i] = "read-only".into(); }
-                if let Some(i) = args.iter().position(|a| a == "sandbox_mode=\"workspace-write\"") { args[i] = "sandbox_mode=\"read-only\"".into(); }
+            if let Some(level) = effort {
+                args.extend(["-c".into(), format!("model_reasoning_effort=\"{level}\"")]);
             }
             for (_, image) in req.images {
                 args.extend(["-i".into(), image.display().to_string()]);
@@ -304,6 +367,9 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
             if let Some(m) = model {
                 args.extend(["--model".into(), m.into()]);
             }
+            if let Some(level) = effort {
+                args.extend(["--effort".into(), level.into()]);
+            }
             if let Some(session) = req.resume_session {
                 args.extend(["--resume".into(), session.into()]);
             }
@@ -312,6 +378,19 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
             }
             if let Some(mode) = req.permission_mode {
                 args.extend(["--permission-mode".into(), mode.into()]);
+            }
+            if req.swarm_worker || req.swarm_tools.is_some() {
+                // A Swarm member in Claude's read-only mode (an audit worker)
+                // also has its file-editing tools denied (shell commands stay).
+                let mut denied = vec!["Agent", "Task"];
+                if req.permission_mode == Some(crate::swarm::audit::READ_ONLY_MODE) {
+                    denied.extend(crate::swarm::audit::WRITE_TOOLS);
+                }
+                args.extend(["--disallowedTools".into(), denied.join(",")]);
+            }
+            if let Some(tools) = req.swarm_tools {
+                args.extend(["--mcp-config".into(), tools.config.display().to_string(),
+                    "--strict-mcp-config".into(), "--allowedTools".into(), tools.allowed.join(",")]);
             }
             let content = if req.images.is_empty() {
                 json!(req.prompt)
@@ -331,6 +410,9 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
             let mut args = vec!["run".to_string(), "--format".into(), "json".into()];
             if let Some(m) = model {
                 args.extend(["-m".into(), m.into()]);
+            }
+            if let Some(level) = effort.filter(|level| *level != "default") {
+                args.extend(["--variant".into(), level.into()]);
             }
             if let Some(session) = req.resume_session {
                 args.extend(["--session".into(), session.into()]);
@@ -364,6 +446,12 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
 
 /// Which turn options a harness accepts (AC-60); anything else is refused with a clear reason.
 pub fn check_turn_options(harness: &str, effort: Option<&str>, mode: Option<&str>, images: usize) -> Result<()> {
+    if harness == "codex-app" {
+        validate_effort(harness, effort)?;
+        if mode.is_some() { bail!("codex-app does not take a per-turn permission mode"); }
+        if images > 0 { bail!("codex-app does not take image attachments"); }
+        return Ok(());
+    }
     let (efforts, modes, can_images): (&[&str], &[&str], bool) = match harness {
         "claude" => (&["low", "medium", "high", "xhigh", "max"], &["acceptEdits", "plan", "auto", "manual"], true),
         "codex" => (&["minimal", "low", "medium", "high", "xhigh"], &["read-only", "workspace-write"], true),
@@ -418,19 +506,41 @@ pub fn permission_reply(harness: &str, request_id: &str, allow: bool, input: &Va
     }
 }
 
-/// Classify an error message into auth / rate_limit / quota / other.
+/// Classify a direct harness error without inferring account quota from HTTP throttling.
 pub fn classify_error(message: &str) -> &'static str {
     let m = message.to_ascii_lowercase();
     if m.contains("usage limit") || m.contains("quota") || m.contains("exceeded your") || m.contains("out of credits") || m.contains("credit limit") || m.contains("insufficient_quota") {
         "quota"
     } else if m.contains("rate limit") || m.contains("rate_limit") || m.contains("429") || m.contains("too many requests") {
         "rate_limit"
+    } else if m.contains("503 service unavailable") || m.contains("http status 503") {
+        "service_unavailable"
+    } else if m.contains("enetdown") || m.contains("network is down") {
+        // A kernel network-down error is host-scoped. A destination-specific
+        // unreachable error is not enough to declare every remote route down.
+        "host_offline"
     } else if m.contains("authenticat") || m.contains("401") || m.contains("unauthorized") || m.contains("not logged in") || m.contains("log in") || m.contains("login") || m.contains("oauth") || m.contains("token expired") {
         "auth"
     } else if is_network_error(&m) {
         "network"
     } else {
         "other"
+    }
+}
+
+fn structured_error(message: &str, source: &Value) -> Norm {
+    structured_error_class(classify_error(message), message, source)
+}
+
+fn structured_error_class(class: &str, message: &str, source: &Value) -> Norm {
+    let retry_after_ms = source.get("retryAfterMs").or_else(|| source.get("retry_after_ms"))
+        .and_then(Value::as_i64)
+        .filter(|ms| (1..=86_400_000).contains(ms));
+    match (class, retry_after_ms) {
+        ("rate_limit" | "service_unavailable", Some(retry_after_ms)) => Norm::ErrorRetryAfter {
+            class: class.into(), message: truncate(message, 2000), retry_after_ms,
+        },
+        _ => Norm::Error { class: class.into(), message: truncate(message, 2000) },
     }
 }
 
@@ -498,11 +608,11 @@ pub fn parse_codex(v: &Value) -> Vec<Norm> {
         "turn.completed" => vec![Norm::Usage(v["usage"].clone()), Norm::TurnDone { ok: true, summary: None }],
         "turn.failed" => {
             let msg = s(&v["error"]["message"]);
-            vec![Norm::Error { class: classify_error(&msg).into(), message: truncate(&msg, 2000) }, Norm::TurnDone { ok: false, summary: Some(truncate(&msg, 300)) }]
+            vec![structured_error(&msg, &v["error"]), Norm::TurnDone { ok: false, summary: Some(truncate(&msg, 300)) }]
         }
         "error" => {
             let msg = s(&v["message"]);
-            vec![Norm::Error { class: classify_error(&msg).into(), message: truncate(&msg, 2000) }]
+            vec![structured_error(&msg, v)]
         }
         "item.started" | "item.updated" | "item.completed" => {
             let item = &v["item"];
@@ -535,7 +645,7 @@ pub fn parse_codex(v: &Value) -> Vec<Norm> {
                 "todo_list" if done => vec![Norm::Text { role: "plan".into(), text: truncate(&item["items"].to_string(), 4000) }],
                 "error" => {
                     let msg = s(&item["message"]);
-                    vec![Norm::Error { class: classify_error(&msg).into(), message: truncate(&msg, 2000) }]
+                    vec![structured_error(&msg, item)]
                 }
                 "collab_tool_call" => parse_codex_collab(item, done),
                 _ if done => vec![Norm::Unparsed(truncate(&v.to_string(), 4000))],
@@ -630,7 +740,7 @@ pub fn parse_codex_app(v: &Value) -> Vec<Norm> {
             let status = s(&turn["status"]);
             let mut out = Vec::new();
             if let Some(msg) = turn["error"]["message"].as_str() {
-                out.push(Norm::Error { class: classify_error(msg).into(), message: truncate(msg, 2000) });
+                out.push(structured_error(msg, &turn["error"]));
             }
             out.push(Norm::TurnDone { ok: status == "completed", summary: Some(status) });
             out
@@ -639,7 +749,8 @@ pub fn parse_codex_app(v: &Value) -> Vec<Norm> {
         "account/rateLimits/updated" => vec![Norm::Usage(json!({"rate_limits": params["rateLimits"]}))],
         "error" => {
             let msg = s(&params["error"]["message"]);
-            vec![Norm::Error { class: classify_error(&msg).into(), message: truncate(&format!("{msg}{}", if params["willRetry"] == true { " (will retry)" } else { "" }), 2000) }]
+            let display = format!("{msg}{}", if params["willRetry"] == true { " (will retry)" } else { "" });
+            vec![structured_error(&display, &params["error"])]
         }
         "item/started" | "item/completed" => {
             let item = &params["item"];
@@ -693,7 +804,7 @@ pub fn scope_codex_app_child(thread: &str, norms: Vec<Norm>) -> Vec<Norm> {
             Norm::Tool { name, summary, .. } => Norm::Child { native_id: thread.into(), parent_native: None, title: None, status: None, text: Some(format!("[tool {name}] {summary}")), only_if_known: true, evidence: evidence.clone() },
             Norm::TurnDone { ok, .. } => Norm::Child { native_id: thread.into(), parent_native: None, title: None, status: Some(if ok { "completed" } else { "failed" }.into()), text: None, only_if_known: true, evidence: evidence.clone() },
             Norm::Child { native_id, parent_native: None, title, status, text, only_if_known, evidence } => Norm::Child { native_id, parent_native: Some(thread.into()), title, status, text, only_if_known, evidence },
-            Norm::TurnId(_) | Norm::Running | Norm::Session(_) | Norm::Usage(_) | Norm::ToolDetail { .. } | Norm::BackgroundLaunched(_) | Norm::BackgroundNotified(_) | Norm::MainContinues => Norm::Ignored,
+            Norm::TurnId(_) | Norm::Running | Norm::Session(_) | Norm::Usage(_) | Norm::Quota(_) | Norm::ToolDetail { .. } | Norm::BackgroundLaunched(_) | Norm::BackgroundNotified(_) | Norm::MainContinues => Norm::Ignored,
             other => other,
         })
         .collect()
@@ -741,7 +852,7 @@ pub fn parse_claude(v: &Value) -> Vec<Norm> {
                     "billing_error" => "quota".to_string(),
                     _ => classify_error(&text).to_string(),
                 };
-                out.push(Norm::Error { class, message: truncate(&text, 2000) });
+                out.push(structured_error_class(&class, &text, v));
                 return out;
             }
             let content = &v["message"]["content"];
@@ -806,7 +917,7 @@ pub fn parse_claude(v: &Value) -> Vec<Norm> {
             let result = s(&v["result"]);
             let mut out = vec![Norm::Usage(json!({"usage": v["usage"], "total_cost_usd": v["total_cost_usd"], "num_turns": v["num_turns"]}))];
             if is_error {
-                out.push(Norm::Error { class: classify_error(&result).into(), message: truncate(&result, 2000) });
+                out.push(structured_error(&result, v));
             }
             if let Some(denials) = v["permission_denials"].as_array().filter(|d| !d.is_empty()) {
                 let tools: Vec<String> = denials.iter().map(|d| s(&d["tool_name"])).collect();
@@ -824,7 +935,39 @@ pub fn parse_claude(v: &Value) -> Vec<Norm> {
             }
         }
         // Usage limits as Claude reports them (AC-62): the account's windows and reset times.
-        "rate_limit_event" => match v.get("rate_limit_info") { Some(info) => vec![Norm::Usage(json!({"rate_limits": {"claude_rate_limit": info}}))], None => vec![Norm::Ignored] },
+        "rate_limit_event" => {
+            let mut out = vec![Norm::Quota(v.clone())];
+            if let Some(info) = v.get("rate_limit_info") {
+                // Account usage needs the known meter fields, not arbitrary
+                // provider prose that may accompany the native event.
+                let mut meter = serde_json::Map::new();
+                for key in ["status", "rateLimitType"] {
+                    if let Some(value) = info[key].as_str() {
+                        meter.insert(key.into(), json!(value));
+                    }
+                }
+                if let Some(value) = info["resetsAt"].as_i64() {
+                    meter.insert("resetsAt".into(), json!(value));
+                }
+                let mut windows = serde_json::Map::new();
+                for key in ["five_hour", "seven_day", "seven_day_opus"] {
+                    let window = &info["unifiedWindows"][key];
+                    let mut fields = serde_json::Map::new();
+                    if let Some(value) = window["utilization"].as_f64() {
+                        fields.insert("utilization".into(), json!(value));
+                    }
+                    if let Some(value) = window["resetsAt"].as_i64() {
+                        fields.insert("resetsAt".into(), json!(value));
+                    }
+                    if !fields.is_empty() {
+                        windows.insert(key.into(), Value::Object(fields));
+                    }
+                }
+                meter.insert("unifiedWindows".into(), Value::Object(windows));
+                out.push(Norm::Usage(json!({"rate_limits": {"claude_rate_limit": meter}})));
+            }
+            out
+        },
         "control_response" | "stream_event" => vec![Norm::Ignored],
         _ => vec![Norm::Unparsed(truncate(&v.to_string(), 4000))],
     }
@@ -878,7 +1021,7 @@ pub fn parse_opencode(v: &Value) -> Vec<Norm> {
         }
         "error" => {
             let msg = v["error"]["data"]["message"].as_str().or(v["error"]["message"].as_str()).map(str::to_string).unwrap_or_else(|| v["error"].to_string());
-            out.push(Norm::Error { class: classify_error(&msg).into(), message: truncate(&msg, 2000) });
+            out.push(structured_error(&msg, &v["error"]["data"]));
             out.push(Norm::TurnDone { ok: false, summary: Some(truncate(&msg, 300)) });
         }
         _ => out.push(Norm::Unparsed(truncate(&v.to_string(), 4000))),
@@ -936,9 +1079,32 @@ mod tests {
     use super::*;
 
     #[test]
+    fn structured_retry_after_is_bounded_and_never_read_from_error_prose() {
+        let native = json!({"method":"error","params":{"error":{
+            "message":"HTTP 429 Too Many Requests","retryAfterMs":300_000}}});
+        assert_eq!(parse_codex_app(&native), vec![Norm::ErrorRetryAfter {
+            class:"rate_limit".into(), message:"HTTP 429 Too Many Requests".into(),
+            retry_after_ms:300_000,
+        }]);
+        let mut injected = native;
+        injected["params"]["error"]["retryAfterMs"] = json!("300000");
+        injected["params"]["error"]["message"] = json!("HTTP 429 Too Many Requests; retryAfterMs: 300000");
+        assert!(matches!(&parse_codex_app(&injected)[0], Norm::Error { class, .. } if class == "rate_limit"));
+        injected["params"]["error"]["retryAfterMs"] = json!(100_000_000);
+        assert!(matches!(&parse_codex_app(&injected)[0], Norm::Error { class, .. } if class == "rate_limit"));
+        injected["params"]["error"]["message"] = json!("usage limit reached");
+        injected["params"]["error"]["retryAfterMs"] = json!(300_000);
+        assert!(matches!(&parse_codex_app(&injected)[0], Norm::Error { class, .. } if class == "quota"),
+            "Retry-After cannot recast a quota rejection as transient health");
+    }
+
+    #[test]
     fn classify_errors() {
         assert_eq!(classify_error("Failed to authenticate: OAuth session expired and could not be refreshed"), "auth");
         assert_eq!(classify_error("stream error: 429 Too Many Requests"), "rate_limit");
+        assert_eq!(classify_error("HTTP 503 Service Unavailable"), "service_unavailable");
+        assert_eq!(classify_error("connect ENETDOWN: Network is down"), "host_offline");
+        assert_eq!(classify_error("connect ENETUNREACH: Network is unreachable"), "network");
         assert_eq!(classify_error("You've hit your usage limit. Upgrade to Pro"), "quota");
         assert_eq!(classify_error("file not found"), "other");
         // Real message formats found in the pinned codex 0.155 binary (strings probe).
@@ -960,11 +1126,11 @@ mod tests {
             "Connection error.",
             "error: Network is unreachable (os error 51)",
             "API Error: 529 {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}",
-            "unexpected status 503 Service Unavailable",
             "tls handshake eof",
         ] {
             assert_eq!(classify_error(m), "network", "{m}");
         }
+        assert_eq!(classify_error("unexpected status 503 Service Unavailable"), "service_unavailable");
         // Account states are never network errors, whatever else the text says.
         assert_eq!(classify_error("exceeded retry limit, last status: 429 Too Many Requests"), "rate_limit");
         assert_eq!(classify_error("You've hit your usage limit."), "quota");
@@ -989,6 +1155,44 @@ mod tests {
         assert!(!env.contains_key("CLAUDECODE"));
         assert!(env["PATH"].starts_with("/x:"));
     }
+
+    #[test]
+    fn selected_effort_reaches_supported_cli_launches_as_one_argument() {
+        for (harness, expected) in [
+            ("codex", "model_reasoning_effort=\"medium\""),
+            ("claude", "--effort"),
+            ("opencode", "--variant"),
+        ] {
+            let launch = launch(harness, &LaunchReq {
+                cwd: Path::new("/tmp"), prompt: "work", model: Some("fixture-model"),
+                effort: Some("medium"), sandbox: Some("workspace-write"), profile_env: BTreeMap::new(),
+                resume_session: None, program_override: Some("/bin/true"),
+                args_override: None, extra_args: &[], permission_mode: None, images: &[], swarm_worker: false, swarm_tools: None,
+            }).unwrap();
+            assert!(launch.args.iter().any(|arg| arg == expected), "{harness}: {:?}", launch.args);
+            assert!(!launch.args.iter().any(|arg| arg.contains(";")));
+        }
+        assert!(validate_effort("codex", Some("medium;touch /tmp/x")).is_err());
+        assert!(validate_effort("generic", Some("medium")).is_err());
+    }
+
+    #[test]
+    fn codex_cli_keeps_selected_read_only_sandbox_on_start_and_resume() {
+        for resume in [None, Some("session-1")] {
+            let launch = launch("codex", &LaunchReq {
+                cwd: Path::new("/tmp"), prompt: "inspect", model: Some("fixture-model"),
+                effort: Some("medium"), sandbox: Some("read-only"), profile_env: BTreeMap::new(),
+                resume_session: resume, program_override: Some("/bin/true"),
+                args_override: None, extra_args: &[], permission_mode: None, images: &[], swarm_worker: false, swarm_tools: None,
+            }).unwrap();
+            let args = &launch.args;
+            if resume.is_some() {
+                assert!(args.contains(&"sandbox_mode=\"read-only\"".to_string()), "{args:?}");
+            } else {
+                assert!(args.windows(2).any(|pair| pair == ["-s", "read-only"]), "{args:?}");
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -996,8 +1200,81 @@ mod turn_option_tests {
     use super::*;
 
     fn req<'a>(resume: Option<&'a str>, images: &'a [(String, PathBuf)]) -> LaunchReq<'a> {
-        LaunchReq { cwd: Path::new("/tmp/w"), prompt: "do it", model: Some("gpt-5.6-luna"), profile_env: BTreeMap::new(), resume_session: resume, program_override: Some("/bin/echo"),
-            args_override: None, extra_args: &[], effort: Some("high"), permission_mode: Some("read-only"), images }
+        LaunchReq { cwd: Path::new("/tmp/w"), prompt: "do it", model: Some("gpt-5.6-luna"), sandbox: Some("workspace-write"), profile_env: BTreeMap::new(), resume_session: resume, program_override: Some("/bin/echo"),
+            args_override: None, extra_args: &[], effort: Some("high"), permission_mode: Some("read-only"), images, swarm_worker: false, swarm_tools: None }
+    }
+
+    #[test]
+    fn swarm_worker_disables_native_claude_delegation_on_initial_and_resumed_turns() {
+        for session in [None, Some("session-1")] {
+            let mut request = req(session, &[]);
+            request.swarm_worker = true;
+            let launch = launch("claude", &request).unwrap();
+            assert!(launch.args.windows(2).any(|a| a == ["--disallowedTools", "Agent,Task"]),
+                "native delegation was not disabled: {:?}", launch.args);
+        }
+    }
+
+    #[test]
+    fn swarm_worker_rejects_unqualified_native_delegation_transports() {
+        let mut request = req(None, &[]);
+        request.swarm_worker = true;
+        for harness in ["codex", "codex-app", "opencode"] {
+            assert!(launch(harness, &request).err().unwrap().to_string()
+                .contains("native delegation is not controlled"), "{harness}");
+        }
+    }
+
+    #[test]
+    fn a_read_only_swarm_worker_has_its_write_tools_denied() {
+        let config = PathBuf::from("/tmp/run/mcp-swarm.json");
+        let allowed = vec!["mcp__overseer__swarm_result".to_string()];
+        let mut request = req(None, &[]);
+        request.swarm_worker = true;
+        request.swarm_tools = Some(SwarmTools { config: &config, allowed: &allowed });
+        request.permission_mode = Some("plan");
+        let args = launch("claude", &request).unwrap().args;
+        assert!(args.windows(2).any(|a| a == ["--permission-mode", "plan"]), "{args:?}");
+        // Shell commands stay allowed (the owner's answer of 2026-09-28); the
+        // post-attempt source check is the guard against a command that writes.
+        assert!(args.windows(2).any(|a| a == ["--disallowedTools", "Agent,Task,Edit,Write,MultiEdit,NotebookEdit"]),
+            "{args:?}");
+        request.permission_mode = None;
+        let args = launch("claude", &request).unwrap().args;
+        assert!(args.windows(2).any(|a| a == ["--disallowedTools", "Agent,Task"]), "{args:?}");
+    }
+
+    #[test]
+    fn swarm_tools_give_claude_its_mcp_tools_and_deny_native_delegation() {
+        let config = PathBuf::from("/tmp/run/mcp-swarm.json");
+        let allowed = vec!["mcp__overseer__swarm_plan".to_string(), "mcp__overseer__swarm_dispatch".to_string()];
+        for session in [None, Some("session-1")] {
+            let mut request = req(session, &[]);
+            request.swarm_tools = Some(SwarmTools { config: &config, allowed: &allowed });
+            let args = launch("claude", &request).unwrap().args;
+            assert!(args.windows(2).any(|a| a == ["--disallowedTools", "Agent,Task"]), "{args:?}");
+            assert!(args.windows(2).any(|a| a == ["--mcp-config", "/tmp/run/mcp-swarm.json"]), "{args:?}");
+            assert!(args.iter().any(|a| a == "--strict-mcp-config"), "{args:?}");
+            assert!(args.windows(2).any(|a| a == ["--allowedTools", "mcp__overseer__swarm_plan,mcp__overseer__swarm_dispatch"]), "{args:?}");
+        }
+        let mut request = req(None, &[]);
+        request.swarm_tools = Some(SwarmTools { config: &config, allowed: &allowed });
+        for harness in ["codex", "codex-app", "opencode"] {
+            assert!(launch(harness, &request).err().unwrap().to_string().contains("not supported"), "{harness}");
+        }
+        let extra = ["--allowedTools".into(), "Agent".into()];
+        request.extra_args = &extra;
+        assert!(launch("claude", &request).err().unwrap().to_string().contains("cannot override its tools"));
+    }
+
+    #[test]
+    fn swarm_worker_cannot_override_delegation_deny_with_extra_arguments() {
+        let mut request = req(None, &[]);
+        request.swarm_worker = true;
+        let extra = ["--allowedTools".into(), "Agent".into()];
+        request.extra_args = &extra;
+        assert!(launch("claude", &request).err().unwrap().to_string()
+            .contains("cannot override native delegation controls"));
     }
 
     #[test]

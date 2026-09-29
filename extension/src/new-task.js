@@ -23,6 +23,7 @@ class NewTaskPanel {
 <section><label for="prompt" class="sec">Task</label><textarea id="prompt" placeholder="Describe the task" aria-describedby="prompt-help"></textarea><div id="prompt-help" class="help">⌘⏎ starts</div></section>
 <section><h2 id="repos-h" class="sec">Repository</h2><div id="repos" class="tiles" aria-labelledby="repos-h"></div></section>
 <section><h2 id="harnesses-h" class="sec">Agent</h2><div id="harnesses" class="tiles" aria-labelledby="harnesses-h"></div></section>
+<section id="auto-preference" hidden><label for="preferred-harness" class="sec">Preferred agent (optional)</label><select id="preferred-harness"><option value="">Any eligible agent</option><option value="codex-app">Prefer Codex</option><option value="claude">Prefer Claude Code</option><option value="opencode">Prefer OpenCode</option></select><p class="help">Auto can choose another eligible agent when the preferred one cannot do this work.</p></section>
 <section id="account-section"><h2 id="accounts-h" class="sec">Account</h2><div id="accounts" class="tiles" aria-labelledby="accounts-h"></div>
 <p id="no-accounts" class="empty" hidden>No account for this agent yet. Add one from Accounts.</p></section>
 <section id="local-section" hidden><h2 id="local-h" class="sec">Local model</h2><div id="local-models" class="tiles" aria-labelledby="local-h"></div>
@@ -30,7 +31,7 @@ class NewTaskPanel {
 <section id="generic-section" hidden><h2 class="sec">Program</h2><div class="row"><div><label for="program">Executable</label><input id="program" placeholder="/absolute/path/to/program"></div>
 <div><label for="args">Arguments (JSON)</label><input id="args" value="[]"></div></div></section>
 <section><h2 id="modes-h" class="sec">Workspace</h2><div id="modes" class="tiles" aria-labelledby="modes-h"></div>
-<div id="ref-row" class="row ref-row"><div><label for="ref">Start from</label><select id="ref"></select></div><div><label for="model">Model</label><input id="model" placeholder="Default"></div></div></section>
+<div id="ref-row" class="row ref-row"><div><label for="ref">Start from</label><select id="ref"></select></div><div id="model-wrap"><label for="model">Model</label><input id="model" placeholder="Default"></div></div></section>
 <section id="approval-section" hidden><h2 id="approvals-h" class="sec">Approvals</h2><div id="approvals" class="tiles" aria-labelledby="approvals-h"></div></section>
 <div class="actions"><button id="start" class="btn primary">Start task</button><span id="start-why" class="why" role="status"></span></div>
 </main>` });

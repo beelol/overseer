@@ -1,0 +1,12 @@
+# SWARM-38 — pinned Agetor parity and reuse ledger
+
+Status: verified (documentation criterion). Reviewed Swarm revision: `81c6185`.
+Pinned source: `alamops/agetor@bd5adcba1fd2c0df6d375fa43c9432294fe12dec` (MIT, copyright 2026 Alamo Saravali). Review date: 2026-09-27.
+
+Input and method: the published [parity ledger](agetor-parity.md), the pinned Agetor source in a disposable local checkout, the Swarm RFC's SWARM-38 row, and the referenced Overseer test files. Reproduce the source check with `git clone --filter=blob:none https://github.com/alamops/agetor.git /private/tmp/agetor-swarm-audit` and `git checkout --detach bd5adcba1fd2c0df6d375fa43c9432294fe12dec` inside that checkout; inspect the source and test links named in the ledger. The checkout is outside this repository and is not a runtime dependency.
+
+Expected: the ledger names selected Agetor behavior, corresponding Overseer evidence, intentional reuse differences and attribution. It covers partial transcript lines, duplicate usage, unavailable quota, account-specific discovery, live-session recovery and descendant completion ordering. Missing behavior remains marked as a gap rather than a parity or superiority claim.
+
+Actual: all six rows are present. Direct inspection of the pinned `account-usage.ts` and its tests confirmed complete-line cursor handling and message-ID/request-ID deduplication. `usage/poller.test.ts` distinguishes unavailable observations; the model and agent discovery tests use harness-specific catalogs; `reconcile.test.ts` distinguishes dead and recoverable live sessions; `claude-subagents.ts` treats an asynchronous launch stub as launch rather than completion. The ledger points to existing Overseer policy, broker, admission, runtime and protocol tests where behavior overlaps. It explicitly labels transcript usage accounting, account-specific live discovery, live model-session recovery and descendant control as unverified in Overseer. No Agetor source was selected for porting; the pinned MIT attribution and reuse decision are recorded in the ledger.
+
+Evidence: [agetor-parity.md](agetor-parity.md), [Swarm RFC comparison](../../rfcs/swarm-mode.md), `daemon/tests/swarm_policy.rs`, `daemon/tests/swarm_broker.rs`, `daemon/tests/swarm_admission.rs`, `daemon/tests/swarm_runtime.rs`, and `daemon/tests/protocol.rs`. This verifies publication and accuracy of the comparison ledger only. It does not verify the separate implementation criteria for the listed gaps, and it makes no live harness claim.

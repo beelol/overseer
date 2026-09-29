@@ -1,0 +1,180 @@
+{
+  "checks": [
+    {
+      "name": "Auto gate is off before an explicit UI choice",
+      "ok": true
+    },
+    {
+      "name": "the UI enabled Auto and the daemon chose one model and effort before the fixture turn",
+      "ok": true,
+      "detail": {
+        "run": "r-ec5430b77c8f4eef9af343c72ad17a86",
+        "status": "completed",
+        "model": "gpt-6-sol",
+        "effort": "medium",
+        "selected": "system-codex/gpt-6-sol/medium",
+        "output": "parent ready"
+      }
+    },
+    {
+      "name": "the selected Auto run opens in the same chat surface as a manual run",
+      "ok": true
+    },
+    {
+      "name": "the chat explains the selected model, effort, allowance, and expected-use uncertainty",
+      "ok": true,
+      "detail": "Auto chose gpt-6-sol · mediumCodex · openai · Allowance: unknown · Expected use: uncalibrated · Selected an eligible default; the account balance has not been verified."
+    },
+    {
+      "name": "Auto parent receives a browser-labelled child result and assigns a stronger diagnosis unit while healthy",
+      "ok": true,
+      "detail": {
+        "parent": "r-61c03ae41c534e2cb729be96f2e89410",
+        "status": "completed",
+        "children": [
+          {
+            "id": "r-a63e3b82de9b",
+            "model": "gpt-6-sol",
+            "effort": "medium",
+            "status": "completed"
+          },
+          {
+            "id": "r-32dc01f3306d",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "status": "completed"
+          }
+        ],
+        "output": "browser result: parent context found; continued with browser result"
+      }
+    },
+    {
+      "name": "the parent chat records both child route choices and their uncertainty",
+      "ok": true,
+      "detail": [
+        "Auto chose gpt-6-sol · mediumCodex · openai · Allowance: unknown · Expected use: uncalibrated · Selected an eligible default; the account balance has not been verified.",
+        "Auto chose gpt-6-sol · mediumCodex · openai · Allowance: unknown · Expected use: uncalibrated · Selected an eligible default; the account balance has not been verified.",
+        "Auto chose gpt-6-astra · highCodex · openai · Allowance: unknown · Expected use: uncalibrated · Selected an eligible default; the account balance has not been verified.1 alternative excludedgpt-6-sol · medium: below the required capability"
+      ]
+    },
+    {
+      "name": "the diagnosis explanation identifies why another route was excluded",
+      "ok": true,
+      "detail": "1 alternative excludedgpt-6-sol · medium: below the required capability"
+    },
+    {
+      "name": "the parent chat shows each child’s reported token activity without calling it subscription allowance",
+      "ok": true,
+      "detail": [
+        {
+          "run": "r-a63e3b82de9b",
+          "text": "browser check49 reported tokens",
+          "title": "browser check\nDone\n42 input · 7 output · activity, not subscription allowance\nmanaged-delegation"
+        },
+        {
+          "run": "r-32dc01f3306d",
+          "text": "diagnosis49 reported tokens",
+          "title": "diagnosis\nDone\n42 input · 7 output · activity, not subscription allowance\nmanaged-delegation"
+        }
+      ]
+    },
+    {
+      "name": "packaged VS Code exposes local Auto work and explicit export/clear without calling tokens allowance",
+      "ok": true,
+      "detail": {
+        "title": "Auto usage",
+        "rows": [
+          "gpt-6-sol · medium, completed · 9/27/2026, 1:04:47 PM, Token activity unavailable · subscription draw unverified",
+          "gpt-6-astra · high, completed · 9/27/2026, 1:04:47 PM, 49 reported tokens · subscription draw unverified",
+          "gpt-6-sol · medium, completed · 9/27/2026, 1:04:45 PM, 49 reported tokens · subscription draw unverified",
+          "gpt-6-sol · medium, completed · 9/27/2026, 1:04:41 PM, 49 reported tokens · subscription draw unverified",
+          "Export local usage…, Save a redacted JSON file on this Mac; nothing is uploaded.",
+          "Clear local usage…, Remove learning records and summaries; agents and task history stay."
+        ],
+        "value": ""
+      }
+    },
+    {
+      "name": "opening a local usage row shows its content-free report",
+      "ok": true
+    },
+    {
+      "name": "the packaged Auto Usage action exports redacted local JSON with owner-only permissions",
+      "ok": true,
+      "detail": {
+        "work_units": 4,
+        "mode": "600"
+      }
+    },
+    {
+      "name": "clearing local Auto learning asks for confirmation",
+      "ok": true,
+      "detail": "Cancel\nClear local Auto usage\nClear local Auto usage and learning? Agents and task history stay available."
+    },
+    {
+      "name": "cancelling Clear preserves the local work records",
+      "ok": true,
+      "detail": {
+        "count": 4
+      }
+    },
+    {
+      "name": "confirmed Clear removes learning but keeps active ownership and completed task history",
+      "ok": true,
+      "detail": {
+        "work_units": 0,
+        "runs": 4
+      }
+    },
+    {
+      "name": "cleared local learning stays empty after window reload without reconstructing completed work",
+      "ok": true,
+      "detail": {
+        "work_units": 0
+      }
+    },
+    {
+      "name": "window reload restores the same child decision history",
+      "ok": true,
+      "detail": [
+        "Auto chose gpt-6-sol · mediumCodex · openai · Allowance: unknown · Expected use: uncalibrated · Selected an eligible default; the account balance has not been verified.",
+        "Auto chose gpt-6-sol · mediumCodex · openai · Allowance: unknown · Expected use: uncalibrated · Selected an eligible default; the account balance has not been verified.",
+        "Auto chose gpt-6-astra · highCodex · openai · Allowance: unknown · Expected use: uncalibrated · Selected an eligible default; the account balance has not been verified.1 alternative excludedgpt-6-sol · medium: below the required capability"
+      ]
+    },
+    {
+      "name": "window reload restores each child’s reported token activity",
+      "ok": true,
+      "detail": [
+        {
+          "run": "r-a63e3b82de9b",
+          "text": "browser check49 reported tokens",
+          "title": "browser check\nDone\n42 input · 7 output · activity, not subscription allowance\nmanaged-delegation"
+        },
+        {
+          "run": "r-32dc01f3306d",
+          "text": "diagnosis49 reported tokens",
+          "title": "diagnosis\nDone\n42 input · 7 output · activity, not subscription allowance\nmanaged-delegation"
+        }
+      ]
+    },
+    {
+      "name": "window reload keeps the original Auto run and remembers Auto as the next choice",
+      "ok": true,
+      "detail": {
+        "runs": [
+          "r-ec5430b77c8f4eef9af343c72ad17a86"
+        ],
+        "remembered": "Agent: Auto routing"
+      }
+    },
+    {
+      "name": "the packaged Auto composer explains known exhaustion and launches no root",
+      "ok": true,
+      "detail": {
+        "message": "Auto routing paused: available account allowance is exhausted. Choose a manual agent or wait for a reset.",
+        "launched": []
+      }
+    }
+  ]
+}

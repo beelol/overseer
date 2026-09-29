@@ -72,6 +72,38 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     ("voice.get", "read"), ("voice.requests", "read"), ("voice.subscribe", "read"), ("voice.set", NEVER), ("voice.say", NEVER), ("voice.simulate", NEVER),
     ("voice.speak", NEVER), ("voice.focus", NEVER), ("voice.download", NEVER), ("voice.cancel", NEVER), ("voice.read_back", NEVER), ("voice.answer", NEVER),
     ("overseer.token", NEVER), ("overseer.level", NEVER), ("agent.share_deny", NEVER), ("overseer.cap", NEVER), ("overseer.fresh", NEVER), ("overseer.send", NEVER), ("overseer.answer", NEVER), ("overseer.cancel", NEVER),
+    // Auto Mode and Swarm (claude/auto-swarm). Reads are reads. Starting a swarm, raising its
+    // limits or deadline, changing its targets, resuming it, or starting an Auto root need the
+    // owner's confirmation (the Swarm/Auto contract: Overseer's level grants no route, allocation
+    // or worker). Stopping or pausing only reduces work. The director and worker protocol, the
+    // fixture launch bridges, the account booking inputs and every setting are not from the
+    // conversation.
+    ("swarm.get", "read"), ("swarm.list", "read"), ("swarm.jobs", "read"), ("swarm.coverage", "read"),
+    ("swarm.messages", "read"), ("swarm.conflicts", "read"), ("swarm.policy.preview", "read"), ("claims.ledger", "read"), ("swarm.findings", "read"), ("swarm.report.final", "read"), ("broker.envelopes", "read"),
+    ("swarm.benefit.preview", "read"), ("swarm.storage.status", "read"), ("swarm.director.summary", "read"),
+    ("swarm.worker.liveness", "read"), ("swarm.route.replay", "read"), ("swarm.native_director.get", "read"), ("agents.limit.get", "read"), ("auto.root.preview", "read"),
+    ("auto.mode.get", "read"), ("auto.models.list", "read"), ("auto.quota.state", "read"), ("auto.quota.list", "read"),
+    ("auto.usage.list", "read"), ("auto.usage.work.list", "read"), ("auto.usage.thread.list", "read"),
+    ("auto.usage.summary", "read"), ("auto.decision.replay", "read"), ("run.result", "read"),
+    ("swarm.stop", STEER), ("swarm.pause", STEER), ("swarm.off", STEER),
+    ("swarm.create", CONFIRM), ("swarm.start", CONFIRM), ("swarm.resume", CONFIRM), ("swarm.limit.set", CONFIRM), ("swarm.deadline.extend", CONFIRM),
+    ("swarm.targets.set", CONFIRM), ("swarm.requirements.change", CONFIRM), ("auto.start", CONFIRM),
+    ("swarm.director.owner.begin", NEVER), ("swarm.director.owner.renew", NEVER), ("swarm.director.owner.refresh_linked", NEVER),
+    ("swarm.director.owner.expire_due", NEVER), ("swarm.director.launch", NEVER), ("swarm.storage.recover", NEVER),
+    ("swarm.storage.limit_pages", NEVER), ("swarm.plan", NEVER), ("swarm.attempt.register", NEVER), ("swarm.report", NEVER),
+    ("swarm.direct", NEVER), ("swarm.ack", NEVER), ("swarm.partial", NEVER), ("swarm.claim", NEVER), ("swarm.artifact.put", NEVER),
+    ("swarm.integrate", NEVER), ("swarm.verify", NEVER), ("swarm.decide", NEVER), ("swarm.conflict.open", NEVER),
+    ("swarm.conflict.resolve", NEVER), ("swarm.finding.record", NEVER), ("swarm.finding.merge", NEVER), ("swarm.reproduce", NEVER), ("swarm.complete", NEVER), ("swarm.attempt.confirm_exit", NEVER), ("swarm.revise", NEVER),
+    ("swarm.benefit.commit", NEVER), ("swarm.availability.observe", NEVER), ("swarm.policy.set", NEVER),
+    ("swarm.estimate.revoke", NEVER), ("swarm.admit", NEVER), ("swarm.schedule.next", NEVER), ("swarm.dispatch.next", NEVER),
+    ("swarm.worker.launch", NEVER), ("swarm.effect.begin", NEVER), ("swarm.effect.reconcile", NEVER), ("swarm.worker.brief", NEVER),
+    ("swarm.context.get", NEVER), ("swarm.context.revoke", NEVER), ("swarm.context.grant", NEVER), ("swarm.worker.reconcile", NEVER),
+    ("swarm.worker.liveness.sample", NEVER), ("swarm.worker.liveness.poll", NEVER), ("swarm.job.deadline.persist_due", NEVER),
+    ("swarm.redirect.persist_due", NEVER), ("swarm.director.claim_batch", NEVER), ("swarm.director.complete_batch", NEVER),
+    ("swarm.director.recover", NEVER), ("swarm.native_director.set", NEVER), ("agents.limit.set", NEVER), ("run.delegate", NEVER), ("auto.mode.set", NEVER),
+    ("auto.bridge.submit", NEVER), ("auto.bridge.result", NEVER), ("auto.dispatch", NEVER), ("auto.models.refresh", NEVER),
+    ("auto.opencode.local.inspect", NEVER), ("auto.tools.inspect", NEVER), ("auto.quota.refresh", NEVER),
+    ("auto.usage.thread.refresh", NEVER), ("auto.usage.export", NEVER), ("auto.usage.clear", NEVER),
     // What the owner does from VS Code or a phone (Gate N): their review marks, putting lines back,
     // a pull request, a sign-in and stopping everyone at once are not Overseer's to do.
     ("review.accept", NEVER), ("review.unaccept", NEVER), ("review.import", NEVER), ("review.reject", NEVER),
@@ -452,6 +484,16 @@ impl Daemon {
             "assign" => {
                 // The keeper owns the paths; the other agent gets a guardrail and a word.
                 let dirs: Vec<String> = paths.clone();
+                // The keeper's area is in the one claim ledger (SWARM-44): a Swarm job holding
+                // one of the paths refuses the whole assignment before anything changes.
+                let held = {
+                    let store = self.store.lock().unwrap();
+                    super::channel::ledger_refusals(&store.conn, &keep, &dirs)?
+                };
+                if !held.is_empty() {
+                    self.notify_claim_refusals()?;
+                    bail!("{}", crate::claims::refusal_text(&held));
+                }
                 self.agent_guardrail(&other, &format!("{keep_title} owns {}; leave those files to it.", dirs.join(", ")), &[], &dirs, false, by)?;
                 {
                     let store = self.store.lock().unwrap();

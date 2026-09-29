@@ -1,0 +1,210 @@
+// Packaged Auto root entry point: a user chooses Auto in the composer and the daemon selects
+// the first model/effort before a fixture turn. The isolated profile and synthetic app-server
+// spend no model tokens. This is only one slice of AUTO-AC-25, not its browser-child Verify clause.
+const fs = require('fs');
+const path = require('path');
+const cp = require('child_process');
+const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
+
+(async () => {
+  const s = new Session('auto-root');
+  const result = { checks: [] };
+  const check = (name, ok, detail) => { result.checks.push({ name, ok: !!ok, detail }); s.note(`${ok ? 'PASS' : 'FAIL'} ${name}`, detail); };
+  const cli = path.join(repoRoot, 'fixtures/fake-harness/account-cli.js');
+  const app = path.join(repoRoot, 'fixtures/fake-harness/codex-app-fixture.js');
+  const sys = path.join(s.root, 'desktop-home');
+  const next = path.join(s.root, 'next-login');
+  const trace = path.join(s.root, 'app-server-trace.txt');
+  const quota = path.join(s.root, 'quota-mode.txt');
+  fs.mkdirSync(sys, { recursive: true });
+  fs.writeFileSync(next, 'auto-fixture:pro');
+  fs.writeFileSync(quota, 'unknown');
+  cp.execFileSync(cli, ['login'], { env: { ...process.env, OVERSEER_TEST_SYSTEM_HOME: sys, FIXTURE_LOGIN_ACCOUNT_FILE: next } });
+  try {
+    const repo = makeRepo(path.join(s.root, 'auto-repo'), { dirty: false });
+    // Auto routing is behind its unfinished-feature setting (AC-204).
+    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'files.simpleDialog.enable': true, 'overseer.experimental.autoRouting': true });
+    s.install(latestVsix());
+    s.launch(repo, { OVERSEER_CODEX_PATH: app, OVERSEER_CLAUDE_PATH: '/nonexistent/claude', OVERSEER_OPENCODE_PATH: '/nonexistent/opencode',
+      OVERSEER_TEST_SYSTEM_HOME: sys, FIXTURE_MODE: 'managed-models', FIXTURE_TRACE_FILE: trace, FIXTURE_QUOTA_MODE_FILE: quota,
+      FIXTURE_EMIT_USAGE: '1',
+      OVERSEER_HARNESS_ENV_PASSTHROUGH: 'FIXTURE_MODE,FIXTURE_TRACE_FILE,FIXTURE_QUOTA_MODE_FILE,FIXTURE_EMIT_USAGE,OVERSEER_TEST_SYSTEM_HOME' });
+    let cdp = await s.connect();
+    await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
+    check('Auto gate is off before an explicit UI choice', s.ctl('auto.mode.get').enabled === false);
+    await cdp.command('Overseer: Open Overseer View');
+    let dash = await s.editorView();
+    await dash.waitFor(`document.body.dataset.mode === 'composer' && !document.querySelector('[data-chip="repo"]').textContent.includes('Loading')`, 20000);
+    const agentPoint = await s.webviewPoint(dash, '[data-chip="agent"]');
+    await cdp.click(agentPoint.x, agentPoint.y); await delay(300);
+    if (!(await dash.eval(`!!document.querySelector('.menu')`))) await cdp.key('Enter');
+    await dash.waitFor(`!!document.querySelector('.menu')`, 5000);
+    await dash.eval(`[...document.querySelectorAll('.menu .menu-item')].find(e => e.textContent.startsWith('Auto routing · any eligible agent')).click()`);
+    const point = await s.webviewPoint(dash, '#task');
+    await cdp.click(point.x, point.y); await cdp.type('seed context');
+    await dash.waitFor(`!document.getElementById('start').disabled`, 5000);
+    await cdp.key('Enter');
+    let root;
+    for (let i = 0; i < 80 && !root; i++) {
+      await delay(250);
+      root = s.ctl('state').runs.find(r => !r.parent_run_id && r.title === 'seed context');
+    }
+    if (!root) throw new Error('Auto root was not created: ' + await dash.eval(`document.querySelector('.composer-note')?.textContent`));
+    for (let i = 0; i < 80 && ['queued', 'starting', 'running'].includes(root.status); i++) {
+      await delay(250); root = s.ctl('state').runs.find(r => r.id === root.id);
+    }
+    const events = s.ctl('events.list', { after: 0, limit: 2000 }).events;
+    const decision = events.find(e => e.kind === 'auto_decision');
+    const selected = decision?.payload?.decision?.selected;
+    const output = s.ctl('events.list', { run_id: root.id, limit: 2000 }).events
+      .filter(e => e.kind === 'output').map(e => e.payload?.text || '').join('\n');
+    check('the UI enabled Auto and the daemon chose one model and effort before the fixture turn',
+      s.ctl('auto.mode.get').enabled && root.status === 'completed' && root.model && root.effort && selected && /parent ready/.test(output),
+      { run: root.id, status: root.status, model: root.model, effort: root.effort, selected, output });
+    const shown = await dash.waitFor(`document.body.dataset.mode === 'chat' && document.getElementById('title')?.textContent === 'seed context'`, 20000).then(() => true, () => false);
+    check('the selected Auto run opens in the same chat surface as a manual run', shown);
+    const decisionCard = await dash.eval(`document.querySelector('.auto-decision')?.textContent || ''`);
+    check('the chat explains the selected model, effort, allowance, and expected-use uncertainty',
+      /gpt-6-sol/.test(decisionCard) && /medium/.test(decisionCard) && /Allowance: unknown/.test(decisionCard) && /Expected use: uncalibrated/.test(decisionCard),
+      decisionCard);
+    await s.screenshot('auto-root-chat');
+    // Leaving a webview textarea focused can swallow the command-palette shortcut.
+    const statusPoint = await cdp.evalWorkbench(`(() => { const r = document.querySelector('.part.statusbar').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+    await cdp.click(statusPoint.x, statusPoint.y);
+    await cdp.focusWorkbench(); await cdp.key('n', { meta: true, alt: true });
+    await dash.waitFor(`document.body.dataset.mode === 'composer' && !document.querySelector('[data-chip="repo"]').textContent.includes('Loading')`, 20000);
+    const autoDefault = await dash.eval(`document.querySelector('[data-chip="agent"]').getAttribute('aria-label')`);
+    await dash.eval(`(() => { const field = document.getElementById('task'); field.value = 'fixture: delegate browser then diagnose'; field.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await dash.waitFor(`!document.getElementById('start').disabled`, 5000);
+    await dash.eval(`document.getElementById('start').click()`);
+    let parent;
+    for (let i = 0; i < 100 && !parent; i++) {
+      await delay(250);
+      parent = s.ctl('state').runs.find(r => !r.parent_run_id && r.title === 'fixture: delegate browser then diagnose');
+    }
+    if (!parent) throw new Error('Auto parent with delegated browser work was not created');
+    let children = [];
+    for (let i = 0; i < 120; i++) {
+      await delay(250);
+      const runs = s.ctl('state').runs;
+      parent = runs.find(r => r.id === parent.id);
+      children = runs.filter(r => r.parent_run_id === parent.id);
+      if (parent.status === 'completed' && children.length === 2 && children.every(r => r.status === 'completed')) break;
+    }
+    const parentOutput = s.ctl('events.list', { run_id: parent.id, limit: 2000 }).events
+      .filter(e => e.kind === 'output').map(e => e.payload?.text || '').join('\n');
+    const childModels = children.map(r => `${r.model}/${r.effort}`);
+    check('Auto parent receives a browser-labelled child result and assigns a stronger diagnosis unit while healthy',
+      /Auto routing/.test(autoDefault) && parent.status === 'completed' && children.length === 2 && children.every(r => r.status === 'completed') &&
+      childModels.includes('gpt-6-sol/medium') && childModels.includes('gpt-6-astra/high') &&
+      /browser result: parent context found/.test(parentOutput) && /continued with browser result/.test(parentOutput),
+      { parent: parent.id, status: parent.status, children: children.map(r => ({ id: r.id, model: r.model, effort: r.effort, status: r.status })), output: parentOutput });
+    await dash.waitFor(`document.querySelectorAll('.auto-decision').length >= 3`, 10000);
+    const childDecisionCards = await dash.eval(`[...document.querySelectorAll('.auto-decision')].map(e => e.textContent)`);
+    check('the parent chat records both child route choices and their uncertainty',
+      childDecisionCards.some(t => /gpt-6-sol/.test(t) && /medium/.test(t) && /Expected use: uncalibrated/.test(t)) &&
+      childDecisionCards.some(t => /gpt-6-astra/.test(t) && /high/.test(t) && /Expected use: uncalibrated/.test(t)), childDecisionCards);
+    const excludedDetail = await dash.eval(`[...document.querySelectorAll('.auto-decision')].find(e => /gpt-6-astra/.test(e.textContent))?.querySelector('details')?.textContent || ''`);
+    check('the diagnosis explanation identifies why another route was excluded',
+      /gpt-6-sol/.test(excludedDetail) && /capability/i.test(excludedDetail), excludedDetail);
+    const childUsage = await dash.eval(`[...document.querySelectorAll('.child-head')].map(e => ({ run: e.parentElement.dataset.run, text: e.textContent, title: e.title }))`);
+    check('the parent chat shows each child’s reported token activity without calling it subscription allowance',
+      children.every(c => childUsage.some(u => u.run === c.id && /49 reported tokens/.test(u.text) && /activity, not subscription allowance/.test(u.title))),
+      childUsage);
+    await s.screenshot('auto-delegation');
+    await cdp.command('Overseer: Auto Usage');
+    await cdp.waitQuickTitle('Auto usage');
+    const usageMenu = await cdp.quickInputState();
+    check('packaged VS Code exposes local Auto work and explicit export/clear without calling tokens allowance',
+      usageMenu.rows.some(row => /gpt-6-sol/.test(row)) &&
+      usageMenu.rows.some(row => /Export local usage/.test(row)) &&
+      usageMenu.rows.some(row => /Clear local usage/.test(row)) &&
+      usageMenu.rows.some(row => /subscription draw unverified/i.test(row)), usageMenu);
+    await s.screenshot('auto-local-usage');
+    await cdp.pick('Auto usage', 'gpt-6-astra');
+    const usageReport = await cdp.waitFor(`document.body.textContent.includes('auto-work-usage-1.md')`, 10000, 'local Auto usage report tab');
+    check('opening a local usage row shows its content-free report', usageReport);
+    await s.screenshot('auto-local-usage-report');
+    await cdp.key('w', { meta: true });
+    await cdp.command('Overseer: Auto Usage');
+    await cdp.pick('Auto usage', 'Export local usage');
+    await cdp.waitFor(`document.querySelector('input[aria-label="Folder path - Export local Auto usage"]')?.getClientRects().length`, 10000, 'local export folder dialog');
+    const exportPath = path.join(s.root, 'auto-usage.json');
+    await cdp.key('a', { meta: true }); await cdp.type(exportPath); await cdp.key('Enter');
+    for (let i = 0; i < 40 && !fs.existsSync(exportPath); i++) await delay(250);
+    if (!fs.existsSync(exportPath)) throw new Error('Auto usage export did not create the requested local file');
+    const exported = JSON.parse(fs.readFileSync(exportPath, 'utf8'));
+    const exportText = JSON.stringify(exported);
+    check('the packaged Auto Usage action exports redacted local JSON with owner-only permissions',
+      exported.schema_version === 3 && exported.work_units?.length >= 3 &&
+      !exportText.includes('seed context') && !exportText.includes('fixture: delegate browser then diagnose') &&
+      (fs.statSync(exportPath).mode & 0o777) === 0o600,
+      { work_units: exported.work_units?.length, mode: (fs.statSync(exportPath).mode & 0o777).toString(8) });
+    await cdp.command('Overseer: Auto Usage');
+    await cdp.pick('Auto usage', 'Clear local usage');
+    const clearButton = async label => cdp.waitFor(`(() => {
+      const box = document.querySelector('.monaco-dialog-box');
+      const button = box && [...box.querySelectorAll('.monaco-button')].find(b => b.textContent.trim() === ${JSON.stringify(label)});
+      if (!button) return null;
+      const r = button.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, message: box.innerText };
+    })()`, 10000, `Auto usage ${label} confirmation`);
+    const cancelClear = await clearButton('Cancel');
+    check('clearing local Auto learning asks for confirmation', /Clear local Auto usage/.test(cancelClear.message), cancelClear.message);
+    await s.screenshot('auto-local-usage-clear-confirmation');
+    await cdp.click(cancelClear.x, cancelClear.y);
+    const usageBeforeClear = s.ctl('auto.usage.work.list', { limit: 30 }).work_units;
+    check('cancelling Clear preserves the local work records', usageBeforeClear.length >= 3, { count: usageBeforeClear.length });
+    await cdp.command('Overseer: Auto Usage');
+    await cdp.pick('Auto usage', 'Clear local usage');
+    const confirmClear = await clearButton('Clear local Auto usage');
+    await cdp.click(confirmClear.x, confirmClear.y);
+    const usageAfterClear = s.ctl('auto.usage.work.list', { limit: 30 }).work_units;
+    const runsAfterClear = s.ctl('state').runs;
+    check('confirmed Clear removes learning but keeps active ownership and completed task history',
+      usageAfterClear.length === 0 && [root.id, parent.id, ...children.map(c => c.id)].every(id => runsAfterClear.some(r => r.id === id && r.status === 'completed')),
+      { work_units: usageAfterClear.length, runs: runsAfterClear.length });
+    await cdp.command('Developer: Reload Window'); await delay(6000);
+    cdp = await s.connect(); s.cdp = cdp;
+    dash = await s.editorView();
+    const usageAfterReload = s.ctl('auto.usage.work.list', { limit: 30 }).work_units;
+    check('cleared local learning stays empty after window reload without reconstructing completed work',
+      usageAfterReload.length === 0, { work_units: usageAfterReload.length });
+    await dash.waitFor(`document.querySelectorAll('.auto-decision').length >= ${childDecisionCards.length}`, 20000);
+    const reloadedCards = await dash.eval(`[...document.querySelectorAll('.auto-decision')].map(e => e.textContent)`);
+    check('window reload restores the same child decision history', reloadedCards.length === childDecisionCards.length &&
+      reloadedCards.every((text, i) => text === childDecisionCards[i]), reloadedCards);
+    const reloadedChildUsage = await dash.eval(`[...document.querySelectorAll('.child-head')].map(e => ({ run: e.parentElement.dataset.run, text: e.textContent, title: e.title }))`);
+    check('window reload restores each child’s reported token activity',
+      children.every(c => reloadedChildUsage.some(u => u.run === c.id && /49 reported tokens/.test(u.text) && /activity, not subscription allowance/.test(u.title))),
+      reloadedChildUsage);
+    const after = s.ctl('state').runs.filter(r => !r.parent_run_id && r.title === 'seed context');
+    await cdp.focusWorkbench(); await cdp.key('n', { meta: true, alt: true });
+    await dash.waitFor(`document.body.dataset.mode === 'composer' && document.querySelector('[data-chip="agent"]')?.getAttribute('aria-label')?.includes('Auto routing')`, 20000);
+    const remembered = await dash.eval(`document.querySelector('[data-chip="agent"]').getAttribute('aria-label')`);
+    check('window reload keeps the original Auto run and remembers Auto as the next choice', after.length === 1 && after[0].id === root.id && /Auto routing/.test(remembered),
+      { runs: after.map(r => r.id), remembered });
+    await s.screenshot('auto-remembered');
+    fs.writeFileSync(quota, 'exhausted');
+    const exhaustedPoint = await s.webviewPoint(dash, '#task');
+    await cdp.click(exhaustedPoint.x, exhaustedPoint.y); await cdp.type('quota exhausted fixture');
+    await dash.waitFor(`!document.getElementById('start').disabled`, 5000);
+    await cdp.key('Enter');
+    await dash.waitFor(`[...document.querySelectorAll('.composer-note')].some(e => e.textContent.includes('allowance is exhausted'))`, 20000);
+    const paused = await dash.eval(`[...document.querySelectorAll('.composer-note')].map(e => e.textContent).find(t => t.includes('allowance is exhausted')) || ''`);
+    const launchedOnExhaustion = s.ctl('state').runs.filter(r => !r.parent_run_id && r.title === 'quota exhausted fixture');
+    check('the packaged Auto composer explains known exhaustion and launches no root',
+      /allowance is exhausted/.test(paused) && launchedOnExhaustion.length === 0,
+      { message: paused, launched: launchedOnExhaustion.map(r => r.id) });
+    await s.screenshot('auto-exhausted');
+  } catch (error) {
+    s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
+    try { await s.screenshot('error'); } catch {}
+  } finally {
+    s.writeLog();
+    fs.writeFileSync(path.join(s.evidence, 'result.json'), JSON.stringify(result, null, 2));
+    if (!process.env.KEEP_OPEN) { await s.quit(); s.stopDaemon(); }
+    const failed = result.error || result.checks.some(c => !c.ok);
+    console.log(failed ? 'SCENARIO FAILED' : 'SCENARIO PASSED', s.root);
+    process.exit(failed ? 1 : 0);
+  }
+})();

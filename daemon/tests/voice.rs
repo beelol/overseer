@@ -2173,6 +2173,8 @@ fn ac173_a_model_above_the_memory_budget_is_refused() {
 fn ac172_an_attention_cue_waits_for_the_thought_and_nothing_overlaps() {
     let env = voice_daemon(&[]);
     env.d.call("audio.set", json!({"enabled": true}));
+    // Ten agents wait on permission while thirty more start: above the default agent limit (nine).
+    env.d.call("agents.limit.set", json!({"max_active": 64}));
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let live = listening(&env);

@@ -127,7 +127,7 @@ const BUDGET = 238;
     // Archive by keyboard: focus the row, Delete (⌘⌫ on macOS).
     const rowPt = await cdp.evalWorkbench(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].find(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === 'Split the payment service'); const b = r.getBoundingClientRect(); return { x: b.left + 120, y: b.top + b.height / 2 }; })()`);
     await cdp.click(rowPt.x, rowPt.y); await delay(1500);
-    await cdp.command('View: Focus on Agents View'); await delay(500);
+    await cdp.command('Focus on Agents View'); await delay(500);
     await cdp.key('Backspace', { meta: true }); await delay(1500);
     const archived = s.ctl('state').tasks.find(t => t.id === runs.nested.task.id).archived_ms;
     // The context menu offers the rest.

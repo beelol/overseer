@@ -20,7 +20,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
   login('desk:pro', ['login']); login('deskclaude:max', ['auth', 'login']);
   try {
     const repo = makeRepo(path.join(s.root, 'composer-repo'), { dirty: false });
-    s.settings({ 'workbench.colorTheme': 'Overseer Dark' });
+    // Auto routing is behind its unfinished-feature setting (AC-204).
+    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'overseer.experimental.autoRouting': true });
     s.install(latestVsix());
     // Codex and Claude both run through the account fixture (signed in above); OpenCode is missing.
     s.launch(repo, { OVERSEER_CODEX_PATH: cli, OVERSEER_CLAUDE_PATH: cli, OVERSEER_OPENCODE_PATH: '/nonexistent/opencode', OVERSEER_TEST_SYSTEM_HOME: sys, FIXTURE_LOGIN_ACCOUNT_FILE: next,
@@ -87,6 +88,15 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const g = await start('hello', 'generic');
     check('generic program started keyboard-only', g.run && g.shown, { run: g.run?.id, shown: g.shown, note: g.note, chip: g.chip, program: g.program });
 
+    // Auto is an explicit route choice; selecting it must not require a manual account or model.
+    await cdp.command('Overseer: New Agent'); await delay(800);
+    await dash.waitFor(`document.body.dataset.mode === 'composer'`, 5000);
+    await pickAgent('Auto routing · any eligible agent');
+    const autoChoice = { agent: await chip('agent'), modelHidden: await dash.eval(`document.querySelector('[data-chip="model"]').hidden`),
+      enabled: await dash.eval(`!document.getElementById('start').disabled`) };
+    check('composer offers Auto routing with agent and model selection delegated to the daemon', /Auto routing/.test(autoChoice.agent) && autoChoice.modelHidden, autoChoice);
+    await pickAgent('Run a program');
+
     // Problems inline with their fix.
     await cdp.command('Overseer: New Agent'); await delay(800);
     await dash.waitFor(`document.body.dataset.mode === 'composer'`, 5000);
@@ -113,6 +123,12 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await dash.eval(`[...document.querySelectorAll('.view-composer .link')].find(b => b.textContent === 'Full form').click()`);
     const form = await cdp.webview(`!!document.getElementById('harnesses') && document.body.dataset.ready === '1'`, 20000).then(() => true, () => false);
     check('the full New Task form stays one click away', form);
+    if (form) {
+      const autoForm = await cdp.webview(`document.getElementById('harnesses')?.querySelector('[data-value="__auto__"]') && document.body.dataset.ready === '1'`, 5000);
+      await autoForm.eval(`document.querySelector('#harnesses [data-value="__auto__"]').click()`);
+      const autoFields = await autoForm.eval(`({ selected: document.querySelector('#harnesses [data-value="__auto__"]').getAttribute('aria-checked'), accountHidden: document.getElementById('account-section').hidden, modelHidden: document.getElementById('model-wrap').hidden, preferenceVisible: !document.getElementById('auto-preference').hidden })`);
+      check('full New Task form shows Auto and its optional harness preference without manual account/model fields', autoFields.selected === 'true' && autoFields.accountHidden && autoFields.modelHidden && autoFields.preferenceVisible, autoFields);
+    }
     await s.screenshot('full-form');
 
     // Untrusted workspace (Restricted Mode, empty window): explained inline with the fix.
@@ -123,7 +139,6 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer/.test(e.textContent))`, 60000, 'status bar');
     await cdp.command('Overseer: Open Overseer View');
     dash = await s.editorView();
-    await cdp.command('Overseer: New Agent'); await delay(800);
     const untrusted = await dash.waitFor(`(() => { const n = document.querySelector('.view-composer .composer-note'); return n && /Trust this workspace/.test(n.textContent) && { note: n.textContent, fix: n.querySelector('.fix')?.textContent, disabled: document.getElementById('start').disabled }; })()`, 20000).catch(() => null);
     check('an untrusted workspace is explained inline with its fix (Trust) and nothing can start', untrusted && untrusted.fix === 'Trust' && untrusted.disabled, untrusted);
     await s.screenshot('untrusted');
