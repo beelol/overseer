@@ -13,10 +13,10 @@ class NewTaskPanel {
 
   async open() {
     if (this.panel) { this.panel.reveal(); return; }
-    const panel = vscode.window.createWebviewPanel('overseer.newTask', 'New Task', { viewColumn: this.column() || vscode.ViewColumn.Active, preserveFocus: false }, { enableScripts: true, localResourceRoots: localRoots(this.context.extensionUri), retainContextWhenHidden: true });
+    const panel = vscode.window.createWebviewPanel('overseer.newTask', 'New Agent', { viewColumn: this.column() || vscode.ViewColumn.Active, preserveFocus: false }, { enableScripts: true, localResourceRoots: localRoots(this.context.extensionUri), retainContextWhenHidden: true });
     this.panel = panel;
     panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'overseer-logo.png');
-    panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'New Task', css: ['new-task.css', 'continuity.css'], js: ['continuity-text.js', 'continuity.js', 'new-task.js'], body: `
+    panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'New Agent', css: ['new-task.css', 'continuity.css'], js: ['continuity-text.js', 'continuity.js', 'new-task.js'], body: `
 <main class="form" data-audit-view="new-task">
 <h1>New task</h1>
 <div id="error" class="error" role="alert" hidden></div>
@@ -33,7 +33,7 @@ class NewTaskPanel {
 <section><h2 id="modes-h" class="sec">Workspace</h2><div id="modes" class="tiles" aria-labelledby="modes-h"></div>
 <div id="ref-row" class="row ref-row"><div><label for="ref">Start from</label><select id="ref"></select></div><div id="model-wrap"><label for="model">Model</label><input id="model" placeholder="Default"></div></div></section>
 <section id="approval-section" hidden><h2 id="approvals-h" class="sec">Approvals</h2><div id="approvals" class="tiles" aria-labelledby="approvals-h"></div></section>
-<div class="actions"><button id="start" class="btn primary">Start task</button><span id="start-why" class="why" role="status"></span></div>
+<div class="actions"><button id="start" class="btn primary">Start agent</button><span id="start-why" class="why" role="status"></span></div>
 </main>` });
     panel.onDidDispose(() => { this.panel = undefined; });
     panel.webview.onDidReceiveMessage(m => this.receive(m).catch(error => panel.webview.postMessage({ type: 'error', message: error.message })));

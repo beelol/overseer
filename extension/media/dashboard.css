@@ -198,4 +198,23 @@ body[data-conversation="1"] .view-composer > .composer-view, body[data-voice="on
 body[data-conversation="1"] .view-composer .hero-mark, body[data-conversation="1"] .view-composer .hero-title { display: none; }
 /* With cards to read, the mark gives them room. */
 body[data-conversation="1"] .home-stage .voice-mark { width: min(220px, 50vw, 22vh); }
-.home[data-empty="1"] .home-title, .home[data-empty="1"] .home-level, .home[data-empty="1"] #home-fresh { display: none; }
+.home[data-empty="1"] .home-level, .home[data-empty="1"] #home-fresh { display: none; }
+
+/* AC-247: home's input is always on screen. A one-time notice (Continuity) above the box is one
+   compact line while folded, so it never pushes the input off. */
+.view-composer .cont-notice:not(:has(details[open])) { align-items: center; padding: var(--ov-space-1) var(--ov-space-3); margin-bottom: var(--ov-space-2); }
+.view-composer .cont-notice:not(:has(details[open])) .cont-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* AC-236: home talks to Overseer first. The conversation's head from the first visit, a one-line
+   hint of what to ask while it is empty, and the Send to choice with its words. */
+.composer-hint { margin: calc(var(--ov-space-2) * -1) 0 var(--ov-space-1); text-align: center; color: var(--ov-muted); font-size: var(--ov-font-sm); }
+.composer-hint[hidden], body[data-conversation="1"] .composer-hint { display: none; }
+.composer-hero > .composer-choices .chip[data-chip="target"] { flex: 0 1 auto; }
+.composer-hero > .composer-choices .chip[data-chip="target"] .chip-label { flex: 0 1 auto; }
+
+/* AC-255: the rollup by state in the grid's header (the side bar shows the same counts). */
+.grid-rollup { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap; color: var(--ov-muted); font-size: var(--ov-font-sm); font-variant-numeric: tabular-nums; }
+.grid-rollup .rollup-needs { color: var(--ov-waiting); }
+.grid-rollup .rollup-working { color: var(--ov-running); }
+.grid-rollup .rollup-unreviewed { color: var(--ov-done); }
+.grid-rollup .rollup-failed { color: var(--ov-failed); }

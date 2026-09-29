@@ -61,9 +61,11 @@ const BUDGET = 238;
     const find = (label, from = rows) => from.filter(r => r.label === label).pop();
     const needsIdx = rows.findIndex(r => r.label === 'Needs you');
     const webIdx = rows.findIndex(r => r.label === 'web-app'), apiIdx = rows.findIndex(r => r.label === 'api-server');
-    const needsItems = rows.slice(needsIdx + 1).filter(r => r.level === 2).slice(0, 2).map(r => r.label);
-    check('the side bar shows Needs you first, then agents by repository with native children nested',
-      needsIdx === 0 && webIdx > 0 && apiIdx > 0 && needsItems.includes('Add a changelog entry') && needsItems.includes('Migration dry-run') &&
+    const needsItems = rows.slice(needsIdx + 1).filter(r => r.level === 2).slice(0, 1).map(r => r.label);
+    // AC-255: the rollup by state is the first row; Needs you (what waits for an answer, AC-254) follows.
+    const rollupFirst = /\d+ working/.test(rows[0]?.label || '') && /needs you/.test(rows[0]?.label || '');
+    check('the side bar shows the rollup, then Needs you, then agents by repository with native children nested',
+      rollupFirst && needsIdx === 1 && webIdx > 0 && apiIdx > 0 && needsItems.includes('Add a changelog entry') &&
       find('child task')?.level === 3 && find('grandchild task')?.level === 4 && find('Refresh sessions once')?.level === 2,
       { needsIdx, webIdx, apiIdx, needsItems, child: find('child task'), grandchild: find('grandchild task') });
 
@@ -75,7 +77,9 @@ const BUDGET = 238;
 
     // Text budget: the Agents view's visible text (labels, descriptions, badges) for the same fixtures.
     const text = await cdp.evalWorkbench(`(() => { const pane = [...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || ''));
-      return [...pane.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).map(r => r.innerText.replace(/\\s+/g, '')).join('').length; })()`);
+      return [...pane.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && !/^Agents: /.test(r.getAttribute('aria-label') || '')).map(r => r.innerText.replace(/\\s+/g, '')).join('').length; })()`);
+    // The rollup row (AC-255, added after Gate J) is measured on its own, so the list keeps Gate J's budget.
+    s.note('rollup row', rows[0]);
     check(`the Agents view's visible text stays within the Gate J agents budget (${BUDGET} characters)`, text <= BUDGET, { chars: text });
 
     // Logos and badges.
@@ -84,10 +88,10 @@ const BUDGET = 238;
       { showcase: find('Refresh sessions once'), watch: find('Watch the build') });
     const needsRows = rows.slice(needsIdx + 1, webIdx).filter(r => r.level === 2);
     check('Needs-you rows carry the provider mark too (Claude logo, program codicon) with the reason as text',
-      needsRows.length >= 2 && needsRows.find(r => r.label === 'Add a changelog entry')?.logo.startsWith('claudecode') && needsRows.find(r => r.label === 'Migration dry-run')?.codicon === 'terminal' && needsRows.every(r => r.description),
+      needsRows.length >= 1 && needsRows.find(r => r.label === 'Add a changelog entry')?.logo.startsWith('claudecode') && find('Migration dry-run')?.codicon === 'terminal' && needsRows.every(r => r.description),
       needsRows.map(r => ({ label: r.label, logo: r.logo, codicon: r.codicon, description: r.description, badge: r.badge })));
     const badgeOf = label => find(label)?.badge;
-    check('status badges: ✓ done, ! needs you, ✕ failed, ● working', badgeOf('Refresh sessions once') === '✓' && badgeOf('Add a changelog entry') === '!' && badgeOf('Migration dry-run') === '✕' && badgeOf('Watch the build') === '●',
+    check('status badges: ✦ done and not reviewed yet (AC-254), ! needs you, ✕ failed, ● working', badgeOf('Refresh sessions once') === '✦' && badgeOf('Add a changelog entry') === '!' && badgeOf('Migration dry-run') === '✕' && badgeOf('Watch the build') === '●',
       ['Refresh sessions once', 'Add a changelog entry', 'Migration dry-run', 'Watch the build'].map(l => [l, badgeOf(l)]));
     const vsix = cp.execFileSync('unzip', ['-l', latestVsix()], { encoding: 'utf8' });
     const variants = ['claudecode', 'codex', 'opencode'].every(n => vsix.includes(`media/logos/${n}-light.svg`) && vsix.includes(`media/logos/${n}-dark.svg`)) && vsix.includes('NOTICE.md');

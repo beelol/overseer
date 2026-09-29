@@ -179,7 +179,7 @@ fn t23_audio_mode_from_the_terminal() {
     tui.snapshot("t23-audio-140x40");
     tui.resize(80, 24);
     let s = tui.screen();
-    for text in ["Audio Mode", "ON · ready", "Track: reactor", "Preview: agent_complete", "Commander: private folder ready"] {
+    for text in ["Audio Mode", "ON · ready", "Track: reactor", "Preview: agent complete", "Commander: private folder ready"] {
         assert!(s.contains(text), "missing {text:?} at 80×24:\n{s}");
     }
     tui.snapshot("t23-audio-80x24");

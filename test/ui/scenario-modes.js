@@ -48,10 +48,10 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     };
     const dashboardRoundTrip = async label => {
       const before = await arrangement();
-      await cdp.command('Overseer: Open Dashboard'); await delay(4000);
+      await cdp.command('Overseer: Enter Focus Mode'); await delay(4000);
       const during = await arrangement();
       await s.screenshot(`dashboard-from-${label}`);
-      await cdp.command('Overseer: Exit Dashboard'); await delay(3000);
+      await cdp.command('Overseer: Exit Focus Mode'); await delay(3000);
       const after = await arrangement();
       check(`${label}: dashboard mode hides the panel and secondary side bar, keeps the side bar on Overseer, and Exit returns to the same arrangement`,
         !during.panel && !during.auxiliary && during.sidebar && /Overseer/i.test(during.sidebarTitle) && (during.groups.every(g => g.active === '') ? JSON.stringify(during.groups.map(g => g.share)) === JSON.stringify(before.groups.map(g => g.share)) : JSON.stringify(during.groups.map(g => g.active)) === JSON.stringify(before.groups.map(g => g.active))) && same(before, after), { before, during, after });
