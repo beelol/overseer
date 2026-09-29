@@ -2,6 +2,8 @@
 const vscode = require('vscode');
 const path = require('path');
 const features = require('./features');
+const Rollup = require('../media/rollup.js');
+const Plain = require('../media/plain-words.js');
 
 const STATUS_ICON = {
   queued: ['clock', 'charts.yellow'], starting: ['loading~spin', 'charts.blue'], running: ['sync~spin', 'charts.blue'],
@@ -93,6 +95,9 @@ class Model {
   }
 }
 
+const HARNESS_NAME = { claude: 'Claude Code', codex: 'Codex', 'codex-app': 'Codex', opencode: 'OpenCode', 'opencode-serve': 'Local model', generic: 'Program' };
+/** A state word the daemon may add later, never as snake_case (AC-245). */
+const plainStatus = s => String(s || '').replace(/_/g, ' ');
 const LOGO_FOR_HARNESS = { claude: 'claudecode', codex: 'codex', 'codex-app': 'codex', opencode: 'opencode', 'opencode-serve': 'opencode' };
 const STATUS_TEXT = { queued: 'queued', starting: 'starting', running: 'working', waiting_for_user: 'needs you', completed: 'done', failed: 'failed', interrupted: 'stopped', disconnected: 'disconnected', unknown: 'unknown' };
 // Status as a row badge (the row icon is the provider's logo, AC-68).
@@ -142,18 +147,28 @@ class AgentsProvider {
         if (uri.scheme !== 'overseer-agent') return undefined;
         const run = this.model.run(uri.path.replace(/^\//, ''));
         if (!run) return undefined;
+        // AC-254: an agent at its end that is not reviewed yet has its own mark (✦ for done work,
+        // a coloured ✕ for a failure); once reviewed it is the plain ✓ or an uncoloured ✕.
+        const fresh = this.unreviewed(run);
+        if (fresh && Rollup.DONE.has(run.status)) return { badge: '✦', color: new vscode.ThemeColor('charts.green'), tooltip: 'Done, to review', propagate: false };
         const [badge, color] = STATUS_BADGE[run.status] || STATUS_BADGE.unknown;
-        return { badge, color: ['failed', 'disconnected', 'waiting_for_user'].includes(run.status) ? new vscode.ThemeColor(color) : undefined, tooltip: STATUS_TEXT[run.status] || run.status, propagate: false };
+        const colored = run.status === 'waiting_for_user' || (fresh && Rollup.FAILED.has(run.status));
+        const ended = !run.parent_run_id && (Rollup.DONE.has(run.status) || Rollup.FAILED.has(run.status));
+        return { badge, color: colored ? new vscode.ThemeColor(color) : undefined, tooltip: `${STATUS_TEXT[run.status] || plainStatus(run.status)}${ended ? (fresh ? ', to review' : ', reviewed') : ''}`, propagate: false };
       },
     };
   }
+  /** Whether an agent at its end still waits to be reviewed (AC-254). */
+  unreviewed(run) { return Rollup.unreviewed(run, this.handlers.reviewed?.() || {}); }
+  /** The rollup by state (AC-255), from the same counts as the grid's header. */
+  rollup() { return Rollup.counts(this.model.state, this.handlers.reviewed?.() || {}); }
   /** What the list shows (relative times in 30-second steps). */
   signature() {
     const st = this.model.state || {};
     return JSON.stringify([Math.floor(Date.now() / 30000), st.oversight || {}, st.overseer || {}, (st.tasks || []).map(t => [t.id, t.title, t.repo_root, t.archived_ms ? 1 : 0]),
       (st.runs || []).map(r => [r.id, r.status, r.parent_run_id, r.attention?.kind, r.harness, r.model, r.profile_id, r.workspace_id, r.title, r.exit_reason, r.ended_ms ? 1 : 0]),
       (st.profiles || []).map(p => [p.id, p.name]), (st.workspaces || []).map(w => [w.id, w.branch, w.kind]),
-      (this.handlers.attention?.() || []).map(a => [a.run_id, a.label, a.detail]), this.handlers.pinned?.() || [],
+      (this.handlers.attention?.() || []).map(a => [a.run_id, a.label, a.detail]), this.handlers.pinned?.() || [], (st.runs || []).filter(r => this.unreviewed(r)).map(r => r.id),
       this.model.swarms.map(s => [s.id, s.status, s.revision, s.active_worker_processes,
         s.job_counts, s.unconfirmed_exit_count, s.benefit?.decision, s.benefit?.reason,
         s.availability?.observed_ms, s.availability?.state, s.availability?.reason, s.capacity]),
@@ -217,6 +232,7 @@ class AgentsProvider {
     if (this.statusFilter === 'needs') return (this.handlers.attention?.() || []).some(a => a.run_id === r.id);
     if (this.statusFilter === 'working') return ACTIVE.has(r.status) && r.status !== 'waiting_for_user';
     if (this.statusFilter === 'done') return r.status === 'completed' || r.status === 'interrupted';
+    if (this.statusFilter === 'review') return this.unreviewed(r);
     if (this.statusFilter === 'failed') return r.status === 'failed' || r.status === 'disconnected';
     return true;
   }
@@ -242,7 +258,11 @@ class AgentsProvider {
     if (!node) {
       if (m.error) return [{ item: Object.assign(new vscode.TreeItem(`Daemon unavailable: ${m.error}`), { iconPath: new vscode.ThemeIcon('warning') }) }];
       const out = [];
-      const needs = this.filter || this.showArchived || this.statusFilter !== 'all' ? [] : (this.handlers.attention?.() || []);
+      const plain = !this.filter && !this.showArchived && this.statusFilter === 'all';
+      // The rollup by state (AC-255): a small summary row first, whatever is running.
+      const counts = plain ? Rollup.parts(this.rollup()) : [];
+      if (counts.length) out.push(this.rollupRow(counts));
+      const needs = plain ? (this.handlers.attention?.() || []) : [];
       if (needs.length) out.push(this.needsSection(needs));
       if (m.swarms.length && !this.filter && !this.showArchived) out.push(this.swarmsSection());
       const repos = [...new Set(this.visibleTasks().map(t => t.repo_root))];
@@ -277,7 +297,7 @@ class AgentsProvider {
     item.iconPath = new vscode.ThemeIcon('organization');
     item.description = `${working} working · ${counts.ready || 0} ready · ${counts.blocked || 0} blocked` +
       (run.unconfirmed_exit_count ? ` · ${unconfirmedExitLabel(run.unconfirmed_exit_count)}` : '');
-    item.tooltip = `${run.objective}\n${run.status} · ${run.job_counts?.total || 0} jobs\n${item.description}\nProvider usage ${run.capacity?.provider_usage_state || 'unknown'}`;
+    item.tooltip = `${run.objective}\n${plainStatus(run.status)} · ${run.job_counts?.total || 0} jobs\n${item.description}\nProvider usage ${run.capacity?.provider_usage_state || 'unknown'}`;
     item.accessibilityInformation = { label: `${run.category} swarm, ${run.status}, ${item.description}` };
     item.contextValue = 'swarm-run-' + run.status;
     return { item, swarm: run, parent };
@@ -290,7 +310,7 @@ class AgentsProvider {
       const item = new vscode.TreeItem('Director');
       item.id = 'swarm-director:' + run.id;
       item.iconPath = new vscode.ThemeIcon('account');
-      item.description = run.director?.process_status || run.director?.owner_status || 'not started';
+      item.description = plainStatus(run.director?.process_status || run.director?.owner_status || 'not started');
       item.contextValue = 'swarm-director';
       rows.push({ item, parent });
       const capacity = new vscode.TreeItem('Capacity', vscode.TreeItemCollapsibleState.Collapsed);
@@ -318,7 +338,7 @@ class AgentsProvider {
         ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
       item.id = `swarm-job:${run.id}:${job.id}`;
       item.iconPath = statusIcon(active?.status || job.status);
-      item.description = active?.status === 'running' ? 'working' : active?.status || job.status;
+      item.description = plainStatus(active?.status === 'running' ? 'working' : active?.status || job.status);
       item.tooltip = `${job.acceptance}\n${item.description} · ${job.attempt_count} attempts`;
       item.accessibilityInformation = { label: `${job.title}, ${item.description}, ${job.attempt_count} attempts` };
       item.contextValue = 'swarm-job';
@@ -436,13 +456,24 @@ class AgentsProvider {
     const item = new vscode.TreeItem('Worker');
     item.id = `swarm-worker:${worker.overseer_run_id}`;
     item.iconPath = this.logo(worker.harness);
-    item.description = worker.status === 'running' ? 'working' : worker.status;
+    item.description = plainStatus(worker.status === 'running' ? 'working' : worker.status);
     const profile = worker.profile_id ? this.model.profile(worker.profile_id) : undefined;
     item.tooltip = [worker.harness, profile?.name, worker.model, worker.status].filter(Boolean).join(' · ');
     item.accessibilityInformation = { label: `Worker, ${item.tooltip}` };
     item.contextValue = 'swarm-worker';
     item.command = { command: 'overseer.selectRun', title: 'Open worker', arguments: [worker.overseer_run_id] };
     return { item, worker, parent };
+  }
+  rollupRow(parts) {
+    const text = parts.map(p => p.text).join(' · ');
+    const item = new vscode.TreeItem(text);
+    item.id = 'section:rollup';
+    item.iconPath = new vscode.ThemeIcon('pulse');
+    item.tooltip = `${text}\nClick to show only one of them.`;
+    item.accessibilityInformation = { label: `Agents: ${text}` };
+    item.contextValue = 'section-rollup';
+    item.command = { command: 'overseer.filterAgents', title: 'Filter agents', arguments: [] };
+    return { item, rollup: parts };
   }
   needsSection(list) {
     const item = new vscode.TreeItem('Needs you', this.expansion('section:needs'));
@@ -483,12 +514,16 @@ class AgentsProvider {
   repoNode(repo) {
     const tasks = this.visibleTasks().filter(t => t.repo_root === repo);
     const active = tasks.filter(t => ACTIVE.has(this.rootOf(t)?.status)).length;
+    // AC-256: the badge counts finished work not reviewed yet too, so a repository that just
+    // finished several agents never looks untouched; it reaches nothing once all are reviewed.
+    const fresh = tasks.map(t => this.rootOf(t)).filter(r => r && !ACTIVE.has(r.status) && this.unreviewed(r));
+    const toReview = fresh.filter(r => Rollup.DONE.has(r.status)).length, failed = fresh.length - toReview;
     const item = new vscode.TreeItem(path.basename(repo), this.expansion('repo:' + repo));
     item.id = 'repo:' + repo;
     item.iconPath = new vscode.ThemeIcon('repo');
-    item.description = active ? String(active) : '';
-    item.tooltip = repo;
-    item.accessibilityInformation = { label: `${path.basename(repo)}, ${tasks.length} agent${tasks.length === 1 ? '' : 's'}${active ? `, ${active} active` : ''}` };
+    item.description = [active && String(active), toReview && `${toReview} to review`, failed && `${failed} failed`].filter(Boolean).join(' · ');
+    item.tooltip = [repo, active && `${active} working`, toReview && `${toReview} done, to review`, failed && `${failed} failed, to review`].filter(Boolean).join('\n');
+    item.accessibilityInformation = { label: `${path.basename(repo)}, ${tasks.length} agent${tasks.length === 1 ? '' : 's'}${active ? `, ${active} active` : ''}${toReview ? `, ${toReview} to review` : ''}${failed ? `, ${failed} failed` : ''}` };
     item.contextValue = 'repo';
     return { item, repo };
   }
@@ -505,13 +540,15 @@ class AgentsProvider {
     const o = (m.state.overseer && m.state.overseer.run_id ? (m.state.oversight || {})[run.id] : undefined) || {};
     const voiced = this.handlers.voiceTargeted?.().has(run.id);
     const marks = [voiced && '🎙 voice', o.held && '⏸ held', o.watched && '◉ watched', o.watching && o.watching.length && '◉ watching', o.conflicts && `⚠ ${o.conflicts} conflict${o.conflicts === 1 ? '' : 's'}`].filter(Boolean);
+    const fresh = !ACTIVE.has(run.status) && this.unreviewed(run);
+    // The ✦ badge marks it (its colour, tooltip and accessible name say "to review"); the row's words stay short.
     item.description = [ACTIVE.has(run.status) ? '' : ago(run.ended_ms || run.created_ms), ...marks].filter(Boolean).join(' · ');
     const profile = run.profile_id ? m.profile(run.profile_id) : undefined;
     const ws = m.workspace(run.workspace_id);
     const status = STATUS_TEXT[run.status] || run.status;
-    item.tooltip = new vscode.MarkdownString([`**${task.title}**`, `${status}${(run.plain_reason || run.exit_reason) && !ACTIVE.has(run.status) ? ` — ${run.plain_reason || run.exit_reason}` : ''}`,
-      [run.harness, profile?.name, run.model].filter(Boolean).join(' · '), ws ? `${ws.kind === 'current' ? 'current checkout' : ws.branch} · ${path.basename(task.repo_root)}` : ''].filter(Boolean).join('\n\n'));
-    item.accessibilityInformation = { label: `${task.title}, ${status}, ${run.harness}${profile ? ', ' + profile.name : ''}${marks.length ? ', ' + marks.map(x => x.replace(/^\S+ /, '')).join(', ') : ''}` };
+    item.tooltip = new vscode.MarkdownString([`**${task.title}**`, `${status}${(run.plain_reason || run.exit_reason) && !ACTIVE.has(run.status) ? ` — ${run.plain_reason || Plain.plain(run.exit_reason, 200)}` : ''}`,
+      [HARNESS_NAME[run.harness] || run.harness, profile?.name, run.model].filter(Boolean).join(' · '), ws ? `${ws.kind === 'current' ? 'current checkout' : ws.branch} · ${path.basename(task.repo_root)}` : ''].filter(Boolean).join('\n\n'));
+    item.accessibilityInformation = { label: `${task.title}, ${status}${fresh ? ', to review' : ''}, ${HARNESS_NAME[run.harness] || run.harness}${profile ? ', ' + profile.name : ''}${marks.length ? ', ' + marks.map(x => x.replace(/^\S+ /, '')).join(', ') : ''}` };
     if (marks.length) item.tooltip.appendMarkdown(`\n\n${[voiced && 'A spoken request is for this agent', o.held && `Held: ${o.hold_reason || ''}`, o.watched && 'Watched by another agent', o.watching && o.watching.length && 'Watching another agent', o.conflicts && `${o.conflicts} open conflict${o.conflicts === 1 ? '' : 's'}`, o.area && o.area.length && `Area: ${o.area.join(', ')}`].filter(Boolean).join('\n\n')}`);
     const pinned = (this.handlers.pinned?.() || []).includes(run.id);
     item.contextValue = `agent-${ACTIVE.has(run.status) ? 'active' : 'done'}${task.archived_ms ? '-archived' : ''}${pinned ? '-pinned' : ''}`;
@@ -580,7 +617,7 @@ class AccountsProvider {
         item.id = 'provider:' + pr.id;
         item.iconPath = pr.available ? this.logo(pr.id, 'account') : new vscode.ThemeIcon('circle-slash');
         item.description = pr.available ? '' : 'unavailable';
-        item.tooltip = pr.available ? `${pr.label}\nSign-in: ${pr.sign_in || 'provider flow'}. Account login only; no API keys.` : pr.why;
+        item.tooltip = pr.available ? `${pr.label}\nAccount login only; no API keys.` : Plain.plain(pr.why, 200);
         item.contextValue = pr.available && pr.id !== 'local' ? 'provider' : 'provider-unavailable';
         return { item, provider: pr };
       });
@@ -594,6 +631,7 @@ class AccountsProvider {
       let detail = 'status not checked';
       if (st) {
         if (!st.installed) detail = 'harness not installed';
+        // The plan and the identity's short fingerprint tell two accounts of one plan apart (not an internal id).
         else if (st.logged_in) detail = [st.identity?.plan, (st.identity?.account_fingerprint || st.identity?.fingerprint || '').slice(0, 8)].filter(Boolean).join(' · ') || 'signed in';
         else detail = 'signed out';
       }
@@ -611,7 +649,7 @@ class AccountsProvider {
       item.description = `${detail}${a.kind === 'follows-app' ? ' · desktop' : ''}${near ? ` · ${Math.round(near.used * 100)}% of ${near.label}` : ''}`;
       item.iconPath = st?.logged_in ? this.logo(a.provider, 'account') : new vscode.ThemeIcon('circle-slash');
       item.accessibilityInformation = { label: `${a.name}, ${st?.logged_in ? 'signed in' : 'not signed in'}${detail && st?.logged_in ? ', ' + detail : ''}${a.kind === 'follows-app' ? ', follows the desktop app' : ''}` };
-      item.tooltip = new vscode.MarkdownString(`**${a.name}** — ${node.provider.label}\n\n${a.kind === 'follows-app' ? `Follows ${a.follows}. It changes when that app switches accounts; Overseer never signs it out.` : `Fixed account with its own credential folder: \`${p.home || ''}\`. The desktop app switching accounts does not change it.`}\n\nUsable by: ${(a.harnesses || []).join(', ')}${a.last_used_ms ? `\n\nLast used ${new Date(a.last_used_ms).toLocaleString()}` : ''}\n\n${usage?.reported ? `Usage (${usage.source}): ${(usage.windows || []).map(w => `${w.label} ${Math.round(w.used * 100)}%${w.resets_at_ms ? `, resets ${new Date(w.resets_at_ms).toLocaleString()}` : ''}`).join('; ')}` : 'Usage: not reported by this harness yet'}${st ? '\n\n```\n' + (st.detail || '') + '\n```' : ''}`);
+      item.tooltip = new vscode.MarkdownString(`**${a.name}** — ${node.provider.label}\n\n${a.kind === 'follows-app' ? `Follows ${a.follows}. It changes when that app switches accounts; Overseer never signs it out.` : `Fixed account with its own credential folder: \`${p.home || ''}\`. The desktop app switching accounts does not change it.`}\n\nUsable by: ${(a.harnesses || []).map(h => HARNESS_NAME[h] || h).join(', ')}${a.last_used_ms ? `\n\nLast used ${new Date(a.last_used_ms).toLocaleString()}` : ''}\n\n${usage?.reported ? `Usage (${usage.source}): ${(usage.windows || []).map(w => `${w.label} ${Math.round(w.used * 100)}%${w.resets_at_ms ? `, resets ${new Date(w.resets_at_ms).toLocaleString()}` : ''}`).join('; ')}` : 'Usage: not reported by this harness yet'}`);
       // The sign-in state picks the menu: Sign In for a signed-out account, Sign Out only for a signed-in one.
       item.contextValue = `${a.kind === 'follows-app' ? 'profile-system' : 'profile-isolated'}-${st?.logged_in ? 'signedin' : 'signedout'}`;
       return { item, profile: p, account: a };

@@ -231,7 +231,7 @@ fn t16_accounts_panel_and_sign_in_from_the_terminal() {
     tui.until(10, |a| a.accounts.len() >= 3 && a.accounts.iter().all(|x| x.status.is_some()));
     let s = tui.screen();
     assert!(s.contains("OpenAI / ChatGPT") && s.contains("Anthropic / Claude"), "{s}");
-    assert!(s.contains("codex (existing login)") && s.contains("follows app") && s.contains("✓ signed in · pro"), "{s}");
+    assert!(s.contains("Your login") && s.contains("follows app") && s.contains("✓ signed in · pro"), "{s}");
     assert!(s.contains("ChatGPT Work") && s.contains("fixed") && s.contains("✗ not signed in"), "{s}");
     assert!(s.contains("never API keys"), "{s}");
     tui.snapshot("t16-accounts");

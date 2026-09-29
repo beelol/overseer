@@ -182,7 +182,7 @@ fn t08_start_agents_from_the_new_agent_form() {
     tui.key(KeyCode::Enter);
     assert_eq!(tui.app.form.error.as_deref(), Some("Type what the agent should do."));
     let s = tui.screen();
-    assert!(s.contains("claude (existing login)"), "compatible account offered:\n{s}");
+    assert!(s.contains("Your login"), "compatible account offered (the machine's own login, as VS Code names it):\n{s}");
     tui.key(KeyCode::BackTab); // → Repository
     tui.key(KeyCode::BackTab); // → Prompt (wraps)
     assert_eq!(tui.app.form.field, 4);

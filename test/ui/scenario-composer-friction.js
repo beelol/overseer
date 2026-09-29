@@ -21,7 +21,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     // A second repository nobody has opened: only its path is known to the owner.
     const other = makeRepo(path.join(s.root, 'elsewhere', 'notes-repo'), { dirty: false });
     fs.mkdirSync(path.join(s.root, 'not-a-repo'), { recursive: true });
-    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'overseer.followNewRuns': false, 'files.simpleDialog.enable': true });
+    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'overseer.home.sendTo': 'agent', 'overseer.followNewRuns': false, 'files.simpleDialog.enable': true });
     s.install(latestVsix());
     fs.writeFileSync(modeFile, 'echo');
     s.launch(repo, { OVERSEER_CLAUDE_PATH: path.join(repoRoot, 'fixtures/fake-harness/claude-fixture.js'), OVERSEER_CODEX_PATH: '/nonexistent/codex', OVERSEER_OPENCODE_PATH: '/nonexistent/opencode',

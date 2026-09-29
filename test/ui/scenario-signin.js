@@ -33,7 +33,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await delay(1500);
     await cdp.command('Notifications: Clear All Notifications');
     const missing = await refreshUntil('Claude work', /signed out/);
-    await cdp.command('Overseer: New Task');
+    await cdp.command('Overseer: Start an Agent with the Full Form');
     const form = await cdp.webview(`document.body.dataset.ready === '1' && !!document.getElementById('harnesses')`, 30000);
     await form.waitFor(`document.querySelectorAll('#harnesses .tile').length >= 3`, 20000);
     await form.eval(`[...document.querySelectorAll('#harnesses .tile')].find(t => /Claude Code/.test(t.textContent)).click()`);

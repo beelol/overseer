@@ -23,7 +23,7 @@ const { auditExpression } = require('./audit');
   try {
     const repo = makeRepo(path.join(s.root, 'followups-repo'), { dirty: false });
     const settingsFile = path.join(s.profile, 'User/settings.json');
-    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'window.dialogStyle': 'custom', 'window.menuStyle': 'custom', 'overseer.grid.maxTiles': 9 });
+    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'overseer.home.sendTo': 'agent', 'window.dialogStyle': 'custom', 'window.menuStyle': 'custom', 'overseer.grid.maxTiles': 9 });
     s.install(latestVsix());
     s.launch(repo, { OVERSEER_CODEX_PATH: cli, OVERSEER_CLAUDE_PATH: cli, OVERSEER_OPENCODE_PATH: '/nonexistent/opencode', OVERSEER_TEST_SYSTEM_HOME: sys, FIXTURE_LOGIN_ACCOUNT_FILE: next,
       OVERSEER_HARNESS_ENV_PASSTHROUGH: 'FIXTURE_LOGIN_ACCOUNT_FILE,OVERSEER_TEST_SYSTEM_HOME' });
@@ -191,9 +191,9 @@ const { auditExpression } = require('./audit');
       counts.push(await cdp.webview(`document.body.dataset.mode === 'grid'`, 10000).then(v => v.eval(`document.querySelectorAll('.grid .tile').length`)).catch(() => 0));
       await s.screenshot('grid-nine-' + t.split(' ')[1].toLowerCase());
       await cdp.command('Overseer: Toggle Agent Grid'); await delay(1500);
-      await cdp.command('Overseer: Open Dashboard'); await delay(3500);
+      await cdp.command('Overseer: Enter Focus Mode'); await delay(3500);
       await s.screenshot('dashboard-nine-' + t.split(' ')[1].toLowerCase());
-      await cdp.command('Overseer: Exit Dashboard'); await delay(2000);
+      await cdp.command('Overseer: Exit Focus Mode'); await delay(2000);
     }
     await theme('Overseer Dark');
     check('the grid and dashboard mode are captured with nine working agents in both Overseer themes (nine tiles each time)', counts.length === 2 && counts.every(n => n === 9), { counts });

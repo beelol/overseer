@@ -1158,7 +1158,7 @@ impl App {
     /// The terminal window title: counts that matter when the TUI is in another tab.
     pub fn window_title(&self) -> String {
         let all = self.state.agents();
-        let needs = all.iter().filter(|r| r.needs_you()).count();
+        let needs = self.state.needs_you_count();
         let active = all.iter().filter(|r| r.active()).count();
         match (needs, active) {
             (0, 0) => "Overseer".into(),

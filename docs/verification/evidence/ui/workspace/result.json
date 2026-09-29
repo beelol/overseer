@@ -1,0 +1,395 @@
+{
+  "checks": [
+    {
+      "name": "1440x900: the cluttered start: side bar, terminal panel and two editor groups with the owner's tabs",
+      "ok": true,
+      "detail": {
+        "sidebar": true,
+        "panel": true,
+        "auxiliary": false,
+        "sidebarTitle": "Explorer",
+        "groups": [
+          {
+            "width": 541,
+            "share": 0.5,
+            "tabs": [
+              "a.txt",
+              "b.txt",
+              "c.txt"
+            ],
+            "active": "c.txt"
+          },
+          {
+            "width": 541,
+            "share": 0.5,
+            "tabs": [
+              "c.txt",
+              "d.txt",
+              "e.txt",
+              "README.md"
+            ],
+            "active": "README.md"
+          }
+        ]
+      }
+    },
+    {
+      "name": "1440x900: the status bar has a Workspace button",
+      "ok": true,
+      "detail": {
+        "text": "Workspace",
+        "x": 411.3984375,
+        "y": 884
+      }
+    },
+    {
+      "name": "1440x900: one click gives the three-part layout: Overseer's conversation, the agent's review, the agent's chat",
+      "ok": true,
+      "detail": {
+        "took": 1908,
+        "groups": [
+          {
+            "width": 380,
+            "share": 0.27,
+            "tabs": [
+              "Overseer"
+            ],
+            "active": "Overseer"
+          },
+          {
+            "width": 622,
+            "share": 0.45,
+            "tabs": [
+              "Review: Live edits (1)"
+            ],
+            "active": "Review: Live edits (1)"
+          },
+          {
+            "width": 380,
+            "share": 0.27,
+            "tabs": [
+              "Live edits"
+            ],
+            "active": "Live edits"
+          }
+        ],
+        "view": {
+          "mode": "composer",
+          "composer": true
+        }
+      }
+    },
+    {
+      "name": "1440x900: the terminal panel and the owner's tabs are gone; each column is at least 360 px",
+      "ok": true,
+      "detail": {
+        "panel": false,
+        "ownerTabs": [],
+        "widths": [
+          380,
+          622,
+          380
+        ]
+      }
+    },
+    {
+      "name": "1440x900: sized for the screen: the side bar gives way at this width; the review is the widest column",
+      "ok": true,
+      "detail": {
+        "sidebar": false,
+        "title": "",
+        "widths": [
+          380,
+          622,
+          380
+        ]
+      }
+    },
+    {
+      "name": "1440x900: the review follows the working agent (its file grows while the workspace is open)",
+      "ok": true,
+      "detail": {
+        "before": 17,
+        "after": 20
+      }
+    },
+    {
+      "name": "1440x900: the button now reads Close Workspace",
+      "ok": true,
+      "detail": {
+        "text": "Close Workspace",
+        "x": 429.01171875,
+        "y": 884
+      }
+    },
+    {
+      "name": "1440x900: closing restores the original layout exactly (parts, groups and sizes, each group's tabs in order and its active tab)",
+      "ok": true,
+      "detail": {
+        "before": {
+          "sidebar": true,
+          "panel": true,
+          "auxiliary": false,
+          "sidebarTitle": "Explorer",
+          "groups": [
+            {
+              "width": 541,
+              "share": 0.5,
+              "tabs": [
+                "a.txt",
+                "b.txt",
+                "c.txt"
+              ],
+              "active": "c.txt"
+            },
+            {
+              "width": 541,
+              "share": 0.5,
+              "tabs": [
+                "c.txt",
+                "d.txt",
+                "e.txt",
+                "README.md"
+              ],
+              "active": "README.md"
+            }
+          ]
+        },
+        "after": {
+          "sidebar": true,
+          "panel": true,
+          "auxiliary": false,
+          "sidebarTitle": "Explorer",
+          "groups": [
+            {
+              "width": 541,
+              "share": 0.5,
+              "tabs": [
+                "a.txt",
+                "b.txt",
+                "c.txt"
+              ],
+              "active": "c.txt"
+            },
+            {
+              "width": 541,
+              "share": 0.5,
+              "tabs": [
+                "c.txt",
+                "d.txt",
+                "e.txt",
+                "README.md"
+              ],
+              "active": "README.md"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "1920x1080: the cluttered start: side bar, terminal panel and two editor groups with the owner's tabs",
+      "ok": true,
+      "detail": {
+        "sidebar": true,
+        "panel": true,
+        "auxiliary": false,
+        "sidebarTitle": "Explorer",
+        "groups": [
+          {
+            "width": 781,
+            "share": 0.5,
+            "tabs": [
+              "a.txt",
+              "b.txt",
+              "c.txt"
+            ],
+            "active": "c.txt"
+          },
+          {
+            "width": 781,
+            "share": 0.5,
+            "tabs": [
+              "c.txt",
+              "d.txt",
+              "e.txt",
+              "README.md"
+            ],
+            "active": "README.md"
+          }
+        ]
+      }
+    },
+    {
+      "name": "1920x1080: the status bar has a Workspace button",
+      "ok": true,
+      "detail": {
+        "text": "Workspace",
+        "x": 411.3984375,
+        "y": 1064
+      }
+    },
+    {
+      "name": "1920x1080: one click gives the three-part layout: Overseer's conversation, the agent's review, the agent's chat",
+      "ok": true,
+      "detail": {
+        "took": 1709,
+        "groups": [
+          {
+            "width": 406,
+            "share": 0.26,
+            "tabs": [
+              "Overseer"
+            ],
+            "active": "Overseer"
+          },
+          {
+            "width": 750,
+            "share": 0.48,
+            "tabs": [
+              "Review: Live edits (1)"
+            ],
+            "active": "Review: Live edits (1)"
+          },
+          {
+            "width": 406,
+            "share": 0.26,
+            "tabs": [
+              "Live edits"
+            ],
+            "active": "Live edits"
+          }
+        ],
+        "view": {
+          "mode": "composer",
+          "composer": true
+        }
+      }
+    },
+    {
+      "name": "1920x1080: the terminal panel and the owner's tabs are gone; each column is at least 360 px",
+      "ok": true,
+      "detail": {
+        "panel": false,
+        "ownerTabs": [],
+        "widths": [
+          406,
+          750,
+          406
+        ]
+      }
+    },
+    {
+      "name": "1920x1080: sized for the screen: the side bar stays (Overseer's agents); the review is the widest column",
+      "ok": true,
+      "detail": {
+        "sidebar": true,
+        "title": "Overseer",
+        "widths": [
+          406,
+          750,
+          406
+        ]
+      }
+    },
+    {
+      "name": "1920x1080: the review follows the working agent (its file grows while the workspace is open)",
+      "ok": true,
+      "detail": {
+        "before": 25,
+        "after": 29
+      }
+    },
+    {
+      "name": "1920x1080: the button now reads Close Workspace",
+      "ok": true,
+      "detail": {
+        "text": "Close Workspace",
+        "x": 429.01171875,
+        "y": 1064
+      }
+    },
+    {
+      "name": "1920x1080: closing restores the original layout exactly (parts, groups and sizes, each group's tabs in order and its active tab)",
+      "ok": true,
+      "detail": {
+        "before": {
+          "sidebar": true,
+          "panel": true,
+          "auxiliary": false,
+          "sidebarTitle": "Explorer",
+          "groups": [
+            {
+              "width": 781,
+              "share": 0.5,
+              "tabs": [
+                "a.txt",
+                "b.txt",
+                "c.txt"
+              ],
+              "active": "c.txt"
+            },
+            {
+              "width": 781,
+              "share": 0.5,
+              "tabs": [
+                "c.txt",
+                "d.txt",
+                "e.txt",
+                "README.md"
+              ],
+              "active": "README.md"
+            }
+          ]
+        },
+        "after": {
+          "sidebar": true,
+          "panel": true,
+          "auxiliary": false,
+          "sidebarTitle": "Explorer",
+          "groups": [
+            {
+              "width": 781,
+              "share": 0.5,
+              "tabs": [
+                "a.txt",
+                "b.txt",
+                "c.txt"
+              ],
+              "active": "c.txt"
+            },
+            {
+              "width": 781,
+              "share": 0.5,
+              "tabs": [
+                "c.txt",
+                "d.txt",
+                "e.txt",
+                "README.md"
+              ],
+              "active": "README.md"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Overseer: Open Workspace from the palette opens it and running it again closes it",
+      "ok": true,
+      "detail": {
+        "viaPalette": [
+          "Overseer",
+          "Review: Live edits (1)",
+          "Live edits"
+        ],
+        "back": [
+          "c.txt",
+          "README.md"
+        ]
+      }
+    },
+    {
+      "name": "no setting changed (apart from VS Code's own migration)",
+      "ok": true
+    }
+  ]
+}

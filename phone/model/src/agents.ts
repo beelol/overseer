@@ -79,33 +79,27 @@ export interface NeedsYou {
 const HARNESS_LOGO: Readonly<Record<string, LogoKey>> = { claude: 'claudecode', codex: 'codex', 'codex-app': 'codex', opencode: 'opencode' };
 const PROVIDER_LOGO: Readonly<Record<string, LogoKey>> = { anthropic: 'claude', openai: 'openai', local: 'opencode', github: 'github' };
 const BADGE_TONE: Readonly<Record<string, BadgeTone>> = { queued: 'yellow', starting: 'blue', running: 'blue', waiting_for_user: 'orange', completed: 'green', failed: 'red', interrupted: 'quiet', disconnected: 'red', unknown: 'purple' };
-const WEEK = 7 * 86400000;
 
 export const logoForHarness = (harness: string): LogoKey | null => HARNESS_LOGO[harness] ?? null;
 export const logoForProvider = (provider: string): LogoKey | null => PROVIDER_LOGO[provider] ?? null;
 
-/** The agents that need the owner, most urgent first (extension.js `attention`). */
-export function needsYou(state: PhoneState, options: Pick<AgentsOptions, 'now' | 'seen' | 'changed'>): ReadonlyArray<NeedsYou> {
-  const runs = rowsOfTable(state.runs).filter(r => !r.parent_run_id);
-  const when = (r: Run): number => r.ended_ms || r.created_ms;
-  // Only the 40 most recently finished runs are looked at for changes to review.
-  const recent = new Set(runs.filter(r => r.status === 'completed').sort((a, b) => when(b) - when(a)).slice(0, 40).map(r => r.id));
+/**
+ * The agents that need the owner (AC-246): what waits for their answer, counted as VS Code and the
+ * TUI count it (extension/media/rollup.js `needsYou`): each non-archived task's newest top-level run
+ * that waits on a permission or a question. Failed and finished agents are "to review" instead
+ * (AC-254), not Needs you. (Overseer's own proposals are counted by VS Code and the TUI; the phone
+ * does not receive them yet.)
+ */
+export function needsYou(state: PhoneState, _options: Pick<AgentsOptions, 'now' | 'seen' | 'changed'>): ReadonlyArray<NeedsYou> {
   const out: NeedsYou[] = [];
   const t = TEXT.agents;
-  for (const r of runs) {
+  for (const r of rootsOf(state).values()) {
     if (taskOf(state, r.task_id)?.archived_ms) continue;
-    const seen = options.seen?.[r.id] || 0;
-    if (r.status === 'waiting_for_user') {
-      const asks = r.attention?.kind === 'permission';
-      out.push({ run_id: r.id, rank: 0, label: asks ? t.approve : t.reply, detail: asks ? t.wantsToUse(String(r.attention?.tool)) : t.waitingForReply });
-    } else if (['failed', 'disconnected'].includes(r.status) && seen < when(r)) {
-      out.push({ run_id: r.id, rank: 1, label: t.failed, detail: r.exit_reason || t.agentFailed });
-    } else if (r.status === 'completed' && recent.has(r.id) && seen < when(r) && options.now - when(r) < WEEK) {
-      const n = options.changed?.[r.id];
-      if (n) out.push({ run_id: r.id, rank: 2, label: t.review, detail: t.filesChanged(n) });
-    }
+    const asks = r.attention?.kind === 'permission';
+    if (r.status !== 'waiting_for_user') continue;
+    out.push({ run_id: r.id, rank: 0, label: asks ? t.approve : t.reply, detail: asks ? t.wantsToUse(String(r.attention?.tool || 'a tool')) : t.waitingForReply });
   }
-  return out.sort((a, b) => a.rank - b.rank);
+  return out;
 }
 
 /** For a badge and a status line: runs still going, and agents that need the owner. */

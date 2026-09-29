@@ -48,7 +48,7 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     await s.screenshot('before');
     check('starting layout: side bar and panel open, two editor groups', before.sidebar && before.panel && before.groups === 2, before);
 
-    await cdp.command('Overseer: Open Dashboard');
+    await cdp.command('Overseer: Enter Focus Mode');
     const dash = await s.editorView();
     await delay(1500);
     const during = await layout();
@@ -99,7 +99,7 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     check('the dashboard survives a window reload (still in dashboard mode)', !!dash2 && afterReload.sidebar && !afterReload.panel && await dash2.eval(`document.body.dataset.dashboard === '1'`), afterReload);
 
     // Exit restores the previous layout exactly.
-    await cdp.command('Overseer: Exit Dashboard');
+    await cdp.command('Overseer: Exit Focus Mode');
     await delay(2500);
     const after = await layout();
     await s.screenshot('after-exit');
@@ -120,7 +120,7 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     const dash3 = await cdp.webview(`document.body.dataset.ready === '1' && document.body.dataset.dashboard === '1'`, 40000).catch(() => null);
     check('with overseer.dashboard.openOnStartup the dashboard opens when VS Code starts', !!dash3);
     await s.screenshot('open-on-startup');
-    await cdp.command('Overseer: Exit Dashboard');
+    await cdp.command('Overseer: Exit Focus Mode');
     await delay(1500);
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;

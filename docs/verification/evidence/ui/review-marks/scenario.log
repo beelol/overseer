@@ -1,0 +1,16 @@
+[2026-09-29T14:44:05.113Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-29T14:44:15.224Z] PASS a repository whose last working agent finishes unreviewed shows a nonzero badge before and after {"before":"1","after":"1 to review"}
+[2026-09-29T14:44:17.991Z] PASS six finished agents, none reviewed: each carries the "to review" mark (✦), and its accessible name says so [{"t":"Notes index","badge":"✦","aria":"Notes index, done, to review, Program"},{"t":"Notes search","badge":"✦","aria":"Notes search, done, to review, Program"},{"t":"Notes export","badge":"✦","aria":"Notes export, done, to review, Program"},{"t":"Site header","badge":"✦","aria":"Site header, done, to review, Program"},{"t":"Site footer","badge":"✦","aria":"Site footer, done, to review, Program"},{"t":"Site pricing","badge":"✦","aria":"Site pricing, done, to review, Program"}]
+[2026-09-29T14:44:17.991Z] PASS the count per repository and in the Agents view's header: 3 and 3, 6 overall {"site":"3 to review","notes":"3 to review","header":"Agents 6 to review"}
+[2026-09-29T14:44:17.991Z] PASS the side bar's rollup row (AC-255) reads the same 6 to review {"label":"6 to review","description":"","level":1,"aria":"Agents: 6 to review","badge":""}
+[2026-09-29T14:44:18.037Z] screenshot docs/verification/evidence/ui/review-marks/01-six-to-review.png
+[2026-09-29T14:44:22.712Z] PASS opening one agent's review clears only its own mark: ✓ for it, ✦ for the other five, site 2 and notes 3 {"own":"✓","others":["✦","✦","✦","✦","✦"],"site":"2 to review","notes":"3 to review","header":"Agents 5 to review","reviewOpen":true}
+[2026-09-29T14:44:27.896Z] PASS at three reviewed, three still carry the mark {"header":"Agents 3 to review","marked":["Site pricing","Notes export","Notes search"]}
+[2026-09-29T14:44:27.972Z] screenshot docs/verification/evidence/ui/review-marks/02-three-to-review.png
+[2026-09-29T14:44:30.586Z] PASS site's badge is empty once every agent in it is reviewed {"label":"site","description":"","level":1,"aria":"site, 3 agents","badge":""}
+[2026-09-29T14:44:31.114Z] PASS notes's badge counts down as its agents are archived and is empty when none is left to review {"oneLeft":"1 to review","after":""}
+[2026-09-29T14:44:36.166Z] PASS with 12 agents at their end (11 finished, 1 failed) and none working, the side bar's rollup reads nonzero counts {"sideRollup":"7 to review · 4 reviewed · 1 failed","done":14}
+[2026-09-29T14:44:38.770Z] PASS the grid's tile view shows none (the grid command goes home), and its note gives the same counts {"mode":"composer","tiles":0,"note":"No agent is working or pinned yet, so the grid has nothing to show. Of the rest: 7 to review · 4 reviewed · 1 failed. Start one here."}
+[2026-09-29T14:44:38.839Z] screenshot docs/verification/evidence/ui/review-marks/03-grid-has-nothing-rollup.png
+[2026-09-29T14:44:43.158Z] PASS with one agent pinned, the grid's header shows the same rollup as the side bar {"grid":{"text":"7 to review · 4 reviewed · 1 failed","tiles":1},"side":"7 to review · 4 reviewed · 1 failed"}
+[2026-09-29T14:44:43.228Z] screenshot docs/verification/evidence/ui/review-marks/04-grid-header-rollup.png

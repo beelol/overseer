@@ -345,6 +345,14 @@ fn display_tool(name: &str) -> String {
         "shell" | "command_execution" | "commandExecution" => "Run".into(),
         "apply_patch" => "Patch".into(),
         n if n.starts_with("collab:") => "Agent".into(),
+        // A tool's internal name in words (AC-245): mcp__overseer__roster is "roster (Overseer)".
+        n if n.starts_with("mcp__") => {
+            let rest = &n[5..];
+            match rest.split_once("__") {
+                Some((server, tool)) => format!("{} ({})", tool.replace('_', " "), if server == "overseer" { "Overseer".to_string() } else { server.replace(['_', '-'], " ") }),
+                None => rest.replace('_', " "),
+            }
+        }
         n => n.to_string(),
     }
 }
@@ -410,6 +418,9 @@ pub fn describe_input(input: &Value, root: Option<&str>) -> String {
 
 fn permission_summary(tool: &str, input: &Value, root: Option<&str>) -> String {
     let (target, _) = tool_target(tool, &input.to_string(), root);
+    // A tool's internal name in words, and no "null" for a request with no input (AC-245).
+    let tool = &display_tool(tool);
+    let target = if target == "null" { String::new() } else { target };
     let target = if target.is_empty() {
         input["command"].as_array().map(|a| a.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(" ")).or_else(|| input["command"].as_str().map(str::to_string)).unwrap_or_default()
     } else {

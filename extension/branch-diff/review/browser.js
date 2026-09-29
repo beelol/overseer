@@ -7,6 +7,8 @@
 import './browser.css';
 import { StatisticsWorker } from './statistics-client';
 import { EditingClient, replaceText } from './editing-client';
+// A harness by name in tooltips (AC-245), never its lowercase id.
+const HARNESS_NAME = { claude: 'Claude Code', codex: 'Codex', 'codex-app': 'Codex', opencode: 'OpenCode', 'opencode-serve': 'Local model', generic: 'Program' };
 
 const vscode = acquireVsCodeApi();
 const saved = vscode.getState() || {};
@@ -731,7 +733,7 @@ function applyOverseer(o) {
   const scope = document.getElementById('scope');
   if (scope && o.scope && scope.value !== o.scope) scope.value = o.scope;
   document.body.dataset.scope = o.scope || 'all';
-  document.getElementById('comparison').title = [o.runTitle, o.harness, o.workspacePath].filter(Boolean).join('\n');
+  document.getElementById('comparison').title = [o.runTitle, HARNESS_NAME[o.harness] || o.harness, o.workspacePath].filter(Boolean).join('\n');
   // The full path is in the tooltip and data-workspace; the note shows ~/…/last/two.
   const note = document.getElementById('workspace-note');
   const home = document.body.dataset.home || '';
