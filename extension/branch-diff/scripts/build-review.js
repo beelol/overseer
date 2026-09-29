@@ -9,12 +9,24 @@ for (const name of ['monaco-editor', 'esbuild']) {
   if (installed.version !== expected.devDependencies[name]) throw new Error(`Install locked review tools before packaging: ${name}`);
 }
 const esbuild = require(path.join(toolRoot, 'node_modules/esbuild'));
+// Overseer (AC-232): a new file is all added lines. Monaco's fast path for an empty original maps its
+// one empty line onto the new text, drawing a blank removed line above the added ones. When the new
+// text ends with a newline, the empty line is its last line: the new lines are a pure insertion.
+const EMPTY_ORIGINAL = 'new DetailedLineRangeMapping(new LineRange(1, 2), new LineRange(1, modified.getLineCount() + 1), [';
+const newFileIsAdded = { name: 'overseer-new-file-is-added', setup(build) {
+  build.onLoad({ filter: /diffEditor[\\/]diffProviderFactoryService\.js$/ }, async args => {
+    const source = fs.readFileSync(args.path, 'utf8');
+    if (!source.includes(EMPTY_ORIGINAL)) throw new Error('Monaco changed its empty-original diff: update build-review.js');
+    const last = 'modified.getLineCount() > 1 && modified.getLineMaxColumn(modified.getLineCount()) === 1';
+    return { contents: source.replace(EMPTY_ORIGINAL, `new DetailedLineRangeMapping(${last} ? new LineRange(1, 1) : new LineRange(1, 2), new LineRange(1, modified.getLineCount() + (${last} ? 0 : 1)), [`), loader: 'js' };
+  });
+} };
 async function build() {
   const outdir = path.join(root, 'dist');
   fs.mkdirSync(outdir, { recursive: true });
   for (const file of fs.readdirSync(outdir)) fs.rmSync(path.join(outdir, file), { recursive: true });
   const common = { absWorkingDir: root, bundle: true, minify: true, target: 'chrome130', logLevel: 'warning',
-    nodePaths: [path.join(toolRoot, 'node_modules')], loader: { '.ttf': 'file' }, legalComments: 'eof', metafile: true };
+    nodePaths: [path.join(toolRoot, 'node_modules')], loader: { '.ttf': 'file' }, legalComments: 'eof', metafile: true, plugins: [newFileIsAdded] };
   const worker = await esbuild.build({ ...common, entryPoints: [path.join(toolRoot, 'node_modules/monaco-editor/esm/vs/editor/editor.worker.js')],
     outfile: path.join(outdir, 'editor.worker.js'), format: 'iife', write: false, footer: { js: 'globalThis.postMessage({type: "branch-diff-worker-ready"});' } });
   const statistics = await esbuild.build({ ...common, entryPoints: ['review/statistics-worker.js'], outfile: path.join(outdir, 'statistics.worker.js'), format: 'iife', write: false });

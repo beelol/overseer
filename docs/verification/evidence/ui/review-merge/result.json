@@ -4,7 +4,7 @@
       "name": "fixture: the agent committed data/features.js on its branch and left .env untracked",
       "ok": true,
       "detail": {
-        "log": "629d009 add features\n55d0ceb fixture base",
+        "log": "010335d add features\n85432e8 fixture base",
         "status": "?? .env"
       }
     },
@@ -44,6 +44,20 @@
         "undo": "Undo",
         "keepTitle": "Keep: the agent's change stays, and this hunk is marked reviewed (nothing is committed or staged)",
         "undoTitle": "Undo: put back what was there before the agent's change, in the agent's copy (Cmd+Z in the native editor brings it back)"
+      }
+    },
+    {
+      "name": "the new file is all added lines: no removed line above them, one hunk",
+      "ok": true,
+      "detail": {
+        "deleted": 0,
+        "inserted": 2,
+        "hunks": "1",
+        "lines": [
+          "export const features = [];",
+          "export default features;",
+          ""
+        ]
       }
     },
     {
@@ -105,7 +119,7 @@
       "name": "merged: main has the agent's file, and the pre-commit hook ran for the commit of .env",
       "ok": true,
       "detail": {
-        "log": "bcffea5 Merge overseer/add-the-features-list into main (Overseer merge back)\n44b66ab Overseer: Add the features list\n629d009 add features",
+        "log": "11e2aaf Merge overseer/add-the-features-list into main (Overseer merge back)\n304e832 Overseer: Add the features list\n010335d add features",
         "hooks": "pre-commit overseer/add-the-features-list\npre-commit overseer/add-the-features-list\npre-commit overseer/add-the-features-list\n"
       }
     },
@@ -115,7 +129,7 @@
       "detail": {
         "hidden": false,
         "state": "merged",
-        "text": "Merged into main (bcffea5)",
+        "text": "Merged into main (11e2aaf)",
         "buttons": [
           "cleanup-now:Clean up"
         ]
@@ -124,30 +138,30 @@
     {
       "name": "its conversation says it once, with the commit (no raw \"merge back\" lines)",
       "ok": true,
-      "detail": "Merged into main (bcffea5)"
+      "detail": "Merged into main (11e2aaf)"
     },
     {
       "name": "the side bar reads \"Merged into main (commit)\"",
       "ok": true,
       "detail": {
         "label": "Add the features list",
-        "description": "Merged into main (bcffea5) · now",
+        "description": "Merged into main (11e2aaf) · now",
         "level": 2,
         "expanded": null,
         "selected": true,
         "focused": true,
-        "aria": "Add the features list, done · Merged into main (bcffea5), generic"
+        "aria": "Add the features list, done · Merged into main (11e2aaf), generic"
       }
     },
     {
       "name": "the review reads \"Merged into main (commit)\" and offers Clean up, no Merge",
       "ok": true,
-      "detail": "Merged into main (bcffea5)\nClean up"
+      "detail": "Merged into main (11e2aaf)\nClean up"
     },
     {
       "name": "the grid tile reads \"Merged into main (commit)\"",
       "ok": true,
-      "detail": "Merged into main (bcffea5)"
+      "detail": "Merged into main (11e2aaf)"
     },
     {
       "name": "a merge stopped on conflicts says so in the chat, with Finish merge and Cancel merge",
@@ -163,7 +177,7 @@
     {
       "name": "main is untouched while the merge is stopped",
       "ok": true,
-      "detail": "35cf816 main changes L5\nbcffea5 Merge overseer/add-the-features-list into main (Overseer merge back)"
+      "detail": "dc687f3 main changes L5\n11e2aaf Merge overseer/add-the-features-list into main (Overseer merge back)"
     },
     {
       "name": "Open PR refuses the worktree in the middle of the merge",
