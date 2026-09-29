@@ -1,5 +1,11 @@
 # AC-146: merges
 
+## Pull request #27 (one view for talking to Overseer; it moves you around VS Code; you can tell it is working), 2026-09-29
+
+- **Finished:** marked ready by its agent (head `8d89b0e7`, main merged in). AC-226, AC-227 and AC-228 verified; AC-217 partial (the turn-on frames exist in the Overseer theme only, as stills). It removed the docked Talk to Overseer panel (home is the one view), made Needs you a badge, and fixed a daemon bug that kept stale proposals open (the stuck Needs you).
+- **Tests:** `scripts/test-all --jobs=3` under the machine lock: 64 of 65; the miss, protocol ac45, passes alone three times in a row at load 2.4 (a fixed 1.5 s wait under ~190 parallel tests). #30 then merged, so main was merged in again: `extension/package.json` conflicted (both added settings; all four kept). On that combination: one_view 7, overseer 34, voice 44, notices 8; unit 19 of 19; links; VSIX; UI one-view, home, voice, keys-on-screen, notify-agents, one-signin, keyboard and gallery passed, and talk passed on its rerun (a webview not ready in time on the first).
+- **Merged:** squash, `24c3c245`.
+
 ## Pull request #30 (one Sign In, keys on what you see, notifications outside VS Code), 2026-09-29
 
 - **Finished:** AC-261 and AC-242 verified, AC-240 partial (a click cannot reach the TUI; the owner's real banner). Its agent finished with the final run queued; the coordinator saw it through.

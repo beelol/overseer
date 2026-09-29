@@ -1358,7 +1358,7 @@ rec(114, "Gate K in the owner's VS Code (owner-confirmed)", "not started", date=
 # Gate N, phone remote on the same network (added by the owner on 2026-09-26; docs/rfcs/phone-remote.md). Not started; built in its own worktree and pull request.
 rec(115, 'Feasibility and reuse before lock-in', 'partial',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     proven="on both simulators in release builds, 20 cold starts each with the door and 20 without, recorded by the app itself (the door shown, the first screen, the opening timed and its frames counted on the UI thread) and the baselines written; the encrypted session (Noise IK) between the Rust daemon and the app, resumed on both after five minutes in the background with the daemon restarted half way; the shared test vectors passing in the daemon, in the app's library and in the extension's reference phone; the daemon's exact notification payload delivered to the iOS simulator by the daemon itself, tapped, and Allow on it; Happy inspected at a recorded revision and the decision written down",
@@ -1379,7 +1379,7 @@ rec(115, 'Feasibility and reuse before lock-in', 'partial',
     limits='No iPhone measurement yet; Flutter stays the fallback the RFC names if the iPhone misses the budget.')
 rec(116, 'A gateway switched on and off on the desktop', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd --test gateway` (ac116: refused by default, listens after enabling, sessions dropped and told on disabling, reconnect with no pairing, a phone's request to change the setting refused, a public address refused, unauthenticated and malformed input); the fuzz test (200,000 first frames, 100,000 transport frames).
@@ -1396,7 +1396,7 @@ rec(116, 'A gateway switched on and off on the desktop', 'verified',
     limits='macOS only.')
 rec(117, 'Pairing needs the Mac', 'partial',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     proven='protocol tests for every refusal and the lockout; the code and the confirmation in VS Code and the terminal, in screenshots; the simulator and the emulator pair by typing the code, and the Mac confirms',
@@ -1414,7 +1414,7 @@ rec(117, 'Pairing needs the Mac', 'partial',
     limits='Scanning waits for the iPhone; the camera path is tested against the fake.')
 rec(118, 'Encrypted and mutually authenticated', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd --test gateway` (ac118: a capture of a live session through a recording forwarder holds no method name, prompt or output; an unknown device key, a gateway with the wrong key, a tampered frame, a replayed frame and a replayed handshake are refused).
@@ -1430,7 +1430,7 @@ rec(118, 'Encrypted and mutually authenticated', 'verified',
     limits='macOS only.')
 rec(119, 'Devices, scopes and revoking', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd` (classes: every daemon method has a class and every class a method; the README table matches; a method added without a class fails; ac119 table-driven: a watch-only device refused on every control method, every device on every Mac-only method; revoke during a live stream; events name the device).
@@ -1447,7 +1447,7 @@ rec(119, 'Devices, scopes and revoking', 'verified',
     limits='macOS only.')
 rec(120, 'Found on the network', 'partial',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     proven="the daemon advertises `_overseer._tcp` with its key's fingerprint while phone access is on and withdraws it when off; an impostor with the same name and another key is refused by the handshake; both simulators connect through a typed address, with no pairing again, after the Mac moved to another port",
@@ -1463,7 +1463,7 @@ rec(120, 'Found on the network', 'partial',
     limits="The local network permission and Bonjour browsing are iPhone steps (the RFC's steps for the owner).")
 rec(121, 'Never lose the session', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd --test gateway` (ac121: a stream cut at 100 random points, with the daemon killed mid-stream, equals the daemon's log event for event; `history_truncated` after pruning); `phone/integration` (the same through the app's own library, 10 tests).
@@ -1479,7 +1479,7 @@ rec(121, 'Never lose the session', 'verified',
     limits='macOS only.')
 rec(122, 'Sent exactly once', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd --test gateway` (ac122: the same id three times at once runs once with three identical replies; a connection cut after the request was written and before the reply, then a retry, leaves one turn; a connection lost while sending; outcomes kept across a restart and 25 hours, and 7 days in the store; an interrupted request is not run again).
@@ -1492,7 +1492,7 @@ rec(122, 'Sent exactly once', 'verified',
     limits='macOS only.')
 rec(123, 'The Mac stays awake while it matters', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd --test gateway` (ac123: `pmset -g assertions` names Overseer's assertion during a fixture run and while an agent waits, not afterwards, and never with phone access off; both are events).
@@ -1507,7 +1507,7 @@ rec(123, 'The Mac stays awake while it matters', 'verified',
     limits='macOS only.')
 rec(124, 'See every agent', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cd phone/model && npm test` (149 tests: the store against the daemon's `state` at 111 recorded moments; the conversation of the same run against VS Code's own `conversation.js` in jsdom, item by item; the agents list against `views.js`; Markdown against marked with DOMPurify).
@@ -1522,7 +1522,7 @@ rec(124, 'See every agent', 'verified',
     limits="The delay has no budget of its own in this criterion; AC-58's 250 ms for a VS Code tile is the reference.")
 rec(125, 'Control every agent', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd --test gateway` (ac125: the phone and the Mac answer one permission request at the same moment, 100 rounds: the harness receives one answer each time, the other side gets `already_answered` with the first outcome) and `--test phone_methods` (launch records from the phone equal VS Code's for the same choices).
@@ -1538,7 +1538,7 @@ rec(125, 'Control every agent', 'verified',
     limits="The live turns ran on the iOS simulator only: one each is what the owner's rules allow.")
 rec(126, 'Review on the phone', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd --test phone_methods` (ac126: path escape, symlink, binary, oversized, `.git` in any case; marks made on each surface seen on the other; a hunk that changed since refused; the 10,000-file repository listed through the gateway).
@@ -1555,7 +1555,7 @@ rec(126, 'Review on the phone', 'verified',
     limits="The display budget (at most 1% of frames dropped) is held on the simulator; the emulator's figure is its own baseline.")
 rec(127, 'Everything else Overseer has', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd --test phone_methods` (ac127: device-code sign-in with the synthetic account CLI, the address and the code reach the phone and a credential never does; *Sign in on the Mac* for a provider without one; a pull request through a fake GitHub CLI and a local stand-in remote; merge back; cleanup that lists uncommitted files first; search, archive, stop all; everything the phone received, decrypted, holds no token).
@@ -1578,7 +1578,7 @@ rec(128, 'Talk to Overseer from the phone', 'not started',
     blocker="AC-107 (verified on main through pull request #11) and Overseer's session in the daemon (Gate S, pull request #14) reached main after this milestone was built; the phone half is the next piece of Gate N. Until it is built, Overseer's methods are Mac-only for phones and shown as not yet in the README's phone table.")
 rec(129, 'Needs-you notifications you can switch', 'partial',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     proven="on the iOS simulator: the daemon's exact payload, sent by the daemon itself to the simulator, shows the notification with the app's icon, title and body; a tap on it opens the agent; Allow on it unblocks the fixture; on the Android emulator the app's own banner while the app is open; the payload holds only the allowed fields; each switch off (phone, kind, the Mac) sends nothing and the log says why; a focused VS Code window suppresses the push; a switch changed on the phone reaches the Mac, kept and sent again until the Mac answers",
@@ -1596,7 +1596,7 @@ rec(129, 'Needs-you notifications you can switch', 'partial',
     limits="Apple's push service needs Overseer's own key in the Mac's Keychain (the RFC's steps for the owner).")
 rec(130, 'Safe without friction', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `node phone/e2e/measure.mjs` (part of `npm run e2e`): 40 cold starts per platform, none showing pairing or any question; the scenarios `reopen`, `restart` and `update`.
@@ -1615,7 +1615,7 @@ rec(130, 'Safe without friction', 'verified',
     limits="Simulators and the emulator; the iPhone's own keychain and Face ID are the owner's session (AC-133).")
 rec(131, 'One app, iOS and Android, that looks like Overseer', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cd phone && npm run tokens:check` (fails when a token differs from `extension/design/tokens.js`); `npm run check:token-rule` (ten seeded values written by hand fail the lint).
@@ -1635,7 +1635,7 @@ rec(131, 'One app, iOS and Android, that looks like Overseer', 'verified',
     limits='Speed is AC-135.')
 rec(132, 'Regression coverage for the phone', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. From a clean clone of the branch: `git clone`, `cd phone && npm ci && npm run prebuild`, then `npm run e2e` (`node e2e/run.mjs`): builds the daemon and both release apps, installs each app anew, starts the lab (`e2e/lab.mjs`), drives every scenario with Maestro (`e2e/flows`), asks the daemon what happened, measures 20 cold starts with the door and 20 without, and checks the budgets.
@@ -1655,7 +1655,7 @@ rec(133, 'Phone session (owner-confirmed)', 'not started',
     blocker="The owner's iPhone: the steps for the owner in the phone remote RFC (a new app identifier, a push key, signing, the local network and notification permissions, then pairing by scanning). The simulator milestone is in pull request #10.")
 rec(134, 'Platform behaviour behind generic interfaces', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cd phone && npm run check:platform-rule` (six seeded violations fail the lint outside the platform layer and in a package beside the app; the same code inside the layer is allowed; the clean tree passes).
@@ -1672,7 +1672,7 @@ rec(134, 'Platform behaviour behind generic interfaces', 'verified',
     limits='—')
 rec(135, 'Hyper fast', 'partial',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     proven="release builds on both simulators: 20 cold starts with the door and 20 without, the baselines written and the last one-command run checked against them; on the iOS simulator every budget held; on the Android emulator every budget but the door's (see below); the app records every launch (the door, the first screen, the opening's frames on the UI thread) and every tap's response; an animation dropped no frame while the app's logic was held for 500 ms on both (the `busy` scenario); a seeded slow start fails the run",
@@ -1693,11 +1693,11 @@ rec(135, 'Hyper fast', 'partial',
     limits='Simulators carry no display budget; the iPhone is where the budgets are due.')
 rec(136, 'The door', 'partial',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     proven="on both simulators in release builds: the closed door from the first frame the app draws (the same picture as the launch screen), its gradient and seam light, the diagonal split with the mark splitting, in recordings read frame by frame with a full-size frame of each opening, in dark and in light, with Reduce Motion (a fade: recording it found Reanimated skipping the app's fades, now kept) and on return from the background (no door); 20 launches per platform timed by the app with the frames counted on the UI thread; the door waits for the first screen to settle so nothing slides in under it",
-    deferred="no dropped frame on the Android emulator, shown by recordings and by a clean 20-run check on a quiet machine (see below; the fix is pull request #24, not merged yet); the owner's iPhone recordings; the owner's marks on the look: the review page is published (https://claude.ai/artifact/FzD5ido4NdwX3annWoY9Uq, from the recordings in `evidence/phone/door`) and the owner has been asked; the owner asked for the same purple streak in the light theme, which this commit draws (accent laid thinly over the background) and the page shows again",
+    deferred="no dropped frame on the Android emulator, shown by recordings and by a clean 20-run check on a quiet machine (see below; the fix is pull request #24, merged as 88cd2779); the owner's iPhone recordings; the owner's marks on the look: the review page is published (https://claude.ai/artifact/FzD5ido4NdwX3annWoY9Uq, from the recordings in `evidence/phone/door`) and the owner has been asked; the owner asked for the same purple streak in the light theme, which this commit draws (accent laid thinly over the background) and the page shows again",
     steps="""1. `node phone/e2e/measure.mjs`: the door's opening is timed by the app and its frames counted on the UI thread (`door.opening`, `door.frames`, `door.dropped`), for 20 cold starts with the door and 20 with it off (the test setting), taken in turn after one warm-up launch.
 2. Recordings of the simulators' screens at launch, in both themes, and with Reduce Motion (`docs/verification/evidence/phone/door/`).""",
     expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
@@ -1711,7 +1711,7 @@ rec(136, 'The door', 'partial',
     limits="The owner's marks are asked for on the published review page; the iPhone frame-by-frame recording is a device step.")
 rec(137, 'Motion throughout', 'partial',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     proven='one motion system: every duration, distance, easing and spring is a token, and the lint fails on one written by hand (proven with seeded values); the door, screen transitions, arriving rows, the needs-you pulse, sheets, presses and the connection line all use it; with Reduce Motion movement becomes a fade (recorded for the door on both simulators); an animation drops no frame while the logic is held for 500 ms, on both simulators',
@@ -1790,7 +1790,7 @@ rec(140, "Memory safety guard", "verified", commit="8639ebb", date="2026-09-26",
 # Gate N addition: pair once (the owner's decision of 2026-09-26).
 rec(141, 'Pair once', 'verified',
     date='2026-09-28 UTC',
-    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    commit='1488b4be0ce0f67311f21c2e5ba7565f4268187d (branch claude/phone-remote-vscode-control-b48a34, pull request #10, merged as b95aedfa)',
     harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
     fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
     steps="""1. `cargo test -p overseerd --test gateway` (ac141: reconnects by itself after 20 reopens, a daemon restart, a newer state version, phone access off and on, and thirty days; pairing was opened once).
@@ -2342,7 +2342,7 @@ rec(214, "Deploy: the one path from dev to production (stage 4)", "verified", co
 rec(216, "A conversation, not only requests, the same typed or spoken", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
-rec(217, "Turning it on is visible", "partial", commit="4832c5e0 (branch claude/one-conversation-view, pull request #27, not merged yet)", date="2026-09-29",
+rec(217, "Turning it on is visible", "partial", commit="4832c5e0 (branch claude/one-conversation-view, pull request #27, merged as 24c3c245)", date="2026-09-29",
     steps="""`node test/ui/scenario-one-view.js` (packaged VSIX, fixture Claude, simulated voice): home's head, the Voice button, then Voice Mode on and off in each theme.""",
     expected="See the RFC criterion (Gate R).",
     actual="""- Home has a visible **Voice** button with its shortcut (⌥⌘⇧V); pressed, home turns into the voice view with the mark's animation (the stage grows in; reduced motion: none). There is no separate "Show voice" any more.
@@ -2377,7 +2377,7 @@ rec(224, "Goals for an agent, at the harness level", "not started", date="—", 
 rec(225, "Goals for Overseer, at the global level", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate S, goals, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
-rec(226, "Overseer moves you around VS Code", "verified", commit="4832c5e0 (branch claude/one-conversation-view, pull request #27, not merged yet)", date="2026-09-29",
+rec(226, "Overseer moves you around VS Code", "verified", commit="4832c5e0 (branch claude/one-conversation-view, pull request #27, merged as 24c3c245)", date="2026-09-29",
     steps="""1. `cargo test -p overseerd --test one_view -- ac226`: typed "Show me the draft agent.", "What did it make?", "Open the file it made." at the Ask first level.
 2. `cargo test -p overseerd --test voice -- ac226_show_me_the_agent_by_voice`.
 3. `node test/ui/scenario-one-view.js`: the same three, typed (the composer) and spoken (simulated voice), each checked in the packaged UI; a click on a card row; a single start with "Show the agent I start" on and off.""",
@@ -2389,7 +2389,7 @@ rec(226, "Overseer moves you around VS Code", "verified", commit="4832c5e0 (bran
     evidence="[one-view](evidence/ui/one-view/) (20 to 29), `daemon/tests/one_view.rs`, `daemon/tests/voice.rs`, pull request #27",
     live="Fixtures and the simulated voice; no paid turn.",
     limits="`open_worktree` opens the worktree's files in a pick list in this window (Manual edit in place is AC-233's). What \"it\" means comes from the model's memory of the conversation; the fixture keeps the agent last talked about.")
-rec(227, "One view for talking to Overseer; Needs you as a small notification", "verified", commit="4832c5e0 (branch claude/one-conversation-view, pull request #27, not merged yet)", date="2026-09-29",
+rec(227, "One view for talking to Overseer; Needs you as a small notification", "verified", commit="4832c5e0 (branch claude/one-conversation-view, pull request #27, merged as 24c3c245)", date="2026-09-29",
     steps="""1. `node test/ui/scenario-one-view.js` (packaged VSIX, fixture Claude, simulated voice): Talk to Overseer; a typed question; Voice Mode on with the Voice button, a spoken request, off, in the three themes; a waiting permission: the badge, its list, a click on the item; typed "Handle what needs me", then "yes"; typed "Tell it yes".
 2. `cargo test -p overseerd --test one_view -- ac227` and `cargo test -p overseerd --test voice -- ac227_handle_what_needs_me_by_voice`.
 3. `node test/ui/scenario-voice.js`, `scenario-home.js`, `scenario-talk.js`: the voice view's states and cards, home, and Talk to Overseer, now all home.""",
@@ -2400,7 +2400,7 @@ rec(227, "One view for talking to Overseer; Needs you as a small notification", 
     evidence="[one-view](evidence/ui/one-view/) (01 to 18), [voice](evidence/ui/voice/), [home](evidence/ui/home/), [talk](evidence/ui/talk/), pull request #27",
     live="Fixtures and the simulated voice; no paid turn.",
     limits="The waiting permission comes up by itself in the view and is read out under AC-230, not here.")
-rec(228, "You can always tell it is working", "verified", commit="4832c5e0 (branch claude/one-conversation-view, pull request #27, not merged yet)", date="2026-09-29",
+rec(228, "You can always tell it is working", "verified", commit="4832c5e0 (branch claude/one-conversation-view, pull request #27, merged as 24c3c245)", date="2026-09-29",
     steps="""1. `node test/ui/scenario-one-view.js`: a typed "Someone should draft the page" (a fixture agent that thinks, writes `draft.md` and reads it over 9 s), every stage of its card recorded as it changed; a spoken aside; Needs you timed after a permission answered and after an agent stopped; every card's text checked.
 2. `node test/ui/scenario-voice.js`: the same token and raw-error check over the voice scenario's cards.
 3. `cargo test -p overseerd --test voice -- ac228_a_request_not_for_overseer_never_says_on_it`; `cargo test -p overseerd --test one_view -- ac228`; `node test/unit/plain-words.js`.""",
