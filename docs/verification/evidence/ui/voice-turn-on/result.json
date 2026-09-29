@@ -5,12 +5,12 @@
       "ok": true,
       "detail": [
         {
-          "opacity": 0.676197,
-          "scale": 0.909335
+          "opacity": 0.827791,
+          "scale": 0.951782
         },
         {
-          "opacity": 0.955952,
-          "scale": 0.987666
+          "opacity": 0.989381,
+          "scale": 0.997027
         },
         {
           "opacity": 1,
@@ -23,11 +23,11 @@
       ]
     },
     {
-      "name": "Overseer: turning it on is recorded (79 frames), with frames before, during and after",
+      "name": "Overseer: turning it on is recorded (87 frames), with frames before, during and after",
       "ok": true,
       "detail": {
-        "frames": 79,
-        "seconds": 3.27,
+        "frames": 87,
+        "seconds": 3.33,
         "gif": "docs/verification/evidence/ui/voice-turn-on/turning-on-overseer.gif"
       }
     },
@@ -40,16 +40,16 @@
       "ok": true,
       "detail": [
         {
-          "opacity": 0.67341,
-          "scale": 0.908555
+          "opacity": 0.793636,
+          "scale": 0.942218
         },
         {
-          "opacity": 0.945081,
-          "scale": 0.984623
+          "opacity": 0.968577,
+          "scale": 0.991202
         },
         {
-          "opacity": 0.997815,
-          "scale": 0.999388
+          "opacity": 0.999882,
+          "scale": 0.999967
         },
         {
           "opacity": 1,
@@ -58,11 +58,11 @@
       ]
     },
     {
-      "name": "Overseer Dark: turning it on is recorded (175 frames), with frames before, during and after",
+      "name": "Overseer Dark: turning it on is recorded (199 frames), with frames before, during and after",
       "ok": true,
       "detail": {
-        "frames": 175,
-        "seconds": 3.13,
+        "frames": 199,
+        "seconds": 3.12,
         "gif": "docs/verification/evidence/ui/voice-turn-on/turning-on-dark.gif"
       }
     },
@@ -75,16 +75,16 @@
       "ok": true,
       "detail": [
         {
-          "opacity": 0.678381,
-          "scale": 0.909947
+          "opacity": 0.766253,
+          "scale": 0.934551
         },
         {
-          "opacity": 0.946057,
-          "scale": 0.984896
+          "opacity": 0.955461,
+          "scale": 0.987529
         },
         {
-          "opacity": 0.996326,
-          "scale": 0.998971
+          "opacity": 0.997806,
+          "scale": 0.999386
         },
         {
           "opacity": 1,
@@ -93,11 +93,11 @@
       ]
     },
     {
-      "name": "Overseer Light: turning it on is recorded (172 frames), with frames before, during and after",
+      "name": "Overseer Light: turning it on is recorded (208 frames), with frames before, during and after",
       "ok": true,
       "detail": {
-        "frames": 172,
-        "seconds": 3.09,
+        "frames": 208,
+        "seconds": 3.12,
         "gif": "docs/verification/evidence/ui/voice-turn-on/turning-on-light.gif"
       }
     },
@@ -108,18 +108,18 @@
   ],
   "recordings": {
     "overseer": {
-      "frames": 79,
-      "seconds": 3.27,
+      "frames": 87,
+      "seconds": 3.33,
       "gif": "docs/verification/evidence/ui/voice-turn-on/turning-on-overseer.gif"
     },
     "dark": {
-      "frames": 175,
-      "seconds": 3.13,
+      "frames": 199,
+      "seconds": 3.12,
       "gif": "docs/verification/evidence/ui/voice-turn-on/turning-on-dark.gif"
     },
     "light": {
-      "frames": 172,
-      "seconds": 3.09,
+      "frames": 208,
+      "seconds": 3.12,
       "gif": "docs/verification/evidence/ui/voice-turn-on/turning-on-light.gif"
     }
   }

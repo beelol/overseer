@@ -9,38 +9,38 @@
       }
     },
     {
-      "name": "six finished agents, none reviewed: each carries the \"to review\" mark (✦) and says so",
+      "name": "six finished agents, none reviewed: each carries the \"to review\" mark (✦), and its accessible name says so",
       "ok": true,
       "detail": [
         {
           "t": "Notes index",
           "badge": "✦",
-          "description": "to review · now"
+          "aria": "Notes index, done, to review, Program"
         },
         {
           "t": "Notes search",
           "badge": "✦",
-          "description": "to review · now"
+          "aria": "Notes search, done, to review, Program"
         },
         {
           "t": "Notes export",
           "badge": "✦",
-          "description": "to review · now"
+          "aria": "Notes export, done, to review, Program"
         },
         {
           "t": "Site header",
           "badge": "✦",
-          "description": "to review · now"
+          "aria": "Site header, done, to review, Program"
         },
         {
           "t": "Site footer",
           "badge": "✦",
-          "description": "to review · now"
+          "aria": "Site footer, done, to review, Program"
         },
         {
           "t": "Site pricing",
           "badge": "✦",
-          "description": "to review · now"
+          "aria": "Site pricing, done, to review, Program"
         }
       ]
     },

@@ -65,7 +65,7 @@
         ],
         "direct": {
           "target": "agent",
-          "label": "Start directly",
+          "label": "Send to: Start directly",
           "choices": [
             "repo",
             "agent",
