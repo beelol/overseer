@@ -1,5 +1,12 @@
 # AC-146: merges
 
+## Pull request #28 (the audit's high-severity bugs; test windows off the owner's screen; no leaked test processes), 2026-09-29
+
+- **Finished:** by its agent (head `c6eef220`), each bug reproduced by a test that failed first: Open PR refusing a worktree left mid-merge with conflict markers (finding 40); Overseer's session loop catching up from the store after falling behind (finding 59: 798,807 events behind in the test); agents' questions kept until Overseer's first turn and across Start fresh and the daily cap (finding 60). AC-249 verified (in-window dialogs for test and dev windows). Test processes are stopped on any exit, and `scripts/test-all` fails a run that leaves any behind. audit's transient "Updating comparison…" is quiet and arrangement's review lag is cut from up to 1,076 ms to about 250 ms (a product fix).
+- **Throwaway copy:** main (with #27 and #30) merged in (`ccab8dab`). `daemon/src/overseer/session.rs` conflicted: #28 moved the event loop into `handle_event` for the catch-up, and #27 had added `expire_stale_proposals` in the old loop's status arm; kept #28's structure and added that line to `handle_event`. Two generated files were regenerated after the merge: the README's phone table and the phone app's protocol types.
+- **Tests:** `scripts/test-all --jobs=3` under the machine lock: 68 of 69 (every UI scenario passed); the Rust step stopped on the README table (fixed), then `cargo test --workspace --no-fail-fast`: 1,359 passed, and the one failure (the app's types, ac134) passed after regenerating them.
+- **Merged:** squash, `5492e130`.
+
 ## Pull request #27 (one view for talking to Overseer; it moves you around VS Code; you can tell it is working), 2026-09-29
 
 - **Finished:** marked ready by its agent (head `8d89b0e7`, main merged in). AC-226, AC-227 and AC-228 verified; AC-217 partial (the turn-on frames exist in the Overseer theme only, as stills). It removed the docked Talk to Overseer panel (home is the one view), made Needs you a badge, and fixed a daemon bug that kept stale proposals open (the stuck Needs you).
