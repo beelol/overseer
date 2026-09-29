@@ -2339,6 +2339,61 @@ rec(214, "Deploy: the one path from dev to production (stage 4)", "verified", co
     live="A temporary production only; the owner's VS Code, daemon, data and logins were never involved. The owner's first real deploy waits for their yes.",
     limits="The notifier's LaunchServices registration is skipped in the test (it would touch the owner's LaunchServices database); the daemon registers it on first use as before.")
 
+rec(216, "A conversation, not only requests, the same typed or spoken", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(217, "Turning it on is visible", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(218, "A voice worth listening to", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(219, "No internal ids in front of the owner", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(220, "Dictation is not a call", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(221, "A dev Overseer uses only the logins it was given", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(222, "Noise filtering is the owner's choice", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(223, "Other audio keeps its volume", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(224, "Goals for an agent, at the harness level", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S, goals, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(225, "Goals for Overseer, at the global level", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S, goals, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(226, "Overseer moves you around VS Code", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(227, "One view for talking to Overseer", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(228, "You can always tell it is working", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(229, "Heard right before it acts", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(230, "Permission modes by conversation", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(231, "Agents start with what Overseer knows", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(232, "The review says what it shows", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(233, "Work in an agent's worktree from your window", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
+    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+
 SHORT_BLOCKERS = {
     154: "verified",
     155: "verified",
@@ -2483,6 +2538,24 @@ SHORT_BLOCKERS = {
     211: "verified",
     214: "verified",
     215: "verified",
+    216: "not started (added by the owner on 2026-09-28)",
+    217: "not started (added by the owner on 2026-09-28)",
+    218: "not started (added by the owner on 2026-09-28)",
+    219: "not started (added by the owner on 2026-09-28)",
+    220: "not started (added by the owner on 2026-09-28)",
+    221: "not started (added by the owner on 2026-09-28)",
+    222: "not started (added by the owner on 2026-09-28)",
+    223: "not started (added by the owner on 2026-09-28)",
+    224: "not started (added by the owner on 2026-09-28)",
+    225: "not started (added by the owner on 2026-09-28)",
+    226: "not started (added by the owner on 2026-09-28)",
+    227: "not started (added by the owner on 2026-09-28)",
+    228: "not started (added by the owner on 2026-09-28)",
+    229: "not started (added by the owner on 2026-09-28)",
+    230: "not started (added by the owner on 2026-09-28)",
+    231: "not started (added by the owner on 2026-09-28)",
+    232: "not started (added by the owner on 2026-09-28)",
+    233: "not started (added by the owner on 2026-09-28)",
 }
 TOTAL = 53
 

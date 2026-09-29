@@ -1,5 +1,12 @@
 # AC-146: merges
 
+## Pull request #26 (Auto routing and Swarm, partial merge AC-204), 2026-09-28
+
+- **Finished:** built by the everything goal with a sub-agent on `claude/auto-swarm`, marked ready (head `6f78182e`). Unfinished VS Code surfaces stay behind `overseer.experimental.autoRouting` and `overseer.experimental.swarm` (both off); `swarm.native_director` is on by default (owner decision, 2026-09-28) but only acts on a confirmed `swarm.start`. Auto 23 of 40 and Swarm 45 of 64 verified at fixture scope; the rest need live runs on the owner's personal accounts, one owner choice (an unmetered director, SWARM-24/40) or packaged-UI scenarios.
+- **Throwaway copy / merges:** main merged into the branch twice (`4e074a4c` with fixes in `62bf1da0`, 15 conflicts resolved keeping both sides; then `6f78182e`, clean). One schema label, 25; a database written by main's daemon opens, keeps its runs and gains the new tables.
+- **Tests:** `cargo test --workspace --no-fail-fast` 1,333 passed (overseer ac189 passed alone); unit 15 of 15, check, links, VSIX, `test/dev/run.js` 11 of 11; every non-live UI scenario at `e91f157d` (52 of 54, continuity and sidebar passing alone), the ones the second merge touches (audit, dev-instance, voice), and audio alone at `6f78182e` (passed). The UI run found four real failures (a header overflow menu taking the side bar's first click; palette titles that only matched by accident on main; sidebar-search's palette selection), fixed in `e91f157d`.
+- **Merged:** squash, `17762f81`.
+
 ## Pull request #24 (the Android door's dropped frames), 2026-09-28
 
 - **Finished:** marked ready by its agent (head `3d4d91ef`, main merged in). The cause, from atrace cold starts: the Mac's state drawn mid-opening (about 190 prop updates, a 44 ms frame), and the opening starting over the first screen's mount. The fix holds the Mac's state until the door has opened, and starts the opening on the UI thread after three on-time frames or 200 ms at most. The door looks the same and opens in 1 s, but may start up to 0.2 s later on a cold start. Touches Gate N's session layer (`hold.ts`), as the PR says.
