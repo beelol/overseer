@@ -1,13 +1,13 @@
-[2026-09-30T09:32:44.226Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-30T09:32:49.177Z] screenshot docs/verification/evidence/ui/inventory/01-side-bar-offer.png
-[2026-09-30T09:32:51.089Z] PASS Overseer offers once to take Explorer's place; "Use Overseer" shows it in the side bar and remembers the choice {"chosen":true,"sideBar":"Overseer","offer":"Source: Overseer\nUse Overseer\nKeep Explorer\nShow Overseer in the side bar instead of Explorer when VS Code opens? Explorer stays one click away in the activity bar."}
-[2026-09-30T09:33:03.195Z] PASS after a reload the side bar opens on Overseer and the offer is not repeated (Explorer is still in the activity bar) {"reopened":{"sideBar":"Overseer","agents":false,"explorer":false,"dirtyTabs":[]},"askedAgain":false}
-[2026-09-30T09:33:08.092Z] screenshot docs/verification/evidence/ui/inventory/02-arrangement-chat-alone.png
-[2026-09-30T09:33:08.106Z] PASS chat alone: agents once (side bar); no files or changed files listed anywhere (no Files pane, no strip) {"agents":["side bar"],"files":[],"changedFiles":[],"unsaved":[]}
-[2026-09-30T09:33:12.496Z] screenshot docs/verification/evidence/ui/inventory/03-arrangement-review-and-chat.png
-[2026-09-30T09:33:12.515Z] PASS review beside the chat: agents once, files once (review navigator), changed files once (not repeated under the conversation) {"agents":["side bar"],"files":["review navigator"],"changedFiles":["review navigator"],"unsaved":[]}
-[2026-09-30T09:33:12.521Z] edit chip present false
-[2026-09-30T09:33:14.626Z] screenshot docs/verification/evidence/ui/inventory/04-arrangement-unsaved-edit.png
-[2026-09-30T09:33:14.651Z] PASS an unsaved edit is marked once among Overseer's views (the review) {"agents":["side bar"],"files":["review navigator"],"changedFiles":["review navigator"],"unsaved":["review","editor tab"]}
-[2026-09-30T09:33:20.025Z] screenshot docs/verification/evidence/ui/inventory/05-arrangement-grid.png
-[2026-09-30T09:33:20.052Z] PASS grid: agents once (side bar); no file lists {"agents":["side bar"],"files":[],"changedFiles":[],"unsaved":[]}
+[2026-09-30T08:21:33.597Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-30T08:21:38.778Z] screenshot docs/verification/evidence/ui/inventory/01-side-bar-offer.png
+[2026-09-30T08:21:40.689Z] PASS Overseer offers once to take Explorer's place; "Use Overseer" shows it in the side bar and remembers the choice {"chosen":true,"sideBar":"Overseer","offer":"Source: Overseer\nUse Overseer\nKeep Explorer\nShow Overseer in the side bar instead of Explorer when VS Code opens? Explorer stays one click away in the activity bar."}
+[2026-09-30T08:21:52.788Z] PASS after a reload the side bar opens on Overseer and the offer is not repeated (Explorer is still in the activity bar) {"reopened":{"sideBar":"Overseer","agents":false,"explorer":false,"dirtyTabs":[]},"askedAgain":false}
+[2026-09-30T08:21:57.689Z] screenshot docs/verification/evidence/ui/inventory/02-arrangement-chat-alone.png
+[2026-09-30T08:21:57.703Z] PASS chat alone: agents once (side bar); no files or changed files listed anywhere (no Files pane, no strip) {"agents":["side bar"],"files":[],"changedFiles":[],"unsaved":[]}
+[2026-09-30T08:22:02.079Z] screenshot docs/verification/evidence/ui/inventory/03-arrangement-review-and-chat.png
+[2026-09-30T08:22:02.099Z] PASS review beside the chat: agents once, files once (review navigator), changed files once (not repeated under the conversation) {"agents":["side bar"],"files":["review navigator"],"changedFiles":["review navigator"],"unsaved":[]}
+[2026-09-30T08:22:02.105Z] edit chip present false
+[2026-09-30T08:22:04.226Z] screenshot docs/verification/evidence/ui/inventory/04-arrangement-unsaved-edit.png
+[2026-09-30T08:22:04.251Z] PASS an unsaved edit is marked once among Overseer's views (the review) {"agents":["side bar"],"files":["review navigator"],"changedFiles":["review navigator"],"unsaved":["review","editor tab"]}
+[2026-09-30T08:22:09.607Z] screenshot docs/verification/evidence/ui/inventory/05-arrangement-grid.png
+[2026-09-30T08:22:09.635Z] PASS grid: agents once (side bar); no file lists {"agents":["side bar"],"files":[],"changedFiles":[],"unsaved":[]}

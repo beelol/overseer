@@ -1,5 +1,5 @@
  ◆ Overseer  page 1/1 · 9 agents · ● 3 active · ◆ 1 needs you                                                                                                            phone access off · ● connected 
-┏ 1 ✓ Write API docs ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Program · 0s ┓╭ 2 ✓ Bump dependencies ─────────────────────────── Program · 0s ╮╭ 3 ✓ Tidy lint warnings ─────────────────────────── Program · 0s ╮
+┏ 1 ✓ Write API docs ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 0s ┓╭ 2 ✓ Bump dependencies ─────────────────────────── generic · 0s ╮╭ 3 ✓ Tidy lint warnings ─────────────────────────── generic · 0s ╮
 ┃ step 2 done                                                     ┃│ step 1 done                                                    ││ step 0 done                                                     │
 ┃                                                                 ┃│                                                                ││                                                                 │
 ┃                                                                 ┃│                                                                ││                                                                 │
@@ -18,7 +18,7 @@
 ┃                                                                 ┃│                                                                ││                                                                 │
 ┃                                                                 ┃│                                                                ││                                                                 │
 ┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰ completed ─────────────────────────────────────────────────────╯╰ completed ──────────────────────────────────────────────────────╯
-╭ 4 ◆ Add a changelog entry ──────────────────── Claude Code · 3s ╮╭ 5 ● Watch the build ───────────────────────────── Program · 3s ╮╭ 6 ● Refactor the payment service so every provid…  Program · 4s ╮
+╭ 4 ◆ Add a changelog entry ───────────────────────── claude · 4s ╮╭ 5 ● Watch the build ───────────────────────────── generic · 4s ╮╭ 6 ● Refactor the payment service so every provid…  generic · 5s ╮
 │ › Add a changelog entry for the session refresh change          ││ watching the build…                                            ││ Reading                                                         │
 │ ✎ perm.txt                                                      ││                                                                ││ web-app/src/payments/providers/stripe/adapters/refund-reconcilia│
 │ ⚙ Write perm.txt …                                              ││                                                                ││ tion-worker.ts                                                  │
@@ -37,10 +37,10 @@
 │                                                                 ││                                                                ││                                                                 │
 │                                                                 ││                                                                ││                                                                 │
 │                                                                 ││                                                                ││                                                                 │
-╰ ◆ Write perm.txt  a allow d deny ──────────── fix…@example.test ╯╰────────────────────────────────────────────────────────────────╯╰─────────────────────────────────────────────────────────────────╯
-╭ 7 ■ Long soak test ─────────────────────────────── Program · 0s ╮╭ 8 ✗ Migration dry-run ─────────────────────────── Program · 0s ╮╭ 9 ✓ Refresh sessions once ──────────────────────── Program · 0s ╮
-│ soaking                                                         ││ error: relation users_v2 missing                               ││ Sessions now refresh once.                                      │
-│ · interrupted: interrupted by user (exit signal 2)              ││ migration dry-run: 3 pending                                   ││ 2 tests passing                                                 │
+╰ ◆ Write perm.txt  a allow d deny ───────────────────────────────╯╰────────────────────────────────────────────────────────────────╯╰─────────────────────────────────────────────────────────────────╯
+╭ 7 ■ Long soak test ─────────────────────────────── generic · 0s ╮╭ 8 ✗ Migration dry-run ─────────────────────────── generic · 0s ╮╭ 9 ✓ Refresh sessions once ──────────────────────── generic · 0s ╮
+│ soaking                                                         ││ migration dry-run: 3 pending                                   ││ Sessions now refresh once.                                      │
+│ · interrupted: interrupted by user (exit signal 2)              ││ error: relation users_v2 missing                               ││ 2 tests passing                                                 │
 │                                                                 ││ · failed: exit code 1                                          ││                                                                 │
 │                                                                 ││                                                                ││                                                                 │
 │                                                                 ││                                                                ││                                                                 │

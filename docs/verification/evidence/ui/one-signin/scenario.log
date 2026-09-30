@@ -1,9 +1,9 @@
-[2026-09-30T09:38:15.020Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-30T09:38:24.659Z] PASS VS Code's own chat is on in this profile (the title bar still shows its chat controls) {"chatOn":true}
-[2026-09-30T09:38:24.728Z] screenshot docs/verification/evidence/ui/one-signin/01-first-view-overseer-dark.png
-[2026-09-30T09:38:24.747Z] PASS Overseer Dark: the first Overseer view shows no competing Sign In (only Overseer's own Accounts) {"found":[],"accounts":true}
-[2026-09-30T09:38:26.730Z] screenshot docs/verification/evidence/ui/one-signin/02-first-view-overseer-light.png
-[2026-09-30T09:38:26.746Z] PASS Overseer Light: the first Overseer view shows no competing Sign In (only Overseer's own Accounts) {"found":[],"accounts":true}
-[2026-09-30T09:38:28.855Z] screenshot docs/verification/evidence/ui/one-signin/03-first-view-overseer.png
-[2026-09-30T09:38:28.870Z] PASS Overseer: the first Overseer view shows no competing Sign In (only Overseer's own Accounts) {"found":[],"accounts":true}
-[2026-09-30T09:38:28.870Z] title bar controls left ["Agent Status","Open in Agents Window (⇧⌘A)"]
+[2026-09-29T05:24:20.806Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-29T05:24:32.395Z] PASS VS Code's own chat is on in this profile (the title bar still shows its chat controls) {"chatOn":true}
+[2026-09-29T05:24:32.515Z] screenshot docs/verification/evidence/ui/one-signin/01-first-view-overseer-dark.png
+[2026-09-29T05:24:32.516Z] PASS Overseer Dark: the first Overseer view shows no competing Sign In (only Overseer's own Accounts) {"found":[],"accounts":true}
+[2026-09-29T05:24:34.533Z] screenshot docs/verification/evidence/ui/one-signin/02-first-view-overseer-light.png
+[2026-09-29T05:24:34.534Z] PASS Overseer Light: the first Overseer view shows no competing Sign In (only Overseer's own Accounts) {"found":[],"accounts":true}
+[2026-09-29T05:24:36.768Z] screenshot docs/verification/evidence/ui/one-signin/03-first-view-overseer.png
+[2026-09-29T05:24:36.769Z] PASS Overseer: the first Overseer view shows no competing Sign In (only Overseer's own Accounts) {"found":[],"accounts":true}
+[2026-09-29T05:24:36.770Z] title bar controls left ["Agent Status","Open in Agents Window (⇧⌘A)"]

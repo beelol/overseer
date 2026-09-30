@@ -26,7 +26,7 @@
         "reason": "beneficial",
         "replay": false,
         "revision": 1,
-        "run_id": "sw-f271a26728a3",
+        "run_id": "sw-47d165f2e2f4",
         "serial": {
           "affordable": true,
           "elapsed_ms": 440,
@@ -44,9 +44,6 @@
       "name": "no approved target records a blocked eligibility reason",
       "ok": true,
       "detail": {
-        "allowance_window_count": 0,
-        "allowance_windows": [],
-        "allowance_windows_truncated": false,
         "changed": true,
         "eligible_targets": [],
         "reason": "no_allowed_target",
@@ -206,7 +203,7 @@
           "expanded": null,
           "selected": false,
           "focused": false,
-          "aria": "Recorded 9/30/2026, 2:58:15 AM. This was the last eligibility observation; admission revalidates it."
+          "aria": "Recorded 9/27/2026, 9:50:26 AM. This was the last eligibility observation; admission revalidates it."
         },
         {
           "label": "No admission recorded",
@@ -320,7 +317,7 @@
           "expanded": null,
           "selected": false,
           "focused": false,
-          "aria": "Recorded 9/30/2026, 2:58:15 AM. This was the last eligibility observation; admission revalidates it."
+          "aria": "Recorded 9/27/2026, 9:50:26 AM. This was the last eligibility observation; admission revalidates it."
         },
         {
           "label": "No admission recorded",
@@ -404,7 +401,7 @@
         "reason": "no_time_benefit",
         "replay": false,
         "revision": 1,
-        "run_id": "sw-f271a26728a3",
+        "run_id": "sw-47d165f2e2f4",
         "serial": {
           "affordable": true,
           "elapsed_ms": 440,
@@ -474,7 +471,7 @@
           "expanded": null,
           "selected": false,
           "focused": false,
-          "aria": "Recorded 9/30/2026, 2:58:15 AM. This was the last eligibility observation; admission revalidates it."
+          "aria": "Recorded 9/27/2026, 9:50:26 AM. This was the last eligibility observation; admission revalidates it."
         },
         {
           "label": "No admission recorded",
@@ -544,7 +541,7 @@
       "name": "Pause from the Swarm row changes durable daemon state within 2 seconds",
       "ok": true,
       "detail": {
-        "pause_ms": 598
+        "pause_ms": 597
       }
     },
     {

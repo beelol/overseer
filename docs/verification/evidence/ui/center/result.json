@@ -6,7 +6,7 @@
       "detail": {
         "explorerShown": false,
         "repos": [
-          "1 working · 2 to review",
+          "Needs you",
           "repo-y",
           "repo-x"
         ]
@@ -72,7 +72,7 @@
         "expanded": null,
         "selected": true,
         "focused": true,
-        "aria": "Y live, working, Program"
+        "aria": "Y live, working, generic"
       }
     },
     {
@@ -85,12 +85,12 @@
       "detail": {
         "start": {
           "label": "X nested agents",
-          "description": "now · Fixture · fix…@example.test",
+          "description": "now",
           "level": 2,
           "expanded": "true",
           "selected": true,
           "focused": true,
-          "aria": "X nested agents, done, Claude Code, Claude Fixture · fix…@example.test · Mac's default login"
+          "aria": "X nested agents, done, claude, Your login"
         },
         "down": {
           "label": "child task",

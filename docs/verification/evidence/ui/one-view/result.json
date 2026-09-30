@@ -55,7 +55,7 @@
           "tag": "dark",
           "mark": {
             "w": 175.5546875,
-            "top": 101.1875
+            "top": 94
           },
           "same": true,
           "on": {
@@ -84,7 +84,7 @@
           "tag": "light",
           "mark": {
             "w": 175.5546875,
-            "top": 101.1875
+            "top": 94
           },
           "same": true,
           "on": {
@@ -175,7 +175,7 @@
       "name": "a click on a Needs-you item focuses that agent (its chat)",
       "ok": true,
       "detail": {
-        "selected": "r-494fe7faa767",
+        "selected": "r-1d92b8566803",
         "mode": "chat"
       }
     },
@@ -184,7 +184,7 @@
       "ok": true,
       "detail": {
         "stillWaiting": "waiting_for_user",
-        "answered": 7
+        "answered": 6
       }
     },
     {
@@ -193,7 +193,7 @@
       "detail": {
         "before": 2,
         "after": 0,
-        "ms": 1
+        "ms": 0
       }
     },
     {
@@ -201,9 +201,9 @@
       "ok": true,
       "detail": {
         "status": "interrupted",
-        "withWriter": 1,
-        "after": 0,
-        "ms": 104
+        "withWriter": 2,
+        "after": 1,
+        "ms": 53
       }
     },
     {
@@ -213,6 +213,7 @@
         "seen": [
           "thinking",
           "waiting",
+          "sending",
           "starting",
           "working",
           "done"
@@ -229,6 +230,11 @@
             "progress": "Waits for your yes"
           },
           {
+            "stage": "sending",
+            "text": "Going ahead",
+            "progress": "Going ahead"
+          },
+          {
             "stage": "starting",
             "text": "Starting draft the page",
             "progress": "Starting draft the page"
@@ -237,6 +243,11 @@
             "stage": "working",
             "text": "draft the page is working · 0s",
             "progress": "draft the page is working · 0s"
+          },
+          {
+            "stage": "working",
+            "text": "draft the page is working · 1s",
+            "progress": "draft the page is working · 1s"
           },
           {
             "stage": "working",
@@ -294,6 +305,11 @@
             "progress": "draft the page is working · 9s · Read: draft.md"
           },
           {
+            "stage": "working",
+            "text": "draft the page is working · 10s · Read: draft.md",
+            "progress": "draft the page is working · 10s · Read: draft.md"
+          },
+          {
             "stage": "done",
             "text": "draft the page finished",
             "progress": "draft the page finished"
@@ -315,7 +331,7 @@
       "ok": true,
       "detail": {
         "aside": "1",
-        "selected": "r-205e12b334b4",
+        "selected": "r-76b780ed7fa6",
         "mode": "chat",
         "chatLeft": 0,
         "chatWidth": 702,
@@ -331,7 +347,7 @@
         {
           "how": "typed",
           "say": "show me the draft agent",
-          "selected": "r-205e12b334b4",
+          "selected": "r-76b780ed7fa6",
           "mode": "chat"
         },
         {
@@ -353,7 +369,7 @@
         {
           "how": "spoken",
           "say": "show me the draft agent",
-          "selected": "r-205e12b334b4",
+          "selected": "r-76b780ed7fa6",
           "mode": "chat"
         },
         {
@@ -368,7 +384,7 @@
           "how": "spoken",
           "say": "open the file it made",
           "tabs": [
-            "Overseer",
+            "Overseer, Editor Group 2",
             "draft.md, Editor Group 2"
           ]
         }
@@ -380,11 +396,11 @@
       "detail": []
     },
     {
-      "name": "clicking a request card opens the agent it started (beside the conversation, AC-257)",
+      "name": "clicking a request card opens the agent it started",
       "ok": true,
       "detail": {
-        "back": "r-205e12b334b4",
-        "mode": "composer"
+        "selected": "r-76b780ed7fa6",
+        "mode": "chat"
       }
     },
     {
@@ -393,7 +409,7 @@
       "detail": {
         "aside": "",
         "mode": "composer",
-        "selected": "r-205e12b334b4"
+        "selected": "r-76b780ed7fa6"
       }
     },
     {

@@ -18,7 +18,7 @@
                                                                                                                                             
                                              ╭ pair a phone ──────────────────────────────────╮                                             
                                              │                                                │                                             
-                                             │ With Mac                                       │                                             
+                                             │ With MacBook-Pro                               │                                             
                                              │                                                │                                             
                                              │ "Bilal's iPhone" is asking to pair.            │                                             
                                              │ Answer below: y pairs it, n does not.          │                                             
@@ -41,6 +41,6 @@
                                                                                                                                             
                                                                                                                                             
                                                                                                                                             
- Pair "Bilal's iPhone"? iPhone · 127.0.0.1 · key ee45 499f 67c1 8e0d. y / n                                                                 
+ Pair "Bilal's iPhone"? iPhone · 127.0.0.1 · key cf40 0dc2 fa5f 1915. y / n                                                                 
                                                                                                                                             
  Phone access is on                                                                                                                         

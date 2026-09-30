@@ -51,7 +51,7 @@
           "expanded": null,
           "selected": false,
           "focused": false,
-          "aria": "Recorded 9/30/2026, 2:57:28 AM. This was the last eligibility observation; admission revalidates it."
+          "aria": "Recorded 9/27/2026, 1:03:02 PM. This was the last eligibility observation; admission revalidates it."
         },
         {
           "label": "pool-a · week",
@@ -133,16 +133,16 @@
           "expanded": null,
           "selected": false,
           "focused": false,
-          "aria": "Recorded 9/30/2026, 2:57:29 AM. This was the last eligibility observation; admission revalidates it."
+          "aria": "Recorded 9/27/2026, 1:03:03 PM. This was the last eligibility observation; admission revalidates it."
         },
         {
           "label": "pool-a · week",
-          "description": "unknown allowance",
+          "description": "unknown",
           "level": 4,
           "expanded": null,
           "selected": false,
           "focused": false,
-          "aria": "Last observed allowance for pool-a, week: unknown allowance"
+          "aria": "Last observed allowance for pool-a, week: unknown"
         },
         {
           "label": "No admission recorded",

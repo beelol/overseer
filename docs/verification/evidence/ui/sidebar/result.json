@@ -1,14 +1,15 @@
 {
   "checks": [
     {
-      "name": "the side bar shows the rollup, then Needs you, then agents by repository with native children nested",
+      "name": "the side bar shows Needs you first, then agents by repository with native children nested",
       "ok": true,
       "detail": {
-        "needsIdx": 1,
-        "webIdx": 3,
-        "apiIdx": 6,
+        "needsIdx": 0,
+        "webIdx": 10,
+        "apiIdx": 4,
         "needsItems": [
-          "Add a changelog entry"
+          "Add a changelog entry",
+          "Migration dry-run"
         ],
         "child": {
           "aria": "child task, done, native child",
@@ -40,7 +41,7 @@
       "name": "the Agents view's visible text stays within the Gate J agents budget (238 characters)",
       "ok": true,
       "detail": {
-        "chars": 207
+        "chars": 226
       }
     },
     {
@@ -48,17 +49,17 @@
       "ok": true,
       "detail": {
         "showcase": {
-          "aria": "Refresh sessions once, done, to review, Claude Code, Claude Fixture · fix…@example.test · Mac's default login",
+          "aria": "Refresh sessions once, done, claude, Your login",
           "level": 2,
           "label": "Refresh sessions once",
-          "description": "now · Fixture · fix…@example.test",
-          "badge": "✦",
+          "description": "now",
+          "badge": "✓",
           "logo": "claudecode-dark",
           "codicon": "",
           "expanded": null
         },
         "watch": {
-          "aria": "Watch the build, working, Program",
+          "aria": "Watch the build, working, generic",
           "level": 2,
           "label": "Watch the build",
           "description": "",
@@ -71,7 +72,7 @@
     },
     {
       "name": "Needs-you rows carry the provider mark too (Claude logo, program codicon) with the reason as text",
-      "ok": true,
+      "ok": false,
       "detail": [
         {
           "label": "Add a changelog entry",
@@ -79,16 +80,51 @@
           "codicon": "",
           "description": "Approve",
           "badge": "!"
+        },
+        {
+          "label": "Migration dry-run",
+          "logo": "",
+          "codicon": "terminal",
+          "description": "Failed",
+          "badge": "✕"
+        },
+        {
+          "label": "Refresh sessions once",
+          "logo": "claudecode-dark",
+          "codicon": "",
+          "description": "Review",
+          "badge": "✓"
+        },
+        {
+          "label": "Watch the build",
+          "logo": "",
+          "codicon": "terminal",
+          "description": "",
+          "badge": "●"
+        },
+        {
+          "label": "Migration dry-run",
+          "logo": "",
+          "codicon": "terminal",
+          "description": "now",
+          "badge": "✕"
+        },
+        {
+          "label": "Split the payment service",
+          "logo": "claudecode-dark",
+          "codicon": "",
+          "description": "now",
+          "badge": "✓"
         }
       ]
     },
     {
-      "name": "status badges: ✦ done and not reviewed yet (AC-254), ! needs you, ✕ failed, ● working",
+      "name": "status badges: ✓ done, ! needs you, ✕ failed, ● working",
       "ok": true,
       "detail": [
         [
           "Refresh sessions once",
-          "✦"
+          "✓"
         ],
         [
           "Add a changelog entry",
@@ -130,8 +166,8 @@
       "name": "the Overseer activity icon badge matches Needs you",
       "ok": true,
       "detail": {
-        "badge": "1",
-        "needs": "1"
+        "badge": "3",
+        "needs": "3"
       }
     },
     {
@@ -142,24 +178,24 @@
           {
             "name": "Stop",
             "x": 279.5625,
-            "y": 259
+            "y": 363
           },
           {
             "name": "Pin to Grid",
             "x": 299.5625,
-            "y": 259
+            "y": 363
           }
         ],
         "onDone": [
           {
             "name": "Archive (⌘Backspace)",
-            "x": 281.2734375,
-            "y": 215
+            "x": 280.078125,
+            "y": 517
           },
           {
             "name": "Pin to Grid",
-            "x": 301.2734375,
-            "y": 215
+            "x": 300.078125,
+            "y": 517
           }
         ]
       }
@@ -200,15 +236,16 @@
       "name": "every row in the Agents view has a screen-reader label",
       "ok": true,
       "detail": [
-        "Agents: 1 working · 1 needs you · 1 to review · 1 failed",
-        "Needs you, 1",
+        "Needs you, 3",
         "Add a changelog entry, Approve: Wants to use Write",
-        "web-app, 2 agents, 1 active, 1 to review",
-        "Add a changelog entry, needs you, Claude Code, Claude Fixture · fix…@example.test · Mac's default login",
-        "Refresh sessions once, done, to review, Claude Code, Claude Fixture · fix…@example.test · Mac's default login",
-        "api-server, 2 agents, 1 active, 1 failed",
-        "Watch the build, working, Program",
-        "Migration dry-run, failed, to review, Program"
+        "Migration dry-run, Failed: exit code 1",
+        "Refresh sessions once, Review: 2 files changed",
+        "web-app, 2 agents, 1 active",
+        "Add a changelog entry, needs you, claude, Your login",
+        "Refresh sessions once, done, claude, Your login",
+        "api-server, 2 agents, 1 active",
+        "Watch the build, working, generic",
+        "Migration dry-run, failed, generic"
       ]
     }
   ]

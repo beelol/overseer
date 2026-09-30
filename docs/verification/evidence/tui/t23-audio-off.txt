@@ -20,7 +20,7 @@
                                 │  Voice: system default    v/V changes installed macOS voice              │                                
                                 │  Commander: no private folder    i imports a private folder              │                                
                                 │                                                                          │                                
-                                │  Preview: agent started    tab changes cue · p plays it                  │                                
+                                │  Preview: agent_started    tab changes cue · p plays it                  │                                
                                 │                                                                          │                                
                                 │  space enable/disable    r refresh    esc close                          │                                
                                 │                                                                          │                                

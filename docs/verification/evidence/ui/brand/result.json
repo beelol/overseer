@@ -34,7 +34,7 @@
       "name": "a search of the repository finds no other Overseer logo (the old eye glyph)",
       "ok": true,
       "detail": {
-        "files": 1112,
+        "files": 854,
         "hits": [],
         "oldFilesPresent": []
       }

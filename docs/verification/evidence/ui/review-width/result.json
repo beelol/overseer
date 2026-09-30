@@ -224,7 +224,7 @@
     {
       "theme": "Overseer Dark",
       "window": 1280,
-      "width": 609,
+      "width": 549,
       "toolbar": {
         "ok": true,
         "height": 48
@@ -252,12 +252,12 @@
       "parts": [],
       "sizes": {
         "page": [
-          609,
-          609
+          549,
+          549
         ],
         "toolbar": [
-          609,
-          609
+          549,
+          549
         ]
       },
       "rowsWithoutIcon": [],
@@ -269,7 +269,7 @@
     {
       "theme": "Overseer Dark",
       "window": 1600,
-      "width": 820,
+      "width": 740,
       "toolbar": {
         "ok": true,
         "height": 48
@@ -297,12 +297,12 @@
       "parts": [],
       "sizes": {
         "page": [
-          820,
-          820
+          740,
+          740
         ],
         "toolbar": [
-          820,
-          820
+          740,
+          740
         ]
       },
       "rowsWithoutIcon": [],
@@ -359,7 +359,7 @@
     {
       "theme": "Overseer Light",
       "window": 1280,
-      "width": 609,
+      "width": 549,
       "toolbar": {
         "ok": true,
         "height": 48
@@ -387,12 +387,12 @@
       "parts": [],
       "sizes": {
         "page": [
-          609,
-          609
+          549,
+          549
         ],
         "toolbar": [
-          609,
-          609
+          549,
+          549
         ]
       },
       "rowsWithoutIcon": [],
@@ -404,7 +404,7 @@
     {
       "theme": "Overseer Light",
       "window": 1600,
-      "width": 820,
+      "width": 740,
       "toolbar": {
         "ok": true,
         "height": 48
@@ -432,12 +432,12 @@
       "parts": [],
       "sizes": {
         "page": [
-          820,
-          820
+          740,
+          740
         ],
         "toolbar": [
-          820,
-          820
+          740,
+          740
         ]
       },
       "rowsWithoutIcon": [],

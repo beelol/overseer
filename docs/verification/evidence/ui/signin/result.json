@@ -14,7 +14,7 @@
     {
       "name": "sign in through the UI",
       "ok": true,
-      "detail": "Max · cla…@example.invalid"
+      "detail": "max · f03ab3f8"
     },
     {
       "name": "a task runs with the signed-in account",
@@ -36,7 +36,7 @@
       "name": "\"Sign in again\" reauthenticates only that account and the follow-up then succeeds",
       "ok": true,
       "detail": {
-        "again": "Max · cla…@example.invalid",
+        "again": "max · 55f70cc2",
         "status": "completed",
         "hello": [
           "hello from claudia@example.invalid",

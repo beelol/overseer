@@ -12,7 +12,7 @@
   │  Voice: Albert    v/V changes installed macOS voice                      │  
   │  Commander: private folder ready    i imports a private folder           │  
   │                                                                          │  
-  │  Preview: agent complete    tab changes cue · p plays it                 │  
+  │  Preview: agent_complete    tab changes cue · p plays it                 │  
   │                                                                          │  
   │  space enable/disable    r refresh    esc close                          │  
   │                                                                          │  

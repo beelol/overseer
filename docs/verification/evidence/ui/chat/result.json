@@ -17,7 +17,7 @@
         "highlighted": true,
         "link": "https://datatracker.ietf.org/doc/html/rfc6749#section-6",
         "longPath": "…/auth/session-refresh-coordinator.ts",
-        "longPathTitle": "/private/tmp/ovs-ui-TjQ2Qa/overseer-home/worktrees/chat-repo-de06aefe/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
+        "longPathTitle": "/private/tmp/ovs-ui-UuT2W4/overseer-home/worktrees/chat-repo-ead324d3/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
         "steps": "6 stepsRead · Searched · Found files · Created · Edited · Ran",
         "edits": [
           "session-refresh-coordinator.ts",
@@ -44,7 +44,7 @@
         "highlighted": true,
         "link": "https://datatracker.ietf.org/doc/html/rfc6749#section-6",
         "longPath": "…/auth/session-refresh-coordinator.ts",
-        "longPathTitle": "/private/tmp/ovs-ui-TjQ2Qa/overseer-home/worktrees/chat-repo-de06aefe/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
+        "longPathTitle": "/private/tmp/ovs-ui-UuT2W4/overseer-home/worktrees/chat-repo-ead324d3/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
         "steps": "6 stepsRead · Searched · Found files · Created · Edited · Ran",
         "edits": [
           "session-refresh-coordinator.ts",
@@ -71,7 +71,7 @@
         "highlighted": true,
         "link": "https://datatracker.ietf.org/doc/html/rfc6749#section-6",
         "longPath": "…/auth/session-refresh-coordinator.ts",
-        "longPathTitle": "/private/tmp/ovs-ui-TjQ2Qa/overseer-home/worktrees/chat-repo-de06aefe/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
+        "longPathTitle": "/private/tmp/ovs-ui-UuT2W4/overseer-home/worktrees/chat-repo-ead324d3/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
         "steps": "6 stepsRead · Searched · Found files · Created · Edited · Ran",
         "edits": [
           "session-refresh-coordinator.ts",
@@ -113,14 +113,14 @@
     },
     {
       "name": "a 2,000-event conversation scrolls with p95 frame time under 16 ms (frame work p95 < 16 ms, no dropped frames at the display refresh rate)",
-      "ok": false,
+      "ok": true,
       "detail": {
         "frames": 235,
-        "p95": 17.9,
-        "median": 16.7,
-        "max": 33,
-        "workP95": 0.2,
-        "workMax": 0.2
+        "p95": 9.2,
+        "median": 8.3,
+        "max": 9,
+        "workP95": 0.3,
+        "workMax": 0.3
       }
     },
     {

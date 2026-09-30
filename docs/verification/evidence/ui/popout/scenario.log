@@ -1,16 +1,16 @@
-[2026-09-30T09:47:57.411Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-30T09:48:05.881Z] PASS the working agent's review sits beside its chat in the main window [{"tabs":["Review: Live edits (1)"],"active":"Review: Live edits (1)"},{"tabs":["Overseer"],"active":"Overseer"}]
-[2026-09-30T09:48:05.990Z] screenshot docs/verification/evidence/ui/popout/01-review-beside-chat.png
-[2026-09-30T09:48:08.092Z] PASS Pop Out Follow moves the review into a separate window {"windows":[{"id":2,"title":"Review: Live edits (1) — pop-repo","visible":true,"focused":false},{"id":1,"title":"Overseer — pop-repo","visible":true,"focused":false}],"auxTabs":["Review: Live edits (1)"]}
-[2026-09-30T09:48:08.092Z] PASS the main window keeps Overseer and the chat (no review there) [{"tabs":["Overseer"],"active":"Overseer"}]
-[2026-09-30T09:48:08.158Z] screenshot docs/verification/evidence/ui/popout/02-main-window-after-pop-out.png
-[2026-09-30T09:48:08.226Z] screenshot docs/verification/evidence/ui/popout/03-separate-window-1.png
-[2026-09-30T09:48:12.276Z] screenshot docs/verification/evidence/ui/popout/04-separate-window-2.png
-[2026-09-30T09:48:12.277Z] PASS the separate window keeps following the agent live (two screenshots seconds apart; its file grew) {"first":8,"later":12}
-[2026-09-30T09:48:13.875Z] PASS selecting another agent: the separate window shows its review; the main window its chat {"windows":[{"id":2,"title":"Review: Other agent (1) — pop-repo","visible":true,"focused":false},{"id":1,"title":"Overseer — pop-repo","visible":true,"focused":false}],"main":[{"tabs":["Overseer"],"active":"Overseer"}]}
-[2026-09-30T09:48:16.289Z] PASS Return Follow brings the review back beside the chat and its window closes {"windows":[{"id":1,"title":"Overseer — pop-repo","visible":true,"focused":false}],"main":[{"tabs":["Review: Live edits (1)"],"active":"Review: Live edits (1)"},{"tabs":["Overseer"],"active":"Overseer"}]}
-[2026-09-30T09:48:16.371Z] screenshot docs/verification/evidence/ui/popout/05-returned.png
-[2026-09-30T09:48:19.340Z] PASS closing the separate window returns the review to the main window beside the chat {"windows":[{"id":1,"title":"Overseer — pop-repo","visible":true,"focused":false}],"main":[{"tabs":["Review: Live edits (1)"],"active":"Review: Live edits (1)"},{"tabs":["Overseer"],"active":"Overseer"}]}
-[2026-09-30T09:48:19.422Z] screenshot docs/verification/evidence/ui/popout/06-closed-window-returned.png
-[2026-09-30T09:48:19.461Z] PASS the separate window never took the focus from the owner's apps (main-process events) {"events":[{"ms":157,"what":"window created","show":true},{"ms":8587,"what":"floating window opened hidden"},{"ms":8598,"what":"window created","show":true},{"ms":18983,"what":"floating window opened hidden"},{"ms":18992,"what":"window created","show":true}]}
-[2026-09-30T09:48:19.465Z] frontmost app samples (four a second) {"loginwindow":86}
+[2026-09-29T16:30:44.564Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-29T16:30:53.281Z] PASS the working agent's review sits beside its chat in the main window [{"tabs":["Review: Live edits (1)"],"active":"Review: Live edits (1)"},{"tabs":["Overseer"],"active":"Overseer"}]
+[2026-09-29T16:30:53.358Z] screenshot docs/verification/evidence/ui/popout/01-review-beside-chat.png
+[2026-09-29T16:30:55.448Z] PASS Pop Out Follow moves the review into a separate window {"windows":[{"id":2,"title":"Review: Live edits (1) — pop-repo","visible":true,"focused":false},{"id":1,"title":"Overseer — pop-repo","visible":true,"focused":false}],"auxTabs":["Review: Live edits (1)"]}
+[2026-09-29T16:30:55.448Z] PASS the main window keeps Overseer and the chat (no review there) [{"tabs":["Overseer"],"active":"Overseer"}]
+[2026-09-29T16:30:55.524Z] screenshot docs/verification/evidence/ui/popout/02-main-window-after-pop-out.png
+[2026-09-29T16:30:55.584Z] screenshot docs/verification/evidence/ui/popout/03-separate-window-1.png
+[2026-09-29T16:30:59.640Z] screenshot docs/verification/evidence/ui/popout/04-separate-window-2.png
+[2026-09-29T16:30:59.640Z] PASS the separate window keeps following the agent live (two screenshots seconds apart; its file grew) {"first":8,"later":12}
+[2026-09-29T16:31:01.240Z] PASS selecting another agent: the separate window shows its review; the main window its chat {"windows":[{"id":2,"title":"Review: Other agent (1) — pop-repo","visible":true,"focused":false},{"id":1,"title":"Overseer — pop-repo","visible":true,"focused":false}],"main":[{"tabs":["Overseer"],"active":"Overseer"}]}
+[2026-09-29T16:31:03.909Z] PASS Return Follow brings the review back beside the chat and its window closes {"windows":[{"id":1,"title":"Overseer — pop-repo","visible":true,"focused":false}],"main":[{"tabs":["Review: Live edits (1)"],"active":"Review: Live edits (1)"},{"tabs":["Overseer"],"active":"Overseer"}]}
+[2026-09-29T16:31:03.976Z] screenshot docs/verification/evidence/ui/popout/05-returned.png
+[2026-09-29T16:31:06.925Z] PASS closing the separate window returns the review to the main window beside the chat {"windows":[{"id":1,"title":"Overseer — pop-repo","visible":true,"focused":false}],"main":[{"tabs":["Review: Live edits (1)"],"active":"Review: Live edits (1)"},{"tabs":["Overseer"],"active":"Overseer"}]}
+[2026-09-29T16:31:06.995Z] screenshot docs/verification/evidence/ui/popout/06-closed-window-returned.png
+[2026-09-29T16:31:06.995Z] PASS the separate window never took the focus from the owner's apps (main-process events) {"events":[{"ms":222,"what":"window created","show":true},{"ms":287,"what":"window shown"},{"ms":8707,"what":"floating window opened hidden"},{"ms":8726,"what":"window created","show":true},{"ms":8750,"what":"window shown"},{"ms":19326,"what":"floating window opened hidden"},{"ms":19339,"what":"window created","show":true},{"ms":19359,"what":"window shown"}]}
+[2026-09-29T16:31:07.002Z] frontmost app samples (four a second) {"ChatGPT":87}

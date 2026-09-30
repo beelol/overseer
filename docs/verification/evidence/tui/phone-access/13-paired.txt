@@ -19,7 +19,7 @@
                                                                                                                                             
                                              ╭ pair a phone ──────────────────────────────────╮                                             
                                              │                                                │                                             
-                                             │ With Mac                                       │                                             
+                                             │ With MacBook-Pro                               │                                             
                                              │                                                │                                             
                                              │ Paired with "Bilal's iPhone".                  │                                             
                                              │ p pairs another phone · esc closes             │                                             

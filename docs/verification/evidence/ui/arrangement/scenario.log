@@ -1,15 +1,15 @@
-[2026-09-30T09:09:09.084Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-30T09:09:13.839Z] PASS no agent selected: one editor group with the new-agent composer and no review [{"share":1,"active":"Overseer","tabs":["Overseer"]}]
-[2026-09-30T09:09:13.913Z] screenshot docs/verification/evidence/ui/arrangement/01-composer-alone.png
-[2026-09-30T09:09:17.559Z] PASS an agent with no changes: one editor group with its chat and no review [{"share":1,"active":"Overseer","tabs":["Overseer"]}]
-[2026-09-30T09:09:17.668Z] screenshot docs/verification/evidence/ui/arrangement/02-chat-alone.png
-[2026-09-30T09:09:18.252Z] first edit → review {"lag":201,"polledLag":370,"events":["permission_answered@-1","status:running@-1","tool_result:completed@59","output@59","usage@59","turn_done@59","status:completed@121"]}
-[2026-09-30T09:09:19.761Z] PASS the first file edit brings the review forward within 500 ms: review on the left (about two thirds) on the changed file, chat on the right {"lag":201,"polledLag":370,"events":["permission_answered@-1","status:running@-1","tool_result:completed@59","output@59","usage@59","turn_done@59","status:completed@121"],"waitedMs":1,"layout":[{"share":0.66,"active":"Review: Write perm.txt (1), Editor Group 1","tabs":["Review: Write perm.txt (1), Editor Group 1"]},{"share":0.34,"active":"Overseer, Editor Group 2","tabs":["Overseer, Editor Group 2"]}],"reviewFiles":["perm.txt","+1","−0","A"]}
-[2026-09-30T09:09:19.836Z] screenshot docs/verification/evidence/ui/arrangement/03-review-and-chat.png
-[2026-09-30T09:09:22.261Z] PASS the chat is a normal tab after moving (not a preview another file would replace) {"cls":"tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge","italic":"normal"}
-[2026-09-30T09:09:22.261Z] PASS closing the review returns the chat to the middle (one group) [{"share":1,"active":"Overseer, Editor Group 2","tabs":["Overseer, Editor Group 2"]}]
-[2026-09-30T09:09:25.286Z] PASS selecting another agent (with changes) keeps the chosen arrangement: chat alone [{"share":1,"active":"Overseer, Editor Group 2","tabs":["Overseer, Editor Group 2"]}]
-[2026-09-30T09:09:27.845Z] PASS Open Review brings the review back beside the chat [{"share":0.66,"active":"Review: Refresh sessions once (2), Editor Group 1","tabs":["Review: Refresh sessions once (2), Editor Group 1"]},{"share":0.34,"active":"Overseer, Editor Group 2","tabs":["Overseer, Editor Group 2"]}]
-[2026-09-30T09:09:40.928Z] PASS the arrangement survives a window reload (review left, chat right) [{"share":0.66,"active":"Review: Refresh sessions once (2), Editor Group 1","tabs":["Review: Refresh sessions once (2), Editor Group 1"]},{"share":0.34,"active":"Overseer, Editor Group 2","tabs":["Overseer, Editor Group 2"]}]
-[2026-09-30T09:09:41.035Z] screenshot docs/verification/evidence/ui/arrangement/04-after-reload.png
-[2026-09-30T09:09:41.055Z] PASS no settings changed (apart from VS Code's own migration)
+[2026-09-29T05:05:44.402Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-29T05:05:49.581Z] PASS no agent selected: one editor group with the new-agent composer and no review [{"share":1,"active":"Overseer","tabs":["Overseer"]}]
+[2026-09-29T05:05:49.642Z] screenshot docs/verification/evidence/ui/arrangement/01-composer-alone.png
+[2026-09-29T05:05:53.402Z] PASS an agent with no changes: one editor group with its chat and no review [{"share":1,"active":"Overseer","tabs":["Overseer"]}]
+[2026-09-29T05:05:53.480Z] screenshot docs/verification/evidence/ui/arrangement/02-chat-alone.png
+[2026-09-29T05:05:54.056Z] first edit → review {"lag":276,"polledLag":380,"events":["permission_answered@-1","status:running@-1","tool_result:completed@45","output@45","usage@45","turn_done@45","status:completed@112"]}
+[2026-09-29T05:05:55.580Z] PASS the first file edit brings the review forward within 500 ms: review on the left (about two thirds) on the changed file, chat on the right {"lag":276,"polledLag":380,"events":["permission_answered@-1","status:running@-1","tool_result:completed@45","output@45","usage@45","turn_done@45","status:completed@112"],"waitedMs":1,"layout":[{"share":0.66,"active":"Review: Write perm.txt (1), Editor Group 1","tabs":["Review: Write perm.txt (1), Editor Group 1"]},{"share":0.34,"active":"Overseer, Editor Group 2","tabs":["Overseer, Editor Group 2"]}],"reviewFiles":["perm.txt","+1","−0","A"]}
+[2026-09-29T05:05:55.662Z] screenshot docs/verification/evidence/ui/arrangement/03-review-and-chat.png
+[2026-09-29T05:05:58.744Z] PASS the chat is a normal tab after moving (not a preview another file would replace) {"cls":"tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge","italic":"normal"}
+[2026-09-29T05:05:58.744Z] PASS closing the review returns the chat to the middle (one group) [{"share":1,"active":"Overseer, Editor Group 2","tabs":["Overseer, Editor Group 2"]}]
+[2026-09-29T05:06:01.809Z] PASS selecting another agent (with changes) keeps the chosen arrangement: chat alone [{"share":1,"active":"Overseer, Editor Group 2","tabs":["Overseer, Editor Group 2"]}]
+[2026-09-29T05:06:04.406Z] PASS Open Review brings the review back beside the chat [{"share":0.6,"active":"Review: Refresh sessions once (2), Editor Group 1","tabs":["Review: Refresh sessions once (2), Editor Group 1"]},{"share":0.4,"active":"Overseer, Editor Group 2","tabs":["Overseer, Editor Group 2"]}]
+[2026-09-29T05:06:17.544Z] PASS the arrangement survives a window reload (review left, chat right) [{"share":0.6,"active":"Review: Refresh sessions once (2), Editor Group 1","tabs":["Review: Refresh sessions once (2), Editor Group 1"]},{"share":0.4,"active":"Overseer, Editor Group 2","tabs":["Overseer, Editor Group 2"]}]
+[2026-09-29T05:06:17.706Z] screenshot docs/verification/evidence/ui/arrangement/04-after-reload.png
+[2026-09-29T05:06:17.706Z] PASS no settings changed (apart from VS Code's own migration)

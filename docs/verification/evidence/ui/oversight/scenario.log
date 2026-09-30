@@ -1,40 +1,40 @@
-[2026-09-30T09:43:21.502Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-30T09:43:30.879Z] PASS a large diff is shared as a patch file and as a branch and commit {"branch":"overseer/share/sh-749db9f663f3","bytes":106082,"commit":"3ff73da5f6d708cd44e2a8a80be50ab98878f5da","file":"/private/tmp/ovs-ui-ARhK9I/overseer-home/runs/r-c0e4146d68b6/shares/sh-749db9f663f3.patch","from":"r-a7c5d84f0002","id":"sh-749db9f663f3","inline_bytes":8086,"kind":"diff","proposal":"p-41ad6270bb0e","source":"from Big change (diff)","to":"r-c0e4146d68b6","ts":1790761410533,"withdrawn_ms":null}
-[2026-09-30T09:43:30.884Z] PASS the share's card has a row for the agent with its delivery, state and times [{"action":"share","answered_ms":1790761410604,"delivered_ms":1790761410533,"delivery":"add","held_ms":1790761410533,"id":"d-c0dbcbfe066c","message":"from Big change (diff): 106082 bytes","picked_ms":null,"run_id":"r-c0e4146d68b6","sent_ms":1790761410533,"state":"answered","title":"Reader","turn_id":null,"why":"named"}]
-[2026-09-30T09:43:31.320Z] PASS the daemon's one state says held, watched and watching {"sessions":{"area":[],"conflicts":0,"held":true,"hold_reason":"wait for the review","needs_decision":false,"role":"agent","watched":false,"watchers":[],"watching":[]},"build":{"area":[],"conflicts":0,"held":false,"hold_reason":null,"needs_decision":false,"role":"agent","watched":true,"watchers":["r-f44a02598219"],"watching":[]},"reviewer":{"area":[],"conflicts":0,"held":false,"hold_reason":null,"needs_decision":false,"role":"agent","watched":false,"watchers":[],"watching":["r-adb627ef3215"]}}
-[2026-09-30T09:43:33.432Z] PASS Overseer: the side bar marks the held, the watched and the watching agent, and lists no run of Overseer's own [["2 working · 1 needs you · 3 to review",""],["Needs you","1"],["Overseer","Decide"],["oversight-repo","2 · 3 to review"],["Sessions","⏸ held"],["Docs build","◉ watched"],["Reader","now · Fixture · fix…@example.test"],["Big change","now"],["Reviewer","now · Fixture · fix…@example.test · ◉ watching"]]
-[2026-09-30T09:43:35.781Z] screenshot docs/verification/evidence/ui/oversight/01-held-chat-overseer.png
-[2026-09-30T09:43:35.794Z] PASS Overseer: the held agent's chat says it is held and why
-[2026-09-30T09:43:38.014Z] screenshot docs/verification/evidence/ui/oversight/02-grid-overseer.png
-[2026-09-30T09:43:38.029Z] PASS Overseer: the grid's tiles show held and watched [{"title":"Docs build","held":false,"watched":true,"marks":"watched"},{"title":"Sessions","held":true,"watched":false,"marks":"held"}]
-[2026-09-30T09:43:42.131Z] screenshot docs/verification/evidence/ui/oversight/03-watched-chat-overseer.png
-[2026-09-30T09:43:44.450Z] screenshot docs/verification/evidence/ui/oversight/04-watcher-chat-overseer.png
-[2026-09-30T09:43:44.465Z] PASS Overseer: the watcher's chat shows the watch and its finding ["Watched: the tests stay in place","Reviewer: concern — it sounds unsure about the tests"]
-[2026-09-30T09:43:46.821Z] screenshot docs/verification/evidence/ui/oversight/05-share-chat-overseer.png
-[2026-09-30T09:43:46.838Z] PASS Overseer: the receiving agent's chat shows the share and its withdrawal ["Overseer shared from Big change (diff)","A share was withdrawn"]
-[2026-09-30T09:43:49.393Z] screenshot docs/verification/evidence/ui/oversight/06-home-cards-overseer.png
-[2026-09-30T09:43:49.411Z] PASS Overseer: home shows the watch, the finding, the withdrawal and the share's card with its row {"kinds":["started","started","started","watch","finding","started","started","withdrawn"],"rows":["Reader you named it · added to its work answered 02:43:30 AM"]}
-[2026-09-30T09:43:52.522Z] PASS Overseer Dark: the side bar marks the held, the watched and the watching agent, and lists no run of Overseer's own [["2 working · 1 needs you · 1 to review · 2 reviewed",""],["Needs you","1"],["Overseer","Decide"],["oversight-repo","2 · 1 to review"],["Sessions","⏸ held"],["Docs build","◉ watched"],["Reader","now · Fixture · fix…@example.test"],["Big change","now"],["Reviewer","now · Fixture · fix…@example.test · ◉ watching"]]
-[2026-09-30T09:43:54.704Z] screenshot docs/verification/evidence/ui/oversight/07-held-chat-overseer-dark.png
-[2026-09-30T09:43:54.725Z] PASS Overseer Dark: the held agent's chat says it is held and why
-[2026-09-30T09:43:56.926Z] screenshot docs/verification/evidence/ui/oversight/08-grid-overseer-dark.png
-[2026-09-30T09:43:56.949Z] PASS Overseer Dark: the grid's tiles show held and watched [{"title":"Docs build","held":false,"watched":true,"marks":"watched"},{"title":"Sessions","held":true,"watched":false,"marks":"held"}]
-[2026-09-30T09:44:00.903Z] screenshot docs/verification/evidence/ui/oversight/09-watched-chat-overseer-dark.png
-[2026-09-30T09:44:03.118Z] screenshot docs/verification/evidence/ui/oversight/10-watcher-chat-overseer-dark.png
-[2026-09-30T09:44:03.144Z] PASS Overseer Dark: the watcher's chat shows the watch and its finding ["Watched: the tests stay in place","Reviewer: concern — it sounds unsure about the tests"]
-[2026-09-30T09:44:05.371Z] screenshot docs/verification/evidence/ui/oversight/11-share-chat-overseer-dark.png
-[2026-09-30T09:44:05.395Z] PASS Overseer Dark: the receiving agent's chat shows the share and its withdrawal ["Overseer shared from Big change (diff)","A share was withdrawn"]
-[2026-09-30T09:44:07.864Z] screenshot docs/verification/evidence/ui/oversight/12-home-cards-overseer-dark.png
-[2026-09-30T09:44:07.891Z] PASS Overseer Dark: home shows the watch, the finding, the withdrawal and the share's card with its row {"kinds":["started","started","started","watch","finding","started","started","withdrawn"],"rows":["Reader you named it · added to its work answered 02:43:30 AM"]}
-[2026-09-30T09:44:11.000Z] PASS Overseer Light: the side bar marks the held, the watched and the watching agent, and lists no run of Overseer's own [["2 working · 1 needs you · 1 to review · 2 reviewed",""],["Needs you","1"],["Overseer","Decide"],["oversight-repo","2 · 1 to review"],["Sessions","⏸ held"],["Docs build","◉ watched"],["Reader","now · Fixture · fix…@example.test"],["Big change","now"],["Reviewer","now · Fixture · fix…@example.test · ◉ watching"]]
-[2026-09-30T09:44:13.198Z] screenshot docs/verification/evidence/ui/oversight/13-held-chat-overseer-light.png
-[2026-09-30T09:44:13.227Z] PASS Overseer Light: the held agent's chat says it is held and why
-[2026-09-30T09:44:15.421Z] screenshot docs/verification/evidence/ui/oversight/14-grid-overseer-light.png
-[2026-09-30T09:44:15.451Z] PASS Overseer Light: the grid's tiles show held and watched [{"title":"Docs build","held":false,"watched":true,"marks":"watched"},{"title":"Sessions","held":true,"watched":false,"marks":"held"}]
-[2026-09-30T09:44:19.416Z] screenshot docs/verification/evidence/ui/oversight/15-watched-chat-overseer-light.png
-[2026-09-30T09:44:21.632Z] screenshot docs/verification/evidence/ui/oversight/16-watcher-chat-overseer-light.png
-[2026-09-30T09:44:21.661Z] PASS Overseer Light: the watcher's chat shows the watch and its finding ["Watched: the tests stay in place","Reviewer: concern — it sounds unsure about the tests"]
-[2026-09-30T09:44:23.880Z] screenshot docs/verification/evidence/ui/oversight/17-share-chat-overseer-light.png
-[2026-09-30T09:44:23.911Z] PASS Overseer Light: the receiving agent's chat shows the share and its withdrawal ["Overseer shared from Big change (diff)","A share was withdrawn"]
-[2026-09-30T09:44:26.379Z] screenshot docs/verification/evidence/ui/oversight/18-home-cards-overseer-light.png
-[2026-09-30T09:44:26.414Z] PASS Overseer Light: home shows the watch, the finding, the withdrawal and the share's card with its row {"kinds":["started","started","started","watch","finding","started","started","withdrawn"],"rows":["Reader you named it · added to its work answered 02:43:30 AM"]}
+[2026-09-28T14:08:13.417Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-28T14:08:22.774Z] PASS a large diff is shared as a patch file and as a branch and commit {"branch":"overseer/share/sh-6ac6cb12c638","bytes":106082,"commit":"9bb9e1e1f2abe820d2ffa1a5d10a3284b97e67f4","file":"/private/tmp/ovs-ui-1IhI94/overseer-home/runs/r-9c52162e358f/shares/sh-6ac6cb12c638.patch","from":"r-c7347aa33e16","id":"sh-6ac6cb12c638","inline_bytes":8086,"kind":"diff","proposal":"p-5d581c41bfd4","source":"from Big change (diff)","to":"r-9c52162e358f","ts":1790604502556,"withdrawn_ms":null}
+[2026-09-28T14:08:22.777Z] PASS the share's card has a row for the agent with its delivery, state and times [{"action":"share","answered_ms":1790604502626,"delivered_ms":1790604502556,"delivery":"add","held_ms":1790604502556,"id":"d-d820401a4dca","message":"from Big change (diff): 106082 bytes","picked_ms":null,"run_id":"r-9c52162e358f","sent_ms":1790604502556,"state":"answered","title":"Reader","turn_id":null,"why":"named"}]
+[2026-09-28T14:08:23.217Z] PASS the daemon's one state says held, watched and watching {"sessions":{"area":[],"conflicts":0,"held":true,"hold_reason":"wait for the review","needs_decision":false,"role":"agent","watched":false,"watchers":[],"watching":[]},"build":{"area":[],"conflicts":0,"held":false,"hold_reason":null,"needs_decision":false,"role":"agent","watched":true,"watchers":["r-db4bb0ee958a"],"watching":[]},"reviewer":{"area":[],"conflicts":0,"held":false,"hold_reason":null,"needs_decision":false,"role":"agent","watched":false,"watchers":[],"watching":["r-0e614d7681e2"]}}
+[2026-09-28T14:08:25.337Z] PASS Overseer: the side bar marks the held, the watched and the watching agent, and lists no run of Overseer's own [["Needs you","2"],["Overseer","Decide"],["Big change","Review"],["oversight-repo","2"],["Sessions","⏸ held"],["Docs build","◉ watched"],["Reader","now"],["Big change","now"],["Reviewer","now · ◉ watching"]]
+[2026-09-28T14:08:27.676Z] screenshot docs/verification/evidence/ui/oversight/01-held-chat-overseer.png
+[2026-09-28T14:08:27.676Z] PASS Overseer: the held agent's chat says it is held and why
+[2026-09-28T14:08:30.253Z] screenshot docs/verification/evidence/ui/oversight/02-grid-overseer.png
+[2026-09-28T14:08:30.253Z] PASS Overseer: the grid's tiles show held and watched [{"title":"Docs build","held":false,"watched":true,"marks":"watched"},{"title":"Sessions","held":true,"watched":false,"marks":"held"}]
+[2026-09-28T14:08:34.718Z] screenshot docs/verification/evidence/ui/oversight/03-watched-chat-overseer.png
+[2026-09-28T14:08:37.035Z] screenshot docs/verification/evidence/ui/oversight/04-watcher-chat-overseer.png
+[2026-09-28T14:08:37.036Z] PASS Overseer: the watcher's chat shows the watch and its finding ["Watched: the tests stay in place","Reviewer: concern — it sounds unsure about the tests"]
+[2026-09-28T14:08:39.388Z] screenshot docs/verification/evidence/ui/oversight/05-share-chat-overseer.png
+[2026-09-28T14:08:39.388Z] PASS Overseer: the receiving agent's chat shows the share and its withdrawal ["Overseer shared from Big change (diff)","A share was withdrawn"]
+[2026-09-28T14:08:42.303Z] screenshot docs/verification/evidence/ui/oversight/06-home-cards-overseer.png
+[2026-09-28T14:08:42.304Z] PASS Overseer: home shows the watch, the finding, the withdrawal and the share's card with its row {"kinds":["started","started","started","watch","finding","started","started","withdrawn"],"rows":["Reader named · add answered 07:08:22 AM"]}
+[2026-09-28T14:08:45.414Z] PASS Overseer Dark: the side bar marks the held, the watched and the watching agent, and lists no run of Overseer's own [["Needs you","2"],["Overseer","Decide"],["Big change","Review"],["oversight-repo","2"],["Sessions","⏸ held"],["Docs build","◉ watched"],["Reader","now"],["Big change","now"],["Reviewer","now · ◉ watching"]]
+[2026-09-28T14:08:47.574Z] screenshot docs/verification/evidence/ui/oversight/07-held-chat-overseer-dark.png
+[2026-09-28T14:08:47.574Z] PASS Overseer Dark: the held agent's chat says it is held and why
+[2026-09-28T14:08:50.096Z] screenshot docs/verification/evidence/ui/oversight/08-grid-overseer-dark.png
+[2026-09-28T14:08:50.096Z] PASS Overseer Dark: the grid's tiles show held and watched [{"title":"Docs build","held":false,"watched":true,"marks":"watched"},{"title":"Sessions","held":true,"watched":false,"marks":"held"}]
+[2026-09-28T14:08:54.424Z] screenshot docs/verification/evidence/ui/oversight/09-watched-chat-overseer-dark.png
+[2026-09-28T14:08:56.599Z] screenshot docs/verification/evidence/ui/oversight/10-watcher-chat-overseer-dark.png
+[2026-09-28T14:08:56.599Z] PASS Overseer Dark: the watcher's chat shows the watch and its finding ["Watched: the tests stay in place","Reviewer: concern — it sounds unsure about the tests"]
+[2026-09-28T14:08:58.803Z] screenshot docs/verification/evidence/ui/oversight/11-share-chat-overseer-dark.png
+[2026-09-28T14:08:58.803Z] PASS Overseer Dark: the receiving agent's chat shows the share and its withdrawal ["Overseer shared from Big change (diff)","A share was withdrawn"]
+[2026-09-28T14:09:01.631Z] screenshot docs/verification/evidence/ui/oversight/12-home-cards-overseer-dark.png
+[2026-09-28T14:09:01.631Z] PASS Overseer Dark: home shows the watch, the finding, the withdrawal and the share's card with its row {"kinds":["started","started","started","watch","finding","started","started","withdrawn"],"rows":["Reader named · add answered 07:08:22 AM"]}
+[2026-09-28T14:09:04.744Z] PASS Overseer Light: the side bar marks the held, the watched and the watching agent, and lists no run of Overseer's own [["Needs you","2"],["Overseer","Decide"],["Big change","Review"],["oversight-repo","2"],["Sessions","⏸ held"],["Docs build","◉ watched"],["Reader","now"],["Big change","now"],["Reviewer","now · ◉ watching"]]
+[2026-09-28T14:09:06.927Z] screenshot docs/verification/evidence/ui/oversight/13-held-chat-overseer-light.png
+[2026-09-28T14:09:06.927Z] PASS Overseer Light: the held agent's chat says it is held and why
+[2026-09-28T14:09:09.461Z] screenshot docs/verification/evidence/ui/oversight/14-grid-overseer-light.png
+[2026-09-28T14:09:09.461Z] PASS Overseer Light: the grid's tiles show held and watched [{"title":"Docs build","held":false,"watched":true,"marks":"watched"},{"title":"Sessions","held":true,"watched":false,"marks":"held"}]
+[2026-09-28T14:09:13.772Z] screenshot docs/verification/evidence/ui/oversight/15-watched-chat-overseer-light.png
+[2026-09-28T14:09:15.959Z] screenshot docs/verification/evidence/ui/oversight/16-watcher-chat-overseer-light.png
+[2026-09-28T14:09:15.959Z] PASS Overseer Light: the watcher's chat shows the watch and its finding ["Watched: the tests stay in place","Reviewer: concern — it sounds unsure about the tests"]
+[2026-09-28T14:09:18.171Z] screenshot docs/verification/evidence/ui/oversight/17-share-chat-overseer-light.png
+[2026-09-28T14:09:18.172Z] PASS Overseer Light: the receiving agent's chat shows the share and its withdrawal ["Overseer shared from Big change (diff)","A share was withdrawn"]
+[2026-09-28T14:09:21.007Z] screenshot docs/verification/evidence/ui/oversight/18-home-cards-overseer-light.png
+[2026-09-28T14:09:21.007Z] PASS Overseer Light: home shows the watch, the finding, the withdrawal and the share's card with its row {"kinds":["started","started","started","watch","finding","started","started","withdrawn"],"rows":["Reader named · add answered 07:08:22 AM"]}

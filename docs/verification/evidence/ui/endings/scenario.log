@@ -1,10 +1,10 @@
-[2026-09-30T09:19:40.462Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-30T09:19:49.365Z] screenshot docs/verification/evidence/ui/endings/01-claude-stopped-dark.png
-[2026-09-30T09:19:49.384Z] PASS a stopped Claude turn reads "Stopped": no empty error card, no "Failed", one ending line {"status":"interrupted","errors":[],"foot":["Stopped"],"statusLines":[],"unparsed":0}
-[2026-09-30T09:19:55.677Z] screenshot docs/verification/evidence/ui/endings/02-codex-stopped-dark.png
-[2026-09-30T09:19:55.697Z] PASS a stopped Codex turn reads "Stopped" (no "Failed", no error card) {"status":"interrupted","errors":[],"foot":["Stopped"],"statusLines":[],"unparsed":0}
-[2026-09-30T09:20:01.221Z] PASS a line the parser does not understand stays out of the chat and is in the event log {"raw":"Warning: telemetry flush skipped (fixture)","inChat":0}
-[2026-09-30T09:20:04.982Z] screenshot docs/verification/evidence/ui/endings/03-failed-dark.png
-[2026-09-30T09:20:04.999Z] PASS a failed turn shows its reason once {"times":1,"foot":["Failed"],"errors":["Error\nMigration failed: relation users_v2 does not exist"],"statusLines":[]}
-[2026-09-30T09:20:09.629Z] screenshot docs/verification/evidence/ui/endings/04-claude-stopped-light.png
-[2026-09-30T09:20:12.743Z] screenshot docs/verification/evidence/ui/endings/05-failed-light.png
+[2026-09-28T16:24:18.729Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-28T16:24:28.791Z] screenshot docs/verification/evidence/ui/endings/01-claude-stopped-dark.png
+[2026-09-28T16:24:28.797Z] PASS a stopped Claude turn reads "Stopped": no empty error card, no "Failed", one ending line {"status":"interrupted","errors":[],"foot":["Stopped"],"statusLines":[],"unparsed":0}
+[2026-09-28T16:24:36.030Z] screenshot docs/verification/evidence/ui/endings/02-codex-stopped-dark.png
+[2026-09-28T16:24:36.036Z] PASS a stopped Codex turn reads "Stopped" (no "Failed", no error card) {"status":"interrupted","errors":[],"foot":["Stopped"],"statusLines":[],"unparsed":0}
+[2026-09-28T16:24:42.259Z] PASS a line the parser does not understand stays out of the chat and is in the event log {"raw":"Warning: telemetry flush skipped (fixture)","inChat":0}
+[2026-09-28T16:24:46.698Z] screenshot docs/verification/evidence/ui/endings/03-failed-dark.png
+[2026-09-28T16:24:46.698Z] PASS a failed turn shows its reason once {"times":1,"foot":["Failed"],"errors":["Error\nMigration failed: relation users_v2 does not exist"],"statusLines":[]}
+[2026-09-28T16:24:51.674Z] screenshot docs/verification/evidence/ui/endings/04-claude-stopped-light.png
+[2026-09-28T16:24:55.169Z] screenshot docs/verification/evidence/ui/endings/05-failed-light.png

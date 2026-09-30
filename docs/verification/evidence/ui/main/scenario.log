@@ -1,36 +1,36 @@
-[2026-09-30T09:35:38.699Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-30T09:35:41.385Z] screenshot docs/verification/evidence/ui/main/01-activated.png
-[2026-09-30T09:35:44.613Z] PASS profile created from UI {"id":"p-ebb750f21da9","harness":"opencode"}
-[2026-09-30T09:35:50.851Z] screenshot docs/verification/evidence/ui/main/02-task-launched.png
-[2026-09-30T09:35:55.165Z] PASS run created in isolated worktree {"run":"r-7e18f427ddc1","workspace":"/private/tmp/ovs-ui-m8I9z7/overseer-home/worktrees/repo-a54d1c3b/sequence-8","branch":"overseer/sequence-8"}
-[2026-09-30T09:35:55.166Z] PASS follow on for launched run
-[2026-09-30T09:35:55.419Z] follow "Following: a.txt:20 (from what the agent asked to change)"
-[2026-09-30T09:35:57.939Z] follow "Following: b.txt:280 (from what the agent asked to change)"
-[2026-09-30T09:35:58.027Z] screenshot docs/verification/evidence/ui/main/03-following.png
-[2026-09-30T09:36:00.318Z] follow "Following: a.txt:60 (from what the agent asked to change)"
-[2026-09-30T09:36:03.093Z] follow "Following: b.txt:240 (from what the agent asked to change)"
-[2026-09-30T09:36:03.346Z] PASS follow navigated across files ["Following: a.txt:20 (from what the agent asked to change)","Following: b.txt:280 (from what the agent asked to change)","Following: a.txt:60 (from what the agent asked to change)","Following: b.txt:240 (from what the agent asked to change)"]
-[2026-09-30T09:36:03.346Z] PASS follow revealed distant lines {"aLines":[20,60]}
-[2026-09-30T09:36:03.347Z] PASS output panel streams events "sequence 8\na.txt\n4 steps\nedit 4×\nb.txt\na.txt\nb.txt\n15 tokens\nedit…"
-[2026-09-30T09:36:04.070Z] PASS scroll pauses follow with visible Resume {"state":"Follow paused by your navigation","resume":true,"top":234}
-[2026-09-30T09:36:04.172Z] screenshot docs/verification/evidence/ui/main/04-paused.png
-[2026-09-30T09:36:10.197Z] PASS paused follow does not move the view {"state":"Follow paused by your navigation","top":234}
-[2026-09-30T09:36:11.205Z] PASS resume restarts follow {"state":"Following: a.txt:100 (from what the agent asked to change)","resume":false}
-[2026-09-30T09:36:11.918Z] PASS selecting another file pauses follow {"state":"Follow paused by your navigation","resume":true}
-[2026-09-30T09:36:12.637Z] PASS base icon identifies snapshot and provenance "Latest run\nBase: 361f9ece0ec5059ce1cb08d2808f039079d47832\nsnapshot s-806cd66e63c9 taken as turn 1 started, including uncommitted and untracked files\nProvenance: recorded\nClick to choose another comparison.\nWorktree: …/repo-a54d1c3b/sequence-8"
-[2026-09-30T09:36:19.359Z] PASS follow off preserves position {"offTop":614,"top":614,"checked":false}
-[2026-09-30T09:36:19.371Z] PASS run completed {"status":"completed","reason":"turn completed; exit 0"}
-[2026-09-30T09:36:19.454Z] screenshot docs/verification/evidence/ui/main/05-completed.png
-[2026-09-30T09:36:20.996Z] save button {"disabled":false,"status":""}
-[2026-09-30T09:36:21.070Z] screenshot docs/verification/evidence/ui/main/06-edited-in-review.png
-[2026-09-30T09:36:22.812Z] PASS review edit saved to the selected worktree "L20: ageUSER EDIT FROM REVIEW nt edit 1"
-[2026-09-30T09:36:22.903Z] PASS source checkout untouched {"status":"M README.md\nM  c.txt\n?? notes.txt"}
-[2026-09-30T09:36:27.040Z] screenshot docs/verification/evidence/ui/main/07-follow-up-running.png
-[2026-09-30T09:36:27.314Z] PASS interrupt from UI {"status":"interrupted","reason":"interrupted by user (exit signal 2)"}
-[2026-09-30T09:36:27.318Z] PASS follow-up created a new turn with its own snapshot [{"n":1,"status":"completed","snapshot":"s-806cd66e63c9"},{"n":2,"status":"interrupted","snapshot":"s-5dee25c8ca5a"}]
-[2026-09-30T09:36:28.406Z] screenshot docs/verification/evidence/ui/main/08-interrupted.png
-[2026-09-30T09:36:31.191Z] PASS three-level native tree visible in the UI {"text":"grandchild hi (@general subagent)now","level":4}
-[2026-09-30T09:36:31.316Z] PASS child controls disabled with explanation (stop hidden, reply disabled: steered through the parent; same worktree as the parent) {"stopHidden":true,"send":true,"why":"Sub-agents are steered through their parent","sendWhy":"Sub-agents are steered through their parent","worktree":"StatusDoneHarnessOpenCode 1.15.13AccountOpenCode · OpenCode mockBranchoverseer/delegationWorktree/private/tmp/ovs-ui-m8I9z7/overseer-home/worktrees/repo-a54d1c3b/delegationRunr-e4dfa7f62177Sessionses_f0e53cae7ffelxrFkNn81kiAZwCapabilitiescontrol: through parent harness only\nworkspace: shared with parent"}
-[2026-09-30T09:36:31.382Z] screenshot docs/verification/evidence/ui/main/09-native-child-selected.png
-[2026-09-30T09:36:33.457Z] PASS UI survives daemon crash: disconnected state, daemon restarted, same tasks {"sawDisconnect":true,"oldPid":26437,"newPid":79674,"tasks":2}
-[2026-09-30T09:36:33.552Z] screenshot docs/verification/evidence/ui/main/10-reconnected.png
+[2026-09-28T16:29:03.846Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-28T16:29:06.599Z] screenshot docs/verification/evidence/ui/main/01-activated.png
+[2026-09-28T16:29:10.993Z] PASS profile created from UI {"id":"p-f7cc659aa7de","harness":"opencode"}
+[2026-09-28T16:29:18.408Z] screenshot docs/verification/evidence/ui/main/02-task-launched.png
+[2026-09-28T16:29:23.890Z] PASS run created in isolated worktree {"run":"r-c03aabb9e287","workspace":"/private/tmp/ovs-ui-ALq38g/overseer-home/worktrees/repo-1876e354/sequence-8","branch":"overseer/sequence-8"}
+[2026-09-28T16:29:23.890Z] PASS follow on for launched run
+[2026-09-28T16:29:24.142Z] follow "Following: a.txt:20 (agent tool input (tool-input))"
+[2026-09-28T16:29:29.187Z] follow "Following: a.txt:60 (agent tool input (tool-input))"
+[2026-09-28T16:29:29.263Z] screenshot docs/verification/evidence/ui/main/03-following.png
+[2026-09-28T16:29:32.030Z] follow "Following: b.txt:240 (agent tool input (tool-input))"
+[2026-09-28T16:29:37.816Z] follow "Following: b.txt:200 (agent tool input (tool-input))"
+[2026-09-28T16:29:38.067Z] PASS follow navigated across files ["Following: a.txt:20 (agent tool input (tool-input))","Following: a.txt:60 (agent tool input (tool-input))","Following: b.txt:240 (agent tool input (tool-input))","Following: b.txt:200 (agent tool input (tool-input))"]
+[2026-09-28T16:29:38.067Z] PASS follow revealed distant lines {"aLines":[20,60]}
+[2026-09-28T16:29:38.068Z] PASS output panel streams events "sequence 8\na.txt\n6 steps\nedit 6×\nb.txt\na.txt\nb.txt\na.txt\nb.txt\n15 tokens\nedit…"
+[2026-09-28T16:29:38.780Z] PASS scroll pauses follow with visible Resume {"state":"Follow paused by your navigation","resume":true,"top":614}
+[2026-09-28T16:29:38.864Z] screenshot docs/verification/evidence/ui/main/04-paused.png
+[2026-09-28T16:29:44.866Z] PASS paused follow does not move the view {"state":"Follow paused by your navigation","top":614}
+[2026-09-28T16:29:45.875Z] PASS resume restarts follow {"state":"Following agent edits (agent tool input (tool-input))","resume":false}
+[2026-09-28T16:29:46.583Z] PASS selecting another file pauses follow {"state":"Follow paused by your navigation","resume":true}
+[2026-09-28T16:29:47.292Z] PASS base icon identifies snapshot and provenance "Latest run\nBase: a466daf8907fdc4181cd5dcf3ad863f5651f6cd9\nrun-start snapshot s-84c42d09c361 (turn 1 of r-c03aabb9e287, 1790612958908), captured including dirty and untracked files\nProvenance: recorded\nClick to choose another comparison.\nWorktree: …/repo-1876e354/sequence-8"
+[2026-09-28T16:29:54.002Z] PASS follow off preserves position {"offTop":862,"top":862,"checked":false}
+[2026-09-28T16:29:54.015Z] PASS run completed {"status":"completed","reason":"turn completed; exit 0"}
+[2026-09-28T16:29:54.104Z] screenshot docs/verification/evidence/ui/main/05-completed.png
+[2026-09-28T16:29:55.614Z] save button {"disabled":false,"status":""}
+[2026-09-28T16:29:55.684Z] screenshot docs/verification/evidence/ui/main/06-edited-in-review.png
+[2026-09-28T16:29:57.394Z] PASS review edit saved to the selected worktree "L20: ageUSER EDIT FROM REVIEW nt edit 1"
+[2026-09-28T16:29:57.545Z] PASS source checkout untouched {"status":"M README.md\nM  c.txt\n?? notes.txt"}
+[2026-09-28T16:30:01.646Z] screenshot docs/verification/evidence/ui/main/07-follow-up-running.png
+[2026-09-28T16:30:01.869Z] PASS interrupt from UI {"status":"interrupted","reason":"interrupted by user (exit signal 2)"}
+[2026-09-28T16:30:01.874Z] PASS follow-up created a new turn with its own snapshot [{"n":1,"status":"completed","snapshot":"s-84c42d09c361"},{"n":2,"status":"interrupted","snapshot":"s-e6428c3c9479"}]
+[2026-09-28T16:30:02.951Z] screenshot docs/verification/evidence/ui/main/08-interrupted.png
+[2026-09-28T16:30:07.129Z] PASS three-level native tree visible in the UI {"text":"grandchild hi (@general subagent)now","level":4}
+[2026-09-28T16:30:07.557Z] PASS child controls disabled with explanation (stop hidden, reply disabled: steered through the parent; same worktree as the parent) {"stopHidden":true,"send":true,"why":"Sub-agents are steered through their parent","sendWhy":"Sub-agents are steered through their parent","worktree":"StatusDoneHarnessOpenCode 1.15.13AccountOpenCode mockBranchoverseer/delegationWorktree/private/tmp/ovs-ui-ALq38g/overseer-home/worktrees/repo-1876e354/delegationRunr-7f3fba8d517eSessionses_f1725db09ffeI9oV7U4Tkma32xCapabilitiescontrol: through parent harness only\nworkspace: shared with parent"}
+[2026-09-28T16:30:07.619Z] screenshot docs/verification/evidence/ui/main/09-native-child-selected.png
+[2026-09-28T16:30:09.666Z] PASS UI survives daemon crash: disconnected state, daemon restarted, same tasks {"sawDisconnect":true,"oldPid":30244,"newPid":54592,"tasks":2}
+[2026-09-28T16:30:09.728Z] screenshot docs/verification/evidence/ui/main/10-reconnected.png

@@ -52,7 +52,7 @@
         "label": "by file the agent edited",
         "expect": "Refresh sessions once",
         "q": "coordinator",
-        "ms": 6,
+        "ms": 8,
         "labels": [
           "Refresh sessions once"
         ],
@@ -98,7 +98,7 @@
         "label": "by status",
         "expect": "Broken migration",
         "q": "failed",
-        "ms": 8,
+        "ms": 7,
         "labels": [
           "Broken migration"
         ],

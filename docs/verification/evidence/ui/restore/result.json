@@ -75,7 +75,7 @@
     {
       "name": "R3 worktree removed before restart",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-fJyqd7/overseer-home/worktrees/repoA-83a90715/r3-removed-later"
+      "detail": "/private/tmp/ovs-ui-Edu6Kq/overseer-home/worktrees/repoA-aa2eb175/r3-removed-later"
     },
     {
       "name": "after-restart: the review and the two side chats reopened",
@@ -154,7 +154,7 @@
       "ok": true,
       "detail": {
         "side3": 1,
-        "text": "Overseer: The worktree for \"R3 removed later\" (/private/tmp/ovs-ui-fJyqd7/overseer-home/worktrees/repoA-83a90715/r3-removed-later) was removed on 9/30/2026, 2:49:28 AM. Its branch overseer/r3-removed-later was kept, so the commits are still in the repository. The run panel still has its history."
+        "text": "Overseer: The worktree for \"R3 removed later\" (/private/tmp/ovs-ui-Edu6Kq/overseer-home/worktrees/repoA-aa2eb175/r3-removed-later) was removed on 9/28/2026, 9:33:04 AM. Its branch overseer/r3-removed-later was kept, so the commits are still in the repository. The run panel still has its history."
       }
     }
   ]

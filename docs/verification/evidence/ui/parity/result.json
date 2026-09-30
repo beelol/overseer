@@ -31,8 +31,6 @@
           "stdio",
           "--model",
           "opus",
-          "--effort",
-          "high",
           "--resume",
           "fixture-session-1",
           "--effort",

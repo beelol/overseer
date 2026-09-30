@@ -1,11 +1,19 @@
-[2026-09-30T09:18:22.872Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-30T09:18:29.749Z] PASS conversation shows the turn with its prompt {"turns":1,"prompt":"spawn a child, then touch approved.txt","spawn":true,"child":"child task","childText":"child output\n","grand":"grandchild task"}
-[2026-09-30T09:18:29.749Z] PASS native child nested under the spawning tool call, grandchild under the child, with their own output {"turns":1,"prompt":"spawn a child, then touch approved.txt","spawn":true,"child":"child task","childText":"child output\n","grand":"grandchild task"}
-[2026-09-30T09:18:29.749Z] PASS permission request inline in the conversation with Allow/Deny {"head":"Allow command: touch approved.txt touch approved.txt?","buttons":["Allow once","Deny"]}
-[2026-09-30T09:18:29.863Z] screenshot docs/verification/evidence/ui/conversation/01-codex-app-pending.png
-[2026-09-30T09:18:30.001Z] ERROR Error: element not found #inline-allow
-    at Session.webviewPointOnce (/Users/bilal/projects/overseer/.claude/worktrees/one-layout-run/test/ui/harness.js:354:23)
-    at async Session.webviewPoint (/Users/bilal/projects/overseer/.claude/worktrees/one-layout-run/test/ui/harness.js:344:17)
-    at async clickIn (/Users/bilal/projects/overseer/.claude/worktrees/one-layout-run/test/ui/scenario-conversation.js:36:60)
-    at async /Users/bilal/projects/overseer/.claude/worktrees/one-layout-run/test/ui/scenario-conversation.js:52:5
-[2026-09-30T09:18:30.106Z] screenshot docs/verification/evidence/ui/conversation/02-error.png
+[2026-09-28T16:23:12.331Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-28T16:23:20.174Z] PASS conversation shows the turn with its prompt {"turns":1,"prompt":"spawn a child, then touch approved.txt","spawn":true,"child":"child task","childText":"child output\n","grand":"grandchild task"}
+[2026-09-28T16:23:20.174Z] PASS native child nested under the spawning tool call, grandchild under the child, with their own output {"turns":1,"prompt":"spawn a child, then touch approved.txt","spawn":true,"child":"child task","childText":"child output\n","grand":"grandchild task"}
+[2026-09-28T16:23:20.174Z] PASS permission request inline in the conversation with Allow/Deny {"head":"Allow command: touch approved.txt touch approved.txt?","buttons":["Allow once","Deny"]}
+[2026-09-28T16:23:20.263Z] screenshot docs/verification/evidence/ui/conversation/01-codex-app-pending.png
+[2026-09-28T16:23:20.880Z] PASS decision recorded inline, turn completed with usage, file edit listed {"decision":["Allowed · command: touch approved.txt touch approved.txt"],"done":"Done","usage":"1 in · 1 out","edits":["approved.txt"]}
+[2026-09-28T16:23:22.193Z] screenshot docs/verification/evidence/ui/conversation/02-tool-expanded.png
+[2026-09-28T16:23:22.801Z] PASS tool call expands to its input and status, and collapses again {"open":{"open":true,"input":"touch approved.txt","status":"completed"},"closed":true}
+[2026-09-28T16:23:23.425Z] PASS clicking a file edit opens that hunk in the run's worktree review "/private/tmp/ovs-ui-hP4P0s/overseer-home/worktrees/conv-demo-4caf9269/app-tree"
+[2026-09-28T16:23:23.506Z] screenshot docs/verification/evidence/ui/conversation/03-edit-opened-in-review.png
+[2026-09-28T16:23:25.106Z] PASS Claude Write tool call shown before its permission request {"summary":"perm.txt"}
+[2026-09-28T16:23:26.630Z] PASS Claude tool call shows input (the written content, full path in the tooltip) and result {"pres":["allowed\n","File created successfully at: /private/tmp/ovs-ui-hP4P0s/overseer-home/worktrees/conv-demo-4caf9269/claude-write/perm.txt"],"labels":["Content","Result"],"title":"/private/tmp/ovs-ui-hP4P0s/overseer-home/worktrees/conv-demo-4caf9269/claude-write/perm.txt (Write)","status":"completed"}
+[2026-09-28T16:23:27.251Z] PASS Claude file edit opens the Claude worktree review (not the codex-app one) "/private/tmp/ovs-ui-hP4P0s/overseer-home/worktrees/conv-demo-4caf9269/claude-write"
+[2026-09-28T16:23:28.869Z] screenshot docs/verification/evidence/ui/conversation/04-event-log-tab.png
+[2026-09-28T16:23:30.388Z] PASS Event log (… menu) lists the raw events; conversation returns 18
+[2026-09-28T16:23:31.492Z] selectAgent: row not selected after the first click; clicking again "burst history"
+[2026-09-28T16:23:33.093Z] PASS history at the retention bound renders within 1.5 s with truncation visible {"last":"burst line 5999","ms":13,"events":5002,"banner":"Older history was trimmed. Raw output keeps everything.","msgs":5000}
+[2026-09-28T16:23:40.801Z] PASS live burst keeps the panel responsive (event-loop lag p95 under 250 ms, the AC-35 bound) and shows the newest output {"n":99,"p95":3,"max":28,"msgs":6000}
+[2026-09-28T16:23:40.928Z] screenshot docs/verification/evidence/ui/conversation/05-burst.png

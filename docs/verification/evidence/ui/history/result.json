@@ -6,7 +6,7 @@
       "detail": {
         "shownAtStart": 24,
         "byTitle": {
-          "ms": 8,
+          "ms": 9,
           "titles": [
             "History task 123"
           ]
@@ -23,7 +23,7 @@
       "name": "a finished agent is archived from the side bar by keyboard (hidden, listed under Show Archived) and restored",
       "ok": true,
       "detail": {
-        "archived": 1790760538159,
+        "archived": 1790756173340,
         "hidden": true,
         "inArchive": [
           "History task 005"

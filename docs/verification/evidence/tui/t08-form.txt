@@ -1,5 +1,5 @@
  ◆ Overseer  page 1/1 · 1 agent                                                                                                  phone access off · ● connected 
-┏ 1 ✓ Older agent ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Program · 0s ┓
+┏ 1 ✓ Older agent ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 0s ┓
 ┃ older                                                                                                                                                        ┃
 ┃                                                                                                                                                              ┃
 ┃                                                                                                                                                              ┃
@@ -18,10 +18,10 @@
 ┃                                                                                                                                                              ┃
 ┃                                     ╭ new agent ───────────────────────────────────────────────────────────────────────╮                                     ┃
 ┃                                     │                                                                                  │                                     ┃
-┃                                     │   Repository  /private/var/folders/mk/vz_j1tqn0rz6w6f4ztwfv0gr0000gn/T/.tmpO0uF… │                                     ┃
-┃                                     │   Harness     ‹ Claude Code claude-fixture 0.0.0 (synthetic) ›  (1/6)            │                                     ┃
+┃                                     │   Repository  /private/var/folders/mk/vz_j1tqn0rz6w6f4ztwfv0gr0000gn/T/.tmpJtq9… │                                     ┃
+┃                                     │   Harness     ‹ claude claude-fixture 0.0.0 (synthetic) ›  (1/6)                 │                                     ┃
 ┃                                     │                                                                                  │                                     ┃
-┃                                     │   Account     Mac's default login · fix…@example.test  ✓ signed in               │                                     ┃
+┃                                     │   Account     claude (existing login)  ✓ signed in                               │                                     ┃
 ┃                                     │   Model       harness default                                                    │                                     ┃
 ┃                                     │                                                                                  │                                     ┃
 ┃                                     │  ›Prompt      ▌                                                                  │                                     ┃

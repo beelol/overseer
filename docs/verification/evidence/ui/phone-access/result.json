@@ -16,7 +16,7 @@
         "text": "Phone access off",
         "aria": "Phone access off",
         "icon": "device-mobile",
-        "x": 493.22265625,
+        "x": 395.08203125,
         "y": 884,
         "background": "rgba(0, 0, 0, 0)",
         "color": "rgb(167, 163, 185)",
@@ -33,7 +33,7 @@
         "text": "Phone access off",
         "aria": "Phone access off",
         "icon": "device-mobile",
-        "x": 493.22265625,
+        "x": 395.08203125,
         "y": 884,
         "background": "rgba(0, 0, 0, 0)",
         "color": "rgb(167, 163, 185)",
@@ -49,7 +49,7 @@
       "detail": {
         "enabled": false,
         "port": null,
-        "configured": 58980,
+        "configured": 50648,
         "refused": true
       }
     },
@@ -70,7 +70,7 @@
         "text": "Phone access on",
         "aria": "Phone access on, no phone connected",
         "icon": "device-mobile",
-        "x": 492.3828125,
+        "x": 394.2421875,
         "y": 884,
         "background": "rgba(0, 0, 0, 0)",
         "color": "rgb(167, 163, 185)",
@@ -85,7 +85,7 @@
       "ok": true,
       "detail": {
         "enabled": true,
-        "port": 58980
+        "port": 50648
       }
     },
     {
@@ -95,7 +95,7 @@
         "text": "Phone access on",
         "aria": "Phone access on, no phone connected",
         "icon": "device-mobile",
-        "x": 492.3828125,
+        "x": 394.2421875,
         "y": 884,
         "background": "rgba(0, 0, 0, 0)",
         "color": "rgb(167, 163, 185)",
@@ -119,20 +119,20 @@
       "name": "3. Pair a Phone shows the code as text: it starts with OVSR1-, names this Mac's key and port",
       "ok": true,
       "detail": {
-        "code": "OVSR1-AENKYJHLJOTDQFOI4JXSYAPVFZ2VZYK7TUGZTQMWIETHXKEMR35TVS3Z7C5ZOHEIZXZWKDLR45NVEDHGMQBA4MJZGIXDCNRYFY2TALRRHA2ASMJSG4XDALRQFYYQ",
-        "port": 58980,
+        "code": "OVSR1-AG5EXTQZ5N6N4PVANAQQLKKE6UNA6ELUZCUKKNPWA3NGUUDJL26XPGPNHRNRSSZT4PCEOIU5NI5BIGOF3ABAWMJXGIXDEMBOGEYC4MYJGEZDOLRQFYYC4MI",
+        "port": 50648,
         "addresses": [
-          "192.168.50.184",
+          "172.20.10.3",
           "127.0.0.1"
         ],
-        "key": "dade91782db75da3"
+        "key": "1e6beb525f4bcc5a"
       }
     },
     {
       "name": "3. the text is the code, character for character, in groups for the eye, and can be selected",
       "ok": true,
       "detail": {
-        "groups": 32,
+        "groups": 31,
         "selectable": "all"
       }
     },
@@ -151,7 +151,7 @@
       "name": "3. the panel shows the Mac's name, three numbered steps, the time left and a Copy button",
       "ok": true,
       "detail": {
-        "mac": "With Mac",
+        "mac": "With MacBook-Pro",
         "steps": [
           "Open Overseer on your phone.",
           "Scan this code, or type it.",
@@ -183,7 +183,7 @@
       "detail": {
         "failures": 0,
         "open": true,
-        "remaining_ms": 42508,
+        "remaining_ms": 42527,
         "waiting": []
       }
     },
@@ -213,19 +213,19 @@
       "ok": true,
       "detail": {
         "Overseer Dark": {
-          "chars": 283,
+          "chars": 286,
           "overflow": [],
           "unnamed": [],
           "longRuns": []
         },
         "Overseer Light": {
-          "chars": 283,
+          "chars": 286,
           "overflow": [],
           "unnamed": [],
           "longRuns": []
         },
         "Default Dark Modern": {
-          "chars": 283,
+          "chars": 286,
           "overflow": [],
           "unnamed": [],
           "longRuns": []
@@ -253,7 +253,7 @@
       "detail": {
         "over": "This code has expired.",
         "newCode": "New code",
-        "afterMs": 44736
+        "afterMs": 44731
       }
     },
     {
@@ -274,9 +274,9 @@
       "name": "4. the Mac asks: Pair \"Bilal's iPhone\"? with the platform, the address and the phone's key",
       "ok": true,
       "detail": {
-        "text": "Don't Pair\nPair\nPair \"Bilal's iPhone\"?\niPhone · 127.0.0.1\nKey 2f14 2ba6 0eb8 dcef\n\nIt will be able to watch and control your agents. You can make it watch only, or revoke it, in Devices.",
+        "text": "Don't Pair\nPair\nPair \"Bilal's iPhone\"?\niPhone · 127.0.0.1\nKey 59cd 7069 aa6a 03de\n\nIt will be able to watch and control your agents. You can make it watch only, or revoke it, in Devices.",
         "message": "Pair \"Bilal's iPhone\"?",
-        "detail": "iPhone · 127.0.0.1\nKey 2f14 2ba6 0eb8 dcef\n\nIt will be able to watch and control your agents. You can make it watch only, or revoke it, in Devices.",
+        "detail": "iPhone · 127.0.0.1\nKey 59cd 7069 aa6a 03de\n\nIt will be able to watch and control your agents. You can make it watch only, or revoke it, in Devices.",
         "buttons": [
           "Don't Pair",
           "Pair"
@@ -302,14 +302,14 @@
       "detail": {
         "failures": 0,
         "open": false,
-        "remaining_ms": 44388,
+        "remaining_ms": 44393,
         "waiting": [
           {
             "address": "127.0.0.1",
-            "fingerprint": "2f142ba60eb8dcef",
+            "fingerprint": "59cd7069aa6a03de",
             "name": "Bilal's iPhone",
             "platform": "ios",
-            "request": "ab644f6d-1ae8-4dd7-a120-998c935009f5"
+            "request": "bf827735-a108-4511-a032-16929261c803"
           }
         ]
       }
@@ -318,9 +318,9 @@
       "name": "5. after Pair the phone's handshake completes: it has its device id and full control",
       "ok": true,
       "detail": {
-        "device": "4f4235f4-3213-4403-9b78-23572b941952",
-        "fingerprint": "dade91782db75da3",
-        "gateway": "Mac",
+        "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
+        "fingerprint": "1e6beb525f4bcc5a",
+        "gateway": "MacBook-Pro",
         "protocol": 1,
         "scope": "full"
       }
@@ -331,7 +331,7 @@
       "detail": {
         "phase": "paired",
         "title": "Pair a phone",
-        "mac": "With Mac",
+        "mac": "With MacBook-Pro",
         "code": "",
         "groups": [],
         "left": "",
@@ -364,7 +364,7 @@
         "text": "1 phone",
         "aria": "Phone access on, 1 phone connected",
         "icon": "device-mobile",
-        "x": 467.6015625,
+        "x": 369.4609375,
         "y": 884,
         "background": "rgba(0, 0, 0, 0)",
         "color": "rgb(167, 163, 185)",
@@ -378,6 +378,7 @@
       "name": "5. Devices is a view of the Overseer side bar, after Accounts",
       "ok": true,
       "detail": [
+        "Search",
         "Agents",
         "Accounts",
         "Devices"
@@ -416,10 +417,10 @@
       "detail": {
         "Phone": "iPhone · Overseer 0.1.0-test",
         "Scope": "Full control",
-        "Paired": "Sep 30, 2026, 2:46 AM",
+        "Paired": "Sep 28, 2026, 9:32 AM",
         "Last seen": "connected now",
         "Address": "127.0.0.1",
-        "Key": "2f14 2ba6 0eb8 dcef"
+        "Key": "59cd 7069 aa6a 03de"
       }
     },
     {
@@ -486,7 +487,7 @@
         "text": "2 phones",
         "aria": "Phone access on, 2 phones connected",
         "icon": "device-mobile",
-        "x": 470.7421875,
+        "x": 372.6015625,
         "y": 884,
         "background": "rgba(0, 0, 0, 0)",
         "color": "rgb(167, 163, 185)",
@@ -572,7 +573,7 @@
       "detail": {
         "looking": true,
         "aboutWatched": {
-          "device": "4f4235f4-3213-4403-9b78-23572b941952",
+          "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
           "fields": [],
           "kind": "finished",
           "name": "Work iPhone",
@@ -586,7 +587,7 @@
       "name": "an agent the window does not show is announced to the phone",
       "ok": true,
       "detail": {
-        "device": "4f4235f4-3213-4403-9b78-23572b941952",
+        "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
         "fields": [
           "aps.alert.body",
           "aps.alert.title",
@@ -650,7 +651,7 @@
       "name": "with the Mac's switch off nothing is sent: the daemon's record says why, and no payload was written",
       "ok": true,
       "detail": {
-        "device": "4f4235f4-3213-4403-9b78-23572b941952",
+        "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
         "fields": [],
         "kind": "finished",
         "name": "Work iPhone",
@@ -663,7 +664,7 @@
       "name": "on again, the phone is told again",
       "ok": true,
       "detail": {
-        "device": "4f4235f4-3213-4403-9b78-23572b941952",
+        "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
         "fields": [
           "aps.alert.body",
           "aps.alert.title",
@@ -709,9 +710,9 @@
       "ok": true,
       "detail": {
         "again": {
-          "device": "4f4235f4-3213-4403-9b78-23572b941952",
-          "fingerprint": "dade91782db75da3",
-          "gateway": "Mac",
+          "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
+          "fingerprint": "1e6beb525f4bcc5a",
+          "gateway": "MacBook-Pro",
           "protocol": 1,
           "scope": "watch"
         },
@@ -739,9 +740,9 @@
           ]
         ],
         "helloAgain": {
-          "device": "4f4235f4-3213-4403-9b78-23572b941952",
-          "fingerprint": "dade91782db75da3",
-          "gateway": "Mac",
+          "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
+          "fingerprint": "1e6beb525f4bcc5a",
+          "gateway": "MacBook-Pro",
           "protocol": 1,
           "scope": "watch"
         }
@@ -803,7 +804,7 @@
         "text": "Phone access on",
         "aria": "Phone access on, no phone connected",
         "icon": "device-mobile",
-        "x": 492.3828125,
+        "x": 394.2421875,
         "y": 884,
         "background": "rgba(0, 0, 0, 0)",
         "color": "rgb(167, 163, 185)",
@@ -852,13 +853,13 @@
       "contrast": 14.55,
       "darkOnLight": true,
       "audit": {
-        "chars": 283,
+        "chars": 286,
         "overflow": [],
         "unnamed": [],
         "longRuns": []
       },
       "camera": [
-        "OVSR1-AENKYJHLJOTDQFOI4JXSYAPVFZ2VZYK7TUGZTQMWIETHXKEMR35TVS3Z7C5ZOHEIZXZWKDLR45NVEDHGMQBA4MJZGIXDCNRYFY2TALRRHA2ASMJSG4XDALRQFYYQ"
+        "OVSR1-AG5EXTQZ5N6N4PVANAQQLKKE6UNA6ELUZCUKKNPWA3NGUUDJL26XPGPNHRNRSSZT4PCEOIU5NI5BIGOF3ABAWMJXGIXDEMBOGEYC4MYJGEZDOLRQFYYC4MI"
       ]
     },
     "Overseer Light": {
@@ -867,13 +868,13 @@
       "contrast": 16.48,
       "darkOnLight": true,
       "audit": {
-        "chars": 283,
+        "chars": 286,
         "overflow": [],
         "unnamed": [],
         "longRuns": []
       },
       "camera": [
-        "OVSR1-AENKYJHLJOTDQFOI4JXSYAPVFZ2VZYK7TUGZTQMWIETHXKEMR35TVS3Z7C5ZOHEIZXZWKDLR45NVEDHGMQBA4MJZGIXDCNRYFY2TALRRHA2ASMJSG4XDALRQFYYQ"
+        "OVSR1-AG5EXTQZ5N6N4PVANAQQLKKE6UNA6ELUZCUKKNPWA3NGUUDJL26XPGPNHRNRSSZT4PCEOIU5NI5BIGOF3ABAWMJXGIXDEMBOGEYC4MYJGEZDOLRQFYYC4MI"
       ]
     },
     "Default Dark Modern": {
@@ -882,20 +883,20 @@
       "contrast": 10.26,
       "darkOnLight": true,
       "audit": {
-        "chars": 283,
+        "chars": 286,
         "overflow": [],
         "unnamed": [],
         "longRuns": []
       },
       "camera": [
-        "OVSR1-AENKYJHLJOTDQFOI4JXSYAPVFZ2VZYK7TUGZTQMWIETHXKEMR35TVS3Z7C5ZOHEIZXZWKDLR45NVEDHGMQBA4MJZGIXDCNRYFY2TALRRHA2ASMJSG4XDALRQFYYQ"
+        "OVSR1-AG5EXTQZ5N6N4PVANAQQLKKE6UNA6ELUZCUKKNPWA3NGUUDJL26XPGPNHRNRSSZT4PCEOIU5NI5BIGOF3ABAWMJXGIXDEMBOGEYC4MYJGEZDOLRQFYYC4MI"
       ]
     }
   },
   "pushes": [
     {
-      "run": "r-83b91736e977",
-      "device": "4f4235f4-3213-4403-9b78-23572b941952",
+      "run": "r-aff497b4947c",
+      "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
       "fields": [
         "aps.alert.body",
         "aps.alert.title",
@@ -916,8 +917,8 @@
       "why": ""
     },
     {
-      "run": "r-83b91736e977",
-      "device": "47f3d91e-4879-4f0c-b52a-f589602363f5",
+      "run": "r-aff497b4947c",
+      "device": "8eb6d5a5-3852-4657-b5a1-ceb95deee3a6",
       "fields": [],
       "kind": "finished",
       "name": "Spare Phone",
@@ -926,8 +927,8 @@
       "why": "notifications are off on this phone"
     },
     {
-      "run": "r-9f7842efecf6",
-      "device": "4f4235f4-3213-4403-9b78-23572b941952",
+      "run": "r-e87dc86abb42",
+      "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
       "fields": [],
       "kind": "finished",
       "name": "Work iPhone",
@@ -936,8 +937,8 @@
       "why": "the owner is looking at this agent on the Mac"
     },
     {
-      "run": "r-9f7842efecf6",
-      "device": "47f3d91e-4879-4f0c-b52a-f589602363f5",
+      "run": "r-e87dc86abb42",
+      "device": "8eb6d5a5-3852-4657-b5a1-ceb95deee3a6",
       "fields": [],
       "kind": "finished",
       "name": "Spare Phone",
@@ -946,8 +947,8 @@
       "why": "notifications are off on this phone"
     },
     {
-      "run": "r-536e3e11eaf6",
-      "device": "4f4235f4-3213-4403-9b78-23572b941952",
+      "run": "r-11087bec80db",
+      "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
       "fields": [],
       "kind": "finished",
       "name": "Work iPhone",
@@ -956,8 +957,8 @@
       "why": "notifications to phones are off on the Mac"
     },
     {
-      "run": "r-536e3e11eaf6",
-      "device": "47f3d91e-4879-4f0c-b52a-f589602363f5",
+      "run": "r-11087bec80db",
+      "device": "8eb6d5a5-3852-4657-b5a1-ceb95deee3a6",
       "fields": [],
       "kind": "finished",
       "name": "Spare Phone",
@@ -966,8 +967,8 @@
       "why": "notifications to phones are off on the Mac"
     },
     {
-      "run": "r-6c932205ae39",
-      "device": "4f4235f4-3213-4403-9b78-23572b941952",
+      "run": "r-d43e37098fd7",
+      "device": "7568e8eb-6652-4f1a-8fad-08e61ab9294c",
       "fields": [
         "aps.alert.body",
         "aps.alert.title",
@@ -988,8 +989,8 @@
       "why": ""
     },
     {
-      "run": "r-6c932205ae39",
-      "device": "47f3d91e-4879-4f0c-b52a-f589602363f5",
+      "run": "r-d43e37098fd7",
+      "device": "8eb6d5a5-3852-4657-b5a1-ceb95deee3a6",
       "fields": [],
       "kind": "finished",
       "name": "Spare Phone",

@@ -47,9 +47,9 @@
       "name": "with the window unfocused, a fixture permission, finish and failure each write one notification naming the agent, with its click URL",
       "ok": true,
       "detail": [
-        "Write the changelog|Needs your permission to use Write · site|vscode://beelol.overseer/open-agent?run=r-1b5451f8e3de",
-        "Summarise the notes|Finished · site|vscode://beelol.overseer/open-agent?run=r-b7b0cd4539f7",
-        "Broken build|Stopped with an error · site|vscode://beelol.overseer/open-agent?run=r-e84b30f993ee"
+        "Write the changelog|Needs your permission to use Write · site|vscode://beelol.overseer/open-agent?run=r-d59e8b99f6ae",
+        "Summarise the notes|Finished · site|vscode://beelol.overseer/open-agent?run=r-9afce9f1f341",
+        "Broken build|Stopped with an error · site|vscode://beelol.overseer/open-agent?run=r-844d4a183013"
       ]
     },
     {
@@ -57,7 +57,7 @@
       "ok": true,
       "detail": {
         "opened": true,
-        "selected": "r-e84b30f993ee"
+        "selected": "r-844d4a183013"
       }
     },
     {
@@ -65,7 +65,7 @@
       "ok": true,
       "detail": {
         "toast": "Source: Overseer\nShow\n“Add the release notes” is waiting for permission to use Write.",
-        "showing": "r-e84b30f993ee"
+        "showing": "r-844d4a183013"
       }
     }
   ]

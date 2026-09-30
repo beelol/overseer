@@ -28,7 +28,7 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-RvaXET/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-2ynN1N/followups-repo\nOn main"
             },
             {
               "chip": "agent",
@@ -59,7 +59,7 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-RvaXET/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-2ynN1N/followups-repo\nOn main"
             },
             {
               "chip": "agent",
@@ -90,7 +90,7 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-RvaXET/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-2ynN1N/followups-repo\nOn main"
             },
             {
               "chip": "agent",
@@ -121,7 +121,7 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-RvaXET/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-2ynN1N/followups-repo\nOn main"
             },
             {
               "chip": "agent",
@@ -155,7 +155,7 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-RvaXET/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-2ynN1N/followups-repo\nOn main"
             },
             {
               "chip": "agent",
@@ -181,7 +181,7 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-RvaXET/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-2ynN1N/followups-repo\nOn main"
             },
             {
               "chip": "agent",
@@ -207,7 +207,7 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-RvaXET/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-2ynN1N/followups-repo\nOn main"
             },
             {
               "chip": "agent",
@@ -233,7 +233,7 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-RvaXET/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-2ynN1N/followups-repo\nOn main"
             },
             {
               "chip": "agent",
@@ -301,7 +301,7 @@
           "filterButton": true
         },
         "said": "“beta” · 1 match",
-        "ms": 10,
+        "ms": 8,
         "shown": [
           "followups-repo",
           "Beta docs"

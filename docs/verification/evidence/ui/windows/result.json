@@ -15,7 +15,7 @@
             "Review: Alpha agent (1), Editor Group 1",
             "Overseer, Editor Group 2",
             "Alpha agent, Editor Group 2",
-            "New Agent, Editor Group 3"
+            "New Task, Editor Group 3"
           ],
           "groups": 3,
           "empty": 0
@@ -30,7 +30,7 @@
           "diff-multiple  Review, Alpha agent (1), Editor group 1",
           "comment-discussion  Chat, Alpha agent, Editor group 2",
           "comment  Chat, taken out, Alpha agent, Editor group 2",
-          "new-file  Full form, a new agent with every option, Editor group 3 · you are here"
+          "new-file  New task, the full form, Editor group 3 · you are here"
         ]
       }
     },
@@ -43,8 +43,8 @@
           "active": "Review: Alpha agent (1), Editor Group 1"
         },
         {
-          "want": "Full form",
-          "active": "New Agent, Editor Group 3"
+          "want": "New task",
+          "active": "New Task, Editor Group 3"
         },
         {
           "want": "Chat",

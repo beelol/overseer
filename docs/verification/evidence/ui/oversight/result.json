@@ -4,18 +4,18 @@
       "name": "a large diff is shared as a patch file and as a branch and commit",
       "ok": true,
       "detail": {
-        "branch": "overseer/share/sh-749db9f663f3",
+        "branch": "overseer/share/sh-6ac6cb12c638",
         "bytes": 106082,
-        "commit": "3ff73da5f6d708cd44e2a8a80be50ab98878f5da",
-        "file": "/private/tmp/ovs-ui-ARhK9I/overseer-home/runs/r-c0e4146d68b6/shares/sh-749db9f663f3.patch",
-        "from": "r-a7c5d84f0002",
-        "id": "sh-749db9f663f3",
+        "commit": "9bb9e1e1f2abe820d2ffa1a5d10a3284b97e67f4",
+        "file": "/private/tmp/ovs-ui-1IhI94/overseer-home/runs/r-9c52162e358f/shares/sh-6ac6cb12c638.patch",
+        "from": "r-c7347aa33e16",
+        "id": "sh-6ac6cb12c638",
         "inline_bytes": 8086,
         "kind": "diff",
-        "proposal": "p-41ad6270bb0e",
+        "proposal": "p-5d581c41bfd4",
         "source": "from Big change (diff)",
-        "to": "r-c0e4146d68b6",
-        "ts": 1790761410533,
+        "to": "r-9c52162e358f",
+        "ts": 1790604502556,
         "withdrawn_ms": null
       }
     },
@@ -25,15 +25,15 @@
       "detail": [
         {
           "action": "share",
-          "answered_ms": 1790761410604,
-          "delivered_ms": 1790761410533,
+          "answered_ms": 1790604502626,
+          "delivered_ms": 1790604502556,
           "delivery": "add",
-          "held_ms": 1790761410533,
-          "id": "d-c0dbcbfe066c",
+          "held_ms": 1790604502556,
+          "id": "d-d820401a4dca",
           "message": "from Big change (diff): 106082 bytes",
           "picked_ms": null,
-          "run_id": "r-c0e4146d68b6",
-          "sent_ms": 1790761410533,
+          "run_id": "r-9c52162e358f",
+          "sent_ms": 1790604502556,
           "state": "answered",
           "title": "Reader",
           "turn_id": null,
@@ -65,7 +65,7 @@
           "role": "agent",
           "watched": true,
           "watchers": [
-            "r-f44a02598219"
+            "r-db4bb0ee958a"
           ],
           "watching": []
         },
@@ -79,7 +79,7 @@
           "watched": false,
           "watchers": [],
           "watching": [
-            "r-adb627ef3215"
+            "r-0e614d7681e2"
           ]
         }
       }
@@ -89,20 +89,20 @@
       "ok": true,
       "detail": [
         [
-          "2 working · 1 needs you · 3 to review",
-          ""
-        ],
-        [
           "Needs you",
-          "1"
+          "2"
         ],
         [
           "Overseer",
           "Decide"
         ],
         [
+          "Big change",
+          "Review"
+        ],
+        [
           "oversight-repo",
-          "2 · 3 to review"
+          "2"
         ],
         [
           "Sessions",
@@ -114,7 +114,7 @@
         ],
         [
           "Reader",
-          "now · Fixture · fix…@example.test"
+          "now"
         ],
         [
           "Big change",
@@ -122,7 +122,7 @@
         ],
         [
           "Reviewer",
-          "now · Fixture · fix…@example.test · ◉ watching"
+          "now · ◉ watching"
         ]
       ]
     },
@@ -179,7 +179,7 @@
           "withdrawn"
         ],
         "rows": [
-          "Reader you named it · added to its work answered 02:43:30 AM"
+          "Reader named · add answered 07:08:22 AM"
         ]
       }
     },
@@ -188,20 +188,20 @@
       "ok": true,
       "detail": [
         [
-          "2 working · 1 needs you · 1 to review · 2 reviewed",
-          ""
-        ],
-        [
           "Needs you",
-          "1"
+          "2"
         ],
         [
           "Overseer",
           "Decide"
         ],
         [
+          "Big change",
+          "Review"
+        ],
+        [
           "oversight-repo",
-          "2 · 1 to review"
+          "2"
         ],
         [
           "Sessions",
@@ -213,7 +213,7 @@
         ],
         [
           "Reader",
-          "now · Fixture · fix…@example.test"
+          "now"
         ],
         [
           "Big change",
@@ -221,7 +221,7 @@
         ],
         [
           "Reviewer",
-          "now · Fixture · fix…@example.test · ◉ watching"
+          "now · ◉ watching"
         ]
       ]
     },
@@ -278,7 +278,7 @@
           "withdrawn"
         ],
         "rows": [
-          "Reader you named it · added to its work answered 02:43:30 AM"
+          "Reader named · add answered 07:08:22 AM"
         ]
       }
     },
@@ -287,20 +287,20 @@
       "ok": true,
       "detail": [
         [
-          "2 working · 1 needs you · 1 to review · 2 reviewed",
-          ""
-        ],
-        [
           "Needs you",
-          "1"
+          "2"
         ],
         [
           "Overseer",
           "Decide"
         ],
         [
+          "Big change",
+          "Review"
+        ],
+        [
           "oversight-repo",
-          "2 · 1 to review"
+          "2"
         ],
         [
           "Sessions",
@@ -312,7 +312,7 @@
         ],
         [
           "Reader",
-          "now · Fixture · fix…@example.test"
+          "now"
         ],
         [
           "Big change",
@@ -320,7 +320,7 @@
         ],
         [
           "Reviewer",
-          "now · Fixture · fix…@example.test · ◉ watching"
+          "now · ◉ watching"
         ]
       ]
     },
@@ -377,7 +377,7 @@
           "withdrawn"
         ],
         "rows": [
-          "Reader you named it · added to its work answered 02:43:30 AM"
+          "Reader named · add answered 07:08:22 AM"
         ]
       }
     }

@@ -1,5 +1,5 @@
  ◆ Overseer  page 1/1 · 2 agents · ● 2 active · ◆ 2 need you                                                                                                             phone access off · ● connected 
-┏ 1 ◆ Write the release notes ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Claude Code · 1s ┓╭ 2 ◆ Tidy the login page ─────────────────────────────────────────────────────── Claude Code · 1s ╮
+┏ 1 ◆ Write the release notes ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Claude Code · 1s ┓╭ 2 ◆ Tidy the login page ─────────────────────────────────────────────────────── Claude Code · 2s ╮
 ┃ › Write the release notes                                                                        ┃│ › Tidy the login page                                                                            │
 ┃ ✎ perm.txt                                                                                       ┃│ ✎ perm.txt                                                                                       │
 ┃ ⚙ Write perm.txt …                                                                               ┃│ ⚙ Write perm.txt …                                                                               │
