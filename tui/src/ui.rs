@@ -97,7 +97,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     header(f, app, head);
     match app.mode {
         Mode::Zoom { .. } => zoom(f, app, body),
-        Mode::Changes => changes(f, app, body),
+        Mode::Changes | Mode::Confirm(Confirm::Reject { .. }) => changes(f, app, body),
         _ if app.compact() && !(app.state.runs.is_empty() || app.visible().is_empty()) => compact_layout(f, app, body),
         _ => main_screen(f, app, body),
     }
@@ -107,7 +107,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         let text = match c {
             Confirm::Interrupt(id) => format!(" Interrupt {}? y / n", short(&app.state.run(id).map(|r| r.title.clone()).unwrap_or_default(), 50)),
             Confirm::Quit => " Unsent drafts will be lost. Quit? y / n".to_string(),
-            Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::OpenPr { text, .. } => format!(" {text} y / n"),
+            Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::OpenPr { text, .. } | Confirm::Reject { text, .. } => format!(" {text} y / n"),
             Confirm::PhoneOff { text } | Confirm::Revoke { text, .. } | Confirm::Pair { text, .. } => format!(" {text} y / n"),
             Confirm::PhoneOnAndPair => " Phone access is off. Turn it on and pair a phone? y / n".to_string(),
         };
@@ -283,7 +283,7 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         Mode::AudioImport => &[("type", "private folder path"), ("enter", "import"), ("esc", "back")],
         Mode::Overseer => &[("type", "to Overseer"), ("enter", "send"), ("ctrl+y/n", "yes/no to a proposal"), ("j/k", "scroll"), ("esc", "close")],
         Mode::Search => &[("type", "to search title, repo, harness, model, prompt"), ("enter", "keep"), ("esc", "clear")],
-        Mode::Changes => &[("j/k", "file"), ("J/K", "scroll diff"), ("c", "comparison"), ("r", "refresh"), ("v/esc", "back")],
+        Mode::Changes => &[("n/p", "change"), ("a/A", "Accept change/file"), ("r/R", "Reject change/file"), ("j/k", "file"), ("t", "Changed | All files"), ("1/2/3 c", "comparison"), ("e", "your editor"), ("J/K", "scroll"), ("ctrl+r", "reload"), ("esc", "back")],
         Mode::Grid if app.picked && app.focused().is_some() => &[("J/K", "next / previous agent"), ("esc", "close the conversation"), ("pgup/pgdn", "scroll"), ("e", if app.expand_tools { "fold tools" } else { "tool details" }), ("i", "message"), ("v", "changes"), ("?", "help")],
         _ if area.width < 110 => &[("i", "message"), ("g", "full view"), ("a/d", "answer"), ("n", "new"), ("o", "Overseer"), ("?", "keys"), ("q", "quit")],
         _ => &[("←↑↓→", "move"), ("J/K", "pick in the list"), ("i", "message"), ("g", "full view"), ("v", "changes"), ("a/d", "allow/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
@@ -568,19 +568,21 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     f.render_widget(Paragraph::new(lines), Rect { x: inner.x + 1, width: inner.width.saturating_sub(1), ..inner });
 }
 
-/// Changes view: the focused agent's changed files and the selected file's diff.
+/// The review (`v`, T-27 to T-29): the comparison in its header with the keys for the others,
+/// Changed or All files, and the selected file's changes, each with Accept and Reject.
 fn changes(f: &mut Frame, app: &mut App, area: Rect) {
     let c = app.changes.clone();
     let run = app.state.run(&c.run).cloned().unwrap_or_default();
-    let label = c.options.get(c.option).map(|o| o.0.as_str()).unwrap_or("…");
+    let label = c.comparison().map(|o| o.label.as_str()).unwrap_or("…");
     let total: (u64, u64) = c.files.iter().fold((0, 0), |a, f| (a.0 + f.2, a.1 + f.3));
+    let muted = Style::new().fg(MUTED);
     let title = Line::from(vec![
-        Span::styled(" changes ", Style::new().fg(accent()).add_modifier(Modifier::BOLD)),
-        Span::styled("· ", Style::new().fg(MUTED)),
+        Span::styled(" review ", Style::new().fg(accent()).add_modifier(Modifier::BOLD)),
+        Span::styled("· ", muted),
         Span::styled(fit(&run.title, 50), Style::new().add_modifier(Modifier::BOLD)),
-        Span::styled(" · ", Style::new().fg(MUTED)),
-        Span::styled(label.to_string(), Style::new().fg(accent())),
-        Span::styled(format!(" · {} file{} ", c.files.len(), if c.files.len() == 1 { "" } else { "s" }), Style::new().fg(MUTED)),
+        Span::styled(" · ", muted),
+        Span::styled(label.to_string(), Style::new().fg(accent()).add_modifier(Modifier::BOLD)),
+        Span::styled(format!(" · {} file{} ", c.files.len(), if c.files.len() == 1 { "" } else { "s" }), muted),
         Span::styled(format!("+{} ", total.0), Style::new().fg(Color::Green)),
         Span::styled(format!("−{} ", total.1), Style::new().fg(Color::Red)),
     ]);
@@ -588,45 +590,103 @@ fn changes(f: &mut Frame, app: &mut App, area: Rect) {
     let inner = block.inner(area);
     f.render_widget(Clear, area);
     f.render_widget(block, area);
-    if c.loading && c.files.is_empty() {
-        f.render_widget(Paragraph::new(Span::styled(" loading…", Style::new().fg(MUTED))), inner);
+    // The comparisons one key away, and which file list is shown.
+    let mut bar = vec![Span::raw(" ")];
+    for (i, (mode, name)) in crate::app::REVIEW_KEYS.iter().enumerate() {
+        let opt = c.options.iter().position(|o| &o.mode == mode);
+        let current = opt == Some(c.option);
+        let available = opt.is_some_and(|i| c.options[i].available);
+        let style = if current { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else if available { Style::new() } else { muted };
+        bar.push(Span::styled(format!("{}", i + 1), Style::new().fg(accent()).add_modifier(Modifier::BOLD)));
+        bar.push(Span::styled(if current { format!(" [{name}]") } else if available || c.options.is_empty() { format!(" {name}") } else { format!(" {name} (not available)") }, style));
+        bar.push(Span::raw("   "));
+    }
+    if !REVIEW_MODES.contains(&c.comparison().map(|o| o.mode.as_str()).unwrap_or("")) && !c.options.is_empty() {
+        bar.push(Span::styled(format!("c [{label}]   "), Style::new().fg(accent()).add_modifier(Modifier::BOLD)));
+    }
+    bar.push(Span::styled("t ", Style::new().fg(accent()).add_modifier(Modifier::BOLD)));
+    bar.push(Span::styled(if c.all_files { "Changed | [All files]" } else { "[Changed] | All files" }, Style::new().add_modifier(Modifier::BOLD)));
+    f.render_widget(Paragraph::new(Line::from(bar)), Rect { height: 1, ..inner });
+    let inner = Rect { y: inner.y + 2, height: inner.height.saturating_sub(2), ..inner };
+    if c.loading && c.files.is_empty() && c.diff.is_empty() {
+        f.render_widget(Paragraph::new(Span::styled(" loading…", muted)), inner);
         return;
     }
     if let Some(e) = &c.error {
         f.render_widget(Paragraph::new(Span::styled(format!(" {e}"), Style::new().fg(Color::Red))), inner);
         return;
     }
-    if c.files.is_empty() {
-        f.render_widget(Paragraph::new(Span::styled(format!(" No changes since {}.", label.to_lowercase()), Style::new().fg(MUTED))), inner);
+    let shown = c.shown();
+    if shown.is_empty() {
+        let text = if c.all_files && c.all_loading > 0 { " listing the worktree…".to_string() } else { format!(" No changes since {}.", label.to_lowercase()) };
+        f.render_widget(Paragraph::new(Span::styled(text, muted)), inner);
         return;
     }
     let list_w = (inner.width / 3).clamp(24, 48);
     let [list, sep, diff] = Layout::horizontal([Constraint::Length(list_w), Constraint::Length(1), Constraint::Min(10)]).areas(inner);
     let mut lines = Vec::new();
-    for (i, (st, path, a, d)) in c.files.iter().enumerate() {
+    for (i, (st, path, a, d)) in shown.iter().enumerate() {
         let sel = i == c.file;
         let color = match st.as_str() { "A" | "?" => Color::Green, "D" => Color::Red, "R" => Color::Cyan, _ => Color::Yellow };
-        let counts = format!(" +{a} −{d}");
+        let counts = if st.is_empty() { String::new() } else { format!(" +{a} −{d}") };
         let room = (list_w as usize).saturating_sub(counts.width() + 5);
         let name = fit_path(path, room);
-        let style = if sel { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else { Style::new() };
+        let style = if sel { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else if st.is_empty() { muted } else { Style::new() };
         lines.push(Line::from(vec![
             Span::styled(if sel { "› " } else { "  " }, Style::new().fg(accent())),
-            Span::styled(format!("{st} "), Style::new().fg(color).add_modifier(Modifier::BOLD)),
+            Span::styled(if st.is_empty() { "  ".to_string() } else { format!("{st} ") }, Style::new().fg(color).add_modifier(Modifier::BOLD)),
             Span::styled(name, style),
-            Span::styled(counts, Style::new().fg(MUTED)),
+            Span::styled(counts, muted),
         ]));
     }
-    let skip = c.file.saturating_sub(list.height as usize / 2).min(c.files.len().saturating_sub(list.height as usize));
+    let skip = c.file.saturating_sub(list.height as usize / 2).min(shown.len().saturating_sub(list.height as usize));
     f.render_widget(Paragraph::new(lines.into_iter().skip(skip).collect::<Vec<_>>()), list);
-    f.render_widget(Paragraph::new(vec![Line::from(Span::styled("│", Style::new().fg(MUTED))); sep.height as usize]), sep);
+    f.render_widget(Paragraph::new(vec![Line::from(Span::styled("│", muted)); sep.height as usize]), sep);
     let w = diff.width.saturating_sub(1) as usize;
-    let body: Vec<Line> = c.diff.iter().skip(c.scroll).take(diff.height as usize).map(|l| {
-        let style = if l.starts_with('+') { Style::new().fg(Color::Green) } else if l.starts_with('-') { Style::new().fg(Color::Red) } else if l.starts_with("@@") { Style::new().fg(accent()) } else { Style::new() };
-        Line::from(Span::styled(fit(&l.replace('\t', "    "), w), style))
-    }).collect();
+    let path = shown.get(c.file).map(|f| f.1.clone()).unwrap_or_default();
+    // The file's header: which change is current and how many are accepted.
+    let head = if c.unchanged {
+        Line::from(vec![Span::styled(fit(&path, w.saturating_sub(24)), Style::new().add_modifier(Modifier::BOLD)), Span::styled("  unchanged · read-only", muted)])
+    } else if c.hunks.is_empty() {
+        Line::from(Span::styled(fit(&path, w), Style::new().add_modifier(Modifier::BOLD)))
+    } else {
+        Line::from(vec![
+            Span::styled(fit(&path, w.saturating_sub(40)), Style::new().add_modifier(Modifier::BOLD)),
+            Span::styled(format!("  change {} of {} · {} accepted", c.change + 1, c.hunks.len(), c.accepted()), muted),
+        ])
+    };
+    let mine = c.mine.get(&path);
+    let current_at = c.hunk_at.get(c.change).copied();
+    let mut body: Vec<Line> = vec![head];
+    for (i, l) in c.diff.iter().enumerate().skip(c.scroll).take((diff.height as usize).saturating_sub(1)) {
+        let raw = l.replace('\t', "    ");
+        if l.starts_with("@@") {
+            let text = fit(&raw, w.saturating_sub(24));
+            let n = c.hunk_at.iter().position(|&at| at == i).unwrap_or(0);
+            let current = current_at == Some(i);
+            let mut spans = vec![Span::styled(if current { "› " } else { "  " }, Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(text, Style::new().fg(accent()))];
+            if c.hunks.get(n).is_some_and(|h| h.reviewed) {
+                spans.push(Span::styled("  ✓ Accepted", Style::new().fg(Color::Green)));
+            } else if current {
+                spans.push(Span::styled("  a Accept · r Reject", Style::new().fg(MUTED)));
+            }
+            body.push(Line::from(spans));
+            continue;
+        }
+        let yours = l.starts_with('+') && mine.is_some_and(|m| m.contains(&l[1..]));
+        let text = fit(&raw, w.saturating_sub(if yours { 16 } else { 3 }));
+        let style = if yours { Style::new().fg(waiting()) } else if l.starts_with('+') { Style::new().fg(Color::Green) } else if l.starts_with('-') { Style::new().fg(Color::Red) } else { Style::new() };
+        let mut spans = vec![Span::raw("  "), Span::styled(text, style)];
+        if yours {
+            spans.push(Span::styled("  ✎ your edit", Style::new().fg(waiting())));
+        }
+        body.push(Line::from(spans));
+    }
     f.render_widget(Paragraph::new(body), Rect { x: diff.x + 1, width: diff.width.saturating_sub(1), ..diff });
 }
+
+/// The comparisons with a key of their own.
+const REVIEW_MODES: [&str; 3] = ["task_start", "latest_run", "entire_worktree"];
 
 /// Fits a path by dropping leading directories: `…/providers/stripe/refund.ts`.
 fn fit_path(path: &str, max: usize) -> String {
@@ -678,7 +738,7 @@ fn help(f: &mut Frame, area: Rect) {
         ("i  enter", "message the focused agent"),
         ("g  z", "zoom: one agent's full view ⇄ grid"),
         ("home / G", "in the full view: top / bottom"),
-        ("v", "changes: files and diffs"),
+        ("v", "review: Accept / Reject changes"),
         ("e  (in zoom)", "expand tool inputs and results"),
         ("a / d", "allow / deny its permission request"),
         ("w", "next agent waiting for you"),

@@ -40,7 +40,8 @@ KEYS:
     C               remove a finished agent's worktree (branch kept)
     P               open a GitHub pull request (your git credentials and gh)
     X               stop all agents and the daemon (r starts it again)
-    v               changes (files, diffs)     M     merge back (asks each step)
+    v               review: comparisons, files, Accept / Reject (e: your $EDITOR)
+    M               merge back (asks each step)
     /               search agents              A     accounts and sign-in
     O               phone access on / off      D     devices: pair a phone, revoke, scope
     S               Audio Mode, track, preview  e     in zoom: expand tool calls
@@ -189,7 +190,9 @@ fn main() -> Result<()> {
                 }
                 let _ = execute!(std::io::stdout(), DisableBracketedPaste);
                 ratatui::restore();
-                println!("{} — Overseer resumes when it finishes.\n", exec.title);
+                if !exec.edit {
+                    println!("{} — Overseer resumes when it finishes.\n", exec.title);
+                }
                 let status = std::process::Command::new(&exec.program).args(&exec.args).envs(exec.env.iter().map(|(k, v)| (k, v))).status();
                 terminal = ratatui::init();
                 let _ = execute!(std::io::stdout(), EnableBracketedPaste);

@@ -1,21 +1,21 @@
- ◆ Overseer  page 1/1 · 1 agent · ● 1 active                                                                                     phone access off · ● connected 
-┏ review · Edits two files · Latest run · 2 files +2 −0 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+ ◆ Overseer  page 1/1 · 2 agents                                                                                                 phone access off · ● connected 
+┏ review · Edits in its worktree · Latest run · 2 files +3 −2 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ 1 Since task start   2 [Latest run]   3 Entire worktree (not available)   t [Changed] | All files                                                            ┃
 ┃                                                                                                                                                              ┃
-┃› M README.md +1 −0                             │ README.md  change 1 of 1 · 0 accepted                                                                       ┃
-┃  A src/deep/nested/new.rs +1 −0                │ › @@ -1,0 +2,1 @@  a Accept · r Reject                                                                      ┃
-┃                                                │    # fixture                                                                                                ┃
-┃                                                │   +more docs                                                                                                ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
+┃› M a.txt +2 −2                                 │ a.txt  change 1 of 2 · 0 accepted                                                                           ┃
+┃  M b.txt +1 −0                                 │ › @@ -2,1 +2,1 @@  a Accept · r Reject                                                                      ┃
+┃                                                │    line 1                                                                                                   ┃
+┃                                                │   -line 2                                                                                                   ┃
+┃                                                │   +line TWO                                                                                                 ┃
+┃                                                │    line 3                                                                                                   ┃
+┃                                                │    line 4                                                                                                   ┃
+┃                                                │   @@ -8,1 +8,1 @@                                                                                           ┃
+┃                                                │    line 6                                                                                                   ┃
+┃                                                │    line 7                                                                                                   ┃
+┃                                                │   -line 8                                                                                                   ┃
+┃                                                │   +line EIGHT                                                                                               ┃
+┃                                                │    line 9                                                                                                   ┃
+┃                                                │    line 10                                                                                                  ┃
 ┃                                                │                                                                                                             ┃
 ┃                                                │                                                                                                             ┃
 ┃                                                │                                                                                                             ┃

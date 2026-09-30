@@ -1,15 +1,15 @@
  ◆ Overseer  page 1/1 · 1 agent · ● 1 active                                                                                     phone access off · ● connected 
-┏ review · Edits two files · Latest run · 2 files +2 −0 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ 1 Since task start   2 [Latest run]   3 Entire worktree (not available)   t [Changed] | All files                                                            ┃
+┏ review · Reviewed in the terminal · Since task start · 1 file +1 −1 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 1 [Since task start]   2 Latest run   3 Entire worktree (not available)   t [Changed] | All files                                                            ┃
 ┃                                                                                                                                                              ┃
-┃› M README.md +1 −0                             │ README.md  change 1 of 1 · 0 accepted                                                                       ┃
-┃  A src/deep/nested/new.rs +1 −0                │ › @@ -1,0 +2,1 @@  a Accept · r Reject                                                                      ┃
-┃                                                │    # fixture                                                                                                ┃
-┃                                                │   +more docs                                                                                                ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
+┃› M a.txt +1 −1                                 │ a.txt  change 1 of 1 · 1 accepted                                                                           ┃
+┃                                                │ › @@ -8,1 +8,1 @@  ✓ Accepted                                                                               ┃
+┃                                                │    line 6                                                                                                   ┃
+┃                                                │    line 7                                                                                                   ┃
+┃                                                │   -line 8                                                                                                   ┃
+┃                                                │   +line EIGHT                                                                                               ┃
+┃                                                │    line 9                                                                                                   ┃
+┃                                                │    line 10                                                                                                  ┃
 ┃                                                │                                                                                                             ┃
 ┃                                                │                                                                                                             ┃
 ┃                                                │                                                                                                             ┃
@@ -41,4 +41,4 @@
 ┃                                                │                                                                                                             ┃
 ┃                                                │                                                                                                             ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
- n/p change   a/A Accept change/file   r/R Reject change/file   j/k file   t Changed | All files   1/2/3 c comparison   e your editor   J/K scroll   ctrl+r relo
+ Already accepted                                                                                                                                               

@@ -94,6 +94,8 @@ pub struct Exec {
     pub program: String,
     pub args: Vec<String>,
     pub env: Vec<(String, String)>,
+    /// The owner's editor from the review (T-39), not a sign-in.
+    pub edit: bool,
 }
 
 /// One row of the Accounts panel.
@@ -116,6 +118,8 @@ pub enum Confirm {
     MergePrepare { run: String, text: String },
     /// Merge back, step 2: merge the agent's branch into the target in the source checkout.
     MergeComplete { run: String, text: String },
+    /// Reject changes in the review: the comparison's lines go back into the worktree (T-29).
+    Reject { path: String, keys: Vec<String>, text: String },
     /// Remove a finished agent's worktree (its branch is kept).
     Cleanup { run: String, text: String, discard: bool },
     /// Interrupt every agent and stop the daemon.
@@ -146,6 +150,11 @@ enum Pending {
     Create,
     Comparisons { run: String },
     Diff { run: String },
+    Hunks { run: String, path: String },
+    FileText { run: String, path: String },
+    Tree { run: String },
+    Accept { run: String, path: String, rest: Vec<Hunk> },
+    Reject { run: String, path: String, rest: Vec<String> },
     AccountList,
     AccountStatus(String),
     Login(String),
@@ -223,24 +232,99 @@ impl NewAgentForm {
     }
 }
 
-/// The Changes view (`v`): what an agent changed, like the review in VS Code.
+/// A comparison the review can show (`comparison.options`): available or not, and why.
+#[derive(Debug, Clone, Default)]
+pub struct Comparison {
+    pub mode: String,
+    pub label: String,
+    pub base: Option<String>,
+    pub available: bool,
+    pub detail: String,
+}
+
+/// One change of a file, as the daemon names it (`workspace.hunks`): its key, the comparison's
+/// lines it replaces and the working copy's lines, and whether it is accepted.
+#[derive(Debug, Clone, Default)]
+pub struct Hunk {
+    pub key: String,
+    pub base_start: usize,
+    pub base_lines: Vec<String>,
+    pub modified_start: usize,
+    pub modified_lines: Vec<String>,
+    pub reviewed: bool,
+}
+
+/// The comparisons that `1`, `2` and `3` switch to (T-27).
+pub const REVIEW_KEYS: [(&str, &str); 3] = [("task_start", "Since task start"), ("latest_run", "Latest run"), ("entire_worktree", "Entire worktree")];
+
+/// The review (`v`): what an agent changed, like the review in VS Code, all through the daemon:
+/// the comparisons, the files, each change with its Accept and Reject.
 #[derive(Debug, Clone, Default)]
 pub struct ChangesView {
     pub run: String,
-    /// Available comparisons: (label, base commit).
-    pub options: Vec<(String, String)>,
+    pub workspace: String,
+    /// Every comparison the daemon offers, available or not.
+    pub options: Vec<Comparison>,
     pub option: usize,
     /// Changed files: (status letter, path, added lines, removed lines).
     pub files: Vec<(String, String, u64, u64)>,
+    /// `t`: All files (the whole worktree, from the daemon) instead of the changed ones (T-28).
+    pub all_files: bool,
+    /// Every file of the worktree, once listed.
+    pub all: Vec<String>,
+    pub all_loading: usize,
     pub file: usize,
-    /// Diff of the selected file (unified, without color codes).
+    /// The selected file's changes and the lines drawn for them.
+    pub hunks: Vec<Hunk>,
+    pub change: usize,
     pub diff: Vec<String>,
+    /// Where each change starts in `diff`.
+    pub hunk_at: Vec<usize>,
+    /// The selected file is unchanged: its contents, read-only.
+    pub unchanged: bool,
     pub scroll: usize,
     /// Tree object of the worktree as captured by the daemon (includes untracked files).
     pub tree: Option<String>,
     pub root: String,
     pub error: Option<String>,
     pub loading: bool,
+    /// The file whose changes are shown.
+    pub path: String,
+    /// The selected file's working copy, by line.
+    pub now: Vec<String>,
+    /// Lines the owner wrote in their own editor (`e`, T-39), per file: shown as theirs.
+    pub mine: HashMap<String, HashSet<String>>,
+    /// The file as it was when the editor opened, to tell the owner's lines from the agent's.
+    pub editing: Option<(String, String)>,
+}
+
+impl ChangesView {
+    /// The file list shown: the changed files, or every file with the changed ones' counts.
+    pub fn shown(&self) -> Vec<(String, String, u64, u64)> {
+        if !self.all_files {
+            return self.files.clone();
+        }
+        let mut out: Vec<(String, String, u64, u64)> = self.all.iter().map(|p| self.files.iter().find(|f| &f.1 == p).cloned().unwrap_or_else(|| (String::new(), p.clone(), 0, 0))).collect();
+        for f in &self.files {
+            if !self.all.contains(&f.1) {
+                out.push(f.clone());
+            }
+        }
+        out.sort_by(|a, b| a.1.cmp(&b.1));
+        out
+    }
+
+    pub fn selected(&self) -> Option<(String, String, u64, u64)> {
+        self.shown().get(self.file).cloned()
+    }
+
+    pub fn comparison(&self) -> Option<&Comparison> {
+        self.options.get(self.option)
+    }
+
+    pub fn accepted(&self) -> usize {
+        self.hunks.iter().filter(|h| h.reviewed).count()
+    }
 }
 
 /// What the daemon last said about Audio Mode. The TUI keeps no audio setting of its own: the
@@ -296,6 +380,10 @@ impl AudioSettings {
 
 /// Lines of diff shown for one file at most.
 const DIFF_LINES: usize = 4000;
+/// Lines of the working copy shown around each change.
+const CONTEXT: usize = 2;
+/// Files listed in All files at most (T-28).
+const ALL_FILES_MAX: usize = 5000;
 
 fn git_out(dir: &str, args: &[&str]) -> Result<String, String> {
     let out = std::process::Command::new("git").arg("-C").arg(dir).args(args).output().map_err(|e| e.to_string())?;
@@ -900,6 +988,10 @@ impl App {
             feed.add(&ev, child.as_deref());
             self.last_event.insert(root, Instant::now());
         }
+        // The review follows marks and rejections made elsewhere (VS Code, the phone).
+        if self.mode == Mode::Changes && matches!(kind.as_str(), "review_mark" | "review_reject") && self.state.root_of(&run_id) == self.changes.run && !self.changes.loading {
+            if kind == "review_reject" { self.load_diff() } else { self.load_file_diff() }
+        }
         // The conversation with Overseer follows its own events while it is open.
         if matches!(self.mode, Mode::Overseer) && matches!(kind.as_str(), "overseer_message" | "proposal" | "proposal_answered" | "overseer_level" | "overseer_session") {
             self.request("overseer.session", json!({}), Pending::OverseerSession);
@@ -1094,18 +1186,28 @@ impl App {
                 if self.changes.run != run {
                     return;
                 }
-                let opts: Vec<(String, String)> = v["options"].as_array().cloned().unwrap_or_default().iter()
-                    .filter(|o| o["available"].as_bool().unwrap_or(false) && o["base"].is_string())
-                    .map(|o| (o["label"].as_str().unwrap_or("comparison").to_string(), o["base"].as_str().unwrap_or_default().to_string()))
-                    .collect();
-                if opts.is_empty() {
-                    self.changes.loading = false;
-                    self.changes.error = Some("No comparison is available for this agent yet.".into());
-                    return;
+                let keep = self.changes.comparison().map(|c| c.mode.clone());
+                let opts: Vec<Value> = v["options"].as_array().cloned().unwrap_or_default();
+                self.changes.options = opts.iter().map(|o| Comparison {
+                    mode: o["mode"].as_str().unwrap_or_default().to_string(),
+                    label: o["label"].as_str().unwrap_or("comparison").to_string(),
+                    base: o["base"].as_str().map(str::to_string),
+                    available: o["available"].as_bool().unwrap_or(false) && o["base"].is_string(),
+                    detail: o["detail"].as_str().unwrap_or_default().to_string(),
+                }).collect();
+                // T-27: the comparison the daemon marks as the default ("Since task start"), else the first available.
+                let default = opts.iter().position(|o| o["default"] == true && o["available"] == true && o["base"].is_string());
+                let kept = keep.and_then(|m| self.changes.options.iter().position(|c| c.mode == m && c.available));
+                match kept.or(default).or_else(|| self.changes.options.iter().position(|c| c.available)) {
+                    Some(i) => {
+                        self.changes.option = i;
+                        self.load_diff();
+                    }
+                    None => {
+                        self.changes.loading = false;
+                        self.changes.error = Some("No comparison is available for this agent yet.".into());
+                    }
                 }
-                self.changes.options = opts;
-                self.changes.option = 0;
-                self.load_diff();
             }
             (Pending::Diff { run }, Ok(v)) => {
                 if self.changes.run != run {
@@ -1125,15 +1227,112 @@ impl App {
                         }
                     }
                 }
-                let keep = self.changes.files.get(self.changes.file).map(|f| f.1.clone());
+                let keep = self.changes.selected().map(|f| f.1);
                 self.changes.files = v["changes"].as_array().cloned().unwrap_or_default().iter().map(|c| {
                     let path = c["path"].as_str().unwrap_or_default().to_string();
                     let (a, d) = counts.get(&path).copied().unwrap_or((0, 0));
                     (c["status"].as_str().unwrap_or("M").to_string(), path, a, d)
                 }).collect();
-                self.changes.file = keep.and_then(|k| self.changes.files.iter().position(|f| f.1 == k)).unwrap_or(0);
+                self.changes.file = keep.and_then(|k| self.changes.shown().iter().position(|f| f.1 == k)).unwrap_or(0);
                 self.changes.error = None;
                 self.load_file_diff();
+            }
+            (Pending::Hunks { run, path }, Ok(v)) => {
+                if self.changes.run != run || self.changes.selected().map(|f| f.1) != Some(path.clone()) {
+                    return;
+                }
+                let strings = |x: &Value| -> Vec<String> { x.as_array().map(|a| a.iter().filter_map(|l| l.as_str().map(str::to_string)).collect()).unwrap_or_default() };
+                self.changes.hunks = v["hunks"].as_array().cloned().unwrap_or_default().iter().map(|h| Hunk {
+                    key: h["key"].as_str().unwrap_or_default().to_string(),
+                    base_start: h["base_start"].as_u64().unwrap_or(0) as usize,
+                    base_lines: strings(&h["base_lines"]),
+                    modified_start: h["modified_start"].as_u64().unwrap_or(0) as usize,
+                    modified_lines: strings(&h["modified_lines"]),
+                    reviewed: h["reviewed"] == true,
+                }).collect();
+                self.changes.change = self.changes.change.min(self.changes.hunks.len().saturating_sub(1));
+                if v["shown"] == false {
+                    self.changes.diff = vec![format!("({})", v["why"].as_str().filter(|w| !w.is_empty()).unwrap_or("not shown as text"))];
+                    self.changes.hunk_at.clear();
+                    self.changes.loading = false;
+                    return;
+                }
+                let ws = self.changes.workspace.clone();
+                self.request("workspace.file", json!({ "workspace_id": ws, "path": path }), Pending::FileText { run, path });
+            }
+            (Pending::FileText { run, path }, Ok(v)) => {
+                if self.changes.run != run || self.changes.selected().map(|f| f.1) != Some(path.clone()) {
+                    return;
+                }
+                self.changes.loading = false;
+                let text = v["now"]["text"].as_str().map(str::to_string);
+                // T-39: lines the owner wrote in the editor just now are theirs.
+                if let Some((p, before)) = self.changes.editing.take() {
+                    if p == path {
+                        let mine = owner_lines(&before, text.as_deref().unwrap_or_default());
+                        self.changes.mine.entry(p).or_default().extend(mine);
+                    }
+                }
+                if self.changes.unchanged {
+                    self.changes.diff = match (&text, v["now"]["note"].as_str()) {
+                        (Some(t), _) => t.lines().take(DIFF_LINES).map(|l| format!(" {l}")).collect(),
+                        (None, Some(note)) => vec![format!("({note})")],
+                        (None, None) => vec!["(this file is not on disk)".into()],
+                    };
+                    self.changes.hunk_at.clear();
+                } else {
+                    self.render_hunks(text.as_deref().unwrap_or_default());
+                }
+            }
+            (Pending::Tree { run }, Ok(v)) => {
+                if self.changes.run != run {
+                    return;
+                }
+                self.changes.all_loading = self.changes.all_loading.saturating_sub(1);
+                for e in v["entries"].as_array().cloned().unwrap_or_default() {
+                    let path = e["path"].as_str().unwrap_or_default().to_string();
+                    if e["dir"] == true && e["symlink"] != true {
+                        // Folders are listed in turn, up to a bound (a very large worktree is cut short).
+                        if self.changes.all.len() < ALL_FILES_MAX {
+                            self.changes.all_loading += 1;
+                            let ws = self.changes.workspace.clone();
+                            self.request("workspace.tree", json!({ "workspace_id": ws, "dir": path }), Pending::Tree { run: run.clone() });
+                        }
+                    } else if self.changes.all.len() < ALL_FILES_MAX && !self.changes.all.contains(&path) {
+                        self.changes.all.push(path);
+                    }
+                }
+                if self.changes.all_loading == 0 {
+                    self.changes.all.sort();
+                    self.changes.file = 0;
+                    self.load_file_diff();
+                }
+            }
+            (Pending::Accept { run, path, rest }, Ok(_)) => {
+                if let Some(next) = rest.first().cloned() {
+                    self.send_accept(&run, &path, next, rest[1..].to_vec());
+                } else {
+                    self.say(format!("Accepted in {path}"), false);
+                    self.load_file_diff();
+                }
+            }
+            (Pending::Reject { run, path, rest }, Ok(_)) => {
+                if let Some(next) = rest.first().cloned() {
+                    self.send_reject(&run, &path, next, rest[1..].to_vec());
+                } else {
+                    self.say(format!("Rejected in {path}: the lines from before are back"), false);
+                    self.load_diff();
+                }
+            }
+            (Pending::Accept { .. } | Pending::Reject { .. }, Err(e)) => {
+                // The daemon's conflict check: the agent changed it meanwhile.
+                self.say(e, true);
+                self.load_diff();
+            }
+            (Pending::Hunks { .. } | Pending::FileText { .. } | Pending::Tree { .. }, Err(e)) => {
+                self.changes.loading = false;
+                self.changes.all_loading = 0;
+                self.changes.error = Some(e);
             }
             (Pending::AccountList, Ok(v)) => {
                 let keep = self.accounts.get(self.account_sel).map(|a| a.id.clone());
@@ -1166,6 +1365,7 @@ impl App {
                     program: v["program"].as_str().unwrap_or_default().to_string(),
                     args: v["args"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default(),
                     env,
+                    edit: false,
                 });
             }
             (Pending::MergePlan { run }, Ok(plan)) => self.on_merge_plan(run, plan),
@@ -1416,37 +1616,158 @@ impl App {
 
     fn open_changes(&mut self) {
         let Some(run) = self.focused().cloned() else { return };
-        self.changes = ChangesView { run: run.id.clone(), loading: true, ..Default::default() };
+        let keep = std::mem::take(&mut self.changes.mine);
+        self.changes = ChangesView { run: run.id.clone(), workspace: run.workspace_id.clone(), loading: true, mine: if self.changes.run == run.id { keep } else { HashMap::new() }, ..Default::default() };
         self.mode = Mode::Changes;
         self.request("comparison.options", json!({ "run_id": run.id }), Pending::Comparisons { run: run.id.clone() });
     }
 
+    /// Reloads the comparisons (their bases move as turns start), then the files and the diff.
+    fn reload_review(&mut self) {
+        let run = self.changes.run.clone();
+        self.changes.loading = true;
+        self.request("comparison.options", json!({ "run_id": run }), Pending::Comparisons { run });
+    }
+
     fn load_diff(&mut self) {
         let run = self.changes.run.clone();
-        let Some(ws) = self.state.run(&run).map(|r| r.workspace_id.clone()) else { return };
-        let Some((_, base)) = self.changes.options.get(self.changes.option).cloned() else { return };
+        let ws = self.changes.workspace.clone();
+        let Some(base) = self.changes.comparison().and_then(|c| c.base.clone()) else { return };
         self.changes.loading = true;
         self.request("workspace.diff", json!({ "workspace_id": ws, "base": base, "status": false }), Pending::Diff { run });
     }
 
-    /// The selected file's unified diff (read-only `git diff` between the base and the captured tree).
+    /// The selected file's changes from the daemon (`workspace.hunks`), or an unchanged file's
+    /// contents (`workspace.file`).
     fn load_file_diff(&mut self) {
         let c = &mut self.changes;
-        c.scroll = 0;
+        let Some((status, path, ..)) = c.selected() else {
+            c.diff.clear();
+            c.hunks.clear();
+            c.hunk_at.clear();
+            return;
+        };
+        // Another file starts at its first change; the same file (a refresh) keeps its place and
+        // its lines until the new ones arrive.
+        if c.path != path {
+            c.path = path.clone();
+            c.scroll = 0;
+            c.diff.clear();
+            c.hunks.clear();
+            c.hunk_at.clear();
+            c.change = 0;
+        }
+        let (run, ws) = (c.run.clone(), c.workspace.clone());
+        c.unchanged = status.is_empty();
+        c.loading = true;
+        if c.unchanged {
+            self.request("workspace.file", json!({ "workspace_id": ws, "path": path }), Pending::FileText { run, path });
+            return;
+        }
+        let Some(base) = c.comparison().and_then(|x| x.base.clone()) else { return };
+        self.request("workspace.hunks", json!({ "workspace_id": ws, "path": path, "base": base, "run_id": run }), Pending::Hunks { run, path });
+    }
+
+    /// Draws the changes as a diff: each change's header, two lines around it from the working
+    /// copy, the comparison's lines (−) and the working copy's (+).
+    fn render_hunks(&mut self, now: &str) {
+        let lines: Vec<&str> = now.split('\n').collect();
+        let c = &mut self.changes;
+        c.now = crate::app::split_lines(now);
         c.diff.clear();
-        let (Some((_, base)), Some(tree), Some(file)) = (c.options.get(c.option), c.tree.as_ref(), c.files.get(c.file)) else { return };
-        let mut args = vec!["diff", "--no-color", "-M", base.as_str(), tree.as_str(), "--"];
-        let old = file.1.clone();
-        args.push(&old);
-        match git_out(&c.root, &args) {
-            Ok(text) => {
-                c.diff = text.lines().skip_while(|l| !l.starts_with("@@") && !l.starts_with("Binary")).take(DIFF_LINES).map(str::to_string).collect();
-                if c.diff.is_empty() {
-                    c.diff.push("(no textual change)".into());
+        c.hunk_at.clear();
+        for h in &c.hunks {
+            c.hunk_at.push(c.diff.len());
+            c.diff.push(format!("@@ -{},{} +{},{} @@", h.base_start, h.base_lines.len(), h.modified_start, h.modified_lines.len()));
+            // The working copy's lines before and after the change (1-based; a removal sits after its line).
+            let (first, after) = if h.modified_lines.is_empty() { (h.modified_start + 1, h.modified_start + 1) } else { (h.modified_start, h.modified_start + h.modified_lines.len()) };
+            for n in first.saturating_sub(CONTEXT).max(1)..first {
+                if let Some(l) = lines.get(n - 1) {
+                    c.diff.push(format!(" {l}"));
                 }
             }
-            Err(e) => c.error = Some(e),
+            c.diff.extend(h.base_lines.iter().map(|l| format!("-{l}")));
+            c.diff.extend(h.modified_lines.iter().map(|l| format!("+{l}")));
+            for n in after..after + CONTEXT {
+                if let Some(l) = lines.get(n - 1).filter(|_| n <= lines.len()) {
+                    c.diff.push(format!(" {l}"));
+                }
+            }
         }
+        if c.hunks.is_empty() {
+            c.diff.push("(no textual change)".into());
+        }
+        c.change = c.change.min(c.hunks.len().saturating_sub(1));
+    }
+
+    fn send_accept(&mut self, run: &str, path: &str, h: Hunk, rest: Vec<Hunk>) {
+        let mut p = json!({ "run_id": run, "path": path, "key": h.key, "modified_start": h.modified_start, "modified_lines": h.modified_lines, "base_lines": h.base_lines });
+        if h.modified_lines.is_empty() {
+            // A change that only removes lines is checked at the line it sits after.
+            if let Some(anchor) = h.modified_start.checked_sub(1).and_then(|i| self.changes.now.get(i)) {
+                p["anchor"] = json!(anchor);
+            }
+        }
+        self.request("review.accept", p, Pending::Accept { run: run.to_string(), path: path.to_string(), rest });
+    }
+
+    fn send_reject(&mut self, run: &str, path: &str, key: String, rest: Vec<String>) {
+        let ws = self.changes.workspace.clone();
+        let Some(base) = self.changes.comparison().and_then(|c| c.base.clone()) else { return };
+        self.request("review.reject", json!({ "workspace_id": ws, "path": path, "base": base, "key": key }), Pending::Reject { run: run.to_string(), path: path.to_string(), rest });
+    }
+
+    /// `1`, `2`, `3` and `c`: another comparison; one that is not available says why (T-27).
+    fn choose_comparison(&mut self, i: usize) {
+        let Some(c) = self.changes.options.get(i).cloned() else { return };
+        if !c.available {
+            self.say(format!("{} is not available: {}", c.label, if c.detail.is_empty() { "the daemon has no base for it" } else { &c.detail }), true);
+            return;
+        }
+        self.changes.option = i;
+        self.changes.files.clear();
+        self.changes.hunks.clear();
+        self.changes.diff.clear();
+        self.changes.path.clear();
+        self.load_diff();
+    }
+
+    fn review_key_comparison(&mut self, n: usize) {
+        let (mode, label) = REVIEW_KEYS[n];
+        match self.changes.options.iter().position(|c| c.mode == mode) {
+            Some(i) => self.choose_comparison(i),
+            None => self.say(format!("{label} is not available: this daemon does not offer it yet"), true),
+        }
+    }
+
+    /// Moves to change `i` of the file and scrolls it into view.
+    fn go_to_change(&mut self, i: usize) {
+        let c = &mut self.changes;
+        if c.hunks.is_empty() {
+            return;
+        }
+        c.change = i.min(c.hunks.len() - 1);
+        c.scroll = c.hunk_at.get(c.change).copied().unwrap_or(0).saturating_sub(2);
+    }
+
+    /// `e` (T-39): the file at the current change in the owner's `$EDITOR` (else `vi`), with the
+    /// TUI suspended; the review refreshes when the editor exits.
+    fn edit_in_editor(&mut self) {
+        let Some((_, path, ..)) = self.changes.selected() else { return };
+        let root = self.state.workspace(&self.changes.workspace).map(|w| w.path.clone()).unwrap_or_else(|| self.changes.root.clone());
+        if root.is_empty() {
+            return;
+        }
+        let line = self.changes.hunks.get(self.changes.change).map(|h| h.modified_start.max(1)).unwrap_or(1);
+        let before = std::fs::read_to_string(std::path::Path::new(&root).join(&path)).unwrap_or_default();
+        self.changes.editing = Some((path.clone(), before));
+        let editor = std::env::var("EDITOR").ok().filter(|e| !e.trim().is_empty()).unwrap_or_else(|| "vi".into());
+        let mut words = editor.split_whitespace().map(str::to_string);
+        let program = words.next().unwrap_or_else(|| "vi".into());
+        let mut args: Vec<String> = words.collect();
+        args.push(format!("+{line}"));
+        args.push(std::path::Path::new(&root).join(&path).display().to_string());
+        self.exec = Some(Exec { title: format!("Editing {path}"), program, args, env: Vec::new(), edit: true });
     }
 
     fn merge_plan(&mut self, run: &str) {
@@ -1598,6 +1919,19 @@ impl App {
 
     /// Called by the event loop after a suspended program (a sign-in) finished.
     pub fn after_exec(&mut self, result: Result<i32, String>) {
+        if self.mode == Mode::Changes && self.changes.editing.is_some() {
+            // T-39: back from the owner's editor; the review shows the file as it is now.
+            match result {
+                Ok(_) => self.say("Back from your editor; the review shows your edits", false),
+                Err(e) => {
+                    self.changes.editing = None;
+                    self.say(format!("Could not open your editor: {e}"), true);
+                }
+            }
+            self.load_diff();
+            self.dirty = true;
+            return;
+        }
         match result {
             Ok(0) => self.say("Sign-in finished", false),
             Ok(code) => self.say(format!("Sign-in exited with code {code}"), true),
@@ -1631,8 +1965,11 @@ impl App {
     }
 
     fn changes_key(&mut self, k: KeyEvent) {
-        let n = self.changes.files.len();
+        let n = self.changes.shown().len();
+        let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
+        let page = (self.size.1 as usize).saturating_sub(8);
         match k.code {
+            KeyCode::Char('r') if ctrl => self.reload_review(),
             KeyCode::Esc | KeyCode::Char('v') | KeyCode::Char('q') => self.mode = Mode::Grid,
             KeyCode::Down | KeyCode::Char('j') if n > 0 => {
                 self.changes.file = (self.changes.file + 1) % n;
@@ -1642,14 +1979,59 @@ impl App {
                 self.changes.file = (self.changes.file + n - 1) % n;
                 self.load_file_diff();
             }
-            KeyCode::Char('J') | KeyCode::PageDown => self.changes.scroll = (self.changes.scroll + (self.size.1 as usize).saturating_sub(6)).min(self.changes.diff.len().saturating_sub(1)),
-            KeyCode::Char('K') | KeyCode::PageUp => self.changes.scroll = self.changes.scroll.saturating_sub((self.size.1 as usize).saturating_sub(6)),
+            KeyCode::Char('J') | KeyCode::PageDown => self.changes.scroll = (self.changes.scroll + page).min(self.changes.diff.len().saturating_sub(1)),
+            KeyCode::Char('K') | KeyCode::PageUp => self.changes.scroll = self.changes.scroll.saturating_sub(page),
+            KeyCode::Char('n') => self.go_to_change(self.changes.change + 1),
+            KeyCode::Char('p') => self.go_to_change(self.changes.change.saturating_sub(1)),
             KeyCode::Char('c') if !self.changes.options.is_empty() => {
-                self.changes.option = (self.changes.option + 1) % self.changes.options.len();
-                self.changes.files.clear();
-                self.load_diff();
+                let len = self.changes.options.len();
+                if let Some(i) = (1..=len).map(|d| (self.changes.option + d) % len).find(|&i| self.changes.options[i].available) {
+                    self.choose_comparison(i);
+                }
             }
-            KeyCode::Char('r') => self.load_diff(),
+            KeyCode::Char(c @ '1'..='3') => self.review_key_comparison(c as usize - '1' as usize),
+            KeyCode::Char('t') => {
+                self.changes.all_files = !self.changes.all_files;
+                self.changes.file = 0;
+                if self.changes.all_files && self.changes.all.is_empty() && self.changes.all_loading == 0 {
+                    let (run, ws) = (self.changes.run.clone(), self.changes.workspace.clone());
+                    self.changes.all_loading = 1;
+                    self.request("workspace.tree", json!({ "workspace_id": ws, "dir": "" }), Pending::Tree { run });
+                } else {
+                    self.load_file_diff();
+                }
+            }
+            KeyCode::Char(c @ ('a' | 'A')) => {
+                let Some((_, path, ..)) = self.changes.selected() else { return };
+                let todo: Vec<Hunk> = if c == 'a' {
+                    self.changes.hunks.get(self.changes.change).filter(|h| !h.reviewed).cloned().into_iter().collect()
+                } else {
+                    self.changes.hunks.iter().filter(|h| !h.reviewed).cloned().collect()
+                };
+                match todo.first().cloned() {
+                    Some(first) => {
+                        let run = self.changes.run.clone();
+                        self.send_accept(&run, &path, first, todo[1..].to_vec());
+                    }
+                    None if self.changes.hunks.is_empty() => self.say("No change to accept here", false),
+                    None => self.say("Already accepted", false),
+                }
+            }
+            KeyCode::Char(c @ ('r' | 'R')) => {
+                let Some((_, path, ..)) = self.changes.selected() else { return };
+                let todo: Vec<Hunk> = if c == 'r' { self.changes.hunks.get(self.changes.change).cloned().into_iter().collect() } else { self.changes.hunks.clone() };
+                if todo.is_empty() {
+                    self.say("No change to reject here", false);
+                    return;
+                }
+                let back: usize = todo.iter().map(|h| h.base_lines.len()).sum();
+                let gone: usize = todo.iter().map(|h| h.modified_lines.len()).sum();
+                let lines = |n: usize| format!("{n} line{}", if n == 1 { "" } else { "s" });
+                let what = if c == 'r' { format!("this change in {path}") } else { format!("all {} change{} in {path}", todo.len(), if todo.len() == 1 { "" } else { "s" }) };
+                let text = format!("Reject {what}? {} go{} back to what was there before; {} the agent wrote {} removed.", lines(back), if back == 1 { "es" } else { "" }, lines(gone), if gone == 1 { "is" } else { "are" });
+                self.mode = Mode::Confirm(Confirm::Reject { path, keys: todo.into_iter().map(|h| h.key).collect(), text });
+            }
+            KeyCode::Char('e') => self.edit_in_editor(),
             _ => {}
         }
     }
@@ -1701,6 +2083,15 @@ impl App {
             Mode::Confirm(c @ (Confirm::PhoneOff { .. } | Confirm::PhoneOnAndPair | Confirm::Revoke { .. } | Confirm::Pair { .. })) => {
                 self.phone_confirm(&c, k);
             }
+            Mode::Confirm(Confirm::Reject { path, keys, .. }) => {
+                self.mode = Mode::Changes;
+                if matches!(k.code, KeyCode::Char('y') | KeyCode::Char('Y')) {
+                    if let Some(first) = keys.first().cloned() {
+                        let run = self.changes.run.clone();
+                        self.send_reject(&run, &path, first, keys[1..].to_vec());
+                    }
+                }
+            }
             Mode::Confirm(c) => match k.code {
                 KeyCode::Char('y') | KeyCode::Char('Y') => {
                     self.mode = Mode::Grid;
@@ -1734,7 +2125,8 @@ impl App {
                                 self.request("workspace.merge_complete", json!({ "workspace_id": ws }), Pending::MergeComplete);
                             }
                         }
-                        // The phone questions are answered in `phone_confirm`.
+                        // The phone questions are answered in `phone_confirm`; Reject above.
+                        Confirm::Reject { .. } => {}
                         Confirm::PhoneOff { .. } | Confirm::PhoneOnAndPair | Confirm::Revoke { .. } | Confirm::Pair { .. } => {}
                     }
                 }
@@ -2144,4 +2536,18 @@ pub fn side_widths(width: u16, list: bool, conversation: bool) -> (u16, u16) {
     let list_w = if list { (width / 5).clamp(30, 42) } else { 0 };
     let conv_w = if conversation { (width.saturating_sub(list_w) * 2 / 5).clamp(40, 90) } else { 0 };
     (list_w, conv_w)
+}
+
+/// Lines in `after` that the owner wrote (T-39): what differs from `before` between their common
+/// first and last lines.
+pub fn owner_lines(before: &str, after: &str) -> HashSet<String> {
+    let (b, a): (Vec<&str>, Vec<&str>) = (before.lines().collect(), after.lines().collect());
+    let head = b.iter().zip(a.iter()).take_while(|(x, y)| x == y).count();
+    let tail = b[head..].iter().rev().zip(a[head..].iter().rev()).take_while(|(x, y)| x == y).count();
+    a[head..a.len() - tail].iter().filter(|l| !l.trim().is_empty()).map(|l| l.to_string()).collect()
+}
+
+/// Lines as the daemon counts them (`\n`, `\r\n` or `\r`), for the checks it makes.
+pub fn split_lines(text: &str) -> Vec<String> {
+    text.replace("\r\n", "\n").replace('\r', "\n").split('\n').map(str::to_string).collect()
 }

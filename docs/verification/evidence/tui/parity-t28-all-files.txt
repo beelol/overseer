@@ -1,12 +1,12 @@
- ◆ Overseer  page 1/1 · 1 agent · ● 1 active                                                                                     phone access off · ● connected 
-┏ review · Edits two files · Latest run · 2 files +2 −0 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ 1 Since task start   2 [Latest run]   3 Entire worktree (not available)   t [Changed] | All files                                                            ┃
+ ◆ Overseer  page 1/1 · 1 agent                                                                                                  phone access off · ● connected 
+┏ review · Edits two of five · Since task start · 2 files +3 −2 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 1 [Since task start]   2 Latest run   3 Entire worktree (not available)   t Changed | [All files]                                                            ┃
 ┃                                                                                                                                                              ┃
-┃› M README.md +1 −0                             │ README.md  change 1 of 1 · 0 accepted                                                                       ┃
-┃  A src/deep/nested/new.rs +1 −0                │ › @@ -1,0 +2,1 @@  a Accept · r Reject                                                                      ┃
-┃                                                │    # fixture                                                                                                ┃
-┃                                                │   +more docs                                                                                                ┃
-┃                                                │                                                                                                             ┃
+┃›   README.md                                   │ README.md  unchanged · read-only                                                                            ┃
+┃  M a.txt +2 −2                                 │    # fixture                                                                                                ┃
+┃  M b.txt +1 −0                                 │                                                                                                             ┃
+┃    c.txt                                       │                                                                                                             ┃
+┃    d.txt                                       │                                                                                                             ┃
 ┃                                                │                                                                                                             ┃
 ┃                                                │                                                                                                             ┃
 ┃                                                │                                                                                                             ┃

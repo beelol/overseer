@@ -1,21 +1,21 @@
- ◆ Overseer  page 1/1 · 1 agent · ● 1 active                                                                                     phone access off · ● connected 
-┏ review · Edits two files · Latest run · 2 files +2 −0 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ 1 Since task start   2 [Latest run]   3 Entire worktree (not available)   t [Changed] | All files                                                            ┃
+ ◆ Overseer  page 1/1 · 1 agent                                                                                                  phone access off · ● connected 
+┏ review · Edited by the owner · Since task start · 2 files +4 −2 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 1 [Since task start]   2 Latest run   3 Entire worktree (not available)   t [Changed] | All files                                                            ┃
 ┃                                                                                                                                                              ┃
-┃› M README.md +1 −0                             │ README.md  change 1 of 1 · 0 accepted                                                                       ┃
-┃  A src/deep/nested/new.rs +1 −0                │ › @@ -1,0 +2,1 @@  a Accept · r Reject                                                                      ┃
-┃                                                │    # fixture                                                                                                ┃
-┃                                                │   +more docs                                                                                                ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
+┃› M a.txt +3 −2                                 │ a.txt  change 2 of 3 · 0 accepted                                                                           ┃
+┃  M b.txt +1 −0                                 │    line 3                                                                                                   ┃
+┃                                                │    line 4                                                                                                   ┃
+┃                                                │ › @@ -8,1 +8,1 @@  a Accept · r Reject                                                                      ┃
+┃                                                │    line 6                                                                                                   ┃
+┃                                                │    line 7                                                                                                   ┃
+┃                                                │   -line 8                                                                                                   ┃
+┃                                                │   +line EIGHT                                                                                               ┃
+┃                                                │    line 9                                                                                                   ┃
+┃                                                │    line 10                                                                                                  ┃
+┃                                                │   @@ -10,0 +11,1 @@                                                                                         ┃
+┃                                                │    line 9                                                                                                   ┃
+┃                                                │    line 10                                                                                                  ┃
+┃                                                │   +written by the owner  ✎ your edit                                                                        ┃
 ┃                                                │                                                                                                             ┃
 ┃                                                │                                                                                                             ┃
 ┃                                                │                                                                                                             ┃
@@ -41,4 +41,4 @@
 ┃                                                │                                                                                                             ┃
 ┃                                                │                                                                                                             ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
- n/p change   a/A Accept change/file   r/R Reject change/file   j/k file   t Changed | All files   1/2/3 c comparison   e your editor   J/K scroll   ctrl+r relo
+ Back from your editor; the review shows your edits                                                                                                             
