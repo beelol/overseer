@@ -398,5 +398,5 @@ agent list, the review screen, and the two numbered ways of showing a picked age
 
 ### Open for later
 
-- Drilling into an agent's sub-agents from the grid or the list (the owner, 2026-09-30: "maybe
-  assume all top level for now").
+- How sub-agents show: drilled into from their parent, or seen as tiles next to the others (the
+  owner, 2026-09-30: "maybe assume all top level for now"; "not a priority, needs more thought").
