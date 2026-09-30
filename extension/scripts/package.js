@@ -25,7 +25,9 @@ const dirty = spawnSync('git', ['status', '--porcelain', '--untracked-files=no']
 run('cargo', ['build', '--release', '-p', 'overseerd'], repo, { ...process.env, OVERSEER_BUILD_COMMIT: head ? head + dirty : 'unknown' });
 fs.mkdirSync(path.join(root, 'bin'), { recursive: true });
 const target = path.join(root, 'bin', `overseerd-${process.platform}-${process.arch}`);
-fs.copyFileSync(path.join(repo, 'target/release/overseerd'), target);
+// Where cargo put it: CARGO_TARGET_DIR when it is set (as scripts/dev reads it), else the checkout's target.
+const built = path.join(process.env.CARGO_TARGET_DIR ? path.resolve(repo, process.env.CARGO_TARGET_DIR) : path.join(repo, 'target'), 'release', 'overseerd');
+fs.copyFileSync(built, target);
 fs.chmodSync(target, 0o755);
 const out = path.join(root, `overseer-${JSON.parse(fs.readFileSync(path.join(root, 'package.json'))).version}.vsix`);
 run(process.execPath, [path.resolve(tool, installed.bin.vsce), 'package', '--no-dependencies', '--allow-missing-repository', '-o', out], root);
