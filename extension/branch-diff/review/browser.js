@@ -262,8 +262,8 @@ function makeRow(entry) {
   const open = node('button', 'open-native', '↗'); open.title = 'Open in native diff (undo, redo, Git gutters)'; open.setAttribute('aria-label', 'Open ' + entry.path + ' in native diff');
   // Overseer (AC-263): the agent's changes are Accepted or Rejected, per change and per file; saving
   // what the owner typed is a separate "Save your edits", shown only once they have typed.
-  const acceptFile = node('button', 'file-accept'); acceptFile.hidden = true;
-  const rejectFile = node('button', 'file-reject'); rejectFile.hidden = true;
+  const fileButton = (cls, icon) => { const b = node('button', cls); const g = node('span', 'codicon codicon-' + icon); g.setAttribute('aria-hidden', 'true'); b.append(g, node('span', 'file-word')); b.hidden = true; return b; };
+  const acceptFile = fileButton('file-accept', 'check-all'), rejectFile = fileButton('file-reject', 'discard');
   const save = node('button', 'save-file', 'Save your edits'); save.disabled = true; save.hidden = true;
   save.title = "Save your edits (Cmd+S): writes what you typed to this file. It does not accept or reject the agent's changes.";
   // An unchanged file opened from the navigator can be closed again (AC-99).
@@ -272,7 +272,7 @@ function makeRow(entry) {
   close.addEventListener('click', () => vscode.postMessage({ type: 'unbrowse', path: row.entry.path }));
   const editStatus = node('span', 'edit-status'); editStatus.setAttribute('role', 'status');
   const host = node('div', 'diff-body'); host.style.height = '220px';
-  header.append(toggle, status, title, unsaved, editStatus, stats, acceptFile, rejectFile, save, open, close); element.append(header, host);
+  header.append(toggle, status, title, unsaved, editStatus, stats, save, acceptFile, rejectFile, open, close); element.append(header, host);
   const progress = node('span', 'file-loading'); progress.setAttribute('role', 'status'); progress.hidden = true; header.insertBefore(progress, stats);
   const row = { entry, element, header, toggle, title, status, unsaved, stats, host, progress, open, save, close, editStatus, acceptFile, rejectFile, nearby: false };
   loading(row, true);
@@ -563,13 +563,13 @@ function fileActions(row, canEdit) {
   const hunks = row.hunks || [], all = hunks.length > 0 && hunks.every(h => reviewedHunks.has(h.key));
   const { acceptFile, rejectFile } = row, name = row.entry.path;
   acceptFile.hidden = rejectFile.hidden = !hunks.length;
-  acceptFile.textContent = all ? 'Accepted' : 'Accept file';
+  acceptFile.querySelector('.file-word').textContent = all ? 'Accepted' : 'Accept file';
   acceptFile.setAttribute('aria-pressed', String(all));
   acceptFile.title = all ? `All of the agent's changes to ${name} are accepted. Click to take the accepts back (the changes stay either way)` : `Accept file: every change the agent made to ${name} stays and is marked accepted (nothing is committed or staged)`;
   acceptFile.setAttribute('aria-label', all ? `${name} accepted; click to take the accepts back` : `Accept every change to ${name}`);
   // A new or deleted file has nothing to put back line by line; Reject file needs an editable file with lines on both sides.
   const whole = canEdit && !['A', 'D', '?'].includes(String(row.entry.status || '').charAt(0));
-  rejectFile.textContent = 'Reject file';
+  rejectFile.querySelector('.file-word').textContent = 'Reject file';
   rejectFile.disabled = !whole;
   rejectFile.title = whole ? `Reject file: take out every change the agent made to ${name} and put back what was there before` : 'Reject file is unavailable here: a new or deleted file, or one the review cannot edit (use Open in Native Diff)';
   rejectFile.setAttribute('aria-label', `Reject every change to ${name}`);

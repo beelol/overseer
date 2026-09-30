@@ -253,7 +253,7 @@ button.land.primary:hover { background: var(--ov-accent-bg-hover, var(--vscode-b
 @media (max-width: 440px) { #compare { padding: 0 var(--ov-space-2, 8px); gap: 2px; } #compare button { padding: 0 6px; } }
 
 /* Overseer (AC-263): Accept file and Reject file in each file's header; Accepted reads pressed. */
-button.file-accept, button.file-reject { height: 24px; padding: 0 var(--ov-space-2, 8px); border-radius: var(--ov-radius-pill, 12px); border: 1px solid var(--ov-border, transparent); background: transparent; color: var(--ov-text, inherit); font-size: var(--ov-font-sm, 12px); white-space: nowrap; cursor: pointer; }
+button.file-accept, button.file-reject { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 var(--ov-space-2, 8px); border-radius: var(--ov-radius-pill, 12px); border: 1px solid var(--ov-border, transparent); background: transparent; color: var(--ov-text, inherit); font-size: var(--ov-font-sm, 12px); white-space: nowrap; cursor: pointer; }
 button.file-accept[hidden], button.file-reject[hidden] { display: none; }
 button.file-accept:hover:not(:disabled), button.file-reject:hover:not(:disabled) { background: var(--ov-hover, var(--vscode-toolbar-hoverBackground)); }
 button.file-accept[aria-pressed="true"] { color: var(--ov-done, var(--vscode-testing-iconPassed)); border-color: transparent; }
@@ -261,3 +261,14 @@ button.file-reject:hover:not(:disabled) { color: var(--ov-removed, var(--vscode-
 button.file-accept:disabled, button.file-reject:disabled { opacity: .5; cursor: default; }
 .hunk-actions .hunk-accept[aria-pressed="true"] { font-weight: 600; }
 @media (max-width: 560px) { button.file-accept, button.file-reject { padding: 0 var(--ov-space-1, 4px); } }
+/* Narrow cards keep every header button on the card: below 440 px Accept file and Reject file are
+   icons (their words stay in the tooltip and label); while "Save your edits" shows on a card below
+   600 px, the file buttons, line counts and Unsaved step aside (each change keeps Accept and Reject). */
+.diff-file { container-type: inline-size; }
+@container (max-width: 440px) {
+  .file-header button.file-accept .file-word, .file-header button.file-reject .file-word { display: none; }
+}
+@container (max-width: 600px) {
+  .file-header:has(.save-file:not([hidden])) button.file-accept, .file-header:has(.save-file:not([hidden])) button.file-reject,
+  .file-header:has(.save-file:not([hidden])) .stats, .file-header:has(.save-file:not([hidden])) .unsaved { display: none; }
+}
