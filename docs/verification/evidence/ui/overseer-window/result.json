@@ -130,7 +130,7 @@
         },
         "home": {
           "mode": "composer",
-          "selected": "r-79c44744142e",
+          "selected": "r-16e53c398912",
           "title": "Live edits",
           "said": [],
           "voice": "",
@@ -176,7 +176,7 @@
       "name": "the workspace file is in Overseer's own storage, not in the repository, and holds the look",
       "ok": true,
       "detail": [
-        "User/globalStorage/beelol.overseer/layouts/743ac19b6311/ws-repo.code-workspace"
+        "User/globalStorage/beelol.overseer/layouts/5e570d12be4f/ws-repo.code-workspace"
       ]
     },
     {
@@ -186,26 +186,26 @@
         "recentBefore": [
           "notes-repo, folders & workspaces",
           "ws-repo, folder with unsaved changes",
-          "repoA",
-          "repoA",
-          "conv-demo",
-          "talk-repo",
           "ws-repo",
-          "windows-repo",
-          "chat-repo",
-          "site-repo"
+          "notes-repo",
+          "files-repo",
+          "files-repo",
+          "own (Workspace)",
+          "modes-repo",
+          "inventory-repo",
+          "web-app"
         ],
         "recentIn": [
           "notes-repo, folders & workspaces",
           "ws-repo",
-          "repoA",
-          "repoA",
-          "conv-demo",
-          "talk-repo",
           "ws-repo",
-          "windows-repo",
-          "chat-repo",
-          "site-repo"
+          "notes-repo",
+          "files-repo",
+          "files-repo",
+          "own (Workspace)",
+          "modes-repo",
+          "inventory-repo",
+          "web-app"
         ]
       }
     },
@@ -240,7 +240,7 @@
         },
         "chat": {
           "mode": "chat",
-          "selected": "r-f9e2b618d213",
+          "selected": "r-8d6fdec8832e",
           "title": "Finished edit",
           "said": [
             "YouWhat is everyone doing?AnsweredStart as an agent"
@@ -256,7 +256,7 @@
       "ok": true,
       "detail": {
         "mode": "composer",
-        "selected": "r-f9e2b618d213",
+        "selected": "r-8d6fdec8832e",
         "title": "Finished edit",
         "said": [
           "YouWhat is everyone doing?AnsweredStart as an agent"
@@ -272,7 +272,7 @@
       "detail": {
         "toAgent": {
           "mode": "chat",
-          "selected": "r-f9e2b618d213",
+          "selected": "r-8d6fdec8832e",
           "title": "Finished edit",
           "said": [
             "YouWhat is everyone doing?AnsweredStart as an agent"
@@ -283,7 +283,7 @@
         },
         "toHome": {
           "mode": "composer",
-          "selected": "r-f9e2b618d213",
+          "selected": "r-8d6fdec8832e",
           "title": "Finished edit",
           "said": [
             "YouWhat is everyone doing?AnsweredStart as an agent"
@@ -361,7 +361,7 @@
         },
         "right": {
           "mode": "chat",
-          "selected": "r-f9e2b618d213",
+          "selected": "r-8d6fdec8832e",
           "title": "Finished edit",
           "said": [
             "YouWhat is everyone doing?AnsweredStart as an agent"
@@ -464,23 +464,23 @@
     }
   ],
   "measures": {
-    "one step: click to the arranged layout (ms)": 4985,
+    "one step: click to the arranged layout (ms)": 5031,
     "the window title": "Overseer — ws-repo",
     "the terminal command keeps running after the reopen": false,
     "a question on the way back (nothing unsaved, nothing running)": "none",
-    "back to the owner's window (ms)": 4334,
+    "back to the owner's window (ms)": 4326,
     "terminal after coming back: tabs shown, the old command running": {
       "terminals": 1,
       "running": false
     },
     "the extension's log": [
-      "2026-09-30 01:02:37.605 [info] overseer window: saved 1 file(s); 1 terminal command(s) stop",
-      "2026-09-30 01:02:37.614 [info] overseer window: reopening on /private/tmp/ovs-ui-BLO4zA/profile/User/globalStorage/beelol.overseer/layouts/743ac19b6311/ws-repo.code-workspace",
-      "2026-09-30 01:02:40.204 [info] overseer window: arranged in 1965 ms",
-      "2026-09-30 01:03:38.072 [info] overseer window: back to file:///private/tmp/ovs-ui-BLO4zA/ws-repo",
-      "2026-09-30 01:03:48.033 [info] overseer window: reopening on /private/tmp/ovs-ui-BLO4zA/profile/User/globalStorage/beelol.overseer/layouts/743ac19b6311/ws-repo.code-workspace",
-      "2026-09-30 01:03:50.363 [info] overseer window: arranging again after the restore",
-      "2026-09-30 01:03:50.480 [info] overseer window: arranged in 1996 ms"
+      "2026-09-30 01:29:07.154 [info] overseer window: saved 1 file(s); 1 terminal command(s) stop",
+      "2026-09-30 01:29:07.163 [info] overseer window: reopening on /private/tmp/ovs-ui-39Gb0o/profile/User/globalStorage/beelol.overseer/layouts/5e570d12be4f/ws-repo.code-workspace",
+      "2026-09-30 01:29:09.568 [info] overseer window: arranged in 1847 ms",
+      "2026-09-30 01:30:07.790 [info] overseer window: back to file:///private/tmp/ovs-ui-39Gb0o/ws-repo",
+      "2026-09-30 01:30:17.734 [info] overseer window: reopening on /private/tmp/ovs-ui-39Gb0o/profile/User/globalStorage/beelol.overseer/layouts/5e570d12be4f/ws-repo.code-workspace",
+      "2026-09-30 01:30:20.070 [info] overseer window: arranging again after the restore",
+      "2026-09-30 01:30:20.184 [info] overseer window: arranged in 2006 ms"
     ]
   }
 }

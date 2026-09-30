@@ -129,7 +129,9 @@ const L = require('./overseer-window-helpers');
     const files = fs.existsSync(layoutsDir) ? fs.readdirSync(layoutsDir).flatMap(d => fs.readdirSync(path.join(layoutsDir, d)).map(f => path.join(layoutsDir, d, f))) : [];
     check('the workspace file is in Overseer\'s own storage, not in the repository, and holds the look', files.length === 1 && !fs.readdirSync(repo).some(f => f.endsWith('.code-workspace')) && JSON.parse(fs.readFileSync(files[0], 'utf8')).settings['workbench.editor.showTabs'] === 'none', files.map(f => path.relative(s.profile, f)));
     const recentIn = await L.recent(main);
-    check('VS Code\'s recent list never shows Overseer\'s file', !recentIn.concat(recentBefore).some(r => /code-workspace|\(Workspace\)/.test(r)), { recentBefore, recentIn });
+    // Only this window's file counts: on macOS the list also holds other scenarios' own workspaces
+    // (scenario-own-layout's "own (Workspace)").
+    check('VS Code\'s recent list never shows Overseer\'s file', !recentIn.concat(recentBefore).some(r => /code-workspace|\(Workspace\)/.test(r) && /ws-repo|layouts/.test(r)), { recentBefore, recentIn });
 
     // ---------- Home, then Overseer's conversation gets a message (its history).
     const shots = async (label, theme) => {
