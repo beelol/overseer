@@ -2782,7 +2782,7 @@ rec(263, "The review opens on \"Since task start\", with the other comparisons o
     expected="See the RFC criterion (the owner's decision of 2026-09-29 on pull request #35's question).",
     actual="Not started: #35 (AC-232) opens a finished agent's review on Since task start in its own worktree and keeps Latest run in the owner's checkout; the owner chose Since task start everywhere, with Latest run and Entire worktree one click away.", live="—", blocker="Its own agent.")
 
-rec(264, "One Overseer layout, and it looks like Focus Mode without its side effects", "verified", date="2026-09-30",
+rec(264, "One Overseer layout, and it looks like Focus Mode without its side effects", "partial", date="2026-09-30", blocker="The owner, 2026-09-30: Follow happens inside the review window (the file the agent is in, live, with All files on the left), not in a plain VS Code editor; #40 opens the real file in VS Code instead. Being rebuilt on #40.",
     commit="f1c79897 (branch claude/one-layout, pull request #40, not merged yet)",
     harness="Generic fixture programs, the Claude Code fixture as Overseer and the simulated voice on the packaged VSIX in isolated VS Code 1.139.1 profiles (background, transparent test windows); no accounts, no paid turns",
     steps="""1. Phase 1: `node test/ui/scenario-one-layout-a.js` and `scenario-one-layout-b.js` at 09144f1f ([comparison and screenshots](https://github.com/beelol/overseer/blob/09144f1f/docs/verification/evidence/ui/one-layout/README.md)): way A (Overseer's panel in the secondary side bar) and way B (the window reopened on an Overseer-owned workspace file), each with a second window of the same profile. The owner chose B.
