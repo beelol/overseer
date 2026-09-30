@@ -589,7 +589,7 @@ function rejectWholeFile(row) {
   if (row.rejectFile.disabled || !row.hunks?.length) return;
   if (!editing.enabled(row) || editing.held(row)) { message('This file cannot be rejected in the review right now. Use Open in Native Diff.'); return; }
   editing.reject(row, row.original.getValue(), row.hunks[0].key);
-  message(`Rejected: the agent's changes to ${row.entry.path} were taken out.`);
+  stickyMessage(`Rejected: the agent's changes to ${row.entry.path} were taken out.`);
 }
 function placeHunks(row) {
   const editor = row.editor?.getModifiedEditor();
@@ -609,7 +609,7 @@ function rejectHunk(row, change, key) {
   const seg = change.originalEndLineNumber ? o.slice(change.originalStartLineNumber - 1, change.originalEndLineNumber) : [];
   const next = [...m.slice(0, a), ...seg, ...m.slice(b)].join(row.modified.getEOL());
   editing.reject(row, next, key);
-  message(`Rejected: the agent's change at ${change.modifiedEndLineNumber ? `lines ${change.modifiedStartLineNumber}–${change.modifiedEndLineNumber}` : `line ${change.modifiedStartLineNumber}`} of ${row.entry.path} was taken out.`);
+  stickyMessage(`Rejected: the agent's change at ${change.modifiedEndLineNumber ? `lines ${change.modifiedStartLineNumber}–${change.modifiedEndLineNumber}` : `line ${change.modifiedStartLineNumber}`} of ${row.entry.path} was taken out.`);
 }
 // Theme variables arrive as hex or rgb()/rgba(); Monaco themes take hex. Without this an rgba value
 // was dropped and Monaco's own olive inserted-text color showed through (Overseer, AC-101).
