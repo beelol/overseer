@@ -10,7 +10,7 @@
       }
     },
     {
-      "name": "review, all files: reached in Overseer Dark, Overseer Light, Overseer",
+      "name": "review in Follow, all files: reached in Overseer Dark, Overseer Light, Overseer",
       "ok": true,
       "detail": {
         "Overseer Dark": true,
@@ -61,7 +61,7 @@
       "Overseer Light": true,
       "Overseer": true
     },
-    "review, all files": {
+    "review in Follow, all files": {
       "Overseer Dark": true,
       "Overseer Light": true,
       "Overseer": true

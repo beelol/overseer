@@ -17,10 +17,10 @@
       }
     },
     {
-      "name": "review: after focus in the side bar, one click on Changes only flips it",
+      "name": "review: after focus in the side bar, one click on the Follow | Diffs only switch flips it",
       "ok": true,
       "detail": {
-        "label": "review toggle",
+        "label": "review switch",
         "ok": true
       }
     },
@@ -28,7 +28,7 @@
       "name": "review: after focus in the chat (another editor group), one click flips it back",
       "ok": true,
       "detail": {
-        "label": "review toggle back",
+        "label": "review switch back",
         "ok": true
       }
     },
@@ -63,11 +63,11 @@
       "ok": true
     },
     {
-      "label": "review toggle",
+      "label": "review switch",
       "ok": true
     },
     {
-      "label": "review toggle back",
+      "label": "review switch back",
       "ok": true
     },
     {

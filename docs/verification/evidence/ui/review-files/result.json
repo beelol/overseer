@@ -1,11 +1,14 @@
 {
   "checks": [
     {
-      "name": "the navigator starts on Changes only while the agent has changes, with the status and counts beside the changed file",
+      "name": "in Diffs only the list is Changed: the changed file, with its status and counts",
       "ok": true,
-      "detail": [
-        "a.txt"
-      ]
+      "detail": {
+        "listName": "Changed",
+        "changesTree": [
+          "a.txt"
+        ]
+      }
     },
     {
       "name": "the changed file is edited and saved from the review",
@@ -25,9 +28,10 @@
       ]
     },
     {
-      "name": "All files lists the worktree top level (folders first, .git left out) and keeps the changed file marked",
+      "name": "in Follow the list is All files: the worktree top level (folders first, .git left out), the changed file still marked",
       "ok": true,
       "detail": {
+        "list": "All files",
         "folders": [
           "src"
         ],
@@ -41,34 +45,43 @@
       }
     },
     {
-      "name": "Changed shows just the changed files again",
+      "name": "back in Diffs only, Changed shows just the changed files again",
       "ok": true,
       "detail": [
         "a.txt"
       ]
     },
     {
-      "name": "a nested unchanged file picked in All files opens as the real file in an editor, the agent in Follow and its review closed",
+      "name": "a nested unchanged file picked in All files shows in the review's middle (selected in the list, \"Follow the agent\" to go back); no VS Code editor or tab opens and the review stays",
       "ok": true,
       "detail": {
-        "active": "nested.txt, Editor Group 1",
-        "review": false,
-        "firstLines": [
-          "nested 1",
-          "nested 2"
-        ]
+        "shown": {
+          "path": "src/deep/nested.txt",
+          "source": "user",
+          "state": "shown",
+          "active": "src/deep/nested.txt",
+          "text": "nested 1\nnested 2\nnested 3\nnested 4\nnested 5\nnested 6\nnested 7\nnested 8\nnested 9\nnested 10\nnested 11\nnested 12\nnested 13\nnested 14\nnested 15\nnested 16\nnested 17\nnested 18\nnested 19\nnested 20\nnested 21",
+          "again": true
+        },
+        "work": {
+          "tabs": [
+            "Review: Files demo (1), Editor Group 1",
+            "Overseer, Editor Group 2"
+          ],
+          "editors": 0
+        }
       }
     },
     {
-      "name": "on a 10,000-file worktree the navigator's first level shows in under 500 ms",
+      "name": "on a 10,000-file worktree Follow's All files shows its first level in under 500 ms",
       "ok": true,
       "detail": {
-        "ms": 3,
+        "ms": 7,
         "folders": 100
       }
     }
   ],
   "timings": {
-    "firstLevel10k": 3
+    "firstLevel10k": 7
   }
 }
