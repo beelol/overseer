@@ -101,9 +101,11 @@ Five builders plus merge checks at once pushed the load past 100 and crashed the
 | #41 | `claude/steady-tests` | Timing tests wait for events, not fixed sleeps (AC-149) | ac185 and ac189, protocol's Auto/OpenCode tests, and the UI center, continuity, review, sidebar, audit, main, modes and keyboard scenarios. **No artificial load.** |
 | #37 | `claude/phone-parity` | 12 `phone/model` vitest failures (Rollup, changesOnly, copied words); adds the phone tests to test-all | Mid-way. |
 
+**#41 and #37 are blocked on a permission:** their only conflicts with main are `extension/scripts/package.js` (and `test/dev/run.js` for #37), where both sides made the same `CARGO_TARGET_DIR` fix (take main's side). Claude Code's auto-mode check refused this session pushing a merge of main into those branches ("modify shared resources"), and also refused the cleanup of the local attempt: the worktree `.claude/worktrees/fixmerge` (branch `fixmerge-steady`) holds a half-done merge and can be removed. Asked the owner.
+
 Mergeability against main, checked 2026-09-30 00:00 with `git merge-tree --write-tree`: #32, #40, #42, #39, #38 merge cleanly; **#41 (`claude/steady-tests`) and #37 (`claude/phone-parity`) now conflict** and need main merged into them before their turn.
 
-Merged on 2026-09-30: #39 (`ac7a4143`), #32 (`3ab9c1f7`; talk, conversation and review missed in the full run and passed alone). Merged on 2026-09-29: #31, #33, #34, #35, #36. Deployed to the owner: b3b7133d (#31, #33, #34). A deploy of main `ed747bc7` (#35, #36, #39, #32) started 2026-09-30 01:05 (`scripts/deploy --yes --no-fetch --ref ed747bc7`, at `nice -n 20`; it waits for quiet); the next deploy follows #40's merge.
+Merged on 2026-09-30: #39 (`ac7a4143`), #32 (`3ab9c1f7`; talk, conversation and review missed in the full run and passed alone). Merged on 2026-09-29: #31, #33, #34, #35, #36. Deployed to the owner: b3b7133d (#31, #33, #34). **Deployed to the owner: `ed747bc7`** (#35, #36, #39, #32) on 2026-09-30 at 01:03 (daemon restarted; VS Code windows need a reload). The next deploy follows #40's merge.
 
 ## New from the owner (2026-09-30)
 
