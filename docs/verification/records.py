@@ -1817,10 +1817,10 @@ rec(178, "The phone app uses the owner's mark", "not started", date="—", commi
     actual="Not started.", live="—", blocker="Not started: the phone app's agent (Gate N) replaces its placeholder marks with the owner's files in docs/design/brand/.")
 rec(179, "The Mac surfaces use the owner's mark", "partial", commit="8653510", date="2026-09-27", harness="none (the packaged VSIX and the helper's build)",
     proven="the notification helper's `.icns` is built from `docs/design/brand/exports/overseer-app-icon-macos-1024.png` by `extension/notifier/build.js` (sips for every macOS size, iconutil); the brand scenario unpacks the installed helper's icon and finds every size, the owner's violet tile (`node test/ui/scenario-brand.js`); Overseer has no menu-bar item and no other Mac app, so those parts do not apply yet",
-    deferred="a screenshot of a real notification banner and of the helper in Finder: macOS asks the owner to allow the helper's notifications, and screenshots of the desktop need the owner's screen-recording permission; the menu-bar image when a menu-bar item exists",
+    deferred="a screenshot of a real notification banner and of the helper in Finder: macOS asks the owner to allow the helper's notifications, and screenshots of the desktop need the owner's screen-recording permission",
     expected="See the RFC criterion (Brand) and [docs/design/brand.md](../design/brand.md).",
     actual="See proven and deferred.",
-    evidence="[helper icon as installed](evidence/ui/brand/notifier-app-icon.png), [brand scenario](evidence/ui/brand/)", live="—",
+    evidence="[helper icon as installed](evidence/ui/brand/notifier-app-icon.png), [brand scenario](evidence/ui/brand/), [the menu-bar item with the flat mark as a template image, light and dark](evidence/ui/menubar/) (AC-262, pull request #42, merged as 86e993fd)", live="—",
     blocker="Owner: run Overseer: Test Notification in VS Code, allow notifications when macOS asks, and screenshot the banner and the helper (Overseer Notifier) in Finder.")
 
 # Gate O, Audio Mode (added by the owner on 2026-09-26; docs/rfcs/audio-mode.md). The daemon and VS Code came with pull
@@ -2763,7 +2763,7 @@ rec(261, "One Sign In, clearly Overseer's or clearly not", "verified", commit="b
     evidence="[one-signin scenario](evidence/ui/one-signin/) (three screenshots, result.json)",
     live="Fixtures only.", limits="VS Code's own Accounts icon in the activity bar stays (it is VS Code's menu, not a Sign In control).")
 
-rec(262, "Overseer in the Mac's menu bar", "verified", date="2026-09-30", commit="b1dc6da8 (branch claude/menu-bar, pull request #42, not merged yet)",
+rec(262, "Overseer in the Mac's menu bar", "verified", date="2026-09-30", commit="86e993fd (pull request #42, merged 2026-09-30)",
     harness="The Claude fixture's menubar mode (\"ask:\", \"busy:\", \"fail\" in the prompt) behind a dev daemon (scripts/dev); SYNTHETIC accounts (a fixture-account.json per profile); no paid turns",
     proven="the owner's yes on the mockup (pull request #39, 2026-09-29, through the coordinating session); the daemon side of every menu state and answer; on screen (2026-09-30, with nobody at the Mac): every state of the Verify clause captured from the real NSMenu in light and dark, the answers pressed in the menu reaching the fixture agents, an agent chosen opening in a test VS Code, and the stopped daemon with Start Overseer",
     steps="""1. Mockup: `docs/design/menu-bar/index.html` on pull request #39, with the owner's answers (violet dot, four requests then \"N more waiting\", Always allow under Allow once's arrow, Quit, the dev item's \"!\").
