@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { record, store, text } from '@/model';
+import { agents, record, store, text } from '@/model';
 import type { Harness, KnownRepo } from '@/protocol';
 import { useSession, useSessionValue } from '@/session';
 
@@ -14,7 +14,7 @@ type PhoneState = store.PhoneState;
 type Offered = {
   repos: { root: string; name: string; branch: string | null }[];
   harnesses: { harness: string; version: string | null; capabilities: Record<string, string> }[];
-  accounts: { id: string; name: string; harnesses: string[]; signedIn: boolean | null; plan: string | null }[];
+  accounts: { id: string; name: string; harnesses: string[]; signedIn: boolean | null; plan: string | null; email?: string | null }[];
 };
 
 /** What the New agent form keeps on the phone between launches (`keyValue.scope('new')`). */
@@ -56,7 +56,11 @@ function accountsOf(list: readonly unknown[]): Offered['accounts'] {
     const id = words(account['id']);
     if (id === null) continue;
     const harnesses = Array.isArray(account['harnesses']) ? account['harnesses'].filter((h): h is string => typeof h === 'string') : [];
-    out.push({ id, name: words(account['name']) ?? id, harnesses, signedIn: null, plan: null });
+    // The Mac's own login is "Mac's default login"; the plan and the shortened email say which account it is (AC-235).
+    const shown = record(account['account']);
+    const own = words(account['name']) ?? id;
+    const name = account['kind'] === 'follows-app' || / \(existing login\)$/.test(own) ? agents.DEFAULT_LOGIN : own;
+    out.push({ id, name, harnesses, signedIn: null, plan: words(shown['plan']), email: words(shown['email']) });
   }
   return out;
 }
@@ -76,7 +80,7 @@ function fromState(state: PhoneState): Offered {
     if (!run || run.parent_run_id || MAC_ONLY.has(run.harness) || harnesses.some((h) => h.harness === run.harness)) continue;
     harnesses.push({ harness: run.harness, version: words(run.harness_version), capabilities: capabilitiesOf(run.capabilities) });
   }
-  const accounts = store.rows(state.profiles).map((profile) => ({ id: profile.id, name: profile.name, harnesses: [profile.harness], signedIn: null, plan: null }));
+  const accounts = store.rows(state.profiles).map((profile) => ({ id: profile.id, name: agents.accountName(profile), harnesses: [profile.harness], signedIn: null, plan: profile.account?.plan ?? null, email: profile.account?.email ?? null }));
   return { repos, harnesses, accounts };
 }
 
@@ -128,7 +132,7 @@ export function useChoices(enabled: boolean): Offer {
       setOffered(next);
       const states = await Promise.all(next.accounts.map((account) => session.request('profile.status', { id: account.id }).then((status) => ({ signedIn: status.logged_in, plan: words(record(status.identity)['plan']) }), () => null)));
       if (!current) return;
-      next = { ...next, accounts: next.accounts.map((account, at) => ({ ...account, ...(states[at] ?? {}) })) };
+      next = { ...next, accounts: next.accounts.map((account, at) => { const read = states[at]; return read ? { ...account, signedIn: read.signedIn, plan: account.plan ?? read.plan } : account; }) };
       setOffered(next);
       writeStored<NewStore, 'offered'>(kept, 'offered', next);
     })();

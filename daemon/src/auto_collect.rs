@@ -499,6 +499,31 @@ fn with_codex_account<T>(
         Instant,
     ) -> Result<T>,
 ) -> Result<T> {
+    with_codex_account_seen(program, env, cwd, timeout, None, operation)
+}
+
+/// The ChatGPT account a Codex profile is signed in to, as Codex's own `account/read` says it
+/// (`email`, `planType`): what every surface shows of it (AC-235). Metadata only, no model turn;
+/// the caller keeps the email shortened and nothing else.
+pub fn codex_account(program: &Path, env: &BTreeMap<String, String>, cwd: &Path, timeout: Duration) -> Result<Value> {
+    let mut seen = Value::Null;
+    with_codex_account_seen(program, env, cwd, timeout, Some(&mut seen), |_, _, _, _| Ok(()))?;
+    Ok(seen)
+}
+
+fn with_codex_account_seen<T>(
+    program: &Path,
+    env: &BTreeMap<String, String>,
+    cwd: &Path,
+    timeout: Duration,
+    seen_account: Option<&mut Value>,
+    operation: impl FnOnce(
+        &mut std::process::ChildStdin,
+        &mut std::process::ChildStdout,
+        &mut Reader,
+        Instant,
+    ) -> Result<T>,
+) -> Result<T> {
     let mut child = Command::new(program)
         .arg("app-server")
         .current_dir(cwd)
@@ -538,6 +563,7 @@ fn with_codex_account<T>(
                 "Codex profile is not signed in with a ChatGPT account"
             ));
         }
+        if let Some(seen) = seen_account { *seen = account["account"].clone(); }
         operation(&mut stdin, &mut stdout, &mut reader, deadline)
     })();
     let _ = child.kill();

@@ -6,7 +6,7 @@ const vscode = require('vscode');
 const { RunFeed, runMessage } = require('./run-feed');
 const { handleRunMessage, changesFetcher } = require('./run-actions');
 const { page, localRoots } = require('./webview-html');
-const { ACTIVE } = require('./views');
+const { ACTIVE, accountLabel, accountShort } = require('./views');
 const Plain = require('../media/plain-words.js');
 
 
@@ -249,7 +249,11 @@ class CommandCenter {
   async push() {
     if (!this.panel) return;
     const { tasks, runs, workspaces, profiles } = this.model.state;
-    const state = { tasks, runs, workspaces, profiles, oversight: this.model.state.oversight || {}, overseer: this.model.state.overseer || {}, accounts: this.handlers.launcher.accounts(), attention: this.handlers.attention(), rollup: this.handlers.rollup?.(), pinned: this.handlers.pinned(),
+    // Overseer's own run is in no list; its account is named in home's head (AC-235).
+    const ovRun = this.model.state.overseer?.run_id && this.model.run(this.model.state.overseer.run_id);
+    const ovProfile = ovRun?.profile_id && this.model.profile(ovRun.profile_id);
+    const overseerAccount = ovProfile ? { label: accountLabel(ovProfile), short: accountShort(ovProfile) } : undefined;
+    const state = { tasks, runs, workspaces, profiles, overseerAccount, oversight: this.model.state.oversight || {}, overseer: this.model.state.overseer || {}, accounts: this.handlers.launcher.accounts(), attention: this.handlers.attention(), rollup: this.handlers.rollup?.(), pinned: this.handlers.pinned(),
       gridMax: Math.max(1, Math.min(16, vscode.workspace.getConfiguration('overseer').get('grid.maxTiles', 6))), archived: this.handlers.archived() };
     await this.panel.webview.postMessage({ type: 'state', state, selected: this.handlers.selected() });
     if (this.chatRun) { const msg = runMessage(this.model, this.chatRun, this.handlers.steering); if (msg) { this.chatFeed.refreshDescendants(); this.panel.webview.postMessage({ type: 'run', channel: 'chat', ...msg }); } }

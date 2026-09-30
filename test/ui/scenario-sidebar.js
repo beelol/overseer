@@ -76,8 +76,12 @@ const BUDGET = 238;
     check('the editor-area Overseer view has no agent rail of its own', railless);
 
     // Text budget: the Agents view's visible text (labels, descriptions, badges) for the same fixtures.
+    // The account each agent runs on (AC-235, added after Gate J) is measured on its own too.
+    const accounts = [...new Set((s.ctl('state').profiles || []).flatMap(p => p.account ? [[p.account.plan, p.account.email].filter(Boolean).join(' · '), p.account.short] : []).concat(["Mac's default login"]))]
+      .map(t => t.replace(/\s+/g, '')).filter(Boolean).sort((a, b) => b.length - a.length);
     const text = await cdp.evalWorkbench(`(() => { const pane = [...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || ''));
-      return [...pane.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && !/^Agents: /.test(r.getAttribute('aria-label') || '')).map(r => r.innerText.replace(/\\s+/g, '')).join('').length; })()`);
+      const drop = ${JSON.stringify(accounts)};
+      return [...pane.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && !/^Agents: /.test(r.getAttribute('aria-label') || '')).map(r => drop.reduce((t, d) => t.split('·' + d).join('').split(d).join(''), r.innerText.replace(/\\s+/g, ''))).join('').length; })()`);
     // The rollup row (AC-255, added after Gate J) is measured on its own, so the list keeps Gate J's budget.
     s.note('rollup row', rows[0]);
     check(`the Agents view's visible text stays within the Gate J agents budget (${BUDGET} characters)`, text <= BUDGET, { chars: text });

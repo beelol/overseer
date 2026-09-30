@@ -229,9 +229,12 @@ fn t16_accounts_panel_and_sign_in_from_the_terminal() {
     tui.key(KeyCode::Char('A'));
     assert_eq!(tui.app.mode, Mode::Accounts);
     tui.until(10, |a| a.accounts.len() >= 3 && a.accounts.iter().all(|x| x.status.is_some()));
+    // The Mac's default login names its plan and its shortened email (AC-235).
+    tui.until(10, |a| a.state.profile("system-codex").and_then(|p| p.account.as_ref()).is_some_and(|x| x.email.is_some()));
     let s = tui.screen();
     assert!(s.contains("OpenAI / ChatGPT") && s.contains("Anthropic / Claude"), "{s}");
-    assert!(s.contains("Your login") && s.contains("follows app") && s.contains("✓ signed in · pro"), "{s}");
+    assert!(s.contains("Mac's default login") && s.contains("follows app") && s.contains("✓ signed in · Pro · des…@example.invalid"), "{s}");
+    assert!(!s.contains("Your login"), "{s}");
     assert!(s.contains("ChatGPT Work") && s.contains("fixed") && s.contains("✗ not signed in"), "{s}");
     assert!(s.contains("never API keys"), "{s}");
     tui.snapshot("t16-accounts");
@@ -264,4 +267,45 @@ fn t16_accounts_panel_and_sign_in_from_the_terminal() {
     assert_eq!(st["identity"]["plan"], "team", "{st}");
     let desk = d.ctl("profile.status", json!({ "id": "system-codex" }));
     assert_eq!(desk["identity"]["plan"], "pro", "the desktop login is untouched: {desk}");
+}
+
+/// AC-235: every tile names the account its agent runs on — the provider and plan and the
+/// shortened email — for the Mac's default login and for a named account alike.
+#[test]
+fn t27_every_tile_names_its_account() {
+    let t = tempfile::tempdir().unwrap();
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    let claude = root.join("fixtures/fake-harness/claude-fixture.js").display().to_string();
+    let sys = t.path().join("desktop-home");
+    std::fs::create_dir_all(sys.join(".claude")).unwrap();
+    // The fixture's accounts (synthetic): the Mac's default login and a named one.
+    std::fs::write(sys.join(".claude/fixture-account.json"), r#"{"email":"bilal@testbox.com","plan":"max"}"#).unwrap();
+    let sys_s = sys.display().to_string();
+    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &claude), ("OVERSEER_TEST_SYSTEM_HOME", &sys_s), ("CLAUDE_FIXTURE_MODE", "permission"), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE")]);
+    let personal = d.ctl("account.create", json!({ "provider": "anthropic", "name": "Personal" }))["account"].clone();
+    let home = Path::new(personal["home"].as_str().unwrap()).join("claude");
+    std::fs::write(home.join("fixture-account.json"), r#"{"email":"ana.silva@personal.example","plan":"pro"}"#).unwrap();
+    let web = repo(&t.path().join("web-app"));
+    let mac = d.ctl("task.create", json!({ "repo": web, "harness": "claude", "prompt": "Tidy the login page", "title": "Tidy the login page" }))["run"]["id"].as_str().unwrap().to_string();
+    let own = d.ctl("task.create", json!({ "repo": web, "harness": "claude", "prompt": "Write the release notes", "title": "Write the release notes", "profile_id": personal["id"] }))["run"]["id"].as_str().unwrap().to_string();
+    d.wait_status(&mac, |s| s == "waiting_for_user", 20);
+    d.wait_status(&own, |s| s == "waiting_for_user", 20);
+
+    let mut tui = Tui::attach(&d, 200, 50);
+    // The TUI reads each account's login once, as VS Code does; the tiles follow.
+    tui.until(15, |a| a.state.profiles.iter().filter(|p| p.account.as_ref().is_some_and(|x| x.email.is_some())).count() >= 2);
+    tui.pump(300);
+    let s = tui.screen();
+    assert!(s.contains("Claude Max · bil…@testbox.com"), "the default login's tile:\n{s}");
+    assert!(s.contains("Claude Pro · ana…@personal.example"), "the named account's tile:\n{s}");
+    assert!(!s.contains("Your login") && !s.contains("existing login"), "{s}");
+    let labels: Vec<String> = [&mac, &own].iter().map(|id| {
+        let run = tui.app.state.run(id).unwrap().clone();
+        tui.app.state.profile(run.profile_id.as_deref().unwrap()).unwrap().label()
+    }).collect();
+    assert_eq!(labels, ["Claude Max · bil…@testbox.com · Mac's default login", "Claude Pro · ana…@personal.example · Personal"]);
+    tui.snapshot("t27-accounts-on-tiles");
+    for id in [&mac, &own] {
+        d.ctl("run.interrupt", json!({ "run_id": id }));
+    }
 }

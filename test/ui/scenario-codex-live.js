@@ -46,7 +46,7 @@ async function sendFollowUp(s, output, text) {
     await cdp.command('Overseer: Start an Agent with Quick Picks');
     await cdp.pick('New agent: repository');
     await cdp.pick('New agent: harness', 'Codex');
-    await cdp.pick('New agent: account for', 'Your login');
+    await cdp.pick('New agent: account for', "Mac's default login");
     if (dry) {
       const b = await cdp.waitFor(`(() => { const b = [...document.querySelectorAll('.notification-toast .monaco-button')].find(b => b.textContent.includes('Launch anyway')); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`, 10000);
       await cdp.click(b.x, b.y);

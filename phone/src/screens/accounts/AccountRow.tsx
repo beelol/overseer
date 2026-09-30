@@ -99,7 +99,7 @@ export const AccountRow = memo(function AccountRow({
   onSignIn,
 }: AccountRowProps) {
   const styles = useStyles();
-  const state = stateText(status, usage, checking);
+  const state = stateText(status, usage, checking, account);
   const signedOut = status !== undefined && status.installed && !status.signedIn;
   const signedIn = status?.signedIn === true;
   const withCode = hasCode(account);

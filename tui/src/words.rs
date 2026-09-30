@@ -2,9 +2,12 @@
 //! internal id, snake_case state, lowercase harness id or raw error text; and Overseer's Markdown
 //! drawn as a terminal can (bullets, bold, headings, code without its marks).
 
-/// An account as VS Code names it: the machine's own login is "Your login", not "claude (existing login)".
+/// What the Mac's own login is called, as VS Code calls it (AC-235).
+pub const DEFAULT_LOGIN: &str = "Mac's default login";
+
+/// An account as VS Code names it: the Mac's own login is "Mac's default login", not "claude (existing login)".
 pub fn account(name: &str) -> String {
-    if name.ends_with(" (existing login)") { "Your login".into() } else { name.to_string() }
+    if name.ends_with(" (existing login)") { DEFAULT_LOGIN.into() } else { name.to_string() }
 }
 
 /// A harness by name: "Claude Code", never "claude".

@@ -23,6 +23,8 @@
     const wrap = el('section', 'home'); wrap.setAttribute('aria-label', 'Conversation with Overseer'); wrap.id = 'home';
     const head = el('header', 'home-head');
     head.append(ui.mark('sm'), el('span', 'home-title', 'Overseer'));
+    // The account Overseer's own run uses (AC-235), named like every agent's.
+    const account = el('span', 'home-account ellipsis'); account.id = 'home-account'; account.hidden = true;
     const level = el('span', 'home-level'); level.id = 'home-level';
     const fresh = el('button', 'link', 'Start fresh'); fresh.type = 'button'; fresh.id = 'home-fresh'; fresh.title = 'Archive this conversation and begin a new one (holds, guardrails, areas, conflicts and watches stay)';
     fresh.addEventListener('click', () => post({ type: 'overseerFresh' }));
@@ -54,7 +56,7 @@
     const backLabel = el('span', 'home-back-agent-label');
     backAgent.append(ui.icon('eye', 'sm'), el('span', 'home-back-agent-verb', 'Back to'), backLabel, el('kbd', null, '⌥⌘U'));
     backAgent.addEventListener('click', () => post({ type: 'backToAgent', runId: backAgent.dataset.run }));
-    head.append(vToggle, vstrip, el('span', 'spacer'), needs, level, fresh, unaside);
+    head.append(account, vToggle, vstrip, el('span', 'spacer'), needs, level, fresh, unaside);
     // The voice view's stage: the mark, the words heard and said, and the strip's controls.
     const stage = el('section', 'home-stage'); stage.id = 'voice-stage'; stage.hidden = true; stage.setAttribute('aria-label', 'Voice Mode');
     const voiceStage = window.OverseerVoiceStage && layers ? window.OverseerVoiceStage.create(stage, { post, layers }) : null;
@@ -118,7 +120,13 @@
       if (kind === 'answer') detail.push(`Question: ${c.question}`);
       if (kind === 'done') { if (c.done) detail.push(c.done); if (c.left_out) detail.push(`Left out: ${c.left_out}`); }
       if (kind === 'finding') { detail.push(`${c.result}${c.held ? ' · held at once' : ''}${c.snapshot ? ' · snapshot ' + String(c.snapshot).slice(0, 8) : ''}`); }
-      if (kind === 'started') { if (c.prompt) detail.push(ui.firstLine(c.prompt, 160)); }
+      if (kind === 'started') {
+        // Which account the new agent runs on (AC-235).
+        const run = (getState().runs || []).find(x => x.id === c.agent);
+        const p = run && run.profile_id && (getState().profiles || []).find(x => x.id === run.profile_id);
+        if (p) detail.push((p.account && p.account.short) || p.name);
+        if (c.prompt) detail.push(ui.firstLine(c.prompt, 160));
+      }
       if (kind === 'cannot_answer' && c.reason) detail.push(plain(c.reason));
       if (detail.length) r.append(el('div', 'card-detail', detail.join(' · ')));
       const agent = c.agent || c.run_id;
@@ -341,6 +349,13 @@
       document.body.dataset.conversation = empty ? '' : '1';
     }
 
+    function renderAccount() {
+      const a = getState().overseerAccount;
+      account.hidden = !a;
+      account.textContent = a ? a.short : '';
+      if (a) { account.title = `Overseer runs on ${a.label}`; account.setAttribute('aria-label', account.title); }
+    }
+
     // ---------- Needs you (AC-227): the badge, its short list, a click focuses the agent.
     function needsList() { return (getState().attention || []).filter(a => a.run_id); }
     function renderNeeds() {
@@ -445,7 +460,7 @@
       /** What each agent is doing right now (its last tool or words), for the working stage. */
       activity(map) { activity = map || {}; renderStages(); },
       /** The daemon's state changed (runs, Needs you). */
-      state() { renderNeeds(); renderStages(); },
+      state() { renderNeeds(); renderStages(); renderAccount(); },
       plain,
     };
   }

@@ -117,7 +117,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     };
     match shown {
         Mode::Help => help(f, area),
-        Mode::NewAgent => new_agent(f, &app.form, area),
+        Mode::NewAgent => new_agent(f, &app.form, &app.state, area),
         Mode::Accounts => accounts(f, app, area),
         Mode::Devices => devices(f, app, Rect { y: head.y, height: head.height + body.height, ..area }),
         Mode::Pairing => pairing(f, app, Rect { y: head.y, height: head.height + body.height, ..area }),
@@ -343,13 +343,14 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     let focused = app.focus.as_deref() == Some(run.id.as_str());
     let (glyph, color) = status_mark(&run.status);
     let border = if focused { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else { Style::new().fg(MUTED) };
-    let account = run.profile_id.as_deref().and_then(|p| app.state.profile(p)).map(|p| if p.name.ends_with(" (existing login)") { String::new() } else { p.name.clone() }).unwrap_or_default();
+    // The account it runs on (AC-235): provider and plan, the shortened email; on the bottom
+    // border, so the title keeps its room.
+    let profile = run.profile_id.as_deref().and_then(|p| app.state.profile(p));
+    let account = profile.map(|p| p.short()).unwrap_or_default();
+    // Where the whole of it does not fit, the email alone still says which account.
+    let email = profile.and_then(|p| p.account.as_ref()).and_then(|a| a.email.clone()).unwrap_or_default();
     let harness = crate::words::harness(&run.harness);
     let mut meta = vec![harness.clone()];
-    // The desktop login is implied; name other accounts.
-    if !account.is_empty() && account != harness && account != run.harness.replace("codex-app", "codex") {
-        meta.push(account);
-    }
     if let Some(m) = run.model.as_deref().filter(|m| !m.is_empty()) {
         meta.push(m.to_string());
     }
@@ -388,8 +389,12 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     } else {
         feed.filter(|f| f.tokens_in + f.tokens_out > 0).map(|f| Line::from(Span::styled(format!(" {} in / {} out ", compact(f.tokens_in), compact(f.tokens_out)), Style::new().fg(MUTED))))
     };
+    let used = bottom.as_ref().map(|b| b.width()).unwrap_or(0);
     if let Some(b) = bottom {
         block = block.title_bottom(b);
+    }
+    if let Some(said) = [&account, &email].into_iter().find(|a| !a.is_empty() && (area.width as usize) >= used + a.width() + 6) {
+        block = block.title_bottom(Line::from(Span::styled(format!(" {said} "), Style::new().fg(MUTED))).right_aligned());
     }
     let inner = block.inner(area);
     f.render_widget(Clear, area);
@@ -586,10 +591,12 @@ fn accounts(f: &mut Frame, app: &App, area: Rect) {
         let sel = i == app.account_sel;
         let st = a.status.as_ref();
         let signed = st.and_then(|s| s["logged_in"].as_bool());
-        let plan = st.and_then(|s| s["identity"]["plan"].as_str()).unwrap_or_default();
-        let fp = st.and_then(|s| s["identity"]["account_fingerprint"].as_str().or(s["identity"]["fingerprint"].as_str())).map(|f| f.chars().take(8).collect::<String>()).unwrap_or_default();
+        // The plan and the shortened email say which account it is (AC-235); the fingerprint until the email is known.
+        let shown = app.state.profile(&a.id).and_then(|p| p.account.clone()).unwrap_or_default();
+        let plan = shown.plan.clone().or_else(|| st.and_then(|s| s["identity"]["plan"].as_str()).map(str::to_string)).unwrap_or_default();
+        let fp = shown.email.clone().unwrap_or_else(|| st.and_then(|s| s["identity"]["account_fingerprint"].as_str().or(s["identity"]["fingerprint"].as_str())).map(|f| f.chars().take(8).collect::<String>()).unwrap_or_default());
         let (mark, color, text) = match signed {
-            Some(true) => ("✓", Color::Green, [Some("signed in"), (!plan.is_empty()).then_some(plan), (!fp.is_empty()).then_some(fp.as_str())].into_iter().flatten().collect::<Vec<_>>().join(" · ")),
+            Some(true) => ("✓", Color::Green, [Some("signed in"), (!plan.is_empty()).then_some(plan.as_str()), (!fp.is_empty()).then_some(fp.as_str())].into_iter().flatten().collect::<Vec<_>>().join(" · ")),
             Some(false) => ("✗", Color::Red, "not signed in".to_string()),
             None => ("…", MUTED, "checking".to_string()),
         };
@@ -824,7 +831,7 @@ fn audio_import(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }).block(block), r);
 }
 
-fn new_agent(f: &mut Frame, form: &NewAgentForm, area: Rect) {
+fn new_agent(f: &mut Frame, form: &NewAgentForm, state: &crate::model::State, area: Rect) {
     let w = 84.min(area.width.saturating_sub(4));
     let prompt_lines = form.prompt.split('\n').count().clamp(1, 6) as u16;
     let h = (11 + prompt_lines).min(area.height.saturating_sub(2));
@@ -843,7 +850,8 @@ fn new_agent(f: &mut Frame, form: &NewAgentForm, area: Rect) {
     let harnesses: Vec<String> = form.harnesses.iter().map(|h| if h.2.is_empty() { crate::words::harness(&h.0) } else { format!("{} {}", crate::words::harness(&h.0), h.2) }).collect();
     let accounts: Vec<String> = form.compatible().iter().map(|&i| {
         let a = &form.accounts[i];
-        format!("{}{}", crate::words::account(&a.1), match a.3 { Some(true) => "  ✓ signed in", Some(false) => "  ✗ not signed in", None => "" })
+        let email = state.profile(&a.0).and_then(|p| p.account.as_ref()).and_then(|x| x.email.clone()).map(|e| format!(" · {e}")).unwrap_or_default();
+        format!("{}{email}{}", crate::words::account(&a.1), match a.3 { Some(true) => "  ✓ signed in", Some(false) => "  ✗ not signed in", None => "" })
     }).collect();
     let values: Vec<(String, String)> = vec![
         ("Repository".into(), choice(repos, form.repo)),

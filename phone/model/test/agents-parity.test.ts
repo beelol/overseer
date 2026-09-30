@@ -190,7 +190,7 @@ describe('agents list parity with VS Code', () => {
   it('gives the head of a conversation', () => {
     const s = load(state);
     const waiting = runHeader(s, String(nine.marks['waiting']));
-    expect(waiting).toMatchObject({ title: 'Write the permissions file', statusText: 'Needs you', statusIcon: 'shield', logo: 'claudecode', account: 'claude (existing login)', branch: 'write-the-permissions-file', branchIcon: 'git-branch', canSend: true, canStop: true, placeholder: 'Message for when it finishes', child: false, active: true });
+    expect(waiting).toMatchObject({ title: 'Write the permissions file', statusText: 'Needs you', statusIcon: 'shield', logo: 'claudecode', account: "Mac's default login", accountShort: "Mac's default login", branch: 'write-the-permissions-file', branchIcon: 'git-branch', canSend: true, canStop: true, placeholder: 'Message for when it finishes', child: false, active: true });
     const done = runHeader(s, String(nine.marks['showcase']));
     expect(done).toMatchObject({ statusText: 'Done', statusIcon: 'check', model: 'fixture-large', canStop: false, placeholder: 'Reply…  (@ to mention a file)', exitReason: null });
     const failed = runHeader(s, String(nine.marks['auth']));

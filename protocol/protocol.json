@@ -74,13 +74,23 @@
       "ended_ms": "number?",
       "status": "string"
     },
+    "Account": {
+      "provider": "string",
+      "plan": "string?",
+      "email": "string?",
+      "default": "boolean",
+      "name": "string",
+      "label": "string",
+      "short": "string"
+    },
     "Profile": {
       "id": "string",
       "name": "string",
       "harness": "string",
       "home": "string?",
       "is_system": "boolean",
-      "created_ms": "number"
+      "created_ms": "number",
+      "account": "Account?"
     },
     "Event": {
       "seq": "number",

@@ -15,8 +15,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
   const result = { checks: [] };
   const check = (name, ok, detail) => { result.checks.push({ name, ok: !!ok, detail }); s.note(`${ok ? 'PASS' : 'FAIL'} ${name}`, detail); };
   const cli = path.join(repoRoot, 'fixtures/fake-harness/account-cli.js');
-  // Signed-in accounts show their plan and identity fingerprint ("team · c4a1579f").
-  const SIGNED_IN = /[0-9a-f]{8}/;
+  // Signed-in accounts show their plan and their shortened email ("Team · wor…@example.invalid", AC-235).
+  const SIGNED_IN = /…?@example\.invalid/;
   const sys = path.join(s.root, 'desktop-home');
   const next = path.join(s.root, 'next-login');
   fs.mkdirSync(sys, { recursive: true });
@@ -33,7 +33,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
     await s.openOverseerView();
     const rows = () => cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.closest('[id="workbench.view.extension.overseer"], .pane-body')).map(r => r.getAttribute('aria-label') || r.textContent)`);
-    // An account row by name, optionally within a provider group (both machine logins read "Your login").
+    // An account row by name, optionally within a provider group (both machine logins read "Mac's default login").
     const accountRow = (name, group) => cdp.evalWorkbench(`(() => { const rows = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent); let g = ''; for (const r of rows) { const l = (r.querySelector('.label-name')?.textContent || '').trim(); if (r.getAttribute('aria-level') === '1') g = l; else if (l === ${JSON.stringify(name)} && (!${JSON.stringify(group || '')} || g === ${JSON.stringify(group || '')})) return r.querySelector('.label-description')?.textContent || ''; } return null; })()`);
     const refresh = async () => { await cdp.command('Overseer: Refresh Account Status'); await delay(2500); };
     // The sign-in terminal runs asynchronously; refresh until the account shows the expected state.
@@ -93,7 +93,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await cdp.type('device code'); await delay(300); await cdp.key('Enter');
     const work1 = await refreshUntil('Work ChatGPT', SIGNED_IN);
     const term1 = await cdp.evalWorkbench(`[...document.querySelectorAll('.xterm-rows, .terminal-wrapper')].map(e => e.innerText).join('\\n')`);
-    check('OpenAI account added and signed in via the device-code flow (browser flow also offered)', methods.some(m => /browser/.test(m)) && methods.some(m => /device code/.test(m)) && /^team · [0-9a-f]{8}/.test(work1 || ''), { methods, work1, terminal: term1.slice(0, 200) });
+    check('OpenAI account added and signed in via the device-code flow (browser flow also offered)', methods.some(m => /browser/.test(m)) && methods.some(m => /device code/.test(m)) && /^Team · wor…@example\.invalid/.test(work1 || ''), { methods, work1, terminal: term1.slice(0, 200) });
     // Anthropic account through the UI.
     fs.writeFileSync(next, 'claudia:max');
     await cdp.command('Overseer: Add Account');
@@ -101,9 +101,9 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await cdp.input('Name for the Anthropic', 'Claude fixed');
     await toastButton('/Created Claude fixed/', 'Sign In');
     const claude1 = await refreshUntil('Claude fixed', SIGNED_IN);
-    check('Anthropic account added and signed in through its own flow', /^max · [0-9a-f]{8}/.test(claude1 || ''), claude1);
-    const desk1 = await accountRow('Your login', 'ChatGPT');
-    check('desktop logins are labeled as following the app; fixed accounts are not', /· desktop$/.test(desk1 || '') && /· desktop$/.test(await accountRow('Your login', 'Claude') || '') && !/· desktop$/.test(work1 || ''), { desk1, work1 });
+    check('Anthropic account added and signed in through its own flow', /^Max · cla…@example\.invalid/.test(claude1 || ''), claude1);
+    const desk1 = await accountRow("Mac's default login", 'ChatGPT');
+    check('desktop logins are labeled as following the app; fixed accounts are not', /· desktop$/.test(desk1 || '') && /· desktop$/.test(await accountRow("Mac's default login", 'Claude') || '') && !/· desktop$/.test(work1 || ''), { desk1, work1 });
     await s.screenshot('accounts-by-provider');
 
     // New Task offers only compatible accounts.
@@ -120,15 +120,15 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     };
     const codexChoices = await accountChoices('Codex');
     const claudeChoices = await accountChoices('Claude Code');
-    check('New Task offers only compatible accounts per harness', codexChoices.some(r => r.includes('Work ChatGPT')) && codexChoices.some(r => r.includes('Your login')) && !codexChoices.some(r => /Claude fixed|claude \(existing/.test(r)) &&
+    check('New Task offers only compatible accounts per harness', codexChoices.some(r => r.includes('Work ChatGPT')) && codexChoices.some(r => r.includes("Mac's default login")) && !codexChoices.some(r => /Claude fixed|claude \(existing/.test(r)) &&
       claudeChoices.some(r => r.includes('Claude fixed')) && !claudeChoices.some(r => /Work ChatGPT|codex/.test(r)), { codexChoices, claudeChoices });
 
     // The desktop app switches accounts: the linked account follows, the fixed one does not.
     desktopLogin('desk2:plus', 'codex');
     await refresh();
-    const desk2 = await accountRow('Your login', 'ChatGPT');
+    const desk2 = await accountRow("Mac's default login", 'ChatGPT');
     const work2 = await accountRow('Work ChatGPT');
-    check('switching the desktop app account changes only the desktop-linked account', desk2 !== desk1 && /plus/.test(desk2) && work2 === work1, { desk1, desk2, work1, work2 });
+    check('switching the desktop app account changes only the desktop-linked account', desk2 !== desk1 && /Plus/.test(desk2) && work2 === work1, { desk1, desk2, work1, work2 });
 
     // Sign out and re-sign-in affect only that account.
     await contextMenu('Work ChatGPT', 'Sign Out');
@@ -138,21 +138,21 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     // A signed-out account's menu offers Sign In, not Sign Out.
     const outMenu = await menuEntries('Work ChatGPT');
     check('a signed-out account offers Sign In, not Sign Out', outMenu.some(e => e.startsWith('Sign In')) && !outMenu.some(e => e.startsWith('Sign Out')), outMenu);
-    const othersAfterOut = [await accountRow('Claude fixed'), await accountRow('Your login', 'ChatGPT')];
+    const othersAfterOut = [await accountRow('Claude fixed'), await accountRow("Mac's default login", 'ChatGPT')];
     fs.writeFileSync(next, 'work-again:plus');
     await cdp.command('Overseer: Sign In');
     await cdp.pick('', 'Work ChatGPT');
     await cdp.pick('Sign in Work ChatGPT', 'browser');
     const resigned = await refreshUntil('Work ChatGPT', SIGNED_IN);
-    check('sign-out and re-sign-in affect only that account', /signed out/.test(signedOut || '') && othersAfterOut[0] === claude1 && othersAfterOut[1] === desk2 && /^plus · [0-9a-f]{8}/.test(resigned || '') && resigned !== work1 &&
-      (await accountRow('Claude fixed')) === claude1 && (await accountRow('Your login', 'ChatGPT')) === desk2, { signedOut, resigned, othersAfterOut });
+    check('sign-out and re-sign-in affect only that account', /signed out/.test(signedOut || '') && othersAfterOut[0] === claude1 && othersAfterOut[1] === desk2 && /^Plus · wor…@example\.invalid/.test(resigned || '') && resigned !== work1 &&
+      (await accountRow('Claude fixed')) === claude1 && (await accountRow("Mac's default login", 'ChatGPT')) === desk2, { signedOut, resigned, othersAfterOut });
 
     // Removal affects only that account.
     await contextMenu('Claude fixed', 'Remove Account');
     const removeText = await dialog('Remove Account');
     await delay(1500);
     const afterRemove = await rows();
-    check('removing an account deletes only it (desktop logins stay; others unchanged)', !afterRemove.some(r => /Claude fixed/.test(r)) && (await accountRow('Work ChatGPT')) === resigned && (await accountRow('Your login', 'Claude')) && fs.existsSync(path.join(sys, '.claude/.fixture-login.json')) && fs.existsSync(path.join(sys, '.codex/auth.json')),
+    check('removing an account deletes only it (desktop logins stay; others unchanged)', !afterRemove.some(r => /Claude fixed/.test(r)) && (await accountRow('Work ChatGPT')) === resigned && (await accountRow("Mac's default login", 'Claude')) && fs.existsSync(path.join(sys, '.claude/.fixture-login.json')) && fs.existsSync(path.join(sys, '.codex/auth.json')),
       { removeText: removeText.slice(0, 200), afterRemove });
     await s.screenshot('after-remove');
 
