@@ -232,7 +232,7 @@ T-23 and T-24 came with pull request #6 (code at 47312f3, merged into main as ea
 
 Status: proposed on 2026-09-30 from the owner's request: "a tui that does pretty much everything
 the same way" as Overseer in VS Code, "it's just convenient to use the terminal for everything
-else." Criteria T-25 to T-36 below. The owner decided the shape the same day:
+else." Criteria T-25 to T-39 below. The owner decided the shape the same day:
 
 - **The TUI we have stays the base.** Nothing is rebuilt. The main screen is still the pages of
   nine, with an agent list added on the side. Picking an agent in the list shows its
@@ -247,9 +247,15 @@ else." Criteria T-25 to T-36 below. The owner decided the shape the same day:
   the same comparisons, the same file lists and the same Accept and Reject as VS Code, all
   through the daemon, so a change accepted in the terminal shows as accepted in VS Code and on
   the phone.
-- **Editing files is an open question** (see the questions at the end of this section). VS Code's
-  review lets the owner type into the agent's files and "Save your edits". The terminal can do
-  that by handing the file to the owner's own editor, or leave editing to VS Code.
+- **Editing files goes to the owner's own editor** (the owner, 2026-09-30: "E in native editor is
+  probably good for now"). `e` opens the file at that change in `$EDITOR`; that editor shows no
+  diffs and doesn't update live while the agent works, so the review stays the place for both and
+  refreshes when the editor closes (T-39).
+- **The owner's answers (2026-09-30):** way 2, the picked agent's conversation beside the grid; the
+  grid sizes itself to fit how many agents there are, up to 16 on one screen, and pages from the
+  17th (T-37); one key switches between the grid and a single agent's view (T-38); the grid shows
+  top-level agents only for now, and whether to drill down into an agent's sub-agents is left for
+  later.
 
 The preview the owner picks from is
 [docs/design/tui-parity/index.html](../design/tui-parity/index.html): the main screen with the
@@ -296,8 +302,7 @@ agent list, the review screen, and the two numbered ways of showing a picked age
   agent first. Each row shows the status mark, the title (shortened with `…`), the account, and a
   mark for needs you, to review or merged. Each repository's heading shows its counts. `J`/`K` (or
   a click) picks the next or previous agent in the list, and the picked agent's conversation shows
-  as the owner chose from the preview (way 1: in place of the grid; way 2: in a column beside the
-  grid), with the same scrollback and tool details as zoom. Esc returns to the grid on that agent.
+  in a column beside the grid (way 2, the owner's pick), with the same scrollback and tool details as zoom. Esc returns to the grid on that agent.
   `L` hides or shows the list. Search and the filter narrow the list and the grid together. The
   list is shown from 100 columns; narrower terminals keep today's compact layout.
   **Verify:** with 20 fixture agents in 3 repositories, snapshots at 200×60, 140×40 and 100×30
@@ -372,10 +377,26 @@ agent list, the review screen, and the two numbered ways of showing a picked age
   reads the commands in `extension/package.json` and fails when one has no row; `?` lists every key
   the table names.
 
-### Questions for the owner
+- [ ] **T-37 — The grid fits the count.** The grid shows top-level agents only (runs without a
+  parent) and sizes itself to how many there are, up to 16 on one screen (1, 1×2, 2×2, 2×3, 3×3,
+  3×4, 4×4 and the shapes between), narrowing to fit beside the list and a picked agent's
+  conversation; from the 17th agent it pages, 16 per page. Arrow keys follow the shape.
+  **Verify:** snapshots at 200×60 with 1, 4, 7, 12, 16 and 17 fixture agents show the expected
+  shape (the 17th on page 2), with and without the conversation column; sub-agents never get a
+  tile.
+- [ ] **T-38 — One key between the grid and one agent.** A key (`g`, shown in `?`) switches between
+  the grid and the focused agent's full view (its conversation with scrollback and tool details),
+  and back to the grid on the same agent. **Verify:** with 9 fixture agents, focusing the fourth
+  and pressing the key shows its full conversation; pressing it again shows the grid with the
+  fourth focused; the key works from the list and from a tile.
+- [ ] **T-39 — Edit in your own editor.** In the review, `e` suspends the TUI and opens the file at
+  the current change in `$EDITOR` (falling back to `vi`); when the editor exits, the TUI comes back
+  and the review refreshes from the daemon, showing the owner's edits as theirs (not the agent's).
+  **Verify:** with `EDITOR` set to a script that appends a line and exits, `e` on a change returns
+  to the review with that line shown as the owner's edit and the terminal restored (no leftover
+  raw mode or alternate screen).
 
-1. The picked agent's conversation: in place of the grid (way 1) or in a column beside it (way 2)?
-   Both are in the preview.
-2. Editing files from the review: `e` opens the file at that change in your own editor (the one
-   set as `$EDITOR`, for example nvim) and the review refreshes when you close it, or leave editing
-   to VS Code?
+### Open for later
+
+- Drilling into an agent's sub-agents from the grid or the list (the owner, 2026-09-30: "maybe
+  assume all top level for now").
