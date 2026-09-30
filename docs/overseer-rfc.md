@@ -559,13 +559,16 @@ From the owner, 2026-09-29:
     - Choosing an agent opens it in a test VS Code.
     - With the daemon stopped, the item says so and offers to start it.
 - [ ] **AC-263 — The review opens on "Since task start", with the other comparisons one click away.** An agent's review opens on everything since its task started, whether the agent works in its own worktree or in the owner's checkout (the owner, 2026-09-29, over keeping "Latest run" in the owner's checkout). "Latest run" and "Entire worktree" (the branch against the base it started from) are one click away in the review's header, and the header always says which one is shown.
+  - The owner (2026-09-29): the agent's changes are **Accepted** or **Rejected**, per change and per file, never "Keep", "Undo" or "Save". Saving the owner's own typing is a separate "Save your edits", shown only once the owner has typed.
   - **Verify:** packaged-UI checks:
     - a finished agent in its own worktree and one in the current checkout both open on Since task start;
     - one click switches to Latest run and one to Entire worktree, each with the right files and count;
     - the header names the comparison each time;
-    - screenshots of the three.
+    - screenshots of the three;
+    - a change and a whole file accepted and rejected with those words;
+    - "Save your edits" appears only after typing.
 
-- [ ] **AC-264 — One Overseer layout, and it looks like Focus Mode without its side effects.** The owner, 2026-09-29, after comparing Workspace (AC-250) and Focus Mode screenshots: "pic 3 looks best … you want to end up in number 3 always."
+- [x] **AC-264 — One Overseer layout, and it looks like Focus Mode without its side effects.** The owner, 2026-09-29, after comparing Workspace (AC-250) and Focus Mode screenshots: "pic 3 looks best … you want to end up in number 3 always."
   - The layout is:
     - the agents list in the left side bar;
     - the review (Follow or Diffs only, AC-233) wide in the middle;
@@ -576,6 +579,9 @@ From the owner, 2026-09-29:
     - (B) the window reopened on an Overseer workspace file, so the tab-hiding setting is that window's own.
   - One command and key (Workspace, ⌥⌘⇧O) arranges any window into it and restores the owner's own layout when run again. The first launch offers it with one click.
   - Focus Mode is retired: its commands are removed or point to this layout, and its settings are put back.
+  - The left side bar is the hierarchy only: agents by repository, and Accounts (the owner, 2026-09-29).
+    - Searching agents lives in the Agents view's own title bar and type-to-filter, not in a Search section.
+    - There is no separate worktree file tree. The review's file list switches between "Changed" and "All files", and "All files" opens any file in the agent's worktree.
   - **Verify:**
     - Screenshots of A and B side by side for the owner's choice. Then, for the chosen way, packaged-UI checks:
       - a cluttered window becomes the layout in one step;
@@ -584,6 +590,8 @@ From the owner, 2026-09-29:
       - Voice Mode takes over the same panel;
       - running the command again restores the cluttered layout exactly;
       - the first-launch offer appears once.
+      - the side bar shows no Search section and no worktree tree; the Agents view's search filters agents;
+      - the review's "All files" lists the whole worktree and opens a file from it.
     - Screenshots at 1440×900 and 1920×1080 in the three themes.
 ### Gate S — Overseer itself (added by the owner, 2026-09-27)
 
