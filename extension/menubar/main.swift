@@ -437,11 +437,11 @@ final class Controller: NSObject, NSMenuDelegate {
         if m["method"] as? String == "event" { queueRefresh() }
     }
 
-    /// Events come in bursts (a turn's output): one refresh per quarter second at most.
+    /// Events come in bursts (a turn's output): one refresh a second at most, quicker while the menu is open.
     func queueRefresh() {
         if refreshQueued { return }
         refreshQueued = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in self?.refreshQueued = false; self?.refresh() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + (menuOpen ? 0.25 : 1)) { [weak self] in self?.refreshQueued = false; self?.refresh() }
     }
 
     func refresh(_ then: ((Snapshot) -> Void)? = nil) {
