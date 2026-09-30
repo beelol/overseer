@@ -540,15 +540,18 @@ From the friction research of 2026-09-28 ([report](audits/2026-09-28-friction-re
 From the owner, 2026-09-29:
 
 - [ ] **AC-262 — Overseer in the Mac's menu bar.** A menu-bar item with the Overseer silhouette (`docs/design/brand/overseer-icon-flat.png` as a template image, AC-179) runs while the daemon does, with or without VS Code.
-  - The icon carries a dot while an agent needs the owner.
+  - The icon carries a dot (Overseer's violet) while an agent needs the owner.
   - Its menu shows, in order:
-    - every Needs-you item, answerable there (Allow once, Deny);
+    - the Needs-you requests, newest first, at most four, then "N more waiting · Show all in Overseer…"; each answerable there: Allow once, whose arrow holds Always allow (the harness's own session rule), and Deny;
     - a one-line summary ("12 working · 5 to review · 13 idle");
     - one submenu per repository with its count, listing at most 8 agents (most recent first, each with its status and account, AC-235), then "Show all in Overseer…";
     - Voice Mode on/off and mute;
-    - Open Overseer (the workspace layout, AC-250) and Talk to Overseer.
+    - Open Overseer (the workspace layout, AC-250) and Talk to Overseer;
+    - Quit ("Agents keep running").
   - Choosing an agent opens it in VS Code (AC-233).
-  - The owner approves a mockup before the build.
+  - The item is only a display, never a second daemon. The deploy registers it to start at login.
+  - A dev daemon has its own item: the same icon with a "!", its name (`dev-NAME`) in the tooltip and as the menu's first greyed row.
+  - The owner approves a mockup before the build (approved 2026-09-29, with the answers above: violet dot, the cap of four, Always allow under Allow once's arrow, repositories most recent first, zero counts left out of the summary, Quit, the dev item).
   - **Verify:**
     - The owner's yes on the mockup (`docs/design/menu-bar/`), which shows the quiet, needs-you and 30-agents states.
     - Then, against a fixture daemon: screenshots of the item and its menu in those three states, in light and dark menu bars.
