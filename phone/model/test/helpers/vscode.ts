@@ -152,7 +152,11 @@ function walk(p: Page, container: Element, depth: number, turn: string, out: Lin
       out.push({ depth, turn, kind: 'child', icon: icon(sum), run: (el as HTMLElement).dataset['run'], title: text(sum.querySelector('.child-title')), usage: text(sum.querySelector('.child-usage')), status: attr(sum.querySelector('.status'), 'aria-label'), tooltip: attr(sum, 'title') });
       walk(p, el.querySelector(':scope > .child-body') as HTMLElement, depth + 1, turn, out);
     } else if (has(el, 'sys')) {
-      out.push({ depth, turn, kind: 'note', text: text(el), status: [...el.classList].find(c => c.startsWith('status-') && c !== 'status-line')?.slice('status-'.length) ?? null, icon: icon(el), tooltip: attr(el, 'title') });
+      // A link after the words (Continuity's "Open it") is read on its own.
+      const link = el.querySelector(':scope button');
+      const words = el.cloneNode(true) as Element;
+      for (const b of words.querySelectorAll('button')) b.remove();
+      out.push({ depth, turn, kind: 'note', text: text(words), link: link ? text(link) : null, status: [...el.classList].find(c => c.startsWith('status-') && c !== 'status-line')?.slice('status-'.length) ?? null, icon: icon(el), tooltip: attr(el, 'title') });
     } else {
       throw new Error(`the page has something this does not read: <${el.tagName.toLowerCase()} class="${el.className}">`);
     }

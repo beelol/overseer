@@ -73,6 +73,21 @@ export const TEXT = {
     failed: from(VIEWS, '✕'), interrupted: from(VIEWS, '■'), disconnected: from(VIEWS, '✕'), unknown: from(VIEWS, '?'),
   } as Readonly<Record<string, string>>,
 
+  /** What Continuity (Gate L) says in a chat (continuity.js). */
+  continuity: {
+    sendingAgain: from(CONTINUITY, 'The connection is back. Sending your message again.'),
+    continuesElsewhere: from(CONTINUITY, 'The work continues in another agent.'),
+    continuesHere: from(CONTINUITY, 'This agent continues the work of another.'),
+    openIt: from(CONTINUITY, 'Open it'),
+    openFirst: from(CONTINUITY, 'Open the first agent'),
+    lost: from(CONTINUITY, 'The connection was lost; the agent keeps trying to reconnect.'),
+    lostAttempts: shaped(CONTINUITY, '` · ${c.netCount} attempts`', (n: number) => `The connection was lost; the agent keeps trying to reconnect. · ${n} attempts`),
+    stall: from(CONTINUITY, 'No answer while offline. Overseer interrupted the turn; your message is kept.'),
+    memoryValve: from(CONTINUITY, 'The system ran short of memory. Overseer paused this agent and unloaded the model; your message is kept.'),
+    localModel: shaped(CONTINUITY, "k context${bytes}${p.already_loaded ? ', already loaded' : ''}.`", (name: string, k: number, gib: string | null, loaded: boolean) => `Local model **${name}** at a ${k}k context${gib !== null ? ` · ${gib} GiB` : ''}${loaded ? ', already loaded' : ''}.`),
+    kept: shaped(CONTINUITY, '. Your message is kept.`', (why: string) => `${why}. Your message is kept.`),
+  },
+
   /** A harness by name (ui.js HARNESS). */
   harness: {
     claude: from(UI, 'Claude Code'), codex: from(UI, 'Codex'), 'codex-app': from(UI, 'Codex app-server'), opencode: from(UI, 'OpenCode'), generic: from(UI, 'Program'),

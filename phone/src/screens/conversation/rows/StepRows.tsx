@@ -122,11 +122,16 @@ export function Child({ id, row, open }: { readonly id: string; readonly row: co
   const actions = useRowActions();
   const toggle = useCallback(() => actions.toggle(row.key), [actions, row.key]);
   return (
-    <Tap testID={id} accessibilityLabel={`${row.title}, ${row.statusText}`} accessibilityState={{ expanded: open }} haptic="selection" scales={false} onPress={toggle} style={styles.line}>
+    <Tap testID={id} accessibilityLabel={[row.title, row.usage, row.statusText].filter(Boolean).join(', ')} accessibilityState={{ expanded: open }} haptic="selection" scales={false} onPress={toggle} style={styles.line}>
       <Icon name={iconOf(row.icon, 'type-hierarchy-sub')} size="md" tone="muted" />
       <Txt kind="label" numberOfLines={1} style={styles.rest}>
         {row.title}
       </Txt>
+      {row.usage ? (
+        <Txt testID={`${id}.usage`} kind="small" tone="muted" numberOfLines={1}>
+          {row.usage}
+        </Txt>
+      ) : null}
       <CrossFade value={row.status}>
         <Txt testID={`${id}.status`} kind="small" tone={row.status === 'failed' ? 'red' : 'muted'}>
           {row.statusText}

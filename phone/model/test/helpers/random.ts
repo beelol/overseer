@@ -23,7 +23,20 @@ const TEXTS = [
   '| a | b |\n| --- | :-: |\n| 1 | 2 |', '```ts\nconst x = 1;\n```', 'A path: /Users/fixture/projects/overseer/extension/media/some/very/long/path/that/does/not/break.ts here', '', 'line one\nline two',
   '<script>alert(1)</script> after', '> quoted\n\ntext', 'a_b_c and *emphasis* and ~~gone~~',
 ];
-const STATUSES = ['queued', 'starting', 'running', 'waiting_for_user', 'completed', 'failed', 'interrupted', 'disconnected', 'unknown'];
+// Continuity's waiting states (waiting_for_connection, waiting_for_memory) and its back_online
+// event are left out: VS Code draws a card for them (Use a local model now, Retry now, Stay on the
+// local model) from the daemon's Continuity status and actions, which the phone does not have yet.
+const STATUSES = ['queued', 'starting', 'running', 'waiting_for_user', 'completed', 'failed', 'interrupted', 'disconnected', 'unknown', 'handed_off'];
+/** What Continuity (Gate L) says in a chat: its own event kinds, and system lines marked as its own. */
+const CONTINUITY = [
+  { kind: 'handoff', payload: { predecessor: ROOT, successor: 'r-next', reason: 'offline' } }, { kind: 'handoff', payload: { predecessor: 'r-before', successor: ROOT, reason: 'back_online' } },
+  { kind: 'stall', payload: {} }, { kind: 'memory_valve', payload: {} }, { kind: 'retry', payload: { sending: true } }, { kind: 'retry', payload: { attempt: 2, next_in_ms: 5000, reason: 'offline' } }, { kind: 'retry', payload: { retry_now: true } },
+  { kind: 'local_model', payload: { model: 'ollama/qwen3-coder:30b', base: 'ollama/qwen3-coder:30b', context: 32768, bytes: 19_327_352_832 } }, { kind: 'local_model', payload: { model: 'ollama/qwen3-coder:30b', base: 'ollama/qwen3-coder:30b', context: 32768, bytes: 19_327_352_832 } },
+  { kind: 'local_model', payload: { model: 'gemma3:4b', context: 8192, already_loaded: true } }, { kind: 'attention', payload: { kind: 'connection', reason: 'the connection was lost.' } }, { kind: 'attention', payload: { kind: 'memory' } },
+  { kind: 'output', payload: { role: 'system', continuity: true, text: 'Back online. The agent **continues** here.' } }, { kind: 'output', payload: { role: 'system', continuity: true, text: 'Queued until a connection is back.' } },
+  { kind: 'output', payload: { role: 'system', continuity: true, text: 'Memory is short: waiting.' } }, { kind: 'output', payload: { role: 'system', continuity: true, text: 'Handed off to a local model.' } },
+  { kind: 'local_load', payload: {} }, { kind: 'connection', payload: { state: 'offline' } }, { kind: 'continuity_settings', payload: {} },
+];
 
 export interface Step {
   /** An event, or the state read again (what VS Code does after a change). */
@@ -101,7 +114,7 @@ export function stream(seed: number, count: number): Step[] {
       push('permission_answered', ROOT, { request_id: id, allow: chance(0.5), by: pick(['the Mac', "phone:Bilal's iPhone"]) }, 'exact', 'user');
       if (attention && (attention as { request_id: string }).request_id === id) { attention = null; statuses.set(ROOT, 'running'); push('status', ROOT, { status: 'running' }, 'exact', 'daemon'); }
     } else if (roll < 0.74) {
-      push('error', anyRun(), { class: pick(['auth', 'rate_limit', 'quota', 'network', 'other', null]), message: pick(['Failed to authenticate', 'API Error: 429', '', '   ', 'boom\nsecond line']) });
+      push('error', anyRun(), { class: pick(['auth', 'rate_limit', 'quota', 'network', 'network', 'other', null]), message: pick(['Failed to authenticate', 'API Error: 429', '', '   ', 'boom\nsecond line', 'error sending request for url (https://api.openai.com/v1/responses)', 'Connection refused (os error 61)']) });
     } else if (roll < 0.80) {
       const unborn = CHILDREN.filter(c => !born.includes(c));
       if (unborn.length) {
@@ -135,6 +148,9 @@ export function stream(seed: number, count: number): Step[] {
       statuses.set(ROOT, statuses.get(ROOT) === 'waiting_for_user' ? 'waiting_for_user' : statuses.get(ROOT) ?? 'running');
     } else if (roll < 0.95) {
       push('interrupt_requested', ROOT, {}, 'exact', 'user');
+    } else if (roll < 0.965) {
+      const said = pick(CONTINUITY);
+      push(said.kind, anyRun(), said.payload, 'exact', 'daemon');
     } else if (roll < 0.985) {
       push(pick(['retention', 'raw_unparsed', 'session', 'remote_command', 'review_mark', 'push', 'reattached', 'merge_back', 'pull_request', 'daemon_error', 'task_created', 'a_new_kind']), anyRun(), pick<unknown>([{}, { text: 'x' }, { method: 'run.follow_up', device: 'd-1', request_id: `request-${seq}` }, null]));
     } else {

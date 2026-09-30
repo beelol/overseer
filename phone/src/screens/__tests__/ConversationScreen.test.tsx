@@ -295,6 +295,30 @@ describe('the rows', () => {
     expect(words(rowId(`note:${stopped.seq}`))).toBe('Stopped from Phone');
   });
 
+  test('a sub-agent says beside its title what it reported using', async () => {
+    const { app } = await open('nested');
+    const child = rowId('child:r-222956848452');
+    expect(screen.queryByTestId(`${child}.usage`)).toBeNull();
+    await arrive(app, makeEvent('usage', { usage: { input_tokens: 18423, output_tokens: 1204 } }, { run_id: 'r-222956848452' }));
+    expect(words(`${child}.usage`)).toBe('20k reported tokens');
+    expect(screen.getByLabelText('child task, 20k reported tokens, Done')).toBeTruthy();
+  });
+
+  test('Continuity: a lost connection is one quiet line that counts the attempts; a handoff opens the other agent', async () => {
+    const { app, run } = await open('echo-follow-up');
+    const lost = makeEvent('error', { class: 'network', message: 'error sending request for url (https://api.openai.com/v1/responses)' }, { run_id: run });
+    await arrive(app, lost, makeEvent('error', { class: 'network', message: 'Connection refused (os error 61)' }, { run_id: run }));
+    const line = rowId(`cont:${lost.seq}`);
+    expect(words(line)).toBe('The connection was lost; the agent keeps trying to reconnect. · 2 attempts');
+    expect(screen.getByTestId(line).props.accessibilityLabel).toBe('The connection was lost; the agent keeps trying to reconnect. · 2 attempts, Could not connect');
+    expect(idsOf(screen.toJSON()).filter((id) => id.startsWith(rowId('err:')))).toEqual([]);
+    const handoff = makeEvent('handoff', { predecessor: run, successor: 'r-successor', reason: 'offline' }, { run_id: run });
+    await arrive(app, handoff);
+    expect(words(rowId(`cont:${handoff.seq}`))).toBe('The work continues in another agent.');
+    await fireEvent.press(screen.getByTestId(`${rowId(`cont:${handoff.seq}`)}.link`));
+    expect(router.pushed).toEqual([routes.agent('r-successor')]);
+  });
+
   test('while the agent works the line under the rows says what it does', async () => {
     const r = recording('showcase');
     const { app } = await open('showcase', { state: stateOf(r, 10), through: 10 });

@@ -204,6 +204,7 @@ function Conversation({ runId }: { readonly runId: string }) {
       remove: (requestId) => session.dismiss(requestId),
       cancel: (requestId) => held.cancel(requestId),
       signIn: () => router.push(routes.accounts),
+      openAgent: (other) => router.push(routes.agent(other)),
       markdownOf: (row) => conversation.markdownOf(row, anchor),
       arriving: (key) => arrivals.arriving(key),
     }),

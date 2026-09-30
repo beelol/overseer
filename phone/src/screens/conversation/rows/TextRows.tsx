@@ -67,16 +67,26 @@ export function Thinking({ id, row }: { readonly id: string; readonly row: conve
   );
 }
 
-/** A quiet line: how a run ended outside a turn, what was done from a phone. */
+/** A quiet line: how a run ended outside a turn, what was done from a phone, what Continuity did. */
 export function Note({ id, row }: { readonly id: string; readonly row: conversation.NoteRow }) {
   const styles = useStyles();
+  const actions = useRowActions();
   const tone: TxtTone = row.status === 'failed' || row.status === 'disconnected' ? 'red' : 'muted';
-  return (
+  const link = row.link;
+  const line = (
     <View testID={id} accessible accessibilityLabel={[row.text, row.tooltip].filter(Boolean).join(', ')} style={styles.mark}>
       {row.icon ? <Icon name={iconOf(row.icon)} size="sm" tone={tone} /> : null}
       <Txt kind="small" tone={tone} style={styles.words}>
         {row.text}
       </Txt>
+    </View>
+  );
+  if (!link) return line;
+  // A handoff names the other agent: one tap opens it.
+  return (
+    <View style={styles.quiet}>
+      {line}
+      <Button testID={`${id}.link`} label={link.label} kind="quiet" haptic="selection" onPress={() => actions.openAgent(link.runId)} />
     </View>
   );
 }
