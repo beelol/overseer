@@ -378,6 +378,7 @@ final class Controller: NSObject, NSMenuDelegate {
     var refreshQueued = false
     var retry: Timer?
     var onSnapshot: [(Snapshot) -> Bool] = []   // --capture/--press wait for a first answer
+    var frozen = false                          // --capture/--press: the menu keeps what it showed
 
     override init() {
         super.init()
@@ -444,7 +445,7 @@ final class Controller: NSObject, NSMenuDelegate {
     }
 
     func refresh(_ then: ((Snapshot) -> Void)? = nil) {
-        guard link != nil else { return }
+        guard link != nil, !frozen else { return }
         call("menubar.snapshot") { [weak self] r in
             guard let self, let j = r["result"] as? [String: Any] else { return }
             let s = Snapshot(j)
@@ -614,6 +615,10 @@ final class Controller: NSObject, NSMenuDelegate {
     @objc func quit() { NSApp.terminate(nil) }
 }
 
+extension NSMenuItem {
+    var isSectionHeaderCompat: Bool { if #available(macOS 14, *) { return isSectionHeader } else { return false } }
+}
+
 // Hooks for the evidence modes.
 var opened: ((String) -> Void)?
 var answered: (([String: Any]) -> Void)?
@@ -671,15 +676,29 @@ final class Evidence {
         NSApp.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
         c.item.button?.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
         c.render()
+        c.frozen = true
         c.menuOpen = true
         c.build()
         if let title = arg("--choose-item") { chooseItem(title); return }
         if let repo = arg("--choose") { choose(repo, Int(arg("--index") ?? "0") ?? 0); return }
-        // Open the menu under the item, as a click does, and work inside its tracking loop.
+        open()
+    }
+
+    /// Opens the menu under the item, as a click does, and works inside its tracking loop. A walk
+    /// to a submenu that went astray (the menu closed under it) opens the menu again, three times at most.
+    var attempts = 0, done = false
+    func open() {
+        attempts += 1
         let timer = Timer(timeInterval: 0.45, repeats: false) { [weak self] _ in self?.inside() }
         RunLoop.main.add(timer, forMode: .common)
         guard let button = c.item.button else { fail("no status item") }
-        c.menu.popUp(positioning: nil, at: NSPoint(x: -1, y: button.bounds.height + 5), in: button)
+        trace("opening the menu (attempt \(attempts))")
+        let shown = c.menu.popUp(positioning: nil, at: NSPoint(x: -1, y: button.bounds.height + 5), in: button)
+        trace("the menu closed (it was shown: \(shown))")
+        if !done {
+            if attempts >= 3 { fail("the menu closed before it could be captured") }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.open() }
+        }
     }
 
     var submenuWanted: String? { arg("--submenu") }
@@ -690,11 +709,12 @@ final class Evidence {
         trace("inside the menu: \(c.menu.items.count) items, windows \(ownMenuWindows())")
         if let repo = submenuWanted, let idx = c.menu.items.firstIndex(where: { $0.title == repo || $0.title.hasPrefix(repo + "  ") }) {
             // Walk the keyboard to the repository and open its submenu, as the owner would.
-            let enabled = c.menu.items.enumerated().filter { $0.element.isEnabled && !$0.element.isSeparatorItem && $0.element.view == nil }.map { $0.offset }
+            // Keyboard stops: enabled items, the requests' views among them.
+            let enabled = c.menu.items.enumerated().filter { $0.element.isEnabled && !$0.element.isSeparatorItem && !$0.element.isSectionHeaderCompat }.map { $0.offset }
             let steps = (enabled.firstIndex(of: idx) ?? 0) + 1
-            for k in 0..<steps { post(125, delay: Double(k) * 0.05) }   // down arrow
-            post(124, delay: Double(steps) * 0.05 + 0.05)                // right arrow
-            let t = Timer(timeInterval: Double(steps) * 0.05 + 0.6, repeats: false) { [weak self] _ in self?.captureAndAct() }
+            for k in 0..<steps { post(125, delay: Double(k) * 0.12) }   // down arrow
+            post(124, delay: Double(steps) * 0.12 + 0.1)                 // right arrow
+            let t = Timer(timeInterval: Double(steps) * 0.12 + 0.8, repeats: false) { [weak self] _ in self?.captureAndAct() }
             RunLoop.main.add(t, forMode: .common)
             return
         }
@@ -718,23 +738,35 @@ final class Evidence {
 
     func captureAndAct() {
         trace("capture: windows \(ownMenuWindows())")
+        if submenuWanted != nil && ownMenuWindows().count < 2 {
+            trace("the submenu is not open; again")
+            c.menu.cancelTracking()
+            return
+        }
+        done = true
         if let prefix { write(prefix) }
         if let what = arg("--press") {
             let index = Int(arg("--index") ?? "0") ?? 0
             let asks = c.menu.items.compactMap { $0.view as? AskView }
             guard index < asks.count else { fail("no request \(index) in the menu (\(asks.count) shown)") }
             let v = asks[index]
+            trace("pressing \(what) on request \(index) of \(asks.count)")
             answered = { r in
+                trace("answered")
                 say(String(data: (try? JSONSerialization.data(withJSONObject: r, options: [.sortedKeys])) ?? Data(), encoding: .utf8) ?? "")
-                let t = Timer(timeInterval: 0.6, repeats: false) { _ in
-                    if let prefix = self.prefix { self.write(prefix + "-after") }
+                let code: Int32 = r["error"] == nil ? 0 : 4
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    trace("after the answer: \(ownMenuWindows().count) menus open")
+                    // The menu after the answer, when it is still open (pressing a control can close it).
+                    if let prefix = self.prefix, !ownMenuWindows().isEmpty { self.write(prefix + "-after") }
                     self.c.menu.cancelTracking()
-                    DispatchQueue.main.async { exit((r["error"] == nil) ? 0 : 4) }
+                    trace("exit \(code)")
+                    exit(code)
                 }
-                RunLoop.main.add(t, forMode: .common)
             }
             switch what {
-            case "allow": v.allow.performClick(nil)
+            // The split button's own target and action, as a click on its left part sends them.
+            case "allow": NSApp.sendAction(v.allow.action!, to: v.allow.target, from: v.allow)
             case "deny": v.deny.performClick(nil)
             case "always":
                 // The Always allow item under the split button's arrow.
@@ -751,6 +783,7 @@ final class Evidence {
     func chooseItem(_ title: String) {
         guard let idx = c.menu.items.firstIndex(where: { $0.title == title }) else { fail("no item \(title) in the menu") }
         opened = { url in say(url) }
+        trace("chose \(title)")
         c.menu.performActionForItem(at: idx)
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { exit(0) }
     }
@@ -760,6 +793,7 @@ final class Evidence {
         let agents = sub.items.enumerated().filter { $0.element.action == #selector(Controller.openAgent(_:)) }
         guard index < agents.count else { fail("\(repo) lists \(agents.count) agents") }
         opened = { url in say(url) }
+        trace("chose \(repo) \(index)")
         sub.performActionForItem(at: agents[index].offset)
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { exit(0) }
     }

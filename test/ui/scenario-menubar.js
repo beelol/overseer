@@ -47,9 +47,14 @@ function call(socket, method, params = {}) {
   const config = path.join(inst, 'bin/menubar.json');
   /** The item's evidence modes: the real menu, opened in-process. */
   const menu = (...args) => {
-    const r = cp.spawnSync(bin, ['--config', config, ...args], { env, encoding: 'utf8', timeout: 60000 });
-    s.note(`$ overseer-menu ${args.join(' ')} → exit ${r.status}`, (r.stdout + r.stderr).trim().slice(-600));
-    return { status: r.status, out: (r.stdout || '').trim(), err: (r.stderr || '').trim() };
+    for (let attempt = 1; ; attempt++) {
+      const r = cp.spawnSync(bin, ['--config', config, ...args], { env: { ...env, OVERSEER_MENU_DEBUG: '1' }, encoding: 'utf8', timeout: 30000 });
+      s.note(`$ overseer-menu ${args.join(' ')} → exit ${r.status}`, (r.stdout + r.stderr).trim().slice(-600));
+      // A menu that never opened (macOS sometimes holds a new binary's first menu) is tried once more;
+      // nothing was pressed then.
+      if (r.status === null && attempt === 1 && !/pressing|chose/.test(r.stderr || '')) continue;
+      return { status: r.status, out: (r.stdout || '').trim(), err: (r.stderr || '').trim() };
+    }
   };
   const shot = (name, ...extra) => {
     for (const look of ['light', 'dark']) {
@@ -84,6 +89,7 @@ function call(socket, method, params = {}) {
     for (const pid of running.split('\n').filter(Boolean)) try { process.kill(Number(pid)); } catch {}
 
     fs.writeFileSync(path.join(inst, 'fixture-mode'), 'menubar');
+    await call(socket, 'agents.limit.set', { max_active: 60 }); // thirty agents, most of them at work
     // Two SYNTHETIC accounts (no real login is read): the Mac's default Claude login and a named one.
     fs.mkdirSync(path.join(inst, 'system/.claude'), { recursive: true });
     fs.writeFileSync(path.join(inst, 'system/.claude/fixture-account.json'), JSON.stringify({ email: 'bilal@testbox.com', plan: 'max' }));
@@ -132,7 +138,7 @@ function call(socket, method, params = {}) {
     const idle = [];
     let k = 0;
     for (const kind of ['idle', 'review', 'working']) {
-      for (const [repo, lists] of Object.entries(plan)) {
+      for (const [repo, lists] of Object.entries(plan).reverse()) { // overseer last: the most recent repository
         for (const title of lists[kind]) {
           const id = await start(repo, title, kind === 'working' ? 'busy: 1800' : 'finish', k++ % 3 === 1 ? personal.id : 'system-claude');
           if (kind === 'idle') idle.push(id);
