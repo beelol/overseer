@@ -5,7 +5,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { DaemonClient, resolveBinary, isProductionInstall } = require('./daemon-client');
 const { Model, AgentsProvider, AccountsProvider, ACTIVE, accountName } = require('./views');
-const { SearchView } = require('./search-view');
+const { AgentSearch, FILTER_LABELS } = require('./agent-search');
 const { OutputPanels } = require('./output-panel');
 const { Review } = require('./review');
 const { CommandCenter } = require('./command-center');
@@ -79,9 +79,10 @@ async function activate(context) {
   const agents = new AgentsProvider(model, context.workspaceState, context.extensionUri, { attention: () => attention(), pinned: () => pinned(), voiceTargeted: () => voiceTargeted(), reviewed: () => reviewed });
   const accounts = new AccountsProvider(model, context.extensionUri);
   const agentsView = vscode.window.createTreeView('overseer.agents', { treeDataProvider: agents, showCollapseAll: true, dragAndDropController: agentDrag() });
-  // The search field above the Agents list (AC-112): typing filters the list through the daemon's search.
-  const searchView = new SearchView(context.extensionUri, { onQuery: q => runAgentSearch(q), onFilter: kind => setStatusFilter(kind), onFilterMenu: () => filterMenu() });
-  /** The filter icon's menu (a native pick: a menu inside the short search pane would be clipped). */
+  // Searching agents (AC-112, AC-264): the Agents view's search button opens VS Code's input box;
+  // typing filters the list through the daemon's search. There is no Search section in the side bar.
+  const searchView = new AgentSearch({ onQuery: q => runAgentSearch(q), onFilterMenu: () => filterMenu() });
+  /** The status filters (All, Working, Needs you, To review, Done, Failed, Archived). */
   async function filterMenu() {
     const now = agents.showArchived ? 'archived' : agents.statusFilter;
     const items = [['all', 'All', 'list-flat'], ['working', 'Working', 'sync'], ['needs', 'Needs you', 'bell'], ['review', 'To review', 'sparkle'], ['done', 'Done', 'check'], ['failed', 'Failed', 'error'], ['archived', 'Archived', 'archive']]
@@ -97,7 +98,6 @@ async function activate(context) {
     vscode.commands.executeCommand('setContext', 'overseer.showArchived', agents.showArchived);
     setAgentFilter(agents.filter);
   }
-  context.subscriptions.push(vscode.window.registerWebviewViewProvider('overseer.search', searchView, { webviewOptions: { retainContextWhenHidden: true } }));
   const accountsView = vscode.window.createTreeView('overseer.accounts', { treeDataProvider: accounts });
   context.subscriptions.push(vscode.window.registerFileDecorationProvider(agents.decorations));
   const outputs = new OutputPanels(context, client, model);
@@ -322,7 +322,7 @@ async function activate(context) {
       const run = session.overseer?.runId && model.run(session.overseer.runId);
       if (run && panel.visible && Rollup.unreviewed(run, reviewed)) markReviewed(run.id);
     }
-    agentsView.description = client.connected ? Rollup.reviewText(rollup()) : '';
+    agentsView.description = agentsDescription();
   });
   model.onDidChange(() => { autoArchive().catch(() => {}); });
   client.on('connected', () => { model.refresh(); updateStatus(); });
@@ -566,8 +566,9 @@ async function activate(context) {
     // How many agents the list shows, said in the search field while a search or a filter is on.
     const narrowed = filter || agents.statusFilter !== 'all' || agents.showArchived;
     const shown = narrowed ? agents.visibleTasks().length : 0;
-    agentsView.description = undefined;
+    // The count is said beside the Agents title (the side bar has no search field) and in the search box.
     searchView.setCount(narrowed ? `${shown} ${filter ? `match${shown === 1 ? '' : 'es'}` : `agent${shown === 1 ? '' : 's'}`}` : '');
+    agentsView.description = agentsDescription();
     vscode.commands.executeCommand('setContext', 'overseer.agentsFiltered', !!filter);
     // Keep the selected agent in view (and selected) when the list changes shape.
     if (selectedRun && (!filter || filter.taskIds.has(model.run(selectedRun)?.task_id))) setTimeout(() => revealInTree(selectedRun), 150);
@@ -584,8 +585,13 @@ async function activate(context) {
     const ids = await search(q);
     if (mine === searchSeq) setAgentFilter({ query: q, taskIds: new Set([...local, ...ids]) });
   }
-  /** Search Agents (⌥⌘F, command palette): puts the cursor in the side bar's search field. */
-  async function searchAgents() { await searchView.focus(); }
+  /** Search Agents (⌥⌘F, the Agents view's search button, command palette): VS Code's input box. */
+  async function searchAgents() { searchView.open(); }
+  /** Beside the Agents title: what a search or filter shows ("“beta” · 1 match"), else what is left to review. */
+  function agentsDescription() {
+    if (searchView.count) return [agents.filter?.query && `“${agents.filter.query}”`, agents.statusFilter !== 'all' || agents.showArchived ? FILTER_LABELS[agents.showArchived ? 'archived' : agents.statusFilter] : '', searchView.count].filter(Boolean).join(' · ');
+    return client.connected ? Rollup.reviewText(rollup()) : '';
+  }
 
   /** Read-only, empty files: the custom editor shows the chat instead of their content. */
   function chatFileSystem() {

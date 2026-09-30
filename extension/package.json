@@ -46,7 +46,6 @@
     },
     "views": {
       "overseer": [
-        { "type": "webview", "id": "overseer.search", "name": "Search", "initialSize": 1 },
         { "id": "overseer.agents", "name": "Agents", "initialSize": 14 },
         { "id": "overseer.accounts", "name": "Accounts", "initialSize": 5 },
         { "id": "overseer.devices", "name": "Devices", "visibility": "collapsed", "initialSize": 3 }
@@ -180,6 +179,7 @@
         { "command": "overseer.newAgent", "when": "view == overseer.agents", "group": "navigation@1" },
         { "command": "overseer.searchAgents", "when": "view == overseer.agents && !overseer.agentsFiltered", "group": "navigation@2" },
         { "command": "overseer.clearAgentSearch", "when": "view == overseer.agents && overseer.agentsFiltered", "group": "navigation@2" },
+        { "command": "overseer.filterAgents", "when": "view == overseer.agents", "group": "1_view@0" },
         { "command": "overseer.toggleGrid", "when": "view == overseer.agents", "group": "navigation@3" },
         { "command": "overseer.showArchived", "when": "view == overseer.agents && !overseer.showArchived", "group": "1_view@1" },
         { "command": "overseer.hideArchived", "when": "view == overseer.agents && overseer.showArchived", "group": "1_view@1" },
