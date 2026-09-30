@@ -13,7 +13,7 @@ EACH PASS
 3. Stalled or stopped agents: take their criteria over (AC-203). Branch from their pushed work, keep uncommitted work as a patch and use it only once it builds and passes. Never push to their branch. Hand the work back if the agent resumes.
 4. Merging (AC-146): once a pull request is marked ready, or its agent is quiet 3+ hours and says it is done:
    - merge main into a throwaway copy, keep both sides working;
-   - run `scripts/test-all --jobs=3` and the UI scenarios it touches;
+   - run `nice -n 20 scripts/test-all --jobs=1` (one full run on the Mac at a time) and the UI scenarios it touches;
    - send failures back to its agent, or fix them if it is gone;
    - squash-merge and record its criteria.
    Stacked pull requests merge after their base. Never force-push.
@@ -28,7 +28,9 @@ RULES
 - Ledger: pull right before each records.py edit; records.py refuses a stale copy (AC-153).
 - New criteria: fetch main first and take the next free number.
 - A timing test that fails under load is rerun alone before calling it a regression. Agree quiet windows with agents running measurements.
-- Paid turns only as AGENTS.md allows (ChatGPT: gpt-5.6-luna, low effort; Claude: haiku, light). Never touch the owner's checkouts, logins or daemon. Leave nothing running.
+- Paid turns only as AGENTS.md allows (gpt-5.6-luna at low effort; no Claude model for now). Never touch the owner's checkouts, logins or daemon. Leave nothing running.
+- Pace (the owner, after the Mac crashed on 2026-09-29): start with ONE builder sub-agent and ONE full test run (`--jobs=1`, `nice -n 20`, `CARGO_BUILD_JOBS=4 RUST_TEST_THREADS=4`); add a second or third builder only while `uptime` stays low; always leave room for the owner's own apps (games) and a couple of other agent tasks. Keep `$TMPDIR/overseer-test-jobs-max` at 1 (a reboot clears it).
+- Push often. Keep docs/goals/handoff.md on main current after every change, and tell the next agent to do the same.
 - Tell the owner in a few lines: what landed, what is blocked, what they must do.
 
 DONE WHEN the tracker only has rows waiting on the owner, every pull request is merged or closed with a reason (AC-161), `scripts/test-all` passes on main, and the ledger is current.

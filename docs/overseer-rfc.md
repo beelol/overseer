@@ -539,7 +539,7 @@ From the friction research of 2026-09-28 ([report](audits/2026-09-28-friction-re
 
 From the owner, 2026-09-29:
 
-- [ ] **AC-262 — Overseer in the Mac's menu bar.** A menu-bar item with the Overseer silhouette (`docs/design/brand/overseer-icon-flat.png` as a template image, AC-179) runs while the daemon does, with or without VS Code.
+- [x] **AC-262 — Overseer in the Mac's menu bar.** A menu-bar item with the Overseer silhouette (`docs/design/brand/overseer-icon-flat.png` as a template image, AC-179) runs while the daemon does, with or without VS Code.
   - The icon carries a dot (Overseer's violet) while an agent needs the owner.
   - Its menu shows, in order:
     - the Needs-you requests, newest first, at most four, then "N more waiting · Show all in Overseer…"; each answerable there: Allow once, whose arrow holds Always allow (the harness's own session rule), and Deny;
@@ -559,11 +559,14 @@ From the owner, 2026-09-29:
     - Choosing an agent opens it in a test VS Code.
     - With the daemon stopped, the item says so and offers to start it.
 - [ ] **AC-263 — The review opens on "Since task start", with the other comparisons one click away.** An agent's review opens on everything since its task started, whether the agent works in its own worktree or in the owner's checkout (the owner, 2026-09-29, over keeping "Latest run" in the owner's checkout). "Latest run" and "Entire worktree" (the branch against the base it started from) are one click away in the review's header, and the header always says which one is shown.
+  - The owner (2026-09-29): the agent's changes are **Accepted** or **Rejected**, per change and per file, never "Keep", "Undo" or "Save". Saving the owner's own typing is a separate "Save your edits", shown only once the owner has typed.
   - **Verify:** packaged-UI checks:
     - a finished agent in its own worktree and one in the current checkout both open on Since task start;
     - one click switches to Latest run and one to Entire worktree, each with the right files and count;
     - the header names the comparison each time;
-    - screenshots of the three.
+    - screenshots of the three;
+    - a change and a whole file accepted and rejected with those words;
+    - "Save your edits" appears only after typing.
 
 - [ ] **AC-264 — One Overseer layout, and it looks like Focus Mode without its side effects.** The owner, 2026-09-29, after comparing Workspace (AC-250) and Focus Mode screenshots: "pic 3 looks best … you want to end up in number 3 always."
   - The layout is:
@@ -576,6 +579,11 @@ From the owner, 2026-09-29:
     - (B) the window reopened on an Overseer workspace file, so the tab-hiding setting is that window's own.
   - One command and key (Workspace, ⌥⌘⇧O) arranges any window into it and restores the owner's own layout when run again. The first launch offers it with one click.
   - Focus Mode is retired: its commands are removed or point to this layout, and its settings are put back.
+  - The left side bar is the hierarchy only: agents by repository, and Accounts (the owner, 2026-09-29).
+    - Searching agents lives in the Agents view's own title bar and type-to-filter, not in a Search section.
+    - There is no separate worktree file tree. The review's file list switches between "Changed" and "All files", and "All files" opens any file in the agent's worktree.
+    - Follow mode always shows the whole worktree, so its file list is "All files": every file, each opening the real file. Diffs only shows "Changed" (the owner, 2026-09-29).
+    - Follow happens inside the review window in the middle, never in a plain VS Code editor (the owner, 2026-09-30: "That review section in the middle is supposed to be follow mode. I don't want to just use regular VS Code for it"). In Follow the middle shows the file the agent is in right now, live, and the list on the left is "All files"; picking a file there shows it in the same place. In Diffs only the middle shows the diffs and the list is "Changed". The review stays on screen in both modes.
   - **Verify:**
     - Screenshots of A and B side by side for the owner's choice. Then, for the chosen way, packaged-UI checks:
       - a cluttered window becomes the layout in one step;
@@ -584,6 +592,8 @@ From the owner, 2026-09-29:
       - Voice Mode takes over the same panel;
       - running the command again restores the cluttered layout exactly;
       - the first-launch offer appears once.
+      - the side bar shows no Search section and no worktree tree; the Agents view's search filters agents;
+      - the review's "All files" lists the whole worktree and opens a file from it.
     - Screenshots at 1440×900 and 1920×1080 in the three themes.
 ### Gate S — Overseer itself (added by the owner, 2026-09-27)
 

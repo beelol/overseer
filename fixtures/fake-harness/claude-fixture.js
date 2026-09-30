@@ -427,6 +427,21 @@ async function mcpClient() {
     const questions = /Questions \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
     const reports = /Reports \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
     const findings = /Findings \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
+    // AC-239: agents in trouble. Say what happened in plain words and offer the fix: another
+    // account for a limit or a sign-in, a retry for a failure, a stop for one that went quiet.
+    const troubles = /Trouble \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
+    const actOnTrouble = async list => {
+      const lines = [];
+      for (const t of list) {
+        let action, offer;
+        if ((t.kind === 'limit' || t.kind === 'signed_out') && t.other_accounts.length) { const o = t.other_accounts[0]; action = { action: 'continue', agent: t.id, profile: o.id }; offer = `I can continue it on ${o.name}`; }
+        else if (t.kind === 'failed' || t.kind === 'limit') { action = { action: 'retry', agent: t.id }; offer = 'I can retry it'; }
+        else { action = { action: 'stop', agent: t.id }; offer = 'I can stop it'; }
+        const outcome = await call('propose', { actions: [action] }).catch(e => 'refused: ' + e.message);
+        lines.push(`${t.title} ${t.reason}. ${offer}${/^Done/.test(outcome) ? ', and did.' : '; say yes to go ahead.'}`);
+      }
+      return lines;
+    };
     // A watcher's finding: Overseer acts on the subject at its level. A stop is a hold (at Ask
     // first a proposal) and then a redirect (a proposal at Steer, done at Auto); a concern is a
     // message to the subject. Each goes in its own proposal so a quiet one is not held back.
@@ -469,9 +484,10 @@ async function mcpClient() {
       await sleep(100);
       process.exit(0);
     }
-    if (mcp && (questions || reports || findings) && !checkIn) {
+    if (mcp && (questions || reports || findings || troubles) && !checkIn) {
       const lines = [];
       const level = (/The level is (\w+)\./.exec(text) || [])[1] || 'ask_first';
+      if (troubles) lines.push(...await actOnTrouble(JSON.parse(troubles[1])));
       if (findings) lines.push(...await actOnFindings(JSON.parse(findings[1]), level));
       for (const q of questions ? JSON.parse(questions[1]) : []) lines.push(await call('answer', { ask: q.id, text: 'From the roster: ' + q.question.replace(/\?$/, '') + ' — see the other agents\' digests.' }));
       if (reports) { const list = JSON.parse(reports[1]); lines.push(await rally(list[0]?.repository)); }
@@ -486,19 +502,30 @@ async function mcpClient() {
       const level = (/The level is (\w+)\./.exec(text) || [])[1] || 'ask_first';
       const items = JSON.parse(checkIn[1]);
       const lines = [];
+      if (troubles) lines.push(...await actOnTrouble(JSON.parse(troubles[1])));
       if (findings) lines.push(...await actOnFindings(JSON.parse(findings[1]), level));
       for (const q of questions ? JSON.parse(questions[1]) : []) lines.push(await call('answer', { ask: q.id, text: 'From the roster: ' + q.question.replace(/\?$/, '') + ' — see the other agents\' digests.' }));
       for (const it of items) {
         const outside = it.area && it.area.length ? it.changed.filter(p => !it.area.some(a => p === a || p.startsWith(a.replace(/\/$/, '') + '/'))) : [];
         const leftOut = (it.asked.join(' ').match(/\[leave out: ([^\]]+)\]/) || [])[1];
         const tripped = it.reasons.some(r => /guardrail|outside|circles|collides/.test(r));
-        let result, reason;
+        let result, reason, didIt, next;
         // Drifting first: an agent that left its area is drifting even when it has stopped.
         if (outside.length || tripped) { result = 'drifting'; reason = outside.length ? `wrote outside its area: ${outside.join(', ')}` : it.reasons.join('; '); }
+        else if (it.finished && it.finished.tests) {
+          // AC-238: the verdict from its final message, its diff and its test output, cited.
+          const t = it.finished.tests;
+          const lines = t.output.split('\n').map(l => l.trim()).filter(Boolean);
+          result = 'done';
+          didIt = t.ok;
+          if (t.ok) { reason = `It added what was asked (${it.changed.length} file changed) and \`${t.command}\` passes: "${lines[lines.length - 1]}".`; next = { action: 'merge_back', agent: it.id }; }
+          else { const why = lines.find(l => /Error/.test(l)) || lines.find(l => /not ok|failing/.test(l)) || lines[lines.length - 1]; reason = `\`${t.command}\` fails: "${why}".`; next = { action: 'message', agent: it.id, text: `\`${t.command}\` fails: ${why}. Please fix it and run the tests again.` }; }
+        }
         else if (it.status === 'completed' || it.status === 'failed') { result = 'done'; reason = `finished with ${it.changed.length} files changed`; }
         else { result = 'on_task'; reason = 'its changes stay within its task'; }
-        await call('check_in', { agent: it.id, result, reason, left_out: result === 'done' && leftOut ? leftOut : '' });
-        lines.push(`${it.title}: ${result}`);
+        await call('check_in', { agent: it.id, result, reason, left_out: result === 'done' && leftOut ? leftOut : '', ...(didIt === undefined ? {} : { did_it: didIt }) });
+        lines.push(didIt === undefined ? `${it.title}: ${result}` : `${it.title}: ${reason}`);
+        if (next) lines.push(await call('propose', { actions: [next] }).catch(e => 'refused: ' + e.message));
         if (result === 'drifting') {
           const action = level === 'auto' ? { action: 'redirect', agent: it.id, text: 'Back to your task; leave the other files alone.' }
             : level === 'steer' ? { action: 'hold', agent: it.id, reason: 'drifting: ' + reason }
@@ -608,10 +635,27 @@ async function mcpClient() {
     const someoneTyped = /^(?:someone should|start an agent to|start one agent to) (.+?)[.!?]*$/i.exec(said);
     const typedRepo = stateAgents.find(a => a.repo)?.repo;
     if (mcp && someoneTyped && typedRepo) {
-      const task = someoneTyped[1];
-      remember(task.split(' ').slice(0, 3).join(' '));
-      const outcome = await call('propose', { actions: [{ action: 'start', repo: typedRepo, title: task.split(' ').slice(0, 3).join(' '), prompt: `Please ${task}.`, confidence: 'high' }] }).catch(e => 'refused: ' + e.message);
-      reply = `Starting one agent to ${task}. ${outcome}`;
+      // AC-237: where it runs, when the owner names it: "with the model X", "on codex", "on the
+      // account X", "on my other account" (the accounts tool names the other one).
+      let task = someoneTyped[1];
+      const start = { action: 'start', repo: typedRepo, confidence: 'high' };
+      let m;
+      if ((m = /\s+with (?:the )?model (\S+)/i.exec(task))) { start.model = m[1]; task = task.replace(m[0], ''); }
+      if ((m = /\s+(?:on|using|with) (codex|claude|opencode)\b/i.exec(task))) { start.harness = m[1].toLowerCase(); task = task.replace(m[0], ''); }
+      if ((m = /\s+on (?:the )?account (\S+)/i.exec(task))) { start.profile = m[1]; task = task.replace(m[0], ''); }
+      if ((m = /\s+on my other account/i.exec(task))) {
+        task = task.replace(m[0], '');
+        const accounts = (await call('accounts', {})).split('\n').map(l => l.split(' · ')).filter(p => p.length >= 4);
+        const other = accounts.find(p => p[2] === (start.harness || 'claude') && p[3] !== 'default');
+        if (other) start.profile = other[0];
+      }
+      start.title = task.split(' ').slice(0, 3).join(' ');
+      start.prompt = `Please ${task}.`;
+      remember(start.title);
+      const outcome = await call('propose', { actions: [start] }).catch(e => 'refused: ' + e.message);
+      // One line: where it runs and why, from the daemon's pick (AC-237).
+      const where = (/\) Start “[^”]*” in \S+ on (.+?)\.?$/.exec(outcome) || [])[1];
+      reply = /^refused/.test(outcome) ? `I could not start it: ${outcome}` : `Starting one agent to ${task}${where ? ' on ' + where : ''}.${/^Done/.test(outcome) ? '' : ' Say yes to go ahead.'}`;
       assistant([{ type: 'text', text: reply }]);
       result(false, reply);
       mcp.close();
@@ -908,6 +952,22 @@ async function mcpClient() {
       result(false, `submitted ${job}`);
     }
     if (mcp) mcp.close();
+  } else if (mode === 'tested' || mode === 'tested-fail') {
+    // AC-238: an agent that writes a function, runs its tests (passing, or one failing) and says so.
+    const pass = mode === 'tested';
+    const file = path.join(process.cwd(), 'src', 'total.js');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, 'module.exports = (a, b) => a + b;\n');
+    assistant([{ type: 'tool_use', id: 'toolu_write_1', name: 'Write', input: { file_path: file, content: 'module.exports = (a, b) => a + b;\n' } }]);
+    user([{ type: 'tool_result', tool_use_id: 'toolu_write_1', content: 'File created successfully' }]);
+    assistant([{ type: 'tool_use', id: 'toolu_test_1', name: 'Bash', input: { command: 'npm test' } }]);
+    const output = pass
+      ? '> total@1.0.0 test\n> node --test\n\n  ok adds two numbers\n  ok adds zero\n  ok adds negatives\n\n3 passing'
+      : '> total@1.0.0 test\n> node --test\n\n  ok adds two numbers\n  not ok adds negatives\n    AssertionError: expected -1 to equal 1\n\n1 passing\n1 failing';
+    user([{ type: 'tool_result', tool_use_id: 'toolu_test_1', content: output, is_error: !pass }]);
+    const said = pass ? 'Added total() in src/total.js with three tests; npm test passes.' : 'Added total() in src/total.js; the negatives test still fails.';
+    assistant([{ type: 'text', text: said }]);
+    result(false, said);
   } else if (mode === 'circles') {
     // The same command failing three times in a row (a free check of AC-189).
     for (let i = 1; i <= 3; i++) {
