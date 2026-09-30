@@ -17,6 +17,62 @@ Updated 2026-09-29, late evening, by the coordinator session. Read this first wh
 
 Nothing needed from the old session survives in /private/tmp: the builders' worktrees and scratch notes were wiped by the reboot. Every builder had pushed, so each branch on GitHub is the whole state. Recreate a worktree from the branch (`git worktree add <dir> gh/claude/<branch>`).
 
+## Full context for a new account
+
+You may be a different Claude account with none of the previous session's memory. Everything you need is here, in AGENTS.md and in the docs it points to. As you learn more, keep it in this file, not only in your memory.
+
+### Who and what
+- **The owner** is Bilal (GitHub `beelol`). The repository is `beelol/overseer`; the main checkout is `/Users/bilal/projects/overseer`, and sessions work in worktrees under `.claude/worktrees/`.
+- **Overseer** is a Rust daemon (`daemon/`, overseerd), a VS Code extension (`extension/`), a TUI (`tui/`), an Expo phone app (`phone/`) and a voice listener (`voice/`). They manage many coding agents (Claude Code, Codex, OpenCode) for the owner.
+- **The owner's bar:** clearly better than talking to Codex and Claude Code separately and relaying between them. You talk to it, it picks models and accounts, sends work out, and keeps agents on track.
+- **After the current queue:** a GitHub Pages site, mods ([docs/rfcs/mods.md](../rfcs/mods.md)), then usability gaps found in real use ([after-current-work.md](after-current-work.md)).
+
+### How the owner works with you
+- **Visual choices are decided by seeing.** Build a small real preview (screenshots, or an HTML page sent to them) before asking. Ask few questions, numbered; they answer in numbered shorthand ("1 yes, 2 violet").
+- **Don't block on the owner.** Ask the precise question, keep working on everything else, and watch things in the background, never in foreground polling loops.
+- **Plain words:** no internal ids or jargon in anything the owner reads.
+- **"Auto" means an agent works on its own** without asking (the permission mode). It does not mean picking models or accounts automatically; that's "route picking" (Auto routing, `docs/rfcs/auto-mode.md`).
+- **Owner-only checks** (microphone, real voice, speakers) run in a dev daemon through `scripts/dev test <check>`. Never ask the owner to install a branch build.
+- **Deploys** to the owner's installed Overseer happen only with `scripts/deploy`, after a merge. The owner has asked for deploys after merges.
+- **Clean up after every sub-agent and test run:** stray VS Code test windows, dev daemons, shims, simulators. Use `xargs` in zsh. Never stop the owner's own apps (games, Chrome, Docker, their other Claude sessions) without asking.
+
+### Repository rules (beyond AGENTS.md)
+- **Criteria, ledger and docs** go straight to main. Implementation goes on a branch plus a PR, and PRs are squash-merged by this goal after a throwaway merge and a full test run. PR descriptions: what changed, the tests actually run, no filler.
+- **AC numbers move fast:** fetch main and recompute the next free number right before pushing a new criterion.
+- **Landing ledger edits:** edit main's `docs/verification/records.py` in place (Python replacements on main's copy), then regenerate with `set -o pipefail; python3 docs/verification/records.py b5693b8`. Never copy a branch's records.py over main's, because it erases other agents' records.
+- **Don't `cargo fmt` the daemon:** it isn't rustfmt-clean. Format only your own files.
+- **Generated files after merges:** `python3 protocol/capabilities.py` (the README's phone table) and `node protocol/gen-ts.mjs` (the phone's types).
+- **GitHub:** push over SSH (`git push git@github.com:beelol/overseer.git HEAD:<branch>`); if SSH fails, use the `gh` CLI. HTTPS pushes hang. Never force-push.
+
+### Accounts and paid turns
+- **Paid turns inside Overseer** (tests, live checks, dev daemons): only `gpt-5.6-luna` at low reasoning effort. No Claude model for now. One attempt per step, no retry loops.
+- **The owner's accounts:**
+  - personal Claude and personal ChatGPT Plus, signed in in the regular browser;
+  - work Claude Max and work ChatGPT Pro (testbox.com), signed in in the work browser.
+  
+  Both ChatGPT accounts may carry luna turns. Sign-in approvals open in the matching browser and the owner clicks them. Never enter credentials, read credential files, or sign anything out.
+- **The Mac's default Claude Code login** is the work account. The owner accepts that for their own use, as long as the app shows which account each agent uses (AC-235, done).
+
+### The Mac
+- **The owner uses it while agents work,** including games. Mind the pace rule below.
+- **Local models (Ollama):** never load one above min(40% of memory, free memory minus headroom), and never `qwen3.5:122b`. One at a time.
+- **`~/Downloads` is unreadable to the tools.** Ask the owner to copy files to /private/tmp.
+- **Apple assets:** the ones already on the Mac belong to another project (aquafriends). Never use them for Overseer. The phone ships through TestFlight (see AGENTS.md).
+
+### Sub-agents
+- Build work goes to background sub-agents with self-contained briefs. The coordinator watches, merges, keeps the ledger and tracker, and does small fixes itself.
+- **Brief every sub-agent with:**
+  - its own worktree (`git worktree add -b claude/<name> <dir> origin/main`) and scratch folder;
+  - an absolute `CARGO_TARGET_DIR`;
+  - the pace rule;
+  - luna-only paid turns;
+  - SSH pushes;
+  - a draft PR, then `gh pr ready`, never merging;
+  - ledger edits on main in place;
+  - clean up at the end;
+  - waiting on runs in the foreground, because a sub-agent that ends its turn while a background run goes never wakes up.
+- Tell it to push often.
+
 ## The pace rule (the owner, after the Mac crashed on 2026-09-29)
 
 Five builders plus merge checks at once pushed the load past 100 and crashed the Mac. Now:
