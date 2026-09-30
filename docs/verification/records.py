@@ -2771,6 +2771,10 @@ rec(263, "The review opens on \"Since task start\", with the other comparisons o
     expected="See the RFC criterion (the owner's decision of 2026-09-29 on pull request #35's question).",
     actual="Not started: #35 (AC-232) opens a finished agent's review on Since task start in its own worktree and keeps Latest run in the owner's checkout; the owner chose Since task start everywhere, with Latest run and Entire worktree one click away.", live="—", blocker="Its own agent.")
 
+rec(264, "One Overseer layout, and it looks like Focus Mode without its side effects", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the owner, 2026-09-29, after comparing the Workspace and Focus Mode screenshots).",
+    actual="Not started: Workspace (AC-250, #33) gives three columns with a separate agent-chat column; Focus Mode hides tab rows by writing user settings in a folder window. The owner wants Focus Mode's look always, two wide areas (review, and one Overseer panel that becomes an agent's chat), and Focus Mode retired.", live="—", blocker="Its own agent; the owner picks A or B from screenshots first.")
+
 SHORT_BLOCKERS = {
     154: "verified",
     155: "verified",
@@ -2963,6 +2967,7 @@ SHORT_BLOCKERS = {
     261: "verified",
     262: "not started (the owner, 2026-09-29)",
     263: "not started (the owner, 2026-09-29)",
+    264: "not started (the owner, 2026-09-29)",
 }
 TOTAL = 53
 
