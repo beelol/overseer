@@ -45,41 +45,13 @@
       }
     },
     {
-      "name": "AC-233: the Worktree view shows the agent's worktree (its files, named after the agent)",
+      "name": "AC-264: no separate tree view of the agent's files anywhere (the side bar is the agents and Accounts)",
       "ok": true,
-      "detail": {
-        "description": "Head agent",
-        "rows": [
-          {
-            "name": "a.txt",
-            "badge": "",
-            "selected": false,
-            "color": "rgb(232, 230, 240)",
-            "title": "a.txt | a.txt"
-          },
-          {
-            "name": "b.txt",
-            "badge": "",
-            "selected": false,
-            "color": "rgb(232, 230, 240)",
-            "title": "b.txt | b.txt"
-          },
-          {
-            "name": "c.txt",
-            "badge": "",
-            "selected": false,
-            "color": "rgb(232, 230, 240)",
-            "title": "c.txt | c.txt"
-          },
-          {
-            "name": "README.md",
-            "badge": "",
-            "selected": false,
-            "color": "rgb(232, 230, 240)",
-            "title": "README.md | README.md"
-          }
-        ]
-      }
+      "detail": [
+        "Agents",
+        "Accounts",
+        "Devices"
+      ]
     },
     {
       "name": "AC-233: Follow opens the file the agent is editing (a.txt) at the changed line, the line tinted and saying what it was",
@@ -106,40 +78,6 @@
           "col": 1
         }
       }
-    },
-    {
-      "name": "AC-233: the changed file is marked in the Worktree view",
-      "ok": true,
-      "detail": [
-        {
-          "name": "a.txt",
-          "badge": "",
-          "selected": true,
-          "color": "rgb(229, 163, 60)",
-          "title": "a.txt — changed by the agent • Changed by the agent | a.txt — changed by the agent"
-        },
-        {
-          "name": "b.txt",
-          "badge": "",
-          "selected": false,
-          "color": "rgb(232, 230, 240)",
-          "title": "b.txt | b.txt"
-        },
-        {
-          "name": "c.txt",
-          "badge": "",
-          "selected": false,
-          "color": "rgb(232, 230, 240)",
-          "title": "c.txt | c.txt"
-        },
-        {
-          "name": "README.md",
-          "badge": "",
-          "selected": false,
-          "color": "rgb(232, 230, 240)",
-          "title": "README.md | README.md"
-        }
-      ]
     },
     {
       "name": "AC-233: Follow moves with the agent to b.txt, at its two changed lines (120 and 121)",
@@ -172,7 +110,7 @@
       "name": "AC-233: an edit typed in the head and saved lands in the agent's worktree, not the window's folder",
       "ok": true,
       "detail": {
-        "worktree": "/private/tmp/ovs-ui-pUxVfd/overseer-home/worktrees/head-repo-ded9f371/head-agent",
+        "worktree": "/private/tmp/ovs-ui-H1a6rU/overseer-home/worktrees/head-repo-f9c83fa5/head-agent",
         "line10": "owner edit: L10: original"
       }
     },
@@ -207,6 +145,58 @@
           "last": 0
         }
       ]
+    },
+    {
+      "name": "AC-264: the review's file list is a two-way switch \"Changed | All files\": Changed lists the changed files, All files the whole worktree with the changed files marked",
+      "ok": true,
+      "detail": {
+        "changedList": {
+          "on": [
+            "Changed"
+          ],
+          "segs": [
+            "Changed",
+            "All files"
+          ],
+          "files": [
+            {
+              "name": "a.txt",
+              "changed": true
+            },
+            {
+              "name": "b.txt",
+              "changed": true
+            }
+          ]
+        },
+        "allList": {
+          "on": [
+            "All files"
+          ],
+          "segs": [
+            "Changed",
+            "All files"
+          ],
+          "files": [
+            {
+              "name": "a.txt",
+              "changed": true
+            },
+            {
+              "name": "b.txt",
+              "changed": true
+            },
+            {
+              "name": "c.txt",
+              "changed": false
+            },
+            {
+              "name": "README.md",
+              "changed": false
+            }
+          ]
+        }
+      }
     },
     {
       "name": "AC-233: and back to Follow, at the same file, line and scroll",
@@ -257,16 +247,29 @@
       }
     },
     {
+      "name": "AC-264: Diffs only opens on \"Changed\"; a file picked in All files (Follow's list) opens as the real file, the agent in Follow and its review closed",
+      "ok": true,
+      "detail": {
+        "opensOn": "Changed",
+        "real": {
+          "title": "c.txt"
+        },
+        "afterPick": [
+          "c.txt, Editor Group 1",
+          "Overseer, Editor Group 2"
+        ]
+      }
+    },
+    {
       "name": "AC-233: removed lines leave a marker where they were",
       "ok": true,
       "detail": {
-        "tab": "b.txt, Editor Group 1",
+        "tab": "b.txt, preview, Editor Group 1",
         "title": "b.txt",
         "active": true,
         "tabs": [
-          "README",
-          "b",
-          "a"
+          "c",
+          "b"
         ],
         "editor": true,
         "after": [
@@ -294,13 +297,12 @@
         },
         "groups": [
           {
-            "tab": "b.txt, Editor Group 1",
+            "tab": "b.txt, preview, Editor Group 1",
             "title": "b.txt",
             "active": false,
             "tabs": [
-              "README",
-              "b",
-              "a"
+              "c",
+              "b"
             ],
             "editor": true,
             "after": [
@@ -332,13 +334,12 @@
       "detail": {
         "left": {
           "head": {
-            "tab": "b.txt, Editor Group 1",
+            "tab": "b.txt, preview, Editor Group 1",
             "title": "b.txt",
             "active": true,
             "tabs": [
-              "README",
-              "b",
-              "a"
+              "c",
+              "b"
             ],
             "editor": true,
             "after": [
@@ -355,13 +356,12 @@
         },
         "returned": {
           "head": {
-            "tab": "b.txt, Editor Group 1",
+            "tab": "b.txt, preview, Editor Group 1",
             "title": "b.txt",
             "active": true,
             "tabs": [
-              "README",
-              "b",
-              "a"
+              "c",
+              "b"
             ],
             "editor": true,
             "after": [
@@ -376,13 +376,12 @@
             "col": 1
           },
           "active": {
-            "tab": "b.txt, Editor Group 1",
+            "tab": "b.txt, preview, Editor Group 1",
             "title": "b.txt",
             "active": true,
             "tabs": [
-              "README",
-              "b",
-              "a"
+              "c",
+              "b"
             ],
             "editor": true,
             "after": [
@@ -404,17 +403,16 @@
         "conv4": "composer",
         "mode5": {
           "mode": "chat",
-          "selected": "r-ef58fc70db2e"
+          "selected": "r-2cb57a2363b1"
         },
         "left2": {
           "head": {
-            "tab": "b.txt, Editor Group 1",
+            "tab": "b.txt, preview, Editor Group 1",
             "title": "b.txt",
             "active": true,
             "tabs": [
-              "README",
-              "b",
-              "a"
+              "c",
+              "b"
             ],
             "editor": true,
             "after": [
@@ -431,13 +429,12 @@
         },
         "returned2": {
           "head": {
-            "tab": "b.txt, Editor Group 1",
+            "tab": "b.txt, preview, Editor Group 1",
             "title": "b.txt",
             "active": true,
             "tabs": [
-              "README",
-              "b",
-              "a"
+              "c",
+              "b"
             ],
             "editor": true,
             "after": [
