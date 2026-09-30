@@ -48,7 +48,7 @@
       "overseer": [
         { "type": "webview", "id": "overseer.search", "name": "Search", "initialSize": 1 },
         { "id": "overseer.agents", "name": "Agents", "initialSize": 14 },
-        { "id": "overseer.worktree", "name": "Worktree", "initialSize": 10, "when": "overseer.headOpen" },
+        { "id": "overseer.worktree", "name": "Files", "initialSize": 10, "when": "overseer.headOpen" },
         { "id": "overseer.accounts", "name": "Accounts", "initialSize": 5 },
         { "id": "overseer.devices", "name": "Devices", "visibility": "collapsed", "initialSize": 3 }
       ]

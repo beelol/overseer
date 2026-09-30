@@ -1,5 +1,5 @@
 // The agent's head (AC-233, AC-257). Opening an agent gives its whole worktree in this window: the
-// Worktree view in Overseer's side bar is its file tree, and its files open as ordinary editors on
+// Files view ("Files in <agent>") in Overseer's side bar is its file tree, and its files open as ordinary editors on
 // their real paths (file: URIs), so they are edited, saved, searched and language-served like any
 // file and every save lands in the agent's worktree. The window's own folder never changes (no
 // workspace folder is added; nothing opens a new window).
@@ -132,7 +132,7 @@ class AgentHead {
     if (!ws || ws.removed_ms) {
       // Its worktree is gone: the view says so rather than showing another agent's files.
       this.runId = root.id; this.root = undefined; this.files = []; this.changed = new Map();
-      this.view.description = root.title; this.view.message = 'This agent\'s worktree was removed.';
+      this.view.title = this.filesTitle(root); this.view.description = ''; this.view.message = 'This agent\'s worktree was removed.';
       this.tree.rebuild();
       this.onSelect?.(root);
       return;
@@ -140,8 +140,8 @@ class AgentHead {
     if (this.runId === root.id && this.root === ws.path) { this.refreshSoon(); return; }
     this.runId = root.id; this.root = ws.path; this.workspaceId = ws.id;
     this.files = []; this.changed = new Map(); this.base = undefined;
-    this.view.title = 'Worktree';
-    this.view.description = root.title;
+    this.view.title = this.filesTitle(root);
+    this.view.description = '';
     this.updateContext(vscode.window.activeTextEditor);
     this.onSelect?.(root);
     this.loading = this.refresh();
@@ -172,7 +172,7 @@ class AgentHead {
     this.files = [...all].sort();
     const before = this.changed;
     this.changed = changed;
-    this.view.description = `${this.model.run(runId)?.title || ''}${changed.size ? ` · ${changed.size} changed` : ''}`;
+    this.view.description = changed.size ? `${changed.size} changed` : '';
     this.view.message = this.files.length ? undefined : 'No files in this worktree.';
     this.tree.rebuild();
     const touched = [...new Set([...before.keys(), ...changed.keys()])];
@@ -377,8 +377,31 @@ class AgentHead {
     }, 500);
   }
 
-  /** The Worktree view is in the side bar while an agent's files are open in Follow (not in Diffs only, whose review lists them). */
-  showView(on) { if (this.viewShown !== on) { this.viewShown = on; vscode.commands.executeCommand('setContext', 'overseer.headOpen', on); } }
+  /** The view's title in plain words: whose files these are (AC-264). */
+  filesTitle(root) { return `Files in ${this.model.task?.(root.task_id)?.title || root.title || 'the agent'}`; }
+
+  /** The Files view is in the side bar while an agent's files are open in Follow (not in Diffs only, whose review lists them). */
+  showView(on) {
+    if (this.viewShown === on) return;
+    this.viewShown = on;
+    if (on) this.place().catch(error => this.log('head: place: ' + error.message));
+    vscode.commands.executeCommand('setContext', 'overseer.headOpen', on);
+  }
+
+  /**
+   * AC-264: the Files view always sits in Overseer's side bar under the agents list, never over
+   * Overseer's panel on the right. VS Code keeps a view where it was last dragged (the secondary
+   * side bar, the panel), so once a session it is moved back into Overseer's view container (VS
+   * Code's own Move Views; nothing moves when it is already there). Moving opens that container, so
+   * the keyboard goes back to the editor after.
+   */
+  async place() {
+    if (this.placed) return;
+    this.placed = true;
+    const focused = vscode.window.activeTextEditor || vscode.window.tabGroups.activeTabGroup.activeTab;
+    await vscode.commands.executeCommand('vscode.moveViews', { viewIds: ['overseer.worktree'], destinationId: 'workbench.view.extension.overseer' });
+    if (focused) await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup').then(undefined, () => {});
+  }
 
   // ------------------------------------------------------------ where the owner was
 

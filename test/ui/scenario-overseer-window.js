@@ -9,7 +9,8 @@
 //   - A second VS Code window keeps its tab strip, and no user setting changes.
 //   - Picking an agent turns the right panel into its chat; back (the arrow, then ⌥⌘U both ways)
 //     returns to Overseer's conversation with its history.
-//   - Voice Mode takes over the same panel.
+//   - Voice Mode takes over the same panel. The agent's Files view, even when the owner once moved it
+//     to the secondary side bar, is put back in the left side bar under the agents.
 //   - The button again restores the cluttered layout exactly (groups and their shares, tabs in
 //     order, active tabs, Explorer, the terminal panel), and the terminal command's fate is measured.
 //   - Screenshots at 1920×1080 and 1440×900 in the three Overseer themes.
@@ -65,6 +66,24 @@ const L = require('./overseer-window-helpers');
     s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', "sed -i '' 's/^L3: original$/L3: done/; s/^L8: original$/L8: checked/' b.txt; printf 'notes\\n- b.txt: lines 3 and 8 updated\\n' > notes.md; echo 'Updated b.txt (lines 3 and 8) and wrote notes.md.'"], prompt: '', title: 'Finished edit' });
     live = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'i=0; while [ $i -lt 900 ]; do i=$((i+1)); echo "step $i" >> live.txt; sleep 1; done'], prompt: '', title: 'Live edits' });
     await delay(2500);
+    // Where the agent's Files view is: the left side bar (under the agents), the secondary side bar or the panel.
+    const filesPane = c => c.evalWorkbench(`(() => { const p = [...document.querySelectorAll('.pane')].find(p => p.offsetParent && /^Files in /i.test(p.querySelector('.pane-header .title')?.textContent.trim() || '')); if (!p) return null;
+      const b = p.querySelector('.pane-header').getBoundingClientRect(); return { title: p.querySelector('.pane-header .title').textContent.trim(), part: p.closest('.part.sidebar') ? 'side bar' : p.closest('.part.auxiliarybar') ? 'secondary side bar' : p.closest('.part.panel') ? 'panel' : 'elsewhere', x: b.left + 60, y: b.top + b.height / 2 }; })()`).catch(() => null);
+
+    // The owner's Files view was once dragged elsewhere (the secondary side bar, where it would sit
+    // over Overseer's panel): VS Code keeps it there across windows.
+    await s.selectAgent('Finished edit', { settle: 2500 });
+    await main.command('Overseer: Follow the Agent in Its Files'); await delay(2500);
+    const files0 = await main.waitFor(`[...document.querySelectorAll('.pane')].some(p => p.offsetParent && /^Files in /i.test(p.querySelector('.pane-header .title')?.textContent.trim() || ''))`, 20000, 'the Files view').then(() => filesPane(main)).catch(() => null);
+    if (files0) { await main.click(files0.x, files0.y); await delay(400); }
+    await main.command('View: Move View');
+    await main.waitFor(`!!document.querySelector('.quick-input-widget .monaco-list-row')`, 8000, 'move view destinations').catch(() => {});
+    await main.type('Secondary Side Bar'); await delay(600); await main.key('Enter'); await delay(1500);
+    const moved = await filesPane(main);
+    await s.screenshot('files-view-moved-away');
+    check('the Files view is named for the agent in plain words ("Files in <agent>"); here it has been moved to the secondary side bar', files0 && /^Files in Finished edit$/i.test(files0.title) && moved?.part === 'secondary side bar', { files0, moved });
+    await main.command('View: Close All Editor Groups'); await delay(1000);
+    await main.command('View: Close Secondary Side Bar'); await delay(800);
     await main.command('View: Show Explorer'); await delay(500);
     for (const f of ['a.txt', 'c.txt']) await L.openFile(main, f);
     await main.command('View: Split Editor Right'); await delay(800);
@@ -185,6 +204,18 @@ const L = require('./overseer-window-helpers');
       voiceState?.state === 'listening' && voiced.groups.length === 2 && voiced.tabStrips === 0 && Math.abs(voiceState.width - voiced.groups[1].width) <= 4, { voiced, voiceState });
     await shots('voice', 'dark');
     await main.command('Overseer: Voice Mode: Turn On or Off'); await delay(1500);
+
+    // Follow: the agent's files in the middle; its Files view back in the left side bar under the agents, never over the right panel.
+    await s.selectAgent('Finished edit', { settle: 2000 });
+    await main.command('Overseer: Follow the Agent in Its Files'); await delay(3000);
+    let placed = null;
+    for (let i = 0; i < 40 && placed?.part !== 'side bar'; i++) { placed = await filesPane(main); if (placed?.part !== 'side bar') await delay(250); }
+    const follow = await L.layout(main);
+    const right = await L.overseerView(main);
+    check('in the Overseer window the Files view is in the left side bar under the agents (moved back), and the right panel stays Overseer\'s',
+      placed?.part === 'side bar' && follow.groups.length === 2 && follow.tabStrips === 0 && follow.breadcrumbs === 0 && Math.abs(right.width - follow.groups[1].width) <= 4, { placed, follow, right });
+    await shots('follow', 'dark');
+    await main.command('Overseer: Diffs Only'); await delay(2000);
 
     // ---------- The button again: the cluttered layout, exactly.
     const b2 = await button(main);

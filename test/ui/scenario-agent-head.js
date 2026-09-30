@@ -73,9 +73,9 @@ const THEMES = ['Overseer Dark', 'Overseer Light', 'Overseer'];
       return headGroup(file);
     };
     const worktreeRows = () => cdp.evalWorkbench(`(() => {
-      const pane = [...document.querySelectorAll('.pane')].find(p => /^Worktree/i.test(p.querySelector('.pane-header .title')?.textContent.trim() || ''));
+      const pane = [...document.querySelectorAll('.pane')].find(p => /^Files in /i.test(p.querySelector('.pane-header .title')?.textContent.trim() || ''));
       if (!pane) return null;
-      return { description: pane.querySelector('.pane-header .description')?.textContent || '', rows: [...pane.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).map(r => {
+      return { title: pane.querySelector('.pane-header .title')?.textContent.trim() || '', inSideBar: !!pane.closest('.part.sidebar'), description: pane.querySelector('.pane-header .description')?.textContent || '', rows: [...pane.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).map(r => {
         const label = r.querySelector('.monaco-icon-label');
         const badge = label ? getComputedStyle(label, '::after').content.replace(/^"|"$/g, '') : '';
         return { name: r.querySelector('.label-name')?.textContent || '', badge: badge === 'none' ? '' : badge, selected: r.classList.contains('selected'),
@@ -109,8 +109,8 @@ const THEMES = ['Overseer Dark', 'Overseer Light', 'Overseer'];
       !!head && g1.length === 2 && g1.some(g => /^Overseer/.test(g.tab)) && conv1.mode === 'composer' && conv1.visible && JSON.stringify(conv1.items) === JSON.stringify(conv0.items), { groups: g1, conv1 });
     await s.openOverseerView();
     const rows = await worktreeRows();
-    check('AC-233: the Worktree view shows the agent\'s worktree (its files, named after the agent)',
-      !!rows && /Head agent/.test(rows.description) && ['a.txt', 'b.txt', 'README.md'].every(n => rows.rows.some(r => r.name === n)), rows);
+    check('AC-233, AC-264: the Files view, in the side bar under the agents, shows the agent\'s worktree (its title: "Files in <agent>")',
+      !!rows && /^Files in Head agent/i.test(rows.title) && rows.inSideBar && ['a.txt', 'b.txt', 'README.md'].every(n => rows.rows.some(r => r.name === n)), rows);
     await s.screenshot('opened-from-conversation');
 
     // ---- AC-233: Follow goes to the file the agent edits, at the line, annotated.
