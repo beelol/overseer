@@ -150,8 +150,8 @@ async function activate(context) {
     backToAgent: runId => backToAgent(runId) });
   centerRef = center;
   const arrangement = new Arrangement({ context, center, review, model, client, outputs, log: say });
-  // The agent's head (AC-233): its worktree in this window, Follow or Diffs only. Switching between
-  // them while only the chat is shown brings the head in first.
+  // The agent's head (AC-233, AC-264): its review in the middle, Follow or Diffs only. Switching
+  // between them while only the chat is shown brings the review in first.
   const head = new AgentHead({ context, client, model, review, log: say, handlers: { ensureShown: runId => arrangement.openReview(runId) } });
   review.head = head;
   outputs.column = () => vscode.ViewColumn.Beside;
@@ -490,7 +490,7 @@ async function activate(context) {
   }
 
   // AC-257: Overseer's conversation and the agent's head are one action apart. Going to the
-  // conversation leaves the agent's head as it is (its files, cursor and scroll stay open beside);
+  // conversation leaves the agent's review as it is (open beside, in Follow or Diffs only);
   // going back focuses the head again and, when the Overseer tab showed the agent's chat, that chat.
   let leftAgent; // { runId, chat }: the agent the owner left for the conversation
   async function backToOverseer() {
@@ -944,7 +944,6 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.head.toggleMode', guard(() => head.toggleMode(head.runId || selectedRun))),
     vscode.commands.registerCommand('overseer.head.follow', guard(() => head.setMode(head.runId || selectedRun, 'follow'))),
     vscode.commands.registerCommand('overseer.head.diffsOnly', guard(() => head.setMode(head.runId || selectedRun, 'diffs'))),
-    vscode.commands.registerCommand('overseer.head.catchUp', guard(() => head.catchUp())),
     vscode.commands.registerCommand('overseer.backToOverseer', guard(() => backToOverseer())),
     vscode.commands.registerCommand('overseer.backToAgent', guard(() => backToAgent())),
     vscode.commands.registerCommand('overseer.switchAgentOverseer', guard(() => switchAgentOverseer())),

@@ -142,9 +142,8 @@
       { "command": "overseer.turnOffPhoneNotifications", "title": "Turn Off Notifications to Phones", "category": "Overseer", "icon": "$(bell-slash)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.turnOnPhoneNotifications", "title": "Turn On Notifications to Phones", "category": "Overseer", "icon": "$(bell)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.head.toggleMode", "title": "Switch Between Follow and Diffs Only", "category": "Overseer", "icon": "$(eye)" },
-      { "command": "overseer.head.follow", "title": "Follow the Agent in Its Files", "category": "Overseer", "icon": "$(eye)" },
+      { "command": "overseer.head.follow", "title": "Follow the Agent", "category": "Overseer", "icon": "$(eye)" },
       { "command": "overseer.head.diffsOnly", "title": "Diffs Only", "category": "Overseer", "icon": "$(diff-multiple)" },
-      { "command": "overseer.head.catchUp", "title": "Go to the Agent's Latest Edit", "category": "Overseer" },
       { "command": "overseer.backToOverseer", "title": "Back to Overseer's Conversation", "category": "Overseer", "icon": "$(comment-discussion)" },
       { "command": "overseer.backToAgent", "title": "Back to the Agent", "category": "Overseer", "icon": "$(eye)" },
       { "command": "overseer.switchAgentOverseer", "title": "Switch Between the Agent and Overseer", "category": "Overseer" }
@@ -242,11 +241,11 @@
       "editor/title": [
         { "command": "overseer.head.diffsOnly", "when": "overseer.headEditor", "group": "navigation@90" },
         { "command": "overseer.backToOverseer", "when": "overseer.headEditor", "group": "navigation@91" },
-        { "command": "overseer.head.follow", "when": "activeWebviewPanelId == 'overseer.review'", "group": "navigation@90" }
+        { "command": "overseer.head.follow", "when": "activeWebviewPanelId == 'overseer.review' && overseer.headMode == 'diffs'", "group": "navigation@90" },
+        { "command": "overseer.head.diffsOnly", "when": "activeWebviewPanelId == 'overseer.review' && overseer.headMode == 'follow'", "group": "navigation@90" }
       ],
       "commandPalette": [
         { "command": "overseer.openEdit", "when": "false" },
-        { "command": "overseer.head.catchUp", "when": "false" },
         { "command": "overseer.startSwarm", "when": "config.overseer.experimental.swarm" },
         { "command": "overseer.filterSwarmJobs", "when": "config.overseer.experimental.swarm" },
         { "command": "overseer.pauseSwarm", "when": "config.overseer.experimental.swarm" },
@@ -304,7 +303,7 @@
         "overseer.devInstance": { "type": "string", "default": "", "markdownDescription": "Dev profiles only (written by `scripts/dev code`): the dev instance (`dev-<name>`) this window is pinned to; a daemon reporting another instance is refused. The installed extension ignores it.", "scope": "machine" },
         "overseer.review.enableEditing": { "type": "boolean", "default": true, "markdownDescription": "Edit working-tree text directly in the review. Undo/redo is available through Open in Native Diff." },
         "overseer.review.largeDiffThreshold": { "type": "integer", "minimum": 1, "default": 500, "markdownDescription": "Show a Load Diff card when additions + deletions exceed this count." },
-        "overseer.agent.openIn": { "type": "string", "enum": ["follow", "diffs"], "enumDescriptions": ["Follow: the agent's worktree in its real files, following the file it is editing, its changes shown inline. You can edit and save any file.", "Diffs only: the review of what the agent changed."], "default": "follow", "markdownDescription": "What opening an agent shows beside its chat. Each agent remembers the last choice you toggled (**Overseer: Switch Between Follow and Diffs Only**)." },
+        "overseer.agent.openIn": { "type": "string", "enum": ["follow", "diffs"], "enumDescriptions": ["Follow: the review shows the file the agent is in, live, its changes marked, with all its worktree's files beside it.", "Diffs only: the review of what the agent changed, with the changed files beside it."], "default": "follow", "markdownDescription": "What opening an agent shows beside its chat. Each agent remembers the last choice you toggled (**Overseer: Switch Between Follow and Diffs Only**)." },
         "overseer.followNewRuns": { "type": "boolean", "default": true, "markdownDescription": "Turn Follow on for agents you start from this window. Opening an agent that already exists never turns Follow on." },
         "overseer.home.sendTo": { "type": "string", "enum": ["overseer", "agent"], "enumDescriptions": ["Overseer reads it and starts, steers or answers.", "Start an agent directly with the task (repository, agent, model and workspace choices)."], "default": "overseer", "scope": "application", "markdownDescription": "Where home's box sends what you type. Home's **Send to** choice changes it and remembers it." },
         "overseer.showStartedAgent": { "type": "boolean", "default": true, "markdownDescription": "**Show the agent I start.** When something you ask Overseer (typed or spoken) starts a single agent, the conversation slides aside, with the mark on the right, and shows that agent working beside it. Off: the conversation stays as it is." },
