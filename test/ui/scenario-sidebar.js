@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
+const { Session, makeRepo, latestVsix, delay, until, repoRoot } = require('./harness');
 
 const BUDGET = 238;
 
@@ -130,18 +130,22 @@ const BUDGET = 238;
       onWatch.some(a => a.name.startsWith('Stop')) && onDone.some(a => a.name.startsWith('Archive')) && onDone.some(a => a.name.startsWith('Pin to Grid')) && [...onWatch, ...onDone].every(a => a.name), { onWatch, onDone });
     await s.screenshot('hover-actions');
     // Pin by mouse.
-    const pin = onDone.find(a => a.name.startsWith('Pin to Grid')); await cdp.click(pin.x, pin.y); await delay(1200);
-    const pinnedAfter = (await hover('Refresh sessions once')).some(a => a.name.startsWith('Unpin from Grid'));
-    // Archive by keyboard: focus the row, Delete (⌘⌫ on macOS).
+    const pin = onDone.find(a => a.name.startsWith('Pin to Grid')); await cdp.click(pin.x, pin.y);
+    const pinnedAfter = (await until(() => hover('Refresh sessions once'), acts => acts.some(a => a.name.startsWith('Unpin from Grid')), 20000)).some(a => a.name.startsWith('Unpin from Grid'));
+    // Archive by keyboard: focus the row, Delete (⌘⌫ on macOS). The key goes to the row once
+    // the Agents view has keyboard focus on it, not after a fixed time.
     const rowPt = await cdp.evalWorkbench(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].find(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === 'Split the payment service'); const b = r.getBoundingClientRect(); return { x: b.left + 120, y: b.top + b.height / 2 }; })()`);
-    await cdp.click(rowPt.x, rowPt.y); await delay(1500);
-    await cdp.command('Focus on Agents View'); await delay(500);
-    await cdp.key('Backspace', { meta: true }); await delay(1500);
-    const archived = s.ctl('state').tasks.find(t => t.id === runs.nested.task.id).archived_ms;
+    await cdp.click(rowPt.x, rowPt.y);
+    await until(() => cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-list-row.selected')].some(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === 'Split the payment service')`), Boolean, 15000);
+    await cdp.command('Focus on Agents View');
+    const keyTarget = await until(() => cdp.evalWorkbench(`(() => { const a = document.activeElement; const pane = a?.closest('.pane'); return !!pane && /^Agents/.test(pane.querySelector('.pane-header')?.textContent.trim() || '') && a.querySelector('.monaco-list-row.focused .label-name')?.textContent.trim() === 'Split the payment service'; })()`), Boolean, 15000);
+    s.note('archive key goes to the focused Agents row', keyTarget);
+    await cdp.key('Backspace', { meta: true });
+    const archived = await until(() => s.ctl('state').tasks.find(t => t.id === runs.nested.task.id).archived_ms, Boolean, 20000);
     // The context menu offers the rest.
     const ctx = await cdp.evalWorkbench(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === 'Refresh sessions once').pop(); const b = r.getBoundingClientRect(); return { x: b.left + 120, y: b.top + b.height / 2 }; })()`);
-    await cdp.click(ctx.x, ctx.y, { button: 'right' }); await delay(800);
-    const menu = await cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-menu .action-item .action-label')].map(a => a.getAttribute('aria-label') || a.textContent.trim()).filter(Boolean)`);
+    await cdp.click(ctx.x, ctx.y, { button: 'right' });
+    const menu = await until(() => cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-menu .action-item .action-label')].map(a => a.getAttribute('aria-label') || a.textContent.trim()).filter(Boolean)`), m => m.some(x => x.startsWith('Archive')), 15000);
     await cdp.key('Escape');
     check('pin by mouse, archive by keyboard (⌘⌫ in the Agents view), and the context menu offers Open to the Side, Open Review, Merge Back and the rest',
       pinnedAfter && !!archived && ['Open to the Side', 'Open Review', 'Merge Back…', 'Unpin from Grid', 'Archive'].every(x => menu.some(m => m.startsWith(x.replace('…', '')))), { pinnedAfter, archived: !!archived, menu });

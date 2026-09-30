@@ -5,7 +5,7 @@
 // overflows sideways; file rows carry codicons; the large diff starts collapsed with its count.
 const fs = require('fs');
 const path = require('path');
-const { Session, makeRepo, latestVsix, delay } = require('./harness');
+const { Session, makeRepo, latestVsix, delay, until } = require('./harness');
 
 const WIDTHS = [900, 1280, 1600];
 const THEMES = ['Overseer Dark', 'Overseer Light'];
@@ -26,12 +26,12 @@ const THEMES = ['Overseer Dark', 'Overseer Light'];
     const script = `sed -i '' -e 's/^L20: original$/${long}/' -e 's/^L140: original$/L140: agent edit/' -e 's/^L260: original$/L260: agent edit/' a.txt; ` +
       `sed -i '' -e 's/^L5: original$/L5: agent edit/' b.txt; i=1; while [ $i -le 800 ]; do echo "generated line $i"; i=$((i+1)); done > big.txt; echo done`;
     const t = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', script], prompt: '', title: 'Wide edits' });
-    for (let i = 0; i < 30 && s.ctl('state').runs.find(r => r.id === t.run.id).status !== 'completed'; i++) await delay(300);
+    await until(() => s.ctl('state').runs.find(r => r.id === t.run.id).status === 'completed', Boolean, 60000, 300);
     await cdp.command('Overseer: Switch Agent…'); await cdp.waitQuickTitle('Switch to agent'); await cdp.type('Wide edits'); await delay(300); await cdp.key('Enter'); await delay(2500);
     const review = await cdp.webview(`!!document.getElementById('diffs') && document.body.dataset.runId === ${JSON.stringify(t.run.id)}`, 30000);
     await review.waitFor(`document.querySelectorAll('.hunk-actions').length >= 3`, 30000);
     const theme = async name => { const cur = JSON.parse(fs.readFileSync(settingsFile, 'utf8')); cur['workbench.colorTheme'] = name; fs.writeFileSync(settingsFile, JSON.stringify(cur, null, 2)); await delay(1800); };
-    const width = async w => { await cdp.call('Emulation.setDeviceMetricsOverride', { width: w, height: 900, deviceScaleFactor: 0, mobile: false }, cdp.workbench); await delay(1600); };
+    const width = async w => { await cdp.call('Emulation.setDeviceMetricsOverride', { width: w, height: 900, deviceScaleFactor: 0, mobile: false }, cdp.workbench); await until(() => cdp.evalWorkbench('innerWidth'), x => x === w, 20000); await delay(600); };
     const audit = () => review.eval(`(() => {
       const box = e => e.getBoundingClientRect();
       const oneLine = el => { const kids = [...el.children].filter(k => k.offsetParent && box(k).width > 0 && getComputedStyle(k).position !== 'absolute'); const mids = kids.map(k => { const b = box(k); return b.top + b.height / 2; }); return { ok: mids.every(m => Math.abs(m - mids[0]) <= 6), height: Math.round(box(el).height) }; };
@@ -67,11 +67,12 @@ const THEMES = ['Overseer Dark', 'Overseer Light'];
         // Scroll through the diffs so every hunk renders once.
         await review.eval(`document.getElementById('diffs').scrollTop = 0`); await delay(600);
         // Measured once the review has settled at this width: while it is still laying out, a
-        // reading can catch it mid-resize. What a transient reading showed is kept.
+        // reading can catch it mid-resize (for longer on a loaded machine: up to 20 s here). What
+        // a transient reading showed is kept.
         let a = await audit();
         const transient = [];
-        for (let i = 0; i < 6 && a.overflow; i++) { transient.push({ wide: a.wide, parts: a.parts, sizes: a.sizes }); await delay(500); a = await audit(); }
-        if (transient.length) s.note(`review at ${w} px in ${th}: overflow in ${transient.length} reading(s) before it settled`, { settled: !a.overflow, transient });
+        for (const end = Date.now() + 20000; a.overflow && Date.now() < end;) { transient.push({ wide: a.wide, parts: a.parts, sizes: a.sizes }); await delay(500); a = await audit(); }
+        if (transient.length) s.note(`review at ${w} px in ${th}: overflow in ${transient.length} reading(s) before it settled`, { settled: !a.overflow, transient: transient.slice(0, 6) });
         result.audits.push({ theme: th, window: w, ...a, ...(transient.length ? { transient } : {}) });
         await s.screenshot(`review-${th.split(' ')[1].toLowerCase()}-${w}`);
       }

@@ -16,7 +16,7 @@ const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
 const net = require('net');
-const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
+const { Session, makeRepo, latestVsix, delay, until, repoRoot } = require('./harness');
 const { auditExpression } = require('./audit');
 
 const freePort = () => new Promise(resolve => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => resolve(p)); }); });
@@ -168,8 +168,9 @@ const G = 2 ** 30;
     let successor; for (let i = 0; i < 100 && !successor; i++) { await delay(300); successor = s.ctl('continuity.handoffs').handoffs.find(h => h.predecessor === moved.run.id)?.successor; }
     await waitStatus(successor, /completed|failed/);
     // The handed-off agent folds under its successor in the side bar; until it has, two rows carry
-    // the title and a click on the lower one opens the predecessor.
-    for (let i = 0; i < 75 && (await s.agentRows()).filter(r => r.label === 'Rename the helpers').length > 1; i++) await delay(200);
+    // the title and a click on the lower one opens the predecessor. Wait for the fold itself.
+    const titled = await until(async () => (await s.agentRows()).filter(r => r.label === 'Rename the helpers'), rs => rs.length === 1, 60000);
+    s.note('rows titled "Rename the helpers" before the click', titled);
     await s.selectAgent('Rename the helpers');
     dash = await s.editorView(`document.getElementById('title')?.textContent === 'Rename the helpers'`);
     const opened = await dash.waitFor(`[...document.querySelectorAll('#conv .cont-note')].map(n => n.textContent)`, 15000);

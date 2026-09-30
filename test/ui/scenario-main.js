@@ -3,7 +3,7 @@
 // turn Follow off, edit the worktree from the review, send a follow-up, interrupt.
 const fs = require('fs');
 const path = require('path');
-const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, delay, git } = require('./harness');
+const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, delay, until, git } = require('./harness');
 
 (async () => {
   const s = new Session(process.env.SCENARIO_NAME || 'main');
@@ -158,10 +158,13 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
 
     // Native child selected in the tree: controls are disabled with an explanation.
     const deleg = s.ctl('task.create', { repo, harness: 'opencode', profile_id: profile.id, model: 'mock/mock-coder', prompt: 'please delegate twice', title: 'delegation' });
-    for (let i = 0; i < 40; i++) { if (s.ctl('state').runs.filter(r => r.task_id === deleg.task.id).length >= 3 && s.ctl('state').runs.find(r => r.id === deleg.run.id).status === 'completed') break; await delay(500); }
-    const icon = await cdp.waitFor(`(() => { const a = [...document.querySelectorAll('.activitybar .action-item a, .activitybar .action-label')].find(a => /^Overseer/.test(a.getAttribute('aria-label') || '')); if (!a) return null; const b = a.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`, 20000);
-    await cdp.click(icon.x, icon.y);
-    const childRow = await cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].find(r => r.offsetParent && /grandchild hi/.test(r.textContent)); if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 80, y: b.top + b.height / 2, text: r.textContent, level: Number(r.getAttribute('aria-level')) }; })()`, 20000, 'grandchild row');
+    // The real OpenCode CLI delegates twice against the mock server: on a loaded machine that takes
+    // longer than a fixed 20 s, so wait for the daemon to have both children and the parent done.
+    const delegated = await until(() => { const st = s.ctl('state'); return st.runs.filter(r => r.task_id === deleg.task.id).length >= 3 && st.runs.find(r => r.id === deleg.run.id).status === 'completed'; }, Boolean, 120000, 500);
+    s.note('delegation finished with its children', delegated);
+    // Show the Overseer side bar (clicking its icon while it is already shown would close it).
+    await s.openOverseerView();
+    const childRow = await cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].find(r => r.offsetParent && /grandchild hi/.test(r.textContent)); if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 80, y: b.top + b.height / 2, text: r.textContent, level: Number(r.getAttribute('aria-level')) }; })()`, 60000, 'grandchild row');
     // Gate K side bar: repository (1) → task (2) → native child (3) → grandchild (4).
     check('three-level native tree visible in the UI', childRow.level >= 4, { text: childRow.text, level: childRow.level });
     await cdp.click(childRow.x, childRow.y);

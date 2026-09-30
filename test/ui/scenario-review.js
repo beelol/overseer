@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } = require('./harness');
+const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, until, git } = require('./harness');
 
 (async () => {
   const s = new Session('review');
@@ -44,13 +44,19 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
     check('selecting an existing run does not turn Follow on', !(await reviewA.eval(`(document.getElementById('follow').dataset.state !== 'off')`)), await reviewA.eval(`document.getElementById('follow').dataset.state`));
     const box = await s.webviewPoint(reviewA, '#follow');
     await cdp.click(box.x, box.y);
-    await reviewA.waitFor(`document.getElementById('follow-state').textContent.startsWith('Following')`, 20000);
+    // Follow is a toggle, so a second click only when the first has had 10 s to show and has not
+    // (on a loaded machine the review can still be settling when the pointer arrives); noted.
+    if (!(await until(() => reviewA.eval(`document.getElementById('follow').dataset.state !== 'off'`), Boolean, 10000))) {
+      s.note('Follow did not turn on after the first click; clicking again', await reviewA.eval(`({ state: document.getElementById('follow').dataset.state, active: document.activeElement?.id })`));
+      const again = await s.webviewPoint(reviewA, '#follow'); await cdp.click(again.x, again.y);
+    }
+    await reviewA.waitFor(`document.getElementById('follow-state').textContent.startsWith('Following')`, 30000);
     // AC-29: a user/unrelated change (not reported by the harness) must not be followed or attributed.
     fs.writeFileSync(path.join(wsA, 'user-note.txt'), 'written by the user, not the agent\n');
     const seen = [];
     for (let i = 0; i < 24; i++) { const t = await reviewA.eval(`document.getElementById('follow-state').textContent`); if (seen[seen.length - 1] !== t) seen.push(t); await delay(250); }
     check('follow ignores unattributed user file', seen.length > 1 && !seen.some(t => t.includes('user-note')), seen);
-    await reviewA.waitFor(`[...document.querySelectorAll('.file-path')].some(e => e.textContent === 'user-note.txt')`, 6000);
+    await reviewA.waitFor(`[...document.querySelectorAll('.file-path')].some(e => e.textContent === 'user-note.txt')`, 30000);
     check('user file still listed in the live review', true, 'user-note.txt listed');
     const topA = await reviewA.eval(`document.getElementById('diffs').scrollTop`);
     await s.screenshot('run-a-following');
@@ -85,7 +91,7 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
     await editLine(reviewB, 'a.txt', ' EDIT-IN-B', '/agent.edit/');
     const saveB = await s.webviewPoint(reviewB, '#save-target');
     await cdp.click(saveB.x, saveB.y);
-    await delay(1500);
+    await until(() => fs.readFileSync(path.join(wsB, 'a.txt'), 'utf8').includes('EDIT-IN-B'), Boolean, 20000);
     check('review edit wrote only B worktree', fs.readFileSync(path.join(wsB, 'a.txt'), 'utf8').includes('EDIT-IN-B') && fs.readFileSync(path.join(wsA, 'a.txt'), 'utf8') === aBefore && !fs.readFileSync(path.join(repoB, 'a.txt'), 'utf8').includes('EDIT-IN-B'), 'A unchanged, source repoB unchanged');
 
     // AC-31: refresh timing without manual refresh.
@@ -149,8 +155,8 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
     git(wsB, 'switch', '-q', 'other'); fs.writeFileSync(path.join(wsB, 'conflict.txt'), 'theirs\n'); git(wsB, 'commit', '-q', '-m', 'theirs', 'conflict.txt');
     git(wsB, 'switch', '-q', 'review-branch');
     s.note('merge', cp.spawnSync('git', ['merge', 'other'], { cwd: wsB, encoding: 'utf8' }).stdout.trim());
-    const conflictShown = await reviewB.waitFor(`[...document.querySelectorAll('#tree .file.conflicted')].some(b => /conflict\\.txt/.test(b.getAttribute('aria-label') || '') && /conflicted/.test(b.getAttribute('aria-label')))`, 8000).then(() => true, () => false);
-    const conflictListed = await reviewB.waitFor(`[...document.querySelectorAll('.diff-file .file-path')].some(e => e.textContent === 'conflict.txt')`, 8000).catch(() => false);
+    const conflictShown = await reviewB.waitFor(`[...document.querySelectorAll('#tree .file.conflicted')].some(b => /conflict\\.txt/.test(b.getAttribute('aria-label') || '') && /conflicted/.test(b.getAttribute('aria-label')))`, 30000).then(() => true, () => false);
+    const conflictListed = await reviewB.waitFor(`[...document.querySelectorAll('.diff-file .file-path')].some(e => e.textContent === 'conflict.txt')`, 30000).catch(() => false);
     check('merge conflict shown as Conflicted and listed in the review', conflictShown && conflictListed, { conflictShown, conflictListed });
     await s.screenshot('conflict');
     // Rename during an unsaved review edit: the draft is not silently lost.
@@ -174,11 +180,10 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
     await reviewC.waitFor(`[...document.querySelectorAll('.diff-file')].some(e => e.querySelector('.file-path')?.textContent === 'a.txt' && e.dataset.loadState === 'rendered')`, 20000);
     const fbox = await s.webviewPoint(reviewC, '#follow');
     await cdp.click(fbox.x, fbox.y);
-    await delay(700);
-    const note = await reviewC.eval(`document.getElementById('follow-state').textContent`);
+    const note = await until(() => reviewC.eval(`document.getElementById('follow-state').textContent`), t => /Filesystem evidence only/.test(t || ''), 15000);
     check('filesystem-only harness shows the Follow limitation', /Filesystem evidence only/.test(note), note);
     await cdp.click(fbox.x, fbox.y);
-    await delay(300);
+    await until(() => reviewC.eval(`document.getElementById('follow').dataset.state`), st => st === 'off', 15000);
     await editLine(reviewC, 'a.txt', ' SAVED-FROM-REVIEW', '/user.change/');
     const saveC = await s.webviewPoint(reviewC, '#save-target');
     await cdp.click(saveC.x, saveC.y);

@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
+const { Session, makeRepo, latestVsix, delay, until, repoRoot } = require('./harness');
 const { auditExpression } = require('./audit');
 
 const UI = process.env.AUDIT_UI || 'gatek';
@@ -125,8 +125,12 @@ const HEIGHT = 860;
       views.agents = tagged ? { frame: null, opts: { root: '[data-audit="agents"]', nativeHover: true, exclude: ['[data-audit="agents"] .monaco-list-row[aria-label^="Agents: "]', '[data-audit="agents"] .pane-header .description'] } } : undefined;
       // VS Code's managed hover really shows the name of a title action (checked once by pointer).
       const act = await cdp.evalWorkbench(`(() => { const a = document.querySelector('[data-audit="agents"] .pane-header .action-label[aria-label^="Search Agents"]'); if (!a) return null; const r = a.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
-      if (act) { await cdp.move(act.x, act.y); await delay(300); await cdp.move(act.x + 1, act.y); }
-      const hoverText = act && await cdp.waitFor(`[...document.querySelectorAll('.workbench-hover, .monaco-hover')].filter(h => h.offsetParent).map(h => h.innerText).find(t => /Search Agents/.test(t))`, 4000).catch(() => '');
+      // VS Code shows a managed hover after its hover delay, measured from the pointer's last move;
+      // a loaded machine can miss a short window, so the pointer rests on the action (nudged again
+      // now and then, as a hand would) until the hover shows, up to 20 s.
+      const shownHover = () => cdp.evalWorkbench(`[...document.querySelectorAll('.workbench-hover, .monaco-hover')].filter(h => h.offsetParent).map(h => h.innerText).find(t => /Search Agents/.test(t)) || ''`);
+      let nudge = 0;
+      const hoverText = act ? await until(async () => { const t = await shownHover(); if (!t && nudge++ % 20 === 0) { await cdp.move(act.x, act.y); await delay(100); await cdp.move(act.x + 1, act.y); } return t; }, Boolean, 20000, 150) : '';
       if (act) await cdp.move(act.x + 300, act.y + 300);
       check('agents: side-bar title actions show their name in VS Code\'s hover', !!hoverText, hoverText);
       views.chat = { frame: dash, opts: { root: '[data-audit-view="chat"]' } };

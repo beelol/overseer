@@ -8,7 +8,7 @@
 // arrangement survives a window reload (AC-49).
 const fs = require('fs');
 const path = require('path');
-const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
+const { Session, makeRepo, latestVsix, delay, until, repoRoot } = require('./harness');
 
 (async () => {
   const s = new Session('arrangement');
@@ -49,8 +49,10 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const perm = s.ctl('task.create', { repo, harness: 'claude', profile_id: 'system-claude', prompt: 'write perm.txt', title: 'Write perm.txt' });
     await waitStatus(perm.run.id, /waiting_for_user/);
     await cdp.command('Overseer: Switch Agent…'); await cdp.waitQuickTitle('Switch to agent');
-    await cdp.type('Write perm.txt'); await delay(300); await cdp.key('Enter'); await delay(2000);
-    const l1 = await layout();
+    await cdp.type('Write perm.txt'); await delay(300); await cdp.key('Enter');
+    // Each step waits for the layout it should reach (30 s at most; the check reports what was there).
+    await cdp.webview(`document.getElementById('title')?.textContent === 'Write perm.txt'`, 30000).catch(() => {});
+    const l1 = await until(layout, l => l.length === 1 && kind(l) === 'chat', 30000, 200);
     check('an agent with no changes: one editor group with its chat and no review', l1.length === 1 && kind(l1) === 'chat' && !l1[0].tabs.some(t => /^Review/.test(t)), l1);
     await s.screenshot('chat-alone');
 
@@ -89,27 +91,29 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
 
     // Closing the review puts the chat back in the middle.
     const closePt = await cdp.evalWorkbench(`(() => { const t = [...document.querySelectorAll('.tab')].find(t => /^Review/.test(t.getAttribute('aria-label') || '')); const c = t?.querySelector('.codicon-close, .tab-actions .action-label'); const b = (c || t).getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
-    await cdp.click(closePt.x, closePt.y); await delay(1500);
-    const l3 = await layout();
+    await cdp.click(closePt.x, closePt.y);
+    const l3 = await until(layout, l => l.length === 1 && kind(l) === 'chat', 30000, 200);
     const chatTab = await cdp.evalWorkbench(`(() => { const t = [...document.querySelectorAll('.tab')].find(t => /^Overseer/.test(t.getAttribute('aria-label') || '')); return t && { cls: t.className, italic: getComputedStyle(t.querySelector('.label-name') || t).fontStyle }; })()`);
     check('the chat is a normal tab after moving (not a preview another file would replace)', chatTab && !/\bpreview\b/.test(chatTab.cls) && chatTab.italic !== 'italic', chatTab);
     check('closing the review returns the chat to the middle (one group)', l3.length === 1 && kind(l3) === 'chat', l3);
     // Selecting an agent with changes keeps the chat-only choice.
     await cdp.command('Overseer: Switch Agent…'); await cdp.waitQuickTitle('Switch to agent');
-    await cdp.type('Refresh sessions once'); await delay(300); await cdp.key('Enter'); await delay(2000);
+    await cdp.type('Refresh sessions once'); await delay(300); await cdp.key('Enter');
+    // The chat shows the agent, then the arrangement has had its chance to change (it must not).
+    await cdp.webview(`document.getElementById('title')?.textContent === 'Refresh sessions once'`, 30000).catch(() => {});
+    await delay(2000);
     const l4 = await layout();
     check('selecting another agent (with changes) keeps the chosen arrangement: chat alone', l4.length === 1 && kind(l4) === 'chat', l4);
     // Open Review brings the review back.
-    await cdp.command('Overseer: Open Review'); await delay(2000);
-    const l5 = await layout();
+    await cdp.command('Overseer: Open Review');
+    const l5 = await until(layout, l => kind(l) === 'review+chat', 30000, 200);
     check('Open Review brings the review back beside the chat', kind(l5) === 'review+chat', l5);
 
     // Survives a reload; no settings changed.
     await cdp.command('Developer: Reload Window'); await delay(7000);
     cdp = await s.connect(); s.cdp = cdp;
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer/.test(e.textContent))`, 60000, 'after reload');
-    await delay(4000);
-    const l6 = await layout();
+    const l6 = await until(layout, l => kind(l) === 'review+chat' && l[0].share >= 0.6, 30000, 200);
     check('the arrangement survives a window reload (review left, chat right)', kind(l6) === 'review+chat' && l6[0].share >= 0.6, l6);
     await s.screenshot('after-reload');
     check('no settings changed (apart from VS Code\'s own migration)', norm(fs.readFileSync(settingsFile, 'utf8')) === settingsBefore);

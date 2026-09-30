@@ -6,7 +6,7 @@
 // navigation in the tree, restore after a window reload, and narrow and wide windows.
 const fs = require('fs');
 const path = require('path');
-const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
+const { Session, makeRepo, latestVsix, delay, until, repoRoot } = require('./harness');
 
 (async () => {
   const s = new Session('center');
@@ -59,11 +59,14 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const tabs = () => cdp.evalWorkbench(`[...document.querySelectorAll('.editor-group-container')].filter(g => g.offsetParent).map(g => g.querySelector('.tab.active')?.getAttribute('aria-label') || '')`);
     const reviewOf = id => cdp.webview(`!!document.getElementById('diffs') && document.body.dataset.runId === ${JSON.stringify(id)} && document.querySelectorAll('#tree .file').length > 0`, 20000).then(() => true, () => false);
     const chatOf = title => cdp.webview(`document.getElementById('title')?.textContent === ${JSON.stringify(title)} && !!document.querySelector('#conv .turn')`, 20000).then(() => true, () => false);
+    // The review's tab says "Review" until its first snapshot has loaded, then names the agent:
+    // read the tabs once the review and chat have loaded, waiting for that name.
+    const tabsFor = title => until(tabs, t => t.some(x => new RegExp(`^Review.*${title}`).test(x)), 20000);
     await s.selectAgent('X edits', { settle: 2500 });
-    const tabsX = await tabs(); const reviewX = await reviewOf(editX.run.id); const chatX = await chatOf('X edits');
+    const reviewX = await reviewOf(editX.run.id); const chatX = await chatOf('X edits'); const tabsX = await tabsFor('X edits');
     await s.screenshot('selected-x');
     await s.selectAgent('Y live', { settle: 2500 });
-    const tabsY = await tabs(); const reviewY = await reviewOf(busy.run.id); const chatY = await chatOf('Y live');
+    const reviewY = await reviewOf(busy.run.id); const chatY = await chatOf('Y live'); const tabsY = await tabsFor('Y live');
     check('selecting a run in another repository switches the review and the conversation', tabsX.some(t => /^Review.*X edits/.test(t)) && tabsY.some(t => /^Review.*Y live/.test(t)) && reviewX && reviewY && chatX && chatY, { tabsX, tabsY, reviewX, reviewY, chatX, chatY });
     await s.screenshot('selected-y');
     rows = await s.agentRows();
@@ -78,20 +81,19 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await s.selectAgent('Y live', { settle: 2500 });
 
     // Keyboard: arrows move through labelled treeitems; Left collapses, then goes to the parent; Right expands.
+    // Each key waits for the focus (or the expansion) to move before the next: a loaded machine
+    // redraws the list later, and a key sent before it has would act on the old row.
     const current = async () => (await s.agentRows()).find(r => r.focused) || {};
-    await s.clickAgentRow('X nested agents', { settle: 2000 });
-    const start = await current();
-    await cdp.key('ArrowDown'); await delay(250);
-    const down = await current();
-    await cdp.key('ArrowUp'); await delay(250);
-    await cdp.key('ArrowLeft'); await delay(250); // collapses the task
-    const collapsedTask = (await current()).expanded;
-    await cdp.key('ArrowRight'); await delay(250); // expands it again
-    const reopened = (await current()).expanded;
-    await cdp.key('ArrowLeft'); await delay(250);
-    await cdp.key('ArrowLeft'); await delay(250); // collapsed: moves to its repository
-    const parent = await current();
-    await cdp.key('ArrowRight'); await delay(250);
+    const after = async (key, ok) => { await cdp.key(key); return until(current, ok, 15000, 100); };
+    await s.clickAgentRow('X nested agents', { settle: 500 });
+    const start = await until(current, r => r.label === 'X nested agents', 15000, 100);
+    const down = await after('ArrowDown', r => r.label !== 'X nested agents');
+    await after('ArrowUp', r => r.label === 'X nested agents');
+    const collapsedTask = (await after('ArrowLeft', r => r.expanded === 'false')).expanded; // collapses the task
+    const reopened = (await after('ArrowRight', r => r.expanded === 'true')).expanded; // expands it again
+    await after('ArrowLeft', r => r.expanded === 'false');
+    const parent = await after('ArrowLeft', r => r.label !== 'X nested agents'); // collapsed: moves to its repository
+    await after('ArrowRight', r => r.expanded === 'true');
     check('keyboard navigation: arrows move between labelled treeitems, Left collapses then goes to the parent, Right expands',
       start.label === 'X nested agents' && down.label === 'child task' && collapsedTask === 'false' && reopened === 'true' && parent.level === 1 && parent.label === 'repo-x' && !!start.aria, { start, down, collapsedTask, parent, reopened });
     await s.selectAgent('Y live', { settle: 2500 });
