@@ -56,7 +56,12 @@
     const backLabel = el('span', 'home-back-agent-label');
     backAgent.append(ui.icon('eye', 'sm'), el('span', 'home-back-agent-verb', 'Back to'), backLabel, el('kbd', null, '⌥⌘U'));
     backAgent.addEventListener('click', () => post({ type: 'backToAgent', runId: backAgent.dataset.run }));
-    head.append(account, vToggle, vstrip, el('span', 'spacer'), needs, level, fresh, unaside);
+    head.append(account, vToggle, vstrip, el('span', 'spacer'), needs, unaside);
+    // The conversation's level and Start fresh sit at the bottom right, under the message box
+    // (the owner, 2026-09-30), in the composer's foot when it is there.
+    const footTools = el('span', 'home-foot-tools'); footTools.append(level, fresh);
+    const composerFoot = host.querySelector('.composer-foot');
+    if (composerFoot) composerFoot.append(footTools); else head.append(footTools);
     // The voice view's stage: the mark, the words heard and said, and the strip's controls.
     const stage = el('section', 'home-stage'); stage.id = 'voice-stage'; stage.hidden = true; stage.setAttribute('aria-label', 'Voice Mode');
     const voiceStage = window.OverseerVoiceStage && layers ? window.OverseerVoiceStage.create(stage, { post, layers }) : null;
