@@ -96,7 +96,7 @@ class ReviewManager {
   overseerInfo(session) {
     const o = session.overseer || {};
     return { runId: o.runId, runTitle: o.runTitle, harness: o.harness, workspacePath: session.repo.rootUri.fsPath, workspaceKind: o.workspaceKind,
-      comparison: o.comparison, scope: o.scope || 'all', view: this.host.view?.(o.runId) || 'diffs', follow: this.host.followState(o.runId), followNote: this.host.followNote(o.runId), reviewed: this.host.reviewedKeys(o.runId),
+      comparison: o.comparison, scope: o.scope || 'all', view: this.host.view?.(o.runId) || 'diffs', viewAt: this.host.viewAt?.(o.runId) || 0, follow: this.host.followState(o.runId), followNote: this.host.followNote(o.runId), reviewed: this.host.reviewedKeys(o.runId),
       land: this.host.land?.(o.runId) };
   }
 
@@ -153,7 +153,7 @@ class ReviewManager {
           // Overseer (AC-243): Merge, Open PR, Cancel merge and Clean up for the review's agent.
           if (message.type === 'land') { await this.host.land_action?.(session.overseer?.runId, String(message.action || '')); this.postOverseer(session); return; }
           // Follow or Diffs only (AC-233), from the review's own switch; both are this review (AC-264).
-          if (message.type === 'setView') { await this.host.setView?.(session.overseer?.runId, String(message.view)); return; }
+          if (message.type === 'setView') { await this.host.setView?.(session.overseer?.runId, String(message.view), Number(message.at) || 0); return; }
           // Follow (AC-264): a file picked in All files shows in the middle; "Follow the agent" goes back.
           if (message.type === 'showFile') { await this.host.followPick?.(session.overseer?.runId, String(message.path || '')); return; }
           if (message.type === 'followAgain') { await this.host.followAgain?.(session.overseer?.runId); return; }

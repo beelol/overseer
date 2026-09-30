@@ -44,6 +44,7 @@ class Review {
     this.observed = new Map(); // abs path -> last observed text (bounded)
     this.userSaves = new Map(); // abs path -> ms of last user save
     this.lastReveal = new Map(); // runId -> last reveal message
+    this.viewAt = new Map(); // runId -> when its review's switch was last used (ms)
     this.lastFile = new Map(); // runId -> the file the agent was last in (edit or read), for Follow
     this.followSeq = 0; this.followLatest = new Map(); // runId -> the newest Follow message's number
     this.manager = new ReviewManager(context, {
@@ -63,7 +64,9 @@ class Review {
       closed: runId => { if (!this.switching) this.onClosed?.(runId); },
       // Follow or Diffs only (AC-233), switched in the review's own header; both are this review (AC-264).
       view: runId => this.head?.modeFor(runId) || 'diffs',
-      setView: (runId, view) => this.head?.setMode(runId, view),
+      // `at` is when the review's own switch was used: messages sent before the host heard of it carry an older one.
+      setView: (runId, view, at) => { if (at) this.viewAt.set(runId, at); return this.head?.setMode(runId, view); },
+      viewAt: runId => this.viewAt.get(runId) || 0,
       // Follow in the review (AC-264): the agent's file, a file picked in All files, and back to the agent.
       followInit: runId => this.followInit(runId),
       followPick: (runId, rel) => this.showFollow(runId, { path: rel, source: 'user' }),

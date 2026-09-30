@@ -767,8 +767,8 @@ function applyOverseer(o) {
   document.getElementById('base').title += `\n${o.workspaceKind === 'current' ? 'Checkout' : 'Worktree'}: ${short}`;
   document.body.dataset.workspace = o.workspacePath || '';
   renderLand(o.land);
-  // A switch made here wins over a message the host sent before it heard of it.
-  if (o.view && o.view !== view && Date.now() - viewChosenAt > 1500) setView(o.view);
+  // A switch made here wins over a message the host sent before it heard of it (older viewAt).
+  if (o.view && o.view !== view && (Number(o.viewAt) || 0) >= viewChosenAt) setView(o.view);
   followState = o.follow || 'off';
   followNote = o.followNote || '';
   followStatus.textContent = followState === 'paused' ? (/paused/.test(o.followNote || '') ? o.followNote : 'Follow paused by your navigation') : followState === 'following' ? (o.followNote || 'Following agent edits') : '';
@@ -804,7 +804,7 @@ function userNavigated(reason) {
 // tells the host, which remembers it for the agent.
 for (const seg of document.querySelectorAll('#view-mode .seg')) seg.addEventListener('click', () => {
   if (seg.dataset.view === view) return;
-  viewChosenAt = Date.now(); setView(seg.dataset.view); vscode.postMessage({ type: 'setView', view: seg.dataset.view });
+  viewChosenAt = Date.now(); setView(seg.dataset.view); vscode.postMessage({ type: 'setView', view: seg.dataset.view, at: viewChosenAt });
 });
 followButton.addEventListener('click', () => {
   if (followState === 'paused') vscode.postMessage({ type: 'followResume' });
@@ -849,6 +849,7 @@ const followView = document.getElementById('follow-view');
 const followEditorHost = document.getElementById('follow-editor');
 const followProblem = document.getElementById('follow-problem');
 const followAgainButton = document.getElementById('follow-again');
+const followNotes = document.head.appendChild(document.createElement('style'));
 followAgainButton.addEventListener('click', () => vscode.postMessage({ type: 'followAgain' }));
 function renderViewSwitch() {
   document.body.dataset.view = view;
@@ -897,7 +898,13 @@ function followMarks(marks) {
   if (!marks || !followModel) return out;
   const lines = followModel.getLineCount();
   const at = line => { const l = Math.max(1, Math.min(lines, line)); const c = followModel.getLineMaxColumn(l); return { startLineNumber: l, startColumn: c, endLineNumber: l, endColumn: c }; };
-  const note = (line, content, className) => out.push({ range: at(line), options: { after: { content, inlineClassName: className } } });
+  // A note after a line: a generated class whose ::after holds the words (Monaco's afterContentClassName).
+  const note = (line, content, className) => {
+    const l = Math.max(1, Math.min(lines, line)), id = `${className}-${notes.length}`;
+    notes.push(`.${id}::after { content: ${JSON.stringify(content)}; }`);
+    out.push({ range: { startLineNumber: l, startColumn: 1, endLineNumber: l, endColumn: followModel.getLineMaxColumn(l) }, options: { afterContentClassName: `${className} ${id}`, showIfCollapsed: true } });
+  };
+  const notes = [];
   for (const r of marks.added || []) out.push({ range: { startLineNumber: r.start, startColumn: 1, endLineNumber: Math.min(lines, r.end), endColumn: 1 }, options: { isWholeLine: true, className: 'follow-added', linesDecorationsClassName: 'follow-bar-added' } });
   for (const r of marks.changed || []) {
     out.push({ range: { startLineNumber: r.start, startColumn: 1, endLineNumber: Math.min(lines, r.end), endColumn: 1 }, options: { isWholeLine: true, className: 'follow-changed', linesDecorationsClassName: 'follow-bar-changed' } });
@@ -909,6 +916,7 @@ function followMarks(marks) {
     out.push({ range: at(line), options: { linesDecorationsClassName: 'follow-bar-removed' } });
     note(line, `− ${r.count} line${r.count === 1 ? '' : 's'} removed ${r.line > 0 ? 'below' : 'above'}`, 'follow-removed');
   }
+  followNotes.textContent = notes.join('\n');
   return out;
 }
 async function applyFollowFile(value) {

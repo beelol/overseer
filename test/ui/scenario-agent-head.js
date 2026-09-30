@@ -62,7 +62,8 @@ const THEMES = ['Overseer Dark', 'Overseer Light', 'Overseer'];
     const followOf = frame => frame.eval(`(() => { const nums = [...document.querySelectorAll('#follow-editor .line-numbers')].map(n => Number(n.textContent)).filter(Boolean);
       return { view: document.body.dataset.view, nav: document.body.dataset.nav, list: document.getElementById('list-title').textContent, path: document.body.dataset.followPath || '', source: document.body.dataset.followSource || '',
         state: document.body.dataset.followState || '', marks: JSON.parse(document.body.dataset.followMarks || '{}'), why: document.getElementById('follow-why').textContent, again: !document.getElementById('follow-again').hidden,
-        was: [...document.querySelectorAll('#follow-editor .follow-was, #follow-editor .follow-removed')].map(e => e.textContent.replace(/\u00a0/g, ' ').trim()),
+        // The notes after lines ("was: …", "− 3 lines removed below") are the ::after content Monaco's after-content spans carry.
+        was: [...document.querySelectorAll('#follow-editor .follow-was, #follow-editor .follow-removed')].map(e => getComputedStyle(e, '::after').content.replace(/^"|"$/g, '').replace(/\\"/g, '"').trim()),
         first: nums.length ? Math.min(...nums) : 0, last: nums.length ? Math.max(...nums) : 0, text: [...document.querySelectorAll('#follow-editor .view-line')].map(l => l.textContent.replace(/\u00a0/g, ' ')).join('\\n').slice(0, 400),
         files: [...document.querySelectorAll('#tree .file')].map(f => f.dataset.path), active: document.querySelector('#tree .file.active')?.dataset.path || '',
         diffs: [...document.querySelectorAll('#diffs .diff-file .file-path')].filter(e => e.offsetParent).map(e => e.textContent) }; })()`);
