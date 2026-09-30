@@ -2470,7 +2470,20 @@ impl Daemon {
     }
 
     pub fn answer_permission(&self, run_id: &str, request_id: &str, allow: bool, message: &str) -> Result<Value> {
+        self.answer_permission_with(run_id, request_id, allow, message, false)
+    }
+
+    /// `always`: allow, and take the request's Always allow offer (the harness's session rule,
+    /// AC-262). Refused when the request offers none.
+    pub fn answer_permission_with(&self, run_id: &str, request_id: &str, allow: bool, message: &str, always: bool) -> Result<Value> {
         let run = self.run(run_id)?;
+        if always {
+            let offered = run.attention.as_ref().filter(|a| a["request_id"].as_str() == Some(request_id)).map(|a| !a["always"].is_null());
+            if offered == Some(false) {
+                return Err(crate::server::ProtoError::new("no_always_allow", format!("{} offers no Always allow for this request", run.harness)).into());
+            }
+        }
+        let allow = allow || always;
         // Several surfaces can answer the same request (VS Code, the terminal, a phone). The
         // request is claimed under the store's lock, so exactly one answer reaches the harness;
         // a later one is told what the first one was.
@@ -2487,7 +2500,8 @@ impl Daemon {
             }
             bail!("permission request {request_id} is not pending");
         };
-        let sent = adapters::permission_reply(&run.harness, request_id, allow, &attention["input"], if message.is_empty() { "Denied by user in Overseer" } else { message })
+        let offer = attention.get("always").filter(|o| always && !o.is_null());
+        let sent = adapters::permission_reply_always(&run.harness, request_id, allow, &attention["input"], if message.is_empty() { "Denied by user in Overseer" } else { message }, offer)
             .ok_or_else(|| anyhow!("{} does not support permission replies", run.harness))
             .and_then(|reply| self.send_stdin(&run, &reply));
         if let Err(e) = sent {
@@ -2496,7 +2510,9 @@ impl Daemon {
             return Err(e);
         }
         self.store.lock().unwrap().update_run_status(run_id, "running", None, None)?;
-        self.emit(Some(&run.task_id), Some(run_id), "permission_answered", "user", "exact", json!({"request_id": request_id, "allow": allow, "by": by}))?;
+        let mut answered = json!({"request_id": request_id, "allow": allow, "by": by});
+        if let Some(o) = offer { answered["always"] = o["label"].clone(); }
+        self.emit(Some(&run.task_id), Some(run_id), "permission_answered", "user", "exact", answered)?;
         self.emit(Some(&run.task_id), Some(run_id), "status", "daemon", "exact", json!({"status": "running"}))?;
         if !allow {
             // What the owner refused is remembered, so Overseer never has another agent do it (AC-196).
@@ -2915,7 +2931,7 @@ impl Daemon {
                     }
                 }
             }
-            Norm::Permission { request_id, tool, input } => {
+            Norm::Permission { request_id, tool, input, always } => {
                 // The daemon's own tools (Overseer's reads, an agent's channel) are always allowed:
                 // the daemon decides what each token may do.
                 if tool.starts_with("mcp__overseer__") {
@@ -2925,7 +2941,8 @@ impl Daemon {
                     ev("permission", "daemon", "exact", json!({"kind": "permission", "request_id": request_id, "tool": tool, "auto_allowed": "Overseer's own tool"}), None)?;
                     return Ok(());
                 }
-                let attention = json!({"kind": "permission", "request_id": request_id, "tool": tool, "input": input});
+                let mut attention = json!({"kind": "permission", "request_id": request_id, "tool": tool, "input": input});
+                if let Some(offer) = always { attention["always"] = offer; }
                 store.set_run_attention(&run.id, Some(&attention))?;
                 store.update_run_status(&run.id, "waiting_for_user", None, None)?;
                 ev("permission", "harness", "exact", attention, None)?;
@@ -3691,6 +3708,14 @@ impl Daemon {
             if let Some(link) = run["id"].as_str().and_then(|id| memberships.get(id)) {
                 run["swarm_membership"] = link.clone();
             }
+            // Why a failed agent stopped, in plain words, for every surface (AC-239); exit_reason
+            // keeps the daemon's own record.
+            if run["status"] == "failed" {
+                // From the recorded reason alone ("…; last error [class]: message"): no read of the events here.
+                let (_, reason) = crate::overseer::trouble::plain_from_exit(run["exit_reason"].as_str().unwrap_or(""));
+                let mut chars = reason.chars();
+                run["plain_reason"] = json!(chars.next().map(|c| c.to_uppercase().collect::<String>() + chars.as_str()).unwrap_or_default());
+            }
         }
         let mut turns = serde_json::Map::new();
         for r in runs.iter().filter(|r| r.parent_run_id.is_none() || matches!(r.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation"))) {
@@ -3847,7 +3872,7 @@ fn find_in_tree(store: &Store, root: &str, native: &str) -> Result<Option<Run>> 
 }
 
 /// Account profiles belong to the harness family (codex-app shares Codex logins).
-fn profile_harness(harness: &str) -> &str {
+pub(crate) fn profile_harness(harness: &str) -> &str {
     match harness {
         "codex-app" => "codex",
         "opencode-serve" => "opencode",

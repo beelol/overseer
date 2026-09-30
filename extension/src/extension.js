@@ -26,7 +26,7 @@ const { AutoUsage } = require('./auto-usage');
 const features = require('./features');
 const { Voice } = require('./voice');
 const { agentsOnScreen, permissionTarget, commandTarget } = require('./on-screen');
-const { Notices, agentFromUri } = require('./notices');
+const { Notices, uriAction } = require('./notices');
 const Rollup = require('../media/rollup.js');
 const Plain = require('../media/plain-words.js');
 
@@ -119,10 +119,14 @@ async function activate(context) {
     if (!runId) return;
     const run = model.run(runId);
     if (run && reviewed.get(runId) >= (run.ended_ms || run.created_ms || 0) && !ACTIVE.has(run.status)) return;
-    reviewed.set(runId, Date.now());
+    const at = Date.now();
+    reviewed.set(runId, at);
     context.globalState.update('overseer.reviewed', Object.fromEntries([...reviewed].slice(-2000)));
+    // The daemon keeps them too, so the Mac's menu-bar item counts "to review" the same (AC-262).
+    if (client.connected) client.request('review.seen', { marks: { [runId]: at } }).catch(() => {});
     model.emitter.fire();
   };
+  client.on('connected', () => { if (reviewed.size) client.request('review.seen', { marks: Object.fromEntries([...reviewed].slice(-2000)) }).catch(() => {}); });
   const archivedTasks = () => (model.state.tasks || []).filter(t => t.archived_ms).map(t => t.id);
   // Needs you (AC-61, AC-246): what waits for the owner's answer, counted as the TUI and the phone
   // count it (media/rollup.js); failed and finished agents carry the "to review" mark instead (AC-254).
@@ -811,11 +815,22 @@ async function activate(context) {
     vscode.window.setStatusBarMessage(`$(trash) Removed ${removed} worktree${removed === 1 ? '' : 's'}; branches kept`, 4000);
   }
 
-  /** A notification's click (AC-52, AC-240): the Overseer view, or that agent. */
+  /** A notification's click (AC-52, AC-240) or the Mac's menu-bar item (AC-262): the Overseer view
+   * (filtered to what waits for the owner, or to one repository), an agent, the workspace layout, or
+   * Talk to Overseer. */
   async function openUri(uri) {
-    if (uri.path === '/open-center') return vscode.commands.executeCommand('overseer.openCenter');
-    const runId = agentFromUri(uri);
-    if (!runId) return undefined;
+    const action = uriAction(uri);
+    if (!action) return undefined;
+    if (action.kind === 'workspace') return vscode.commands.executeCommand('overseer.openWorkspace');
+    if (action.kind === 'talk') return vscode.commands.executeCommand('overseer.talk');
+    if (action.kind === 'center') {
+      if (action.filter) { setStatusFilter(action.filter); searchView.setFilter(action.filter); }
+      if (action.repo) setAgentFilter(action.repo);
+      await vscode.commands.executeCommand('overseer.openCenter');
+      if (action.filter || action.repo) await vscode.commands.executeCommand('overseer.agents.focus').then(undefined, () => {});
+      return undefined;
+    }
+    const runId = action.run;
     await model.refresh();
     if (!model.run(runId)) { vscode.window.showInformationMessage('That agent is no longer in Overseer.'); return undefined; }
     await selectRun(runId); center.focus('chat');

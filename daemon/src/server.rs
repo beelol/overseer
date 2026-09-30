@@ -2757,7 +2757,7 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             json!(d.start_turn(run_id, s(p, "prompt")?, true, &crate::daemon::TurnOpts::from_params(p)?)?)
         }
         "run.interrupt" => d.interrupt(s(p, "run_id")?)?,
-        "run.permission" => d.answer_permission(s(p, "run_id")?, s(p, "request_id")?, p["allow"].as_bool().unwrap_or(false), p["message"].as_str().unwrap_or(""))?,
+        "run.permission" => d.answer_permission_with(s(p, "run_id")?, s(p, "request_id")?, p["allow"].as_bool().unwrap_or(false), p["message"].as_str().unwrap_or(""), p["always"].as_bool().unwrap_or(false))?,
         "run.raw_output" => d.raw_output(s(p, "run_id")?, p["max_bytes"].as_u64().unwrap_or(256 * 1024).min(4 * 1024 * 1024) as usize)?,
         "run.turns" => json!(d.store.lock().unwrap().turns(s(p, "run_id")?)?),
         "run.active" => {
@@ -3154,6 +3154,8 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let id = s(p, "run_id")?;
             json!({"digest": d.digest(id)?, "text": d.digest_text(id)?})
         }
+        "menubar.snapshot" => crate::menubar::snapshot(d)?,
+        "review.seen" => crate::menubar::review_seen(d, p)?,
         "agents.roster" => json!({"roster": d.roster()?, "text": d.roster_text()?}),
         "conflicts.list" => d.conflicts_list(p["run_id"].as_str(), p["include_closed"].as_bool().unwrap_or(false))?,
         "conflict.dismiss" => d.conflict_dismiss(s(p, "id")?, p["by"].as_str().unwrap_or("user"))?,
@@ -3161,6 +3163,7 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "overseer.session" => d.overseer_session()?,
         "overseer.messages" => d.overseer_messages(p["after"].as_i64().unwrap_or(0), p["limit"].as_i64().unwrap_or(100))?,
         "overseer.send" => d.overseer_send(s(p, "text")?, p["surface"].as_str().unwrap_or("vscode"), p["harness"].as_str(), p["model"].as_str())?,
+        "overseer.visit" => d.overseer_visit(p["surface"].as_str().unwrap_or("vscode"))?,
         "overseer.propose" => d.overseer_propose(&p["actions"], p["source"].as_str().unwrap_or("api"))?,
         "overseer.answer" => d.overseer_answer(s(p, "id")?, p["yes"].as_bool().unwrap_or(false), p["surface"].as_str().unwrap_or("vscode"), p["by"].as_str().unwrap_or("owner"))?,
         "overseer.level" => d.overseer_level(p["level"].as_str())?,

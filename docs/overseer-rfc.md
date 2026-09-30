@@ -539,7 +539,7 @@ From the friction research of 2026-09-28 ([report](audits/2026-09-28-friction-re
 
 From the owner, 2026-09-29:
 
-- [ ] **AC-262 — Overseer in the Mac's menu bar.** A menu-bar item with the Overseer silhouette (`docs/design/brand/overseer-icon-flat.png` as a template image, AC-179) runs while the daemon does, with or without VS Code.
+- [x] **AC-262 — Overseer in the Mac's menu bar.** A menu-bar item with the Overseer silhouette (`docs/design/brand/overseer-icon-flat.png` as a template image, AC-179) runs while the daemon does, with or without VS Code.
   - The icon carries a dot (Overseer's violet) while an agent needs the owner.
   - Its menu shows, in order:
     - the Needs-you requests, newest first, at most four, then "N more waiting · Show all in Overseer…"; each answerable there: Allow once, whose arrow holds Always allow (the harness's own session rule), and Deny;
@@ -568,7 +568,7 @@ From the owner, 2026-09-29:
     - a change and a whole file accepted and rejected with those words;
     - "Save your edits" appears only after typing.
 
-- [x] **AC-264 — One Overseer layout, and it looks like Focus Mode without its side effects.** The owner, 2026-09-29, after comparing Workspace (AC-250) and Focus Mode screenshots: "pic 3 looks best … you want to end up in number 3 always."
+- [ ] **AC-264 — One Overseer layout, and it looks like Focus Mode without its side effects.** The owner, 2026-09-29, after comparing Workspace (AC-250) and Focus Mode screenshots: "pic 3 looks best … you want to end up in number 3 always."
   - The layout is:
     - the agents list in the left side bar;
     - the review (Follow or Diffs only, AC-233) wide in the middle;
@@ -582,6 +582,8 @@ From the owner, 2026-09-29:
   - The left side bar is the hierarchy only: agents by repository, and Accounts (the owner, 2026-09-29).
     - Searching agents lives in the Agents view's own title bar and type-to-filter, not in a Search section.
     - There is no separate worktree file tree. The review's file list switches between "Changed" and "All files", and "All files" opens any file in the agent's worktree.
+    - Follow mode always shows the whole worktree, so its file list is "All files": every file, each opening the real file. Diffs only shows "Changed" (the owner, 2026-09-29).
+    - Follow happens inside the review window in the middle, never in a plain VS Code editor (the owner, 2026-09-30: "That review section in the middle is supposed to be follow mode. I don't want to just use regular VS Code for it"). In Follow the middle shows the file the agent is in right now, live, and the list on the left is "All files"; picking a file there shows it in the same place. In Diffs only the middle shows the diffs and the list is "Changed". The review stays on screen in both modes.
   - **Verify:**
     - Screenshots of A and B side by side for the owner's choice. Then, for the chosen way, packaged-UI checks:
       - a cluttered window becomes the layout in one step;

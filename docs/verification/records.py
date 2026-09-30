@@ -1817,10 +1817,10 @@ rec(178, "The phone app uses the owner's mark", "not started", date="—", commi
     actual="Not started.", live="—", blocker="Not started: the phone app's agent (Gate N) replaces its placeholder marks with the owner's files in docs/design/brand/.")
 rec(179, "The Mac surfaces use the owner's mark", "partial", commit="8653510", date="2026-09-27", harness="none (the packaged VSIX and the helper's build)",
     proven="the notification helper's `.icns` is built from `docs/design/brand/exports/overseer-app-icon-macos-1024.png` by `extension/notifier/build.js` (sips for every macOS size, iconutil); the brand scenario unpacks the installed helper's icon and finds every size, the owner's violet tile (`node test/ui/scenario-brand.js`); Overseer has no menu-bar item and no other Mac app, so those parts do not apply yet",
-    deferred="a screenshot of a real notification banner and of the helper in Finder: macOS asks the owner to allow the helper's notifications, and screenshots of the desktop need the owner's screen-recording permission; the menu-bar image when a menu-bar item exists",
+    deferred="a screenshot of a real notification banner and of the helper in Finder: macOS asks the owner to allow the helper's notifications, and screenshots of the desktop need the owner's screen-recording permission",
     expected="See the RFC criterion (Brand) and [docs/design/brand.md](../design/brand.md).",
     actual="See proven and deferred.",
-    evidence="[helper icon as installed](evidence/ui/brand/notifier-app-icon.png), [brand scenario](evidence/ui/brand/)", live="—",
+    evidence="[helper icon as installed](evidence/ui/brand/notifier-app-icon.png), [brand scenario](evidence/ui/brand/), [the menu-bar item with the flat mark as a template image, light and dark](evidence/ui/menubar/) (AC-262, pull request #42, merged as 86e993fd)", live="—",
     blocker="Owner: run Overseer: Test Notification in VS Code, allow notifications when macOS asks, and screenshot the banner and the helper (Overseer Notifier) in Finder.")
 
 # Gate O, Audio Mode (added by the owner on 2026-09-26; docs/rfcs/audio-mode.md). The daemon and VS Code came with pull
@@ -2480,7 +2480,7 @@ rec(236, "Home talks to Overseer first", "verified", date="2026-09-29", commit="
     evidence="`test/ui/scenario-home-overseer.js` and its evidence folder `docs/verification/evidence/ui/home-overseer/` on the branch, pull request #31",
     live="Fixtures only; no paid turn.",
     limits="Existing scenarios that start agents by typing at home choose \"Start directly\" (`overseer.home.sendTo: agent`) in their profile.")
-rec(237, "Overseer starts agents on the right harness, model and account", "verified", date="2026-09-29", commit="ebb245e2 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(237, "Overseer starts agents on the right harness, model and account", "verified", date="2026-09-29", commit="3ab9c1f7 (pull request #32, merged 2026-09-30)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the whole Verify clause with the fixture as Overseer's model: starts on a named model, a named account and a named harness, each confirmed on the run; an unnamed start on Auto's route pick with its reason on the card; the tool schema's fields",
     steps="""1. `cargo test --test overseer_brain ac237` (3 tests, real daemon binary, Claude fixture as Overseer and agents, Codex app-server fixture with listed models).
@@ -2495,7 +2495,7 @@ rec(237, "Overseer starts agents on the right harness, model and account", "veri
     evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/ebb245e2/daemon/tests/overseer_brain.rs) (`ac237_*`)",
     live="Fixtures only; a live model choosing the fields from free wording was not exercised.",
     limits="Auto routing is used when Auto Mode is on; Auto Mode stays off by default until its own checks pass (docs/rfcs/auto-mode.md), which is the owner's switch. Within the owner's allowed accounts means Auto's allowed set (the default accounts) or an account the owner names; there is no separate allowed-accounts setting for Overseer yet.")
-rec(238, "Overseer checks finished work and offers the next step", "verified", date="2026-09-29", commit="ebb245e2 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(238, "Overseer checks finished work and offers the next step", "verified", date="2026-09-29", commit="3ab9c1f7 (pull request #32, merged 2026-09-30)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the whole Verify clause with the fixture as Overseer's model",
     steps="""1. `cargo test --test overseer_brain ac238_overseer_checks_finished_work_and_offers_the_next_step`.
@@ -2507,7 +2507,7 @@ rec(238, "Overseer checks finished work and offers the next step", "verified", d
 - Nothing happened without a yes: the repository's HEAD did not move and the failing agent got no turn; the owner's yes sent the fix. A check-in may propose merge_back or pull_request only for a finished agent and they always wait for a yes; archive and the other Confirm actions stay the owner's own to ask for.""",
     evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/ebb245e2/daemon/tests/overseer_brain.rs) (`ac238_*`)",
     live="Fixtures only: the verdict's quality with a live model is not judged here.")
-rec(239, "Stuck, failed and limited agents come back to Overseer", "partial", date="2026-09-29", commit="ebb245e2 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(239, "Stuck, failed and limited agents come back to Overseer", "partial", date="2026-09-29", commit="3ab9c1f7 (pull request #32, merged 2026-09-30)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the daemon side of the Verify clause: ratelimit, failed-reason and a silent agent each give one Overseer turn and a card with a plain reason; continuing on the other account carries the work on a second fixture profile in the same worktree; neither the conversation nor the daemon's state shows an error class or HTTP code",
     steps="""1. `cargo test --test overseer_brain ac239_stuck_failed_and_limited_agents_come_back_to_overseer`, plus the unit test `overseer::trouble::tests::reasons_are_plain`.
@@ -2606,7 +2606,7 @@ rec(247, "Home's input is always on screen", "verified", date="2026-09-29", comm
 - Continuity's notice, folded, is one compact line (44 px at most; it was 51 px on main, which the scenario failed first). One view for talking to Overseer (#27) had already pinned the box to the foot.""",
     evidence="`test/ui/scenario-home-input.js` and `docs/verification/evidence/ui/home-input/` on the branch, pull request #31",
     live="Fixtures only.")
-rec(248, "Overseer's session never drops what it was told", "verified", date="2026-09-29", commit="ebb245e2 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(248, "Overseer's session never drops what it was told", "verified", date="2026-09-29", commit="3ab9c1f7 (pull request #32, merged 2026-09-30)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the whole Verify clause: a forced Lagged error, an ask before Overseer's first turn, a failed turn start, a proposal after its spoken request closed",
     steps="""1. From pull request #28 (merged): `cargo test --test overseer ac181_the_session_loop_catches_up_after_falling_behind` (a 64-event bus flooded with 800,000 output events) and `ac190_a_question_waits_for_overseers_first_turn_and_survives_start_fresh`.
@@ -2659,7 +2659,7 @@ rec(252, "Zero-friction loop, measured", "not started", date="—", commit="—"
     expected="See the RFC criterion (the owner's zero-friction goal, 2026-09-28).",
     actual="Not started: added for the overnight zero-friction goal (docs/goals/zero-friction.md).", live="—", blocker="Overnight goal.")
 
-rec(253, "Overseer leads with what happened while you were away", "verified", date="2026-09-29", commit="ebb245e2 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(253, "Overseer leads with what happened while you were away", "verified", date="2026-09-29", commit="3ab9c1f7 (pull request #32, merged 2026-09-30)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the whole Verify clause: a packaged-UI scenario and a daemon test",
     steps="""1. `cargo test --test overseer_brain ac253_overseer_leads_with_what_happened_while_you_were_away`.
@@ -2763,26 +2763,26 @@ rec(261, "One Sign In, clearly Overseer's or clearly not", "verified", commit="b
     evidence="[one-signin scenario](evidence/ui/one-signin/) (three screenshots, result.json)",
     live="Fixtures only.", limits="VS Code's own Accounts icon in the activity bar stays (it is VS Code's menu, not a Sign In control).")
 
-rec(262, "Overseer in the Mac's menu bar", "partial", date="2026-09-29", commit="83937bd8 (branch claude/menu-bar, pull request #42, not merged yet)",
+rec(262, "Overseer in the Mac's menu bar", "verified", date="2026-09-30", commit="86e993fd (pull request #42, merged 2026-09-30)",
     harness="The Claude fixture's menubar mode (\"ask:\", \"busy:\", \"fail\" in the prompt) behind a dev daemon (scripts/dev); SYNTHETIC accounts (a fixture-account.json per profile); no paid turns",
-    proven="the owner's yes on the mockup (pull request #39, 2026-09-29, through the coordinating session); the daemon side of every menu state and answer; on screen so far: the quiet and needs-you menus captured from the real NSMenu, and Allow once and Deny pressed in that menu reaching the fixture agents",
+    proven="the owner's yes on the mockup (pull request #39, 2026-09-29, through the coordinating session); the daemon side of every menu state and answer; on screen (2026-09-30, with nobody at the Mac): every state of the Verify clause captured from the real NSMenu in light and dark, the answers pressed in the menu reaching the fixture agents, an agent chosen opening in a test VS Code, and the stopped daemon with Start Overseer",
     steps="""1. Mockup: `docs/design/menu-bar/index.html` on pull request #39, with the owner's answers (violet dot, four requests then \"N more waiting\", Always allow under Allow once's arrow, Quit, the dev item's \"!\").
 2. `cargo test -p overseerd --test menubar`: `menubar.snapshot` for two repositories (most recent first, a waiting one marked, \"3 working · 1 to review\"), requests newest first as questions (\"Run npm test?\") with Claude Code's session rule (\"Bash(npm test:*) · this session\"); Always allow reaching the fixture as `updatedPermissions`; Deny; `review.seen` moving an agent from to review to idle; the item's `hello` never counted as a VS Code window; Always allow refused when a request offers none. Unit tests `menubar::tests` (30 agents in 18, 7 and 5, at most 8 per submenu; zero counts left out) and `adapters::always_allow_tests` (Codex's `acceptForSession`).
 3. `node test/ui/scenario-menubar.js` (ON SCREEN, run with `scripts/test-all --only=menubar`): `scripts/dev up` starts the dev daemon's own item; the item's evidence modes open its real menu in-process and capture only its own windows (`--capture`), press a request's controls (`--press allow|always|deny`) and choose items (`--choose`, `--choose-item`).""",
     expected="See the RFC criterion (added by the owner on 2026-09-29; the mockup's answers of the same day).",
     actual="""- `Overseer Menu.app` (extension/menubar, built like the notifier): the flat silhouette as a template image, a violet dot beside it while an agent waits, and the menu of the criterion. A dev daemon's item carries a \"!\" and names itself. The deploy copies it to the data folder, registers it as a login item (`SMAppService`) and starts it; `scripts/dev up` starts a dev daemon's own.
-- Passed on screen (run of 2026-09-29): quiet (\"3 working\", overseer 2 and site 1, accounts \"Claude Max · bil…@testbox.com\" and \"Claude Pro · ana…@personal.example\"); needs you (both requests, newest first, with their session rules); Allow once pressed in the menu: the fixture's tool call ran, no rule kept; Deny pressed in the menu: the fixture was told no.""",
-    evidence="[daemon/tests/menubar.rs](https://github.com/beelol/overseer/blob/83937bd8/daemon/tests/menubar.rs), [daemon/src/menubar.rs](https://github.com/beelol/overseer/blob/83937bd8/daemon/src/menubar.rs), [test/ui/scenario-menubar.js](https://github.com/beelol/overseer/blob/83937bd8/test/ui/scenario-menubar.js), mockup on [pull request #39](https://github.com/beelol/overseer/pull/39)",
+- Passed on screen (run of 2026-09-29): quiet (\"3 working\", overseer 2 and site 1, accounts \"Claude Max · bil…@testbox.com\" and \"Claude Pro · ana…@personal.example\"); needs you (both requests, newest first, with their session rules); Allow once pressed in the menu: the fixture's tool call ran, no rule kept; Deny pressed in the menu: the fixture was told no.
+- Passed on screen (run of 2026-09-30 at `b1dc6da8`, the Mac idle, 10 of 10): the dev item pinned to its own socket and profile; quiet; needs you; Allow once and Deny; 30 agents (\"12 working · 5 to review · 13 idle\", overseer 18, site 7, notes 5, at most 8 in a submenu, the waiting one first); Always allow under Allow once's arrow reaching the fixture with Claude Code's session rule; six waiting (four shown, then \"2 more waiting · Show all in Overseer…\"); choosing an agent opening it in the test VS Code; the daemon stopped, the item saying so, and Start Overseer bringing it back.""",
+    evidence="[daemon/tests/menubar.rs](https://github.com/beelol/overseer/blob/83937bd8/daemon/tests/menubar.rs), [daemon/src/menubar.rs](https://github.com/beelol/overseer/blob/83937bd8/daemon/src/menubar.rs), [test/ui/scenario-menubar.js](https://github.com/beelol/overseer/blob/83937bd8/test/ui/scenario-menubar.js), mockup on [pull request #39](https://github.com/beelol/overseer/pull/39), [on-screen evidence](evidence/ui/menubar/) (screenshots in light and dark, result.json, scenario.log)",
     live="Fixtures only. A real Claude Code sends `permission_suggestions` on `can_use_tool` the same way; not yet seen live here.",
-    deferred="the on-screen captures of the 30-agents menu (a submenu open) in light and dark, six waiting, choosing an agent opening it in a test VS Code, and the daemon stopped with Start Overseer",
     limits="The menu bar itself is drawn by the system in macOS 26, so each capture draws the item from its own button above the captured menu.",
-    blocker="The on-screen run was stopped while the owner used the Mac (the owner's input closes the menus). Still to capture: the 30-agents menu with a submenu open, in light and dark; six waiting; choosing an agent opening it in a test VS Code; the daemon stopped and Start Overseer. The scenario runs them in about 3 minutes with nobody at the Mac.")
+    blocker="—")
 
 rec(263, "The review opens on \"Since task start\", with the other comparisons one click away", "not started", date="—", commit="—",
     expected="See the RFC criterion (the owner's decision of 2026-09-29 on pull request #35's question).",
     actual="Not started: #35 (AC-232) opens a finished agent's review on Since task start in its own worktree and keeps Latest run in the owner's checkout; the owner chose Since task start everywhere, with Latest run and Entire worktree one click away.", live="—", blocker="Its own agent.")
 
-rec(264, "One Overseer layout, and it looks like Focus Mode without its side effects", "verified", date="2026-09-30",
+rec(264, "One Overseer layout, and it looks like Focus Mode without its side effects", "partial", date="2026-09-30", blocker="The owner, 2026-09-30: Follow happens inside the review window (the file the agent is in, live, with All files on the left), not in a plain VS Code editor; #40 opens the real file in VS Code instead. Being rebuilt on #40.",
     commit="f1c79897 (branch claude/one-layout, pull request #40, not merged yet)",
     harness="Generic fixture programs, the Claude Code fixture as Overseer and the simulated voice on the packaged VSIX in isolated VS Code 1.139.1 profiles (background, transparent test windows); no accounts, no paid turns",
     steps="""1. Phase 1: `node test/ui/scenario-one-layout-a.js` and `scenario-one-layout-b.js` at 09144f1f ([comparison and screenshots](https://github.com/beelol/overseer/blob/09144f1f/docs/verification/evidence/ui/one-layout/README.md)): way A (Overseer's panel in the secondary side bar) and way B (the window reopened on an Overseer-owned workspace file), each with a second window of the same profile. The owner chose B.

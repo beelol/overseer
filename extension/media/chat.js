@@ -128,7 +128,7 @@
         items.push(w);
       }
       this.metaEl.replaceChildren(...items.flatMap((x, i) => (i ? [el('span', 'sep', '·'), x] : [x])));
-      if (run.exit_reason && /failed|interrupted|disconnected/.test(run.status)) this.metaEl.title = window.OverseerPlain ? window.OverseerPlain.plain(run.exit_reason, 400) : run.exit_reason; else this.metaEl.removeAttribute('title');
+      if ((run.plain_reason || run.exit_reason) && /failed|interrupted|disconnected/.test(run.status)) this.metaEl.title = run.plain_reason || (window.OverseerPlain ? window.OverseerPlain.plain(run.exit_reason, 400) : run.exit_reason); else this.metaEl.removeAttribute('title');
 
       this.stopBtn.hidden = child || !msg.active || !msg.interruptSupported || !msg.trusted;
       const worktree = msg.workspace && msg.workspace.kind === 'worktree';
@@ -213,7 +213,7 @@
       const run = this.msg.run, ws = this.msg.workspace;
       const dl = el('dl');
       const row = (k, v, wrap) => { if (!v) return; const dd = el('dd', wrap ? 'wrap' : null, v); dd.title = v; dl.append(el('dt', null, k), dd); };
-      row('Status', ui.statusText(run.status) + (run.exit_reason ? ` (${window.OverseerPlain ? window.OverseerPlain.plain(run.exit_reason, 400) : run.exit_reason})` : ''), true);
+      row('Status', ui.statusText(run.status) + ((run.plain_reason || run.exit_reason) ? ` (${run.plain_reason || (window.OverseerPlain ? window.OverseerPlain.plain(run.exit_reason, 400) : run.exit_reason)})` : ''), true);
       row('Harness', `${ui.HARNESS[run.harness] || run.harness} ${run.harness_version || ''}`.trim());
       row('Account', this.msg.profile);
       row('Model', run.model);
