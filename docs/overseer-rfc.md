@@ -568,7 +568,7 @@ From the owner, 2026-09-29:
     - a change and a whole file accepted and rejected with those words;
     - "Save your edits" appears only after typing.
 
-- [ ] **AC-264 — One Overseer layout, and it looks like Focus Mode without its side effects.** The owner, 2026-09-29, after comparing Workspace (AC-250) and Focus Mode screenshots: "pic 3 looks best … you want to end up in number 3 always."
+- [x] **AC-264 — One Overseer layout, and it looks like Focus Mode without its side effects.** The owner, 2026-09-29, after comparing Workspace (AC-250) and Focus Mode screenshots: "pic 3 looks best … you want to end up in number 3 always."
   - The layout is:
     - the agents list in the left side bar;
     - the review (Follow or Diffs only, AC-233) wide in the middle;
