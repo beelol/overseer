@@ -227,3 +227,176 @@ T-23 and T-24 came with pull request #6 (code at 47312f3, merged into main as ea
 [the evidence index](../verification/evidence/tui/README.md):
 [both suites on main with pull requests #5 and #6](../verification/evidence/tui/t23-t24-suites.txt) and
 [the run against a daemon without Audio Mode](../verification/evidence/tui/t24-old-daemon.txt).
+
+## Parity with VS Code and the review in the terminal
+
+Status: proposed on 2026-09-30 from the owner's request: "a tui that does pretty much everything
+the same way" as Overseer in VS Code, "it's just convenient to use the terminal for everything
+else." Criteria T-25 to T-39 below. The owner decided the shape the same day:
+
+- **The TUI we have stays the base.** Nothing is rebuilt. The main screen is still the pages of
+  nine, with an agent list added on the side. Picking an agent in the list shows its
+  conversation.
+- **Everything that makes sense in a terminal comes over.** Things that only exist because
+  VS Code is a window manager (popping the review out, the Overseer window layout, dragging the
+  grid, themes) stay in VS Code. The table below says which is which.
+- **The review happens inside the TUI.** The owner first thought of a separate diff viewer and
+  text editor, "maybe external like the system Overseer was built on" (that is Branch Diff, the
+  owner's VS Code extension whose review Overseer vendored and grew into its own). Then decided:
+  no separate viewer and no outside tool. The TUI's changes view (`v`) becomes Overseer's review:
+  the same comparisons, the same file lists and the same Accept and Reject as VS Code, all
+  through the daemon, so a change accepted in the terminal shows as accepted in VS Code and on
+  the phone.
+- **Editing files goes to the owner's own editor** (the owner, 2026-09-30: "E in native editor is
+  probably good for now"). `e` opens the file at that change in `$EDITOR`; that editor shows no
+  diffs and doesn't update live while the agent works, so the review stays the place for both and
+  refreshes when the editor closes (T-39).
+- **The owner's answers (2026-09-30):** way 2, the picked agent's conversation beside the grid; the
+  grid sizes itself to fit how many agents there are, up to 16 on one screen, and pages from the
+  17th (T-37); one key switches between the grid and a single agent's view (T-38); the grid shows
+  top-level agents only for now, and whether to drill down into an agent's sub-agents is left for
+  later.
+
+The preview the owner picks from is
+[docs/design/tui-parity/index.html](../design/tui-parity/index.html): the main screen with the
+agent list, the review screen, and the two numbered ways of showing a picked agent.
+
+### What VS Code does and what the terminal does today
+
+"Has" means the TUI does it now; "partial" and "missing" name the gap and the criterion that closes it.
+
+| In VS Code | In the TUI today | How the TUI does it |
+| --- | --- | --- |
+| Agents list in the side bar, grouped by repository, newest first, with status and account | Partial: a list exists only below 100×30, one page, not grouped | An agent list beside the grid at every size, grouped by repository (T-25) |
+| Clicking an agent shows its conversation (its chat) | Partial: `z` zooms the focused tile full screen | Picking an agent in the list shows its conversation (T-25) |
+| State rollup: working, needs you, to review, reviewed, failed | Partial: the header counts total, active and needs you | The same five counts, from the same numbers VS Code uses (T-26) |
+| Unreviewed mark on finished agents, per repository and overall | Missing (VS Code keeps the marks to itself) | Marks kept by the daemon so every surface shows the same; shown in the list (T-26) |
+| Account shown on every agent | Has: on each tile | Also on each list row (T-25) |
+| Talk to Overseer (home), proposals answered yes or no, the "while you were away" summary | Has: `o` | Unchanged; the list and grid stay beside it |
+| Voice Mode: state, heard words, mute, cancel, yes and no | Missing (Audio Mode cues only) | A voice line in Overseer's conversation and keys for each (T-35) |
+| Needs you: count, list, jump to the next | Has: header count, `w`, the Needs you filter, the bell | Unchanged |
+| Answer a permission: Allow once, Allow for this session, Deny with a note | Partial: `a` allow and `d` deny only | All three, with the note (T-31) |
+| Follow-up to an agent | Has: `i` | Unchanged |
+| Interrupt, stop everything | Has: `x`, `X` | Unchanged |
+| New agent: repository, harness, account, model, effort, permission mode, prompt | Partial: no effort and no permission mode | The two missing fields (T-32) |
+| Search agents | Has: `/` | Also filters the list (T-25) |
+| Review opens on "Since task start"; "Latest run" and "Entire worktree" one click away; the header names what is shown | Partial: `c` cycles comparisons, but the first one opens, not the daemon's default | Opens on the daemon's default, each comparison one key away (T-27) |
+| Changed or All files in the review's file list | Missing: changed files only | The same switch; All files lists the whole worktree (T-28) |
+| Accept or Reject each change and each file | Missing: the diff is read-only | Accept and Reject per change and per file, through the daemon (T-29) |
+| Follow: the review follows the file the agent is editing | Missing | The same Follow, on and off (T-30) |
+| Type into the agent's files and "Save your edits" | Missing | Open question: the owner's own editor, or VS Code only |
+| Merge back, "Merged into main (commit)", Clean up afterwards | Has: `M`, the merged line, `C` | Unchanged |
+| Cancel a conflicted merge | Missing | Cancel from the same place (T-33) |
+| Open a pull request | Has: `P` | Unchanged |
+| Archive a finished agent, show and restore archived ones | Missing | Archive, show archived, restore (T-34) |
+| Accounts and sign-in | Has: `A` | Unchanged |
+| Phone access, pairing, devices | Has: `O`, `D` | Unchanged |
+| Audio Mode | Has: `S` | Unchanged |
+| Pop the review out to another screen, the Overseer window layout, dragging the grid, themes | Not in a terminal | Stay in VS Code: the terminal is already its own window, and colours come from the terminal |
+| A command that VS Code gains later | — | The parity table fails its test until the command has a key or a reason (T-36) |
+
+### Criteria
+
+- [ ] **T-25 — An agent list beside the grid.** The main screen keeps the pages of nine and adds an
+  agent list on the left: agents grouped by repository, the most recently active repository and
+  agent first. Each row shows the status mark, the title (shortened with `…`), the account, and a
+  mark for needs you, to review or merged. Each repository's heading shows its counts. `J`/`K` (or
+  a click) picks the next or previous agent in the list, and the picked agent's conversation shows
+  in a column beside the grid (way 2, the owner's pick), with the same scrollback and tool details as zoom. Esc returns to the grid on that agent.
+  `L` hides or shows the list. Search and the filter narrow the list and the grid together. The
+  list is shown from 100 columns; narrower terminals keep today's compact layout.
+  **Verify:** with 20 fixture agents in 3 repositories, snapshots at 200×60, 140×40 and 100×30
+  show the grouped list, each row's account and marks, and the repository counts. `J` three times
+  shows the third agent's conversation and Esc returns to the grid with that agent focused. A
+  search for one repository leaves only its group. No rendered line is wider than the terminal.
+- [ ] **T-26 — The same counts and the same unreviewed marks as VS Code.** The header shows
+  working, needs you, to review, reviewed and failed, the same five counts as VS Code's rollup,
+  with zero counts left out. Whether a finished agent has been reviewed is kept by the daemon, not
+  by one VS Code window, so opening an agent's review in the TUI clears its mark in VS Code and the
+  other way round; merging clears it too. **Verify:** a fixture finishes 6 agents in 2
+  repositories. The TUI header and VS Code's side bar give the same counts. Opening one agent's
+  review in the TUI clears only that mark, in both. A mark cleared in VS Code clears in the TUI
+  within 2 s.
+- [ ] **T-27 — The review opens on "Since task start".** `v` opens the review on the comparison
+  the daemon marks as the default: "Since task start". `1`, `2` and `3` switch to Since task start,
+  Latest run and Entire worktree, and `c` still cycles through every comparison. The review's
+  header always names what is shown and how many files and lines changed. A comparison that is not
+  available says why instead of disappearing. **Verify:** a finished fixture agent in its own
+  worktree and one in the current checkout both open on Since task start. Each key shows the right
+  files and counts. The header names each one. Snapshots of the three.
+- [ ] **T-28 — Changed or All files.** `t` switches the file list between Changed (what the
+  comparison shows) and All files (the agent's whole worktree, from the daemon), as in VS Code.
+  In All files, changed files carry their `+/−` counts, and picking an unchanged file shows its
+  contents read-only. The switch says which list is shown. **Verify:** an agent that edited 2 of 5
+  files lists 2 in Changed and 5 in All files; an unchanged file's contents show; the switch
+  snapshot.
+- [ ] **T-29 — Accept and Reject in the terminal.** In the review, `n`/`p` move between changes.
+  `a` Accepts the change under the cursor and `A` the whole file; `r` Rejects the change and `R`
+  the whole file, after a y/n that says how many lines go back to what was there before (reloading the review moves from `r` to Ctrl-R). Accept
+  marks a change reviewed; Reject puts back the comparison's text in the agent's worktree. Both go
+  through the daemon, with its conflict check: a change the agent altered meanwhile is refused
+  with the reason. The words are Accept and Reject, never Keep, Undo or Save. What is accepted in
+  the TUI shows as accepted in VS Code and on the phone, and the other way round. **Verify:**
+  against a real daemon: a change accepted in the TUI is accepted in the daemon's marks and in
+  VS Code's review; a change rejected in the TUI restores the base lines in the worktree; a whole
+  file accepted and rejected; a change the fixture agent edits again before Reject is refused with
+  the reason; a text audit finds no Keep, Undo or Save in the review.
+- [ ] **T-30 — Follow in the review.** `F` turns Follow on: the review moves to the file the agent
+  is editing and to the change being made, as edits arrive. Moving by hand pauses Follow and the
+  header says "Paused"; `F` resumes it. **Verify:** a fixture agent editing three files in turn:
+  the review moves to each within 250 ms of its edit; `j` pauses it; `F` resumes it.
+- [ ] **T-31 — A waiting agent can always be answered from the terminal.** A pending permission
+  offers Allow once (`a`), Allow for this session (`s`, the harness's own rule) and Deny with a
+  note (`d` opens a one-line note; Enter sends, empty is fine). The note reaches the agent as the
+  reason. This is the terminal side of the main RFC's "a waiting agent can always be answered".
+  **Verify:** on the Claude fixture: Allow for this session is not asked again for the same tool;
+  a denial's note is in the fixture's input log; the prompt's snapshot.
+- [ ] **T-32 — New agent with every choice VS Code has.** The `n` form adds effort and permission
+  mode (Ask first, Accept edits, Auto) to repository, harness, account, model and prompt, offering
+  only what the chosen harness and model support, remembered like VS Code's composer. **Verify:** a
+  fixture agent started with a chosen effort and mode has both in its task record; a harness
+  without efforts hides the field.
+- [ ] **T-33 — Cancel a conflicted merge.** When merge back stops on conflicts, `M` on that agent
+  offers to cancel the merge (y/n), which puts the worktree back as it was before the merge, as
+  VS Code's Cancel merge does. The merge confirmation lists every file that will be committed,
+  untracked ones included. **Verify:** a fixture merge that conflicts; cancelling restores the
+  worktree's pre-merge HEAD and files; the confirmation of a worktree with an untracked `.env`
+  names it.
+- [ ] **T-34 — Archive and restore.** `E` archives a finished agent (y/n): it leaves the list and
+  the grid, as in VS Code. The filter gains Archived, where `E` restores one. **Verify:** archiving
+  a fixture agent in the TUI hides it in both the TUI and VS Code; restoring brings it back in both.
+- [ ] **T-35 — Voice Mode in the terminal.** Overseer's conversation (`o`) shows a Voice Mode line:
+  off, listening, hearing you, thinking, speaking, muted or paused for a call, and the words as they
+  are heard. Spoken requests are the same cards as typed ones. Keys turn Voice Mode on and off,
+  mute, cancel the open request, and answer a read-back yes or no. The daemon listens and speaks;
+  the TUI only shows and sends. **Verify:** with a fixture voice session each state shows in turn,
+  a card fills in as it advances, and mute, cancel and yes work by key; the same state shows in
+  VS Code at the same time.
+- [ ] **T-36 — Nothing left out without a reason.** This RFC keeps a table of every command VS Code
+  Overseer offers, each with its TUI key or the reason it stays in VS Code. **Verify:** a unit test
+  reads the commands in `extension/package.json` and fails when one has no row; `?` lists every key
+  the table names.
+
+- [ ] **T-37 — The grid fits the count.** The grid shows top-level agents only (runs without a
+  parent) and sizes itself to how many there are, up to 16 on one screen (1, 1×2, 2×2, 2×3, 3×3,
+  3×4, 4×4 and the shapes between), narrowing to fit beside the list and a picked agent's
+  conversation; from the 17th agent it pages, 16 per page. Arrow keys follow the shape.
+  **Verify:** snapshots at 200×60 with 1, 4, 7, 12, 16 and 17 fixture agents show the expected
+  shape (the 17th on page 2), with and without the conversation column; sub-agents never get a
+  tile.
+- [ ] **T-38 — One key between the grid and one agent.** A key (`g`, shown in `?`) switches between
+  the grid and the focused agent's full view (its conversation with scrollback and tool details),
+  and back to the grid on the same agent. **Verify:** with 9 fixture agents, focusing the fourth
+  and pressing the key shows its full conversation; pressing it again shows the grid with the
+  fourth focused; the key works from the list and from a tile.
+- [ ] **T-39 — Edit in your own editor.** In the review, `e` suspends the TUI and opens the file at
+  the current change in `$EDITOR` (falling back to `vi`); when the editor exits, the TUI comes back
+  and the review refreshes from the daemon, showing the owner's edits as theirs (not the agent's).
+  **Verify:** with `EDITOR` set to a script that appends a line and exits, `e` on a change returns
+  to the review with that line shown as the owner's edit and the terminal restored (no leftover
+  raw mode or alternate screen).
+
+### Open for later
+
+- How sub-agents show: drilled into from their parent, or seen as tiles next to the others (the
+  owner, 2026-09-30: "maybe assume all top level for now"; "not a priority, needs more thought").

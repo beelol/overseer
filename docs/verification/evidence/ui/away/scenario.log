@@ -1,0 +1,8 @@
+[2026-09-29T11:49:21.775Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-29T11:49:27.074Z] PASS home opens on its empty hero while nothing has happened {"conversation":""}
+[2026-09-29T11:49:32.841Z] PASS eight agents finished across two repositories, one failed [["Header","completed"],["Footer","completed"],["Pricing","completed"],["Blog","completed"],["Search","failed"],["Inbox","completed"],["Tags","completed"],["Export","completed"]]
+[2026-09-29T11:49:36.564Z] screenshot docs/verification/evidence/ui/away/01-reopened-while-away.png
+[2026-09-29T11:49:36.564Z] PASS reopening home shows the summary as the newest message, on screen, instead of the empty hero {"conversation":"1","last":"While you were away: 4 finished and 1 failed in site; 3 finished in notes.","onScreen":true,"r":[469.7734375,504.671875],"box":[46,504.5078125]}
+[2026-09-29T11:49:37.784Z] screenshot docs/verification/evidence/ui/away/02-asked-what-happened.png
+[2026-09-29T11:49:37.784Z] PASS asking "what happened while I was away" gives the same line, with no model turn {"count":2,"run":null}
+[2026-09-29T11:49:37.788Z] background window: main-process events [{"ms":195,"what":"window created","show":true}]

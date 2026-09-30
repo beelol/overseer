@@ -77,7 +77,8 @@ class CommandCenter {
     if (!m || typeof m !== 'object') return;
     const post = x => this.panel?.webview.postMessage(x);
     switch (m.type) {
-      case 'ready': if (this.pendingTarget) post({ type: 'composerTarget', target: this.pendingTarget }); await this.push(); await this.pushOverseer(); this.pushVoice(); this.voiceSource?.refresh(); this.pushActivity(); if (this.inDashboard) post({ type: 'dashboard', on: true }); if (this.aside) post({ type: 'aside', on: true }); if (this.head) post({ type: 'headAgent', agent: this.head }); return;
+      // Opening home is a visit: what happened while the owner was away leads (AC-253).
+      case 'ready': if (this.pendingTarget) post({ type: 'composerTarget', target: this.pendingTarget }); await this.push(); await this.client.request('overseer.visit', { surface: 'vscode' }).catch(() => undefined); await this.pushOverseer(); this.pushVoice(); this.voiceSource?.refresh(); this.pushActivity(); if (this.inDashboard) post({ type: 'dashboard', on: true }); if (this.aside) post({ type: 'aside', on: true }); if (this.head) post({ type: 'headAgent', agent: this.head }); return;
       // Voice Mode's controls in the view (AC-227).
       case 'voiceMute': await vscode.commands.executeCommand('overseer.voice.mute'); return;
       case 'voiceToggle': await vscode.commands.executeCommand('overseer.voice.toggle'); return;

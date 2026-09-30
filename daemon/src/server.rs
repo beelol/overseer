@@ -3163,6 +3163,7 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "overseer.session" => d.overseer_session()?,
         "overseer.messages" => d.overseer_messages(p["after"].as_i64().unwrap_or(0), p["limit"].as_i64().unwrap_or(100))?,
         "overseer.send" => d.overseer_send(s(p, "text")?, p["surface"].as_str().unwrap_or("vscode"), p["harness"].as_str(), p["model"].as_str())?,
+        "overseer.visit" => d.overseer_visit(p["surface"].as_str().unwrap_or("vscode"))?,
         "overseer.propose" => d.overseer_propose(&p["actions"], p["source"].as_str().unwrap_or("api"))?,
         "overseer.answer" => d.overseer_answer(s(p, "id")?, p["yes"].as_bool().unwrap_or(false), p["surface"].as_str().unwrap_or("vscode"), p["by"].as_str().unwrap_or("owner"))?,
         "overseer.level" => d.overseer_level(p["level"].as_str())?,
