@@ -15,7 +15,7 @@ const vscode = {
 };
 const load = Module._load;
 Module._load = function (request, ...rest) { return request === 'vscode' ? vscode : load.call(this, request, ...rest); };
-const { Notices, kindsFrom, agentFromUri } = require(path.resolve(__dirname, '../../extension/src/notices.js'));
+const { Notices, kindsFrom, agentFromUri, uriAction } = require(path.resolve(__dirname, '../../extension/src/notices.js'));
 
 let failures = 0, passed = 0;
 const test = async (name, fn) => { try { await fn(); passed++; console.log('ok  ', name); } catch (e) { failures++; console.log('FAIL', name, '-', e.message); } };
@@ -72,6 +72,16 @@ function setup({ fail } = {}) {
     assert.strictEqual(agentFromUri({ path: '/open-center', query: '' }), undefined);
     assert.strictEqual(agentFromUri({ path: '/open-agent', query: 'run=../../x' }), undefined);
     assert.strictEqual(agentFromUri({ path: '/open-agent', query: '' }), undefined);
+  });
+  await test("the menu-bar item's links (AC-262): an agent, the view filtered, the workspace, Talk to Overseer", () => {
+    assert.deepStrictEqual(uriAction({ path: '/open-agent', query: 'run=r-1' }), { kind: 'agent', run: 'r-1' });
+    assert.strictEqual(uriAction({ path: '/open-agent', query: 'run=../x' }), undefined);
+    assert.deepStrictEqual(uriAction({ path: '/open-center', query: '' }), { kind: 'center', filter: undefined, repo: undefined });
+    assert.deepStrictEqual(uriAction({ path: '/open-center', query: 'filter=needs' }), { kind: 'center', filter: 'needs', repo: undefined });
+    assert.deepStrictEqual(uriAction({ path: '/open-center', query: 'repo=overseer&filter=bogus' }), { kind: 'center', filter: undefined, repo: 'overseer' });
+    assert.deepStrictEqual(uriAction({ path: '/open-workspace', query: '' }), { kind: 'workspace' });
+    assert.deepStrictEqual(uriAction({ path: '/talk', query: '' }), { kind: 'talk' });
+    assert.strictEqual(uriAction({ path: '/rm-rf', query: '' }), undefined);
   });
   console.log(`${passed} passed, ${failures} failed`);
   process.exit(failures ? 1 : 0);

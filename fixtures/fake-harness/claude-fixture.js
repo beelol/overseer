@@ -15,6 +15,7 @@
 //   overseer:    answers as Talk to Overseer (AC-107) from the agents' state in the prompt: a summary
 //                for "what is everyone doing?", and for "tell <agent> to <task>" a proposal block
 //   editor:      edits files one step at a time as its prompt lists them (AC-233's Follow)
+//   menubar:     the menu-bar item's agents (AC-262): "ask: <command>", "busy: <seconds>", "fail" in the prompt
 //   swarm:       a Swarm member on the proposed native path (swarm.native_director): with the
 //                director's tools it follows CLAUDE_FIXTURE_SWARM_SCRIPT, with a worker's tools
 //                CLAUDE_FIXTURE_SWARM_WORKERS; every step goes through the daemon's MCP tools and is
@@ -902,6 +903,40 @@ async function mcpClient() {
       result(false, `submitted ${job}`);
     }
     if (mcp) mcp.close();
+  } else if (mode === 'menubar') {
+    // The menu-bar item's agents (AC-262), each told by its prompt what to be:
+    //   "ask: <command>"  asks can_use_tool for Bash with Claude Code's session-rule suggestion,
+    //                     waits for the answer and writes it to answer.json in its worktree;
+    //   "busy: <seconds>" works that long (honours an interrupt); "fail" fails; else it finishes.
+    const ask = firstText.match(/ask:\s*(.+)/);
+    const busy = firstText.match(/busy:\s*(\d+)/);
+    const stop = () => next(m => m.type === 'control_request' && m.request?.subtype === 'interrupt').then(() => 'interrupt');
+    if (ask) {
+      const command = ask[1].trim();
+      const input = { command, description: 'Run ' + command };
+      assistant([{ type: 'tool_use', id: 'toolu_bash', name: 'Bash', input }]);
+      const rule = command.split(/\s+/).slice(0, 2).join(' ') + ':*';
+      out({ type: 'control_request', request_id: 'req-bash', request: { subtype: 'can_use_tool', tool_name: 'Bash', input,
+        permission_suggestions: [{ type: 'addRules', rules: [{ toolName: 'Bash', ruleContent: rule }], behavior: 'allow', destination: 'session' }] } });
+      const reply = await next(m => m.type === 'control_response' || (m.type === 'control_request' && m.request?.subtype === 'interrupt'));
+      if (reply.type === 'control_request') { result(true, 'interrupted'); await sleep(50); process.exit(130); }
+      const decision = reply.response.response;
+      fs.writeFileSync(path.join(process.cwd(), 'answer.json'), JSON.stringify(decision) + '\n');
+      const allowed = decision.behavior === 'allow';
+      user([{ type: 'tool_result', tool_use_id: 'toolu_bash', content: allowed ? 'ok' : 'Permission denied: ' + decision.message, is_error: !allowed }]);
+      assistant([{ type: 'text', text: allowed ? `ran ${command}${decision.updatedPermissions ? ' (always allowed for this session)' : ''}` : 'permission denied' }]);
+      result(false, allowed ? 'ran' : 'denied');
+    } else if (busy) {
+      assistant([{ type: 'text', text: 'working' }]);
+      const done = sleep(Number(busy[1]) * 1000).then(() => 'done');
+      if ((await Promise.race([stop(), done])) === 'interrupt') { result(true, 'interrupted'); await sleep(50); process.exit(130); }
+      result(false, 'finished');
+    } else if (/\bfail\b/.test(firstText)) {
+      result(true, 'the fixture failed as asked');
+    } else {
+      assistant([{ type: 'text', text: 'done' }]);
+      result(false, 'done');
+    }
   } else if (mode === 'circles') {
     // The same command failing three times in a row (a free check of AC-189).
     for (let i = 1; i <= 3; i++) {
