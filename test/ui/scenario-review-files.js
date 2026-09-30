@@ -85,7 +85,7 @@ const { Session, makeRepo, latestVsix, delay, git } = require('./harness');
     await review.waitFor(`!!document.querySelector('#tree .file[data-path="src/deep/nested.txt"]')`, 10000);
     await review.eval(`document.querySelector('#tree .file[data-path="src/deep/nested.txt"]').click()`);
     const realTab = async () => cdp.evalWorkbench(`(() => { const t = [...document.querySelectorAll('.tabs-container .tab')]; const a = t.find(x => x.classList.contains('active') && x.closest('.editor-group-container.active'));
-      return { active: a ? (a.getAttribute('aria-label') || a.textContent.trim()) : '', review: t.some(x => /^Review/.test(x.textContent.trim())), text: [...document.querySelectorAll('.editor-group-container.active .monaco-editor .view-line')].map(l => l.textContent.replace(/\u00a0/g, ' ')).join('\n') }; })()`);
+      return { active: a ? (a.getAttribute('aria-label') || a.textContent.trim()) : '', review: t.some(x => /^Review/.test(x.textContent.trim())), text: [...document.querySelectorAll('.editor-group-container.active .monaco-editor .view-line')].map(l => l.textContent.replace(/\\u00a0/g, ' ')).join('\\n') }; })()`);
     let opened = await realTab();
     for (let i = 0; i < 80 && !/nested\.txt/.test(opened.active); i++) { await delay(250); opened = await realTab(); }
     await delay(800); opened = await realTab();
