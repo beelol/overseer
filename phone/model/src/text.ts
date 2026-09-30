@@ -112,6 +112,10 @@ export const TEXT = {
     handedOff: from(CONVERSATION, 'Handed off'),
     queued: shaped(CONVERSATION, "`Queued by ${p.detail && p.detail.by ? 'Overseer' : ev.source === 'overseer' ? 'Overseer' : 'you'}: ${", (byOverseer: unknown, text: string) => `Queued by ${byOverseer ? 'Overseer' : 'you'}: ${text}`),
     briefing: from(CONVERSATION, 'Overseer added a briefing'),
+    merged: shaped(CONVERSATION, "`Merged into ${p.target || 'main'}${p.commit ? ` (${String(p.commit).slice(0, 7)})` : ''}`", (target: string, commit: string) => `Merged into ${target}${commit ? ` (${commit})` : ''}`),
+    mergeConflicts: shaped(CONVERSATION, "`Merge stopped: conflicts in ${", (files: string) => `Merge stopped: conflicts in ${files}`),
+    mergeCancelled: from(CONVERSATION, 'Merge cancelled: the worktree is as it was before it'),
+    pullRequest: shaped(CONVERSATION, "`Pull request${p && p.number ? ' #' + p.number : ''} opened`", (n: string) => `Pull request${n ? ' #' + n : ''} opened`),
   },
 
   /** A harness by name (ui.js HARNESS). */
@@ -144,8 +148,6 @@ export const TEXT = {
     /** The status's words after an agent's end (AC-254): ", to review" until its review is opened, then ", reviewed". */
     toReview: shaped(VIEWS, "', to review'", ', to review'),
     reviewed: shaped(VIEWS, "', reviewed'", ', reviewed'),
-    /** The Mac's own login (views.js `accountName`). */
-    yourLogin: from(VIEWS, 'Your login'),
     doneToReview: from(VIEWS, 'Done, to review'),
     repoToReview: shaped(VIEWS, '`${toReview} to review`', (n: number) => `${n} to review`),
     repoFailed: shaped(VIEWS, '`${failed} failed`', (n: number) => `${n} failed`),
@@ -274,7 +276,8 @@ export const TEXT = {
     currentCheckout: from(CHAT, 'current checkout'),
     currentCheckoutTitle: from(CHAT, 'Current checkout'),
     whenItFinishes: from(CHAT, 'Message for when it finishes'),
-    mergeBack: from(CHAT, 'Merge back…'),
+    // AC-243: the chat's menu names the branch the work lands on.
+    mergeBack: shaped(CHAT, "`Merge into ${land.target || 'main'}…`", (target = 'main') => `Merge into ${target}…`),
     openPullRequest: from(CHAT, 'Open pull request…'),
     rawOutput: from(CHAT, 'Raw output'),
     details: from(CHAT, 'Details'),

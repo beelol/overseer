@@ -2420,7 +2420,7 @@ rec(230, "Permission modes by conversation", "not started", date="—", commit="
 rec(231, "Agents start with what Overseer knows", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
-rec(232, "The review says what it shows", "verified", date="2026-09-29", commit="994f78bf (branch claude/review-merge, pull request #35, not merged yet)",
+rec(232, "The review says what it shows", "verified", date="2026-09-29", commit="994f78bf (branch claude/review-merge, pull request #35, merged as 0fad2bee)",
     harness="Generic fixture programs on the packaged VSIX (isolated VS Code profile, background window) and the real daemon binary with real Git; no accounts, no paid turns",
     proven="the whole Verify clause: an agent that commits a new file (then has a turn that changes nothing, the owner's case) shows it added, every line added and no removed line, with the right count in the packaged review; Save reads \"Save your changes to the agent's copy\" and shows only with edits; each hunk offers Keep or Undo in words; with no remote the chat offers Merge into main and Publish to GitHub and the review Merge into main, and Open PR offers the local merge in a quick pick, never a dialog",
     steps="""1. `cargo test -p overseerd --test review_merge`: `ac232_a_finished_agents_committed_new_file_is_in_its_default_review` (an agent commits data/features.js, a second turn changes nothing; a finished agent's default comparison in its worktree is Since task start and lists `A data/features.js`, as the chat's count does; while an agent works, and in the owner's own checkout, the default stays Latest run) and `ac232_the_merge_plan_says_whether_there_is_a_github_remote`.
@@ -2451,7 +2451,7 @@ rec(234, "Deploys follow merges by themselves", "not started", date="—", commi
     expected="See the RFC criterion (Gate T, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28; the first manual deploys (87aa4f87, cc5e5463) were run by the coordinator with the owner's yes.", live="—", blocker="Its own agent; CI's required checks must be green first (the TUI t10 timing test on hosted runners is the owner's decision).")
 
-rec(235, "You can always see which account an agent uses", "verified", date="2026-09-29", commit="f2eb56f9 (branch claude/account-shown, pull request #36, not merged yet)",
+rec(235, "You can always see which account an agent uses", "verified", date="2026-09-29", commit="f2eb56f9 (branch claude/account-shown, pull request #36, merged as 7be5f462)",
     harness="SYNTHETIC accounts only: the Claude fixture (a per-profile fixture-account.json) and the account CLI fixture (Claude auth status, Codex login and Codex's app-server account/read); packaged VSIX; no real login is read, no paid turns",
     proven="the whole Verify clause: packaged-UI screenshots of an agent on the Mac's default login and one on a named account show the plan and the email's domain in the header, the side bar and the composer (and the grid); the TUI's tiles and the phone's agent list show the same; no surface says only \"Your login\"",
     steps="""1. `node test/ui/scenario-account-shown.js`: the Mac's default Claude login is bilal@testbox.com (Max), a named account \"Personal\" is ana.silva@personal.example (Pro); one agent on each; Refresh Account Status.
@@ -2545,7 +2545,7 @@ rec(242, "Keys act only on what you can see", "verified", commit="13b71844 (bran
     actual="All pass. The scenario failed on the previous VSIX at the which-request step (⌥⌘Y had answered the first waiting agent). Open Pull Request and Stop (overseer.interrupt) take the same picker.",
     evidence="[keys-on-screen scenario](evidence/ui/keys-on-screen/); `extension/src/on-screen.js`, `test/unit/on-screen.js`",
     live="Fixtures only.", limits="The picker lists agents the command applies to (Stop: running ones; Merge Back and Clean Up: finished ones with a worktree).")
-rec(243, "Merge from the agent, and it reads merged afterwards", "verified", date="2026-09-29", commit="994f78bf (branch claude/review-merge, pull request #35, not merged yet)",
+rec(243, "Merge from the agent, and it reads merged afterwards", "verified", date="2026-09-29", commit="994f78bf (branch claude/review-merge, pull request #35, merged as 0fad2bee)",
     harness="Generic fixture programs on the packaged VSIX (isolated VS Code profile, background window), the real daemon binary with real Git, and the TUI against a real daemon; no accounts, no paid turns",
     proven="the whole Verify clause: the merge from the chat's button with one confirmation listing the files (the fixture .env apart); the side bar, the chat, the grid, the review and the TUI read \"Merged into main (commit)\" and offer Clean up; a merge stopped on conflicts is cancelled from the chat and the worktree is as before; a worktree mid-merge (conflicted, or resolved but unfinished) refuses Open PR; the repository's pre-commit hook runs (and a refusing one stops the merge and keeps the work)",
     steps="""1. `cargo test -p overseerd --test review_merge`: `ac243_merge_lists_the_files_and_untracked_ones_runs_hooks_and_reads_merged`, `ac243_a_refusing_pre_commit_hook_stops_the_merge_and_keeps_the_work`, `ac243_cancel_restores_the_pre_merge_worktree_and_open_pr_refuses_mid_merge`; `cargo test -p overseerd --test protocol -- ac50_open_pr_refuses_a_worktree_left_mid_merge_with_conflicts`.
@@ -2763,6 +2763,18 @@ rec(261, "One Sign In, clearly Overseer's or clearly not", "verified", commit="b
     evidence="[one-signin scenario](evidence/ui/one-signin/) (three screenshots, result.json)",
     live="Fixtures only.", limits="VS Code's own Accounts icon in the activity bar stays (it is VS Code's menu, not a Sign In control).")
 
+rec(262, "Overseer in the Mac's menu bar", "not started", date="—", commit="—",
+    expected="See the RFC criterion (added by the owner on 2026-09-29).",
+    actual="Not started: the owner asked for it on 2026-09-29 (the Mac showed no menu-bar item); a mockup comes first, for the owner's yes, including 30 agents across repositories.", live="—", blocker="Its own agent: the mockup (docs/design/menu-bar/), the owner's yes, then the build.")
+
+rec(263, "The review opens on \"Since task start\", with the other comparisons one click away", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the owner's decision of 2026-09-29 on pull request #35's question).",
+    actual="Not started: #35 (AC-232) opens a finished agent's review on Since task start in its own worktree and keeps Latest run in the owner's checkout; the owner chose Since task start everywhere, with Latest run and Entire worktree one click away.", live="—", blocker="Its own agent.")
+
+rec(264, "One Overseer layout, and it looks like Focus Mode without its side effects", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the owner, 2026-09-29, after comparing the Workspace and Focus Mode screenshots).",
+    actual="Not started: Workspace (AC-250, #33) gives three columns with a separate agent-chat column; Focus Mode hides tab rows by writing user settings in a folder window. The owner wants Focus Mode's look always, two wide areas (review, and one Overseer panel that becomes an agent's chat), and Focus Mode retired.", live="—", blocker="Its own agent; the owner picks A or B from screenshots first.")
+
 SHORT_BLOCKERS = {
     154: "verified",
     155: "verified",
@@ -2953,6 +2965,9 @@ SHORT_BLOCKERS = {
     259: "verified",
     260: "verified",
     261: "verified",
+    262: "not started (the owner, 2026-09-29)",
+    263: "not started (the owner, 2026-09-29)",
+    264: "not started (the owner, 2026-09-29)",
 }
 TOTAL = 53
 

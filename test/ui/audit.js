@@ -3,13 +3,14 @@
 //
 //   root     CSS selector of the view's root (default: body)
 //   exclude  CSS selectors whose subtrees are not part of this view
+//   drop     texts not counted wherever they appear (measured on their own; `dropped` says how much)
 //
 // Text inside Monaco diff editors (code) is not counted. "Visible" follows checkVisibility(): text in closed <details>, [hidden] or display:none parts is
 // not counted; text scrolled out of view is (it is part of the view).
 // nativeHover: VS Code's own workbench actions (.action-label) show their name in VS Code's managed
 // hover instead of a title attribute; there the accessible name is the tooltip text.
 // words: also return every visible text run (to compare two readings and name what changed).
-function auditExpression({ root = 'body', exclude = [], nativeHover = false, words: withWords = false } = {}) {
+function auditExpression({ root = 'body', exclude = [], drop = [], nativeHover = false, words: withWords = false } = {}) {
   return `(() => {
   const root = document.querySelector(${JSON.stringify(root)});
   if (!root) return { missing: ${JSON.stringify(root)} };
@@ -17,14 +18,17 @@ function auditExpression({ root = 'body', exclude = [], nativeHover = false, wor
   const outside = n => excluded.some(x => x.contains(n));
   const visible = e => e && (e.checkVisibility ? e.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) : e.offsetParent !== null);
   const CODE = 'pre, code, textarea, .code, .monaco-editor, .view-lines';
-  let chars = 0; const longRuns = []; const words = [];
+  let chars = 0, dropped = 0; const longRuns = []; const words = [];
+  const drops = ${JSON.stringify(drop)}.filter(Boolean).sort((a, b) => b.length - a.length);
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
     const p = n.parentElement;
     if (!p || ['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(p.tagName) || outside(p) || !visible(p)) continue;
     // Code shown in diff editors is the same content before and after; it is not UI text.
     if (p.closest('.monaco-editor')) continue;
-    const text = n.textContent.replace(/\\s+/g, ' ').trim();
+    let text = n.textContent.replace(/\\s+/g, ' ').trim();
+    for (const d of drops) { const before = text.length; text = text.split(d).join(''); dropped += before - text.length; }
+    text = text.trim();
     if (!text) continue;
     chars += text.length;
     words.push(text);
@@ -59,7 +63,7 @@ function auditExpression({ root = 'body', exclude = [], nativeHover = false, wor
     const tip = b.getAttribute('title') || b.closest('[title]')?.getAttribute('title') || b.getAttribute('data-tooltip') || (${nativeHover} && b.matches('.action-label') && name);
     if (!name || !tip) unnamed.push({ html: b.outerHTML.slice(0, 100), name: !!name, tip: !!tip });
   }
-  return { chars, longRuns: longRuns.slice(0, 20), overflow, unnamed, sample: words.join(' | ').slice(0, 400), width: W, ...(${withWords} ? { words } : {}) };
+  return { chars, dropped, longRuns: longRuns.slice(0, 20), overflow, unnamed, sample: words.join(' | ').slice(0, 400), width: W, ...(${withWords} ? { words } : {}) };
 })()`;
 }
 

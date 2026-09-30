@@ -39,7 +39,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const chip = sel => dash.eval(`document.querySelector('[data-chip="${sel}"]').getAttribute('aria-label')`);
     const note = () => dash.eval(`document.querySelector('.view-composer .composer-note').textContent`);
     // Keyboard: focus the task, Shift+Tab to reach chips, open the agent menu, pick an entry by label.
-    // label: the item's text; under (optional): a pattern its menu heading must match (both logins read "Your login").
+    // label: the item's text; under (optional): a pattern its menu heading must match (both logins read "Mac's default login").
     const pickAgent = async (label, under) => {
       // Focus the webview on the agent chip (keyboard from here on), then open its menu with Enter.
       const at = await s.webviewPoint(dash, '[data-chip="agent"]'); await cdp.click(at.x, at.y); await delay(300);
@@ -65,7 +65,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     };
 
     // Claude, keyboard only.
-    await pickAgent('Your login', /Claude/);
+    await pickAgent("Mac's default login", /Claude/);
     const claudeChip = await chip('agent');
     const c = await start('Say hello from Claude', 'claude');
     check('Claude agent started keyboard-only from the composer; it becomes selected and streams in place', /Claude Code/.test(claudeChip) && c.run && c.shown, { claudeChip, run: c.run?.id, shown: c.shown });
@@ -76,7 +76,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     // Codex.
     await cdp.command('Overseer: New Agent'); await delay(800);
     await dash.waitFor(`document.body.dataset.mode === 'composer'`, 5000);
-    await pickAgent('Your login', /Codex/);
+    await pickAgent("Mac's default login", /Codex/);
     const x = await start('Say hello from Codex', 'codex');
     check('Codex agent started keyboard-only', x.run && x.shown, { run: x.run?.id, shown: x.shown });
     // Generic program.

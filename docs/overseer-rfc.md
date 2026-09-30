@@ -537,6 +537,51 @@ From the friction research of 2026-09-28 ([report](audits/2026-09-28-friction-re
 - [x] **AC-260 — Starting an agent in another repository never needs a native dialog.** The repository chip's picker offers recent repositories, a fuzzy search over known repositories, and a typed path, entirely inside the webview; the native `Open Folder` dialog is never the only way to add one. **Verify:** a packaged-UI scenario adds a not-yet-open repository by typing its path into the repository chip's own picker and starts a task there, with no native dialog opened; keyboard-only from the composer.
 - [x] **AC-261 — One Sign In, clearly Overseer's or clearly not.** Whenever Overseer's own view is active, VS Code's own account/sign-in entry point (used by its built-in chat) is either hidden or visibly labelled as unrelated to Overseer, so a new owner never has to guess which one starts Overseer. **Verify:** packaged-UI screenshots of a fresh profile's first Overseer view in the three themes show either no competing sign-in control or one clearly labelled as VS Code's own.
 
+From the owner, 2026-09-29:
+
+- [ ] **AC-262 — Overseer in the Mac's menu bar.** A menu-bar item with the Overseer silhouette (`docs/design/brand/overseer-icon-flat.png` as a template image, AC-179) runs while the daemon does, with or without VS Code.
+  - The icon carries a dot while an agent needs the owner.
+  - Its menu shows, in order:
+    - every Needs-you item, answerable there (Allow once, Deny);
+    - a one-line summary ("12 working · 5 to review · 13 idle");
+    - one submenu per repository with its count, listing at most 8 agents (most recent first, each with its status and account, AC-235), then "Show all in Overseer…";
+    - Voice Mode on/off and mute;
+    - Open Overseer (the workspace layout, AC-250) and Talk to Overseer.
+  - Choosing an agent opens it in VS Code (AC-233).
+  - The owner approves a mockup before the build.
+  - **Verify:**
+    - The owner's yes on the mockup (`docs/design/menu-bar/`), which shows the quiet, needs-you and 30-agents states.
+    - Then, against a fixture daemon: screenshots of the item and its menu in those three states, in light and dark menu bars.
+    - An Allow from the menu reaches the fixture agent.
+    - Choosing an agent opens it in a test VS Code.
+    - With the daemon stopped, the item says so and offers to start it.
+- [ ] **AC-263 — The review opens on "Since task start", with the other comparisons one click away.** An agent's review opens on everything since its task started, whether the agent works in its own worktree or in the owner's checkout (the owner, 2026-09-29, over keeping "Latest run" in the owner's checkout). "Latest run" and "Entire worktree" (the branch against the base it started from) are one click away in the review's header, and the header always says which one is shown.
+  - **Verify:** packaged-UI checks:
+    - a finished agent in its own worktree and one in the current checkout both open on Since task start;
+    - one click switches to Latest run and one to Entire worktree, each with the right files and count;
+    - the header names the comparison each time;
+    - screenshots of the three.
+
+- [ ] **AC-264 — One Overseer layout, and it looks like Focus Mode without its side effects.** The owner, 2026-09-29, after comparing Workspace (AC-250) and Focus Mode screenshots: "pic 3 looks best … you want to end up in number 3 always."
+  - The layout is:
+    - the agents list in the left side bar;
+    - the review (Follow or Diffs only, AC-233) wide in the middle;
+    - one Overseer panel wide on the right.
+  - The Overseer panel is home: Overseer's conversation, typed or spoken, and Voice Mode (AC-227). Picking an agent turns the same panel into that agent's chat. A back control and ⌥⌘U return it to Overseer, where it was. There is no separate agent-chat column.
+  - The look is Focus Mode's: no tab rows and no breadcrumbs over Overseer's views. Nothing in any other VS Code window changes, and no user setting is written. The owner picks between two ways after seeing both:
+    - (A) the Overseer panel in VS Code's secondary side bar, with the review keeping one tab row;
+    - (B) the window reopened on an Overseer workspace file, so the tab-hiding setting is that window's own.
+  - One command and key (Workspace, ⌥⌘⇧O) arranges any window into it and restores the owner's own layout when run again. The first launch offers it with one click.
+  - Focus Mode is retired: its commands are removed or point to this layout, and its settings are put back.
+  - **Verify:**
+    - Screenshots of A and B side by side for the owner's choice. Then, for the chosen way, packaged-UI checks:
+      - a cluttered window becomes the layout in one step;
+      - a second VS Code window's tab strip and user settings are unchanged;
+      - picking an agent turns the right panel into its chat, and back returns to Overseer's conversation with its history;
+      - Voice Mode takes over the same panel;
+      - running the command again restores the cluttered layout exactly;
+      - the first-launch offer appears once.
+    - Screenshots at 1440×900 and 1920×1080 in the three themes.
 ### Gate S — Overseer itself (added by the owner, 2026-09-27)
 
 Owner request (2026-09-27): the orchestrator itself should have the context for all the other agents and be able to rein them in, change their direction, or send one agent to monitor another; the agents should report to it, and context should be passed around so that agents in flight do not collide. The owner wants to talk to Overseer itself, not only to the agents that are fired off. Owner decisions (same day): Overseer lives in the daemon (Rust), not only in the extension. There is one chat: home is the conversation with Overseer, and the composer still starts a new agent by default. Agents do the work and Overseer orchestrates them: it does what the owner asks of one agent or of all at once, and by itself it keeps each agent on task, checking in every third turn and when the agent is done, as closely as the owner directs, and getting up to speed whenever the owner asks for something; an agent that is on task is left to do its own thing. It has three levels, Ask first (the default), Steer and Auto; Auto is the mode an agent has when it is left to work on its own, and it is Overseer's own switch. At Steer and Auto what the owner types goes out without a yes, after a short window. Choosing who does the work (pull request #2, called Auto mode there) is a different layer that may get another name; it is called route picking here. Overseer, not the watcher, acts on what a watcher finds. Agents that run outside Overseer are ignored for now. Voice Mode (Gate R) is the spoken side of the same Overseer and is built separately: the two share one session in the daemon, the classes of AC-171, and the deliveries, states and cards of AC-167 and AC-169. AC-107 keeps its ID and its behaviour; what it does moves into the daemon. The owner also confirmed (same day): a check-in is due when one of the daemon's free checks trips; Overseer starts at most 100 turns a day by itself, and a turn that answers the owner is never counted; its own turns run on the default account's harness. Overseer never answers a permission request by itself, at any level (the owner's decision: an agent that asks is one the owner told to ask; to let an agent work without asking, the owner runs it on Auto). An agent gets a briefing and a channel only when more than one agent works in its repository (the owner's decision). The other numbers in these criteria are the side RFC's proposed bounds; the spike (AC-180) may revise them by a recorded decision. Nothing is started yet. Built in its own worktree and pull request, and it can be built in parallel with Voice Mode: the daemon methods of the one Overseer session are the contract between the two. Design, the owner's decisions and the proposed defaults: [Overseer RFC](rfcs/orchestrator.md). Prepared goal, not activated: [orchestrator-goal.md](rfcs/orchestrator-goal.md).

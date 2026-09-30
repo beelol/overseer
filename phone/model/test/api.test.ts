@@ -7,7 +7,7 @@ import { here } from './helpers/fixtures.ts';
 
 const COMMITTED: Record<string, string[]> = {
   store: ['EMPTY', 'load', 'apply', 'applyAll', 'snapshot', 'loadMarks', 'markStopping', 'rows', 'run', 'task', 'workspace', 'profile', 'turnsOf', 'marksOf', 'childrenOf', 'descendantsOf', 'rootOf'],
-  agents: ['agentRows', 'needsYou', 'counts', 'rollup', 'rollupText', 'searchLocally', 'emptyText', 'logoForHarness', 'logoForProvider', 'runHeader'],
+  agents: ['agentRows', 'needsYou', 'counts', 'rollup', 'rollupText', 'searchLocally', 'emptyText', 'logoForHarness', 'logoForProvider', 'runHeader', 'DEFAULT_LOGIN', 'accountName', 'accountLabel', 'accountShort', 'accountBrief'],
   conversation: ['create', 'setRun', 'append', 'appendAll', 'build', 'belongs', 'rowsOf', 'rowAt', 'rowCount', 'visibleRows', 'toolDetail', 'requestText', 'permissionActions', 'markdownOf', 'describe'],
   markdown: ['parse', 'plainText', 'safeHref', 'opensExternally', 'knownEntities'],
   review: ['statusLetter', 'changedFiles', 'changesSummary', 'comparisonChoices', 'branchChoices', 'fileDiff', 'hunkKey', 'splitLine', 'editTarget', 'acceptParams'],

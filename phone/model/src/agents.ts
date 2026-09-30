@@ -18,6 +18,30 @@ import { ago, basename, continuityState, firstLine, listStatusText, PHONE_ONLY, 
 import { isActive, record } from './types.ts';
 import type { Profile, Run, Task } from './types.ts';
 
+/** What the Mac's own login is called, as VS Code calls it (AC-235, views.js `DEFAULT_LOGIN`). */
+export const DEFAULT_LOGIN = "Mac's default login";
+
+/** An account's own name: the Mac's login is "Mac's default login", never "claude (existing login)". */
+export function accountName(p: Profile | undefined): string {
+  if (p === undefined) return '';
+  return p.is_system || / \(existing login\)$/.test(p.name || '') ? DEFAULT_LOGIN : p.name;
+}
+
+/** The account an agent runs on, in full (AC-235): "Claude Max · bil…@testbox.com · Mac's default login". */
+export function accountLabel(p: Profile | undefined): string {
+  return p === undefined ? '' : p.account?.label || accountName(p);
+}
+
+/** Beside the provider's logo (a list row): the plan and the shortened email, "Max · bil…@testbox.com". */
+export function accountBrief(p: Profile | undefined): string {
+  return p === undefined ? '' : [p.account?.plan, p.account?.email || accountName(p)].filter(Boolean).join(' · ');
+}
+
+/** The same where room is tight: "Claude Max · bil…@testbox.com". */
+export function accountShort(p: Profile | undefined): string {
+  return p === undefined ? '' : p.account?.short || accountName(p);
+}
+
 export type AgentFilter = 'all' | 'active' | 'needs';
 export type LogoKey = 'claudecode' | 'codex' | 'opencode' | 'claude' | 'openai' | 'github' | 'anthropic';
 export type BadgeTone = 'blue' | 'yellow' | 'orange' | 'green' | 'red' | 'purple' | 'quiet';
@@ -192,12 +216,6 @@ function listedRoots(state: PhoneState): Run[] {
   return [...rootsOf(state).values()].filter(r => !taskOf(state, r.task_id)?.archived_ms);
 }
 
-/** The Mac's own login reads "Your login" (views.js `accountName`), not "claude (existing login)". */
-function accountName(p: Profile | undefined): string | undefined {
-  if (p === undefined) return undefined;
-  return p.is_system || record(p)['kind'] === 'follows-app' || / \(existing login\)$/.test(p.name || '') ? TEXT.agents.yourLogin : p.name;
-}
-
 /** Task ids whose title, repository, harness, model, account or prompt holds `query`, whatever the case. */
 export function searchLocally(state: PhoneState, query: string): ReadonlyArray<string> {
   const q = query.trim().toLowerCase();
@@ -206,7 +224,7 @@ export function searchLocally(state: PhoneState, query: string): ReadonlyArray<s
   const has = (value: unknown): boolean => typeof value === 'string' && value.toLowerCase().includes(q);
   return rowsOfTable(state.tasks).filter(t => {
     const r = roots.get(t.id);
-    return has(t.title) || has(t.prompt) || has(t.repo_root) || (r !== undefined && (has(r.title) || has(r.harness) || has(TEXT.harness[r.harness]) || has(r.model) || has(profileOf(state, r.profile_id)?.name)));
+    return has(t.title) || has(t.prompt) || has(t.repo_root) || (r !== undefined && (has(r.title) || has(r.harness) || has(TEXT.harness[r.harness]) || has(r.model) || has(accountLabel(profileOf(state, r.profile_id)))));
   }).map(t => t.id);
 }
 
@@ -345,16 +363,16 @@ function build(state: PhoneState, options: AgentsOptions): AgentRow[] {
       const kids = childrenOf(state, run.id);
       const rowId = 'agent:' + task.id;
       const expanded = kids.length > 0 && !collapsed.has(rowId);
-      const account = accountName(profileOf(state, run.profile_id));
+      const account = profileOf(state, run.profile_id);
       const ws = workspaceOf(state, run.workspace_id);
       const status = listStatusText(run.status);
       const going = listActive(run.status);
       const isPinned = pinned.includes(run.id);
       const marked = mark(run, options);
       const harness = harnessName(run.harness);
-      const tooltip = [task.title, `${status}${run.exit_reason && !going ? ` — ${plain(run.exit_reason, 200)}` : ''}`, [harness, account, run.model].filter(Boolean).join(' · '), ws ? `${ws.kind === 'current' ? t.currentCheckout : ws.branch} · ${basename(task.repo_root)}` : ''].filter(Boolean).join('\n');
+      const tooltip = [task.title, `${status}${run.exit_reason && !going ? ` — ${plain(run.exit_reason, 200)}` : ''}`, [harness, accountLabel(account), run.model].filter(Boolean).join(' · '), ws ? `${ws.kind === 'current' ? t.currentCheckout : ws.branch} · ${basename(task.repo_root)}` : ''].filter(Boolean).join('\n');
       // The ✦ badge marks it; the accessible name says "to review" too.
-      out.push({ id: rowId, kind: 'agent', depth: 1, label: task.title, description: going ? '' : ago(run.ended_ms || run.created_ms, options.now), tooltip, accessibilityLabel: `${task.title}, ${status}${!going && marked.toReview ? t.toReview : ''}, ${harness}${account ? ', ' + account : ''}`, ...picture(run.harness), ...marked, runId: run.id, taskId: task.id, repo, expandable: kids.length > 0, expanded, context: `agent-${going ? 'active' : 'done'}${task.archived_ms ? '-archived' : ''}${isPinned ? '-pinned' : ''}`, active: going, archived: !!task.archived_ms, pinned: isPinned });
+      out.push({ id: rowId, kind: 'agent', depth: 1, label: task.title, description: [going ? '' : ago(run.ended_ms || run.created_ms, options.now), accountBrief(account)].filter(Boolean).join(' · '), tooltip, accessibilityLabel: `${task.title}, ${status}${!going && marked.toReview ? t.toReview : ''}, ${harness}${account ? ', ' + accountLabel(account) : ''}`, ...picture(run.harness), ...marked, runId: run.id, taskId: task.id, repo, expandable: kids.length > 0, expanded, context: `agent-${going ? 'active' : 'done'}${task.archived_ms ? '-archived' : ''}${isPinned ? '-pinned' : ''}`, active: going, archived: !!task.archived_ms, pinned: isPinned });
       if (expanded) for (const kid of kids) child(kid, 2);
     }
   }
@@ -381,8 +399,10 @@ export interface RunHeader {
   readonly statusIcon: string;
   readonly logo: LogoKey | null;
   readonly icon: string | null;
-  /** The account's name, or the harness when it has none. */
+  /** The account it runs on (AC-235): provider and plan, the shortened email, whose login; the harness when it has none. */
   readonly account: string;
+  /** The account where room is tight ("Claude Max · bil…@testbox.com"); empty when it has none. */
+  readonly accountShort: string;
   readonly accountTooltip: string;
   readonly model: string | null;
   /** The branch's last part, or "current checkout". */
@@ -419,7 +439,7 @@ export function runHeader(state: PhoneState, runId: string): RunHeader | undefin
   return {
     runId: run.id, title: run.title || firstLine(task?.prompt) || TEXT.chat.agent, status: run.status, statusText: statusText(run.status),
     statusIcon: ['running', 'starting', 'queued'].includes(run.status) ? 'dot' : icons[run.status] || 'question', ...picture(run.harness),
-    account: account?.name || harness, accountTooltip: `${harness}${run.harness_version ? ' ' + run.harness_version : ''}${account ? ' · ' + account.name : ''}`, model: run.model || null,
+    account: accountLabel(account) || harness, accountShort: accountShort(account), accountTooltip: `${harness}${run.harness_version ? ' ' + run.harness_version : ''}${account ? '\nAccount: ' + accountLabel(account) : ''}`, model: run.model || null,
     branch: ws ? (worktree ? basename(ws.branch) : TEXT.chat.currentCheckout) : null, branchIcon: ws ? (worktree ? 'git-branch' : 'repo') : null,
     branchTooltip: ws ? `${worktree ? ws.branch : TEXT.chat.currentCheckoutTitle}\n${ws.path}` : null,
     exitReason: run.exit_reason && /failed|interrupted|disconnected/.test(run.status) ? run.exit_reason : null,

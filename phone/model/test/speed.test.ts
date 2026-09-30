@@ -141,7 +141,7 @@ describe('speed of the store', () => {
       runs.push(runRecord(`r-${i}`, t, 'running', null, 1000 + i));
       turns[`r-${i}`] = [{ id: `u-${i}`, run_id: `r-${i}`, n: 1, prompt: `Do thing ${i}`, snapshot_id: null, started_ms: 1000 + i, ended_ms: null, status: 'running' }];
     }
-    return { cursor: 10, tasks, runs, workspaces, profiles: [{ id: 'system-claude', name: 'claude (existing login)', harness: 'claude', home: null, is_system: true, created_ms: 1 }], turns, oversight: {}, overseer: null, daemon: { pid: 1, started_ms: 1, version: '0.1.0', parser_version: 'x', swarm_storage: 'ready' } };
+    return { cursor: 10, tasks, runs, workspaces, profiles: [{ id: 'system-claude', name: 'claude (existing login)', harness: 'claude', home: null, is_system: true, created_ms: 1 }], turns, oversight: {}, overseer: null, landings: {}, daemon: { pid: 1, started_ms: 1, version: '0.1.0', parser_version: 'x', swarm_storage: 'ready' } };
   })();
 
   /** 1,000 events as a busy hour has them: mostly output and tools, with statuses, turns, requests, children and new agents among them. */

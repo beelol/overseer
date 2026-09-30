@@ -2,6 +2,7 @@
 const vscode = require('vscode');
 const path = require('path');
 const features = require('./features');
+const Landing = require('../media/landing-text.js');
 const Rollup = require('../media/rollup.js');
 const Plain = require('../media/plain-words.js');
 
@@ -26,8 +27,17 @@ function statusIcon(status) {
   return new vscode.ThemeIcon(icon, new vscode.ThemeColor(color));
 }
 
-/** The machine's own login reads "Your login" (the harness is named beside it), not "codex (existing login)". */
-function accountName(a) { return a && (a.is_system || a.kind === 'follows-app' || / \(existing login\)$/.test(a.name || '')) ? 'Your login' : a?.name; }
+/** The Mac's own login reads "Mac's default login" (AC-235), never "codex (existing login)" or only "Your login". */
+const DEFAULT_LOGIN = "Mac's default login";
+function accountName(a) { return a && (a.is_system || a.kind === 'follows-app' || / \(existing login\)$/.test(a.name || '')) ? DEFAULT_LOGIN : a?.name; }
+/**
+ * The account an agent runs on, as every surface names it (AC-235): the daemon's label (provider
+ * and plan, the email shortened, whose login it is), or its short form where room is tight.
+ */
+function accountLabel(p) { return p ? p.account?.label || accountName(p) : ''; }
+function accountShort(p) { return p ? p.account?.short || accountName(p) : ''; }
+/** Beside the provider's logo (a side bar row): the plan and the shortened email, "Max · bil…@testbox.com". */
+function accountBrief(p) { return p ? [p.account?.plan, p.account?.email || accountName(p)].filter(Boolean).join(' · ') : ''; }
 
 class Model {
   constructor(client) {
@@ -165,9 +175,9 @@ class AgentsProvider {
   /** What the list shows (relative times in 30-second steps). */
   signature() {
     const st = this.model.state || {};
-    return JSON.stringify([Math.floor(Date.now() / 30000), st.oversight || {}, st.overseer || {}, (st.tasks || []).map(t => [t.id, t.title, t.repo_root, t.archived_ms ? 1 : 0]),
+    return JSON.stringify([Math.floor(Date.now() / 30000), st.oversight || {}, st.overseer || {}, st.landings || {}, (st.tasks || []).map(t => [t.id, t.title, t.repo_root, t.archived_ms ? 1 : 0]),
       (st.runs || []).map(r => [r.id, r.status, r.parent_run_id, r.attention?.kind, r.harness, r.model, r.profile_id, r.workspace_id, r.title, r.exit_reason, r.ended_ms ? 1 : 0]),
-      (st.profiles || []).map(p => [p.id, p.name]), (st.workspaces || []).map(w => [w.id, w.branch, w.kind]),
+      (st.profiles || []).map(p => [p.id, p.name, p.account?.label]), (st.workspaces || []).map(w => [w.id, w.branch, w.kind]),
       (this.handlers.attention?.() || []).map(a => [a.run_id, a.label, a.detail]), this.handlers.pinned?.() || [], (st.runs || []).filter(r => this.unreviewed(r)).map(r => r.id),
       this.model.swarms.map(s => [s.id, s.status, s.revision, s.active_worker_processes,
         s.job_counts, s.unconfirmed_exit_count, s.benefit?.decision, s.benefit?.reason,
@@ -357,7 +367,7 @@ class AgentsProvider {
     for (const target of run.capacity?.selected_targets || []) {
       const item = new vscode.TreeItem(`Target: ${target.id}`);
       item.iconPath = this.logo(target.harness);
-      const account = target.profile_id ? this.model.profile(target.profile_id)?.name || target.profile_id : 'account unknown';
+      const account = target.profile_id ? accountShort(this.model.profile(target.profile_id)) || 'account unknown' : 'account unknown';
       item.description = `${target.harness || 'harness unknown'} · ${account} · ${target.attempts} attempt${target.attempts === 1 ? '' : 's'}`;
       item.tooltip = [target.id, target.harness, account, target.model, target.effort].filter(Boolean).join(' · ');
       rows.push({ item, parent });
@@ -458,7 +468,7 @@ class AgentsProvider {
     item.iconPath = this.logo(worker.harness);
     item.description = plainStatus(worker.status === 'running' ? 'working' : worker.status);
     const profile = worker.profile_id ? this.model.profile(worker.profile_id) : undefined;
-    item.tooltip = [worker.harness, profile?.name, worker.model, worker.status].filter(Boolean).join(' · ');
+    item.tooltip = [HARNESS_NAME[worker.harness] || worker.harness, accountLabel(profile), worker.model, worker.status].filter(Boolean).join(' · ');
     item.accessibilityInformation = { label: `Worker, ${item.tooltip}` };
     item.contextValue = 'swarm-worker';
     item.command = { command: 'overseer.selectRun', title: 'Open worker', arguments: [worker.overseer_run_id] };
@@ -542,13 +552,16 @@ class AgentsProvider {
     const marks = [voiced && '🎙 voice', o.held && '⏸ held', o.watched && '◉ watched', o.watching && o.watching.length && '◉ watching', o.conflicts && `⚠ ${o.conflicts} conflict${o.conflicts === 1 ? '' : 's'}`].filter(Boolean);
     const fresh = !ACTIVE.has(run.status) && this.unreviewed(run);
     // The ✦ badge marks it (its colour, tooltip and accessible name say "to review"); the row's words stay short.
-    item.description = [ACTIVE.has(run.status) ? '' : ago(run.ended_ms || run.created_ms), ...marks].filter(Boolean).join(' · ');
+    // AC-243: what its work became, first: "Merged into main (1a2b3c4)".
+    const landed = ACTIVE.has(run.status) ? '' : Landing.text((m.state.landings || {})[run.workspace_id]);
     const profile = run.profile_id ? m.profile(run.profile_id) : undefined;
+    // The account it runs on, always (AC-235): the plan and the shortened email beside the provider's logo.
+    item.description = [landed, ACTIVE.has(run.status) ? '' : ago(run.ended_ms || run.created_ms), accountBrief(profile), ...marks].filter(Boolean).join(' · ');
     const ws = m.workspace(run.workspace_id);
-    const status = STATUS_TEXT[run.status] || run.status;
+    const status = (STATUS_TEXT[run.status] || run.status) + (landed ? ` · ${landed}` : '');
     item.tooltip = new vscode.MarkdownString([`**${task.title}**`, `${status}${run.exit_reason && !ACTIVE.has(run.status) ? ` — ${Plain.plain(run.exit_reason, 200)}` : ''}`,
-      [HARNESS_NAME[run.harness] || run.harness, profile?.name, run.model].filter(Boolean).join(' · '), ws ? `${ws.kind === 'current' ? 'current checkout' : ws.branch} · ${path.basename(task.repo_root)}` : ''].filter(Boolean).join('\n\n'));
-    item.accessibilityInformation = { label: `${task.title}, ${status}${fresh ? ', to review' : ''}, ${HARNESS_NAME[run.harness] || run.harness}${profile ? ', ' + profile.name : ''}${marks.length ? ', ' + marks.map(x => x.replace(/^\S+ /, '')).join(', ') : ''}` };
+      [HARNESS_NAME[run.harness] || run.harness, accountLabel(profile), run.model].filter(Boolean).join(' · '), ws ? `${ws.kind === 'current' ? 'current checkout' : ws.branch} · ${path.basename(task.repo_root)}` : ''].filter(Boolean).join('\n\n'));
+    item.accessibilityInformation = { label: `${task.title}, ${status}${fresh ? ', to review' : ''}, ${HARNESS_NAME[run.harness] || run.harness}${profile ? ', ' + accountLabel(profile) : ''}${marks.length ? ', ' + marks.map(x => x.replace(/^\S+ /, '')).join(', ') : ''}` };
     if (marks.length) item.tooltip.appendMarkdown(`\n\n${[voiced && 'A spoken request is for this agent', o.held && `Held: ${o.hold_reason || ''}`, o.watched && 'Watched by another agent', o.watching && o.watching.length && 'Watching another agent', o.conflicts && `${o.conflicts} open conflict${o.conflicts === 1 ? '' : 's'}`, o.area && o.area.length && `Area: ${o.area.join(', ')}`].filter(Boolean).join('\n\n')}`);
     const pinned = (this.handlers.pinned?.() || []).includes(run.id);
     item.contextValue = `agent-${ACTIVE.has(run.status) ? 'active' : 'done'}${task.archived_ms ? '-archived' : ''}${pinned ? '-pinned' : ''}`;
@@ -631,8 +644,9 @@ class AccountsProvider {
       let detail = 'status not checked';
       if (st) {
         if (!st.installed) detail = 'harness not installed';
-        // The plan and the identity's short fingerprint tell two accounts of one plan apart (not an internal id).
-        else if (st.logged_in) detail = [st.identity?.plan, (st.identity?.account_fingerprint || st.identity?.fingerprint || '').slice(0, 8)].filter(Boolean).join(' · ') || 'signed in';
+        // The plan and the shortened email say which account it is (AC-235); the identity's short
+        // fingerprint stands in until the harness has said the email.
+        else if (st.logged_in) { const shown = p.account || a.account || {}; detail = [shown.plan || st.identity?.plan, shown.email || (st.identity?.account_fingerprint || st.identity?.fingerprint || '').slice(0, 8)].filter(Boolean).join(' · ') || 'signed in'; }
         else detail = 'signed out';
       }
       // Local models run through Ollama on this machine: there is no account to sign in to (AC-95).
@@ -649,7 +663,7 @@ class AccountsProvider {
       item.description = `${detail}${a.kind === 'follows-app' ? ' · desktop' : ''}${near ? ` · ${Math.round(near.used * 100)}% of ${near.label}` : ''}`;
       item.iconPath = st?.logged_in ? this.logo(a.provider, 'account') : new vscode.ThemeIcon('circle-slash');
       item.accessibilityInformation = { label: `${a.name}, ${st?.logged_in ? 'signed in' : 'not signed in'}${detail && st?.logged_in ? ', ' + detail : ''}${a.kind === 'follows-app' ? ', follows the desktop app' : ''}` };
-      item.tooltip = new vscode.MarkdownString(`**${a.name}** — ${node.provider.label}\n\n${a.kind === 'follows-app' ? `Follows ${a.follows}. It changes when that app switches accounts; Overseer never signs it out.` : `Fixed account with its own credential folder: \`${p.home || ''}\`. The desktop app switching accounts does not change it.`}\n\nUsable by: ${(a.harnesses || []).map(h => HARNESS_NAME[h] || h).join(', ')}${a.last_used_ms ? `\n\nLast used ${new Date(a.last_used_ms).toLocaleString()}` : ''}\n\n${usage?.reported ? `Usage (${usage.source}): ${(usage.windows || []).map(w => `${w.label} ${Math.round(w.used * 100)}%${w.resets_at_ms ? `, resets ${new Date(w.resets_at_ms).toLocaleString()}` : ''}`).join('; ')}` : 'Usage: not reported by this harness yet'}`);
+      item.tooltip = new vscode.MarkdownString(`**${a.name}** — ${node.provider.label}${(p.account || a.account)?.email ? `\n\n${(p.account || a.account).label}` : ''}\n\n${a.kind === 'follows-app' ? `Follows ${a.follows}. It changes when that app switches accounts; Overseer never signs it out.` : `Fixed account with its own credential folder: \`${p.home || ''}\`. The desktop app switching accounts does not change it.`}\n\nUsable by: ${(a.harnesses || []).map(h => HARNESS_NAME[h] || h).join(', ')}${a.last_used_ms ? `\n\nLast used ${new Date(a.last_used_ms).toLocaleString()}` : ''}\n\n${usage?.reported ? `Usage (${usage.source}): ${(usage.windows || []).map(w => `${w.label} ${Math.round(w.used * 100)}%${w.resets_at_ms ? `, resets ${new Date(w.resets_at_ms).toLocaleString()}` : ''}`).join('; ')}` : 'Usage: not reported by this harness yet'}`);
       // The sign-in state picks the menu: Sign In for a signed-out account, Sign Out only for a signed-in one.
       item.contextValue = `${a.kind === 'follows-app' ? 'profile-system' : 'profile-isolated'}-${st?.logged_in ? 'signedin' : 'signedout'}`;
       return { item, profile: p, account: a };
@@ -657,4 +671,4 @@ class AccountsProvider {
   }
 }
 
-module.exports = { Model, AgentsProvider, AccountsProvider, ACTIVE, statusIcon, ago, accountName };
+module.exports = { Model, AgentsProvider, AccountsProvider, ACTIVE, statusIcon, ago, accountName, accountLabel, accountShort, accountBrief, DEFAULT_LOGIN };

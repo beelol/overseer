@@ -27,7 +27,7 @@ const why = (error: unknown): string => (error instanceof Error ? error.message 
 /** "signed in", "not signed in", and the plan where the Mac knows it. */
 function accountDetail(account: AccountChoice): string {
   const state = account.signedIn === null ? '' : account.signedIn ? WORDS.signedIn : WORDS.notSignedIn;
-  return [state, account.plan].filter(Boolean).join(' · ');
+  return [state, account.plan, account.email].filter(Boolean).join(' · ');
 }
 
 /** Test ids of choices by their name; a name that comes twice is numbered. */

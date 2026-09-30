@@ -716,7 +716,7 @@ pub fn local_profile(d: &crate::daemon::Daemon) -> Result<crate::store::Profile>
     }
     let home = crate::paths::profiles_dir().join(LOCAL_PROFILE);
     crate::paths::ensure_private_dir(&home)?;
-    let profile = crate::store::Profile { id: LOCAL_PROFILE.into(), name: "Local models".into(), harness: "opencode".into(), home: Some(home.display().to_string()), is_system: false, created_ms: crate::daemon::now() };
+    let profile = crate::store::Profile { id: LOCAL_PROFILE.into(), name: "Local models".into(), harness: "opencode".into(), home: Some(home.display().to_string()), is_system: false, created_ms: crate::daemon::now(), account: None };
     d.store.lock().unwrap().insert_profile(&profile)?;
     Ok(profile)
 }

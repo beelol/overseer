@@ -262,7 +262,7 @@ function Conversation({ runId }: { readonly runId: string }) {
     <Screen
       id="agent"
       title={header?.title ?? text.TEXT.chat.agent}
-      {...(header ? { subtitle: header.statusText } : {})}
+      {...(header ? { subtitle: [header.statusText, header.accountShort].filter(Boolean).join(' · ') } : {})}
       actions={<HeaderActions runId={runId} header={header} taskId={run?.task_id} workspace={workspace} changes={header?.child ? null : changes} watch={watch} onStop={stop} />}
       footer={watch ? <WatchOnlyLine /> : header ? <Composer runId={runId} header={header} model={header.model} choices={choices} busy={busy} onSend={send} onStop={stop} /> : undefined}
     >

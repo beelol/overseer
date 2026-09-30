@@ -171,6 +171,17 @@ pre.code.error { color: var(--ov-failed); }
 .needs-bar { display: flex; align-items: center; gap: var(--ov-space-2); padding: var(--ov-space-2) var(--ov-space-2) var(--ov-space-2) var(--ov-space-3); border-radius: var(--ov-radius-card); border: 1px solid var(--ov-waiting); background: var(--ov-raised); }
 .needs-bar .codicon { color: var(--ov-waiting); }
 .needs-bar .needs-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* AC-243: a finished agent's work: Merge into main, Open PR, or Merged into main (commit) and Clean up. */
+.land-bar { display: flex; align-items: center; gap: var(--ov-space-2); padding: var(--ov-space-2) var(--ov-space-2) var(--ov-space-2) var(--ov-space-3); border-radius: var(--ov-radius-card); border: 1px solid var(--ov-border); background: var(--ov-raised); }
+.land-bar[hidden] { display: none; }
+.land-bar .land-text { flex: 1 1 8ch; min-width: 6ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.land-bar > .codicon { color: var(--ov-icon); }
+.land-bar[data-state="merged"] { border-color: var(--ov-done); }
+.land-bar[data-state="merged"] > .codicon { color: var(--ov-done); }
+.land-bar[data-state="conflicts"] { border-color: var(--ov-waiting); }
+.land-bar[data-state="conflicts"] > .codicon { color: var(--ov-waiting); }
+.land-bar .btn { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; white-space: nowrap; }
+.land-bar .btn > span { overflow: hidden; text-overflow: ellipsis; }
 .composer { display: flex; flex-direction: column; gap: 6px; padding: 10px 10px 8px 14px; border-radius: var(--ov-radius-card); border: 1px solid var(--ov-border); background: var(--ov-raised); transition: border-color var(--ov-motion-fast); }
 .composer:focus-within { border-color: var(--ov-focus); }
 .composer textarea { width: 100%; resize: none; border: none; background: transparent; padding: 2px 0; min-height: 22px; max-height: 240px; line-height: 1.5; color: var(--ov-input-fg); outline: none; }

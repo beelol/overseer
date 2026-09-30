@@ -75,6 +75,16 @@ export interface Turn {
   status: string;
 }
 
+export interface Account {
+  provider: string;
+  plan?: string | null;
+  email?: string | null;
+  default: boolean;
+  name: string;
+  label: string;
+  short: string;
+}
+
 export interface Profile {
   id: string;
   name: string;
@@ -82,6 +92,7 @@ export interface Profile {
   home?: string | null;
   is_system: boolean;
   created_ms: number;
+  account?: Account | null;
 }
 
 export interface Event {
@@ -119,6 +130,7 @@ export interface State {
   turns: Record<string, Array<Turn>>;
   oversight: Record<string, unknown>;
   overseer: unknown;
+  landings: Record<string, unknown>;
   daemon: {
     pid: number;
     started_ms: number;

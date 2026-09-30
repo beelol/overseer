@@ -77,8 +77,8 @@
     $('auto-preference').hidden = form.routing !== 'auto';
     $('preferred-harness').value = form.preferredHarness;
     $('model-wrap').hidden = form.routing === 'auto' || local();
-    tiles($('accounts'), 'Account', accounts.map(a => ({ value: a.id, title: a.name, logo: ui.providerMark(a.provider, 16), sub: [a.plan, a.kind === 'follows-app' ? 'desktop login' : ''].filter(Boolean).join(' · ') || (a.signedIn ? 'signed in' : ''),
-      tip: `${a.name}: ${a.signedIn ? 'signed in' : 'not signed in'}${a.plan ? ' · ' + a.plan : ''}${a.fingerprint ? ' · id ' + a.fingerprint : ''}${a.kind === 'follows-app' ? '\nFollows the desktop app login and changes when the app switches accounts' : '\nFixed account with its own credential folder'}`,
+    tiles($('accounts'), 'Account', accounts.map(a => ({ value: a.id, title: a.name, logo: ui.providerMark(a.provider, 16), sub: (a.account && a.account.email ? a.short : [a.plan, a.kind === 'follows-app' ? 'desktop login' : ''].filter(Boolean).join(' · ')) || (a.signedIn ? 'signed in' : ''),
+      tip: `${a.label || a.name}: ${a.signedIn ? 'signed in' : 'not signed in'}${a.fingerprint ? ' · id ' + a.fingerprint : ''}${a.kind === 'follows-app' ? '\nFollows the desktop app login and changes when the app switches accounts' : '\nFixed account with its own credential folder'}`,
       status: a.signedIn ? { cls: 'ok', text: 'signed in' } : { cls: 'warn', text: 'not signed in' }, hints: [a.plan, a.fingerprint && 'id ' + a.fingerprint].filter(Boolean),
       disabled: !a.signedIn, why: a.signedIn ? '' : 'Sign in first' })), form.account, v => { form.account = v; persist(); render(); });
     $('no-accounts').hidden = form.routing === 'auto' || !form.harness || form.harness === 'generic' || local() || accounts.length > 0;

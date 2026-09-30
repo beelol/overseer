@@ -2,8 +2,10 @@
 // SYNTHETIC account CLI fixture (not a live harness): stands in for `codex` and `claude`
 // account commands so account governance can be tested without real logins.
 //   codex:  --version | login [--device-auth] | login status | logout      (CODEX_HOME/auth.json)
+//           app-server: initialize and account/read (the account's email and plan, AC-235)
 //   claude: --version | auth login | auth status | auth logout            (CLAUDE_CONFIG_DIR/.fixture-login.json)
-// `login` signs in as the account named in $FIXTURE_LOGIN_ACCOUNT_FILE ("name:plan").
+// `login` signs in as the account named in $FIXTURE_LOGIN_ACCOUNT_FILE ("name:plan", or
+// "name:plan:email"; the email is name@example.invalid unless given).
 //   claude -p (stream-json): one turn that fails with authentication_failed unless signed in,
 //           so expired/missing logins and re-sign-in can be exercised end to end.
 //   codex exec [resume <id>] --json ... -- <prompt>: one synthetic turn (fails unless signed in);
@@ -14,7 +16,7 @@ const path = require('path');
 const args = process.argv.slice(2);
 if (args[0] === '--version') { console.log('account-fixture 0.0.0 (synthetic)'); process.exit(0); }
 const base = process.env.OVERSEER_TEST_SYSTEM_HOME || process.env.HOME;
-const next = () => { const [name, plan] = fs.readFileSync(process.env.FIXTURE_LOGIN_ACCOUNT_FILE, 'utf8').trim().split(':'); return { name, plan: plan || 'plus' }; };
+const next = () => { const [name, plan, email] = fs.readFileSync(process.env.FIXTURE_LOGIN_ACCOUNT_FILE, 'utf8').trim().split(':'); return { name, plan: plan || 'plus', email: email || `${name}@example.invalid` }; };
 const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
 if (args.includes('-p')) {
   const dir = process.env.CLAUDE_CONFIG_DIR || path.join(base, '.claude');
@@ -44,7 +46,7 @@ if (args[0] === 'auth') {
     console.log(JSON.stringify(d ? { loggedIn: true, authMethod: 'claude.ai', email: d.email, subscriptionType: d.plan } : { loggedIn: false, authMethod: 'none' }));
   } else if (args[1] === 'login') {
     const a = next(); fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(file, JSON.stringify({ email: `${a.name}@example.invalid`, plan: a.plan }));
+    fs.writeFileSync(file, JSON.stringify({ email: a.email, plan: a.plan }));
     console.log(`Login successful (fixture account ${a.name}).`);
   } else if (args[1] === 'logout') { fs.rmSync(file, { force: true }); console.log('Successfully logged out.'); }
   process.exit(0);
@@ -70,6 +72,21 @@ if (args[0] === 'exec') {
   }, Number(process.env.FIXTURE_CODEX_DELAY_MS || 200));
   return;
 }
+if (args[0] === 'app-server') {
+  // Codex's metadata protocol, as far as Overseer reads an account with it: who is signed in.
+  const out = o => process.stdout.write(JSON.stringify(o) + '\n');
+  require('readline').createInterface({ input: process.stdin }).on('line', line => {
+    let m; try { m = JSON.parse(line); } catch { return; }
+    if (m.method === 'initialize') out({ id: m.id, result: { userAgent: 'account-fixture' } });
+    else if (m.method === 'account/read') {
+      if (!fs.existsSync(auth)) { out({ id: m.id, result: { account: null, requiresOpenaiAuth: true } }); return; }
+      const token = JSON.parse(fs.readFileSync(auth, 'utf8')).tokens.id_token;
+      const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString());
+      out({ id: m.id, result: { account: { type: 'chatgpt', email: claims.email || null, planType: claims['https://api.openai.com/auth'].chatgpt_plan_type }, requiresOpenaiAuth: true } });
+    } else if (m.id !== undefined) out({ id: m.id, error: { code: -32601, message: 'not in this fixture' } });
+  });
+  return;
+}
 if (args[0] === 'login' && args[1] === 'status') {
   if (fs.existsSync(auth)) { console.log('Logged in using ChatGPT'); process.exit(0); }
   console.log('Not logged in'); process.exit(1);
@@ -86,7 +103,7 @@ if (args[0] === 'login' && args[1] === 'status') {
     if (fs.existsSync(process.env.FIXTURE_DEVICE_APPROVAL_FILE)) {
       clearInterval(timer);
       const a = next(); fs.mkdirSync(dir, { recursive: true });
-      const claims = { sub: 'user-' + a.name, 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-' + a.name, chatgpt_user_id: 'user-' + a.name, chatgpt_plan_type: a.plan } };
+      const claims = { sub: 'user-' + a.name, email: a.email, 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-' + a.name, chatgpt_user_id: 'user-' + a.name, chatgpt_plan_type: a.plan } };
       fs.writeFileSync(auth, JSON.stringify({ auth_mode: 'chatgpt', tokens: { id_token: `${b64({ alg: 'none' })}.${b64(claims)}.`, access_token: 'fixture', refresh_token: 'fixture' } }));
       console.log(`Successfully logged in with a device code (fixture account ${a.name}).`);
       process.exit(0);
@@ -96,7 +113,7 @@ if (args[0] === 'login' && args[1] === 'status') {
   return;
 } else if (args[0] === 'login') {
   const a = next(); fs.mkdirSync(dir, { recursive: true });
-  const claims = { sub: 'user-' + a.name, 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-' + a.name, chatgpt_user_id: 'user-' + a.name, chatgpt_plan_type: a.plan } };
+  const claims = { sub: 'user-' + a.name, email: a.email, 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-' + a.name, chatgpt_user_id: 'user-' + a.name, chatgpt_plan_type: a.plan } };
   fs.writeFileSync(auth, JSON.stringify({ auth_mode: 'chatgpt', tokens: { id_token: `${b64({ alg: 'none' })}.${b64(claims)}.`, access_token: 'fixture', refresh_token: 'fixture' } }));
   console.log(`Successfully logged in${args.includes('--device-auth') ? ' with a device code' : ''} (fixture account ${a.name}).`);
 } else if (args[0] === 'logout') { fs.rmSync(auth, { force: true }); console.log('Successfully logged out'); }

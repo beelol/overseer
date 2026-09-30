@@ -41,7 +41,9 @@ const OVERSIGHT = [
   { kind: 'ask', payload: { question: 'Which branch?' } }, { kind: 'claim', payload: { paths: ['src/a.ts'] } }, { kind: 'share', payload: { source: 'the schema' } }, { kind: 'share', payload: {} }, { kind: 'share_withdrawn', payload: {} },
   { kind: 'finding', payload: { watcher_title: 'Reviewer', result: 'concern', text: 'The test is flaky' } }, { kind: 'finding', payload: {} }, { kind: 'watch_started', payload: { mode: 'check', brief: 'Watch the migration' } },
   { kind: 'watch_started', payload: { brief: 'Just watch' } }, { kind: 'watch_ended', payload: { reason: 'done' } }, { kind: 'queued', payload: { text: 'Then run the linter\nplease' } }, { kind: 'queued', payload: { text: 'From Overseer', detail: { by: 'overseer' } } },
-  { kind: 'briefing', payload: { text: 'The owner wants small commits.' } }, { kind: 'overseer_tool_call', payload: {} }, { kind: 'going_in_circles', payload: {} }, { kind: 'conflict', payload: {} }, { kind: 'dispatch', payload: {} },
+  { kind: 'briefing', payload: { text: 'The owner wants small commits.' } },
+  { kind: 'merge_back', payload: { state: 'merged', target: 'develop', commit: '1a2b3c4d5e6f' } }, { kind: 'merge_back', payload: { state: 'merged' } }, { kind: 'merge_back', payload: { state: 'conflicts', files: ['a.ts', 'b.ts'] } },
+  { kind: 'merge_back', payload: { state: 'cancelled' } }, { kind: 'merge_back', payload: { state: 'ready' } }, { kind: 'pull_request', payload: { number: 42 } }, { kind: 'pull_request', payload: {} }, { kind: 'overseer_tool_call', payload: {} }, { kind: 'going_in_circles', payload: {} }, { kind: 'conflict', payload: {} }, { kind: 'dispatch', payload: {} },
 ];
 
 /** What Continuity (Gate L) says in a chat: its own event kinds, and system lines marked as its own. */

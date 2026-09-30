@@ -18,6 +18,10 @@ use tokio::sync::broadcast;
 
 /// `waiting_for_connection` and `waiting_for_memory` are Continuity's: the run has no process,
 /// keeps its message and its worktree, and is started again by Overseer (daemon/src/handoff.rs).
+/// When each Codex profile's account was last read with Codex's own `account/read`, and for which
+/// login (AC-235).
+static CODEX_ACCOUNT_READS: std::sync::OnceLock<Mutex<HashMap<String, (i64, String)>>> = std::sync::OnceLock::new();
+
 pub const ACTIVE: &[&str] = &["queued", "starting", "running", "waiting_for_user", "waiting_for_connection", "waiting_for_memory"];
 const RAW_SEGMENTS_KEPT: u64 = 4;
 pub const DEFAULT_AUTO_EXECUTION_BUDGET_MS: u64 = 300_000;
@@ -533,6 +537,7 @@ impl Daemon {
                     home: None,
                     is_system: true,
                     created_ms: now(),
+                    account: None,
                 })?;
             }
         }
@@ -550,7 +555,7 @@ impl Daemon {
         let id = format!("p-{}", short_id());
         let home = paths::profiles_dir().join(&id);
         paths::ensure_private_dir(&home)?;
-        let profile = Profile { id, name: name.into(), harness: harness.into(), home: Some(home.display().to_string()), is_system: false, created_ms: now() };
+        let profile = Profile { id, name: name.into(), harness: harness.into(), home: Some(home.display().to_string()), is_system: false, created_ms: now(), account: None };
         // Create the harness credential folder now (0700), so a sign-in never starts without it.
         let _ = Self::profile_env(&profile);
         self.store.lock().unwrap().insert_profile(&profile)?;
@@ -657,6 +662,19 @@ impl Daemon {
         Ok(json!({"exit": out.0, "output": redact(&out.1)}))
     }
 
+    /// Keeps the account a profile is signed in to, as every surface shows it (AC-235): the email
+    /// shortened here, so the full address is never stored or sent. A change reaches every client
+    /// as a `profile` event.
+    fn record_account(&self, id: &str, email: Option<&str>, plan: Option<&str>) -> Result<()> {
+        let email = email.and_then(crate::accounts::short_email);
+        let plan = plan.map(str::to_string).filter(|p| crate::accounts::plan_words(p).is_some());
+        let changed = self.store.lock().unwrap().record_account_shown(id, email.as_deref(), plan.as_deref(), now())?;
+        if changed {
+            self.emit(None, None, "profile", "daemon", "exact", json!({"profile_id": id, "action": "account"}))?;
+        }
+        Ok(())
+    }
+
     pub fn profile_status(&self, id: &str) -> Result<Value> {
         let profile = self.profile(id)?;
         let env = Self::profile_env(&profile);
@@ -680,6 +698,34 @@ impl Daemon {
                     result["logged_in"] = json!(false);
                     result["detail"] = json!("This profile uses an API key. Overseer requires ChatGPT account login.");
                 }
+                if result["logged_in"] == true {
+                    // Codex's own account read names the account (AC-235); never while an agent of
+                    // this profile runs (its own session reads it), and the last one stays shown.
+                    let busy = self.store.lock().unwrap().runs()?.iter().any(|r| r.profile_id.as_deref() == Some(id) && ACTIVE.contains(&r.status.as_str()));
+                    // Read again when the login changed (its identity's fingerprint) or ten minutes on:
+                    // every client asks for every account's status often, and each read starts Codex.
+                    let who = result["identity"]["account_fingerprint"].as_str().unwrap_or_default().to_string()
+                        + result["identity"]["plan"].as_str().unwrap_or_default();
+                    let fresh = {
+                        let mut seen = CODEX_ACCOUNT_READS.get_or_init(Default::default).lock().unwrap();
+                        let fresh = seen.get(id).is_some_and(|(at, was)| *was == who && now() - at < 10 * 60 * 1000);
+                        if !fresh && !busy { seen.insert(id.to_string(), (now(), who)); }
+                        fresh
+                    };
+                    if !busy && !fresh {
+                        let mut full = adapters::base_env(&program.display().to_string());
+                        full.extend(env.clone());
+                        let read = crate::auto_collect::codex_account(&program, &full, &adapters::neutral_dir(), std::time::Duration::from_secs(5));
+                        let plan = result["identity"]["plan"].as_str().map(str::to_string);
+                        match read {
+                            Ok(account) => self.record_account(id, account["email"].as_str(), account["planType"].as_str().or(plan.as_deref()))?,
+                            Err(_) => self.record_account(id, None, plan.as_deref())?,
+                        }
+                    }
+                } else {
+                    CODEX_ACCOUNT_READS.get_or_init(Default::default).lock().unwrap().remove(id);
+                    self.record_account(id, None, None)?;
+                }
             }
             "claude" => {
                 let (_, out) = run_with_env(&program, &["auth", "status"], &env)?;
@@ -694,6 +740,12 @@ impl Daemon {
                 if parsed["authMethod"].as_str().map(|m| m.contains("api")).unwrap_or(false) {
                     result["logged_in"] = json!(false);
                     result["detail"] = json!("This profile uses an API key. Overseer requires Claude account login.");
+                }
+                if result["logged_in"] == true {
+                    let email = parsed["email"].as_str().or(parsed["emailAddress"].as_str());
+                    self.record_account(id, email, crate::auto_collect::bounded_plan(parsed.get("subscriptionType")).as_deref())?;
+                } else {
+                    self.record_account(id, None, None)?;
                 }
             }
             "opencode" => {
@@ -3466,14 +3518,21 @@ impl Daemon {
         let turns = self.store.lock().unwrap().turns(&root.id)?;
         let mut options = Vec::new();
         let snap_info = |id: &str| -> Option<Snapshot> { self.store.lock().unwrap().snapshot(id).ok().flatten() };
+        // AC-232: while the agent works, the review opens on its latest run (the owner's default);
+        // once an agent in its own worktree has finished, on everything it did since the task
+        // started, so work committed in an earlier turn is never hidden behind a later turn that
+        // changed nothing ("0 files"). In the owner's own checkout the latest run stays the
+        // default: since the task started would also hold the owner's own work between turns.
+        let working = self.store.lock().unwrap().runs()?.iter().any(|r| r.workspace_id == ws.id && ACTIVE.contains(&r.status.as_str()));
+        let start_default = ws.kind == "worktree" && !working && task.start_snapshot.as_deref().and_then(snap_info).is_some();
         match turns.last().and_then(|t| t.snapshot_id.as_deref().and_then(snap_info).map(|s| (t.clone(), s))) {
             Some((turn, snap)) => options.push(json!({
-                "mode": "latest_run", "label": "Latest run", "base": snap.commit_sha, "available": true, "default": true,
+                "mode": "latest_run", "label": "Latest run", "base": snap.commit_sha, "available": true, "default": !start_default,
                 "detail": format!("snapshot {} taken as turn {} started, including uncommitted and untracked files", snap.id, turn.n),
                 "provenance": "recorded", "snapshot": snap,
                 "inherited": run.parent_run_id.is_some(),
             })),
-            None => options.push(json!({"mode": "latest_run", "label": "Latest run", "available": false, "default": true, "detail": "no snapshot was taken when the agent started"})),
+            None => options.push(json!({"mode": "latest_run", "label": "Latest run", "available": false, "default": !start_default, "detail": "no snapshot was taken when the agent started"})),
         }
         for turn in turns.iter().rev().skip(1) {
             if let Some(snap) = turn.snapshot_id.as_deref().and_then(snap_info) {
@@ -3482,7 +3541,7 @@ impl Daemon {
             }
         }
         match task.start_snapshot.as_deref().and_then(snap_info) {
-            Some(snap) => options.push(json!({"mode": "task_start", "label": "Since task start", "base": snap.commit_sha, "available": true,
+            Some(snap) => options.push(json!({"mode": "task_start", "label": "Since task start", "base": snap.commit_sha, "available": true, "default": start_default,
                 "detail": format!("task-start snapshot {} (HEAD {} plus dirty contents at creation)", snap.id, snap.head.clone().unwrap_or_else(|| "none".into())), "provenance": "recorded"})),
             None => options.push(json!({"mode": "task_start", "label": "Since task start", "available": false, "detail": "task-start snapshot missing"})),
         }
@@ -3684,7 +3743,9 @@ impl Daemon {
                 None => json!({"session": Value::Null, "level": "ask_first", "open_proposals": 0, "conflicts_needing_decision": 0}),
             }
         };
-        Ok(json!({"cursor": store.max_seq()?, "tasks": tasks, "runs": run_values, "workspaces": workspaces, "profiles": store.profiles()?, "turns": turns, "oversight": oversight, "overseer": overseer,
+        // What each agent's work became (AC-243): merged, stopped on conflicts, or a pull request.
+        let landings = crate::merge::landings_for_state(&store.conn, &runs, &turns)?;
+        Ok(json!({"cursor": store.max_seq()?, "tasks": tasks, "runs": run_values, "workspaces": workspaces, "profiles": store.profiles()?, "turns": turns, "oversight": oversight, "overseer": overseer, "landings": landings,
             "daemon": {"pid": std::process::id(), "started_ms": self.started_ms, "version": env!("CARGO_PKG_VERSION"), "parser_version": adapters::PARSER_VERSION,
                 "swarm_storage": if self.swarm_storage_blocked.load(std::sync::atomic::Ordering::SeqCst) { "blocked" } else { "ready" }}}))
     }

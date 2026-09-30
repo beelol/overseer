@@ -64,8 +64,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
       }
       return '';
     };
-    const claudeHover = await hoverOf('Your login', 'Claude');
-    const codexHover = await hoverOf('Your login', 'ChatGPT');
+    const claudeHover = await hoverOf("Mac's default login", 'Claude');
+    const codexHover = await hoverOf("Mac's default login", 'ChatGPT');
     await s.screenshot('accounts-usage');
     check('the Accounts view shows reported usage per account, with reset times, on hover',
       /5 hours 95%/.test(claudeHover) && /resets/.test(claudeHover) && /5 hours 20%/.test(codexHover), { claudeHover, codexHover });
@@ -80,19 +80,20 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await dash.waitFor(`!document.querySelector('[data-chip="agent"]').textContent.includes('Loading')`, 20000);
     await dash.eval(`document.querySelector('[data-chip="agent"]').click()`); await delay(300);
     const agentMenu = await dash.eval(`[...document.querySelectorAll('.menu .menu-item')].map(b => (b.querySelector('.menu-label')?.textContent || '') + ' | ' + (b.querySelector('.menu-hint')?.textContent || ''))`);
-    await dash.eval(`[...document.querySelectorAll('.menu .menu-item')].find(b => { let h = b.previousElementSibling; while (h && !h.classList.contains('menu-head')) h = h.previousElementSibling; return b.querySelector('.menu-label')?.textContent === 'Your login' && /Claude/.test(h?.textContent || ''); }).click()`); await delay(400);
+    await dash.eval(`[...document.querySelectorAll('.menu .menu-item')].find(b => { let h = b.previousElementSibling; while (h && !h.classList.contains('menu-head')) h = h.previousElementSibling; return b.querySelector('.menu-label')?.textContent === "Mac's default login" && /Claude/.test(h?.textContent || ''); }).click()`); await delay(400);
     await dash.eval(`document.getElementById('task').focus()`); await cdp.type('a small task'); await delay(300);
     const warn = await dash.eval(`(() => { const n = document.querySelector('.view-composer .composer-note'); return { text: n.textContent, fix: n.querySelector('.fix')?.textContent, cls: n.className, startDisabled: document.getElementById('start').disabled }; })()`);
     await s.screenshot('near-limit-warning');
     await dash.eval(`document.querySelector('.view-composer .composer-note .fix').click()`); await delay(400);
-    const switched = await dash.eval(`document.querySelector('[data-chip="agent"]').getAttribute('aria-label')`);
+    // The chip names the account by plan and email (AC-235); its tooltip has the account's name.
+    const switched = await dash.eval(`(c => c.getAttribute('aria-label') + ' | ' + c.title)(document.querySelector('[data-chip="agent"]'))`);
     check('starting on an account near its limit warns (95% of 5 hours, reset time) and offers another compatible account; the warning does not block',
       /95% of its 5 hours limit/.test(warn.text) && /resets/.test(warn.text) && warn.fix === 'Use Claude Second' && !warn.startDisabled && /Claude Second/.test(switched) && agentMenu.some(a => /5 hours 95%/.test(a)), { warn, switched, agentMenu });
 
     // Accounts view: the near-limit account says so; others show nothing extra.
     await s.openOverseerView();
     const rows = await cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).map(r => (r.querySelector('.label-name')?.textContent || '') + ' | ' + (r.querySelector('.label-description')?.textContent || ''))`);
-    check('the Accounts view marks an account near its limit', rows.some(r => /^Your login \|.*95% of 5 hours/.test(r)), rows);
+    check('the Accounts view marks an account near its limit', rows.some(r => /^Mac's default login \|.*95% of 5 hours/.test(r)), rows);
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}

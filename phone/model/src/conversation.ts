@@ -901,7 +901,7 @@ const QUIET = new Set([
 const KNOWN = new Set([
   'auto_decision', 'turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed',
   'proposal', 'proposal_answered', 'queued', 'briefing', 'overseer_message', 'redirect', 'hold', 'release', 'guardrail', 'guardrail_crossed', 'check_in', 'report', 'ask', 'claim', 'share', 'share_withdrawn',
-  'finding', 'watch_started', 'watch_ended', 'handoff', 'remote_command',
+  'finding', 'watch_started', 'watch_ended', 'handoff', 'remote_command', 'merge_back', 'pull_request',
 ]);
 
 /**
@@ -928,6 +928,13 @@ function oversightLine(kind: string, p: Readonly<Record<string, unknown>>, sourc
     case 'watch_started': return ['eye', o.watched(p['mode'] === 'check', firstLine(p['brief'] || '', 120))];
     case 'watch_ended': return ['eye-closed', o.watchEnded(p['reason'] ? s('reason') : '')];
     case 'handoff': return ['arrow-right', o.handedOff];
+    // AC-243: what a merge did, once, in words; its steps ("ready") are not news.
+    case 'merge_back':
+      if (p['state'] === 'merged') return ['git-merge', o.merged(p['target'] ? s('target') : 'main', p['commit'] ? s('commit').slice(0, 7) : '')];
+      if (p['state'] === 'conflicts') return ['warning', o.mergeConflicts(Array.isArray(p['files']) ? p['files'].map(String).join(', ') : '')];
+      if (p['state'] === 'cancelled') return ['discard', o.mergeCancelled];
+      return undefined;
+    case 'pull_request': return ['git-pull-request', o.pullRequest(p['number'] ? s('number') : '')];
     default: return undefined;
   }
 }
