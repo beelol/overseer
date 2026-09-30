@@ -267,6 +267,128 @@
         ],
         "more": "More…"
       }
+    },
+    {
+      "name": "each file offers Accept file and Reject file, each change Accept and Reject; no Keep, Undo or Save before typing",
+      "ok": true,
+      "detail": {
+        "load": "rendered",
+        "hunks": 2,
+        "accepted": 0,
+        "accept": "Accept file",
+        "acceptPressed": "false",
+        "reject": "Reject file",
+        "rejectDisabled": false,
+        "save": null,
+        "hunkWords": [
+          [
+            "Accept",
+            "Reject"
+          ],
+          [
+            "Accept",
+            "Reject"
+          ]
+        ],
+        "notice": ""
+      }
+    },
+    {
+      "name": "a change accepted reads Accepted; the file on disk keeps the agent's line",
+      "ok": true,
+      "detail": {
+        "load": "rendered",
+        "hunks": 2,
+        "accepted": 1,
+        "accept": "Accept file",
+        "acceptPressed": "false",
+        "reject": "Reject file",
+        "rejectDisabled": false,
+        "save": null,
+        "hunkWords": [
+          [
+            "Accepted",
+            "Reject"
+          ],
+          [
+            "Accept",
+            "Reject"
+          ]
+        ],
+        "notice": ""
+      }
+    },
+    {
+      "name": "a change rejected: the line is back on disk, the review says Rejected, and \"Save your edits\" does not appear",
+      "ok": true,
+      "detail": {
+        "afterReject": {
+          "load": "rendered",
+          "hunks": 1,
+          "accepted": 1,
+          "accept": "Accepted",
+          "acceptPressed": "true",
+          "reject": "Reject file",
+          "rejectDisabled": false,
+          "save": null,
+          "hunkWords": [
+            [
+              "Accepted",
+              "Reject"
+            ]
+          ],
+          "notice": "Rejected: the agent's change at lines 100–100 of a.txt was taken out."
+        },
+        "l100": "L100: original"
+      }
+    },
+    {
+      "name": "a whole file accepted: every change reads Accepted and the file's button reads Accepted",
+      "ok": true,
+      "detail": {
+        "load": "rendered",
+        "hunks": 2,
+        "accepted": 2,
+        "accept": "Accepted",
+        "acceptPressed": "true",
+        "reject": "Reject file",
+        "rejectDisabled": false,
+        "save": null,
+        "hunkWords": [
+          [
+            "Accepted",
+            "Reject"
+          ],
+          [
+            "Accepted",
+            "Reject"
+          ]
+        ],
+        "notice": "Rejected: the agent's change at lines 100–100 of a.txt was taken out."
+      }
+    },
+    {
+      "name": "a whole file rejected: b.txt is as it was before the agent, leaves the review, and the review says Rejected",
+      "ok": true,
+      "detail": {
+        "notice": "Rejected: the agent's changes to b.txt were taken out.",
+        "count": "1",
+        "saves": 0,
+        "same": true
+      }
+    },
+    {
+      "name": "\"Save your edits\" appears once the owner types",
+      "ok": true,
+      "detail": "Save your edits"
+    },
+    {
+      "name": "Save your edits writes what was typed, then goes away",
+      "ok": true,
+      "detail": {
+        "l10": "L10: agent edit OWNER-TYPED",
+        "hiddenAgain": true
+      }
     }
   ]
 }

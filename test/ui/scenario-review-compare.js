@@ -154,7 +154,7 @@ const { Session, makeRepo, latestVsix, delay, git } = require('./harness');
     await s.screenshot('file-rejected');
     check('a whole file rejected: b.txt is as it was before the agent, leaves the review, and the review says Rejected', bGone && bText === bBefore && afterFileReject.notice === "Rejected: the agent's changes to b.txt were taken out." && afterFileReject.count === '1' && afterFileReject.saves === 0, { ...afterFileReject, same: bText === bBefore });
     // Typing shows "Save your edits"; saving writes what was typed and hides it again.
-    await er.waitFor(`(() => { const e = ${fileOf('a.txt')}; if (!e || e.dataset.loadState !== 'rendered') return false; e.scrollIntoView(); const l = [...e.querySelectorAll('.editor.modified .view-lines .view-line')].find(l => /L10: agent edit/.test(l.textContent)); if (!l) return false; l.scrollIntoView({ block: 'center' }); document.getElementById('click-target')?.removeAttribute('id'); l.id = 'click-target'; return true; })()`, 15000);
+    await er.waitFor(`(() => { const e = ${fileOf('a.txt')}; if (!e || e.dataset.loadState !== 'rendered') return false; e.scrollIntoView(); const l = [...e.querySelectorAll('.editor.modified .view-lines .view-line')].find(l => /L10:.agent.edit/.test(l.textContent)); if (!l) return false; l.scrollIntoView({ block: 'center' }); document.getElementById('click-target')?.removeAttribute('id'); l.id = 'click-target'; return true; })()`, 15000);
     await delay(500);
     const p = await s.webviewPoint(er, '#click-target');
     await cdp.click(p.x - 20, p.y); await cdp.key('End'); await cdp.type(' OWNER-TYPED'); await delay(800);

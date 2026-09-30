@@ -61,7 +61,7 @@
       "name": "concurrent agent edit during Reject is a conflict and is not overwritten",
       "ok": true,
       "detail": {
-        "note": "Reject was not applied: this file changed while the hunk was being rejected (conflict). Nothing was overwritten; review the current content.",
+        "note": "Reject was not applied: this file changed while the change was being rejected (conflict). Nothing was overwritten; review the current content.",
         "disk": "L200: agent edit v2"
       }
     },
