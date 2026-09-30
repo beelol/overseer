@@ -2,8 +2,8 @@
 // comparison/base control, Follow (off/following/paused), agent-edit reveal, restores
 // the saved scroll anchor once the rows above it have rendered (after reload/restart), and
 // per-hunk Accept (mark reviewed) / Reject (restore the base text through the native edit path),
-// and (AC-99) a file navigator over the whole worktree: Changes only or All files, where any file
-// opens inside the review (an unchanged one as plain editable text).
+// and (AC-99) a file navigator over the whole worktree: Changed or All files. A changed file jumps to
+// its diff; in All files (Follow's list, AC-264) any file opens as the real file, in Follow.
 import './browser.css';
 import { StatisticsWorker } from './statistics-client';
 import { EditingClient, replaceText } from './editing-client';
@@ -159,8 +159,12 @@ function fileButton(relPath, entry) {
   button.addEventListener('click', () => openPath(relPath));
   return button;
 }
-/** Opens any worktree file in the review: jump to its row, or ask for it as a browsed file. */
+/**
+ * Changed (Diffs only): a file jumps to its diff. All files is Follow's list (AC-264, the owner
+ * 2026-09-29): every file of the worktree, each opening the real file, the agent in Follow.
+ */
 function openPath(relPath) {
+  if (!changesOnly()) { vscode.postMessage({ type: 'openReal', path: relPath }); return; }
   const entry = snapshot?.entries.find(e => e.path === relPath);
   if (entry) { jump(entry.id); return; }
   pendingBrowse = relPath;
@@ -174,7 +178,7 @@ function renderTree() {
   const only = changesOnly();
   changesOnlyButton.setAttribute('aria-pressed', String(only));
   // AC-264: a two-way switch at the top of the list, "Changed | All files"; a click flips it.
-  changesOnlyButton.title = only ? 'Showing the changed files. Click for all the files in the agent\'s worktree.' : 'Showing all the files in the agent\'s worktree. Click for the changed files only.';
+  changesOnlyButton.title = only ? 'Showing the changed files; each opens its diff. Click for all the files in the agent\'s worktree.' : 'Showing all the files in the agent\'s worktree; each opens the real file, in Follow. Click for the changed files only.';
   changesOnlyButton.setAttribute('aria-label', only ? 'Changed files (click for all files)' : 'All files (click for changed files)');
   for (const seg of changesOnlyButton.querySelectorAll('.seg')) seg.classList.toggle('on', (seg.dataset.mode === 'changes') === only);
   document.body.dataset.nav = only ? 'changes' : 'all';

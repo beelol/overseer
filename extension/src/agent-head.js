@@ -108,6 +108,20 @@ class AgentHead {
     this.updateStatus();
   }
 
+  /** All files (AC-264): `rel` opens as the real file in Follow, where the agent's review was. */
+  async followFile(runId, rel) {
+    runId = runId || this.runId;
+    if (!runId || !rel) return;
+    const found = this.review.manager.panelFor(runId);
+    this.modes.set(runId, 'follow');
+    this.context.workspaceState.update('overseer.head.modes', Object.fromEntries([...this.modes].slice(-300)));
+    await this.open(runId, { viewColumn: found?.panel.viewColumn || this.column, preserveFocus: false, reveal: { path: rel } });
+    if (found) { this.review.switching = (this.review.switching || 0) + 1; try { found.panel.dispose(); } finally { this.review.switching--; } }
+    this.log(`head: ${runId} opens ${rel} from All files, in Follow`);
+    this.updateContext(vscode.window.activeTextEditor);
+    this.updateStatus();
+  }
+
   toggleMode(runId) {
     runId = runId || this.runId;
     if (runId) return this.setMode(runId, this.modeFor(runId) === 'follow' ? 'diffs' : 'follow');

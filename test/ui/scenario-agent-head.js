@@ -11,7 +11,8 @@
 //   in the agent's worktree (not the window's folder); the toggle switches to Diffs only (the
 //   review) and back to the same file and line; the window's folder and window count never change.
 //   AC-264: there is no separate tree view of the agent's files: the review's file list is a
-//   "Changed | All files" switch, and All files lists the whole worktree (the changed file marked).
+//   "Changed | All files" switch, and All files lists the whole worktree (the changed file marked);
+//   a file picked in All files (Follow's list) opens as the real file, the agent in Follow.
 const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay, repoRoot, git } = require('./harness');
@@ -164,6 +165,20 @@ const THEMES = ['Overseer Dark', 'Overseer Light', 'Overseer'];
     const afterToggle = { head: await headGroup(), cursor: await cursor() };
     check('AC-233: and back to Follow, at the same file, line and scroll',
       !!again && afterToggle.head?.title === beforeToggle.head?.title && afterToggle.cursor?.line === beforeToggle.cursor?.line && afterToggle.head?.first === beforeToggle.head?.first && !(await groups()).some(g => /^Review/.test(g.tab)), { beforeToggle, afterToggle });
+
+    // AC-264 (the owner, 2026-09-29): All files is Follow's list: every file opens the real file, in Follow.
+    await cdp.command('Overseer: Switch Between Follow and Diffs Only');
+    const review2 = await cdp.webview(`!!document.getElementById('diffs') && document.body.dataset.runId === ${JSON.stringify(runId)}`, 30000);
+    await review2.waitFor(`!!document.querySelector('#changes-only .seg.on')`, 10000).catch(() => {});
+    const opensOn = await review2.eval(`document.querySelector('#changes-only .seg.on')?.textContent`);
+    await review2.eval(`document.getElementById('changes-only').click()`);
+    await review2.waitFor(`[...document.querySelectorAll('#tree .file')].some(f => f.querySelector('.file-name')?.textContent === 'c.txt')`, 10000).catch(() => {});
+    await review2.eval(`[...document.querySelectorAll('#tree .file')].find(f => f.querySelector('.file-name')?.textContent === 'c.txt')?.click()`);
+    const real = await waitHead('c.txt', () => true, 20000);
+    await delay(800);
+    const afterPick = await groups();
+    check('AC-264: Diffs only opens on "Changed"; a file picked in All files (Follow\'s list) opens as the real file, the agent in Follow and its review closed',
+      opensOn === 'Changed' && !!real && !afterPick.some(g => /^Review/.test(g.tab)), { opensOn, real: real && { title: real.title }, afterPick: afterPick.map(g => g.tab || g.title) });
 
     go(4);
     head = await waitHead('b.txt', g => g.after.some(a => /^− 3 lines removed/.test(a)), 30000);

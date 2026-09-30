@@ -56,6 +56,8 @@ class Review {
       closed: runId => { if (!this.switching) this.onClosed?.(runId); },
       // Diffs only → Follow, from the review's own header (AC-233).
       showHead: runId => this.head?.setMode(runId, 'follow'),
+      // AC-264: a file picked from the review's All files list opens as the real file, in Follow.
+      openReal: (runId, rel) => this.head?.followFile(runId, rel),
       setScope: (runId, scope) => this.setScope(runId, scope),
       // AC-243: the review's Merge / Open PR / Cancel merge buttons, the same as the chat's.
       land: runId => (runId ? this.model.landing?.summary(runId) : undefined),
