@@ -24,6 +24,9 @@ const root = path.resolve(__dirname, '..');
 // One full run at a time on this machine: several agents running test-all at once load the Mac
 // until timing checks fail for everyone. A run waits for the lock; a lock whose process has died
 // is taken over. OVERSEER_TEST_LOCK=off skips it (a CI runner has the machine to itself).
+// The owner uses this Mac while tests run: the whole run, and everything it starts, yields the CPU
+// to the owner's own apps (lowest priority; child processes inherit it).
+try { require('os').setPriority(19); } catch {}
 (function takeTheMachineLock() {
   if (process.env.OVERSEER_TEST_LOCK === 'off') return;
   const lock = path.join(require('os').tmpdir(), 'overseer-test-all.lock');
