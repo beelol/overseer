@@ -53,15 +53,6 @@
         "Overseer Light": true,
         "Overseer": true
       }
-    },
-    {
-      "name": "dashboard: reached in Overseer Dark, Overseer Light, Overseer",
-      "ok": true,
-      "detail": {
-        "Overseer Dark": true,
-        "Overseer Light": true,
-        "Overseer": true
-      }
     }
   ],
   "reached": {
@@ -91,11 +82,6 @@
       "Overseer": true
     },
     "where am I": {
-      "Overseer Dark": true,
-      "Overseer Light": true,
-      "Overseer": true
-    },
-    "dashboard": {
       "Overseer Dark": true,
       "Overseer Light": true,
       "Overseer": true

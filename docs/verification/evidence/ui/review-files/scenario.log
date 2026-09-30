@@ -1,20 +1,15 @@
-[2026-09-28T16:33:38.818Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-28T16:33:48.124Z] PASS the navigator starts on Changes only while the agent has changes, with the status and counts beside the changed file ["a.txt"]
-[2026-09-28T16:33:48.198Z] screenshot docs/verification/evidence/ui/review-files/01-changes-only.png
-[2026-09-28T16:33:48.402Z] PASS All files lists the worktree top level (folders first, .git left out) and keeps the changed file marked {"folders":["src"],"files":["a.txt","b.txt","c.txt","README.md"],"changed":"M"}
-[2026-09-28T16:33:50.014Z] PASS a nested unchanged file opens inside the review as its whole text (no hidden regions), not counted as a change {"lines":31,"first":true,"last":true,"hidden":false,"total":"1","status":"","close":true}
-[2026-09-28T16:33:50.094Z] screenshot docs/verification/evidence/ui/review-files/02-unchanged-file-open.png
-[2026-09-28T16:33:51.050Z] tabs before typing ["Review: Files demo (1), Editor Group 1 [tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge]","Overseer, Editor Group 2 [tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge]"]
-[2026-09-28T16:33:52.103Z] tabs after typing ["Review: Files demo (1), Editor Group 1 [tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge]","nested.txt, Editor Group 1 [tab tab-actions-right sizing-fit has-icon dirty]","Overseer, Editor Group 2 [tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge]"]
-[2026-09-28T16:33:53.812Z] tabs after save ["Review: Files demo (2), Editor Group 1 [tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge]","Overseer, Editor Group 2 [tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge]"]
-[2026-09-28T16:33:54.063Z] PASS the unchanged file is edited and saved from the review (worktree file on disk) ["nested 4","nested 5 EDITED-UNCHANGED","nested 6"]
-[2026-09-28T16:33:54.065Z] PASS once saved with a change it is a changed file like any other (status M, counted) {"tree":"M","total":"2"}
-[2026-09-28T16:33:55.017Z] tabs before typing ["Review: Files demo (2), Editor Group 1 [tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge]","Overseer, Editor Group 2 [tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge]"]
-[2026-09-28T16:33:56.063Z] tabs after typing ["Review: Files demo (2), Editor Group 1 [tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge]","a.txt, Editor Group 1 [tab tab-actions-right sizing-fit has-icon dirty connected-tab-narrow]","Overseer, Editor Group 2 [tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge]"]
-[2026-09-28T16:33:57.778Z] tabs after save ["Review: Files demo (2), Editor Group 1 [tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge]","Overseer, Editor Group 2 [tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge]"]
-[2026-09-28T16:33:58.029Z] PASS the changed file is edited and saved from the review too ["L1: original","L2: agent edit EDITED-CHANGED","L3: original"]
-[2026-09-28T16:33:58.030Z] PASS reading and editing the agent's files opened no editor tab ["Review: Files demo (2), Editor Group 1","Overseer, Editor Group 2"]
-[2026-09-28T16:33:58.106Z] screenshot docs/verification/evidence/ui/review-files/03-edited.png
-[2026-09-28T16:33:58.109Z] PASS Changes only shows just the changed files again ["a.txt","src/deep/nested.txt"]
-[2026-09-28T16:34:00.857Z] PASS on a 10,000-file worktree the navigator's first level shows in under 500 ms {"ms":4,"folders":100}
-[2026-09-28T16:34:00.940Z] screenshot docs/verification/evidence/ui/review-files/04-all-files-10k.png
+[2026-09-30T08:23:47.311Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-30T08:23:55.157Z] PASS the navigator starts on Changes only while the agent has changes, with the status and counts beside the changed file ["a.txt"]
+[2026-09-30T08:23:55.233Z] screenshot docs/verification/evidence/ui/review-files/01-changes-only.png
+[2026-09-30T08:23:56.217Z] tabs before typing ["Review: Files demo (1), Editor Group 1 [tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge]","Overseer, Editor Group 2 [tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge]"]
+[2026-09-30T08:23:57.271Z] tabs after typing ["Review: Files demo (1), Editor Group 1 [tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge]","a.txt, Editor Group 1 [tab tab-actions-right sizing-fit has-icon dirty connected-tab-narrow]","Overseer, Editor Group 2 [tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge]"]
+[2026-09-30T08:23:58.989Z] tabs after save ["Review: Files demo (1), Editor Group 1 [tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge]","Overseer, Editor Group 2 [tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge]"]
+[2026-09-30T08:23:59.240Z] PASS the changed file is edited and saved from the review ["L1: original","L2: agent edit EDITED-CHANGED","L3: original"]
+[2026-09-30T08:23:59.241Z] PASS editing the agent's changed file in the review opened no editor tab ["Review: Files demo (1), Editor Group 1","Overseer, Editor Group 2"]
+[2026-09-30T08:23:59.313Z] screenshot docs/verification/evidence/ui/review-files/02-edited.png
+[2026-09-30T08:23:59.535Z] PASS All files lists the worktree top level (folders first, .git left out) and keeps the changed file marked {"folders":["src"],"files":["a.txt","b.txt","c.txt","README.md"],"changed":"M"}
+[2026-09-30T08:23:59.537Z] PASS Changed shows just the changed files again ["a.txt"]
+[2026-09-30T08:24:00.998Z] PASS a nested unchanged file picked in All files opens as the real file in an editor, the agent in Follow and its review closed {"active":"nested.txt, Editor Group 1","review":false,"firstLines":["nested 1","nested 2"]}
+[2026-09-30T08:24:01.058Z] screenshot docs/verification/evidence/ui/review-files/03-all-files-real-file.png
+[2026-09-30T08:24:03.504Z] PASS on a 10,000-file worktree the navigator's first level shows in under 500 ms {"ms":3,"folders":100}
+[2026-09-30T08:24:03.614Z] screenshot docs/verification/evidence/ui/review-files/04-all-files-10k.png

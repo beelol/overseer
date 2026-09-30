@@ -80,22 +80,6 @@
         "changedFiles": [],
         "unsaved": []
       }
-    },
-    {
-      "name": "dashboard: agents once, files once, changed files once",
-      "ok": true,
-      "detail": {
-        "agents": [
-          "side bar"
-        ],
-        "files": [
-          "review navigator"
-        ],
-        "changedFiles": [
-          "review navigator"
-        ],
-        "unsaved": []
-      }
     }
   ],
   "inventory": {
@@ -140,18 +124,6 @@
       ],
       "files": [],
       "changedFiles": [],
-      "unsaved": []
-    },
-    "dashboard": {
-      "agents": [
-        "side bar"
-      ],
-      "files": [
-        "review navigator"
-      ],
-      "changedFiles": [
-        "review navigator"
-      ],
       "unsaved": []
     }
   }
