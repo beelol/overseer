@@ -33,9 +33,13 @@
       }
     },
     {
-      "name": "search field: after focus in the chat, one click puts the cursor there and typing filters",
+      "name": "search: after focus in the chat, one click on the Agents view's search button puts the cursor in the search box and typing filters",
       "ok": true,
       "detail": {
+        "searchButton": {
+          "x": 257,
+          "y": 82
+        },
         "focused": true,
         "typed": "Busy"
       }
@@ -45,14 +49,6 @@
       "ok": true,
       "detail": {
         "label": "grid pin",
-        "ok": true
-      }
-    },
-    {
-      "name": "dashboard: after focus in the side bar, one click on the chat's More opens its menu",
-      "ok": true,
-      "detail": {
-        "label": "dashboard chat more",
         "ok": true
       }
     }
@@ -75,15 +71,11 @@
       "ok": true
     },
     {
-      "label": "search field",
+      "label": "search button",
       "ok": true
     },
     {
       "label": "grid pin",
-      "ok": true
-    },
-    {
-      "label": "dashboard chat more",
       "ok": true
     }
   ]
