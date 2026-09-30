@@ -559,7 +559,7 @@ class AgentsProvider {
     item.description = [landed, ACTIVE.has(run.status) ? '' : ago(run.ended_ms || run.created_ms), accountBrief(profile), ...marks].filter(Boolean).join(' · ');
     const ws = m.workspace(run.workspace_id);
     const status = (STATUS_TEXT[run.status] || run.status) + (landed ? ` · ${landed}` : '');
-    item.tooltip = new vscode.MarkdownString([`**${task.title}**`, `${status}${run.exit_reason && !ACTIVE.has(run.status) ? ` — ${Plain.plain(run.exit_reason, 200)}` : ''}`,
+    item.tooltip = new vscode.MarkdownString([`**${task.title}**`, `${status}${(run.plain_reason || run.exit_reason) && !ACTIVE.has(run.status) ? ` — ${run.plain_reason || Plain.plain(run.exit_reason, 200)}` : ''}`,
       [HARNESS_NAME[run.harness] || run.harness, accountLabel(profile), run.model].filter(Boolean).join(' · '), ws ? `${ws.kind === 'current' ? 'current checkout' : ws.branch} · ${path.basename(task.repo_root)}` : ''].filter(Boolean).join('\n\n'));
     item.accessibilityInformation = { label: `${task.title}, ${status}${fresh ? ', to review' : ''}, ${HARNESS_NAME[run.harness] || run.harness}${profile ? ', ' + accountLabel(profile) : ''}${marks.length ? ', ' + marks.map(x => x.replace(/^\S+ /, '')).join(', ') : ''}` };
     if (marks.length) item.tooltip.appendMarkdown(`\n\n${[voiced && 'A spoken request is for this agent', o.held && `Held: ${o.hold_reason || ''}`, o.watched && 'Watched by another agent', o.watching && o.watching.length && 'Watching another agent', o.conflicts && `${o.conflicts} open conflict${o.conflicts === 1 ? '' : 's'}`, o.area && o.area.length && `Area: ${o.area.join(', ')}`].filter(Boolean).join('\n\n')}`);

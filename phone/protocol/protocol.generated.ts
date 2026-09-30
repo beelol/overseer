@@ -54,6 +54,7 @@ export interface Run {
   native_id?: string | null;
   status: RunStatus;
   exit_reason?: string | null;
+  plain_reason?: string | null;
   created_ms: number;
   ended_ms?: number | null;
   title: string;
@@ -348,6 +349,10 @@ export interface EventPayloads {
     status: unknown;
     previous: unknown;
     first?: boolean | null;
+  };
+  trouble: {
+    kind: string;
+    reason: string;
   };
 }
 
@@ -968,6 +973,8 @@ export interface Methods {
   "overseer.messages": { class: 'mac_only'; params: unknown; result: unknown };
   /** Say something to Overseer. */
   "overseer.send": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Open Talk to Overseer: what happened while you were away leads. */
+  "overseer.visit": { class: 'mac_only'; params: unknown; result: unknown };
   /** Propose actions for the owner to approve. */
   "overseer.propose": { class: 'mac_only'; params: unknown; result: unknown };
   /** Answer one of Overseer's proposals. */
@@ -1365,6 +1372,7 @@ export const METHOD_CLASS = {
   "overseer.session": 'mac_only',
   "overseer.messages": 'mac_only',
   "overseer.send": 'mac_only',
+  "overseer.visit": 'mac_only',
   "overseer.propose": 'mac_only',
   "overseer.answer": 'mac_only',
   "overseer.cancel": 'mac_only',

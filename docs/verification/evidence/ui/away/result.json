@@ -1,0 +1,74 @@
+{
+  "checks": [
+    {
+      "name": "home opens on its empty hero while nothing has happened",
+      "ok": true,
+      "detail": {
+        "conversation": ""
+      }
+    },
+    {
+      "name": "eight agents finished across two repositories, one failed",
+      "ok": true,
+      "detail": [
+        [
+          "Header",
+          "completed"
+        ],
+        [
+          "Footer",
+          "completed"
+        ],
+        [
+          "Pricing",
+          "completed"
+        ],
+        [
+          "Blog",
+          "completed"
+        ],
+        [
+          "Search",
+          "failed"
+        ],
+        [
+          "Inbox",
+          "completed"
+        ],
+        [
+          "Tags",
+          "completed"
+        ],
+        [
+          "Export",
+          "completed"
+        ]
+      ]
+    },
+    {
+      "name": "reopening home shows the summary as the newest message, on screen, instead of the empty hero",
+      "ok": true,
+      "detail": {
+        "conversation": "1",
+        "last": "While you were away: 4 finished and 1 failed in site; 3 finished in notes.",
+        "onScreen": true,
+        "r": [
+          469.7734375,
+          504.671875
+        ],
+        "box": [
+          46,
+          504.5078125
+        ]
+      }
+    },
+    {
+      "name": "asking \"what happened while I was away\" gives the same line, with no model turn",
+      "ok": true,
+      "detail": {
+        "count": 2,
+        "run": null
+      }
+    }
+  ]
+}
