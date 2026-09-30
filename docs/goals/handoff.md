@@ -1,6 +1,6 @@
 # Handoff: where the everything goal stands
 
-Updated 2026-09-30 00:00 by the coordinator session (a new session took over from the one that wrote most of this). Read this first when you pick up the everything goal ([everything.md](everything.md)).
+Updated 2026-09-30 00:00 by the third coordinator session, which took over at 23:57 on 2026-09-29. Read this first when you pick up the everything goal ([everything.md](everything.md)).
 
 **Keep this file current, and tell whoever comes after you to do the same.** Update it and push it to main the moment anything changes: a merge or deploy, an owner decision, a builder started or finished, a PR opened or closed, a new criterion. Also update your own memory's resume note. The owner asked for both (2026-09-29), so the next agent never loses work when usage or a session runs out.
 
@@ -12,7 +12,7 @@ Updated 2026-09-30 00:00 by the coordinator session (a new session took over fro
   - starting #32's third full run;
   - stopping its layout builder once #40 was pushed (f0182365).
 - **23:45 to 23:55:** a second session ("overseer-fe") took over. It read the hand-off, created the worktree `.claude/worktrees/coord` (branch `coord-main`, clean, safe to reuse or remove) and pushed one hand-off update (072db9f2), then crashed. It changed nothing else.
-- **Now:** the next session picks up from this file. The first session has stopped coordinating; it is only keeping #32's test run alive until that run ends.
+- **23:57 on:** a third session is coordinating from the worktree `.claude/worktrees/coord` (branch `coord-main`, fast-forwarded to main). #32's third run was still alive then (pid 96715, past Rust, unit, dev, guided and deploy, building the VSIX); it watches the log for the `EXIT` line, then merges #32 and deploys. The first session only keeps that run's shell alive.
 
 ## How to pick up
 
