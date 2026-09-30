@@ -16,10 +16,8 @@ const { PullRequests } = require('./pull-request');
 const { Landing } = require('./landing');
 const { TaskLauncher } = require('./task-launcher');
 const { Steering } = require('./run-actions');
-const { Dashboard } = require('./dashboard-mode');
 const { PhoneAccess } = require('./phone-access');
-const { Immersive } = require('./immersive');
-const { OneLayout } = require('./one-layout');
+const { OverseerWindow, retireFocusMode } = require('./overseer-window');
 const { VsCodeChat } = require('./vscode-chat');
 const { OverseerChat } = require('./overseer-chat');
 const { SwarmControls } = require('./swarm-controls');
@@ -140,7 +138,6 @@ async function activate(context) {
   const pinned = () => context.workspaceState.get('overseer.pinned', []).filter(id => model.run(id));
   const setPinned = (runId, on) => context.workspaceState.update('overseer.pinned', [...new Set([...pinned().filter(id => id !== runId), ...(on ? [runId] : [])])]);
   const search = async q => { try { return (await client.request('search', { query: q, limit: 200 })).task_ids || []; } catch { return []; } };
-  // With the dashboard open, the chat stays inside it and reviews go to the column on its right.
   const center = new CommandCenter(context, model, { select: (runId, opts) => selectRun(runId, opts), selected: () => selectedRun, client, model, launcher, attention, rollup, pinned, setPinned, archived: archivedTasks, search, steering,
     // A card, a request's stage or a Needs-you item opens its agent, or its finished work (AC-226).
     openAgent: (runId, opts) => openAgent(runId, opts),
@@ -159,7 +156,6 @@ async function activate(context) {
   review.head = head;
   outputs.column = () => vscode.ViewColumn.Beside;
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.center', center));
-  const immersive = new Immersive(context, say);
   // AC-258: VS Code's own chat view is closed the first time Overseer's view is on screen here.
   const vsChat = new VsCodeChat(center, say);
   // It runs as Overseer's view comes on screen (part of the action that showed it), not later, when
@@ -170,26 +166,20 @@ async function activate(context) {
     setTimeout(() => { if (center.panel?.visible) vsChat.check().catch(error => say('vscode chat: ' + error.message)); }, 300);
   };
   context.subscriptions.push(vscode.window.tabGroups.onDidChangeTabs(checkVsChat));
-  // The agent the workspace shows (AC-250): the selected one, else the most recent working one, else the most recent.
+  // The agent the Overseer window shows first (AC-264): the selected one, else the most recent working one, else the most recent.
   const focusedAgent = () => {
     if (selectedRun && model.run(selectedRun)) return (model.rootRun(model.run(selectedRun)) || model.run(selectedRun)).id;
     const archived = new Set(archivedTasks());
-    const roots = (model.state.runs || []).filter(r => !r.parent_run_id && !archived.has(r.task_id)).sort((a, b) => (ACTIVE.has(b.status) - ACTIVE.has(a.status)) || b.created_ms - a.created_ms);
+    // Overseer's own run is no agent of the list (AC-182).
+    const overseer = r => r.id === model.state.overseer?.run_id || (model.state.oversight || {})[r.id]?.role === 'overseer';
+    const roots = (model.state.runs || []).filter(r => !r.parent_run_id && !archived.has(r.task_id) && !overseer(r)).sort((a, b) => (ACTIVE.has(b.status) - ACTIVE.has(a.status)) || b.created_ms - a.created_ms);
     return roots[0]?.id;
   };
-  const dashboard = new Dashboard(context, center, say, {
-    // The dashboard takes the whole editor area, the owner's groups included (it puts them back on exit).
-    arrange: () => { arrangement.takeover = true; return selectedRun && model.run(selectedRun) ? arrangement.show(selectedRun) : arrangement.chatOnly(); },
-    arrangeWorkspace: async sizes => { const id = focusedAgent(); if (id) selectedRun = id; await arrangement.workspace(id, { sizes }); },
-    leaveWorkspace: () => arrangement.leaveWorkspace(),
-    agentsVisible: () => agentsView.visible, immersive, vsChat });
-  if (dashboard.inWorkspace) arrangement.current = 'workspace';
-  // AC-264 prototypes (phase 1): A, Overseer's panel in the secondary side bar; B, the window on Overseer's own workspace file.
-  const oneLayout = new OneLayout({ context, center, arrangement, model, log: say, focusedAgent, select: (id, opts) => { selectedRun = id; return selectRun(id, opts); }, backToOverseer: () => backToOverseer() });
-  context.subscriptions.push(vscode.window.registerWebviewViewProvider('overseer.panel', oneLayout, { webviewOptions: { retainContextWhenHidden: true } }));
-  arrangement.takeover = dashboard.inDashboard;
-  // Another dashboard window may have put the immersive settings back on its exit: apply them again here.
-  context.subscriptions.push(vscode.window.onDidChangeWindowState(s => { if (s.focused && dashboard.inDashboard) immersive.apply().catch(() => {}); }));
+  // AC-264: the one Overseer layout, this window reopened as the Overseer window (Workspace, ⌥⌘⇧O).
+  const overseerWindow = new OverseerWindow({ context, center, arrangement, log: say,
+    handlers: { focusedAgent, select: (id, opts) => { selectedRun = id; return selectRun(id, opts); }, backToOverseer: () => backToOverseer() } });
+  // In the Overseer window Overseer's views take the whole editor area (the owner's layout is their folder window's).
+  arrangement.takeover = overseerWindow.active;
   // AC-104: an agent dragged from the side bar onto the grid. VS Code's editor drop opens the agent's
   // chat editor (AC-71) in the grid's group, or in a group split off beside it; while the grid is shown
   // that editor (and a group the drop created) is closed again and the agent is placed on the grid's
@@ -294,17 +284,16 @@ async function activate(context) {
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.output', outputs),
     agentsView.onDidExpandElement(e => agents.setCollapsed(e.element, false)),
     agentsView.onDidCollapseElement(e => agents.setCollapsed(e.element, true)));
-  // AC-250: one button for the whole Overseer layout, beside Overseer's own item.
+  // AC-264: one button for the Overseer layout, beside Overseer's own item.
   const workspaceButton = vscode.window.createStatusBarItem('overseer.workspace', vscode.StatusBarAlignment.Left, 49);
   workspaceButton.name = 'Overseer Workspace';
   const updateWorkspaceButton = () => {
-    const on = dashboard.inWorkspace;
+    const on = overseerWindow.active;
     workspaceButton.text = on ? '$(layout-sidebar-left-off) Close Workspace' : '$(layout) Workspace';
-    workspaceButton.tooltip = on ? 'Close the Overseer workspace and put your layout back' : 'Open the Overseer workspace: Overseer, the agent\'s review and its chat, sized for the screen';
+    workspaceButton.tooltip = on ? 'Go back to your own layout of this folder (⌥⌘⇧O)' : 'Open the Overseer layout: your agents on the left, the review in the middle, Overseer on the right (⌥⌘⇧O)';
     workspaceButton.command = on ? 'overseer.closeWorkspace' : 'overseer.openWorkspace';
     workspaceButton.show();
   };
-  dashboard.onChange = () => { arrangement.takeover = dashboard.inDashboard; updateWorkspaceButton(); };
   updateWorkspaceButton();
   context.subscriptions.push(workspaceButton);
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
@@ -387,9 +376,11 @@ async function activate(context) {
   const gridHasAgents = () => (model.state.runs || []).some(r => !r.parent_run_id && ACTIVE.has(r.status)) || pinned().length > 0;
   /** The rollup (AC-255) for a one-line note where the grid would be: " Of the rest: 6 to review · 3 reviewed." */
   const rollupNote = () => { const t = Rollup.text({ ...rollup(), working: 0, needs: 0 }); return t ? ` Of the rest: ${t}.` : ''; };
-  /** The home view: the composer alone in the middle, with an optional one-line note. */
+  /** The home view: the composer alone in the middle, with an optional one-line note. In the Overseer
+   *  window home is the right panel: the review stays in the middle (AC-264). */
   async function goHome(note) {
-    await arrangement.chatOnly();
+    if (overseerWindow.active && center.panel && arrangement.current === 'split') await center.open({ column: center.panel.viewColumn });
+    else await arrangement.chatOnly();
     center.setMode('composer');
     if (note) center.panel?.webview.postMessage({ type: 'notice', scope: 'composer', kind: 'info', message: note });
   }
@@ -477,7 +468,7 @@ async function activate(context) {
   /** The Overseer view shows the agent's chat; in the workspace it keeps Overseer's conversation (AC-250). */
   async function showInCenter(runId) {
     // (Telling the view which agent is selected would switch it to that agent's chat.)
-    if (arrangement.current !== 'workspace') await center.select(runId);
+    await center.select(runId);
   }
 
   /** Shows an agent: its chat, and its review beside it when it has changes (Gate K). */
@@ -518,7 +509,8 @@ async function activate(context) {
     const run = id && model.run(id);
     if (!run) { vscode.window.showInformationMessage('No agent to go back to: open one from the side bar or the conversation.'); return; }
     const root = model.rootRun(run) || run;
-    const chat = leftAgent?.runId === root.id && leftAgent.chat;
+    // In the Overseer window the right panel is the agent's chat again (AC-264).
+    const chat = (leftAgent?.runId === root.id && leftAgent.chat) || overseerWindow.active;
     leftAgent = undefined;
     if (chat) { selectedRun = root.id; await center.select(root.id); }
     // Its head is still open: straight back there. Closed meanwhile: opened again where it was left.
@@ -1094,15 +1086,9 @@ async function activate(context) {
     // open-agent?run=<id> (AC-240): that agent's chat.
     vscode.window.registerUriHandler({ handleUri: uri => openUri(uri) }),
     vscode.commands.registerCommand('overseer.openCenter', guard(async () => { await model.refresh(); if (selectedRun && model.run(selectedRun)) await selectRun(selectedRun); else { await arrangement.chatOnly(); center.setMode('composer'); } })),
-    vscode.commands.registerCommand('overseer.openDashboard', guard(async () => { await model.refresh(); await dashboard.enter(); if (selectedRun && model.run(selectedRun)) await selectRun(selectedRun); })),
-    vscode.commands.registerCommand('overseer.exitDashboard', guard(() => dashboard.exit())),
-    vscode.commands.registerCommand('overseer.toggleDashboard', guard(async () => { if (dashboard.inDashboard) await dashboard.exit(); else { await model.refresh(); await dashboard.enter(); } })),
-    vscode.commands.registerCommand('overseer.openDashboardWindow', guard(() => dashboard.openWindow())),
-    // AC-250: the whole layout in one step; again (or Close Workspace) puts the owner's layout back.
-    vscode.commands.registerCommand('overseer.openWorkspace', guard(async () => { await model.refresh(); await dashboard.openWorkspace(); })),
-    vscode.commands.registerCommand('overseer.closeWorkspace', guard(async () => { if (dashboard.inWorkspace) await dashboard.exit(); })),
-    vscode.commands.registerCommand('overseer.prototype.panelLayout', guard(async () => { await model.refresh(); await oneLayout.toggleA(); })),
-    vscode.commands.registerCommand('overseer.prototype.overseerWindow', guard(async () => { await model.refresh(); await oneLayout.toggleB(); })),
+    // AC-264: the Overseer layout in one step; again (or Close Workspace) the owner's own layout.
+    vscode.commands.registerCommand('overseer.openWorkspace', guard(async () => { await model.refresh(); await overseerWindow.toggle(); })),
+    vscode.commands.registerCommand('overseer.closeWorkspace', guard(async () => { if (overseerWindow.active) await overseerWindow.leave(); })),
     // AC-251: the review (Follow) in its own window, to put on another screen.
     vscode.commands.registerCommand('overseer.popOutReview', guard(async arg => {
       await model.refresh();
@@ -1185,12 +1171,14 @@ async function activate(context) {
     await model.refresh();
     refreshAccounts().catch(() => {});
     announceBackgroundAgents().catch(error => say('background notice check: ' + error.message));
-    dashboard.startup().catch(error => say('dashboard startup: ' + error.message)).then(() => oneLayout.startup()).catch(error => say('one layout: ' + (error.stack || error.message)));
-    setTimeout(() => offerSideBar(context).catch(error => say('side bar offer: ' + error.message)), 3000);
+    retireFocusMode(context, say).catch(error => say('focus mode: ' + error.message));
+    overseerWindow.startup().catch(error => say('overseer window: ' + (error.stack || error.message)));
+    // The first launch offers the Overseer layout, then (another time) the side bar.
+    setTimeout(() => overseerWindow.offer().catch(error => say('layout offer: ' + error.message)).then(() => offerSideBar(context)).catch(error => say('side bar offer: ' + error.message)), 3000);
     const remembered = context.workspaceState.get('overseer.selectedRun');
     // Reopen where the user left off (AC-80) when VS Code did not restore the Overseer editor itself.
     if (remembered && model.run(remembered) && context.workspaceState.get('overseer.editorOpen', false)) {
-      setTimeout(() => { if (!center.active && !dashboard.inDashboard) selectRun(remembered).catch(error => say('reopen: ' + error.message)); }, 2500);
+      setTimeout(() => { if (!center.active && !overseerWindow.active) selectRun(remembered).catch(error => say('reopen: ' + error.message)); }, 2500);
     }
     if (remembered && model.run(remembered)) {
       selectedRun = remembered;
@@ -1204,7 +1192,7 @@ async function activate(context) {
     // A pinned dev window says it once ('unreachable') and keeps waiting for its instance.
     if (pin && !client.refusal) { updateStatus(); client.reconnectLater(); } else vscode.window.showErrorMessage(`Overseer could not start its daemon: ${Plain.plain(error.message, 300)}`);
   }
-  return { client, model, review, outputs, selectRun, agents, agentsView, center, dashboard, arrangement, attention, phoneAccess, voice, openUri, selectedRun: () => selectedRun }; // exported for UI tests
+  return { client, model, review, outputs, selectRun, agents, agentsView, center, overseerWindow, arrangement, attention, phoneAccess, voice, openUri, selectedRun: () => selectedRun }; // exported for UI tests
 }
 
 function deactivate() { if (centerRef) centerRef.shuttingDown = true; client?.dispose(); }

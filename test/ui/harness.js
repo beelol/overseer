@@ -142,7 +142,7 @@ class Session {
       'telemetry.telemetryLevel': 'off', 'extensions.autoUpdate': false, 'extensions.autoCheckUpdates': false,
       'git.autofetch': false, 'git.openRepositoryInParentFolders': 'always', 'workbench.startupEditor': 'none',
       'security.workspace.trust.enabled': false, 'files.autoSave': 'off', 'update.mode': 'none',
-      'workbench.tips.enabled': false, 'overseer.sideBar.openOnStartup': false, 'chat.disableAIFeatures': true, 'window.restoreWindows': 'none',
+      'workbench.tips.enabled': false, 'overseer.sideBar.openOnStartup': false, 'overseer.layout.offerOnStartup': false, 'chat.disableAIFeatures': true, 'window.restoreWindows': 'none',
       'editor.minimap.enabled': false, 'workbench.secondarySideBar.defaultVisibility': 'hidden', 'window.dialogStyle': 'custom',
       // Opening an agent defaults to Follow (AC-233); the scenarios written for the review (Diffs
       // only) keep opening it. scenario-agent-head drops this to test the default.

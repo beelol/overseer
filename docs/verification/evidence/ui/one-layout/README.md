@@ -1,5 +1,7 @@
 # One Overseer layout (AC-264): way A or way B
 
+**The owner chose B (2026-09-29).** B is built as Workspace (⌥⌘⇧O); its checks and screenshots are in [../overseer-window](../overseer-window). This page is the phase 1 comparison; the prototype commands it names are gone, and so is way A's code.
+
 Both ways give the layout you asked for:
 
 - the agents list on the left;

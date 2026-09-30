@@ -1,7 +1,7 @@
 // Packaged-UI gallery for the Gate M design review (AC-108), fixture runs only: every Gate M view in
 // the three Overseer themes (Overseer Dark, Overseer Light and Overseer). The chat beside the review,
 // the review's All files navigator with an unchanged file open, the grid tracking an agent, the
-// composer, Talk to Overseer, Where am I and the immersive dashboard. Screenshots only; the checks
+// composer, Talk to Overseer, Where am I. Screenshots only; the checks
 // are that each view was reached in each theme.
 const fs = require('fs');
 const path = require('path');
@@ -91,10 +91,6 @@ const slug = t => t.toLowerCase().replace(/\s+/g, '-');
       await cdp.command('Overseer: Where Am I'); await delay(800);
       await s.screenshot(`where-am-i-${t}`); reached('where am I', theme, await cdp.evalWorkbench(`/Where am I/.test(document.querySelector('.quick-input-widget')?.textContent || '')`));
       await cdp.key('Escape'); await delay(400);
-      // The immersive dashboard.
-      await cdp.command('Overseer: Enter Focus Mode'); await delay(3000);
-      await s.screenshot(`dashboard-${t}`); reached('dashboard', theme, await cdp.evalWorkbench(`![...document.querySelectorAll('.editor-group-container .tabs-container')].some(e => e.offsetHeight > 0)`));
-      await cdp.command('Overseer: Exit Focus Mode'); await delay(2000);
     }
     for (const [view, themes] of Object.entries(result.reached)) check(`${view}: reached in ${THEMES.join(', ')}`, THEMES.every(t => themes[t]), themes);
   } catch (error) {

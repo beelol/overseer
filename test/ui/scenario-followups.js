@@ -3,7 +3,7 @@
 // field at editor widths 360, 480, 640 and 900 px (AC-109); account names say the harness once on every
 // surface (AC-110); a side-bar search is visible as the list's first row, started by shortcut from the
 // editor and from the side bar and cleared by Escape or by mouse (AC-112); the grid never shows an empty
-// screen, and the grid and dashboard mode are captured with nine working agents (AC-113).
+// screen, and the grid is captured with nine working agents (AC-113).
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
@@ -176,7 +176,7 @@ const { auditExpression } = require('./audit');
     const backNote = await grid.eval(`document.querySelector('.view-composer .composer-note')?.innerText || ''`);
     check('when the last tile goes, the grid gives way to the home composer', back && /grid is empty/.test(backNote), { back, backNote });
 
-    // Nine working agents: the grid and dashboard mode, in both themes.
+    // Nine working agents: the grid, in both themes.
     for (let i = 1; i <= 9; i++) {
       const t = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', `i=0; while [ $i -lt 400 ]; do echo "step $i of task ${i}: checking module ${i}.$i"; i=$((i+1)); sleep 0.4; done`], prompt: '', title: ['Split payments', 'Refresh sessions', 'Migrate users', 'Fix flaky test', 'Upgrade deps', 'Docs pass', 'Cache warmup', 'Audit logs', 'Retry policy'][i - 1] });
       loops.push(t.run.id);
@@ -191,12 +191,9 @@ const { auditExpression } = require('./audit');
       counts.push(await cdp.webview(`document.body.dataset.mode === 'grid'`, 10000).then(v => v.eval(`document.querySelectorAll('.grid .tile').length`)).catch(() => 0));
       await s.screenshot('grid-nine-' + t.split(' ')[1].toLowerCase());
       await cdp.command('Overseer: Toggle Agent Grid'); await delay(1500);
-      await cdp.command('Overseer: Enter Focus Mode'); await delay(3500);
-      await s.screenshot('dashboard-nine-' + t.split(' ')[1].toLowerCase());
-      await cdp.command('Overseer: Exit Focus Mode'); await delay(2000);
     }
     await theme('Overseer Dark');
-    check('the grid and dashboard mode are captured with nine working agents in both Overseer themes (nine tiles each time)', counts.length === 2 && counts.every(n => n === 9), { counts });
+    check('the grid is captured with nine working agents in both Overseer themes (nine tiles each time)', counts.length === 2 && counts.every(n => n === 9), { counts });
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}

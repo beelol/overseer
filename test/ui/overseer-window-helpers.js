@@ -1,29 +1,12 @@
-// Shared by the AC-264 prototype scenarios (scenario-one-layout-a.js, scenario-one-layout-b.js): two
-// windows of one profile (the owner's repository and another folder), three fixture agents, and the
-// readers the screenshots are checked with.
+// Helpers for scenario-overseer-window.js (AC-264): the owner's other window, attaching to a window
+// by its title (a reopened window is a new page), and the readers the screenshots are checked with.
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const { makeRepo, delay, git } = require('./harness');
+const { delay } = require('./harness');
 const { Cdp } = require('./cdp');
 
-function setup(s) {
-  const repo = makeRepo(path.join(s.root, 'ws-repo'), { dirty: false });
-  fs.writeFileSync(path.join(repo, 'd.txt'), 'd.txt\n');
-  git(repo, 'add', '.'); git(repo, 'commit', '-q', '-m', 'more files');
-  const other = makeRepo(path.join(s.root, 'notes-repo'), { dirty: false });
-  // VS Code's own folder picker inside the window (no macOS dialog), for the second window's folder.
-  s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'workbench.editor.enablePreview': false, 'workbench.editor.enablePreviewFromQuickOpen': false, 'files.simpleDialog.enable': true });
-  return { repo, other, settingsFile: path.join(s.profile, 'User/settings.json') };
-}
-
 const norm = text => { const o = JSON.parse(text); if (o['extensions.autoUpdate'] === false) o['extensions.autoUpdate'] = 'off'; return JSON.stringify(o); };
-
-function agents(s, repo) {
-  const finished = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', "sed -i '' 's/^L3: original$/L3: done/; s/^L8: original$/L8: checked/' b.txt; printf 'notes\\n- b.txt: lines 3 and 8 updated\\n' > notes.md; echo 'Updated b.txt (lines 3 and 8) and wrote notes.md.'"], prompt: '', title: 'Finished edit' });
-  const live = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'i=0; while [ $i -lt 600 ]; do i=$((i+1)); echo "step $i" >> live.txt; sleep 1; done'], prompt: '', title: 'Live edits' });
-  return { finished, live };
-}
 
 /** A CDP connection on the workbench page whose title matches (each window is its own page). */
 async function attach(s, match, timeout = 60000, skip = new Set()) {
@@ -79,7 +62,7 @@ const layout = c => c.evalWorkbench(`(() => {
     auxiliary: vis('.part.auxiliarybar'), auxiliaryWidth: aux && vis('.part.auxiliarybar') ? Math.round(aux.getBoundingClientRect().width) : 0, window: window.innerWidth,
     tabStrips: groups.filter(g => shown(g.querySelector('.tabs-and-actions-container, .tabs-container'))).length,
     breadcrumbs: [...document.querySelectorAll('.part.editor .breadcrumbs-control')].filter(shown).length,
-    groups: groups.map(g => ({ width: Math.round(g.getBoundingClientRect().width), tabs: [...g.querySelectorAll('.tab')].map(t => (t.getAttribute('aria-label') || '').split(',')[0]), active: (g.querySelector('.tab.active')?.getAttribute('aria-label') || '').split(',')[0] })) };
+    groups: groups.map(g => ({ width: Math.round(g.getBoundingClientRect().width), share: Math.round(g.getBoundingClientRect().width / groups.reduce((n, x) => n + x.getBoundingClientRect().width, 0) * 100) / 100, tabs: [...g.querySelectorAll('.tab')].map(t => (t.getAttribute('aria-label') || '').split(',')[0]), active: (g.querySelector('.tab.active')?.getAttribute('aria-label') || '').split(',')[0] })) };
 })()`);
 
 async function openFile(c, name) {
@@ -124,7 +107,7 @@ function sideBySide(s, left, right, label) {
 /** The Overseer view (home, Voice Mode or an agent's chat): which it shows. */
 async function overseerView(c) {
   const f = await c.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.view-composer') && !!window.__overseer`, 20000);
-  return f.eval(`({ mode: document.body.dataset.mode, selected: window.__overseer.selected(), title: document.querySelector('.view-chat #title')?.textContent || '', back: !!document.querySelector('#back-to-overseer') && !document.querySelector('#back-to-overseer').hidden, width: window.innerWidth })`);
+  return f.eval(`({ mode: document.body.dataset.mode, selected: window.__overseer.selected(), title: document.querySelector('.view-chat #title')?.textContent || '', said: [...document.querySelectorAll('#home-conv .home-msg.from-owner')].map(m => m.textContent.trim()), voice: document.getElementById('voice-state')?.checkVisibility() ? document.getElementById('voice-state').dataset.state : '', back: !!document.querySelector('#back-to-overseer') && !document.querySelector('#back-to-overseer').hidden, width: window.innerWidth })`);
 }
 
 /** The extension's own log lines about the layout (its output channel's file in the profile's logs). */
@@ -143,4 +126,19 @@ async function settled(c, file) {
   await delay(800);
 }
 
-module.exports = { settled, extensionLog, secondWindow, setup, norm, agents, attach, layout, openFile, recent, size, shot, sideBySide, overseerView };
+/** The window on the owner's repository, once it is (or is no longer) the Overseer window: a reopened window is a new page. */
+async function reopened(s, overseer, timeout = 90000) {
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    const c = await attach(s, t => /ws-repo/.test(t) && !/notes-repo/.test(t), 5000).catch(() => null);
+    if (c) {
+      const file = await c.evalWorkbench(`globalThis.vscode?.context?.configuration?.()?.workspace?.configPath?.path || ''`).catch(() => null);
+      if (file !== null && /\/layouts\//.test(file) === overseer) return c;
+      c.close();
+    }
+    await delay(500);
+  }
+  throw new Error(`the window did not reopen ${overseer ? 'as the Overseer window' : 'on the folder'}`);
+}
+
+module.exports = { reopened, settled, extensionLog, secondWindow, norm, attach, layout, openFile, recent, size, shot, sideBySide, overseerView };

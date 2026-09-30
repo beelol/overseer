@@ -1,6 +1,6 @@
 // Packaged-UI scenario for AC-100 (fixture runs only): nothing is shown twice. Overseer offers once
 // to take Explorer's place in the side bar; then, in every arrangement (chat alone, review beside
-// the chat, the grid, the dashboard) an inventory lists where each kind of information appears:
+// the chat, the grid) an inventory lists where each kind of information appears:
 // agents, the agent's files, its changed files and unsaved edits. Each appears in exactly one place
 // (none where the arrangement does not show it); the chat has no Files pane and no changed-files
 // strip, and its edit chips still open the review.
@@ -113,12 +113,6 @@ const WEBVIEW = `(() => {
     const grid = await inventory('grid');
     check('grid: agents once (side bar); no file lists', once(grid, 'agents', 1) && once(grid, 'files', 0) && once(grid, 'changedFiles', 0), grid);
     await cdp.command('Overseer: Toggle Agent Grid'); await delay(1500);
-
-    await cdp.command('Overseer: Enter Focus Mode'); await delay(3000);
-    await s.selectAgent('Changes agent', { settle: 3000 });
-    const dashboard = await inventory('dashboard');
-    check('dashboard: agents once, files once, changed files once', once(dashboard, 'agents', 1) && once(dashboard, 'files', 1) && once(dashboard, 'changedFiles', 1), dashboard);
-    await cdp.command('Overseer: Exit Focus Mode'); await delay(1500);
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}

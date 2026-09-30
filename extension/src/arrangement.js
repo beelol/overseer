@@ -5,8 +5,9 @@
 // is opened again. Built from editor groups; no setting is written.
 //
 // When the owner has split the editor area themselves, Overseer opens beside their groups and never
-// rebuilds the layout (AC-244). The Overseer workspace (AC-250) is three columns: Overseer's
-// conversation, the agent's review (Follow) and the agent's chat. The review can be popped out into
+// rebuilds the layout (AC-244). In the Overseer window (AC-264) Overseer's views take the whole
+// editor area: the review in the middle and the Overseer view (home or the agent's chat) on the
+// right. The review can be popped out into
 // its own window, VS Code's floating editor windows, to follow the agent on another screen (AC-251).
 const vscode = require('vscode');
 const { isOurs, besideOwner } = require('./layout');
@@ -26,7 +27,6 @@ class Arrangement {
     this.lastTool = new Map(); // run id -> the id of its latest tool call (a file edit names its file right after)
     this.quiet = 0; // > 0 while Overseer itself closes reviews
     this.popped = undefined; // { runId, group }: the review popped out into its own window (AC-251)
-    this.workspaceChats = new Set(); // agents' chats the workspace opened in its third column
     this.takeover = false; // the dashboard takes the whole editor area (and gives it back on exit)
     client.on('event', event => this.onEvent(event).catch(error => log('arrangement: ' + error.message)));
     review.onClosed = runId => this.onReviewClosed(runId);
@@ -53,7 +53,6 @@ class Arrangement {
     this.runId = root.id;
     const ws = this.model.workspace(root.workspace_id);
     const reviewable = ws && !ws.removed_ms;
-    if (this.current === 'workspace') { await this.workspace(root.id, { follow }); return; }
     // The review is in its own window: that window follows the agent now shown (AC-251).
     if (this.popped) { await this.chatOnly(); if (reviewable) await this.popTo(root.id, { follow }); return; }
     const split = reviewable && (force || (this.preference === 'auto' && await this.changes(root) > 0));
@@ -77,9 +76,6 @@ class Arrangement {
 
   /** The chat (or composer) alone in the middle. */
   async chatOnly() {
-    if (this.current === 'workspace') { await this.center.open({ column: vscode.ViewColumn.One }); return; }
-    // AC-264 prototype A: Overseer's view is in the secondary side bar; the editor area keeps the review only.
-    if (this.sideView) { await this.closeReviews(); await this.center.open({ preserveFocus: true }); this.current = 'chat'; this.persist(); return; }
     await this.closeReviews(this.popped?.runId);
     if (this.popped || this.beside()) {
       // Beside the owner's groups (or with the review in its own window): no layout is rebuilt.
@@ -97,16 +93,6 @@ class Arrangement {
 
   /** The review on the left, the chat on the right. */
   async split(runId, { follow } = {}) {
-    if (this.current === 'workspace') { await this.workspace(runId, { follow }); return; }
-    if (this.sideView) {
-      // AC-264 prototype A: the review alone in the editor area; Overseer's view is on the right.
-      await this.closeReviews(runId);
-      await vscode.commands.executeCommand('vscode.setEditorLayout', SINGLE);
-      await this.review.open(runId, { viewColumn: vscode.ViewColumn.One, preserveFocus: true, follow });
-      await this.center.open({ preserveFocus: true });
-      this.current = 'split'; this.persist();
-      return;
-    }
     if (this.popped) { await this.chatOnly(); await this.popTo(runId, { follow }); return; }
     if (this.beside()) { await this.splitBeside(runId, { follow }); return; }
     await this.closeReviews(runId);
@@ -114,7 +100,9 @@ class Arrangement {
     // editor keeps its pinned tab, while reveal() into another column would reopen it as a preview.
     await this.review.open(runId, { viewColumn: vscode.ViewColumn.One, preserveFocus: true, follow });
     await this.moveChatRight();
+    // In the Overseer window (AC-264) the review keeps the wide column even when its group was rebuilt.
     if (this.current !== 'split') { await vscode.commands.executeCommand('vscode.setEditorLayout', SPLIT); this.chatShare = SPLIT.groups[1].size; }
+    else if (this.takeover) { const share = this.chatShare || SPLIT.groups[1].size; await vscode.commands.executeCommand('vscode.setEditorLayout', { orientation: 0, groups: [{ size: 1 - share }, { size: share }] }); }
     await this.fitChat();
     this.current = 'split';
     this.persist();
@@ -239,7 +227,6 @@ class Arrangement {
     if (!this.quiet && this.popped && runId === this.popped.runId) {
       this.popped = undefined;
       this.log(`arrangement: the review of ${runId} left its own window; back beside the chat`);
-      if (this.current === 'workspace') return;
       this.current = 'chat';
       setTimeout(() => { if (this.runId === runId) this.split(runId).catch(error => this.log('arrangement: ' + error.message)); }, 0);
       return;
@@ -292,55 +279,6 @@ class Arrangement {
     this.context.workspaceState.update('overseer.arrangementState', { current: this.current, runId: this.runId });
   }
 
-  // ---- AC-250: the Overseer workspace, three columns ----
-
-  /**
-   * Overseer's conversation on the left, the agent's review (following it while it works) in the
-   * middle and the agent's chat on the right. `sizes` are the columns' shares (layout.js). With no
-   * agent to show, the conversation alone.
-   */
-  async workspace(runId, { follow, sizes } = {}) {
-    if (sizes) this.workspaceSizes = sizes;
-    const run = runId && this.model.run(runId);
-    const root = run && (this.model.rootRun(run) || run);
-    this.current = 'workspace';
-    if (root) this.runId = root.id;
-    const ws = root && this.model.workspace(root.workspace_id);
-    const reviewable = ws && !ws.removed_ms;
-    await this.closeReviews(reviewable ? root.id : undefined);
-    const shares = this.workspaceSizes || [0.3, 0.4, 0.3];
-    const three = reviewable && !this.popped;
-    const layout = !root ? SINGLE : three ? { orientation: 0, groups: shares.map(size => ({ size })) } : { orientation: 0, groups: [{ size: 0.4 }, { size: 0.6 }] };
-    // vscode.setEditorLayout acts on the active window's editor area: with the review in its own
-    // window, the main window's is made active first.
-    if (this.popped) await this.center.open({ column: vscode.ViewColumn.One, preserveFocus: false });
-    await vscode.commands.executeCommand('vscode.setEditorLayout', layout);
-    await this.center.open({ column: vscode.ViewColumn.One, preserveFocus: true });
-    this.center.setMode('composer');
-    this.center.panel?.webview.postMessage({ type: 'askOverseer', text: '' });
-    if (root) {
-      const active = ['queued', 'starting', 'running', 'waiting_for_user'].includes(root.status);
-      if (three) await this.review.open(root.id, { viewColumn: vscode.ViewColumn.Two, preserveFocus: true, follow: follow ?? (active || undefined) });
-      else if (reviewable) await this.popTo(root.id, { follow });
-      const chatColumn = three ? vscode.ViewColumn.Three : vscode.ViewColumn.Two;
-      for (const id of [...this.workspaceChats]) if (id !== root.id) { this.outputs.panels.get(id)?.panel.dispose(); this.workspaceChats.delete(id); }
-      await this.outputs.show(root.id, { viewColumn: chatColumn, preserveFocus: true });
-      this.workspaceChats.add(root.id);
-    }
-    this.persist();
-  }
-
-  /** Leaving the workspace: its reviews and chats close; the dashboard puts the owner's layout back. */
-  async leaveWorkspace() {
-    for (const id of this.workspaceChats) this.outputs.panels.get(id)?.panel.dispose();
-    this.workspaceChats.clear();
-    // Its review closes wherever it is, its own window included.
-    this.popped = undefined;
-    await this.closeReviews();
-    this.current = undefined;
-    this.persist();
-  }
-
   // ---- AC-251: the review (Follow) in its own window ----
 
   /**
@@ -355,7 +293,7 @@ class Arrangement {
     if (this.popped?.runId === root.id) return true;
     if (this.popped) { await this.popTo(root.id, { follow }); return true; }
     let entry = this.review.manager.panelFor(root.id);
-    if (!entry) { await this.review.open(root.id, { viewColumn: this.current === 'workspace' ? vscode.ViewColumn.Two : undefined, preserveFocus: true, follow }); entry = this.review.manager.panelFor(root.id); }
+    if (!entry) { await this.review.open(root.id, { viewColumn: undefined, preserveFocus: true, follow }); entry = this.review.manager.panelFor(root.id); }
     const panel = entry?.panel;
     if (!panel) return false;
     // "Move Editor into New Window" moves the active editor: bring the review forward, focused.
@@ -399,8 +337,8 @@ class Arrangement {
     this.quiet++;
     try { for (const [session, panel] of [...this.review.manager.panels]) if (session.overseer?.runId === runId) panel.dispose(); } finally { this.quiet--; }
     this.popped = undefined;
-    if (this.current === 'workspace') await this.workspace(runId);
-    else { this.current = 'chat'; await this.split(runId); }
+    this.current = 'chat';
+    await this.split(runId);
     return true;
   }
 }

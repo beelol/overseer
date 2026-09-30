@@ -1,0 +1,438 @@
+{
+  "checks": [
+    {
+      "name": "the first launch offers the Overseer layout, with one click to set it up",
+      "ok": true,
+      "detail": {
+        "text": "Set up the Overseer layout? Your agents on the left, the review in the middle and Overseer on the right. Workspace (⌥⌘⇧O) switches back and forth.",
+        "buttons": [
+          "Set Up",
+          "Not Now"
+        ]
+      }
+    },
+    {
+      "name": "the terminal command is running",
+      "ok": true
+    },
+    {
+      "name": "the cluttered start: Explorer, the terminal, two groups of files (one with unsaved words); the other window has its tab strip",
+      "ok": true,
+      "detail": {
+        "before": {
+          "title": "d.txt — ws-repo",
+          "sidebar": true,
+          "sidebarTitle": "Explorer",
+          "panel": true,
+          "auxiliary": false,
+          "auxiliaryWidth": 0,
+          "window": 1920,
+          "tabStrips": 2,
+          "breadcrumbs": 2,
+          "groups": [
+            {
+              "width": 781,
+              "share": 0.5,
+              "tabs": [
+                "a.txt",
+                "c.txt"
+              ],
+              "active": "c.txt"
+            },
+            {
+              "width": 781,
+              "share": 0.5,
+              "tabs": [
+                "c.txt",
+                "d.txt"
+              ],
+              "active": "d.txt"
+            }
+          ]
+        },
+        "secondBefore": {
+          "title": "README.md — notes-repo",
+          "sidebar": true,
+          "sidebarTitle": "Explorer",
+          "panel": false,
+          "auxiliary": false,
+          "auxiliaryWidth": 0,
+          "window": 1920,
+          "tabStrips": 1,
+          "breadcrumbs": 1,
+          "groups": [
+            {
+              "width": 1562,
+              "share": 1,
+              "tabs": [
+                "README.md"
+              ],
+              "active": "README.md"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "the status bar has the Workspace button",
+      "ok": true,
+      "detail": {
+        "text": "Workspace",
+        "x": 377.7109375,
+        "y": 1064
+      }
+    },
+    {
+      "name": "Overseer asks once, in its words: save the file, and the terminal command stops",
+      "ok": true,
+      "detail": {
+        "text": "Save 1 file and open the Overseer layout?",
+        "detail": "This window reopens. The command running in the terminal stops.",
+        "buttons": [
+          "Cancel",
+          "Save All"
+        ]
+      }
+    },
+    {
+      "name": "VS Code's own save question never shows; the unsaved words are saved",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "the layout: the agents list on the left, the working agent's review wide in the middle, Overseer's conversation on the right; no tab rows, no breadcrumbs, no panel",
+      "ok": true,
+      "detail": {
+        "inB": {
+          "title": "Overseer — ws-repo",
+          "sidebar": true,
+          "sidebarTitle": "Overseer",
+          "panel": false,
+          "auxiliary": false,
+          "auxiliaryWidth": 0,
+          "window": 1920,
+          "tabStrips": 0,
+          "breadcrumbs": 0,
+          "groups": [
+            {
+              "width": 1031,
+              "share": 0.66,
+              "tabs": [],
+              "active": ""
+            },
+            {
+              "width": 531,
+              "share": 0.34,
+              "tabs": [],
+              "active": ""
+            }
+          ]
+        },
+        "home": {
+          "mode": "composer",
+          "selected": "r-02d565754140",
+          "title": "Live edits",
+          "said": [],
+          "voice": "",
+          "back": true,
+          "width": 531
+        }
+      }
+    },
+    {
+      "name": "what Overseer said about the terminal command is what happened (it stopped)",
+      "ok": true
+    },
+    {
+      "name": "the other window keeps its tab strip and its tabs",
+      "ok": true,
+      "detail": {
+        "title": "README.md — notes-repo",
+        "sidebar": true,
+        "sidebarTitle": "Explorer",
+        "panel": false,
+        "auxiliary": false,
+        "auxiliaryWidth": 0,
+        "window": 1920,
+        "tabStrips": 1,
+        "breadcrumbs": 1,
+        "groups": [
+          {
+            "width": 1562,
+            "share": 1,
+            "tabs": [
+              "README.md"
+            ],
+            "active": "README.md"
+          }
+        ]
+      }
+    },
+    {
+      "name": "no user setting changed",
+      "ok": true
+    },
+    {
+      "name": "the workspace file is in Overseer's own storage, not in the repository, and holds the look",
+      "ok": true,
+      "detail": [
+        "User/globalStorage/beelol.overseer/layouts/de6b636830c4/ws-repo.code-workspace"
+      ]
+    },
+    {
+      "name": "VS Code's recent list never shows Overseer's file",
+      "ok": true,
+      "detail": {
+        "recentBefore": [
+          "notes-repo, folders & workspaces",
+          "ws-repo, folder with unsaved changes",
+          "audio-demo",
+          "arr-repo",
+          "acct-demo",
+          "shop",
+          "ws-repo",
+          "notes-repo",
+          "repoA",
+          "notes-repo"
+        ],
+        "recentIn": [
+          "notes-repo, folders & workspaces",
+          "ws-repo",
+          "audio-demo",
+          "arr-repo",
+          "acct-demo",
+          "shop",
+          "ws-repo",
+          "notes-repo",
+          "repoA",
+          "notes-repo"
+        ]
+      }
+    },
+    {
+      "name": "picking an agent: its review wide in the middle, its chat in the same right panel with a back control; still no tab rows",
+      "ok": true,
+      "detail": {
+        "picked": {
+          "title": "Overseer — ws-repo",
+          "sidebar": true,
+          "sidebarTitle": "Overseer",
+          "panel": false,
+          "auxiliary": false,
+          "auxiliaryWidth": 0,
+          "window": 1920,
+          "tabStrips": 0,
+          "breadcrumbs": 0,
+          "groups": [
+            {
+              "width": 1031,
+              "share": 0.66,
+              "tabs": [],
+              "active": ""
+            },
+            {
+              "width": 531,
+              "share": 0.34,
+              "tabs": [],
+              "active": ""
+            }
+          ]
+        },
+        "chat": {
+          "mode": "chat",
+          "selected": "r-dca6d1aa6f8d",
+          "title": "Finished edit",
+          "said": [
+            "YouWhat is everyone doing?AnsweredStart as an agent"
+          ],
+          "voice": "",
+          "back": true,
+          "width": 531
+        }
+      }
+    },
+    {
+      "name": "back returns the right panel to Overseer's conversation, with its history; the review stays in the middle",
+      "ok": true,
+      "detail": {
+        "mode": "composer",
+        "selected": "r-dca6d1aa6f8d",
+        "title": "Finished edit",
+        "said": [
+          "YouWhat is everyone doing?AnsweredStart as an agent"
+        ],
+        "voice": "",
+        "back": true,
+        "width": 531
+      }
+    },
+    {
+      "name": "⌥⌘U turns the panel to the agent's chat and back to Overseer",
+      "ok": true,
+      "detail": {
+        "toAgent": {
+          "mode": "chat",
+          "selected": "r-dca6d1aa6f8d",
+          "title": "Finished edit",
+          "said": [
+            "YouWhat is everyone doing?AnsweredStart as an agent"
+          ],
+          "voice": "",
+          "back": true,
+          "width": 531
+        },
+        "toHome": {
+          "mode": "composer",
+          "selected": "r-dca6d1aa6f8d",
+          "title": "Finished edit",
+          "said": [
+            "YouWhat is everyone doing?AnsweredStart as an agent"
+          ],
+          "voice": "",
+          "back": true,
+          "width": 531
+        }
+      }
+    },
+    {
+      "name": "Voice Mode takes over the same right panel; the review stays in the middle",
+      "ok": true,
+      "detail": {
+        "voiced": {
+          "title": "Overseer — ws-repo",
+          "sidebar": true,
+          "sidebarTitle": "Overseer",
+          "panel": false,
+          "auxiliary": false,
+          "auxiliaryWidth": 0,
+          "window": 1920,
+          "tabStrips": 0,
+          "breadcrumbs": 0,
+          "groups": [
+            {
+              "width": 1031,
+              "share": 0.66,
+              "tabs": [],
+              "active": ""
+            },
+            {
+              "width": 531,
+              "share": 0.34,
+              "tabs": [],
+              "active": ""
+            }
+          ]
+        },
+        "voiceState": {
+          "state": "listening",
+          "width": 531,
+          "mode": "composer"
+        }
+      }
+    },
+    {
+      "name": "the button now reads Close Workspace",
+      "ok": true,
+      "detail": {
+        "text": "Close Workspace",
+        "x": 473.08984375,
+        "y": 1064
+      }
+    },
+    {
+      "name": "running it again restores the cluttered layout exactly (Explorer, the terminal panel, the groups and their shares, each group's tabs in order and its active tab)",
+      "ok": true,
+      "detail": {
+        "before": {
+          "title": "d.txt — ws-repo",
+          "sidebar": true,
+          "sidebarTitle": "Explorer",
+          "panel": true,
+          "auxiliary": false,
+          "auxiliaryWidth": 0,
+          "window": 1920,
+          "tabStrips": 2,
+          "breadcrumbs": 2,
+          "groups": [
+            {
+              "width": 781,
+              "share": 0.5,
+              "tabs": [
+                "a.txt",
+                "c.txt"
+              ],
+              "active": "c.txt"
+            },
+            {
+              "width": 781,
+              "share": 0.5,
+              "tabs": [
+                "c.txt",
+                "d.txt"
+              ],
+              "active": "d.txt"
+            }
+          ]
+        },
+        "after": {
+          "title": "d.txt — ws-repo",
+          "sidebar": true,
+          "sidebarTitle": "Explorer",
+          "panel": true,
+          "auxiliary": false,
+          "auxiliaryWidth": 0,
+          "window": 1920,
+          "tabStrips": 2,
+          "breadcrumbs": 2,
+          "groups": [
+            {
+              "width": 781,
+              "share": 0.5,
+              "tabs": [
+                "a.txt",
+                "c.txt"
+              ],
+              "active": "c.txt"
+            },
+            {
+              "width": 781,
+              "share": 0.5,
+              "tabs": [
+                "c.txt",
+                "d.txt"
+              ],
+              "active": "d.txt"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "the offer does not come back",
+      "ok": true
+    },
+    {
+      "name": "the other window and the user settings are unchanged throughout",
+      "ok": true
+    }
+  ],
+  "measures": {
+    "one step: click to the arranged layout (ms)": 6455,
+    "the window title": "Overseer — ws-repo",
+    "the terminal command keeps running after the reopen": false,
+    "a question on the way back (nothing unsaved, nothing running)": "none",
+    "back to the owner's window (ms)": 4717,
+    "terminal after coming back: tabs shown, the old command running": {
+      "terminals": 1,
+      "running": false
+    },
+    "the extension's log": [
+      "2026-09-29 20:54:58.969 [info] overseer window: saved 1 file(s); 1 terminal command(s) stop",
+      "2026-09-29 20:54:58.989 [info] overseer window: reopening on /private/tmp/ovs-ui-GMK92S/profile/User/globalStorage/beelol.overseer/layouts/de6b636830c4/ws-repo.code-workspace",
+      "2026-09-29 20:55:03.527 [info] overseer window: arranged in 3062 ms",
+      "2026-09-29 20:56:02.974 [info] overseer window: back to file:///private/tmp/ovs-ui-GMK92S/ws-repo",
+      "2026-09-29 20:56:13.409 [info] overseer window: reopening on /private/tmp/ovs-ui-GMK92S/profile/User/globalStorage/beelol.overseer/layouts/de6b636830c4/ws-repo.code-workspace",
+      "2026-09-29 20:56:18.353 [info] overseer window: arranged in 3874 ms"
+    ]
+  }
+}
