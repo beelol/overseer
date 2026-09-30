@@ -2,14 +2,14 @@
 // including its native descendants), then live events batched every 40 ms so bursts of thousands
 // of events become a few messages. Shared by run panels, the dashboard chat and grid tiles.
 const vscode = require('vscode');
-const { ACTIVE } = require('./views');
+const { ACTIVE, accountLabel, accountShort } = require('./views');
 
 function runMessage(model, runId, steering) {
   const run = model.run(runId);
   if (!run) return undefined;
   const profile = run.profile_id && model.profile(run.profile_id);
   const task = model.task(run.task_id);
-  return { run, profile: profile?.name, provider: profile?.provider, workspace: model.workspace(run.workspace_id), turns: model.state.turns?.[runId] || [], prompt: task?.prompt, taskId: task?.id, archived: !!task?.archived_ms,
+  return { run, profile: profile ? accountLabel(profile) : undefined, account: profile ? { label: accountLabel(profile), short: accountShort(profile), default: !!profile.account?.default } : undefined, provider: profile?.provider, workspace: model.workspace(run.workspace_id), turns: model.state.turns?.[runId] || [], prompt: task?.prompt, taskId: task?.id, archived: !!task?.archived_ms,
     repo: task?.repo_root, trusted: vscode.workspace.isTrusted, active: ACTIVE.has(run.status), queued: steering?.queued(runId),
     followUpSupported: !String(run.capabilities?.follow_up || '').startsWith('unsupported'),
     interruptSupported: !String(run.capabilities?.interrupt || '').startsWith('unsupported'),

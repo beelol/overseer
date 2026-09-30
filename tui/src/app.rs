@@ -346,6 +346,9 @@ pub struct App {
     pub overseer_draft: String,
     pub overseer_scroll: usize,
     pub accounts: Vec<AccountRow>,
+    /// Each account's login read once after the first state (AC-235), so every tile names its
+    /// account even when VS Code has not asked yet.
+    accounts_read: bool,
     pub account_sel: usize,
     pub audio: AudioSettings,
     /// When to ask the daemon for its audio settings again.
@@ -428,6 +431,7 @@ impl App {
             overseer_draft: String::new(),
             overseer_scroll: 0,
             accounts: Vec::new(),
+            accounts_read: false,
             account_sel: 0,
             audio: AudioSettings::default(),
             audio_due: None,
@@ -497,8 +501,8 @@ impl App {
     fn matches(&self, r: &Run, q: &str) -> bool {
         let task = self.state.task(&r.task_id);
         let repo = task.map(|t| t.repo_root.rsplit('/').next().unwrap_or_default()).unwrap_or_default();
-        let account = r.profile_id.as_deref().and_then(|p| self.state.profile(p)).map(|p| p.name.as_str()).unwrap_or_default();
-        [r.title.as_str(), repo, r.harness.as_str(), r.model.as_deref().unwrap_or_default(), account, task.map(|t| t.prompt.as_str()).unwrap_or_default(), r.status.as_str()]
+        let account = r.profile_id.as_deref().and_then(|p| self.state.profile(p)).map(|p| p.label()).unwrap_or_default();
+        [r.title.as_str(), repo, r.harness.as_str(), r.model.as_deref().unwrap_or_default(), account.as_str(), task.map(|t| t.prompt.as_str()).unwrap_or_default(), r.status.as_str()]
             .iter()
             .any(|f| f.to_lowercase().contains(q))
     }
@@ -786,7 +790,7 @@ impl App {
             self.request("overseer.session", json!({}), Pending::OverseerSession);
         }
         // Statuses, turns and new runs come from `state`, reloaded like VS Code does.
-        if (matches!(kind.as_str(), "status" | "turn_started" | "turn_done" | "permission" | "permission_answered" | "child" | "child_reparented" | "task_created" | "workspace_removed" | "reattached")
+        if (matches!(kind.as_str(), "status" | "turn_started" | "turn_done" | "permission" | "permission_answered" | "child" | "child_reparented" | "task_created" | "workspace_removed" | "reattached" | "profile")
             || (!run_id.is_empty() && self.state.run(&run_id).is_none()))
             && self.state_due.is_none()
         {
@@ -828,6 +832,13 @@ impl App {
                         }
                         self.settle_focus();
                         self.ensure_history();
+                        if !self.accounts_read {
+                            self.accounts_read = true;
+                            let ids: Vec<String> = self.state.profiles.iter().map(|p| p.id.clone()).collect();
+                            for id in ids {
+                                self.request("profile.status", json!({ "id": id }), Pending::ProfileStatus(id.clone()));
+                            }
+                        }
                     }
                     Err(e) => self.say(format!("Could not read the daemon state: {e}"), true),
                 }

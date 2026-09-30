@@ -646,7 +646,7 @@ async function activate(context) {
       await refreshAccounts();
       const compatible = (model.accounts || []).filter(a => (a.harnesses || []).includes(harness));
       const statuses = compatible.map(a => model.profileStatus.get(a.id));
-      const pPick = await vscode.window.showQuickPick(compatible.map((a, i) => ({ label: a.name, description: `${statuses[i]?.logged_in ? 'signed in' : 'not signed in'}${statuses[i]?.identity?.plan ? ' · ' + statuses[i].identity.plan : ''} · ${a.kind === 'follows-app' ? 'follows the desktop app (can change)' : 'fixed account'}`, detail: statuses[i]?.detail, p: model.profile(a.id) || { id: a.id, name: a.name }, ok: statuses[i]?.logged_in })),
+      const pPick = await vscode.window.showQuickPick(compatible.map((a, i) => ({ label: a.name, description: `${statuses[i]?.logged_in ? 'signed in' : 'not signed in'}${a.account?.email ? ' · ' + a.account.short : statuses[i]?.identity?.plan ? ' · ' + statuses[i].identity.plan : ''} · ${a.kind === 'follows-app' ? 'follows the desktop app (can change)' : 'fixed account'}`, detail: statuses[i]?.detail, p: model.profile(a.id) || { id: a.id, name: a.name }, ok: statuses[i]?.logged_in })),
         { title: `New agent: account for ${hPick.label} (only compatible accounts; account login only, no API keys)` });
       if (!pPick) return;
       if (!pPick.ok) {
@@ -897,7 +897,7 @@ async function activate(context) {
       const result = await swarmControls.start({ category, objective, repositories: [repo] }, {
         pickAccounts: async () => {
           const profiles = await client.request('profile.list');
-          const picked = await vscode.window.showQuickPick(profiles.map(p => ({ label: p.name, description: p.harness, id: p.id })),
+          const picked = await vscode.window.showQuickPick(profiles.map(p => ({ label: accountName(p), description: p.account?.short || p.harness, id: p.id })),
             { title: `Accounts ${category} may use (asked once)`, canPickMany: true });
           return picked?.map(p => p.id);
         },

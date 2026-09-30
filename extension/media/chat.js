@@ -109,9 +109,12 @@
       this.statusEl.replaceWith(this.statusEl = Object.assign(ui.status(run.status, run.attention?.kind), { id: 'status' }));
       this.statusEl.dataset.text = run.status;
       // One quiet meta line: account (with logo) · model · branch. Everything else is in Details.
+      // The account always says which one (AC-235): provider and plan, the shortened email, and
+      // whose login it is ("Mac's default login" or the account's own name).
       const items = [];
-      const acct = el('span', 'meta-item'); acct.append(ui.harnessMark(run.harness, 13), el('span', null, msg.profile || ui.HARNESS[run.harness] || run.harness));
-      acct.title = `${ui.HARNESS[run.harness] || run.harness}${run.harness_version ? ' ' + run.harness_version : ''}${msg.profile ? ' · ' + msg.profile : ''}`;
+      const acct = el('span', 'meta-item meta-account'); acct.dataset.account = msg.profile || '';
+      acct.append(ui.harnessMark(run.harness, 13), el('span', 'ellipsis', msg.profile || ui.HARNESS[run.harness] || run.harness));
+      acct.title = `${ui.HARNESS[run.harness] || run.harness}${run.harness_version ? ' ' + run.harness_version : ''}${msg.profile ? '\nAccount: ' + msg.profile : ''}`;
       items.push(acct);
       if (run.model) { const m = el('span', 'meta-item', run.model); m.title = 'Model'; items.push(m); }
       if (msg.workspace) {

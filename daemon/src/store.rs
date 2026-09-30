@@ -130,6 +130,10 @@ pub struct Profile {
     pub home: Option<String>,
     pub is_system: bool,
     pub created_ms: i64,
+    /// How every surface names this account (AC-235): provider, plan, shortened email and
+    /// whose login it is (`accounts::shown`). Filled when read from the store.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account: Option<Value>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -370,6 +374,8 @@ impl Store {
             CREATE TABLE IF NOT EXISTS profiles(
               id TEXT PRIMARY KEY, name TEXT NOT NULL, harness TEXT NOT NULL, home TEXT, is_system INTEGER NOT NULL,
               created_ms INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS account_shown(
+              profile_id TEXT PRIMARY KEY, email TEXT, plan TEXT, observed_ms INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS events(
               seq INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, task_id TEXT, run_id TEXT, kind TEXT NOT NULL,
               source TEXT NOT NULL, confidence TEXT NOT NULL, payload TEXT NOT NULL);
@@ -1842,17 +1848,23 @@ impl Store {
     }
 
     pub fn profiles(&self) -> Result<Vec<Profile>> {
-        let mut stmt = self.conn.prepare("SELECT * FROM profiles ORDER BY created_ms, id")?;
+        let mut stmt = self.conn.prepare("SELECT p.*, a.email AS shown_email, a.plan AS shown_plan FROM profiles p
+            LEFT JOIN account_shown a ON a.profile_id = p.id ORDER BY p.created_ms, p.id")?;
         let rows = stmt
             .query_map([], |row| {
-                Ok(Profile {
+                let mut profile = Profile {
                     id: row.get("id")?,
                     name: row.get("name")?,
                     harness: row.get("harness")?,
                     home: row.get("home")?,
                     is_system: row.get::<_, i64>("is_system")? != 0,
                     created_ms: row.get("created_ms")?,
-                })
+                    account: None,
+                };
+                let email: Option<String> = row.get("shown_email")?;
+                let plan: Option<String> = row.get("shown_plan")?;
+                profile.account = Some(crate::accounts::shown(&profile, email.as_deref(), plan.as_deref()));
+                Ok(profile)
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
@@ -1862,7 +1874,22 @@ impl Store {
         Ok(self.profiles()?.into_iter().find(|p| p.id == id))
     }
 
+    /// The account a profile is signed in to, as its harness last reported it (AC-235): the
+    /// email already shortened (`accounts::short_email`, the full address is never kept) and the
+    /// plan. `None`s when it is signed out. True when it changed.
+    pub fn record_account_shown(&self, profile_id: &str, email: Option<&str>, plan: Option<&str>, observed_ms: i64) -> Result<bool> {
+        use rusqlite::OptionalExtension;
+        let was: Option<(Option<String>, Option<String>)> = self.conn.query_row(
+            "SELECT email, plan FROM account_shown WHERE profile_id=?1", params![profile_id], |r| Ok((r.get(0)?, r.get(1)?))).optional()?;
+        let now = (email.map(str::to_string), plan.map(str::to_string));
+        self.conn.execute("INSERT INTO account_shown(profile_id, email, plan, observed_ms) VALUES(?1, ?2, ?3, ?4)
+            ON CONFLICT(profile_id) DO UPDATE SET email=excluded.email, plan=excluded.plan, observed_ms=excluded.observed_ms",
+            params![profile_id, email, plan, observed_ms])?;
+        Ok(was.as_ref() != Some(&now))
+    }
+
     pub fn delete_profile(&self, id: &str) -> Result<()> {
+        self.conn.execute("DELETE FROM account_shown WHERE profile_id=?1 AND profile_id IN (SELECT id FROM profiles WHERE is_system=0)", params![id])?;
         self.conn.execute("DELETE FROM profiles WHERE id=?1 AND is_system=0", params![id])?;
         Ok(())
     }

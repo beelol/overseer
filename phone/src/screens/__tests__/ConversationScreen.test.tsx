@@ -53,7 +53,7 @@ describe('the header', () => {
   test('says the title, the status in words, and leads back', async () => {
     const { app } = await open('showcase');
     expect(words('agent.title')).toBe('Refresh sessions once');
-    expect(words('agent.subtitle')).toBe('Done');
+    expect(words('agent.subtitle')).toBe("Done · Mac's default login");
     await fireEvent.press(screen.getByTestId('agent.back'));
     expect(router.backs).toBe(1);
     expect(app.connection.calls('events.list')).toHaveLength(1);
@@ -301,7 +301,7 @@ describe('the rows', () => {
     expect(screen.getByTestId('agent.working')).toBeTruthy();
     await arrive(app, ...after(r, 10));
     expect(screen.queryByTestId('agent.working')).toBeNull();
-    expect(words('agent.subtitle')).toBe('Done');
+    expect(words('agent.subtitle')).toBe("Done · Mac's default login");
   });
 });
 

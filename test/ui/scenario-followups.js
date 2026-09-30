@@ -89,8 +89,8 @@ const { auditExpression } = require('./audit');
     const twice = t => ['codex', 'claude'].some(h => (String(t).toLowerCase().match(new RegExp(h, 'g')) || []).length > 1);
     const all = [labels.chatHeader, labels.agentChip, ...labels.agentMenu, ...labels.accounts];
     await s.screenshot('names');
-    check('account names say the harness once (chat header, agent chip and menu, Accounts view); the machine\'s own login reads "Your login"',
-      !all.some(twice) && /Your login/.test(labels.agentChip + labels.accounts.join(' ')) && !all.some(t => /existing login/.test(t)), labels);
+    check('account names say the harness once (chat header, agent chip and menu, Accounts view); the Mac\'s own login reads "Mac\'s default login" (AC-235)',
+      !all.some(twice) && /Mac's default login/.test(labels.chatHeader + labels.accounts.join(' ')) && !all.some(t => /existing login|Your login/.test(t)), labels);
 
     // AC-112: search you can see. Three agents to search among.
     for (const t of ['Alpha refactor', 'Beta docs', 'Gamma tests']) s.ctl('task.create', { repo, harness: 'generic', program: '/bin/echo', args: [`${t} done`], prompt: '', title: t });

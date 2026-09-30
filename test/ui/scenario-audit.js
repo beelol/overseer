@@ -66,7 +66,15 @@ const HEIGHT = 860;
     // A view is measured once it has settled: two equal readings 500 ms apart. A transient state
     // (text that comes and goes while the view updates) is not what the owner reads; it is recorded
     // with the words that differed, so it can be found, and never counted.
-    const auditOnce = (frame, opts) => (frame ? frame.eval(auditExpression({ ...opts, words: true })) : cdp.evalWorkbench(auditExpression({ ...opts, words: true })));
+    // The account an agent runs on (AC-235, the owner's, added after Gate J) is on every surface:
+    // its words are measured on their own (`dropped`), so each view's budget stays Gate J's.
+    const accountTexts = () => {
+      let profiles = [];
+      try { profiles = s.ctl('state', {}, { wait: false }).profiles || []; } catch { /* no daemon yet */ }
+      const texts = profiles.flatMap(p => p.account ? [`Runs on ${p.account.label}`, p.account.label, p.account.short, [p.account.plan, p.account.email].filter(Boolean).join(' · '), p.account.email] : []).concat(["Mac's default login"]).filter(Boolean);
+      return [...new Set(texts.flatMap(t => [` · ${t}`, t]))];
+    };
+    const auditOnce = (frame, opts) => { const o = { drop: accountTexts(), ...opts, words: true }; return frame ? frame.eval(auditExpression(o)) : cdp.evalWorkbench(auditExpression(o)); };
     const wordDiff = (a, b) => {
       const count = ws => ws.reduce((m, w) => m.set(w, (m.get(w) || 0) + 1), new Map());
       const ca = count(a || []), cb = count(b || []);

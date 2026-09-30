@@ -79,6 +79,37 @@ pub struct Profile {
     pub id: String,
     pub name: String,
     pub harness: String,
+    #[serde(default)]
+    pub is_system: bool,
+    /// How the daemon names the account (AC-235): provider and plan, the shortened email, whose login.
+    #[serde(default)]
+    pub account: Option<Account>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct Account {
+    #[serde(default)]
+    pub plan: Option<String>,
+    #[serde(default)]
+    pub email: Option<String>,
+    #[serde(default)]
+    pub label: String,
+    #[serde(default)]
+    pub short: String,
+}
+
+impl Profile {
+    /// The account in full: "Claude Max · bil…@testbox.com · Mac's default login".
+    pub fn label(&self) -> String {
+        self.account.as_ref().map(|a| a.label.clone()).filter(|l| !l.is_empty()).unwrap_or_else(|| self.own_name())
+    }
+    /// Where room is tight: "Claude Max · bil…@testbox.com".
+    pub fn short(&self) -> String {
+        self.account.as_ref().map(|a| a.short.clone()).filter(|l| !l.is_empty()).unwrap_or_else(|| self.own_name())
+    }
+    fn own_name(&self) -> String {
+        if self.is_system { crate::words::DEFAULT_LOGIN.to_string() } else { crate::words::account(&self.name) }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]

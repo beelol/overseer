@@ -132,7 +132,7 @@ const G = 2 ** 30;
     await cdp.key('Escape'); await delay(200);
 
     // ---- Offline (AC-83, AC-95): every view says so, none says online ----
-    await pickMenu('Codex', 'Your login');
+    await pickMenu('Codex', "Mac's default login");
     network(OFFLINE);
     const off = await waitConn(/Offline/);
     let side; for (let i = 0; i < 30 && !/offline/.test(side || ''); i++) { await delay(300); side = await sideMessage(); }
@@ -247,7 +247,7 @@ const G = 2 ** 30;
     // ---- The light theme: the same states ----
     await setTheme('Overseer Light');
     dash = await newAgent();
-    await pickMenu('Codex', 'Your login');
+    await pickMenu('Codex', "Mac's default login");
     network(OFFLINE);
     await waitConn(/Offline/);
     await dash.waitFor(`(() => { const n = document.querySelector('.view-composer .composer-note'); return n && /Offline/.test(n.textContent); })()`, 10000);

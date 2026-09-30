@@ -14,6 +14,7 @@ import {
   readStatus,
   readUsage,
   resetTime,
+  stateText,
   usageText,
   usageTone,
 } from '@/screens/accounts/accounts';
@@ -589,6 +590,14 @@ describe('accounts: what the Mac answers, read', () => {
     expect(own && hasCode(own)).toBe(true);
     expect(desktop && hasCode(desktop)).toBe(false);
     expect(claude && hasCode(claude)).toBe(false);
+  });
+
+  test('a signed-in account says its plan and its shortened email, as the Mac names them (AC-235)', () => {
+    const status = { installed: true, signedIn: true, plan: 'max', apiKey: false };
+    expect(stateText(status, undefined, false, { plan: 'Max', email: 'bil…@testbox.com' })).toBe('Signed in · Max · bil…@testbox.com');
+    expect(stateText(status, undefined, false, { plan: null, email: null })).toBe('Signed in · Max');
+    const [group] = byProvider([{ ...profile('system-claude', 'claude (existing login)', 'claude', true), account: { provider: 'Claude', plan: 'Max', email: 'bil…@testbox.com', default: true, name: "Mac's default login", label: "Claude Max · bil…@testbox.com · Mac's default login", short: 'Claude Max · bil…@testbox.com' } }], null);
+    expect(group?.accounts[0]).toMatchObject({ name: "Mac's default login", email: 'bil…@testbox.com', plan: 'Max' });
   });
 
   test('the sign-in state keeps the plan and nothing else of the identity', () => {
