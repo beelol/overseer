@@ -3519,12 +3519,12 @@ impl Daemon {
         let mut options = Vec::new();
         let snap_info = |id: &str| -> Option<Snapshot> { self.store.lock().unwrap().snapshot(id).ok().flatten() };
         // AC-232: while the agent works, the review opens on its latest run (the owner's default);
-        // once an agent in its own worktree has finished, on everything it did since the task
-        // started, so work committed in an earlier turn is never hidden behind a later turn that
-        // changed nothing ("0 files"). In the owner's own checkout the latest run stays the
-        // default: since the task started would also hold the owner's own work between turns.
+        // once it has finished, on everything it did since the task started, so work committed in
+        // an earlier turn is never hidden behind a later turn that changed nothing ("0 files").
+        // AC-263 (the owner, 2026-09-29): the same in the owner's own checkout, where the review
+        // says that it also holds any edits made in that folder (`folder_edits`).
         let working = self.store.lock().unwrap().runs()?.iter().any(|r| r.workspace_id == ws.id && ACTIVE.contains(&r.status.as_str()));
-        let start_default = ws.kind == "worktree" && !working && task.start_snapshot.as_deref().and_then(snap_info).is_some();
+        let start_default = !working && task.start_snapshot.as_deref().and_then(snap_info).is_some();
         match turns.last().and_then(|t| t.snapshot_id.as_deref().and_then(snap_info).map(|s| (t.clone(), s))) {
             Some((turn, snap)) => options.push(json!({
                 "mode": "latest_run", "label": "Latest run", "base": snap.commit_sha, "available": true, "default": !start_default,
@@ -3544,6 +3544,22 @@ impl Daemon {
             Some(snap) => options.push(json!({"mode": "task_start", "label": "Since task start", "base": snap.commit_sha, "available": true, "default": start_default,
                 "detail": format!("task-start snapshot {} (HEAD {} plus dirty contents at creation)", snap.id, snap.head.clone().unwrap_or_else(|| "none".into())), "provenance": "recorded"})),
             None => options.push(json!({"mode": "task_start", "label": "Since task start", "available": false, "detail": "task-start snapshot missing"})),
+        }
+        // AC-263: Entire worktree, the agent's branch against the commit it started from, with its
+        // uncommitted and untracked files. In its own worktree that is the recorded start of its
+        // branch; in the owner's checkout, where its branch left the integration branch (recorded
+        // when the task started), else the commit HEAD was on when the task started.
+        let start_head = task.start_snapshot.as_deref().and_then(snap_info).and_then(|s| s.head);
+        let entire = match (&task.fork_commit, &start_head) {
+            (Some(fork), _) if git::rev_parse(path, fork).is_some() => Some((fork.clone(), task.fork_provenance.clone().unwrap_or_default())),
+            (_, Some(h)) if git::rev_parse(path, h).is_some() => Some((h.clone(), format!("HEAD {h} when the task started (no fork point was recorded)"))),
+            _ => None,
+        };
+        match entire {
+            Some((base, prov)) => options.push(json!({"mode": "entire_worktree", "label": "Entire worktree", "base": base, "available": true,
+                "detail": format!("everything in {} against {} ({prov}), including uncommitted and untracked files", if ws.kind == "worktree" { "the agent's worktree" } else { "this checkout" }, &base[..base.len().min(10)]),
+                "provenance": if prov.starts_with("recorded") { "recorded" } else { "detected" }})),
+            None => options.push(json!({"mode": "entire_worktree", "label": "Entire worktree", "available": false, "detail": "unknown: no commit was recorded for where the agent's branch started"})),
         }
         if let Some(snap) = self.redirect_snapshot(&root.workspace_id) {
             options.push(json!({"mode": "redirect", "label": "Since the change of direction", "base": snap.commit_sha, "available": true, "detail": format!("snapshot {} taken when Overseer redirected this agent", snap.id), "provenance": "recorded", "snapshot": snap}));
@@ -3572,7 +3588,10 @@ impl Daemon {
             (None, _) => options.push(json!({"mode": "branch_merge_base", "label": "Target branch", "available": false, "detail": "no target branch: none configured and no default branch detected"})),
             (_, None) => options.push(json!({"mode": "branch_merge_base", "label": "Target branch", "available": false, "detail": "workspace has no HEAD commit"})),
         }
-        Ok(json!({"run_id": run_id, "workspace": ws, "head": head, "branch": git::head_branch(path), "options": options, "branches": git::branches(path)}))
+        // AC-263: in the owner's own checkout every comparison also holds whatever else was edited
+        // in that folder (the owner's own work between turns); the review says so.
+        let folder_edits = ws.kind != "worktree";
+        Ok(json!({"run_id": run_id, "workspace": ws, "head": head, "branch": git::head_branch(path), "options": options, "branches": git::branches(path), "folder_edits": folder_edits}))
     }
 
     /// Archives or restores a task (AC-63): hidden from the default list, never deleted.

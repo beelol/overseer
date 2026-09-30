@@ -468,6 +468,7 @@ export interface Methods {
     branch?: string | null;
     branches: Array<string>;
     options: Array<Comparison>;
+    folder_edits: boolean;
   } };
   /** The diff of a workspace against a comparison. */
   "workspace.diff": { class: 'read'; params: {
