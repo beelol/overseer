@@ -17,8 +17,15 @@ fn claude_daemon(mode: &str) -> Daemon {
     Daemon::start(&[("OVERSEER_CLAUDE_PATH", &claude), ("CLAUDE_FIXTURE_MODE", mode), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE")])
 }
 
+/// Agents with a tile on screen: a title after its slot number ("7 ✓ agent 15"); the agent list's
+/// rows (T-25) have no number.
 fn titles_on_screen(s: &str, n: usize) -> Vec<usize> {
-    (1..=n).filter(|i| s.contains(&format!("agent {i:02}"))).collect()
+    (1..=n)
+        .filter(|i| {
+            let t = format!("agent {i:02}");
+            s.lines().any(|l| l.match_indices(&t).any(|(at, _)| l[..at].chars().rev().nth(3).is_some_and(|c| c.is_ascii_digit())))
+        })
+        .collect()
 }
 
 #[test]

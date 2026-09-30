@@ -1,0 +1,40 @@
+ ◆ Overseer  page 1/3 · 20 agents · ● 4 active · ◆ 2 need you                                                phone access off · ● connected 
+╭ agents ────────────────────╮┏ 1 ◆ Write the release notes ━━━━━━┓╭ 2 ◆ Tidy the login page ─────────╮╭ 3 ● Watch build 2 ── Program · 1s ╮
+│ web-app                    │┃ › Write the release notes         ┃│ › Tidy the login page            ││ output of watch build 2           │
+│   2 working · 2 needs you  │┃ ✎ perm.txt                        ┃│ ✎ perm.txt                       ││                                   │
+│›◆ Write the re… Personal ◆ │┃ ⚙ Write perm.txt …                ┃│ ⚙ Write perm.txt …               ││                                   │
+│ ◆ Tidy the l… Claude Max ◆ │┃ ◆ wants Write perm.txt            ┃│ ◆ wants Write perm.txt           ││                                   │
+│ ● Watch build 2            │┃                                   ┃│                                  ││                                   │
+│ ● Watch build 1            │┃                                   ┃│                                  ││                                   │
+│ ✓ Web task 4               │┃                                   ┃│                                  ││                                   │
+│ ✓ Web task 3               │┃                                   ┃│                                  ││                                   │
+│ ✓ Web task 2               │┃                                   ┃│                                  ││                                   │
+│ ✓ Web task 1               │┃                                   ┃│                                  ││                                   │
+│                            │┃                                   ┃│                                  ││                                   │
+│ api-server  1 failed       │┗ ◆ Write perm.t…  a allow d deny ━━┛╰ ◆ Write perm.…  a allow d deny ──╯╰───────────────────────────────────╯
+│ ✗ Migration dry-run        │╭ 4 ● Watch build 1 ── Program · 2s ╮╭ 5 ✓ Web task 4 ──── Program · 0s ╮╭ 6 ✓ Web task 3 ───── Program · 0s ╮
+│ ✓ Endpoint 6               ││ output of watch build 1           ││ output of web task 4             ││ output of web task 3              │
+│ ✓ Endpoint 5               ││                                   ││                                  ││                                   │
+│ ✓ Endpoint 4               ││                                   ││                                  ││                                   │
+│ ✓ Endpoint 3               ││                                   ││                                  ││                                   │
+│ ✓ Endpoint 2               ││                                   ││                                  ││                                   │
+│ ✓ Endpoint 1               ││                                   ││                                  ││                                   │
+│                            ││                                   ││                                  ││                                   │
+│ docs-site  1 merged        ││                                   ││                                  ││                                   │
+│ ✓ Docs page 4              ││                                   ││                                  ││                                   │
+│ ✓ Docs page 3              ││                                   ││                                  ││                                   │
+│ ✓ Docs page 2              │╰───────────────────────────────────╯╰ completed ───────────────────────╯╰ completed ────────────────────────╯
+│ ✓ Docs page 1              │╭ 7 ✓ Web task 2 ───── Program · 0s ╮╭ 8 ✓ Web task 1 ──── Program · 0s ╮╭ 9 ✗ Migration dry-run ────────────╮
+│ ✓ Add the features list  ✓ ││ output of web task 2              ││ output of web task 1             ││ error: relation users_v2 missing  │
+│                            ││                                   ││                                  ││ · failed: exit code 1             │
+│                            ││                                   ││                                  ││                                   │
+│                            ││                                   ││                                  ││                                   │
+│                            ││                                   ││                                  ││                                   │
+│                            ││                                   ││                                  ││                                   │
+│                            ││                                   ││                                  ││                                   │
+│                            ││                                   ││                                  ││                                   │
+│                            ││                                   ││                                  ││                                   │
+│                            ││                                   ││                                  ││                                   │
+│                            ││                                   ││                                  ││                                   │
+╰────── ◆ needs you ✓ merged ╯╰ completed ────────────────────────╯╰ completed ───────────────────────╯╰ failed · exit code 1 ─────────────╯
+ ←↑↓→ move   J/K pick in the list   i message   z zoom   v changes   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help 

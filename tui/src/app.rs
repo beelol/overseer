@@ -321,6 +321,14 @@ pub struct App {
     pub size: (u16, u16),
     /// Tile rectangles from the last draw: (run id, x, y, w, h), for mouse clicks.
     pub hit: Vec<(String, u16, u16, u16, u16)>,
+    /// Agent list rows from the last draw (T-25): a click picks the agent.
+    pub list_hit: Vec<(String, u16, u16, u16, u16)>,
+    /// The focused agent's conversation shows in a column beside the grid (T-25, way 2).
+    pub picked: bool,
+    /// Lines up from the bottom in that conversation (0 = following).
+    pub conv_scroll: usize,
+    /// `L` hides the agent list.
+    pub list_hidden: bool,
     /// Working directory's Git root (the default repository for new agents).
     pub cwd_repo: Option<String>,
     pending: HashMap<u64, Pending>,
@@ -413,6 +421,10 @@ impl App {
             dirty: true,
             size: (120, 40),
             hit: Vec::new(),
+            list_hit: Vec::new(),
+            picked: false,
+            conv_scroll: 0,
+            list_hidden: false,
             cwd_repo: None,
             pending: HashMap::new(),
             history_requested: HashSet::new(),
@@ -524,6 +536,75 @@ impl App {
         self.focus = None;
         self.settle_focus();
         self.ensure_history();
+    }
+
+    /// The agent list (T-25): the visible agents grouped by repository, the most recently active
+    /// repository and agent first. An agent that is working counts as active now.
+    pub fn groups(&self) -> Vec<(String, Vec<&Run>)> {
+        let recent = |r: &Run| if r.active() { i64::MAX } else { r.ended_ms.unwrap_or(r.created_ms) };
+        let mut groups: Vec<(String, Vec<&Run>)> = Vec::new();
+        for r in self.visible() {
+            let repo = self.state.task(&r.task_id).map(|t| t.repo_root.clone()).unwrap_or_default();
+            match groups.iter_mut().find(|g| g.0 == repo) {
+                Some(g) => g.1.push(r),
+                None => groups.push((repo, vec![r])),
+            }
+        }
+        for g in groups.iter_mut() {
+            g.1.sort_by(|a, b| recent(b).cmp(&recent(a)).then(b.created_ms.cmp(&a.created_ms)).then(b.id.cmp(&a.id)));
+        }
+        groups.sort_by(|a, b| recent(b.1[0]).cmp(&recent(a.1[0])).then(b.1[0].created_ms.cmp(&a.1[0].created_ms)).then(a.0.cmp(&b.0)));
+        groups
+    }
+
+    /// Agent ids in the list's order (`J`/`K` walk it).
+    pub fn list_ids(&self) -> Vec<String> {
+        self.groups().into_iter().flat_map(|g| g.1.into_iter().map(|r| r.id.clone())).collect()
+    }
+
+    /// The list shows beside the grid from 100 columns (and 30 rows, below which the compact
+    /// layout keeps the room), unless `L` hid it.
+    pub fn list_shown(&self) -> bool {
+        !self.list_hidden && !self.compact()
+    }
+
+    /// Below 100×30 one focused tile and a compact list take the screen (T-09).
+    pub fn compact(&self) -> bool {
+        self.size.0 < 100 || self.size.1 < 30
+    }
+
+    /// Picks an agent: it takes focus and its conversation opens beside the grid.
+    pub fn pick(&mut self, id: &str) {
+        if let Some(i) = self.index_of(id) {
+            if self.focus.as_deref() != Some(id) {
+                self.conv_scroll = 0;
+            }
+            self.focus_index(i);
+            self.picked = true;
+            self.dirty = true;
+        }
+    }
+
+    /// `J`/`K`: the next or previous agent in the list; the first press picks the first (or last).
+    fn pick_step(&mut self, delta: i32) {
+        let ids = self.list_ids();
+        if ids.is_empty() {
+            return;
+        }
+        let n = ids.len() as i32;
+        let at = self.focus.as_deref().and_then(|f| ids.iter().position(|i| i == f)).filter(|_| self.picked);
+        let next = match at {
+            Some(i) => (i as i32 + delta).rem_euclid(n),
+            None if delta > 0 => 0,
+            None => n - 1,
+        };
+        let id = ids[next as usize].clone();
+        self.pick(&id);
+    }
+
+    fn scroll_conv(&mut self, delta: i64) {
+        self.conv_scroll = (self.conv_scroll as i64 + delta).max(0) as usize;
+        self.dirty = true;
     }
 
     pub fn pages(&self) -> usize {
@@ -1542,7 +1623,12 @@ impl App {
     // ---------------------------------------------------------------- input
 
     pub fn handle_mouse(&mut self, m: MouseEvent) {
+        let inside = |(_, x, y, w, h): &(String, u16, u16, u16, u16)| m.column >= *x && m.column < x + w && m.row >= *y && m.row < y + h;
         if let MouseEventKind::Down(MouseButton::Left) = m.kind {
+            if let Some((id, ..)) = self.list_hit.iter().find(|r| inside(r)).cloned() {
+                self.pick(&id);
+                return;
+            }
             if let Some((id, ..)) = self.hit.iter().find(|(_, x, y, w, h)| m.column >= *x && m.column < x + w && m.row >= *y && m.row < y + h).cloned() {
                 if let Some(i) = self.index_of(&id) {
                     self.focus_index(i);
@@ -1552,6 +1638,12 @@ impl App {
             match m.kind {
                 MouseEventKind::ScrollUp => self.scroll(3),
                 MouseEventKind::ScrollDown => self.scroll(-3),
+                _ => {}
+            }
+        } else if self.picked && self.mode == Mode::Grid {
+            match m.kind {
+                MouseEventKind::ScrollUp => self.scroll_conv(3),
+                MouseEventKind::ScrollDown => self.scroll_conv(-3),
                 _ => {}
             }
         }
@@ -1648,6 +1740,11 @@ impl App {
             KeyCode::Char('q') => self.try_quit(),
             KeyCode::Char('?') => self.mode = Mode::Help,
             KeyCode::Esc if zoom => self.mode = Mode::Grid,
+            // The agent list (T-25): J/K pick the next or previous agent; Esc closes its conversation.
+            KeyCode::Char('J') => self.pick_step(1),
+            KeyCode::Char('K') => self.pick_step(-1),
+            KeyCode::Char('L') => self.list_hidden = !self.list_hidden,
+            KeyCode::Esc if self.picked => self.picked = false,
             KeyCode::Char('z') => self.mode = if zoom { Mode::Grid } else { Mode::Zoom { scroll: 0 } },
             KeyCode::Char('i') | KeyCode::Enter => {
                 if let Some(run) = self.focused().cloned() {
@@ -1743,6 +1840,12 @@ impl App {
             KeyCode::Char('e') if zoom => self.expand_tools = !self.expand_tools,
             KeyCode::Char('g') if zoom => self.mode = Mode::Zoom { scroll: usize::MAX / 2 },
             KeyCode::Char('G') if zoom => self.mode = Mode::Zoom { scroll: 0 },
+            // The picked agent's conversation beside the grid: the same scrollback and tool details as zoom.
+            KeyCode::PageUp if self.picked => self.scroll_conv(self.size.1 as i64 - 6),
+            KeyCode::PageDown if self.picked => self.scroll_conv(-(self.size.1 as i64 - 6)),
+            KeyCode::Home if self.picked => self.conv_scroll = usize::MAX / 2,
+            KeyCode::End if self.picked => self.conv_scroll = 0,
+            KeyCode::Char('e') if self.picked => self.expand_tools = !self.expand_tools,
             // Grid navigation.
             KeyCode::Left | KeyCode::Char('h') => self.move_focus(-1, 0),
             KeyCode::Right | KeyCode::Char('l') => self.move_focus(1, 0),
@@ -1994,4 +2097,12 @@ pub fn short(s: &str, max: usize) -> String {
     let mut out: String = s.chars().take(max.saturating_sub(1)).collect();
     out.push('…');
     out
+}
+
+/// The widths of the agent list and of the picked agent's conversation beside the grid
+/// (T-25), for a terminal `width` columns wide; the grid takes the rest.
+pub fn side_widths(width: u16, list: bool, conversation: bool) -> (u16, u16) {
+    let list_w = if list { (width / 5).clamp(30, 42) } else { 0 };
+    let conv_w = if conversation { (width.saturating_sub(list_w) * 2 / 5).clamp(40, 90) } else { 0 };
+    (list_w, conv_w)
 }

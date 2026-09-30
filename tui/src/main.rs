@@ -32,6 +32,8 @@ OPTIONS:
 KEYS:
     ←↓↑→ / h j k l  move between agents        1–9   focus agent n on this page
     tab / shift+tab next / previous agent      ] [   next / previous page (also PgDn/PgUp)
+    J / K           pick in the agent list (its conversation beside the grid; esc closes it)
+    L               hide or show the agent list
     i / enter       message the focused agent  z     zoom (full screen, scrollback)
     a / d           allow / deny a permission  w     next agent waiting for you
     x               interrupt                  n     new agent

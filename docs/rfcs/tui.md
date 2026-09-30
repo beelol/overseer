@@ -42,6 +42,9 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | 1–9 | Focus tile n on this page |
 | Tab / Shift-Tab | Next / previous agent (across pages) |
 | ] / [ , PgDn / PgUp | Next / previous page |
+| J / K | Pick the next / previous agent in the agent list: its conversation opens in a column beside the grid (PgUp/PgDn, Home/End scroll it; e tool details) (T-25) |
+| Esc | Close the picked agent's conversation; the grid stays on that agent (T-25) |
+| L | Hide or show the agent list (T-25) |
 | i, Enter | Compose a message to the focused agent (Enter sends, Esc closes, Alt-Enter new line) |
 | z | Zoom: focused agent full screen with scrollback (j/k, PgUp/PgDn, g/G; z or Esc returns) |
 | v | Changes: the focused agent's changed files and their diffs (j/k file, J/K scroll, c comparison) |
