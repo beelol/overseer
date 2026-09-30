@@ -9,8 +9,9 @@
 //   - A second VS Code window keeps its tab strip, and no user setting changes.
 //   - Picking an agent turns the right panel into its chat; back (the arrow, then ⌥⌘U both ways)
 //     returns to Overseer's conversation with its history.
-//   - Voice Mode takes over the same panel. Follow shows the agent's files in the middle; no file tree
-//     covers the right panel. The side bar is the agents and Accounts (no Search section).
+//   - Voice Mode takes over the same panel. Follow happens in the review in the middle (the owner,
+//     2026-09-30): it shows the agent's file there, its list is All files, and no VS Code editor
+//     opens; no file tree covers the right panel. The side bar is the agents and Accounts (no Search section).
 //   - The button again restores the cluttered layout exactly (groups and their shares, tabs in
 //     order, active tabs, Explorer, the terminal panel), and the terminal command's fate is measured.
 //   - Screenshots at 1920×1080 and 1440×900 in the three Overseer themes.
@@ -189,14 +190,22 @@ const L = require('./overseer-window-helpers');
     await shots('voice', 'dark');
     await main.command('Overseer: Voice Mode: Turn On or Off'); await delay(1500);
 
-    // Follow: the agent's real files in the middle (inline changes); the right panel stays Overseer's and no file tree covers it.
+    // Follow (the owner, 2026-09-30): the review in the middle shows the agent's file, its list is All
+    // files, and no VS Code editor opens; the right panel stays Overseer's and no file tree covers it.
     await s.selectAgent('Finished edit', { settle: 2000 });
-    await main.command('Overseer: Follow the Agent in Its Files'); await delay(3000);
+    await main.command('Overseer: Follow the Agent');
+    const followView = await main.webview(`document.body.dataset.view === 'follow' && document.body.dataset.followState === 'shown' && /^b\\.txt:/.test(document.body.dataset.followShown || '')`, 20000).catch(() => null);
+    await delay(1200);
     const follow = await L.layout(main);
     const right = await L.overseerView(main);
     const trees = await main.evalWorkbench(`[...document.querySelectorAll('.pane-header')].filter(h => h.offsetParent).map(h => h.querySelector('.title')?.textContent.trim() || '')`);
-    check('Follow in the Overseer window: the agent\'s files in the middle, Overseer\'s panel on the right, and no separate file tree anywhere',
-      follow.groups.length === 2 && follow.tabStrips === 0 && follow.breadcrumbs === 0 && Math.abs(right.width - follow.groups[1].width) <= 4 && !trees.some(t => /^(Worktree|Files)/i.test(t)), { follow, right, trees });
+    const editors = await main.evalWorkbench(`[...document.querySelectorAll('.part.editor .monaco-editor')].filter(e => e.offsetParent && !e.closest('.webview')).length`);
+    const inside = followView && await followView.eval(`({ view: document.body.dataset.view, list: document.getElementById('list-title').textContent, shown: document.body.dataset.followShown, marks: JSON.parse(document.body.dataset.followMarks || '{}'),
+      files: [...document.querySelectorAll('#tree .file')].map(f => f.dataset.path), switch: [...document.querySelectorAll('#view-mode .seg.on')].map(b => b.textContent.trim()) })`);
+    check('Follow in the Overseer window: the review in the middle shows the agent\'s file (b.txt, its changes marked) with All files beside it, no VS Code editor opens, Overseer\'s panel stays on the right, and no separate file tree anywhere',
+      follow.groups.length === 2 && follow.tabStrips === 0 && follow.breadcrumbs === 0 && Math.abs(right.width - follow.groups[1].width) <= 4 && !trees.some(t => /^(Worktree|Files)/i.test(t))
+      && editors === 0 && inside?.view === 'follow' && inside.list === 'All files' && inside.marks.changed >= 1 && ['a.txt', 'b.txt', 'd.txt', 'notes.md'].every(f => inside.files.includes(f)) && inside.switch[0] === 'Follow',
+      { follow, right, trees, editors, inside });
     await shots('follow', 'dark');
     await main.command('Overseer: Diffs Only'); await delay(2000);
 
@@ -249,6 +258,12 @@ const L = require('./overseer-window-helpers');
       await s.selectAgent('Finished edit', { settle: 2500 });
       await L.settled(main, 'notes.md');
       await shots('agent', tag);
+      // Follow in the review, in this theme too.
+      await main.command('Overseer: Follow the Agent');
+      await main.webview(`document.body.dataset.view === 'follow' && document.body.dataset.followState === 'shown'`, 20000).catch(() => null);
+      await delay(1200);
+      await shots('follow', tag);
+      await main.command('Overseer: Diffs Only'); await delay(1500);
     }
     const cur = JSON.parse(fs.readFileSync(settingsFile, 'utf8')); cur['workbench.colorTheme'] = 'Overseer Dark'; fs.writeFileSync(settingsFile, JSON.stringify(cur, null, 2));
     measure('the extension\'s log', L.extensionLog(s, /overseer window|focus mode/));

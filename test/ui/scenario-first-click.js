@@ -56,11 +56,12 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     check('chat: after focus in the review (another editor group), one click on More opens its menu', await once('chat more', chat, '#more', `document.querySelector('.menu')?.remove()`, `!!document.querySelector('.menu')`), result.clicks.at(-1));
     await cdp.key('Escape'); await delay(300);
     await focusSideBar();
-    const pressed = await review.eval(`document.getElementById('changes-only').getAttribute('aria-pressed')`);
-    check('review: after focus in the side bar, one click on Changes only flips it', await once('review toggle', review, '#changes-only', '', `document.getElementById('changes-only').getAttribute('aria-pressed') !== ${JSON.stringify(pressed)}`), result.clicks.at(-1));
+    // The review's Follow | Diffs only switch (AC-264): one click on the other side switches it.
+    const shown = await review.eval(`document.body.dataset.view`);
+    const other = v => v === 'follow' ? 'diffs' : 'follow';
+    check('review: after focus in the side bar, one click on the Follow | Diffs only switch flips it', await once('review switch', review, `#view-mode .seg[data-view="${other(shown)}"]`, '', `document.body.dataset.view === ${JSON.stringify(other(shown))}`), result.clicks.at(-1));
     await focusOther(chat);
-    const pressed2 = await review.eval(`document.getElementById('changes-only').getAttribute('aria-pressed')`);
-    check('review: after focus in the chat (another editor group), one click flips it back', await once('review toggle back', review, '#changes-only', '', `document.getElementById('changes-only').getAttribute('aria-pressed') !== ${JSON.stringify(pressed2)}`), result.clicks.at(-1));
+    check('review: after focus in the chat (another editor group), one click flips it back', await once('review switch back', review, `#view-mode .seg[data-view="${shown}"]`, '', `document.body.dataset.view === ${JSON.stringify(shown)}`), result.clicks.at(-1));
 
     // Searching agents (AC-264: no Search section): after focus in the chat, ONE click on the Agents
     // view's search button opens VS Code's input box with the cursor in it, and typing filters.
