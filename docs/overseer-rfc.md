@@ -582,6 +582,7 @@ From the owner, 2026-09-29:
   - The left side bar is the hierarchy only: agents by repository, and Accounts (the owner, 2026-09-29).
     - Searching agents lives in the Agents view's own title bar and type-to-filter, not in a Search section.
     - There is no separate worktree file tree. The review's file list switches between "Changed" and "All files", and "All files" opens any file in the agent's worktree.
+    - Follow mode always shows the whole worktree, so its file list is "All files": every file, each opening the real file. Diffs only shows "Changed" (the owner, 2026-09-29).
   - **Verify:**
     - Screenshots of A and B side by side for the owner's choice. Then, for the chosen way, packaged-UI checks:
       - a cluttered window becomes the layout in one step;
