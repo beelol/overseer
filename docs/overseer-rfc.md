@@ -564,7 +564,7 @@ From the owner, 2026-09-29:
     - a finished agent in its own worktree and one in the current checkout both open on Since task start;
     - one click switches to Latest run and one to Entire worktree, each with the right files and count;
     - the header names the comparison each time;
-    - screenshots of the three.
+    - screenshots of the three;
     - a change and a whole file accepted and rejected with those words;
     - "Save your edits" appears only after typing.
 
