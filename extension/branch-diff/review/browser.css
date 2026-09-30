@@ -91,7 +91,7 @@ button.icon:hover { background: var(--vscode-toolbar-hoverBackground, var(--vsco
 #toolbar #comparison { flex: 0 1 auto; min-width: 3em; }
 #toolbar .spacer { flex: 1 1 0; min-width: 0; }
 /* Narrow reviews (beside the chat on a small window): icons first, words go to tooltips. */
-@media (max-width: 700px) { #base-label, #total { display: none; } #scope { max-width: 7.5em; } }
+@media (max-width: 700px) { #total { display: none; } #scope { max-width: 7.5em; } }
 /* The agent's name stays at every width: with no tab strip (AC-102) it is what names the review. */
 @media (max-width: 520px) { #layout { display: none; } }
 @media (max-width: 760px) { #review { grid-template-columns: min(var(--nav-width), 32%) 5px minmax(0, 1fr); } }
@@ -234,3 +234,20 @@ button.land.primary { background: var(--ov-accent-gradient, var(--vscode-button-
 button.land:hover { background: var(--ov-hover, var(--vscode-toolbar-hoverBackground)); }
 button.land.primary:hover { background: var(--ov-accent-bg-hover, var(--vscode-button-hoverBackground)); }
 .save-file[hidden] { display: none; }
+
+/* Overseer (AC-263): the comparison row under the toolbar: Since task start, Latest run and Entire
+   worktree one click each, the shown one pressed; More… for the rest; the checkout's note. */
+#compare { display: flex; align-items: center; gap: var(--ov-space-1, 4px); min-height: 34px; padding: 0 var(--ov-space-3, 12px); border-bottom: 1px solid var(--ov-border, var(--vscode-panel-border)); overflow: hidden; white-space: nowrap; }
+#compare[hidden], #compare button[hidden] { display: none; }
+#compare button { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 var(--ov-space-2, 8px); border-radius: var(--ov-radius-pill, 12px); border: 1px solid var(--ov-border, transparent); background: transparent; color: var(--ov-muted, var(--vscode-descriptionForeground)); font-size: var(--ov-font-sm, 12px); }
+#compare button:hover:not(:disabled) { background: var(--ov-hover, var(--vscode-toolbar-hoverBackground)); color: var(--ov-text, var(--vscode-foreground)); }
+#compare button[aria-pressed="true"] { background: var(--ov-accent-soft, var(--vscode-inputOption-activeBackground)); color: var(--ov-text, var(--vscode-foreground)); border-color: var(--ov-accent, var(--vscode-focusBorder)); font-weight: var(--ov-weight-medium, 500); }
+#compare button:disabled { opacity: .5; cursor: default; }
+#compare .cmp-more { margin-left: var(--ov-space-1, 4px); height: 24px; background: transparent; }
+#compare-note { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; margin-left: var(--ov-space-1, 4px); color: var(--ov-muted, var(--vscode-descriptionForeground)); font-size: var(--ov-font-sm, 12px); }
+/* A narrow review: the buttons not shown shorten first, the shown one keeps its name, More… is its icon. */
+#compare button { min-width: 0; flex: 0 1 auto; }
+#compare button[aria-pressed="true"] { flex: none; }
+#compare .cmp-word, #base-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 700px) { #compare .cmp-more[aria-pressed="false"] #base-label { display: none; } }
+@media (max-width: 440px) { #compare { padding: 0 var(--ov-space-2, 8px); gap: 2px; } #compare button { padding: 0 6px; } }

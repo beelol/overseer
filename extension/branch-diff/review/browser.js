@@ -728,9 +728,8 @@ function applyOverseer(o) {
     reviewedHunks = next;
     if (changed) for (const row of rows.values()) if (row.editor) renderHunks(row);
   }
-  const label = document.getElementById('base-label');
   const c = o.comparison || {};
-  label.textContent = c.label || 'Comparison';
+  renderCompare(o, c);
   document.getElementById('base').title = [c.label, c.base ? 'Base: ' + c.base : 'Base unavailable', c.detail, c.provenance ? 'Provenance: ' + c.provenance : ''].filter(Boolean).join('\n') + '\nClick to choose another comparison.';
   document.getElementById('comparison').textContent = o.runTitle || 'Run';
   const scope = document.getElementById('scope');
@@ -755,6 +754,42 @@ function applyOverseer(o) {
   followStatus.textContent = followState === 'paused' ? (/paused/.test(o.followNote || '') ? o.followNote : 'Follow paused by your navigation') : followState === 'following' ? (o.followNote || 'Following agent edits') : '';
   renderFollow();
 }
+// Overseer (AC-263): the header names the comparison shown, and Since task start, Latest run and
+// Entire worktree are one click each; More… lists the rest (earlier turns, the fork, a branch).
+// In the owner's own checkout it says that the changes also hold any edits made in that folder.
+const compareBar = document.getElementById('compare');
+function renderCompare(o, c) {
+  if (!compareBar) return;
+  const choices = o.choices?.options || [];
+  const note = (o.choices ? o.choices.folderEdits : o.workspaceKind === 'current') ? 'includes any edits made in this folder' : '';
+  let quick = false;
+  for (const b of compareBar.querySelectorAll('button.cmp')) {
+    const choice = choices.find(x => x.mode === b.dataset.mode);
+    const on = b.dataset.mode === c.mode;
+    quick ||= on;
+    const word = choice?.label || b.querySelector('.cmp-word').textContent;
+    b.querySelector('.cmp-word').textContent = word;
+    // A daemon that does not list a comparison (an older one) does not show its button.
+    b.hidden = !choice && !on && !!o.choices;
+    b.disabled = !!choice && !choice.available;
+    b.setAttribute('aria-pressed', String(on));
+    b.setAttribute('aria-label', on && note ? `${word} (${note})` : word);
+    b.title = [on ? `Showing ${word}` : choice && !choice.available ? `${word} is unavailable` : `Show ${word}`, choice?.detail, on && note ? `This folder is your own checkout: the changes ${note}, not only the agent's.` : ''].filter(Boolean).join('\n');
+  }
+  const more = document.getElementById('base');
+  document.getElementById('base-label').textContent = quick ? 'More…' : (c.label || 'Comparison');
+  more.setAttribute('aria-pressed', String(!quick && !!c.label));
+  more.setAttribute('aria-label', quick ? 'More comparisons' : `${c.label || 'Comparison'}${note ? ` (${note})` : ''}: choose another comparison`);
+  document.getElementById('compare-note').textContent = note ? `(${note})` : '';
+  compareBar.dataset.mode = c.mode || '';
+  compareBar.dataset.label = c.label || '';
+  compareBar.hidden = false;
+}
+compareBar?.addEventListener('click', event => {
+  const b = event.target.closest('button.cmp');
+  if (!b || b.disabled || b.getAttribute('aria-pressed') === 'true') return;
+  vscode.postMessage({ type: 'chooseComparison', mode: b.dataset.mode });
+});
 // Overseer (AC-243): the chat's Merge buttons in the review's toolbar, for this agent.
 const landBox = document.getElementById('land');
 // Publish to GitHub (no remote) is in the chat only; the review keeps its toolbar short (AC-54, AC-76).

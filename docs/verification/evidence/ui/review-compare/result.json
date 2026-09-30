@@ -1,0 +1,272 @@
+{
+  "checks": [
+    {
+      "name": "fixture: turn 1 committed one.txt, turn 2 left two.txt untracked, main moved on",
+      "ok": true,
+      "detail": "?? two.txt"
+    },
+    {
+      "name": "a finished agent in its own worktree: the review opens on Since task start (one.txt and two.txt, 2 files)",
+      "ok": true,
+      "detail": {
+        "files": [
+          "one.txt",
+          "two.txt"
+        ],
+        "count": "2",
+        "total": "2 files",
+        "label": "Since task start",
+        "pressed": [
+          "Since task start"
+        ],
+        "pressedName": [
+          "Since task start"
+        ],
+        "note": "",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "the header names it: Since task start pressed, Latest run and Entire worktree one click away, no folder note",
+      "ok": true,
+      "detail": {
+        "files": [
+          "one.txt",
+          "two.txt"
+        ],
+        "count": "2",
+        "total": "2 files",
+        "label": "Since task start",
+        "pressed": [
+          "Since task start"
+        ],
+        "pressedName": [
+          "Since task start"
+        ],
+        "note": "",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "one click: Latest run (two.txt, 1 file), named in the header",
+      "ok": true,
+      "detail": {
+        "files": [
+          "two.txt"
+        ],
+        "count": "1",
+        "total": "1 file",
+        "label": "Latest run",
+        "pressed": [
+          "Latest run"
+        ],
+        "pressedName": [
+          "Latest run"
+        ],
+        "note": "",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "one click: Entire worktree (the branch against where it started: one.txt and two.txt, not main's later commit), named in the header",
+      "ok": true,
+      "detail": {
+        "files": [
+          "one.txt",
+          "two.txt"
+        ],
+        "count": "2",
+        "total": "2 files",
+        "label": "Entire worktree",
+        "pressed": [
+          "Entire worktree"
+        ],
+        "pressedName": [
+          "Entire worktree"
+        ],
+        "note": "",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "one click back to Since task start",
+      "ok": true,
+      "detail": {
+        "files": [
+          "one.txt",
+          "two.txt"
+        ],
+        "count": "2",
+        "total": "2 files",
+        "label": "Since task start",
+        "pressed": [
+          "Since task start"
+        ],
+        "pressedName": [
+          "Since task start"
+        ],
+        "note": "",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "a finished agent in the owner's checkout: the review opens on Since task start (c1, c2 and the owner's edit between turns; not the edit before the task)",
+      "ok": true,
+      "detail": {
+        "files": [
+          "c1.txt",
+          "c2.txt",
+          "owner.txt"
+        ],
+        "count": "3",
+        "total": "3 files",
+        "label": "Since task start",
+        "pressed": [
+          "Since task start"
+        ],
+        "pressedName": [
+          "Since task start (includes any edits made in this folder)"
+        ],
+        "note": "(includes any edits made in this folder)",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "the header says it includes any edits made in this folder",
+      "ok": true,
+      "detail": {
+        "files": [
+          "c1.txt",
+          "c2.txt",
+          "owner.txt"
+        ],
+        "count": "3",
+        "total": "3 files",
+        "label": "Since task start",
+        "pressed": [
+          "Since task start"
+        ],
+        "pressedName": [
+          "Since task start (includes any edits made in this folder)"
+        ],
+        "note": "(includes any edits made in this folder)",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "one click: Latest run (c2.txt, 1 file), named in the header",
+      "ok": true,
+      "detail": {
+        "files": [
+          "c2.txt"
+        ],
+        "count": "1",
+        "total": "1 file",
+        "label": "Latest run",
+        "pressed": [
+          "Latest run"
+        ],
+        "pressedName": [
+          "Latest run (includes any edits made in this folder)"
+        ],
+        "note": "(includes any edits made in this folder)",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "one click: Entire worktree (the feature branch against main: a.txt, c1, c2, feature.txt, owner.txt, 5 files), named in the header",
+      "ok": true,
+      "detail": {
+        "files": [
+          "a.txt",
+          "c1.txt",
+          "c2.txt",
+          "feature.txt",
+          "owner.txt"
+        ],
+        "count": "5",
+        "total": "5 files",
+        "label": "Entire worktree",
+        "pressed": [
+          "Entire worktree"
+        ],
+        "pressedName": [
+          "Entire worktree (includes any edits made in this folder)"
+        ],
+        "note": "(includes any edits made in this folder)",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "each agent keeps its own choice (the worktree agent is still on Since task start)",
+      "ok": true,
+      "detail": {
+        "files": [
+          "one.txt",
+          "two.txt"
+        ],
+        "count": "2",
+        "total": "2 files",
+        "label": "Since task start",
+        "pressed": [
+          "Since task start"
+        ],
+        "pressedName": [
+          "Since task start"
+        ],
+        "note": "",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    }
+  ]
+}
