@@ -103,7 +103,7 @@ Five builders plus merge checks at once pushed the load past 100 and crashed the
 
 Mergeability against main, checked 2026-09-30 00:00 with `git merge-tree --write-tree`: #32, #40, #42, #39, #38 merge cleanly; **#41 (`claude/steady-tests`) and #37 (`claude/phone-parity`) now conflict** and need main merged into them before their turn.
 
-Merged on 2026-09-30: #39 (`ac7a4143`), #32 (`3ab9c1f7`; talk, conversation and review missed in the full run and passed alone). Merged on 2026-09-29: #31, #33, #34, #35, #36. Deployed to the owner: b3b7133d (#31, #33, #34). #35, #36 and later are **not deployed**; deploy after the next merges (`scripts/deploy --yes --no-fetch --ref <main>`; it waits for quiet).
+Merged on 2026-09-30: #39 (`ac7a4143`), #32 (`3ab9c1f7`; talk, conversation and review missed in the full run and passed alone). Merged on 2026-09-29: #31, #33, #34, #35, #36. Deployed to the owner: b3b7133d (#31, #33, #34). A deploy of main `ed747bc7` (#35, #36, #39, #32) started 2026-09-30 01:05 (`scripts/deploy --yes --no-fetch --ref ed747bc7`, at `nice -n 20`; it waits for quiet); the next deploy follows #40's merge.
 
 ## New from the owner (2026-09-30)
 
