@@ -576,6 +576,9 @@ From the owner, 2026-09-29:
     - (B) the window reopened on an Overseer workspace file, so the tab-hiding setting is that window's own.
   - One command and key (Workspace, ⌥⌘⇧O) arranges any window into it and restores the owner's own layout when run again. The first launch offers it with one click.
   - Focus Mode is retired: its commands are removed or point to this layout, and its settings are put back.
+  - The left side bar is the hierarchy only: agents by repository, and Accounts (the owner, 2026-09-29).
+    - Searching agents lives in the Agents view's own title bar and type-to-filter, not in a Search section.
+    - There is no separate worktree file tree. The review's file list switches between "Changed" and "All files", and "All files" opens any file in the agent's worktree.
   - **Verify:**
     - Screenshots of A and B side by side for the owner's choice. Then, for the chosen way, packaged-UI checks:
       - a cluttered window becomes the layout in one step;
@@ -584,6 +587,8 @@ From the owner, 2026-09-29:
       - Voice Mode takes over the same panel;
       - running the command again restores the cluttered layout exactly;
       - the first-launch offer appears once.
+      - the side bar shows no Search section and no worktree tree; the Agents view's search filters agents;
+      - the review's "All files" lists the whole worktree and opens a file from it.
     - Screenshots at 1440×900 and 1920×1080 in the three themes.
 ### Gate S — Overseer itself (added by the owner, 2026-09-27)
 
