@@ -124,6 +124,7 @@ const server = http.createServer((req, res) => {
 });
 server.listen(port, '127.0.0.1', () => {
   const actual = server.address().port;
-  if (process.env.MOCK_PORT_FILE) fs.writeFileSync(process.env.MOCK_PORT_FILE, String(actual));
+  // Written whole (a temporary file renamed into place): a reader that sees the file sees the port.
+  if (process.env.MOCK_PORT_FILE) { fs.writeFileSync(process.env.MOCK_PORT_FILE + '.tmp', String(actual)); fs.renameSync(process.env.MOCK_PORT_FILE + '.tmp', process.env.MOCK_PORT_FILE); }
   console.log(`mock-openai listening on 127.0.0.1:${actual}`);
 });

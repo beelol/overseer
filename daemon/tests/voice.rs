@@ -468,8 +468,10 @@ fn ac172_cues_wait_for_overseer_s_phrase_and_give_way_to_the_owner() {
 
 // ---------------------------------------------------------------------- requests
 
+/// A working agent for the test's whole length: a loaded machine can stretch a test past a minute,
+/// and an agent that has finished is no longer one the owner's words can name.
 fn agent(d: &Daemon, repo: &Path, title: &str) -> String {
-    let created = d.call("task.create", json!({"repo": repo, "harness": "generic", "workspace_mode": "worktree", "program": "/bin/sleep", "args": ["60"], "prompt": "", "title": title}));
+    let created = d.call("task.create", json!({"repo": repo, "harness": "generic", "workspace_mode": "worktree", "program": "/bin/sleep", "args": ["600"], "prompt": "", "title": title}));
     created["run"]["id"].as_str().unwrap().to_string()
 }
 
