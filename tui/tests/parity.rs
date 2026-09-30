@@ -133,3 +133,74 @@ fn t25_an_agent_list_beside_the_grid() {
         d.ctl("run.interrupt", json!({ "run_id": id }));
     }
 }
+
+/// The grid's rows and columns as drawn: the tiles left of the conversation column, by row.
+fn drawn_shape(tui: &mut Tui) -> (usize, usize) {
+    tui.draw();
+    let (w, _) = tui.app.size;
+    let (_, conv_w) = overseer_tui::app::side_widths(w, tui.app.list_shown(), tui.app.picked);
+    let tiles: Vec<(u16, u16)> = tui.app.hit.iter().filter(|h| h.1 + h.3 <= w - conv_w).map(|h| (h.1, h.2)).collect();
+    let mut ys: Vec<u16> = tiles.iter().map(|t| t.1).collect();
+    ys.sort();
+    ys.dedup();
+    let first = tiles.iter().filter(|t| t.1 == ys[0]).count();
+    (ys.len(), first)
+}
+
+/// T-37: top-level agents only, the grid fitting the count up to 16 (1, 2×2, 3×3, 3×4, 4×4),
+/// the 17th on page 2, with and without the picked agent's conversation beside the grid.
+#[test]
+fn t37_the_grid_fits_the_count() {
+    let t = tempfile::tempdir().unwrap();
+    // The Claude fixture's default run starts native sub-agents ("child task", "grandchild task").
+    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture("claude-fixture.js"))]);
+    let repo = repo(&t.path().join("fits"));
+    let parent = d.ctl("task.create", json!({ "repo": repo, "harness": "claude", "prompt": "Delegate to a sub-agent", "title": "Delegates to sub-agents" }))["run"]["id"].as_str().unwrap().to_string();
+    d.wait_status(&parent, |s| s == "completed", 20);
+    let mut tui = Tui::attach(&d, 200, 60);
+    tui.until(15, |a| a.state.runs.iter().filter(|r| r.parent_run_id.is_some()).count() >= 1 && a.visible().len() == 1);
+    let mut made = 1;
+    for (n, want) in [(1usize, (1usize, 1usize)), (4, (2, 2)), (7, (3, 3)), (12, (3, 4)), (16, (4, 4)), (17, (4, 4))] {
+        while made < n {
+            made += 1;
+            d.sh(&repo, &format!("agent {made:02}"), &format!("echo I am agent {made:02}"));
+        }
+        tui.until(15, |a| a.visible().len() == n);
+        tui.pump(200);
+        assert!(tui.app.page_agents().iter().all(|r| r.parent_run_id.is_none()), "sub-agents never get a tile");
+        assert!(tui.app.state.runs.len() > n, "the sub-agents are in the daemon's state");
+        tui.app.picked = false;
+        assert_eq!(drawn_shape(&mut tui), want, "{n} agents");
+        let s = tui.screen();
+        // A tile's title follows its slot number ("2 ✓ child task"); the parent's conversation may name it.
+        let tile_titled = |l: &str| l.match_indices("child task").any(|(at, _)| l[..at].chars().rev().nth(3).is_some_and(|c| c.is_ascii_digit()));
+        assert!(!s.lines().any(tile_titled), "no tile for a sub-agent:\n{s}");
+        assert!(s.contains(&format!("page 1/{}", if n > 16 { 2 } else { 1 })), "{s}");
+        no_line_wider(&s, 200);
+        tui.snapshot(&format!("parity-t37-{n:02}"));
+        // With the picked agent's conversation beside the grid: the same shape, narrower.
+        tui.key(KeyCode::Char('J'));
+        assert!(tui.app.picked);
+        assert_eq!(drawn_shape(&mut tui), want, "{n} agents beside a conversation");
+        no_line_wider(&tui.screen(), 200);
+        tui.snapshot(&format!("parity-t37-{n:02}-conversation"));
+        tui.key(KeyCode::Esc);
+    }
+    // The 17th agent (the oldest) is alone on page 2.
+    tui.key(KeyCode::Char(']'));
+    let s = tui.screen();
+    assert!(s.contains("page 2/2"), "{s}");
+    assert_eq!(tui.app.page_agents().len(), 1);
+    assert_eq!(tui.app.page_agents()[0].id, parent, "the oldest agent is on page 2");
+    assert_eq!(drawn_shape(&mut tui), (1, 1));
+    tui.snapshot("parity-t37-17-page-2");
+    // Arrow keys follow the shape: on page 1's 4×4, down moves four agents on.
+    tui.key(KeyCode::Char('['));
+    tui.key(KeyCode::Char('1'));
+    let first = tui.app.focus.clone();
+    tui.key(KeyCode::Down);
+    let ids: Vec<String> = tui.app.visible().iter().map(|r| r.id.clone()).collect();
+    assert_eq!(tui.app.focus.as_deref(), Some(ids[4].as_str()), "down from tile 1 is tile 5 (was {first:?})");
+    tui.key(KeyCode::Right);
+    assert_eq!(tui.app.focus.as_deref(), Some(ids[5].as_str()));
+}

@@ -1,4 +1,4 @@
-overseer-tui — nine live Overseer agents per page, from the same overseerd daemon VS Code uses.
+overseer-tui — up to sixteen live Overseer agents per page, from the same overseerd daemon VS Code uses.
 
 USAGE:
     overseer-tui [OPTIONS]
@@ -16,6 +16,8 @@ OPTIONS:
 KEYS:
     ←↓↑→ / h j k l  move between agents        1–9   focus agent n on this page
     tab / shift+tab next / previous agent      ] [   next / previous page (also PgDn/PgUp)
+    J / K           pick in the agent list (its conversation beside the grid; esc closes it)
+    L               hide or show the agent list
     i / enter       message the focused agent  z     zoom (full screen, scrollback)
     a / d           allow / deny a permission  w     next agent waiting for you
     x               interrupt                  n     new agent
@@ -29,4 +31,4 @@ KEYS:
     f               filter all/active/needs you ?     all keys
     q               quit (agents keep running)
 
-Agents are pages of nine, newest first: page 1 is the newest nine.
+Top-level agents, newest first; the grid fits the count, up to sixteen: page 1 is the newest sixteen.

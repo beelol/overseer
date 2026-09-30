@@ -14,7 +14,7 @@ use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-const HELP: &str = "overseer-tui — nine live Overseer agents per page, from the same overseerd daemon VS Code uses.
+const HELP: &str = "overseer-tui — up to sixteen live Overseer agents per page, from the same overseerd daemon VS Code uses.
 
 USAGE:
     overseer-tui [OPTIONS]
@@ -47,7 +47,7 @@ KEYS:
     f               filter all/active/needs you ?     all keys
     q               quit (agents keep running)
 
-Agents are pages of nine, newest first: page 1 is the newest nine.";
+Top-level agents, newest first; the grid fits the count, up to sixteen: page 1 is the newest sixteen.";
 
 enum Ev {
     Daemon(Msg),

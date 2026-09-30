@@ -12,7 +12,7 @@ Run everything with `cargo test -p overseer-tui` (T-13 needs `OVERSEER_TUI_LIVE=
 | AC | Test | Evidence | Result |
 | --- | --- | --- | --- |
 | T-01 Same daemon | `tests/live.rs` `t01_…` | [t01-same-daemon](t01-same-daemon.txt) | A message typed in the TUI is a turn in the daemon and an event seen by a second subscribed client; an agent and a follow-up made through `ctl` appear in the TUI. |
-| T-02 Pages of nine | `tests/interact.rs` `t02_…` | [page 1](t02-page-1.txt), [2](t02-page-2.txt), [3](t02-page-3.txt) | 20 agents: 12–20 / 3–11 / 1–2, "page n/3"; focus stays on agent 15 when agent 21 starts (it becomes tile 1); filter all → active → needs you. |
+| T-02 Pages (sixteen per page since T-37) | `tests/interact.rs` `t02_…` | [page 1](t02-page-1.txt), [2](t02-page-2.txt) | 20 agents: 5–20 / 1–4, "page n/2"; focus stays on agent 15 when agent 21 starts (it becomes tile 1); filter all → active → needs you. |
 | T-03 Live tiles | `tests/live.rs` `t03_…` | [t03-live-tiles](t03-live-tiles.txt) | Event → tile lag p95 2 ms; connection dropped mid-stream: all 60 lines present exactly once. |
 | T-04 Keys and help | `tests/interact.rs` `t04_…` | [t04-help](t04-help.txt) | Arrows/hjkl, page-edge wrapping, 1–9, Tab/Shift-Tab across pages, help, mouse click. |
 | T-05 Talk to any agent | `tests/interact.rs` `t05_…` | [t05-composer](t05-composer.txt) | A's message reaches only A; B's two-line draft survives switching tiles and is delivered; a running Claude turn shows "can't send now: a turn is running" and keeps the draft. |

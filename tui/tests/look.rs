@@ -199,7 +199,7 @@ fn t12_help_explains_options_and_keys() {
     let out = Command::new(env!("CARGO_BIN_EXE_overseer-tui")).arg("--help").output().unwrap();
     let text = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
-    for s in ["--daemon PATH", "--home DIR", "--no-mouse", "page 1 is the newest nine", "allow / deny", "quit (agents keep running)"] {
+    for s in ["--daemon PATH", "--home DIR", "--no-mouse", "page 1 is the newest sixteen", "allow / deny", "quit (agents keep running)"] {
         assert!(text.contains(s), "help lacks {s}:\n{text}");
     }
     std::fs::write(Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().join("docs/verification/evidence/tui/t12-help.txt"), text.as_bytes()).unwrap();

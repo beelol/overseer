@@ -14,7 +14,11 @@ use std::time::{Duration, Instant};
 mod phone;
 pub use phone::{ago, code_groups, fingerprint, platform_name, Device, PairRequest, Pairing, PairingState, Phone};
 
-pub const PAGE: usize = 9;
+/// Agents on one screen at most (T-37); from the 17th the grid pages.
+pub const PAGE: usize = 16;
+/// The smallest tile the grid narrows to before it takes fewer columns (T-37).
+pub const MIN_TILE_W: u16 = 22;
+pub const MIN_TILE_H: u16 = 5;
 /// Pages of history fetched per run (5,000 events each), newest kept by the feed cap.
 const HISTORY_PAGES: usize = 10;
 const MAX_AUDIO_IMPORT_PATH: usize = 4096;
@@ -607,13 +611,39 @@ impl App {
         self.dirty = true;
     }
 
+    /// The grid's room in cells: the body beside the list and the picked agent's conversation.
+    pub fn grid_room(&self) -> (u16, u16) {
+        let (w, h) = self.size;
+        if self.compact() {
+            return (w, h.saturating_sub(2));
+        }
+        let (list_w, conv_w) = side_widths(w, self.list_shown(), self.picked && self.focus.is_some());
+        (w.saturating_sub(list_w + conv_w), h.saturating_sub(2))
+    }
+
+    /// Agents per page (T-37): up to 16, fewer when the grid has no room for that many tiles.
+    pub fn page_size(&self) -> usize {
+        let (w, h) = self.grid_room();
+        let cols = (w / MIN_TILE_W).max(1) as usize;
+        let rows = (h / MIN_TILE_H).max(1) as usize;
+        (cols * rows).clamp(1, PAGE)
+    }
+
+    /// The grid's shape for `n` tiles in the room it has (T-37).
+    pub fn grid_shape(&self, n: usize) -> (usize, usize) {
+        let max_cols = (self.grid_room().0 / MIN_TILE_W).max(1) as usize;
+        let (r, c) = shape(n);
+        if c <= max_cols { (r, c) } else { (n.div_ceil(max_cols).max(1), max_cols) }
+    }
+
     pub fn pages(&self) -> usize {
-        self.visible().len().div_ceil(PAGE).max(1)
+        self.visible().len().div_ceil(self.page_size()).max(1)
     }
 
     /// The agents on the current page (at most nine).
     pub fn page_agents(&self) -> Vec<&Run> {
-        self.visible().into_iter().skip(self.page * PAGE).take(PAGE).collect()
+        let ps = self.page_size();
+        self.visible().into_iter().skip(self.page * ps).take(ps).collect()
     }
 
     pub fn focused(&self) -> Option<&Run> {
@@ -633,23 +663,24 @@ impl App {
         }
         let i = i.min(ids.len() - 1);
         self.focus = Some(ids[i].clone());
-        self.page = i / PAGE;
+        self.page = i / self.page_size();
         self.dirty = true;
         self.ensure_history();
     }
 
     /// Keeps focus on the same agent after the list changed (new agents, filter changes).
-    fn settle_focus(&mut self) {
+    pub fn settle_focus(&mut self) {
         let n = self.visible().len();
+        let ps = self.page_size();
         if n == 0 {
             self.focus = None;
             self.page = 0;
             return;
         }
         match self.focus.clone().and_then(|f| self.index_of(&f)) {
-            Some(i) => self.page = i / PAGE,
+            Some(i) => self.page = i / ps,
             None => {
-                let i = (self.page * PAGE).min(n - 1);
+                let i = (self.page * ps).min(n - 1);
                 self.focus_index(i);
             }
         }
@@ -657,13 +688,15 @@ impl App {
     }
 
     fn move_focus(&mut self, dx: i32, dy: i32) {
+        let ps = self.page_size();
+        let shape = |n: usize| self.grid_shape(n);
         let Some(i) = self.focus.clone().and_then(|f| self.index_of(&f)) else {
-            self.focus_index(self.page * PAGE);
+            self.focus_index(self.page * ps);
             return;
         };
         let n = self.visible().len();
-        let (page, slot) = (i / PAGE, i % PAGE);
-        let on_page = |p: usize| n.saturating_sub(p * PAGE).min(PAGE);
+        let (page, slot) = (i / ps, i % ps);
+        let on_page = |p: usize| n.saturating_sub(p * ps).min(ps);
         let (_, cols) = shape(on_page(page));
         let (row, col) = ((slot / cols) as i32, (slot % cols) as i32);
         let target = if dx != 0 {
@@ -674,7 +707,7 @@ impl App {
                     None
                 } else {
                     let (_, pc) = shape(on_page(page - 1));
-                    Some((page - 1) * PAGE + (row as usize) * pc + pc - 1)
+                    Some((page - 1) * ps + (row as usize) * pc + pc - 1)
                 }
             } else if c >= cols as i32 {
                 // Past the right edge: the next page's same row (or its last agent).
@@ -682,15 +715,15 @@ impl App {
                     None
                 } else {
                     let (nr, nc) = shape(on_page(page + 1));
-                    Some(((page + 1) * PAGE + (row as usize).min(nr - 1) * nc).min(n - 1))
+                    Some(((page + 1) * ps + (row as usize).min(nr - 1) * nc).min(n - 1))
                 }
             } else {
-                Some(page * PAGE + (row * cols as i32 + c) as usize)
+                Some(page * ps + (row * cols as i32 + c) as usize)
             }
         } else {
             let r = row + dy;
-            let t = page * PAGE + (r.max(0) as usize) * cols + col as usize;
-            if r >= 0 && t < page * PAGE + on_page(page) { Some(t) } else { None }
+            let t = page * ps + (r.max(0) as usize) * cols + col as usize;
+            if r >= 0 && t < page * ps + on_page(page) { Some(t) } else { None }
         };
         if let Some(t) = target {
             if t < n {
@@ -700,14 +733,15 @@ impl App {
     }
 
     fn change_page(&mut self, delta: i32) {
+        let ps = self.page_size();
         let pages = self.pages() as i32;
         let next = (self.page as i32 + delta).clamp(0, pages - 1) as usize;
         if next == self.page {
             return;
         }
-        let slot = self.focus.clone().and_then(|f| self.index_of(&f)).map(|i| i % PAGE).unwrap_or(0);
+        let slot = self.focus.clone().and_then(|f| self.index_of(&f)).map(|i| i % ps).unwrap_or(0);
         let n = self.visible().len();
-        self.focus_index((next * PAGE + slot).min(n.saturating_sub(1)));
+        self.focus_index((next * ps + slot).min(n.saturating_sub(1)));
     }
 
     /// Loads history for the agents on screen (and the zoomed one) that have none yet.
@@ -1857,8 +1891,9 @@ impl App {
             KeyCode::Char('[') | KeyCode::PageUp => self.change_page(-1),
             KeyCode::Char(c @ '1'..='9') => {
                 let slot = c as usize - '1' as usize;
-                if self.page * PAGE + slot < self.visible().len() {
-                    self.focus_index(self.page * PAGE + slot);
+                let ps = self.page_size();
+                if slot < ps && self.page * ps + slot < self.visible().len() {
+                    self.focus_index(self.page * ps + slot);
                 }
             }
             _ => self.dirty = false,
@@ -2071,7 +2106,8 @@ fn publish_pr(ws: &str, plan: &Value, body: &str) -> Result<Value, String> {
     Ok(json!({ "url": url, "number": number }))
 }
 
-/// Grid shape (rows, columns) for `n` agents on a page: 1, 1×2, 1×3, 2×2, 2×3, 3×3.
+/// Grid shape (rows, columns) for `n` agents on a page (T-37): 1, 1×2, 1×3, 2×2, 2×3, 3×3,
+/// 3×4, 4×4.
 pub fn shape(n: usize) -> (usize, usize) {
     match n {
         0 | 1 => (1, 1),
@@ -2079,7 +2115,9 @@ pub fn shape(n: usize) -> (usize, usize) {
         3 => (1, 3),
         4 => (2, 2),
         5 | 6 => (2, 3),
-        _ => (3, 3),
+        7..=9 => (3, 3),
+        10..=12 => (3, 4),
+        _ => (4, 4),
     }
 }
 

@@ -2,7 +2,7 @@
 //! form. Terminal default colors for text (works on dark and light terminals) plus a purple
 //! accent and status colors; truecolor when the terminal says so, 256 colors otherwise.
 
-use crate::app::{code_groups, shape, short, App, Confirm, Mode, NewAgentForm, PairingState, PAGE};
+use crate::app::{code_groups, short, App, Confirm, Mode, NewAgentForm, PairingState};
 use crate::qr;
 use crate::feed::{compact, Feed, Item, Kind, ToolStatus};
 use crate::model::Run;
@@ -86,7 +86,11 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     app.hit.clear();
     app.list_hit.clear();
     let area = f.area();
-    app.size = (area.width, area.height);
+    if app.size != (area.width, area.height) {
+        app.size = (area.width, area.height);
+    }
+    // The page follows the focused agent when the room changes (a resize, the list, a conversation).
+    app.settle_focus();
     let composing = matches!(app.mode, Mode::Compose) || matches!(app.mode, Mode::Confirm(_));
     let composer_h = if matches!(app.mode, Mode::Compose) { composer_height(app, area.width) } else if composing { 2 } else { 0 };
     let [head, body, comp, foot] = Layout::vertical([Constraint::Length(1), Constraint::Min(3), Constraint::Length(composer_h), Constraint::Length(1)]).areas(area);
@@ -420,9 +424,9 @@ fn agent_list(f: &mut Frame, app: &mut App, area: Rect) {
 
 fn grid(f: &mut Frame, app: &mut App, area: Rect) {
     let agents: Vec<Run> = app.page_agents().into_iter().cloned().collect();
-    let (nr, nc) = shape(agents.len());
+    let (nr, nc) = app.grid_shape(agents.len());
     let rows = Layout::vertical(vec![Constraint::Ratio(1, nr as u32); nr]).split(area);
-    for (slot, run) in agents.iter().enumerate().take(PAGE) {
+    for (slot, run) in agents.iter().enumerate() {
         let cols = Layout::horizontal(vec![Constraint::Ratio(1, nc as u32); nc]).split(rows[slot / nc]);
         tile(f, app, run, slot + 1, cols[slot % nc], false);
     }

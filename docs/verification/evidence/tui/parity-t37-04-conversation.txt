@@ -1,0 +1,60 @@
+ ◆ Overseer  page 1/1 · 4 agents                                                                                                                                         phone access off · ● connected 
+╭ agents ──────────────────────────────╮┏ 1 ✓ agent 04 ━━━━━━━━━━━━━━━━━━ Program · 0s ┓╭ 2 ✓ agent 03 ────────────────── Program · 0s ╮┏ 1 ✓ agent 04 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Program · 0s ┓
+│ fits                                 │┃ I am agent 04                                ┃│ I am agent 03                                │┃ I am agent 04                                                ┃
+│›✓ agent 04                           │┃                                              ┃│                                              │┃                                                              ┃
+│ ✓ agent 03                           │┃                                              ┃│                                              │┃                                                              ┃
+│ ✓ agent 02                           │┃                                              ┃│                                              │┃                                                              ┃
+│ ✓ Delegates to sub-a… Claude Fixt…   │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┃                                              ┃│                                              │┃                                                              ┃
+│                                      │┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰ completed ───────────────────────────────────╯┃                                                              ┃
+│                                      │╭ 3 ✓ agent 02 ────────────────── Program · 0s ╮╭ 4 ✓ Delegates to sub-agents ─────────────────╮┃                                                              ┃
+│                                      ││ I am agent 02                                ││ › Delegate to a sub-agent                    │┃                                                              ┃
+│                                      ││                                              ││ ↳ grandchild task                            │┃                                                              ┃
+│                                      ││                                              ││ │ grandchild says hi                         │┃                                                              ┃
+│                                      ││                                              ││ ↳ child task                                 │┃                                                              ┃
+│                                      ││                                              ││ ⚙ Agent child task ✓                         │┃                                                              ┃
+│                                      ││                                              ││ │ child done                                 │┃                                                              ┃
+│                                      ││                                              ││ all done                                     │┃                                                              ┃
+│                                      ││                                              ││ ■ done · 1 in / 1 out                        │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+│                                      ││                                              ││                                              │┃                                                              ┃
+╰──────────────── ◆ needs you ✓ merged ╯╰ completed ───────────────────────────────────╯╰ completed ──────────────── fix…@example.test ╯┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+ J/K next / previous agent   esc close the conversation   pgup/pgdn scroll   e tool details   i message   v changes   ? help                                                                            
