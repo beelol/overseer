@@ -206,6 +206,7 @@ pub fn parse(v: &Value) -> Vec<Norm> {
             request_id: text(&v["id"]),
             tool: permission_title(&text(&v["permission"]), &v["patterns"], &v["metadata"]),
             input: json!({"permission": v["permission"], "patterns": v["patterns"], "path": v["metadata"]["filepath"], "diff": v["metadata"]["diff"].as_str().map(|d| clip(d, 8192)), "call": v["call"], "child": v["child"]}),
+            always: None, // Overseer answers OpenCode Allow once or Deny; nothing is remembered
         }],
         "child" => vec![Norm::Child {
             native_id: text(&v["id"]),
@@ -785,7 +786,7 @@ mod tests {
         assert!(turn.idle && turn.failed.is_none());
         assert_eq!((turn.tools_called, turn.last_reply.as_str()), (2, "done"));
         let asks: Vec<&Norm> = norms.iter().filter(|n| matches!(n, Norm::Permission { .. })).collect();
-        let Norm::Permission { request_id, tool, input } = asks[0] else { unreachable!() };
+        let Norm::Permission { request_id, tool, input, .. } = asks[0] else { unreachable!() };
         assert!(request_id.starts_with("per_"));
         assert_eq!(tool, "edit: allowed.txt");
         assert_eq!(input["path"], "/WORKSPACE/allowed.txt");

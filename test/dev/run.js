@@ -34,6 +34,7 @@ async function check(name, fn) {
 function dev(home, root, args, { json = false, ok = true } = {}) {
   const env = { ...process.env, HOME: home, OVERSEER_DEV_ROOT: root, CARGO_HOME: process.env.CARGO_HOME || path.join(realHome, '.cargo'), RUSTUP_HOME: process.env.RUSTUP_HOME || path.join(realHome, '.rustup') };
   for (const k of Object.keys(env)) if (k.startsWith('OVERSEER_') && k !== 'OVERSEER_DEV_ROOT') delete env[k];
+  env.OVERSEER_DEV_MENUBAR = 'off'; // no dev item in the owner's menu bar from a test (AC-262)
   const r = cp.spawnSync(process.execPath, [DEV, ...args, ...(json ? ['--json'] : [])], { env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 15 * 60 * 1000 });
   if (ok && r.status !== 0) throw new Error(`scripts/dev ${args.join(' ')} exited ${r.status}:\n${r.stdout}\n${r.stderr}`);
   return json && r.status === 0 ? JSON.parse(r.stdout) : r;

@@ -35,7 +35,7 @@ const FLAGS = {
   '--owner-logins': 'bool', '--mdns': 'bool', '--json': 'bool', '--keep-clients': 'bool', '--follow': 'bool',
   '-f': 'bool', '--vsix': 'value', '--inspect': 'bool', '--dry-run': 'bool', '--platform': 'value', '--all': 'bool',
   '--list': 'bool', '--start': 'bool', '--record': 'value', '--skip': 'value', '--finish': 'bool', '--ref': 'value',
-  '--no-fetch': 'bool', '--file': 'value', '--evidence': 'value', '--status': 'bool',
+  '--no-fetch': 'bool', '--file': 'value', '--evidence': 'value', '--status': 'bool', '--no-menubar': 'bool', '--menubar': 'bool',
   '--help': 'bool', '-h': 'bool',
 };
 
@@ -107,6 +107,11 @@ WHERE THINGS ARE
   NAME: lower-case letters, digits and hyphens (up to 32); the daemon runs as dev-NAME.
   Gateway: each instance gets its own port from ${FIRST_PORT} up (production uses 47810); mDNS
       is off unless --mdns, and then only as _overseer-dev._tcp, never _overseer._tcp.
+  Menu bar (macOS, AC-262): up also starts the instance's own Overseer item in the menu bar,
+      the icon with a "!" (hover: "Dev daemon: dev-NAME"), built from the checkout. Choosing an
+      agent there opens it in the instance's VS Code; Start Overseer runs up --no-build. down
+      and clean quit it. --no-menubar (or OVERSEER_DEV_MENUBAR=off) leaves it out; under
+      scripts/test-all it is left out unless --menubar.
 
 LOGINS AND PAID TURNS
   By default an instance has no logins: Claude is the repository's fixture harness, Codex and
@@ -388,6 +393,7 @@ async function up(o) {
       fs.cpSync(app, path.join(i.bin, 'Overseer Listener.app'), { recursive: true });
     }
   }
+  const menubar = menubarWanted(o) && menubarInstall(o, repo, i);
   fs.writeFileSync(path.join(i.bin, MARKER), i.id + '\n');
   fs.writeFileSync(path.join(i.bin, 'notify'), `#!/bin/sh\nprintf '%s\\t%s\\t%s\\t%s\\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$1" "$2" "$3" >> ${shq(i.notifications)}\n`);
   fs.chmodSync(path.join(i.bin, 'notify'), 0o755);
@@ -400,8 +406,39 @@ async function up(o) {
   };
   writeMeta(i, meta);
   const hello = await startDaemon(i, meta);
+  if (menubar) menubarStart(i);
   const st = { ...meta, running: true, pid: hello.pid, version: hello.version };
   print(st, o['--json'], describe(st, i));
+}
+
+/** The instance's item in the menu bar (AC-262): wanted on macOS unless turned off (tests leave it out). */
+function menubarWanted(o) {
+  if (process.platform !== 'darwin' || o['--no-menubar'] || process.env.OVERSEER_DEV_MENUBAR === 'off') return false;
+  return !!o['--menubar'] || !process.env.OVERSEER_TEST_RUN;
+}
+const menubarApp = i => path.join(i.bin, 'Overseer Menu.app');
+/** Builds (unless --no-build) and copies the checkout's Overseer Menu.app next to the instance's daemon, with its menubar.json. */
+function menubarInstall(o, repo, i) {
+  const built = path.join(repo, 'extension/bin/Overseer Menu.app');
+  if (!o['--no-build'] || !exists(built)) {
+    const r = cp.spawnSync(process.execPath, ['extension/menubar/build.js'], { cwd: repo, stdio: ['ignore', process.stderr, process.stderr], env: { ...process.env, OVERSEER_MENUBAR_ARCH: 'host' } });
+    if (r.status !== 0) { process.stderr.write(`the menu-bar item did not build in ${repo} (node extension/menubar/build.js); going on without it\n`); return false; }
+  }
+  if (pidsWith(menubarApp(i)).length) return true; // running: an up --no-build from its own Start Overseer
+  fs.rmSync(menubarApp(i), { recursive: true, force: true });
+  fs.cpSync(built, menubarApp(i), { recursive: true });
+  fs.writeFileSync(path.join(i.bin, 'menubar.json'), JSON.stringify({
+    socket: i.socket, instance: i.id, daemon: i.daemon,
+    start: [process.execPath, path.join(SELF_REPO, 'scripts/dev'), 'up', '--name', i.name, '--no-build'],
+    code: CODE, code_args: ['--user-data-dir', i.profile, '--extensions-dir', i.extensions],
+  }, null, 2) + '\n');
+  return true;
+}
+function menubarStart(i) {
+  const bin = path.join(menubarApp(i), 'Contents/MacOS/overseer-menu');
+  if (!exists(bin) || pidsWith(menubarApp(i)).length) return;
+  const child = cp.spawn(bin, [], { detached: true, stdio: 'ignore', env: clientEnv(i) });
+  child.unref();
 }
 
 async function down(o, i = instance(o['--name'])) {

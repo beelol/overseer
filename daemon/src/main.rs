@@ -29,6 +29,7 @@ mod voice;
 mod git;
 mod handoff;
 mod local;
+mod menubar;
 mod merge;
 mod net;
 mod ollama_install;

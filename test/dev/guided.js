@@ -25,6 +25,7 @@ async function check(name, fn) {
 const realHome = os.homedir();
 const env = { ...process.env, HOME: home, OVERSEER_DEV_ROOT: root, CARGO_HOME: process.env.CARGO_HOME || path.join(realHome, '.cargo'), RUSTUP_HOME: process.env.RUSTUP_HOME || path.join(realHome, '.rustup') };
 for (const k of Object.keys(env)) if (k.startsWith('OVERSEER_') && k !== 'OVERSEER_DEV_ROOT') delete env[k];
+env.OVERSEER_DEV_MENUBAR = 'off'; // no dev item in the owner's menu bar from a test (AC-262)
 const FIXTURE = path.join(__dirname, 'owner-check-fixture.json');
 function dev(args, { ok = true } = {}) {
   const r = cp.spawnSync(process.execPath, [DEV, ...args], { env, encoding: 'utf8', input: '', maxBuffer: 64 * 1024 * 1024 });
