@@ -219,3 +219,18 @@ button.open-native, button.close-file { height: 24px; min-width: 24px; padding: 
 /* A review narrower than about 440 px (beside the chat on a small window): Where am I (also ⌥⌘M)
    and Refresh (the review refreshes itself) give their room to the agent's name (AC-76). */
 @media (max-width: 440px) { #where, #refresh { display: none; } #toolbar { gap: 4px; padding: 0 var(--ov-space-2); } }
+
+/* Overseer (AC-232): Keep / Undo in words; (AC-243) the agent's work in the toolbar: Merge, Open PR, Merged. */
+.hunk-actions .hunk-word { margin-left: 3px; font-size: 11px; }
+#land { display: inline-flex; align-items: center; gap: 6px; margin-right: 6px; min-width: 0; flex: 0 1 auto; overflow: hidden; }
+#land[hidden], #land button[hidden] { display: none; }
+#land-text { font-size: var(--ov-font-sm, 12px); color: var(--ov-muted, var(--vscode-descriptionForeground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 30ch; min-width: 0; flex: 0 1 auto; }
+button.land .codicon { font-size: 14px; }
+@media (max-width: 640px) { button.land .land-word { display: none; } button.land { padding: 0 6px; } #land-text { max-width: 12ch; } }
+#land[data-state="merged"] #land-text { color: var(--ov-done, var(--vscode-testing-iconPassed)); }
+#land[data-state="conflicts"] #land-text { color: var(--ov-waiting, var(--vscode-editorWarning-foreground)); }
+button.land { display: inline-flex; align-items: center; gap: 4px; flex: none; height: 22px; padding: 0 10px; border-radius: var(--ov-radius-pill, 11px); border: 1px solid var(--ov-border, transparent); background: transparent; color: inherit; cursor: pointer; white-space: nowrap; font-size: var(--ov-font-sm, 12px); }
+button.land.primary { background: var(--ov-accent-gradient, var(--vscode-button-background)); color: var(--ov-accent-fg, var(--vscode-button-foreground)); border-color: transparent; }
+button.land:hover { background: var(--ov-hover, var(--vscode-toolbar-hoverBackground)); }
+button.land.primary:hover { background: var(--ov-accent-bg-hover, var(--vscode-button-hoverBackground)); }
+.save-file[hidden] { display: none; }

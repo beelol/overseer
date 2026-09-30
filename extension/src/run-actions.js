@@ -2,7 +2,7 @@
 // a trusted workspace and only ever targets the given run.
 const vscode = require('vscode');
 
-const CONTROL = ['followUp', 'interrupt', 'permission', 'mergeBack', 'signIn', 'openPullRequest', 'cleanup', 'steer'];
+const CONTROL = ['followUp', 'interrupt', 'permission', 'mergeBack', 'signIn', 'openPullRequest', 'cleanup', 'steer', 'cancelMerge', 'publishToGitHub'];
 // A message typed while an agent waits for its connection is kept until the wait is over (Gate L).
 const ACTIVE = new Set(['queued', 'starting', 'running', 'waiting_for_connection', 'waiting_for_memory']);
 
@@ -79,6 +79,10 @@ async function handleRunMessage({ client, model, steering }, runId, message, rep
     }
     case 'openPullRequest': await vscode.commands.executeCommand('overseer.openPullRequest', runId); return true;
     case 'mergeBack': await vscode.commands.executeCommand('overseer.mergeBack', runId); return true;
+    case 'cancelMerge': await vscode.commands.executeCommand('overseer.cancelMerge', runId); return true;
+    case 'publishToGitHub': await vscode.commands.executeCommand('overseer.publishToGitHub', runId); return true;
+    // The chat's … menu opened: check the remote and what can merge now (the owner may have added a remote).
+    case 'refreshLanding': await model.landing?.refresh(runId, { force: true }); return true;
     case 'openReview': await vscode.commands.executeCommand('overseer.openReview', runId); return true;
     case 'openEdit': await vscode.commands.executeCommand('overseer.openEdit', String(message.runId || runId), String(message.path || '')); return true;
     case 'cleanup': await vscode.commands.executeCommand('overseer.cleanupWorkspace', runId); return true;

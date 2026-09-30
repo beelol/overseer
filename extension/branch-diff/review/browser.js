@@ -260,7 +260,9 @@ function makeRow(entry) {
   const status = node('span', 'status'); const unsaved = node('span', 'unsaved');
   const stats = node('span', 'stats', '…');
   const open = node('button', 'open-native', '↗'); open.title = 'Open in native diff (undo, redo, Git gutters)'; open.setAttribute('aria-label', 'Open ' + entry.path + ' in native diff');
-  const save = node('button', 'save-file', 'Save'); save.disabled = true; save.title = 'Save this file (Cmd+S)';
+  // Overseer (AC-232): Save says what it does; it writes your edits, it does not keep or undo the agent's change.
+  const save = node('button', 'save-file', "Save your changes to the agent's copy"); save.disabled = true; save.hidden = true;
+  save.title = "Save your changes to the agent's copy (Cmd+S): writes your edits to this file in the agent's worktree. It does not keep or undo the agent's change.";
   // An unchanged file opened from the navigator can be closed again (AC-99).
   const close = node('button', 'close-file'); close.title = 'Close this file (it has no changes)'; close.setAttribute('aria-label', 'Close ' + entry.path);
   const closeIcon = node('span', 'codicon codicon-close'); closeIcon.setAttribute('aria-hidden', 'true'); close.append(closeIcon);
@@ -525,14 +527,15 @@ function renderHunks(row) {
     dom.setAttribute('role', 'group'); dom.setAttribute('aria-label', `Hunk ${index + 1} of ${row.entry.path}, ${where}`);
     const glyph = name => { const g = node('span', 'codicon codicon-' + name); g.setAttribute('aria-hidden', 'true'); return g; };
     if (reviewed) { const badge = node('span', 'hunk-badge'); badge.append(glyph('pass-filled')); badge.title = 'Reviewed'; dom.append(badge); }
-    const accept = node('button', 'hunk-accept'); accept.append(glyph(reviewed ? 'close' : 'check'));
-    accept.title = reviewed ? 'Unmark: this hunk is reviewed; mark it not reviewed' : 'Accept: keep this change and mark the hunk reviewed (no Git staging)';
+    // Overseer (AC-232): keeping or undoing the agent's change is a choice in words, Keep or Undo.
+    const accept = node('button', 'hunk-accept'); accept.append(glyph(reviewed ? 'close' : 'check'), node('span', 'hunk-word', reviewed ? 'Unmark' : 'Keep'));
+    accept.title = reviewed ? "Kept and marked reviewed. Click to mark it not reviewed (the change stays either way)" : "Keep: the agent's change stays, and this hunk is marked reviewed (nothing is committed or staged)";
     accept.setAttribute('aria-label', reviewed ? `Unmark reviewed hunk ${index + 1}` : `Accept hunk ${index + 1}`);
     accept.addEventListener('click', () => vscode.postMessage({ type: 'hunkReview', reviewed: !reviewed, key, path: row.entry.path, version: snapshot?.version,
       modifiedStart: change.modifiedStartLineNumber, modifiedEnd: change.modifiedEndLineNumber, modified: mod, anchor: row.modified.getLineContent(Math.max(1, Math.min(change.modifiedStartLineNumber || 1, row.modified.getLineCount()))) }));
-    const reject = node('button', 'hunk-reject'); reject.append(glyph('discard'));
+    const reject = node('button', 'hunk-reject'); reject.append(glyph('discard'), node('span', 'hunk-word', 'Undo'));
     reject.disabled = !canEdit;
-    reject.title = canEdit ? 'Reject: restore this hunk to the comparison base (undo with Cmd+Z in the native editor)' : 'Reject is unavailable: this file cannot be edited in the review (see Open in Native Diff)';
+    reject.title = canEdit ? "Undo: put back what was there before the agent's change, in the agent's copy (Cmd+Z in the native editor brings it back)" : 'Undo is unavailable: this file cannot be edited in the review (see Open in Native Diff)';
     reject.setAttribute('aria-label', `Reject hunk ${index + 1}`);
     reject.addEventListener('click', () => rejectHunk(row, change, key));
     dom.append(accept, reject);
@@ -746,10 +749,32 @@ function applyOverseer(o) {
   note.hidden = true;
   document.getElementById('base').title += `\n${o.workspaceKind === 'current' ? 'Checkout' : 'Worktree'}: ${short}`;
   document.body.dataset.workspace = o.workspacePath || '';
+  renderLand(o.land);
   followState = o.follow || 'off';
   followNote = o.followNote || '';
   followStatus.textContent = followState === 'paused' ? (/paused/.test(o.followNote || '') ? o.followNote : 'Follow paused by your navigation') : followState === 'following' ? (o.followNote || 'Following agent edits') : '';
   renderFollow();
+}
+// Overseer (AC-243): the chat's Merge buttons in the review's toolbar, for this agent.
+const landBox = document.getElementById('land');
+// Publish to GitHub (no remote) is in the chat only; the review keeps its toolbar short (AC-54, AC-76).
+for (const [id, action] of [['land-merge', 'merge'], ['land-pr', 'openPullRequest'], ['land-cancel', 'cancelMerge'], ['land-cleanup', 'cleanup']]) {
+  document.getElementById(id)?.addEventListener('click', () => vscode.postMessage({ type: 'land', action }));
+}
+function renderLand(l) {
+  if (!landBox) return;
+  // Narrow reviews show the buttons' icons only; their names stay in the tooltip and accessible name.
+  const show = (id, on, text) => { const b = document.getElementById(id); b.hidden = !on; const w = b.querySelector('.land-word'); if (text) w.textContent = text; b.title = w.textContent; b.setAttribute('aria-label', w.textContent); };
+  const state = !l || !l.worktree || l.active ? '' : l.conflicts ? 'conflicts' : l.merged ? 'merged' : l.canMerge ? 'ready' : l.text ? 'landed' : '';
+  landBox.hidden = !state; landBox.dataset.state = state;
+  if (!state) return;
+  const words = document.getElementById('land-text');
+  words.title = state === 'conflicts' ? `Merge stopped: conflicts in ${l.conflicts.join(', ')}` : l.text || '';
+  words.textContent = state === 'conflicts' ? (l.conflicts.length ? `Merge stopped: conflicts in ${l.conflicts.join(', ')}` : 'Merge stopped: conflicts') : state === 'ready' ? (l.landing && l.landing.state === 'pr' ? l.text : '') : l.text;
+  show('land-merge', state === 'conflicts' || state === 'ready', state === 'conflicts' ? 'Finish merge' : `Merge into ${l.target || 'main'}`);
+  show('land-pr', state === 'ready' && !!l.github);
+  show('land-cancel', state === 'conflicts');
+  show('land-cleanup', state === 'merged' && !l.removed);
 }
 function userNavigated(reason) {
   if (followState !== 'following') return;

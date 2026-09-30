@@ -82,7 +82,7 @@
       case 'run': if (m.channel === 'grid') grid.run(m); else if (m.run.id === selected) chat.setRun(m); break;
       case 'history': if (m.channel === 'grid') grid.history(m); else if (m.root === selected) chat.history(m.events, m.truncated, saved.chat && saved.chat.runId === selected ? saved.chat : undefined); break;
       case 'events': if (m.channel === 'grid') grid.events(m.items); else chat.events(m.items.filter(x => x.root === selected)); break;
-      case 'notice': if (m.scope === 'composer') composer.notice(m); else chat.notice(m.message); break;
+      case 'notice': if (m.scope === 'composer') composer.notice(m); else chat.notice(m.message, m.info); break;
       case 'raw': chat.raw(m.raw); break;
       case 'changes': if (m.runId === selected) chat.changes(m.changes); break;
       case 'composerData': composer.data(m.data); break;

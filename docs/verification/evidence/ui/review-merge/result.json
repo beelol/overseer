@@ -1,0 +1,206 @@
+{
+  "checks": [
+    {
+      "name": "fixture: the agent committed data/features.js on its branch and left .env untracked",
+      "ok": true,
+      "detail": {
+        "log": "8fa560b add features\ndf9cb34 fixture base",
+        "status": "?? .env"
+      }
+    },
+    {
+      "name": "the review counts the committed new file (never \"0 files\") and shows it added, every line",
+      "ok": true,
+      "detail": {
+        "total": "2 files",
+        "count": "2",
+        "base": "Since task start",
+        "rows": [
+          {
+            "path": ".env",
+            "status": "A",
+            "browsed": false,
+            "added": "1",
+            "removed": "0"
+          },
+          {
+            "path": "data/features.js",
+            "status": "A",
+            "browsed": false,
+            "added": "2",
+            "removed": "0"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Save says what it does (\"Save your changes to the agent's copy\") and shows only once you have edits",
+      "ok": true,
+      "detail": {
+        "save": "Save your changes to the agent's copy",
+        "saveHidden": true,
+        "saveTitle": "Save your changes to the agent's copy (Cmd+S): writes your edits to this file in the agent's worktree. It does not keep or undo the agent's change.",
+        "keep": "Keep",
+        "undo": "Undo",
+        "keepTitle": "Keep: the agent's change stays, and this hunk is marked reviewed (nothing is committed or staged)",
+        "undoTitle": "Undo: put back what was there before the agent's change, in the agent's copy (Cmd+Z in the native editor brings it back)"
+      }
+    },
+    {
+      "name": "the new file is all added lines: no removed line above them, one hunk",
+      "ok": true,
+      "detail": {
+        "deleted": 0,
+        "inserted": 2,
+        "hunks": "1",
+        "lines": [
+          "export const features = [];",
+          "export default features;",
+          ""
+        ]
+      }
+    },
+    {
+      "name": "each hunk is a clear choice: Keep (the agent's change stays) or Undo (put back what was there)",
+      "ok": true,
+      "detail": {
+        "save": "Save your changes to the agent's copy",
+        "saveHidden": true,
+        "saveTitle": "Save your changes to the agent's copy (Cmd+S): writes your edits to this file in the agent's worktree. It does not keep or undo the agent's change.",
+        "keep": "Keep",
+        "undo": "Undo",
+        "keepTitle": "Keep: the agent's change stays, and this hunk is marked reviewed (nothing is committed or staged)",
+        "undoTitle": "Undo: put back what was there before the agent's change, in the agent's copy (Cmd+Z in the native editor brings it back)"
+      }
+    },
+    {
+      "name": "no remote: the chat offers Merge into main and Publish to GitHub, not Open PR",
+      "ok": true,
+      "detail": {
+        "hidden": false,
+        "state": "ready",
+        "text": "2 files to land",
+        "buttons": [
+          "merge-now:Merge into main",
+          "publish:Publish to GitHub…"
+        ]
+      }
+    },
+    {
+      "name": "the review has the same Merge button (no Open PR without a GitHub remote)",
+      "ok": true,
+      "detail": {
+        "merge": "Merge into main",
+        "pr": false
+      }
+    },
+    {
+      "name": "Open PR with no remote offers the local merge (or Publish to GitHub) in the window, never a dialog",
+      "ok": true,
+      "detail": {
+        "offered": {
+          "title": "This repository has no GitHub remote, so there is no pull request to open",
+          "rows": [
+            "git-merge  Merge into main, Merge the agent's work into main in this repository, on this Mac. Nothing is pushed.",
+            "github  Publish to GitHub…, Create a GitHub repository for it first; you are asked before anything is created."
+          ],
+          "value": ""
+        },
+        "alert": false
+      }
+    },
+    {
+      "name": "one confirmation lists the files that land, and the untracked .env apart",
+      "ok": true,
+      "detail": "Cancel\nMerge into main\nMerge into main: “Add the features list”?\n2 files land on main in shop:\nA  .env\nA  data/features.js\n\nNot tracked by Git yet (committed to the agent's branch first, check none is a secret):\n?  .env\n\nGit's hooks run. If main changed the same lines, the program is asked to combine them, and you can cancel the merge from its chat.\nThe worktree is kept until you clean it up."
+    },
+    {
+      "name": "merged: main has the agent's file, and the pre-commit hook ran for the commit of .env",
+      "ok": true,
+      "detail": {
+        "log": "215f51a Merge overseer/add-the-features-list into main (Overseer merge back)\n503fdd6 Overseer: Add the features list\n8fa560b add features",
+        "hooks": "pre-commit overseer/add-the-features-list\npre-commit overseer/add-the-features-list\npre-commit overseer/add-the-features-list\n"
+      }
+    },
+    {
+      "name": "the chat reads \"Merged into main (commit)\" and offers Clean up",
+      "ok": true,
+      "detail": {
+        "hidden": false,
+        "state": "merged",
+        "text": "Merged into main (215f51a)",
+        "buttons": [
+          "cleanup-now:Clean up"
+        ]
+      }
+    },
+    {
+      "name": "its conversation says it once, with the commit (no raw \"merge back\" lines)",
+      "ok": true,
+      "detail": "Merged into main (215f51a)"
+    },
+    {
+      "name": "the side bar reads \"Merged into main (commit)\"",
+      "ok": true,
+      "detail": {
+        "label": "Add the features list",
+        "description": "Merged into main (215f51a) · now",
+        "level": 2,
+        "expanded": null,
+        "selected": true,
+        "focused": true,
+        "aria": "Add the features list, done · Merged into main (215f51a), Program"
+      }
+    },
+    {
+      "name": "the review reads \"Merged into main (commit)\" and offers Clean up, no Merge",
+      "ok": true,
+      "detail": "Merged into main (215f51a)\nClean up"
+    },
+    {
+      "name": "the grid tile reads \"Merged into main (commit)\"",
+      "ok": true,
+      "detail": "Merged into main (215f51a)"
+    },
+    {
+      "name": "a merge stopped on conflicts says so in the chat, with Finish merge and Cancel merge",
+      "ok": true,
+      "detail": {
+        "text": "Merge stopped: conflicts in a.txt",
+        "buttons": [
+          "merge-now:Finish merge",
+          "cancel-merge:Cancel merge"
+        ]
+      }
+    },
+    {
+      "name": "main is untouched while the merge is stopped",
+      "ok": true,
+      "detail": "4b469fa main changes L5\n215f51a Merge overseer/add-the-features-list into main (Overseer merge back)"
+    },
+    {
+      "name": "Open PR refuses the worktree in the middle of the merge",
+      "ok": true,
+      "detail": {
+        "ok": false,
+        "reason": "Merging main into overseer/change-line-five is unfinished: a.txt still has conflicts. Resolve them, or cancel the merge back, before opening a pull request."
+      }
+    },
+    {
+      "name": "Cancel merge restores the worktree as it was before the merge (the work uncommitted again)",
+      "ok": true,
+      "detail": {
+        "before": "M a.txt\n?? notes.txt",
+        "after": "M a.txt\n?? notes.txt"
+      }
+    },
+    {
+      "name": "the conversation says the merge stopped and was cancelled",
+      "ok": true,
+      "detail": [
+        "Merge stopped: conflicts in a.txt",
+        "Merge cancelled: the worktree is as it was before it"
+      ]
+    }
+  ]
+}

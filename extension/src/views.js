@@ -2,6 +2,7 @@
 const vscode = require('vscode');
 const path = require('path');
 const features = require('./features');
+const Landing = require('../media/landing-text.js');
 const Rollup = require('../media/rollup.js');
 const Plain = require('../media/plain-words.js');
 
@@ -174,7 +175,7 @@ class AgentsProvider {
   /** What the list shows (relative times in 30-second steps). */
   signature() {
     const st = this.model.state || {};
-    return JSON.stringify([Math.floor(Date.now() / 30000), st.oversight || {}, st.overseer || {}, (st.tasks || []).map(t => [t.id, t.title, t.repo_root, t.archived_ms ? 1 : 0]),
+    return JSON.stringify([Math.floor(Date.now() / 30000), st.oversight || {}, st.overseer || {}, st.landings || {}, (st.tasks || []).map(t => [t.id, t.title, t.repo_root, t.archived_ms ? 1 : 0]),
       (st.runs || []).map(r => [r.id, r.status, r.parent_run_id, r.attention?.kind, r.harness, r.model, r.profile_id, r.workspace_id, r.title, r.exit_reason, r.ended_ms ? 1 : 0]),
       (st.profiles || []).map(p => [p.id, p.name, p.account?.label]), (st.workspaces || []).map(w => [w.id, w.branch, w.kind]),
       (this.handlers.attention?.() || []).map(a => [a.run_id, a.label, a.detail]), this.handlers.pinned?.() || [], (st.runs || []).filter(r => this.unreviewed(r)).map(r => r.id),
@@ -551,11 +552,13 @@ class AgentsProvider {
     const marks = [voiced && '🎙 voice', o.held && '⏸ held', o.watched && '◉ watched', o.watching && o.watching.length && '◉ watching', o.conflicts && `⚠ ${o.conflicts} conflict${o.conflicts === 1 ? '' : 's'}`].filter(Boolean);
     const fresh = !ACTIVE.has(run.status) && this.unreviewed(run);
     // The ✦ badge marks it (its colour, tooltip and accessible name say "to review"); the row's words stay short.
+    // AC-243: what its work became, first: "Merged into main (1a2b3c4)".
+    const landed = ACTIVE.has(run.status) ? '' : Landing.text((m.state.landings || {})[run.workspace_id]);
     const profile = run.profile_id ? m.profile(run.profile_id) : undefined;
     // The account it runs on, always (AC-235): the plan and the shortened email beside the provider's logo.
-    item.description = [ACTIVE.has(run.status) ? '' : ago(run.ended_ms || run.created_ms), accountBrief(profile), ...marks].filter(Boolean).join(' · ');
+    item.description = [landed, ACTIVE.has(run.status) ? '' : ago(run.ended_ms || run.created_ms), accountBrief(profile), ...marks].filter(Boolean).join(' · ');
     const ws = m.workspace(run.workspace_id);
-    const status = STATUS_TEXT[run.status] || run.status;
+    const status = (STATUS_TEXT[run.status] || run.status) + (landed ? ` · ${landed}` : '');
     item.tooltip = new vscode.MarkdownString([`**${task.title}**`, `${status}${run.exit_reason && !ACTIVE.has(run.status) ? ` — ${Plain.plain(run.exit_reason, 200)}` : ''}`,
       [HARNESS_NAME[run.harness] || run.harness, accountLabel(profile), run.model].filter(Boolean).join(' · '), ws ? `${ws.kind === 'current' ? 'current checkout' : ws.branch} · ${path.basename(task.repo_root)}` : ''].filter(Boolean).join('\n\n'));
     item.accessibilityInformation = { label: `${task.title}, ${status}${fresh ? ', to review' : ''}, ${HARNESS_NAME[run.harness] || run.harness}${profile ? ', ' + accountLabel(profile) : ''}${marks.length ? ', ' + marks.map(x => x.replace(/^\S+ /, '')).join(', ') : ''}` };

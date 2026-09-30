@@ -239,6 +239,9 @@ class CommandCenter {
     this.pushChanges(true);
   }
 
+  /** A line under the dashboard chat, when it shows that agent (AC-243's merge results). */
+  notice(runId, text) { if (this.chatRun === runId) this.panel?.webview.postMessage({ type: 'notice', message: text, info: true }); }
+
   async pushChanges(force) {
     const run = this.chatRun && this.model.run(this.chatRun);
     if (!run || run.parent_run_id) return;
@@ -253,7 +256,7 @@ class CommandCenter {
     const ovRun = this.model.state.overseer?.run_id && this.model.run(this.model.state.overseer.run_id);
     const ovProfile = ovRun?.profile_id && this.model.profile(ovRun.profile_id);
     const overseerAccount = ovProfile ? { label: accountLabel(ovProfile), short: accountShort(ovProfile) } : undefined;
-    const state = { tasks, runs, workspaces, profiles, overseerAccount, oversight: this.model.state.oversight || {}, overseer: this.model.state.overseer || {}, accounts: this.handlers.launcher.accounts(), attention: this.handlers.attention(), rollup: this.handlers.rollup?.(), pinned: this.handlers.pinned(),
+    const state = { tasks, runs, workspaces, profiles, overseerAccount, oversight: this.model.state.oversight || {}, overseer: this.model.state.overseer || {}, landings: this.model.state.landings || {}, accounts: this.handlers.launcher.accounts(), attention: this.handlers.attention(), rollup: this.handlers.rollup?.(), pinned: this.handlers.pinned(),
       gridMax: Math.max(1, Math.min(16, vscode.workspace.getConfiguration('overseer').get('grid.maxTiles', 6))), archived: this.handlers.archived() };
     await this.panel.webview.postMessage({ type: 'state', state, selected: this.handlers.selected() });
     if (this.chatRun) { const msg = runMessage(this.model, this.chatRun, this.handlers.steering); if (msg) { this.chatFeed.refreshDescendants(); this.panel.webview.postMessage({ type: 'run', channel: 'chat', ...msg }); } }

@@ -32,6 +32,13 @@
       case 'watch_started': return ['eye', `Watched${p && p.mode === 'check' ? ' and checked' : ''}: ${ui.firstLine((p && p.brief) || '', 120)}`];
       case 'watch_ended': return ['eye-closed', `The watch ended: ${(p && p.reason) || ''}`];
       case 'handoff': return ['arrow-right', 'Handed off'];
+      // AC-243: what a merge did, once, in words; its steps ("ready") are not news.
+      case 'merge_back':
+        if (p && p.state === 'merged') return ['git-merge', `Merged into ${p.target || 'main'}${p.commit ? ` (${String(p.commit).slice(0, 7)})` : ''}`];
+        if (p && p.state === 'conflicts') return ['warning', `Merge stopped: conflicts in ${((p && p.files) || []).join(', ')}`];
+        if (p && p.state === 'cancelled') return ['discard', 'Merge cancelled: the worktree is as it was before it'];
+        return undefined;
+      case 'pull_request': return ['git-pull-request', `Pull request${p && p.number ? ' #' + p.number : ''} opened`];
       default: return undefined;
     }
   }
@@ -609,7 +616,7 @@
       card.el.replaceChildren(...kids);
     }
   }
-  Conversation.KNOWN = new Set(['auto_decision', 'turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed', 'proposal', 'proposal_answered', 'queued', 'briefing', 'overseer_message', 'redirect', 'hold', 'release', 'guardrail', 'guardrail_crossed', 'check_in', 'report', 'ask', 'claim', 'share', 'share_withdrawn', 'finding', 'watch_started', 'watch_ended', 'handoff', 'remote_command']);
+  Conversation.KNOWN = new Set(['auto_decision', 'turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed', 'proposal', 'proposal_answered', 'queued', 'briefing', 'overseer_message', 'redirect', 'hold', 'release', 'guardrail', 'guardrail_crossed', 'check_in', 'report', 'ask', 'claim', 'share', 'share_withdrawn', 'finding', 'watch_started', 'watch_ended', 'handoff', 'remote_command', 'merge_back', 'pull_request']);
   Conversation.describe = describe;
 
   window.OverseerConversation = Conversation;
