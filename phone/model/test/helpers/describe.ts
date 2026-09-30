@@ -33,7 +33,7 @@ function line(row: Row, c: Conversation): Line {
       requestLabel: TEXT.conversation.request, requestHint: TEXT.conversation.requestHint, request: requestText(row),
     };
     case 'error': return { ...at, kind: 'error', icon: row.icon, class: row.class, title: row.title, message: row.message, signIn: row.signIn ? { label: TEXT.conversation.signInAgain, says: TEXT.conversation.signInAgainLabel } : null };
-    case 'child': return { ...at, kind: 'child', icon: row.icon, run: row.childRun, title: row.title, status: row.statusText, tooltip: row.tooltip };
+    case 'child': return { ...at, kind: 'child', icon: row.icon, run: row.childRun, title: row.title, usage: row.usage, status: row.statusText, tooltip: row.tooltip };
     case 'note': return { ...at, kind: 'note', text: row.text, status: row.status, icon: row.icon, tooltip: row.tooltip };
     case 'footer': return { ...at, kind: 'footer', state: row.state, icon: row.icon, text: row.text, tooltip: row.tooltip, duration: row.duration, usage: row.usage, usageDetail: row.usageDetail };
   }

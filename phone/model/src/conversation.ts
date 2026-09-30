@@ -20,6 +20,7 @@ import type { ToolDescription } from './describe.ts';
 import { mapGet, mapSet, pmap, pvec, vecArray, vecGet, vecPush, vecSet, vecSplice } from './persistent.ts';
 import type { PMap, PVec } from './persistent.ts';
 import { parse } from './markdown.ts';
+import { plain } from './plain.ts';
 import type { Block } from './markdown.ts';
 import { basename, compact, duration, statusText, TEXT } from './text.ts';
 import { record } from './types.ts';
@@ -172,6 +173,8 @@ export interface ChildRow extends RowBase {
   readonly title: string;
   readonly status: string;
   readonly statusText: string;
+  /** What it reported using, beside its title: "20k reported tokens"; empty until it reports. */
+  readonly usage: string;
   readonly tooltip: string;
 }
 
@@ -297,6 +300,8 @@ export interface Conversation {
   readonly blocks: PMap<BlockState>;
   readonly blockOrder: ReadonlyArray<string>;
   readonly childInfo: PMap<ChildInfo>;
+  /** What each native child reported using: its label and the tooltip's line. */
+  readonly childUsage: PMap<{ readonly label: string; readonly detail: string }>;
   readonly cards: PMap<CardState>;
   readonly cardRequests: PMap<unknown>;
   /** A request from a phone that was just accepted: the next turn is its message. */
@@ -320,7 +325,7 @@ export function create(options: ConversationOptions): Conversation {
   return {
     rootId: options.rootId, home: options.home ?? '', rows: pvec(), working: { shown: false, label: TEXT.conversation.working }, banner: null, status: undefined, attention: undefined,
     landed: pmap(), active: false, stopping: false, seen: pmap(), family: mapSet(pmap<true>(), options.rootId, true), turns: [], tools: pmap(), toolsOf: pmap(), open: [], groups: pmap(),
-    blocks: pmap(), blockOrder: [], childInfo: pmap(), cards: pmap(), cardRequests: pmap(), arriving: null,
+    blocks: pmap(), blockOrder: [], childInfo: pmap(), childUsage: pmap(), cards: pmap(), cardRequests: pmap(), arriving: null,
   };
 }
 
@@ -587,7 +592,8 @@ function toolRow(b: RowBase, t: ToolState, c: Conversation): ToolRow {
   const d = describe(t.name, t.input, t.summary);
   const done = !!t.status && !/running|started|inProgress|in_progress/.test(t.status);
   const verb = !done && d.pending && t.status !== undefined ? d.pending : d.verb;
-  const full = [d.full, t.name !== d.verb ? `(${t.name})` : ''].filter(Boolean).join(' ');
+  // The tool's own name follows in brackets, unless it is an internal one (mcp__server__tool, AC-245).
+  const full = [d.full, t.name !== d.verb && !/^mcp__/.test(t.name) ? `(${t.name})` : ''].filter(Boolean).join(' ');
   return {
     ...b, kind: 'tool', id: t.id ?? '', name: t.name, icon: d.icon, verb, target: d.target || '', code: !!d.code, full,
     result: resultOf(t, d, c), group: t.group ?? null,
@@ -714,9 +720,11 @@ function summarize(w: Work, gkey: string): void {
 function childRow(b: RowBase, run: string, c: Conversation): ChildRow {
   const info = mapGet(c.childInfo, run) || {};
   const st = info.status || 'unknown';
+  const used = mapGet(c.childUsage, run);
+  // Its title, state and usage; how it was linked to its parent is the daemon's business (AC-245).
   return {
-    ...b, kind: 'child', icon: 'type-hierarchy-sub', childRun: run, title: info.title || TEXT.conversation.subAgent, status: st, statusText: statusText(st),
-    tooltip: [info.title, statusText(st)].filter(Boolean).join('\n'),
+    ...b, kind: 'child', icon: 'type-hierarchy-sub', childRun: run, title: info.title || TEXT.conversation.subAgent, status: st, statusText: statusText(st), usage: used?.label ?? '',
+    tooltip: [info.title, statusText(st), used?.detail].filter(Boolean).join('\n'),
   };
 }
 
@@ -1039,7 +1047,7 @@ function add(w: Work, ev: DaemonEvent): void {
       if (!child) turnChange(w, ensureTurn(w, ev), { hadError: true });
       const place = placeFor(w, ev);
       const cls = typeof p['class'] === 'string' ? p['class'] : '';
-      const row: ErrorRow = { ...base(place, `err:${ev.seq}`, run, ev.seq), kind: 'error', icon: 'error', class: cls || 'error', title: t.errorTitle[cls] || t.errorTitleOther, message: String(p['message'] || ''), signIn: cls === 'auth' };
+      const row: ErrorRow = { ...base(place, `err:${ev.seq}`, run, ev.seq), kind: 'error', icon: 'error', class: cls || 'error', title: t.errorTitle[cls] || t.errorTitleOther, message: plain(p['message'] || '', 600), signIn: cls === 'auth' };
       put(w, place.end, [row]);
       break;
     }
@@ -1076,9 +1084,10 @@ function add(w: Work, ev: DaemonEvent): void {
       const ok = !!p['ok'];
       const stopped = !ok && w.c.stopping;
       const word = ok ? t.done : stopped ? t.stopped : t.failed;
-      const reason = !ok && !stopped && !turn.hadError && p['summary'] ? (String(p['summary']).split('\n')[0] as string).slice(0, 160) : '';
+      // The harness's words in plain words (AC-245).
+      const reason = !ok && !stopped && !turn.hadError && p['summary'] ? plain(String(p['summary']).split('\n')[0], 400).slice(0, 160) : '';
       const change: Writable<Partial<FooterRow>> = { state: ok ? 'ok' : stopped ? 'stopped' : 'fail', icon: ok ? 'check' : stopped ? 'circle-slash' : 'error', text: reason ? `${word}: ${reason}` : word };
-      if (p['summary'] && !ok) change.tooltip = String(p['summary']);
+      if (p['summary'] && !ok) change.tooltip = plain(p['summary'], 400);
       w.c.stopping = false;
       const end = eventTime(ev);
       if (turn.started && end && end > turn.started) change.duration = duration(end - turn.started);
@@ -1128,16 +1137,30 @@ function status(w: Work, ev: DaemonEvent, p: Readonly<Record<string, unknown>>, 
   const place = placeFor(w, ev);
   put(w, place.end, [{
     ...base(place, `status:${ev.seq}`, ev.run_id || w.c.rootId, ev.seq), kind: 'note', text: statusText(st), status: st, icon: st === 'interrupted' ? 'circle-slash' : 'error',
-    tooltip: p['reason'] ? String(p['reason']) : null,
+    tooltip: p['reason'] ? plain(p['reason'], 400) : null,
   }]);
 }
 
 function usage(w: Work, ev: DaemonEvent, p: Readonly<Record<string, unknown>>, child: boolean): void {
-  if (child) return;
-  const ordinal = ensureTurn(w, ev);
   const u = record(p['usage'] || p['total'] || p['tokens'] || p);
   const pick = (...keys: string[]): number | undefined => keys.map(k => u[k]).find(v => typeof v === 'number') as number | undefined;
   const input = pick('input_tokens', 'inputTokens', 'input'), output = pick('output_tokens', 'outputTokens', 'output');
+  if (child) {
+    // A sub-agent's usage stands beside its title: what it reported, never counted as allowance.
+    const counts = [input, output];
+    if (counts.every(v => v === undefined) || counts.some(v => v !== undefined && (!Number.isSafeInteger(v) || v < 0))) return;
+    const total = (input || 0) + (output || 0);
+    if (!Number.isSafeInteger(total)) return;
+    const t = TEXT.conversation;
+    const label = input !== undefined && output !== undefined ? t.childTokens(compact(total)) : t.childTokensOf(compact(total), input !== undefined);
+    const detail = [input !== undefined && t.childInput(input), output !== undefined && t.childOutput(output), t.notAllowance].filter(Boolean).join(' · ');
+    const run = ev.run_id as string;
+    w.c.childUsage = mapSet(w.c.childUsage, run, { label, detail });
+    childBlock(w, run, undefined, ev);
+    childHeader(w, run);
+    return;
+  }
+  const ordinal = ensureTurn(w, ev);
   const cached = pick('cache_read_input_tokens', 'cached_input_tokens', 'cachedInputTokens');
   const cost = typeof p['total_cost_usd'] === 'number' ? p['total_cost_usd'] : typeof p['cost'] === 'number' ? p['cost'] : undefined;
   if (input === undefined && output === undefined && cost === undefined) return;

@@ -162,12 +162,12 @@ describe('the agents list', () => {
     expect(app.connection.calls('search')).toEqual([]);
     expect(order().filter((id) => id.startsWith('agents.row.'))).toEqual([row(RUN.running), row(RUN.failed)]);
     expect(order().some((id) => id.startsWith('agents.needs.'))).toBe(false);
-    expect(screen.getByTestId('agents.search.matches')).toHaveTextContent('2 matches for “migration”');
+    expect(screen.getByTestId('agents.search.matches')).toHaveTextContent('2 matches');
 
     // The Mac knows the words of the conversations: what it finds is added.
     await waitFor(() => expect(app.connection.calls('search')).toEqual([{ query: 'migration', limit: 200 }]));
     await waitFor(() => expect(screen.getByTestId(row(RUN.showcase))).toBeTruthy());
-    expect(screen.getByTestId('agents.search.matches')).toHaveTextContent('3 matches for “migration”');
+    expect(screen.getByTestId('agents.search.matches')).toHaveTextContent('3 matches');
 
     await fireEvent.changeText(screen.getByTestId('agents.search.field'), 'no such agent');
     expect(screen.getByTestId('agents.empty')).toHaveTextContent(text.PHONE_ONLY.noMatches);

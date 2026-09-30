@@ -3,9 +3,15 @@
 // reviewed marks against what the daemon answers.
 //
 // VS Code's review cannot be loaded whole outside VS Code (it needs Monaco and the Git extension).
-// The functions compared are taken from its files as they stand and run as they are:
-// `renderTree`, `node` and `hunkHash` of extension/branch-diff/review/browser.js in a page, and
-// `statusLetter`, `STATUS` and the picker's items of extension/src/review.js.
+// The functions compared are taken from its files as they stand and run as they are: the
+// navigator's tree (`renderTree` and what it calls) and `hunkHash` of
+// extension/branch-diff/review/browser.js in a page, and `statusLetter`, `STATUS` and the picker's
+// items of extension/src/review.js.
+//
+// VS Code's navigator has two modes (AC-99): Changes only, the default while an agent has changes,
+// and All files, which browses the whole worktree a folder at a time. The phone's review is the
+// changed files (AC-126: "the changed files with status and counts"); browsing every file of the
+// worktree is not part of the phone's gate, so the tree is compared in Changes only.
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import { acceptParams, branchChoices, changedFiles, changesSummary, comparisonChoices, editTarget, fileDiff, hunkKey, splitLine, statusLetter } from '../src/review.ts';
@@ -32,12 +38,15 @@ interface TreeRow { kind: 'folder' | 'file'; depth: number; name: string; key: s
 
 /** The tree VS Code's review draws for these entries, read from the page. */
 function theirTree(entries: Array<{ id: string; path: string; status: string; conflicted?: boolean }>, query = '', closed: string[] = []): TreeRow[] {
-  const dom = new JSDOM('<!doctype html><body><div id="navigator"><div id="tree"></div></div></body>');
+  const dom = new JSDOM('<!doctype html><body><button id="changes-only"></button><div id="navigator"><div id="tree"></div></div></body>');
   const document = dom.window.document;
-  const draw = new Function('document', 'snapshot', 'filter', 'closedFolders', 'selected', 'jump', 'persist', 'tree',
-    `${functionSource(BROWSER, 'node')}\n${functionSource(BROWSER, 'renderTree')}\nrenderTree();`);
+  const TREE = ['node', 'changedEntries', 'changesOnly', 'countsText', 'fileButton', 'openPath', 'populateChanges', 'renderTree'];
+  const draw = new Function('document', 'snapshot', 'filter', 'closedFolders', 'selected', 'jump', 'persist', 'tree', 'navMode', 'rows', 'changesOnlyButton', 'vscode',
+    `${TREE.map(name => functionSource(BROWSER, name)).join('\n')}\nrenderTree();`);
   const tree = document.getElementById('tree') as HTMLElement;
-  draw(document, { entries }, { value: query }, new Set(closed), undefined, () => {}, () => {}, tree);
+  // No diff is drawn yet, so no row has its counts: the tree lists what changed, with its letter.
+  draw(document, { entries }, { value: query }, new Set(closed), undefined, () => {}, () => {}, tree, 'changes', new Map(), document.getElementById('changes-only'), { postMessage: () => {} });
+  if (document.body.dataset['nav'] !== 'changes') throw new Error('the review is not in Changes only');
   const out: TreeRow[] = [];
   const walk = (parent: Element, depth: number): void => {
     for (const el of parent.children) {

@@ -84,7 +84,7 @@ again: `Task`, `Run`, `RunStatus`, `Turn`, `Workspace`, `Profile`, `Event`, `Sta
 | `interface EditRow { kind: 'edit'; icon: string; files: ReadonlyArray<{ name: string; path: string; tooltip: string }>; confidence: string; group: string \| null }` | Files the agent changed; each opens the review at the hunk. |
 | `interface PermissionRow { kind: 'permission'; requestId: unknown; tool: unknown; input: unknown; state: 'pending' \| 'allowed' \| 'denied' \| 'asked'; icon: string; text: string; full: string; preview: string \| null; by: string \| null }` | A permission request and what became of it. |
 | `interface ErrorRow { kind: 'error'; icon: string; class: string; title: string; message: string; signIn: boolean }` | An error. |
-| `interface ChildRow { kind: 'child'; icon: string; childRun: string; title: string; status: string; statusText: string; tooltip: string }` | A native child; its rows follow, one deeper. |
+| `interface ChildRow { kind: 'child'; icon: string; childRun: string; title: string; status: string; statusText: string; usage: string; tooltip: string }` | A native child; its rows follow, one deeper. `usage`: what it reported using, beside its title ("20k reported tokens"), empty until it reports; the tooltip says it in full. |
 | `interface NoteRow { kind: 'note'; text: string; status: string \| null; icon: string \| null; tooltip: string \| null }` | A quiet line. |
 | `interface FooterRow { kind: 'footer'; state: 'ok' \| 'stopped' \| 'fail' \| null; icon: string \| null; text: string; tooltip: string \| null; duration: string; usage: string; usageDetail: string }` | The end of a turn: status, time, tokens and cost. |
 | `interface ConversationOptions { rootId: string; home?: string }` | `home`: the Mac's home folder, when known. |
@@ -177,6 +177,8 @@ again: `Task`, `Run`, `RunStatus`, `Turn`, `Workspace`, `Profile`, `Event`, `Sta
 | `COPIED: ReadonlyArray<{ text: string; from: string }>` | Every copied sentence with the file it came from. |
 | `statusText(status: string \| null \| undefined): string` | "Running", "Needs you", "Done". |
 | `listStatusText(status: string): string` | The agents list's word: "working", "needs you". |
+| `continuityState(status: string \| null \| undefined): { text: string; icon: string; active: boolean } \| undefined` | One of the states Continuity adds (Gate L): waiting for a connection or for memory, handed off. |
+| `plain(text: unknown, max?: number): string`, `plainTool(name: unknown): string` | Raw text of the daemon or a harness in plain words, as VS Code shows it (AC-245, `extension/media/plain-words.js`): no ids, snake_case, `mcp__` names or raw error text; "get issue (linear)" for `mcp__linear__get_issue`. |
 | `ago(ms: number \| null \| undefined, now: number): string` | "now", "5m", "2h", "3d", as the side bar says it. |
 | `agoInWords(ms: number \| null \| undefined, now: number): string` | "just now", "5m ago". |
 | `duration(ms: number \| null \| undefined): string` | "12s", "3m 4s", "1h 2m". |

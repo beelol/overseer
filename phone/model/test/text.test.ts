@@ -24,9 +24,12 @@ describe('the words are the extension\'s', () => {
   it('names a status as the chat and the side bar name it', () => {
     const p = page();
     const ui = (p.window as unknown as { OverseerUI: { statusText(s: unknown): string; HARNESS: Record<string, string> } }).OverseerUI;
-    for (const status of ['queued', 'starting', 'running', 'waiting_for_user', 'completed', 'failed', 'interrupted', 'disconnected', 'unknown', 'a_new_status', '', undefined, null]) expect(statusText(status), String(status)).toBe(ui.statusText(status));
+    for (const status of ['queued', 'starting', 'running', 'waiting_for_user', 'completed', 'failed', 'interrupted', 'disconnected', 'unknown', 'waiting_for_connection', 'waiting_for_memory', 'handed_off', 'a_new_status', '', undefined, null]) expect(statusText(status), String(status)).toBe(ui.statusText(status));
     expect(TEXT.harness).toEqual(ui.HARNESS);
     expect(TEXT.listStatus).toEqual(constant('extension/src/views.js', 'STATUS_TEXT'));
+    // Continuity's states (Gate L), which the chat and the side bar take from continuity-text.js.
+    const states = constant('extension/media/continuity-text.js', 'STATES') as Record<string, { text: string; icon: string; active: boolean }>;
+    expect(Object.fromEntries(Object.entries(TEXT.continuityStates).map(([k, v]) => [k, { ...v }]))).toEqual(Object.fromEntries(Object.entries(states).map(([k, v]) => [k, { text: v.text, icon: v.icon, active: v.active }])));
     expect(TEXT.badge).toEqual(Object.fromEntries(Object.entries(constant('extension/src/views.js', 'STATUS_BADGE')).map(([k, v]) => [k, (v as string[])[0]])));
     expect(TEXT.conversation.errorTitle).toEqual(new Function(`return ${/const TITLES = (\{[^}]*\})/.exec(fs.readFileSync(path.join(repoRoot, 'extension/media/conversation.js'), 'utf8'))?.[1]};`)());
     expect(TEXT.conversation.fromPhone).toEqual(constant('extension/media/conversation.js', 'FROM_PHONE'));

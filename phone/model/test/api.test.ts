@@ -12,7 +12,7 @@ const COMMITTED: Record<string, string[]> = {
   markdown: ['parse', 'plainText', 'safeHref', 'opensExternally', 'knownEntities'],
   review: ['statusLetter', 'changedFiles', 'changesSummary', 'comparisonChoices', 'branchChoices', 'fileDiff', 'hunkKey', 'splitLine', 'editTarget', 'acceptParams'],
   pending: ['pendingRows', 'withPending', 'isWaiting', 'sentLabel', 'keyOf'],
-  text: ['TEXT', 'PHONE_ONLY', 'COPIED', 'statusText', 'listStatusText', 'ago', 'agoInWords', 'duration', 'compact', 'grouped', 'basename', 'firstLine', 'shortPath'],
+  text: ['TEXT', 'PHONE_ONLY', 'COPIED', 'statusText', 'listStatusText', 'continuityState', 'plain', 'plainTool', 'ago', 'agoInWords', 'duration', 'compact', 'grouped', 'basename', 'firstLine', 'shortPath'],
 };
 const TOP = ['ACTIVE_STATUSES', 'isActive', 'isRun', 'isTurn', 'isAttention', 'isMark', 'record', 'textOf', 'numberOf', 'number'];
 

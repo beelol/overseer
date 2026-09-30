@@ -1,8 +1,11 @@
 // VS Code's side of the comparison: the extension's real files, loaded into a page.
 //
 // Nothing of the extension is copied or rewritten here. The files are read from extension/media
-// and run in jsdom in the order the webview loads them (extension/src/webview-html.js): ui.js,
-// logos.js, marked, DOMPurify, highlight.js, markdown.js, conversation.js. The page is then read
+// and run in jsdom in the order the webview loads them. That order is not written here: it is read
+// from extension/src/webview-html.js (`SHARED_JS`, then `CHAT_JS` up to conversation.js), so a
+// script the chat's page gains (plain-words.js and Continuity's did, and a hand-kept list missed
+// them) is loaded here too. What comes after conversation.js is the chat page's own shell (the
+// composer and chat.js, which talk to VS Code); the phone draws its own. The page is then read
 // the way a person reads it:
 //
 //   a row's text          the text of its elements (textContent), white space squashed
@@ -18,11 +21,16 @@ import path from 'node:path';
 import { JSDOM } from 'jsdom';
 import { repoRoot } from './fixtures.ts';
 import { mark, squash } from './lines.ts';
+import { list } from './source.ts';
 import type { Description, Line } from './lines.ts';
 import type { DaemonEvent, Run } from '../../src/types.ts';
 
 const media = path.join(repoRoot, 'extension/media');
-const FILES = ['ui.js', 'logos.js', 'vendor/marked.umd.js', 'vendor/purify.min.js', 'vendor/highlight.min.js', 'markdown.js', 'conversation.js'];
+const WEBVIEW = 'extension/src/webview-html.js';
+const loaded = [...list(WEBVIEW, 'SHARED_JS'), ...list(WEBVIEW, 'CHAT_JS')] as string[];
+if (!loaded.includes('conversation.js')) throw new Error(`${WEBVIEW} no longer loads conversation.js`);
+/** The scripts of the chat's page, in its order, up to the conversation view. */
+export const FILES = loaded.slice(0, loaded.indexOf('conversation.js') + 1);
 const sources = FILES.map(f => fs.readFileSync(path.join(media, f), 'utf8'));
 
 export interface Page {
@@ -141,7 +149,7 @@ function walk(p: Page, container: Element, depth: number, turn: string, out: Lin
       out.push({ depth, turn, kind: 'error', icon: icon(el.querySelector('.error-head')), class: attr(el, 'data-class') || attr(el, 'title'), title: text(el.querySelector('.error-head strong')), message: el.querySelector(':scope > .text')?.textContent ?? '', signIn: button ? { label: text(button), says: attr(button, 'aria-label') } : null });
     } else if (el.matches('details.child')) {
       const sum = el.querySelector(':scope > summary') as HTMLElement;
-      out.push({ depth, turn, kind: 'child', icon: icon(sum), run: (el as HTMLElement).dataset['run'], title: text(sum.querySelector('.child-title')), status: attr(sum.querySelector('.status'), 'aria-label'), tooltip: attr(sum, 'title') });
+      out.push({ depth, turn, kind: 'child', icon: icon(sum), run: (el as HTMLElement).dataset['run'], title: text(sum.querySelector('.child-title')), usage: text(sum.querySelector('.child-usage')), status: attr(sum.querySelector('.status'), 'aria-label'), tooltip: attr(sum, 'title') });
       walk(p, el.querySelector(':scope > .child-body') as HTMLElement, depth + 1, turn, out);
     } else if (has(el, 'sys')) {
       out.push({ depth, turn, kind: 'note', text: text(el), status: [...el.classList].find(c => c.startsWith('status-') && c !== 'status-line')?.slice('status-'.length) ?? null, icon: icon(el), tooltip: attr(el, 'title') });

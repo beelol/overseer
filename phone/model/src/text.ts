@@ -4,6 +4,8 @@
 //
 // Sentences the phone has and VS Code does not are in PHONE_ONLY, at the end.
 
+export { plain, plainTool } from './plain.ts';
+
 const UI = 'extension/media/ui.js';
 const CONVERSATION = 'extension/media/conversation.js';
 const CHAT = 'extension/media/chat.js';
@@ -15,6 +17,9 @@ const BROWSER = 'extension/branch-diff/review/browser.js';
 const PHONE_TEXT = 'extension/src/phone-text.js';
 const DAEMON = 'daemon/src/daemon.rs';
 const ROLLUP = 'extension/media/rollup.js';
+const SEARCH_VIEW = 'extension/src/search-view.js';
+const CONTINUITY_TEXT = 'extension/media/continuity-text.js';
+const CONTINUITY = 'extension/media/continuity.js';
 
 export interface Copied {
   /** The words, as they stand in the file. */
@@ -71,7 +76,19 @@ export const TEXT = {
   /** A harness by name (ui.js HARNESS). */
   harness: {
     claude: from(UI, 'Claude Code'), codex: from(UI, 'Codex'), 'codex-app': from(UI, 'Codex app-server'), opencode: from(UI, 'OpenCode'), generic: from(UI, 'Program'),
+    // Continuity's local models (Gate L): continuity.js adds the name to ui.js's.
+    'opencode-serve': from(CONTINUITY_TEXT, 'Local model'),
   } as Readonly<Record<string, string>>,
+
+  /**
+   * The states Continuity adds (Gate L, continuity-text.js STATES): waiting for a connection or for
+   * memory (the agent still holds its work, so it counts as active), and handed off.
+   */
+  continuityStates: {
+    waiting_for_connection: { text: from(CONTINUITY_TEXT, 'Waiting for a connection'), icon: 'cloud', active: true },
+    waiting_for_memory: { text: from(CONTINUITY_TEXT, 'Waiting for memory'), icon: 'cloud', active: true },
+    handed_off: { text: from(CONTINUITY_TEXT, 'Handed off'), icon: 'arrow-right', active: false },
+  } as Readonly<Record<string, { readonly text: string; readonly icon: string; readonly active: boolean }>>,
 
   agents: {
     title: from(PACKAGE, 'Agents'),
@@ -91,9 +108,10 @@ export const TEXT = {
     waitingForReply: from(ROLLUP, 'Waiting for your reply'),
     needYou: shaped(EXTENSION, "`${n} need${n === 1 ? 's' : ''} you`", (n: number) => `${n} need${n === 1 ? 's' : ''} you`),
     search: from(PACKAGE, 'Search Agents'),
-    searchHint: from(EXTENSION, 'Title, message, file, repository, account or status'),
+    /** What the search looks in, as the search field's tooltip says it; the phone's field shows it as its placeholder. */
+    searchHint: shaped(SEARCH_VIEW, 'title, message, file, repository, account or status', 'Title, message, file, repository, account or status'),
     clearSearch: from(PACKAGE, 'Clear Search'),
-    matches: shaped(EXTENSION, "`${shown} match${shown === 1 ? '' : 'es'} for “${filter.query}”`", (shown: number, query: string) => `${shown} match${shown === 1 ? '' : 'es'} for “${query}”`),
+    matches: shaped(EXTENSION, "match${shown === 1 ? '' : 'es'}", (shown: number) => `${shown} match${shown === 1 ? '' : 'es'}`),
     showArchived: from(PACKAGE, 'Show Archived Agents'),
     showActive: from(PACKAGE, 'Show Active Agents'),
     archive: from(PACKAGE, 'Archive'),
@@ -143,6 +161,12 @@ export const TEXT = {
     tokensIn: shaped(CONVERSATION, '} in`', (n: number) => `${grouped(n)} in`),
     tokensOut: shaped(CONVERSATION, '} out`', (n: number) => `${grouped(n)} out`),
     tokensCached: shaped(CONVERSATION, '} cached`', (n: number) => `${grouped(n)} cached`),
+    /** A sub-agent's usage beside its title (both counts, or the one reported). */
+    childTokens: shaped(CONVERSATION, '`${ui.compact(total)} reported tokens`', (count: string) => `${count} reported tokens`),
+    childTokensOf: shaped(CONVERSATION, "`${ui.compact(total)} reported ${input !== undefined ? 'input' : 'output'} tokens`", (count: string, input: boolean) => `${count} reported ${input ? 'input' : 'output'} tokens`),
+    childInput: shaped(CONVERSATION, '`${input.toLocaleString()} input`', (n: number) => `${grouped(n)} input`),
+    childOutput: shaped(CONVERSATION, '`${output.toLocaleString()} output`', (n: number) => `${grouped(n)} output`),
+    notAllowance: from(CONVERSATION, 'activity, not subscription allowance'),
     /** What was done from a phone, in the owner's words. */
     fromPhone: {
       'run.follow_up': from(CONVERSATION, 'Message'), 'run.permission': from(CONVERSATION, 'Answered'), 'run.interrupt': from(CONVERSATION, 'Stopped'), 'task.create': from(CONVERSATION, 'Started'),
@@ -187,7 +211,7 @@ export const TEXT = {
     queueMessage: from(CHAT, 'Queue message'),
     stop: from(CHAT, 'Stop'),
     reviewChanges: from(CHAT, 'Review changes'),
-    files: shaped(CHAT, "`${n} file${n === 1 ? '' : 's'}`", (n: number) => `${n} file${plural(n)}`),
+    files: shaped(CHAT, "${n} file${n === 1 ? '' : 's'}", (n: number) => `${n} file${plural(n)}`),
     currentCheckout: from(CHAT, 'current checkout'),
     currentCheckoutTitle: from(CHAT, 'Current checkout'),
     whenItFinishes: from(CHAT, 'Message for when it finishes'),
@@ -266,13 +290,19 @@ export const PHONE_ONLY = {
 
 /** "Needs you" for waiting_for_user; an unknown status with its underscores as spaces (ui.js statusText). */
 export function statusText(status: string | null | undefined): string {
-  const known = status ? TEXT.status[status] : undefined;
+  const known = status ? (TEXT.status[status] ?? continuityState(status)?.text) : undefined;
   return known ?? String(status || 'unknown').replace(/_/g, ' ');
+}
+
+/** One of Continuity's states, or undefined for any other. */
+export function continuityState(status: string | null | undefined): { readonly text: string; readonly icon: string; readonly active: boolean } | undefined {
+  return status && Object.hasOwn(TEXT.continuityStates, status) ? TEXT.continuityStates[status] : undefined;
 }
 
 /** The agents list's word for a status: "working", "needs you" (views.js). */
 export function listStatusText(status: string): string {
-  return TEXT.listStatus[status] ?? status;
+  // views.js adds Continuity's states to its STATUS_TEXT, in lower case.
+  return TEXT.listStatus[status] ?? continuityState(status)?.text.toLowerCase() ?? status;
 }
 
 /** "now", "5m", "2h", "3d": how long ago in the agents list (views.js `ago`). */

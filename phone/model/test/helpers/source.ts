@@ -38,6 +38,14 @@ export function constant(file: string, name: string): Record<string, unknown> {
   return new Function(`return ${balanced(source, start + `const ${name} = `.length, '{', '}')};`)() as Record<string, unknown>;
 }
 
+/** The list written after `const NAME =` in a file: `['ui.js', 'logos.js']`. */
+export function list(file: string, name: string): unknown[] {
+  const source = read(file);
+  const start = source.indexOf(`const ${name} = [`);
+  if (start < 0) throw new Error(`${file} has no ${name}`);
+  return new Function(`return ${balanced(source, start + `const ${name} = `.length, '[', ']')};`)() as unknown[];
+}
+
 /** What is written in the parentheses that follow `before` in a file. */
 export function argument(file: string, before: string): string {
   const source = read(file);
