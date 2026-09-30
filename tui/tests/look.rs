@@ -95,9 +95,9 @@ fn t10_nine_busy_agents_stay_responsive() {
         k += 1;
         tui.pump(15);
     }
-    for id in &ids {
-        d.wait_status(id, |s| s == "completed", 30);
-    }
+    // Keep reading events while the agents finish, as the TUI's own loop does: blocking on the
+    // daemon here left them unread in the channel, and their wait counted as lag (AC-149).
+    tui.until(60, |a| ids.iter().all(|id| a.state.run(id).is_some_and(|r| r.status == "completed")));
     tui.until(20, |a| ids.iter().all(|id| a.feeds.get(id).is_some_and(|f| f.items().any(|i| i.text.contains("line 119")))));
     times.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let p95 = times[times.len() * 95 / 100];
