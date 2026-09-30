@@ -839,7 +839,7 @@ the owner action or decision each one needs.
 - [ ] [AC-230](docs/verification/AC-230.md) (Permission modes by conversation): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-231](docs/verification/AC-231.md) (Agents start with what Overseer knows): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-234](docs/verification/AC-234.md) (Deploys follow merges by themselves): Its own agent; CI's required checks must be green first (the TUI t10 timing test on hosted runners is the owner's decision).
-- [ ] [AC-239](docs/verification/AC-239.md) (Stuck, failed and limited agents come back to Overseer): No UI scenario yet checks the VS Code surfaces (tree tooltip, Needs you, chat status) for a raw error with a limited agent; they read `plain_reason` but that is unproven on screen.
+- [ ] [AC-239](docs/verification/AC-239.md) (Stuck, failed and limited agents come back to Overseer): No UI scenario yet checks the VS Code surfaces (tree tooltip, home's stage line, chat status) for a raw error with a limited agent; they read `plain_reason` but that is unproven on screen.
 - [ ] [AC-240](docs/verification/AC-240.md) (You hear about it outside VS Code): The TUI on click with VS Code closed has no route; the real banner and click are owner checks.
 - [ ] [AC-241](docs/verification/AC-241.md) (A waiting agent can always be answered): To be built by its own agent.
 - [ ] [AC-244](docs/verification/AC-244.md) (Opening an agent leaves your layout alone): The owner chooses what the dashboard does with its settings in a window opened on a folder (see deferred).
