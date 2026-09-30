@@ -33,7 +33,10 @@
       this.whereBtn = ui.iconButton('location', 'Where am I', { action: 'where', shortcut: '⌥⌘M' }); this.whereBtn.id = 'where';
       if (this.opts.mode !== 'dashboard') this.whereBtn.hidden = true;
       actions.append(this.stopBtn, this.reviewBtn, this.whereBtn, this.moreBtn);
-      head.append(this.statusEl, titles, actions);
+      // AC-264: the Overseer view shows an agent's chat in place of home; back returns to Overseer.
+      this.backBtn = ui.iconButton('arrow-left', 'Back to Overseer', { action: 'back', shortcut: '⌥⌘U' }); this.backBtn.id = 'back-to-overseer';
+      if (this.opts.mode !== 'dashboard') this.backBtn.hidden = true;
+      head.append(this.backBtn, this.statusEl, titles, actions);
 
       this.scroll = el('div', 'chat-scroll'); this.scroll.id = 'scroll';
       const col = el('div', 'chat-column');
@@ -66,6 +69,7 @@
       this.root.replaceChildren(head, this.scroll, this.jump, bottom);
 
       this.stopBtn.addEventListener('click', () => this.post({ type: 'interrupt' }));
+      this.backBtn.addEventListener('click', () => this.post({ type: 'command', command: 'overseer.backToOverseer' }));
       this.reviewBtn.addEventListener('click', () => this.post({ type: 'openReview' }));
       this.moreBtn.addEventListener('click', () => this.menu());
       this.whereBtn.addEventListener('click', () => this.post({ type: 'command', command: 'overseer.whereAmI' }));

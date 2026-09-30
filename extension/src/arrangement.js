@@ -78,6 +78,8 @@ class Arrangement {
   /** The chat (or composer) alone in the middle. */
   async chatOnly() {
     if (this.current === 'workspace') { await this.center.open({ column: vscode.ViewColumn.One }); return; }
+    // AC-264 prototype A: Overseer's view is in the secondary side bar; the editor area keeps the review only.
+    if (this.sideView) { await this.closeReviews(); await this.center.open({ preserveFocus: true }); this.current = 'chat'; this.persist(); return; }
     await this.closeReviews(this.popped?.runId);
     if (this.popped || this.beside()) {
       // Beside the owner's groups (or with the review in its own window): no layout is rebuilt.
@@ -96,6 +98,15 @@ class Arrangement {
   /** The review on the left, the chat on the right. */
   async split(runId, { follow } = {}) {
     if (this.current === 'workspace') { await this.workspace(runId, { follow }); return; }
+    if (this.sideView) {
+      // AC-264 prototype A: the review alone in the editor area; Overseer's view is on the right.
+      await this.closeReviews(runId);
+      await vscode.commands.executeCommand('vscode.setEditorLayout', SINGLE);
+      await this.review.open(runId, { viewColumn: vscode.ViewColumn.One, preserveFocus: true, follow });
+      await this.center.open({ preserveFocus: true });
+      this.current = 'split'; this.persist();
+      return;
+    }
     if (this.popped) { await this.chatOnly(); await this.popTo(runId, { follow }); return; }
     if (this.beside()) { await this.splitBeside(runId, { follow }); return; }
     await this.closeReviews(runId);

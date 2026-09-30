@@ -157,11 +157,12 @@ class Session {
     this.note('installed', out.trim());
   }
 
+  /** folder: a folder, or several (each opens in its own window of this profile). */
   launch(folder, env = {}) {
     fs.rmSync(path.join(this.profile, 'DevToolsActivePort'), { force: true });
     this.customDialogs();
     const args = ['--remote-debugging-port=0', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
-      '--new-window', '--user-data-dir', this.profile, '--extensions-dir', this.extensions, '--skip-welcome', '--skip-release-notes', ...(env.OVERSEER_TEST_TRUST ? [] : ['--disable-workspace-trust']), ...(folder ? [folder] : [])];
+      '--new-window', '--user-data-dir', this.profile, '--extensions-dir', this.extensions, '--skip-welcome', '--skip-release-notes', ...(env.OVERSEER_TEST_TRUST ? [] : ['--disable-workspace-trust']), ...(folder ? [].concat(folder) : [])];
     if (quiet.wanted(CODE)) {
       // macOS: the window opens behind whatever the owner is using and never becomes the active app.
       this.quiet?.close();

@@ -42,7 +42,8 @@
       "overseer-mark": { "description": "Overseer mark", "default": { "fontPath": "media/overseer-mark.woff", "fontCharacter": "\\E001" } }
     },
     "viewsContainers": {
-      "activitybar": [{ "id": "overseer", "title": "Overseer", "icon": "media/overseer.svg" }]
+      "activitybar": [{ "id": "overseer", "title": "Overseer", "icon": "media/overseer.svg" }],
+      "secondarySidebar": [{ "id": "overseerPanel", "title": "Overseer", "icon": "media/overseer.svg" }]
     },
     "views": {
       "overseer": [
@@ -51,6 +52,9 @@
         { "id": "overseer.worktree", "name": "Worktree", "initialSize": 10, "when": "overseer.headOpen" },
         { "id": "overseer.accounts", "name": "Accounts", "initialSize": 5 },
         { "id": "overseer.devices", "name": "Devices", "visibility": "collapsed", "initialSize": 3 }
+      ],
+      "overseerPanel": [
+        { "type": "webview", "id": "overseer.panel", "name": "Overseer", "when": "overseer.panelLayout" }
       ]
     },
     "viewsWelcome": [
@@ -68,6 +72,8 @@
       { "command": "overseer.openDashboardWindow", "title": "Open Focus Mode in a New Window", "category": "Overseer", "icon": "$(empty-window)" },
       { "command": "overseer.openWorkspace", "title": "Open Workspace", "category": "Overseer", "icon": "$(layout)" },
       { "command": "overseer.closeWorkspace", "title": "Close Workspace", "category": "Overseer", "icon": "$(layout-sidebar-left-off)", "enablement": "overseer.inWorkspace" },
+      { "command": "overseer.prototype.panelLayout", "title": "One Layout, Way A: Overseer in the Right Side Bar", "category": "Overseer" },
+      { "command": "overseer.prototype.overseerWindow", "title": "One Layout, Way B: Reopen as the Overseer Window", "category": "Overseer" },
       { "command": "overseer.popOutReview", "title": "Pop Out Follow into Its Own Window", "category": "Overseer", "icon": "$(multiple-windows)" },
       { "command": "overseer.returnReview", "title": "Return Follow to the Main Window", "category": "Overseer", "icon": "$(screen-normal)" },
       { "command": "overseer.newAgent", "title": "New Agent", "category": "Overseer", "icon": "$(add)", "enablement": "isWorkspaceTrusted" },
@@ -330,7 +336,7 @@
     }
   },
   "scripts": {
-    "check": "node --check src/extension.js && node --check src/daemon-client.js && node --check src/views.js && node --check src/swarm-controls.js && node --check src/review.js && node --check src/agent-head.js && node --check src/line-diff.js && node --check src/output-panel.js && node --check src/phone-access.js && node --check src/phone-text.js && node --check media/pairing.js && node --check branch-diff/review/panel.js && node --check src/arrangement.js && node --check src/dashboard-mode.js && node --check src/layout.js && node --check src/vscode-chat.js && node --check src/immersive.js",
+    "check": "node --check src/extension.js && node --check src/daemon-client.js && node --check src/views.js && node --check src/swarm-controls.js && node --check src/review.js && node --check src/agent-head.js && node --check src/line-diff.js && node --check src/output-panel.js && node --check src/phone-access.js && node --check src/phone-text.js && node --check media/pairing.js && node --check branch-diff/review/panel.js && node --check src/arrangement.js && node --check src/dashboard-mode.js && node --check src/layout.js && node --check src/vscode-chat.js && node --check src/immersive.js && node --check src/one-layout.js",
     "build:review": "node branch-diff/scripts/build-review.js",
     "package": "node scripts/package.js",
     "test": "node ../test/unit/run.js"

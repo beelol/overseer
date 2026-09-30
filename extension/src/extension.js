@@ -19,6 +19,7 @@ const { Steering } = require('./run-actions');
 const { Dashboard } = require('./dashboard-mode');
 const { PhoneAccess } = require('./phone-access');
 const { Immersive } = require('./immersive');
+const { OneLayout } = require('./one-layout');
 const { VsCodeChat } = require('./vscode-chat');
 const { OverseerChat } = require('./overseer-chat');
 const { SwarmControls } = require('./swarm-controls');
@@ -183,6 +184,9 @@ async function activate(context) {
     leaveWorkspace: () => arrangement.leaveWorkspace(),
     agentsVisible: () => agentsView.visible, immersive, vsChat });
   if (dashboard.inWorkspace) arrangement.current = 'workspace';
+  // AC-264 prototypes (phase 1): A, Overseer's panel in the secondary side bar; B, the window on Overseer's own workspace file.
+  const oneLayout = new OneLayout({ context, center, arrangement, model, log: say, focusedAgent, select: (id, opts) => { selectedRun = id; return selectRun(id, opts); }, backToOverseer: () => backToOverseer() });
+  context.subscriptions.push(vscode.window.registerWebviewViewProvider('overseer.panel', oneLayout, { webviewOptions: { retainContextWhenHidden: true } }));
   arrangement.takeover = dashboard.inDashboard;
   // Another dashboard window may have put the immersive settings back on its exit: apply them again here.
   context.subscriptions.push(vscode.window.onDidChangeWindowState(s => { if (s.focused && dashboard.inDashboard) immersive.apply().catch(() => {}); }));
@@ -1097,6 +1101,8 @@ async function activate(context) {
     // AC-250: the whole layout in one step; again (or Close Workspace) puts the owner's layout back.
     vscode.commands.registerCommand('overseer.openWorkspace', guard(async () => { await model.refresh(); await dashboard.openWorkspace(); })),
     vscode.commands.registerCommand('overseer.closeWorkspace', guard(async () => { if (dashboard.inWorkspace) await dashboard.exit(); })),
+    vscode.commands.registerCommand('overseer.prototype.panelLayout', guard(async () => { await model.refresh(); await oneLayout.toggleA(); })),
+    vscode.commands.registerCommand('overseer.prototype.overseerWindow', guard(async () => { await model.refresh(); await oneLayout.toggleB(); })),
     // AC-251: the review (Follow) in its own window, to put on another screen.
     vscode.commands.registerCommand('overseer.popOutReview', guard(async arg => {
       await model.refresh();
@@ -1179,7 +1185,7 @@ async function activate(context) {
     await model.refresh();
     refreshAccounts().catch(() => {});
     announceBackgroundAgents().catch(error => say('background notice check: ' + error.message));
-    dashboard.startup().catch(error => say('dashboard startup: ' + error.message));
+    dashboard.startup().catch(error => say('dashboard startup: ' + error.message)).then(() => oneLayout.startup()).catch(error => say('one layout: ' + (error.stack || error.message)));
     setTimeout(() => offerSideBar(context).catch(error => say('side bar offer: ' + error.message)), 3000);
     const remembered = context.workspaceState.get('overseer.selectedRun');
     // Reopen where the user left off (AC-80) when VS Code did not restore the Overseer editor itself.
