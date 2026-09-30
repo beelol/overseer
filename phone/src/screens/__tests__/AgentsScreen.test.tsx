@@ -55,7 +55,7 @@ async function loaded(): Promise<void> {
 /** The test ids of the list's rows, in the order they stand. */
 function order(): string[] {
   const ids: string[] = [];
-  for (const node of screen.getAllByTestId(/^agents\.(row|needs|repo|section)\.[^.]+$/)) ids.push(String(node.props.testID));
+  for (const node of screen.getAllByTestId(/^agents\.(rollup|(row|needs|repo|section)\.[^.]+)$/)) ids.push(String(node.props.testID));
   return ids;
 }
 
@@ -82,8 +82,9 @@ describe('the agents list', () => {
     expect(screen.getByTestId(`${row(RUN.running)}.title`)).toHaveTextContent('A slow migration');
     expect(screen.getByTestId(`${row(RUN.running)}.title`).props.numberOfLines).toBe(1);
     expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent('shop · working');
-    expect(screen.getByTestId(`${row(RUN.showcase)}.status`)).toHaveTextContent('shop · done · now');
-    expect(screen.getByTestId(`${row(RUN.auth)}.status`)).toHaveTextContent('billing-service · failed · now');
+    // An agent at its end says whether it was reviewed (AC-254): these ended a moment ago.
+    expect(screen.getByTestId(`${row(RUN.showcase)}.status`)).toHaveTextContent('shop · done, to review · now');
+    expect(screen.getByTestId(`${row(RUN.auth)}.status`)).toHaveTextContent('billing-service · failed, to review · now');
 
     // Children are indented under their parent, each level further, with a line.
     expect(screen.queryByTestId(`${row(RUN.nested)}.under`)).toBeNull();
@@ -97,8 +98,8 @@ describe('the agents list', () => {
 
   test('is the model’s rows, in the model’s order', async () => {
     await open();
-    const rows = agents.agentRows(store.load(NINE), { now: NOW, filter: 'all', query: '', matches: [], collapsed: new Set(), seen: {}, changed: {}, pinned: [] });
-    const expected = rows.map((r) => (r.kind === 'section' ? 'agents.section.needs' : r.kind === 'repo' ? `agents.repo.${r.label}` : r.kind === 'needs' ? needs(String(r.runId)) : row(String(r.runId))));
+    const rows = agents.agentRows(store.load(NINE), { now: NOW, filter: 'all', query: '', matches: [], collapsed: new Set(), seen: {}, pinned: [] });
+    const expected = rows.map((r) => (r.kind === 'rollup' ? 'agents.rollup' : r.kind === 'section' ? 'agents.section.needs' : r.kind === 'repo' ? `agents.repo.${r.label}` : r.kind === 'needs' ? needs(String(r.runId)) : row(String(r.runId))));
     expect(order()).toEqual(expected);
   });
 
@@ -107,7 +108,7 @@ describe('the agents list', () => {
   test('puts the agent that waits for the owner first; the failed ones stay in their repositories', async () => {
     await open();
     const all = order();
-    expect(all.slice(0, 2)).toEqual(['agents.section.needs', needs(RUN.waiting)]);
+    expect(all.slice(0, 3)).toEqual(['agents.rollup', 'agents.section.needs', needs(RUN.waiting)]);
     for (const id of [RUN.auth, RUN.ratelimit, RUN.failed]) { expect(screen.queryByTestId(needs(id))).toBeNull(); expect(screen.getByTestId(row(id))).toBeTruthy(); }
     expect(screen.getByTestId(`${needs(RUN.waiting)}.status`)).toHaveTextContent('billing-service · Approve · Wants to use Write');
     // A row that needs the owner carries the mark, in the section and in its repository.
@@ -118,7 +119,7 @@ describe('the agents list', () => {
 
   test('filters by All, Active and Needs you, and says how many need the owner', async () => {
     await open();
-    const counts = agents.counts(store.load(NINE), { now: NOW, seen: {}, changed: {} });
+    const counts = agents.counts(store.load(NINE), { now: NOW, seen: {} });
     expect(counts.needs).toBe(1);
     expect(screen.getByTestId('agents.filter.needs')).toHaveTextContent(`Needs you${counts.needs}`);
     expect(screen.getByTestId('agents.filter.needs').props.accessibilityLabel).toBe('Needs you, 1');
@@ -194,7 +195,7 @@ describe('the agents list', () => {
     expect(screen.getByTestId('agents.filter.needs')).toHaveTextContent('Needs you1');
 
     await app.events(makeEvent('status', { status: 'completed', reason: 'turn completed' }, { run_id: RUN.running, task_id: taskOf(RUN.running), ts: NOW }));
-    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent('shop · done · now');
+    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent('shop · done, to review · now');
 
     // The one that waited was answered on the Mac: it no longer needs the owner.
     await app.events(makeEvent('status', { status: 'running' }, { run_id: RUN.waiting, task_id: taskOf(RUN.waiting), ts: NOW }));
@@ -207,24 +208,24 @@ describe('the agents list', () => {
   test('a changed status cross-fades: the old words leave while the new ones arrive', async () => {
     const app = await open();
     await app.events(makeEvent('status', { status: 'completed', reason: 'turn completed' }, { run_id: RUN.running, task_id: taskOf(RUN.running), ts: NOW }));
-    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent('shop · done · now');
+    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent('shop · done, to review · now');
     expect(screen.getAllByText('shop · working', HIDDEN)).toHaveLength(1);
     await waitFor(() => expect(screen.queryByText('shop · working', HIDDEN)).toBeNull());
-    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent('shop · done · now');
+    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent('shop · done, to review · now');
   });
 
   test('what an agent writes does not draw the list again', async () => {
     const app = await open();
     const before = app.session.getSnapshot().state;
     const shown = listed(app.session.getSnapshot());
-    const rows = agents.agentRows(shown, { now: NOW, filter: 'all', query: '', matches: [], collapsed: new Set(), seen: {}, changed: {}, pinned: [] });
+    const rows = agents.agentRows(shown, { now: NOW, filter: 'all', query: '', matches: [], collapsed: new Set(), seen: {}, pinned: [] });
     await app.events(makeEvent('output', { role: 'assistant', text: 'One more line.' }, { run_id: RUN.running, task_id: taskOf(RUN.running), ts: NOW }));
     const after = app.session.getSnapshot();
     expect(after.state).not.toBe(before);
     expect(after.state.cursor).toBeGreaterThan(before.cursor);
     // The list reads the same state as before, so its rows are the same rows.
     expect(listed(after)).toBe(shown);
-    expect(agents.agentRows(listed(after), { now: NOW, filter: 'all', query: '', matches: [], collapsed: new Set(), seen: {}, changed: {}, pinned: [] })).toBe(rows);
+    expect(agents.agentRows(listed(after), { now: NOW, filter: 'all', query: '', matches: [], collapsed: new Set(), seen: {}, pinned: [] })).toBe(rows);
   });
 
   test('a new agent started on the Mac appears in the list', async () => {
@@ -258,27 +259,35 @@ describe('the agents list', () => {
     expect(order().filter((id) => id.startsWith('agents.needs.'))).toEqual([needs(RUN.waiting)]);
   });
 
-  test('a finished agent with changes is not in Needs you (it is to review, AC-254)', async () => {
-    const app = await createTestApp({ state: NINE });
-    const asked: string[] = [];
-    const showcase = NINE.runs.find((run) => run.id === RUN.showcase);
-    app.connection.answers['workspace.changes'] = (params: { workspace_id: string }) => {
-      asked.push(params.workspace_id);
-      return { files: params.workspace_id === showcase?.workspace_id ? 3 : 0, added: 10, removed: 2, names: [] };
-    };
-    await app.render(<AgentsScreen />);
-    await loaded();
-    await waitFor(() => expect(asked.length).toBeGreaterThan(0));
+  test('a finished agent is not in Needs you: it carries the to-review mark until it is opened (AC-254)', async () => {
+    const app = await open();
     expect(screen.queryByTestId(needs(RUN.showcase))).toBeNull();
     expect(screen.getByTestId('agents.filter.needs')).toHaveTextContent('Needs you1');
-    // Once for each finished agent that is not archived, and never for a child.
-    const finished = NINE.runs.filter((run) => !run.parent_run_id && run.status === 'completed' && run.id !== RUN.archived);
-    expect([...asked].sort()).toEqual(finished.map((run) => run.workspace_id).sort());
+    expect(screen.getByTestId(`${row(RUN.showcase)}.review`, HIDDEN)).toHaveTextContent('✦');
+    expect(screen.getByTestId(row(RUN.showcase)).props.accessibilityLabel).toMatch(/^Refresh sessions once, done, to review, /);
+    // The list asks the Mac nothing for it: the mark is the phone's own, from when it was opened.
+    expect(app.connection.calls('workspace.changes')).toEqual([]);
+    await fireEvent.press(screen.getByTestId(row(RUN.showcase)));
+    expect(screen.queryByTestId(`${row(RUN.showcase)}.review`, HIDDEN)).toBeNull();
+    expect(screen.getByTestId(`${row(RUN.showcase)}.status`)).toHaveTextContent('shop · done, reviewed · now');
+    // Opening a sub-agent reviews the agent it belongs to, as in VS Code.
+    await fireEvent.press(screen.getByTestId(row(CHILD)));
+    expect(screen.queryByTestId(`${row(RUN.nested)}.review`, HIDDEN)).toBeNull();
+  });
+
+  test('says first what the agents are doing, counted as the side bar counts them (AC-255)', async () => {
+    await open();
+    // After its icon, the counts.
+    expect(screen.getByTestId('agents.rollup')).toHaveTextContent(/1 working · 1 needs you · 3 to review · 3 failed$/);
+    expect(screen.getByTestId('agents.rollup').props.accessibilityLabel).toBe('Agents: 1 working · 1 needs you · 3 to review · 3 failed');
+    // While a filter or a search narrows the list, it is not there.
+    await fireEvent.press(screen.getByTestId('agents.filter.active'));
+    expect(screen.queryByTestId('agents.rollup')).toBeNull();
   });
 
   test('a repository folds and unfolds, and stays folded', async () => {
     const app = await open();
-    expect(screen.getByLabelText('shop, 5 agents, 1 active')).toBeTruthy();
+    expect(screen.getByLabelText('shop, 5 agents, 1 active, 3 to review, 1 failed')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('agents.repo.shop'));
     for (const id of [RUN.showcase, RUN.nested, RUN.generic, RUN.failed, RUN.running, CHILD]) expect(screen.queryByTestId(row(id))).toBeNull();
     expect(screen.getByTestId(row(RUN.auth))).toBeTruthy();
@@ -439,7 +448,7 @@ describe('what the list changes on the Mac', () => {
     await fireEvent.press(screen.getByTestId('agents.actions.close', HIDDEN));
 
     await app.events(makeEvent('status', { status: 'interrupted', reason: 'interrupted by user' }, { run_id: RUN.running, task_id: taskOf(RUN.running), ts: NOW }));
-    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent('shop · stopped · now');
+    expect(screen.getByTestId(`${row(RUN.running)}.status`)).toHaveTextContent('shop · stopped, to review · now');
   });
 
   test('Stop all agents asks once, naming how many will stop', async () => {

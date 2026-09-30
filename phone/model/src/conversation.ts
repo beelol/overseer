@@ -22,7 +22,7 @@ import type { PMap, PVec } from './persistent.ts';
 import { parse } from './markdown.ts';
 import { plain } from './plain.ts';
 import type { Block } from './markdown.ts';
-import { basename, compact, continuityState, duration, statusText, TEXT } from './text.ts';
+import { basename, compact, continuityState, duration, firstLine, statusText, TEXT } from './text.ts';
 import { record } from './types.ts';
 import type { DaemonEvent, Run } from './types.ts';
 
@@ -187,6 +187,8 @@ export interface NoteRow extends RowBase {
   readonly tooltip: string | null;
   /** A link after the words that opens another agent: Continuity's "Open it" after a handoff. */
   readonly link?: { readonly label: string; readonly runId: string };
+  /** What the line opens to: the briefing Overseer added. */
+  readonly detail?: string;
 }
 
 /** The end of a turn: how it ended, how long it took, tokens and cost. */
@@ -891,9 +893,44 @@ function seenBefore(w: Work, seq: number): boolean {
   return false;
 }
 
-/** Kinds that say nothing in a chat, and kinds the chat has a picture for; any other is a quiet line. */
-const QUIET = new Set(['session', 'task_created', 'reattached', 'interrupt_requested', 'workspace_removed', 'background_notice', 'daemon_stopping', 'status', 'usage', 'push']);
-const KNOWN = new Set(['turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed', 'remote_command']);
+/** Kinds that say nothing in a chat, and kinds the chat has a picture for; any other is a quiet line (conversation.js QUIET and KNOWN). */
+const QUIET = new Set([
+  'session', 'task_created', 'reattached', 'interrupt_requested', 'workspace_removed', 'background_notice', 'daemon_stopping', 'status', 'usage', 'overseer_tool_call', 'overseer_action', 'outside_area',
+  'going_in_circles', 'check_in_started', 'watch_wake', 'watcher_started', 'watch_capped', 'watch_copy_removed', 'oversight_moved', 'dispatch', 'area', 'conflict', 'conflict_closed', 'push',
+]);
+const KNOWN = new Set([
+  'auto_decision', 'turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed',
+  'proposal', 'proposal_answered', 'queued', 'briefing', 'overseer_message', 'redirect', 'hold', 'release', 'guardrail', 'guardrail_crossed', 'check_in', 'report', 'ask', 'claim', 'share', 'share_withdrawn',
+  'finding', 'watch_started', 'watch_ended', 'handoff', 'remote_command',
+]);
+
+/**
+ * What Overseer's oversight (Gate S, AC-199) says in an agent's chat: a quiet line with an icon
+ * (conversation.js `oversightLine`), or nothing.
+ */
+function oversightLine(kind: string, p: Readonly<Record<string, unknown>>, source: string): readonly [string, string] | undefined {
+  const o = TEXT.oversight;
+  const s = (key: string): string => String(p[key] ?? '');
+  const paths = (): string => (Array.isArray(p['paths']) ? p['paths'].map(String).join(', ') : '');
+  switch (kind) {
+    case 'hold': return ['debug-pause', o.held(p['reason'] ? s('reason') : '')];
+    case 'release': return ['debug-continue', o.released(p['why'] ? s('why') : '')];
+    case 'guardrail': return ['shield', o.guardrail(p['words'] ? firstLine(p['words'], 120) : '', p['enforcement'] ? s('enforcement') : '')];
+    case 'guardrail_crossed': return ['warning', o.crossed(paths())];
+    case 'redirect': return source === 'overseer' ? ['arrow-swap', o.redirected] : undefined;
+    case 'check_in': return ['checklist', o.checkIn(p['result'] ? s('result').replace('_', ' ') : '', p['reason'] ? s('reason') : '', p['left_out'] ? s('left_out') : '')];
+    case 'report': return ['note', o.reported(firstLine(p['doing'] || '', 120))];
+    case 'ask': return ['question', o.asked(firstLine(p['question'] || '', 120))];
+    case 'claim': return ['symbol-folder', o.claimed(paths())];
+    case 'share': return ['export', o.shared(p['source'] ? s('source') : '')];
+    case 'share_withdrawn': return ['discard', o.shareWithdrawn];
+    case 'finding': return ['eye', o.finding(p['watcher_title'] ? s('watcher_title') : '', p['result'] ? s('result') : '', p['text'] ? firstLine(p['text'], 140) : '')];
+    case 'watch_started': return ['eye', o.watched(p['mode'] === 'check', firstLine(p['brief'] || '', 120))];
+    case 'watch_ended': return ['eye-closed', o.watchEnded(p['reason'] ? s('reason') : '')];
+    case 'handoff': return ['arrow-right', o.handedOff];
+    default: return undefined;
+  }
+}
 
 /** True when the event is this agent's or one of its native children's: what VS Code's feed passes on. */
 export function belongs(conversation: Conversation, event: DaemonEvent): boolean {
@@ -1107,12 +1144,31 @@ function add(w: Work, ev: DaemonEvent): void {
     case 'retention':
       w.c.banner = t.trimmed;
       break;
+    case 'queued': {
+      // A message queued for the agent, by the owner or by Overseer.
+      const detail = record(p['detail']);
+      const place = placeFor(w, ev);
+      put(w, place.end, [{ ...base(place, `note:${ev.seq}`, run, ev.seq), kind: 'note', text: TEXT.oversight.queued(detail['by'] || ev.source === 'overseer', firstLine(p['text'] || '', 80)), status: null, icon: 'history', tooltip: null }]);
+      break;
+    }
+    case 'briefing': {
+      // What Overseer added to the agent's prompt: one line, the briefing when it is opened.
+      const place = placeFor(w, ev);
+      put(w, place.end, [{ ...base(place, `note:${ev.seq}`, run, ev.seq), kind: 'note', text: TEXT.oversight.briefing, status: null, icon: 'info', tooltip: null, detail: String(p['text'] || '') }]);
+      break;
+    }
+    // Overseer's own conversation (its proposals and message cards) and Auto's decisions are not
+    // drawn on the phone: Overseer's chat on the phone is AC-128's, and Auto is unfinished (AC-204).
     default:
       break;
   }
   if (ev.kind === 'status') status(w, ev, p, child);
   if (ev.kind === 'usage') usage(w, ev, p, child);
-  if (!QUIET.has(ev.kind) && !KNOWN.has(ev.kind)) {
+  const line = oversightLine(ev.kind, p, String(ev.source || ''));
+  if (line) {
+    const place = placeFor(w, ev);
+    put(w, place.end, [{ ...base(place, `note:${ev.seq}`, run, ev.seq), kind: 'note', text: line[1].trim(), status: null, icon: line[0], tooltip: null }]);
+  } else if (!QUIET.has(ev.kind) && !KNOWN.has(ev.kind)) {
     const place = placeFor(w, ev);
     put(w, place.end, [{ ...base(place, `note:${ev.seq}`, run, ev.seq), kind: 'note', text: ev.kind.replace(/_/g, ' '), status: null, icon: null, tooltip: null }]);
   }

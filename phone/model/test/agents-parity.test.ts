@@ -1,6 +1,7 @@
-// Agents list parity: the rows of VS Code's side bar, from the extension's real views.js, against
-// the phone's rows for the same state. Nine agents in two repositories, with a nested child and
-// its child, an archived agent, two that need the owner and one that works.
+// Agents list parity: the rows of VS Code's side bar, from the extension's real views.js and
+// rollup.js, against the phone's rows for the same state. Nine agents in two repositories, with a
+// nested child and its child, an archived agent, two that need the owner, one that works, and
+// finished ones to review (AC-254, AC-255, AC-256).
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { agentRows, counts, emptyText, logoForHarness, needsYou, runHeader, searchLocally } from '../src/agents.ts';
 import type { AgentRow, AgentsOptions } from '../src/agents.ts';
@@ -26,15 +27,16 @@ function comparable(row: AgentRow): SideBarRow {
   };
 }
 
-function compare(state: State, mine: Omit<AgentsOptions, 'now'>, theirs: SideBarOptions): { rows: number; differences: string[]; listed: SideBarRow[] } {
+async function compare(state: State, mine: Omit<AgentsOptions, 'now'>, theirs: SideBarOptions): Promise<{ rows: number; differences: string[]; listed: SideBarRow[] }> {
   const a = agentRows(load(state), { now: NOW, ...mine }).map(comparable);
-  const b = sideBar(state, theirs).rows;
+  // VS Code's rollup row opens a filter picker when clicked, and its tooltip says so; the phone's
+  // filters are the chips above the list, so its row says only the counts.
+  const b = (await sideBar(state, theirs)).rows.map(row => (row.id === 'section:rollup' ? { ...row, tooltip: row.tooltip.replace(/\nClick to show only one of them\.$/, '') } : row));
   return { rows: b.length, differences: differences(a, b), listed: b };
 }
 
 describe('agents list parity with VS Code', () => {
   const state = nine.final;
-  const changed = { [String(nine.marks['showcase'])]: 2 };
   const summary: string[] = [];
   const say = (what: string, r: { rows: number; differences: string[] }): void => { summary.push(`${what.padEnd(44)} rows ${String(r.rows).padStart(2)}  differences ${r.differences.length}`); };
 
@@ -44,43 +46,47 @@ describe('agents list parity with VS Code', () => {
     expect(state.tasks.filter(t => t.archived_ms)).toHaveLength(1);
   });
 
-  it('lists the same rows in the same order, Needs you first', () => {
-    const r = compare(state, { changed }, { changed });
+  it('lists the same rows in the same order: the rollup, Needs you, then the agents', async () => {
+    const r = await compare(state, {}, {});
     say('the list as it opens', r);
     expect(r.differences).toEqual([]);
-    expect(r.listed[0]?.id).toBe('section:needs');
+    expect(r.listed.slice(0, 2).map(x => x.id)).toEqual(['section:rollup', 'section:needs']);
+    expect(r.listed[0]?.label).toBe('1 working · 1 needs you · 3 to review · 3 failed');
+    // Done work not looked at since it ended carries its own mark, on its row and its repository.
+    expect(r.listed.filter(x => x.badge === '✦').map(x => x.statusText)).toEqual(['Done, to review', 'Done, to review', 'Done, to review']);
+    expect(r.listed.filter(x => x.id.startsWith('repo:')).map(x => x.description)).toEqual(['1 · 2 failed', '1 · 3 to review · 1 failed']);
     expect(r.listed.filter(x => x.id.startsWith('agent:'))).toHaveLength(8);
     expect(r.listed.filter(x => x.id.startsWith('run:')).map(x => x.depth)).toEqual([2, 3]);
     console.log(['The side bar, as VS Code lists it:', ...r.listed.map(x => `${'  '.repeat(x.depth)}${x.badge ?? ' '} ${x.label}${x.description ? `  (${x.description})` : ''}  [${x.logo ?? x.icon}]`)].join('\n  '));
   });
 
-  it('lists the same rows for agents seen, pinned, and rows closed', () => {
+  it('lists the same rows for agents seen, pinned, and rows closed', async () => {
     const seen = Object.fromEntries(state.runs.filter(r => r.status === 'failed').slice(0, 2).map(r => [r.id, NOW]));
     const pinned = [String(nine.marks['running']), String(nine.marks['showcase'])];
     const collapsed = ['repo:/fixture/billing-service', `agent:${state.runs.find(r => r.id === nine.marks['nested'])?.task_id}`];
-    const r = compare(state, { seen, pinned, collapsed: new Set(collapsed), changed }, { seen, pinned, collapsed, changed });
+    const r = await compare(state, { seen, pinned, collapsed: new Set(collapsed) }, { seen, pinned, collapsed });
     say('some seen, two pinned, two rows closed', r);
     expect(r.differences).toEqual([]);
-    const closed = compare(state, { collapsed: new Set(['section:needs']) }, { collapsed: ['section:needs'] });
+    const closed = await compare(state, { collapsed: new Set(['section:needs']) }, { collapsed: ['section:needs'] });
     say('Needs you closed', closed);
     expect(closed.differences).toEqual([]);
   });
 
-  it('lists the same archived agents', () => {
-    const r = compare(state, { showArchived: true }, { showArchived: true });
+  it('lists the same archived agents', async () => {
+    const r = await compare(state, { showArchived: true }, { showArchived: true });
     say('archived agents', r);
     expect(r.differences).toEqual([]);
     expect(r.listed.filter(x => x.id.startsWith('agent:'))).toHaveLength(1);
   });
 
-  it('lists the same rows for a search, with what the daemon found', () => {
+  it('lists the same rows for a search, with what the daemon found', async () => {
     for (const call of nine.calls.filter(c => c.method === 'search')) {
       const query = String((call.params as { query: string }).query);
       const found = (call.result as { task_ids: string[] }).task_ids;
       // VS Code shows the agents whose title holds the words, and the ones the daemon found.
       const titled = state.tasks.filter(t => t.title.toLowerCase().includes(query.toLowerCase())).map(t => t.id);
       for (const showArchived of [false, true]) {
-        const r = compare(state, { query, matches: found, showArchived }, { filter: { query, taskIds: [...titled, ...found] }, showArchived });
+        const r = await compare(state, { query, matches: found, showArchived }, { filter: { query, taskIds: [...titled, ...found] }, showArchived });
         say(`search “${query}”${showArchived ? ', archived' : ''}`, r);
         expect(r.differences, `search ${query}`).toEqual([]);
       }
@@ -102,30 +108,30 @@ describe('agents list parity with VS Code', () => {
     expect(searchLocally(s, '   ')).toEqual([]);
   });
 
-  it('says the same when the daemon cannot be reached', () => {
-    const r = compare(state, { error: 'daemon connection lost; reconnecting' }, { error: 'daemon connection lost; reconnecting' });
+  it('says the same when the daemon cannot be reached', async () => {
+    const r = await compare(state, { error: 'daemon connection lost; reconnecting' }, { error: 'daemon connection lost; reconnecting' });
     say('daemon unavailable', { rows: r.rows, differences: r.differences.filter(d => !/\.id: |\.context: /.test(d)) });
     expect(r.listed[0]?.label).toBe('Daemon unavailable: daemon connection lost; reconnecting');
     expect(r.differences.filter(d => !/\.id: /.test(d))).toEqual([]);
   });
 
-  it('names the same agents as needing the owner, in the same order', () => {
-    for (const options of [{}, { changed }, { changed, seen: { [String(nine.marks['failed'])]: NOW } }]) {
+  it('names the same agents as needing the owner, in the same order', async () => {
+    for (const options of [{}, { seen: { [String(nine.marks['showcase'])]: NOW } }, { seen: { [String(nine.marks['failed'])]: NOW } }]) {
       const mine = needsYou(load(state), { now: NOW, ...options });
-      const theirs = sideBar(state, options).needs;
+      const theirs = (await sideBar(state, options)).needs;
       expect(differences(mine, theirs)).toEqual([]);
       expect(counts(load(state), { now: NOW, ...options }).needs).toBe(theirs.length);
     }
     expect(counts(load(state), { now: NOW }).active).toBe(state.runs.filter(r => ['queued', 'starting', 'running', 'waiting_for_user'].includes(r.status)).length);
   });
 
-  it('lists the same rows at every moment of every recording', () => {
+  it('lists the same rows at every moment of every recording', async () => {
     let compared = 0, rows = 0;
     const different: string[] = [];
     for (const f of fixtures) {
       for (const m of [...f.checkpoints, { cursor: f.final.cursor, state: f.final }]) {
         for (const showArchived of [false, true]) {
-          const r = compare(m.state, { showArchived }, { showArchived });
+          const r = await compare(m.state, { showArchived }, { showArchived });
           compared++;
           rows += r.rows;
           different.push(...r.differences.map(d => `${f.scenario} after event ${m.cursor}: ${d}`));
@@ -136,22 +142,33 @@ describe('agents list parity with VS Code', () => {
     expect(different.slice(0, 10)).toEqual([]);
   });
 
-  it('uses the side bar\'s marks, words and logos for every status', () => {
+  it('uses the side bar\'s marks, words and logos for every status, reviewed or not', async () => {
     const badge = constant('extension/src/views.js', 'STATUS_BADGE') as Record<string, [string, string]>;
-    const words = constant('extension/src/views.js', 'STATUS_TEXT') as Record<string, string>;
+    const continuity = constant('extension/media/continuity-text.js', 'STATES') as Record<string, unknown>;
     const logos = constant('extension/src/views.js', 'LOGO_FOR_HARNESS') as Record<string, string>;
-    const s = load({ ...state, runs: state.runs.slice(0, 1), tasks: state.tasks.filter(t => t.id === state.runs[0]?.task_id) });
-    for (const status of Object.keys(badge)) {
-      const run = { ...(state.runs[0] as State['runs'][number]), status: status as State['runs'][number]['status'] };
-      const row = agentRows(load({ ...state, runs: [run], tasks: state.tasks.filter(t => t.id === run.task_id) }), { now: NOW }).find(r => r.kind === 'agent') as AgentRow;
-      expect(row.badge, status).toBe((badge[status] as [string, string])[0]);
-      expect(row.badgeTone, status).toBe((badge[status] as [string, string])[1].replace(/^charts\./, '').replace('descriptionForeground', 'quiet'));
-      expect(row.statusText, status).toBe(words[status]);
+    const first = state.runs.find(r => !r.parent_run_id) as State['runs'][number];
+    const alone = (status: string, ended: number): State => {
+      const run = { ...first, status: status as State['runs'][number]['status'], ended_ms: ended };
+      return { ...state, runs: [run], tasks: state.tasks.filter(t => t.id === run.task_id).map(t => ({ ...t, archived_ms: null })) };
+    };
+    let compared = 0;
+    const different: string[] = [];
+    // Every status VS Code has a mark for, Continuity's, and one it has never heard of; each just
+    // ended, ended and opened since, and ended more than a week ago.
+    for (const status of [...Object.keys(badge), ...Object.keys(continuity), 'a_new_status']) {
+      for (const [ended, seen] of [[NOW - 60_000, {}], [NOW - 60_000, { [first.id]: NOW }], [NOW - 8 * 86_400_000, {}]] as const) {
+        const r = await compare(alone(status, ended), { seen }, { seen });
+        compared++;
+        different.push(...r.differences.map(d => `${status}, ${Object.keys(seen).length ? 'reviewed' : 'not reviewed'}, ended ${Math.round((NOW - ended) / 60_000)} min ago: ${d}`));
+      }
     }
+    say('every status, reviewed or not', { rows: compared, differences: different });
+    expect(different).toEqual([]);
     expect(Object.keys(TEXT.badge).sort()).toEqual(Object.keys(badge).sort());
     for (const [harness, logo] of Object.entries(logos)) expect(logoForHarness(harness)).toBe(logo);
     expect(logoForHarness('generic')).toBeNull();
-    expect(s.runs.order.length).toBe(1);
+    const fresh = agentRows(load(alone('completed', NOW - 60_000)), { now: NOW }).find(r => r.kind === 'agent') as AgentRow;
+    expect(fresh).toMatchObject({ badge: '✦', statusText: 'Done, to review', toReview: true, emphasized: true });
   });
 
   it('says what an empty list means', () => {

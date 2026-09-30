@@ -2,11 +2,22 @@
 //
 // views.js asks for the `vscode` module, which exists only inside VS Code. It is given a small
 // stand-in with the few things the file uses (tree items, icons, colours, addresses, an event
-// emitter): plain objects that keep what they are given, so nothing of the list's logic is in
-// the stand-in. The list of agents that need the owner is a function inside extension.js
-// (`attention`, within `activate`); its source is taken from the file as it stands and run with
-// the same state, so it is the real one too. The tree is then walked the way VS Code walks it
-// (getChildren, then the children of every open row) and each row is read from its tree item.
+// emitter, a settings reader that has every setting at its default): plain objects that keep what
+// they are given, so nothing of the list's logic is in the stand-in. The state reaches the list the
+// way it does in VS Code, through the model's own `refresh` (which names the Mac's own login and
+// leaves out Overseer's own run and Swarm's workers).
+//
+// What extension.js gives the list is taken from extension.js itself: `attention` (the Needs-you
+// list, within `activate`) is its source as it stands, run with the same state and the same
+// shared rollup (media/rollup.js) that extension.js requires, and the reviewed marks are handed to
+// the list as extension.js hands them (`reviewed`: run id to when its review was opened). A name
+// `attention` uses that is not given here fails the test (a ReferenceError), so the next thing
+// extension.js starts to pass the list is noticed. Two things are VS Code's alone for now and are
+// given as empty: Continuity's waiting agents (from the daemon's `continuity.ui`, which the phone
+// does not ask for yet) and the agents a spoken request is for (Voice Mode is on the Mac).
+//
+// The tree is then walked the way VS Code walks it (getChildren, then the children of every open
+// row) and each row is read from its tree item.
 import Module, { createRequire } from 'node:module';
 import path from 'node:path';
 import { repoRoot } from './fixtures.ts';
@@ -29,6 +40,8 @@ class EventEmitter<T> {
 }
 const stub = {
   ThemeColor, ThemeIcon, MarkdownString, TreeItem, EventEmitter,
+  // Every setting at its default: the unfinished features (Swarm, Auto routing) are off.
+  workspace: { getConfiguration: () => ({ get: <T>(_key: string, fallback: T): T => fallback }) },
   TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
   Uri: {
     from: (parts: { scheme: string; path: string }) => ({ ...parts }),
@@ -43,10 +56,12 @@ const original = (Module as unknown as Loader)._load;
   return request === 'vscode' ? stub : original.call(this, request, ...rest);
 };
 const views = require(path.join(repoRoot, 'extension/src/views.js')) as {
-  Model: new (client: unknown) => { state: State; error?: string; onDidChange: unknown; run(id: string): unknown };
+  Model: new (client: unknown) => { state: State; error?: string; onDidChange: unknown; run(id: string): unknown; refresh(): Promise<void> };
   AgentsProvider: new (model: unknown, memento: unknown, uri: unknown, handlers: unknown) => SideBar;
 };
 (Module as unknown as Loader)._load = original;
+/** The rollup extension.js requires: what the agents are doing, counted once (AC-246, AC-254, AC-255). */
+const Rollup = require(path.join(repoRoot, 'extension/media/rollup.js')) as unknown;
 
 interface Node { item: TreeItem; run?: { id: string }; task?: { id: string }; repo?: string }
 interface SideBar {
@@ -75,8 +90,8 @@ export interface SideBarRow {
 }
 
 export interface SideBarOptions {
+  /** The reviewed marks (AC-254): when each agent was opened at its end or its review was. */
   seen?: Record<string, number>;
-  changed?: Record<string, number>;
   pinned?: string[];
   collapsed?: string[];
   showArchived?: boolean;
@@ -87,16 +102,17 @@ export interface SideBarOptions {
 const tone = (color: ThemeColor | undefined): string | null => (color ? color.id.replace(/^charts\./, '').replace('descriptionForeground', 'quiet') : null);
 
 /** The rows of VS Code's agents list for a state, read from the real tree. `Date.now()` is the time the test set. */
-export function sideBar(state: State, options: SideBarOptions = {}): { rows: SideBarRow[]; needs: Array<{ run_id: string; rank: number; label: string; detail: string }> } {
-  const model = new views.Model({ request: async () => state });
-  model.state = state;
+export async function sideBar(state: State, options: SideBarOptions = {}): Promise<{ rows: SideBarRow[]; needs: Array<{ run_id: string; rank: number; label: string; detail: string }> }> {
+  // The daemon's answer is a copy: refresh names accounts in place, as it does in VS Code.
+  const model = new views.Model({ request: async () => JSON.parse(JSON.stringify(state)) as State });
+  await model.refresh();
   if (options.error) model.error = options.error;
   const reviewed = new Map(Object.entries(options.seen ?? {}));
-  const changedRuns = new Map(Object.entries(options.changed ?? {}));
-  const archivedTasks = (): string[] => (model.state.tasks || []).filter(t => t.archived_ms).map(t => t.id);
-  const attention = new Function('model', 'reviewed', 'changedRuns', 'archivedTasks', 'checkChanged', `${functionSource('extension/src/extension.js', 'attention')}; return attention;`)(model, reviewed, changedRuns, archivedTasks, () => {}) as () => Array<{ run_id: string; rank: number; label: string; detail: string }>;
+  // Continuity's waiting agents: none, as without the daemon's Continuity status.
+  const continuity = { attention: (): undefined => undefined };
+  const attention = new Function('model', 'Rollup', 'continuity', `${functionSource('extension/src/extension.js', 'attention')}; return attention;`)(model, Rollup, continuity) as () => Array<{ run_id: string; rank: number; label: string; detail: string }>;
   const memento = { get: (_key: string, fallback: unknown) => (options.collapsed ? options.collapsed : fallback), update: () => {} };
-  const provider = new views.AgentsProvider(model, memento, { path: '/extension' }, { attention, pinned: () => options.pinned ?? [] });
+  const provider = new views.AgentsProvider(model, memento, { path: '/extension' }, { attention, pinned: () => options.pinned ?? [], reviewed: () => reviewed });
   provider.showArchived = !!options.showArchived;
   provider.filter = options.filter ? { query: options.filter.query, taskIds: new Set(options.filter.taskIds) } : undefined;
   const rows: SideBarRow[] = [];

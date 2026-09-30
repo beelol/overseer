@@ -12,8 +12,9 @@ export interface HeadingRowProps {
   readonly onFold: (row: Row) => void;
 }
 
-/** The test id of a heading: `agents.section.needs`, `agents.repo.<name>`. */
+/** The test id of a heading: `agents.rollup`, `agents.section.needs`, `agents.repo.<name>`. */
 export function headingTestID(row: Row): string {
+  if (row.kind === 'rollup') return 'agents.rollup';
   if (row.kind === 'repo') return `agents.repo.${row.label}`;
   if (row.kind === 'section') return `agents.section.${row.id.slice(row.id.indexOf(':') + 1)}`;
   return 'agents.notice';
@@ -25,11 +26,12 @@ const useStyles = makeStyles((theme) => ({
   fill: { flex: 1 },
 }));
 
-const ICON: Readonly<Record<string, IconName>> = { 'bell-dot': 'bell-dot', repo: 'repo', warning: 'warning' };
+const ICON: Readonly<Record<string, IconName>> = { 'bell-dot': 'bell-dot', repo: 'repo', warning: 'warning', pulse: 'pulse' };
 
 /**
- * A quiet heading of the list: "Needs you" with its count, a repository with the number of its
- * agents that are going. Tapping it folds what is under it, and unfolds it again.
+ * A quiet heading of the list: the agents by state ("2 working · 6 to review", AC-255), "Needs
+ * you" with its count, a repository with its agents that are going, to review and failed.
+ * Tapping a section or a repository folds what is under it, and unfolds it again.
  */
 export const HeadingRow = memo(function HeadingRow({ row, onFold }: HeadingRowProps) {
   const styles = useStyles();

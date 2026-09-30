@@ -73,6 +73,11 @@ export const TEXT = {
     failed: from(VIEWS, '✕'), interrupted: from(VIEWS, '■'), disconnected: from(VIEWS, '✕'), unknown: from(VIEWS, '?'),
   } as Readonly<Record<string, string>>,
 
+  /** The marks views.js adds: an agent at its end not reviewed yet (AC-254), and Continuity's states. */
+  badgeToReview: from(VIEWS, '✦'),
+  badgeWaiting: from(VIEWS, '☁'),
+  badgeHandedOff: from(VIEWS, '→'),
+
   /** What Continuity (Gate L) says in a chat (continuity.js). */
   continuity: {
     sendingAgain: from(CONTINUITY, 'The connection is back. Sending your message again.'),
@@ -86,6 +91,27 @@ export const TEXT = {
     memoryValve: from(CONTINUITY, 'The system ran short of memory. Overseer paused this agent and unloaded the model; your message is kept.'),
     localModel: shaped(CONTINUITY, "k context${bytes}${p.already_loaded ? ', already loaded' : ''}.`", (name: string, k: number, gib: string | null, loaded: boolean) => `Local model **${name}** at a ${k}k context${gib !== null ? ` · ${gib} GiB` : ''}${loaded ? ', already loaded' : ''}.`),
     kept: shaped(CONTINUITY, '. Your message is kept.`', (why: string) => `${why}. Your message is kept.`),
+  },
+
+  /** What Overseer's oversight says in an agent's chat (Gate S, conversation.js `oversightLine`). */
+  oversight: {
+    held: shaped(CONVERSATION, "`Held by Overseer${p && p.reason ? ': ' + p.reason : ''}`", (reason: string) => `Held by Overseer${reason ? ': ' + reason : ''}`),
+    released: shaped(CONVERSATION, "`Released${p && p.why ? ': ' + p.why : ''}`", (why: string) => `Released${why ? ': ' + why : ''}`),
+    guardrail: shaped(CONVERSATION, "`Guardrail${p && p.words ? ': ' + ui.firstLine(p.words, 120) : ''}${p && p.enforcement ? ' (' + p.enforcement + ')' : ''}`", (words: string, enforcement: string) => `Guardrail${words ? ': ' + words : ''}${enforcement ? ' (' + enforcement + ')' : ''}`),
+    crossed: shaped(CONVERSATION, '`Wrote across a guardrail: ${', (paths: string) => `Wrote across a guardrail: ${paths}`),
+    redirected: from(CONVERSATION, 'Redirected by Overseer'),
+    checkIn: shaped(CONVERSATION, "`Check-in: ${p && p.result ? p.result.replace('_', ' ') : ''}${p && p.reason ? ' — ' + p.reason : ''}${p && p.left_out ? ' · left out: ' + p.left_out : ''}`", (result: string, reason: string, leftOut: string) => `Check-in: ${result}${reason ? ' — ' + reason : ''}${leftOut ? ' · left out: ' + leftOut : ''}`),
+    reported: shaped(CONVERSATION, '`Reported to Overseer: ${', (doing: string) => `Reported to Overseer: ${doing}`),
+    asked: shaped(CONVERSATION, '`Asked Overseer: ${', (question: string) => `Asked Overseer: ${question}`),
+    claimed: shaped(CONVERSATION, '`Claimed ${', (paths: string) => `Claimed ${paths}`),
+    shared: shaped(CONVERSATION, "`Overseer shared ${(p && p.source) || 'a piece'}`", (source: string) => `Overseer shared ${source || 'a piece'}`),
+    shareWithdrawn: from(CONVERSATION, 'A share was withdrawn'),
+    finding: shaped(CONVERSATION, "`${(p && p.watcher_title) || 'A watcher'}: ${(p && p.result) || ''}${p && p.text ? ' — ' + ui.firstLine(p.text, 140) : ''}`", (watcher: string, result: string, said: string) => `${watcher || 'A watcher'}: ${result}${said ? ' — ' + said : ''}`),
+    watched: shaped(CONVERSATION, "`Watched${p && p.mode === 'check' ? ' and checked' : ''}: ${", (checked: boolean, brief: string) => `Watched${checked ? ' and checked' : ''}: ${brief}`),
+    watchEnded: shaped(CONVERSATION, "`The watch ended: ${(p && p.reason) || ''}`", (reason: string) => `The watch ended: ${reason}`),
+    handedOff: from(CONVERSATION, 'Handed off'),
+    queued: shaped(CONVERSATION, "`Queued by ${p.detail && p.detail.by ? 'Overseer' : ev.source === 'overseer' ? 'Overseer' : 'you'}: ${", (byOverseer: unknown, text: string) => `Queued by ${byOverseer ? 'Overseer' : 'you'}: ${text}`),
+    briefing: from(CONVERSATION, 'Overseer added a briefing'),
   },
 
   /** A harness by name (ui.js HARNESS). */
@@ -109,6 +135,23 @@ export const TEXT = {
     title: from(PACKAGE, 'Agents'),
     needsYou: from(VIEWS, 'Needs you'),
     needsYouCount: shaped(VIEWS, '`Needs you, ${list.length}`', (n: number) => `Needs you, ${n}`),
+    /** The rollup by state (AC-255, rollup.js `parts`): "2 working · 1 needs you · 6 to review · 3 reviewed · 1 failed". */
+    rollup: {
+      working: shaped(ROLLUP, "'working'", 'working'), needs: shaped(ROLLUP, "'needs you'", 'needs you'), unreviewed: shaped(ROLLUP, "'to review'", 'to review'),
+      reviewed: shaped(ROLLUP, "'reviewed'", 'reviewed'), failed: shaped(ROLLUP, "'failed'", 'failed'),
+    },
+    rollupLabel: shaped(VIEWS, '`Agents: ${text}`', (text: string) => `Agents: ${text}`),
+    /** The status's words after an agent's end (AC-254): ", to review" until its review is opened, then ", reviewed". */
+    toReview: shaped(VIEWS, "', to review'", ', to review'),
+    reviewed: shaped(VIEWS, "', reviewed'", ', reviewed'),
+    /** The Mac's own login (views.js `accountName`). */
+    yourLogin: from(VIEWS, 'Your login'),
+    doneToReview: from(VIEWS, 'Done, to review'),
+    repoToReview: shaped(VIEWS, '`${toReview} to review`', (n: number) => `${n} to review`),
+    repoFailed: shaped(VIEWS, '`${failed} failed`', (n: number) => `${n} failed`),
+    repoWorking: shaped(VIEWS, '`${active} working`', (n: number) => `${n} working`),
+    repoDoneToReview: shaped(VIEWS, '`${toReview} done, to review`', (n: number) => `${n} done, to review`),
+    repoFailedToReview: shaped(VIEWS, '`${failed} failed, to review`', (n: number) => `${n} failed, to review`),
     empty: from(PACKAGE, 'No agents yet.'),
     emptyMore: from(PACKAGE, 'Overseer runs agents through a local daemon; closing VS Code does not stop them.'),
     newTask: from(PACKAGE, 'New Agent'),
@@ -116,7 +159,8 @@ export const TEXT = {
     nativeChild: from(VIEWS, 'native child'),
     inferred: from(VIEWS, ' (inferred)'),
     currentCheckout: from(VIEWS, 'current checkout'),
-    repoLabel: shaped(VIEWS, "agent${tasks.length === 1 ? '' : 's'}${active ? `, ${active} active` : ''}", (name: string, agents: number, active: number) => `${name}, ${agents} agent${plural(agents)}${active ? `, ${active} active` : ''}`),
+    repoLabel: shaped(VIEWS, "agent${tasks.length === 1 ? '' : 's'}${active ? `, ${active} active` : ''}${toReview ? `, ${toReview} to review` : ''}${failed ? `, ${failed} failed` : ''}",
+      (name: string, agents: number, active: number, toReview = 0, failed = 0) => `${name}, ${agents} agent${plural(agents)}${active ? `, ${active} active` : ''}${toReview ? `, ${toReview} to review` : ''}${failed ? `, ${failed} failed` : ''}`),
     approve: from(ROLLUP, 'Approve'),
     reply: from(ROLLUP, 'Reply'),
     wantsToUse: shaped(ROLLUP, "`Wants to use ${r.attention.tool || 'a tool'}`", (tool: string) => `Wants to use ${tool}`),

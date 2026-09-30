@@ -27,6 +27,23 @@ const TEXTS = [
 // event are left out: VS Code draws a card for them (Use a local model now, Retry now, Stay on the
 // local model) from the daemon's Continuity status and actions, which the phone does not have yet.
 const STATUSES = ['queued', 'starting', 'running', 'waiting_for_user', 'completed', 'failed', 'interrupted', 'disconnected', 'unknown', 'handed_off'];
+/**
+ * What Overseer's oversight (Gate S) says in an agent's chat, and the kinds it keeps quiet. Overseer's
+ * own conversation (`proposal`, `overseer_message` cards) and Auto's `auto_decision` are left out:
+ * VS Code draws cards for them that the phone does not have (Overseer's chat on the phone is AC-128's;
+ * Auto is unfinished, AC-204); test/conversation-parity.test.ts checks the phone draws nothing for them.
+ */
+const OVERSIGHT = [
+  { kind: 'hold', payload: { reason: 'two agents write the same file' } }, { kind: 'hold', payload: {} }, { kind: 'release', payload: { why: 'the other one finished' } }, { kind: 'release', payload: {} },
+  { kind: 'guardrail', payload: { words: 'Never touch the migrations\nsecond line', enforcement: 'hold' } }, { kind: 'guardrail', payload: {} }, { kind: 'guardrail_crossed', payload: { paths: ['db/migrate/1.sql', 'db/x.sql'] } },
+  { kind: 'redirect', payload: { text: 'go the other way' }, source: 'overseer' }, { kind: 'redirect', payload: { text: 'from you' }, source: 'user' },
+  { kind: 'check_in', payload: { result: 'on_track', reason: 'tests pass', left_out: 'the docs' } }, { kind: 'check_in', payload: {} }, { kind: 'report', payload: { doing: 'Writing the tests\nthen the docs' } },
+  { kind: 'ask', payload: { question: 'Which branch?' } }, { kind: 'claim', payload: { paths: ['src/a.ts'] } }, { kind: 'share', payload: { source: 'the schema' } }, { kind: 'share', payload: {} }, { kind: 'share_withdrawn', payload: {} },
+  { kind: 'finding', payload: { watcher_title: 'Reviewer', result: 'concern', text: 'The test is flaky' } }, { kind: 'finding', payload: {} }, { kind: 'watch_started', payload: { mode: 'check', brief: 'Watch the migration' } },
+  { kind: 'watch_started', payload: { brief: 'Just watch' } }, { kind: 'watch_ended', payload: { reason: 'done' } }, { kind: 'queued', payload: { text: 'Then run the linter\nplease' } }, { kind: 'queued', payload: { text: 'From Overseer', detail: { by: 'overseer' } } },
+  { kind: 'briefing', payload: { text: 'The owner wants small commits.' } }, { kind: 'overseer_tool_call', payload: {} }, { kind: 'going_in_circles', payload: {} }, { kind: 'conflict', payload: {} }, { kind: 'dispatch', payload: {} },
+];
+
 /** What Continuity (Gate L) says in a chat: its own event kinds, and system lines marked as its own. */
 const CONTINUITY = [
   { kind: 'handoff', payload: { predecessor: ROOT, successor: 'r-next', reason: 'offline' } }, { kind: 'handoff', payload: { predecessor: 'r-before', successor: ROOT, reason: 'back_online' } },
@@ -151,6 +168,9 @@ export function stream(seed: number, count: number): Step[] {
     } else if (roll < 0.965) {
       const said = pick(CONTINUITY);
       push(said.kind, anyRun(), said.payload, 'exact', 'daemon');
+    } else if (roll < 0.975) {
+      const said = pick(OVERSIGHT);
+      push(said.kind, anyRun(), said.payload, 'exact', said.source ?? 'overseer');
     } else if (roll < 0.985) {
       push(pick(['retention', 'raw_unparsed', 'session', 'remote_command', 'review_mark', 'push', 'reattached', 'merge_back', 'pull_request', 'daemon_error', 'task_created', 'a_new_kind']), anyRun(), pick<unknown>([{}, { text: 'x' }, { method: 'run.follow_up', device: 'd-1', request_id: `request-${seq}` }, null]));
     } else {

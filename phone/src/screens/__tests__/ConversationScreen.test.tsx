@@ -295,6 +295,20 @@ describe('the rows', () => {
     expect(words(rowId(`note:${stopped.seq}`))).toBe('Stopped from Phone');
   });
 
+  test('what Overseer does to the agent is a quiet line; its briefing opens on a tap', async () => {
+    const { app, run } = await open('echo-follow-up');
+    const held = makeEvent('hold', { reason: 'two agents write the same file' }, { run_id: run, source: 'overseer' });
+    const briefing = makeEvent('briefing', { text: 'The owner wants small commits.' }, { run_id: run, source: 'overseer' });
+    const quiet = makeEvent('overseer_tool_call', { name: 'hold' }, { run_id: run, source: 'overseer' });
+    await arrive(app, held, briefing, quiet);
+    expect(words(rowId(`note:${held.seq}`))).toBe('Held by Overseer: two agents write the same file');
+    expect(words(rowId(`note:${briefing.seq}`))).toBe('Overseer added a briefing');
+    expect(screen.queryByTestId(`${rowId(`note:${briefing.seq}`)}.detail`)).toBeNull();
+    await fireEvent.press(screen.getByTestId(rowId(`note:${briefing.seq}`)));
+    expect(words(`${rowId(`note:${briefing.seq}`)}.detail`)).toBe('The owner wants small commits.');
+    expect(screen.queryByTestId(rowId(`note:${quiet.seq}`))).toBeNull();
+  });
+
   test('a sub-agent says beside its title what it reported using', async () => {
     const { app } = await open('nested');
     const child = rowId('child:r-222956848452');
