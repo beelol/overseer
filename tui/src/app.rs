@@ -1779,7 +1779,8 @@ impl App {
             KeyCode::Char('K') => self.pick_step(-1),
             KeyCode::Char('L') => self.list_hidden = !self.list_hidden,
             KeyCode::Esc if self.picked => self.picked = false,
-            KeyCode::Char('z') => self.mode = if zoom { Mode::Grid } else { Mode::Zoom { scroll: 0 } },
+            // z, and g (T-38): the grid and the focused agent's full view, back on the same agent.
+            KeyCode::Char('z') | KeyCode::Char('g') => self.mode = if zoom { Mode::Grid } else { Mode::Zoom { scroll: 0 } },
             KeyCode::Char('i') | KeyCode::Enter => {
                 if let Some(run) = self.focused().cloned() {
                     self.mode = Mode::Compose;
@@ -1872,8 +1873,8 @@ impl App {
             KeyCode::PageUp if zoom => self.scroll(self.size.1 as i64 - 4),
             KeyCode::PageDown if zoom => self.scroll(-(self.size.1 as i64 - 4)),
             KeyCode::Char('e') if zoom => self.expand_tools = !self.expand_tools,
-            KeyCode::Char('g') if zoom => self.mode = Mode::Zoom { scroll: usize::MAX / 2 },
-            KeyCode::Char('G') if zoom => self.mode = Mode::Zoom { scroll: 0 },
+            KeyCode::Home if zoom => self.mode = Mode::Zoom { scroll: usize::MAX / 2 },
+            KeyCode::Char('G') | KeyCode::End if zoom => self.mode = Mode::Zoom { scroll: 0 },
             // The picked agent's conversation beside the grid: the same scrollback and tool details as zoom.
             KeyCode::PageUp if self.picked => self.scroll_conv(self.size.1 as i64 - 6),
             KeyCode::PageDown if self.picked => self.scroll_conv(-(self.size.1 as i64 - 6)),

@@ -46,7 +46,7 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | Esc | Close the picked agent's conversation; the grid stays on that agent (T-25) |
 | L | Hide or show the agent list (T-25) |
 | i, Enter | Compose a message to the focused agent (Enter sends, Esc closes, Alt-Enter new line) |
-| z | Zoom: focused agent full screen with scrollback (j/k, PgUp/PgDn, g/G; z or Esc returns) |
+| g, z | The grid ⇄ the focused agent's full view: its whole conversation with scrollback (j/k, PgUp/PgDn, Home/G) and tool details; g, z or Esc returns to the grid on that agent (T-38) |
 | v | Changes: the focused agent's changed files and their diffs (j/k file, J/K scroll, c comparison) |
 | e (zoom) | Expand or fold every tool call's input and result |
 | a / d | Allow / deny the focused agent's pending permission |

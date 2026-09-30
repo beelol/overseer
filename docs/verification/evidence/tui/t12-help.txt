@@ -18,7 +18,7 @@ KEYS:
     tab / shift+tab next / previous agent      ] [   next / previous page (also PgDn/PgUp)
     J / K           pick in the agent list (its conversation beside the grid; esc closes it)
     L               hide or show the agent list
-    i / enter       message the focused agent  z     zoom (full screen, scrollback)
+    i / enter       message the focused agent  g / z grid <-> the focused agent's full view
     a / d           allow / deny a permission  w     next agent waiting for you
     x               interrupt                  n     new agent
     C               remove a finished agent's worktree (branch kept)

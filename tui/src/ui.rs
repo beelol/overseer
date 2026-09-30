@@ -273,7 +273,7 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
     }
     let keys: &[(&str, &str)] = match app.mode {
         Mode::Compose => &[("enter", "send"), ("alt+enter", "new line"), ("esc", "close (keeps draft)"), ("ctrl+u", "clear")],
-        Mode::Zoom { .. } => &[("e", if app.expand_tools { "fold tools" } else { "expand tools" }), ("j/k", "scroll"), ("g/G", "top/bottom"), ("i", "message"), ("a/d", "allow/deny"), ("x", "interrupt"), ("z", "grid"), ("?", "help")],
+        Mode::Zoom { .. } => &[("e", if app.expand_tools { "fold tools" } else { "expand tools" }), ("j/k", "scroll"), ("home/G", "top/bottom"), ("i", "message"), ("a/d", "allow/deny"), ("x", "interrupt"), ("g/z", "grid"), ("?", "help")],
         Mode::NewAgent => &[("tab", "next field"), ("←/→", "choose"), ("enter", "start"), ("esc", "cancel")],
         Mode::Accounts => &[("j/k", "select"), ("s", "sign in"), ("S", "device code (ChatGPT)"), ("r", "refresh"), ("esc", "close")],
         Mode::Devices => &[("p", "pair a phone"), ("j/k", "select"), ("s", "scope"), ("x", "revoke"), ("N", "notifications"), ("O", "on/off"), ("esc", "close")],
@@ -285,8 +285,8 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         Mode::Search => &[("type", "to search title, repo, harness, model, prompt"), ("enter", "keep"), ("esc", "clear")],
         Mode::Changes => &[("j/k", "file"), ("J/K", "scroll diff"), ("c", "comparison"), ("r", "refresh"), ("v/esc", "back")],
         Mode::Grid if app.picked && app.focused().is_some() => &[("J/K", "next / previous agent"), ("esc", "close the conversation"), ("pgup/pgdn", "scroll"), ("e", if app.expand_tools { "fold tools" } else { "tool details" }), ("i", "message"), ("v", "changes"), ("?", "help")],
-        _ if area.width < 110 => &[("i", "message"), ("z", "zoom"), ("a/d", "answer"), ("n", "new"), ("o", "Overseer"), ("?", "keys"), ("q", "quit")],
-        _ => &[("←↑↓→", "move"), ("J/K", "pick in the list"), ("i", "message"), ("z", "zoom"), ("v", "changes"), ("a/d", "allow/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
+        _ if area.width < 110 => &[("i", "message"), ("g", "full view"), ("a/d", "answer"), ("n", "new"), ("o", "Overseer"), ("?", "keys"), ("q", "quit")],
+        _ => &[("←↑↓→", "move"), ("J/K", "pick in the list"), ("i", "message"), ("g", "full view"), ("v", "changes"), ("a/d", "allow/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
     };
     let mut spans = vec![Span::raw(" ")];
     for (k, v) in keys {
@@ -676,7 +676,8 @@ fn help(f: &mut Frame, area: Rect) {
         ("L", "hide or show the agent list"),
         ("] [   pgdn pgup", "next / previous page"),
         ("i  enter", "message the focused agent"),
-        ("z", "zoom: full screen with scrollback"),
+        ("g  z", "zoom: one agent's full view ⇄ grid"),
+        ("home / G", "in the full view: top / bottom"),
         ("v", "changes: files and diffs"),
         ("e  (in zoom)", "expand tool inputs and results"),
         ("a / d", "allow / deny its permission request"),

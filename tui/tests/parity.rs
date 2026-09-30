@@ -204,3 +204,53 @@ fn t37_the_grid_fits_the_count() {
     tui.key(KeyCode::Right);
     assert_eq!(tui.app.focus.as_deref(), Some(ids[5].as_str()));
 }
+
+/// T-38: `g` switches between the grid and the focused agent's full view and back, on the same
+/// agent, from a tile and from the list.
+#[test]
+fn t38_one_key_between_the_grid_and_one_agent() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let repo = repo(&t.path().join("one"));
+    for i in 1..=9 {
+        // Forty lines each: a tile shows its tail, the full view the whole conversation.
+        d.sh(&repo, &format!("agent {i:02}"), &format!("for n in $(seq 1 40); do echo agent {i:02} line $n; done"));
+    }
+    let mut tui = Tui::attach(&d, 160, 60);
+    tui.until(10, |a| a.visible().len() == 9);
+    tui.until_screen(10, "agent 01 line 40");
+    // From a tile: the fourth.
+    tui.key(KeyCode::Char('4'));
+    let fourth = tui.app.focus.clone().unwrap();
+    assert_eq!(tui.app.state.run(&fourth).unwrap().title, "agent 06");
+    let grid = tui.screen();
+    assert!(!grid.contains("agent 06 line 1\n") && !grid.contains("agent 06 line 1 "), "the tile shows only the tail");
+    tui.key(KeyCode::Char('g'));
+    assert!(matches!(tui.app.mode, Mode::Zoom { .. }));
+    tui.key(KeyCode::Home);
+    let s = tui.screen();
+    assert!(s.contains("agent 06 line 1 ") && s.contains("agent 06 line 30"), "its whole conversation from the top:\n{s}");
+    assert!(!s.contains("agent 05 line"), "only that agent:\n{s}");
+    tui.snapshot("parity-t38-full-view");
+    tui.key(KeyCode::Char('g'));
+    assert_eq!(tui.app.mode, Mode::Grid);
+    assert_eq!(tui.app.focus.as_deref(), Some(fourth.as_str()), "back on the grid with the fourth focused");
+    let s = tui.screen();
+    assert!(s.contains("┏ 4 ✓ agent 06"), "the fourth tile is the focused one:\n{s}");
+    // From the list: J picks the first agent in the list; g shows it, g returns.
+    tui.key(KeyCode::Char('J'));
+    let picked = tui.app.focus.clone().unwrap();
+    assert_eq!(picked, tui.app.list_ids()[0]);
+    tui.key(KeyCode::Char('g'));
+    assert!(matches!(tui.app.mode, Mode::Zoom { .. }));
+    let title = tui.app.state.run(&picked).unwrap().title.clone();
+    assert!(tui.screen().contains(&format!("{title} line 40")));
+    tui.key(KeyCode::Char('g'));
+    assert_eq!((tui.app.mode.clone(), tui.app.focus.clone()), (Mode::Grid, Some(picked)));
+    // `?` names the key.
+    tui.key(KeyCode::Char('?'));
+    let s = tui.screen();
+    assert!(s.contains("g  z") && s.contains("one agent's full view"), "{s}");
+    tui.key(KeyCode::Esc);
+    assert_eq!(tui.app.mode, Mode::Grid);
+}

@@ -96,7 +96,7 @@ fn t07_zoom_shows_the_whole_conversation_with_scrollback() {
     let s = tui.screen();
     assert!(s.contains("row 1999") && !s.contains("row 0\n") && !s.contains("row 1000 "), "{s}");
     tui.snapshot("t07-zoom-bottom");
-    tui.key(KeyCode::Char('g'));
+    tui.key(KeyCode::Home);
     let s = tui.screen();
     assert!(s.contains("│ row 0 ") || s.contains("┃ row 0 "), "top of history:\n{s}");
     assert!(!s.contains("row 1999"));
