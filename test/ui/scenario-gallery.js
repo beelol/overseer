@@ -1,6 +1,6 @@
 // Packaged-UI gallery for the Gate M design review (AC-108), fixture runs only: every Gate M view in
 // the three Overseer themes (Overseer Dark, Overseer Light and Overseer). The chat beside the review,
-// the review's All files navigator with an unchanged file open, the grid tracking an agent, the
+// the review's All files navigator with a folder open, the grid tracking an agent, the
 // composer, Talk to Overseer, Where am I. Screenshots only; the checks
 // are that each view was reached in each theme.
 const fs = require('fs');
@@ -54,7 +54,7 @@ const slug = t => t.toLowerCase().replace(/\s+/g, '-');
     for (const theme of THEMES) {
       await setTheme(theme);
       const t = slug(theme);
-      // Chat beside the review, then the review's All files navigator with an unchanged file open.
+      // Chat beside the review, then the review's All files navigator with a folder open.
       await s.selectAgent('Refresh sessions once', { settle: 3000 });
       const reviewProbe = `!!document.getElementById('diffs') && document.body.dataset.runId === ${JSON.stringify(showcase.run.id)} && document.querySelectorAll('.diff-file').length > 0`;
       let review = await cdp.webview(reviewProbe, 12000).catch(() => null);
@@ -65,10 +65,11 @@ const slug = t => t.toLowerCase().replace(/\s+/g, '-');
         await review.waitFor(`[...document.querySelectorAll('#tree details.folder > summary')].some(s => s.textContent === 'src')`, 10000).catch(() => {});
         await review.eval(`(() => { const s = [...document.querySelectorAll('#tree details.folder > summary')].find(s => s.textContent === 'src'); if (s && !s.parentElement.open) s.click(); return true; })()`); await delay(600);
         await review.eval(`(() => { const s = [...document.querySelectorAll('#tree details.folder > summary')].find(s => s.textContent === 'auth'); if (s && !s.parentElement.open) s.click(); return true; })()`); await delay(600);
-        await review.eval(`document.querySelector('#tree .file[data-path="src/auth/session.ts"]')?.click()`);
-        const open = await review.waitFor(`[...document.querySelectorAll('.diff-file.browsed')].some(e => e.dataset.loadState === 'rendered')`, 15000).then(() => true, () => false);
+        // AC-264: All files is Follow's list (a file picked there opens as the real file), so the
+        // gallery shows the list itself with a folder open.
+        const open = await review.waitFor(`!!document.querySelector('#tree .file[data-path="src/auth/session.ts"]')`, 15000).then(() => true, () => false);
         await delay(800); await s.screenshot(`review-all-files-${t}`); reached('review, all files', theme, open);
-        await review.eval(`(() => { if (document.body.dataset.nav !== 'changes') document.getElementById('changes-only').click(); document.querySelector('.diff-file.browsed .close-file')?.click(); return true; })()`);
+        await review.eval(`(() => { if (document.body.dataset.nav !== 'changes') document.getElementById('changes-only').click(); return true; })()`);
       }
       // The grid, tracking an agent.
       await cdp.command('Overseer: Toggle Agent Grid'); await delay(2500);
