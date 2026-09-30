@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Overseer Menu Bar</title>
 <!--
-  The mockup for AC-262: Overseer's item in the Mac's menu bar, in four states, on a light and a
-  dark menu bar. Open this file in a browser. Nothing here talks to a daemon; the data is made up.
+  The mockup for AC-262: Overseer's item in the Mac's menu bar, on a light and a dark menu bar.
+  Open this file in a browser. Nothing here talks to a daemon; the data is made up.
   The item is the brand silhouette (../brand/exports/overseer-icon-flat-64.png, inlined below as
   --mark) drawn as a template image: one colour, the menu bar's own. The menus use macOS's colours.
-  URL hash picks the state and options, e.g. #crowd, #needs&answer=submenu&dot=mono&bars=dark.
+  The owner's answers of 2026-09-29 are in README.md.
+  URL hash picks the state and options, e.g. #six, #six&badge=number, #needs&drop=0, #dev&bars=dark.
 -->
 <style>
   :root {
@@ -36,7 +37,7 @@
   body { background: var(--bg); color: var(--text); font: 14px/1.45 var(--sys); -webkit-font-smoothing: antialiased; }
   .page { max-width: 1408px; margin: 0 auto; padding: 20px 16px 32px; }
   header h1 { font-size: 20px; margin: 0 0 4px; font-weight: 650; letter-spacing: -0.01em; }
-  header p { margin: 0; color: var(--muted); max-width: 820px; }
+  header p { margin: 0; color: var(--muted); max-width: 860px; }
   .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; margin: 14px 0 14px; align-items: center; }
   .control { display: flex; align-items: center; gap: 8px; }
   .control > span { color: var(--muted); font-size: 12px; }
@@ -44,12 +45,12 @@
   .seg button { font: 500 12.5px var(--sys); color: var(--text); background: none; border: 0; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
   .seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
   .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .caption { color: var(--muted); margin: 0 0 14px; max-width: 900px; min-height: 2.9em; }
+  .caption { color: var(--muted); margin: 0 0 14px; max-width: 920px; min-height: 2.9em; }
   .caption b { color: var(--text); font-weight: 600; }
   .screens { display: flex; flex-wrap: wrap; gap: 16px; }
   .stage { position: relative; overflow: hidden; border-radius: 10px; box-shadow: 0 0 0 1px var(--border), 0 6px 24px rgba(0,0,0,.10); flex: 0 0 auto; }
   .label { font-size: 12px; color: var(--muted); margin: 0 0 6px 2px; }
-  footer { margin-top: 18px; color: var(--muted); font-size: 12.5px; max-width: 900px; }
+  footer { margin-top: 18px; color: var(--muted); font-size: 12.5px; max-width: 920px; }
   footer code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
 
   /* ---------- A slice of a Mac screen, drawn at 1 CSS px = 1 pt ---------- */
@@ -57,22 +58,20 @@
     font-family: var(--sys); -webkit-font-smoothing: antialiased; cursor: default; user-select: none; }
   .screen.light { --wall: radial-gradient(120% 90% at 85% 0%, #f6d9e8 0%, rgba(246,217,232,0) 55%), radial-gradient(90% 80% at 10% 100%, #bfe0f5 0%, rgba(191,224,245,0) 60%), linear-gradient(160deg, #dfe9f7 0%, #e8e2f4 55%, #d6e9f2 100%);
     --bar-fg: rgba(0,0,0,.86); --bar-hl: rgba(0,0,0,.10);
-    --menu-bg: rgba(242,242,244,.80); --menu-edge: rgba(0,0,0,.14); --menu-inner: rgba(255,255,255,.55);
+    --menu-bg: rgba(242,242,244,.80); --menu-inner: rgba(255,255,255,.55);
     --fg: rgba(0,0,0,.86); --fg2: rgba(0,0,0,.52); --fg3: rgba(0,0,0,.26); --sep: rgba(0,0,0,.10);
     --sel: #0A63D8; --on-sel: #fff;
     --green: #28CD41; --orange: #FF9500; --blue: #007AFF; --red: #FF3B30;
-    --btn-bg: #fff; --btn-edge: rgba(0,0,0,.14); --btn-shadow: 0 .5px 1.5px rgba(0,0,0,.16);
-    --dot: #6B47E0; --shadow: 0 10px 34px rgba(0,0,0,.20), 0 0 0 .5px rgba(0,0,0,.12); }
+    --btn-bg: #fff; --btn-edge: rgba(0,0,0,.14); --btn-shadow: 0 .5px 1.5px rgba(0,0,0,.16); --btn-div: rgba(0,0,0,.14);
+    --dot: #6B47E0; --on-dot: #fff; --shadow: 0 10px 34px rgba(0,0,0,.20), 0 0 0 .5px rgba(0,0,0,.12); }
   .screen.dark { --wall: radial-gradient(110% 90% at 85% 0%, #3b2468 0%, rgba(59,36,104,0) 55%), radial-gradient(90% 80% at 10% 100%, #0f3b5c 0%, rgba(15,59,92,0) 60%), linear-gradient(160deg, #101a33 0%, #1c1535 55%, #0c1f2e 100%);
     --bar-fg: #fff; --bar-hl: rgba(255,255,255,.20);
-    --menu-bg: rgba(38,38,42,.78); --menu-edge: rgba(0,0,0,.55); --menu-inner: rgba(255,255,255,.14);
+    --menu-bg: rgba(38,38,42,.78); --menu-inner: rgba(255,255,255,.14);
     --fg: rgba(255,255,255,.88); --fg2: rgba(255,255,255,.55); --fg3: rgba(255,255,255,.25); --sep: rgba(255,255,255,.12);
     --sel: #0A5BD0; --on-sel: #fff;
     --green: #30D158; --orange: #FF9F0A; --blue: #0A84FF; --red: #FF453A;
-    --btn-bg: rgba(255,255,255,.16); --btn-edge: rgba(255,255,255,.08); --btn-shadow: 0 .5px 1px rgba(0,0,0,.4);
-    --dot: #A48BFF; --shadow: 0 10px 34px rgba(0,0,0,.55), 0 0 0 .5px rgba(0,0,0,.6); }
-  .screen.dot-red { --dot: var(--red); }
-  .screen.dot-mono { --dot: var(--bar-fg); }
+    --btn-bg: rgba(255,255,255,.16); --btn-edge: rgba(255,255,255,.08); --btn-shadow: 0 .5px 1px rgba(0,0,0,.4); --btn-div: rgba(255,255,255,.18);
+    --dot: #A48BFF; --on-dot: #17161D; --shadow: 0 10px 34px rgba(0,0,0,.55), 0 0 0 .5px rgba(0,0,0,.6); }
   .screen { background: var(--wall); }
 
   /* The menu bar (macOS 26 Tahoe: no bar background, items straight on the wallpaper). */
@@ -82,9 +81,10 @@
   .bar .left span { padding: 0 9px; }
   .bar .left .apple { font-size: 15px; padding: 0 12px 0 6px; line-height: 1; }
   .bar .left .app { font-weight: 700; }
-  .bar .si { height: 22px; min-width: 30px; padding: 0 7px; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
+  .bar .si { height: 22px; min-width: 30px; padding: 0 7px; display: flex; align-items: center; justify-content: center; border-radius: 6px; gap: 4px; }
   .bar .si svg { display: block; }
   .bar .si.open { background: var(--bar-hl); }
+  .bar .si .devname { font-size: 13px; }
   .bar .clock { padding: 0 8px; }
   /* Overseer: the silhouette as a template image, with a knocked-out corner for the dot. */
   .mark { position: relative; width: 18px; height: 18px; }
@@ -94,13 +94,28 @@
     -webkit-mask-composite: source-in; mask: var(--mark) center / contain no-repeat, radial-gradient(circle at 15.3px 3.3px, transparent 4.8px, #000 5.3px); mask-composite: intersect; }
   .mark b { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: var(--dot); left: 11.8px; top: -.2px; }
   .mark.stopped i { opacity: .38; }
+  /* A dev daemon's item: the same silhouette with a "!" in its lower corner, still one colour. */
+  .mark.dev i { -webkit-mask: var(--mark) center / contain no-repeat, radial-gradient(circle at 15px 14.2px, transparent 4.9px, #000 5.4px);
+    -webkit-mask-composite: source-in; mask: var(--mark) center / contain no-repeat, radial-gradient(circle at 15px 14.2px, transparent 4.9px, #000 5.4px); mask-composite: intersect; }
+  .mark.dev.has-dot i { -webkit-mask: var(--mark) center / contain no-repeat, radial-gradient(circle at 15.3px 3.3px, transparent 4.8px, #000 5.3px), radial-gradient(circle at 15px 14.2px, transparent 4.9px, #000 5.4px);
+    -webkit-mask-composite: source-in, source-in; mask: var(--mark) center / contain no-repeat, radial-gradient(circle at 15.3px 3.3px, transparent 4.8px, #000 5.3px), radial-gradient(circle at 15px 14.2px, transparent 4.9px, #000 5.4px); mask-composite: intersect, intersect; }
+  .mark u { position: absolute; left: 13px; top: 9.4px; width: 4px; height: 10px; text-decoration: none; font: 800 10.5px/10px var(--sys); color: var(--bar-fg); text-align: center; }
+  /* macOS 26 tooltip. */
+  .tip { position: absolute; z-index: 8; font-size: 11.5px; line-height: 15px; padding: 4px 8px; border-radius: 7px; white-space: nowrap;
+    background: var(--tip-bg); color: var(--fg); box-shadow: 0 3px 10px rgba(0,0,0,.18), 0 0 0 .5px var(--tip-edge); }
+  .screen.light { --tip-bg: #F4F4F5; --tip-edge: rgba(0,0,0,.18); }
+  .screen.dark { --tip-bg: #3A3A3E; --tip-edge: rgba(0,0,0,.6); }
+  .cursor { position: absolute; z-index: 9; width: 13px; height: 20px; pointer-events: none; }
+  .num { min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; background: var(--dot); color: var(--on-dot);
+    font: 700 10.5px/15px var(--sys); text-align: center; font-variant-numeric: tabular-nums; }
 
   /* Menus (NSMenu, macOS 26 look: rounder panel, inset rounded selection). */
   .menu { position: absolute; top: 29px; padding: 5px; border-radius: 12px; background: var(--menu-bg);
     -webkit-backdrop-filter: blur(28px) saturate(1.7); backdrop-filter: blur(28px) saturate(1.7);
     box-shadow: var(--shadow), inset 0 0 0 .5px var(--menu-inner); color: var(--fg); font-size: 13px; line-height: 16px; min-width: 250px; width: max-content; }
   .menu.sub { z-index: 3; }
-  .row { display: flex; align-items: center; min-height: 22px; padding: 3px 9px 3px 0; border-radius: 7px; gap: 0; position: relative; }
+  .menu.pop { z-index: 4; min-width: 0; }
+  .row { display: flex; align-items: center; min-height: 22px; padding: 3px 9px 3px 0; border-radius: 7px; position: relative; }
   .row .chk { width: 22px; flex: 0 0 22px; display: flex; justify-content: center; }
   .row .ico { width: 16px; flex: 0 0 16px; height: 16px; display: flex; align-items: center; justify-content: center; margin-right: 7px; color: var(--fg); }
   .row .ico svg { display: block; }
@@ -112,12 +127,11 @@
   .row.hdr { min-height: 18px; padding-top: 4px; padding-bottom: 1px; font-size: 11px; font-weight: 600; color: var(--fg2); }
   .row.act:hover, .row.open { background: var(--sel); color: var(--on-sel); }
   .row.act:hover .sub, .row.open .sub, .row.act:hover .rt, .row.open .rt, .row.act:hover .arrow, .row.open .arrow, .row.act:hover .ico, .row.open .ico { color: rgba(255,255,255,.86); }
-  .row.act { cursor: default; }
   .sepr { height: 1px; background: var(--sep); margin: 5px 10px; }
   .pip { width: 7px; height: 7px; border-radius: 50%; background: var(--orange); display: inline-block; }
   .count { font-variant-numeric: tabular-nums; }
 
-  /* A Needs-you request as a custom menu-item view with two buttons. */
+  /* A Needs-you request: a custom menu-item view with a split button and Deny. */
   .ask { padding: 4px 10px 8px 0; display: flex; }
   .ask .chk { width: 22px; flex: 0 0 22px; }
   .ask .ico { width: 16px; flex: 0 0 16px; margin-right: 7px; padding-top: 1px; }
@@ -126,14 +140,19 @@
   .ask .t em { font-style: normal; font-weight: 400; color: var(--fg2); font-size: 11px; }
   .ask .sub { display: block; font-size: 11px; line-height: 14px; color: var(--fg2); }
   .ask .btns { display: flex; gap: 6px; margin-top: 7px; }
-  .ask .btn { font: 500 12px/20px var(--sys); height: 22px; padding: 0 12px; border-radius: 11px; background: var(--btn-bg);
-    box-shadow: var(--btn-shadow), inset 0 0 0 .5px var(--btn-edge); color: var(--fg); cursor: default; border: 0; }
-  .ask .btn:active { filter: brightness(.9); }
-  .ask .btn.primary { background: var(--sel); color: #fff; box-shadow: var(--btn-shadow); }
+  .btn { font: 500 12px/22px var(--sys); height: 22px; padding: 0 12px; border-radius: 11px; background: var(--btn-bg);
+    box-shadow: var(--btn-shadow), inset 0 0 0 .5px var(--btn-edge); color: var(--fg); cursor: default; border: 0; display: inline-flex; align-items: center; }
+  .btn:active { filter: brightness(.9); }
+  .split { display: inline-flex; }
+  .split .btn:first-child { border-radius: 11px 0 0 11px; padding-right: 10px; }
+  .split .btn.caret { border-radius: 0 11px 11px 0; padding: 0 8px 0 7px; position: relative; }
+  .split .btn.caret::before { content: ""; position: absolute; left: 0; top: 5px; bottom: 5px; width: 1px; background: var(--btn-div); }
+  .split .btn.caret.on { background: var(--sel); color: #fff; }
+  .split .btn.caret.on::before { display: none; }
 
   .toast { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); background: rgba(20,20,24,.82); color: #fff;
     font-size: 12px; padding: 7px 12px; border-radius: 9px; white-space: nowrap; opacity: 0; transition: opacity .2s; pointer-events: none;
-    -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+    -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); z-index: 9; }
   .toast.on { opacity: 1; }
 </style>
 </head>
@@ -141,21 +160,18 @@
 <div class="page">
   <header>
     <h1>Overseer in the menu bar</h1>
-    <p>Mockup for AC-262. The item runs while the daemon does, with or without VS Code. Hover rows, open a repository, answer a request or pick an agent: the mockup says what the real item would do.</p>
+    <p>Mockup for AC-262, updated with the owner's answers. The item is a display for the daemon: it runs from login, with or without VS Code. Hover rows, open a repository, answer a request (the ▾ holds Always allow) or pick an agent: the mockup says what the real item would do.</p>
   </header>
 
   <div class="controls" role="group" aria-label="Mockup options">
     <div class="control"><span>State</span><div class="seg" data-key="state">
-      <button data-v="quiet">1 · Quiet</button><button data-v="needs">2 · Needs you</button><button data-v="crowd">3 · 30 agents</button><button data-v="stopped">4 · Daemon stopped</button>
+      <button data-v="quiet">1 · Quiet</button><button data-v="needs">2 · Needs you</button><button data-v="crowd">3 · 30 agents</button><button data-v="six">4 · 6 waiting</button><button data-v="devhover">5 · Dev daemon: hover</button><button data-v="dev">6 · Dev daemon: menu</button><button data-v="stopped">7 · Daemon stopped</button>
     </div></div>
     <div class="control"><span>Menu bar</span><div class="seg" data-key="bars">
       <button data-v="both">Light and dark</button><button data-v="light">Light</button><button data-v="dark">Dark</button>
     </div></div>
-    <div class="control"><span>Answer a request</span><div class="seg" data-key="answer">
-      <button data-v="buttons">Buttons in the menu</button><button data-v="submenu">Submenu</button>
-    </div></div>
-    <div class="control"><span>Dot</span><div class="seg" data-key="dot">
-      <button data-v="accent">Violet</button><button data-v="mono">Menu-bar colour</button><button data-v="red">Red</button>
+    <div class="control"><span>While agents wait</span><div class="seg" data-key="badge">
+      <button data-v="dot">Dot</button><button data-v="number">Number</button>
     </div></div>
   </div>
 
@@ -163,8 +179,8 @@
   <div class="screens" id="screens"></div>
 
   <footer>
-    Drawn at the Mac's own size (1 px here is 1 pt on screen). The icon is <code>overseer-icon-flat.png</code> as a template image, so macOS paints it the menu bar's colour; only the dot has a colour of its own.
-    Menu colours are macOS's (selection blue, system green, orange and blue for status). Dot colours: violet is the accent in <code>extension/design/tokens.js</code> (<code>#6B47E0</code> light, <code>#A48BFF</code> dark). Orange is left out on purpose: macOS uses an orange dot in the menu bar for "microphone in use", which Voice Mode triggers.
+    Drawn at the Mac's own size (1 px here is 1 pt on screen). The icon is <code>overseer-icon-flat.png</code> as a template image, so macOS paints it the menu bar's colour; only the dot (or number) has a colour of its own: Overseer's violet from <code>extension/design/tokens.js</code> (<code>#6B47E0</code> light, <code>#A48BFF</code> dark).
+    Menu colours are macOS's (selection blue, system green, orange and blue for status).
   </footer>
 </div>
 
@@ -178,12 +194,13 @@ const I = {
   talk: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M8 2.2c3.5 0 6.2 2.2 6.2 5s-2.7 5-6.2 5c-.7 0-1.4-.1-2-.3L3 13.4l.7-2.6C2.6 9.9 1.8 8.6 1.8 7.2c0-2.8 2.7-5 6.2-5z"/></svg>',
   play: '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4.6 2.9v10.2c0 .5.5.8.9.5l8-5.1c.4-.2.4-.8 0-1L5.5 2.4c-.4-.3-.9 0-.9.5z"/></svg>',
   showall: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M5.5 4h8M5.5 8h8M5.5 12h8"/><circle cx="2.6" cy="4" r=".6" fill="currentColor"/><circle cx="2.6" cy="8" r=".6" fill="currentColor"/><circle cx="2.6" cy="12" r=".6" fill="currentColor"/></svg>',
-  allow: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.4l3.2 3.1L13 4.6"/></svg>',
-  deny: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
-  code: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 4.5L2 8l3.5 3.5M10.5 4.5L14 8l-3.5 3.5"/></svg>',
+  more: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.6" fill="none" stroke="var(--orange)" stroke-width="1.3"/><circle cx="5.2" cy="8" r=".9" fill="var(--orange)"/><circle cx="8" cy="8" r=".9" fill="var(--orange)"/><circle cx="10.8" cy="8" r=".9" fill="var(--orange)"/></svg>',
+  always: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M1.8 8.6l2.4 2.4 5.2-5.6M7.4 10.2l.8.8 5.2-5.6"/></svg>',
+  quit: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M5.2 3.6a5.6 5.6 0 1 0 5.6 0M8 1.8v6"/></svg>',
   warn: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.6" fill="var(--orange)"/><path d="M8 4.4v4.3" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.2" r=".95" fill="#fff"/></svg>',
   check: '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.4l2.6 2.6L10 3.4"/></svg>',
   chev: '<svg width="7" height="11" viewBox="0 0 7 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 1.5l4 4-4 4"/></svg>',
+  caret: '<svg width="8" height="5" viewBox="0 0 8 5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l3 3 3-3"/></svg>',
   status: {
     working: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.2" fill="var(--green)"/></svg>',
     needs:   '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.2" fill="var(--orange)"/></svg>',
@@ -199,6 +216,10 @@ const I = {
 // ---------- Data (made up; accounts in AC-235's shortened form) ----------
 const MAX = 'Claude Max · bil…@testbox.com', PRO = 'ChatGPT Pro · bil…@testbox.com', PLUS = 'ChatGPT Plus · ana…@personal.example';
 const a = (title, status, account, age) => ({ title, status, account, age });
+// A request's "Always allow" carries the rule the harness offers: Claude Code's permission
+// suggestion (a session rule such as Bash(npm test:*)), Codex's "approve for this session".
+const ask = (q, repo, agent, account, ago, rule) => ({ q, repo, agent, account, ago, rule });
+const CAP = 4; // at most this many requests in the menu; the rest behind "N more waiting"
 const STATES = {
   quiet: {
     voice: false, muted: false, open: 'overseer',
@@ -211,12 +232,12 @@ const STATES = {
   needs: {
     voice: true, muted: false,
     repos: [
-      { name: 'overseer', agents: [a('Gateway reconnect backoff', 'needs', MAX, '6m'), a('Menu-bar status item', 'working', PLUS, '11m'), a('Voice Mode wake word', 'review', MAX), a('TUI grid resize flicker', 'working', PRO, '23m'), a('Ledger link check', 'idle', PRO, '1h')] },
       { name: 'site', agents: [a('Checkout page redesign', 'needs', PLUS, '2m'), a('Pricing table copy', 'working', MAX, '15m'), a('Hero animation', 'review', MAX)] },
+      { name: 'overseer', agents: [a('Gateway reconnect backoff', 'needs', MAX, '6m'), a('Menu-bar status item', 'working', PLUS, '11m'), a('Voice Mode wake word', 'review', MAX), a('TUI grid resize flicker', 'working', PRO, '23m'), a('Ledger link check', 'idle', PRO, '1h')] },
     ],
     asks: [
-      { q: 'Run npm test?', repo: 'site', agent: 'Checkout page redesign', account: PLUS, ago: 'now' },
-      { q: 'Run cargo test -p overseerd?', repo: 'overseer', agent: 'Gateway reconnect backoff', account: MAX, ago: '3m' },
+      ask('Run npm test?', 'site', 'Checkout page redesign', PLUS, 'now', 'npm test · for the rest of this session'),
+      ask('Run cargo test -p overseerd?', 'overseer', 'Gateway reconnect backoff', MAX, '3m', 'Bash(cargo test:*) · this session'),
     ],
   },
   crowd: {
@@ -235,26 +256,55 @@ const STATES = {
       { name: 'notes', agents: [
         a('Weekly notes digest', 'working', MAX, '9m'), a('Tag search', 'review', PLUS), a('Markdown export', 'idle', PRO, '3h'), a('Daily template', 'idle', MAX, '1d'), a('Backlinks', 'idle', PLUS, '2d')] },
     ],
-    asks: [ { q: 'Run npm test?', repo: 'overseer', agent: 'Fix flaky gateway test', account: MAX, ago: '1m' } ],
+    asks: [ ask('Run npm test?', 'overseer', 'Fix flaky gateway test', MAX, '1m', 'Bash(npm test:*) · this session') ],
+  },
+  six: {
+    voice: true, muted: false,
+    repos: [
+      { name: 'overseer', agents: [a('Fix flaky gateway test', 'needs', MAX, '9m'), a('Gateway reconnect backoff', 'needs', MAX, '4m'), a('Swarm admission limits', 'needs', PRO, '38m'),
+        a('Menu-bar status item', 'working', PLUS, '11m'), a('Voice Mode wake word', 'review', MAX), a('TUI grid resize flicker', 'working', PRO, '23m'), a('Ledger link check', 'idle', PRO, '1h'), a('Deploy guard', 'idle', MAX, '1d')] },
+      { name: 'site', agents: [a('Checkout page redesign', 'needs', PLUS, '6m'), a('Blog RSS feed', 'needs', PRO, '31m'), a('Pricing table copy', 'working', MAX, '15m'), a('Hero animation', 'review', MAX), a('Sitemap', 'idle', PLUS, '1d')] },
+      { name: 'notes', agents: [a('Weekly notes digest', 'needs', MAX, '9m'), a('Tag search', 'review', PLUS), a('Markdown export', 'idle', PRO, '3h')] },
+    ],
+    asks: [
+      ask('Run npm test?', 'overseer', 'Fix flaky gateway test', MAX, 'now', 'Bash(npm test:*) · this session'),
+      ask('Edit .github/workflows/ci.yml?', 'site', 'Checkout page redesign', PLUS, '1m', 'edits in this worktree · this session'),
+      ask('Run cargo test -p overseerd?', 'overseer', 'Gateway reconnect backoff', MAX, '2m', 'Bash(cargo test:*) · this session'),
+      ask('Fetch docs.rs/tokio?', 'notes', 'Weekly notes digest', MAX, '3m', 'WebFetch(domain:docs.rs) · this session'),
+      ask('Run pnpm build?', 'site', 'Blog RSS feed', PRO, '5m', 'pnpm build · for the rest of this session'),
+      ask('Run git push origin swarm-limits?', 'overseer', 'Swarm admission limits', PRO, '8m', 'git push · for the rest of this session'),
+    ],
+  },
+  dev: {
+    dev: 'dev-voice', voice: false, muted: false,
+    repos: [ { name: 'overseer', agents: [a('Fixture: say hello', 'needs', 'Fixture harness · no login', '1m'), a('Fixture: edit README', 'working', 'Fixture harness · no login', '3m')] } ],
+    asks: [ ask('Run echo hello?', 'overseer', 'Fixture: say hello', 'Fixture harness · no login', 'now', 'Bash(echo:*) · this session') ],
+    // The owner's installed Overseer, beside the dev item, in its own state.
+    prod: { asks: 1 },
   },
   stopped: { stopped: true, repos: [], asks: [] },
 };
+STATES.devhover = { ...JSON.parse(JSON.stringify(STATES.dev)), hover: true };
 const CAPTIONS = {
   quiet: '<b>Quiet.</b> Three agents working, nothing needs you: the icon has no dot. The summary leaves out zero counts. The overseer submenu is open to show how an agent reads: status, then the account it runs on. Voice Mode is off, so Mute is greyed out.',
-  needs: '<b>Needs you.</b> Two agents are waiting on a permission. The icon carries the dot, and both requests sit at the top of the menu, answerable there. A repository holding a waiting agent gets an orange pip.',
+  needs: '<b>Needs you.</b> Two agents are waiting on a permission. The icon carries the dot, and both requests sit at the top, answerable there: Allow once, its ▾ for Always allow (the harness\'s session rule), or Deny. Repositories are most recent first; one holding a waiting agent gets an orange pip.',
   crowd: '<b>30 agents in 3 repositories.</b> The menu stays the same height whatever the number of agents: one row per repository with its count, and each submenu lists the 8 most recent agents, then "Show all in Overseer…" for the other 10.',
-  stopped: '<b>Daemon stopped.</b> The item stays in the menu bar, dimmed, says so, and offers to start Overseer.',
+  six: '<b>Six waiting.</b> The menu shows at most 4 requests, newest first, then "2 more waiting · Show all in Overseer…", so nothing is pushed off the screen. Switch "While agents wait" to Number to see the count beside the icon instead of the dot.',
+  devhover: '<b>A dev daemon beside the real one: hover.</b> A dev daemon (scripts/dev up --name voice) gets its own item: the same icon with a "!" in its corner and no text, since the menu bar has no room for a name. Hovering it shows the name. The installed Overseer\'s item stays to its right, in its own state.',
+  dev: '<b>A dev daemon beside the real one: clicked.</b> The dev item\'s menu opens with its name as the first, greyed row ("Dev daemon: dev-voice"), then the same menu as the real one, for that daemon\'s agents.',
+  stopped: '<b>Daemon stopped.</b> The item stays in the menu bar, dimmed, says so, and offers to start Overseer. Quit hides the item until the next login; it never stops the daemon or its agents.',
 };
 
-// ---------- Options (URL hash: #crowd&answer=submenu&dot=mono&bars=dark) ----------
-const opts = { state: 'crowd', bars: 'both', answer: 'buttons', dot: 'accent' };
+// ---------- Options (URL hash: #six&badge=number&bars=dark&drop=0) ----------
+const DEFAULTS = { state: 'crowd', bars: 'both', badge: 'dot' };
+const opts = { ...DEFAULTS };
 for (const part of location.hash.slice(1).split('&').filter(Boolean)) {
   const [k, v] = part.split('=');
   if (v === undefined) opts.state = k; else opts[k] = v;
 }
 if (!STATES[opts.state]) opts.state = 'crowd';
 let live = null;   // a working copy of the current state that the owner's clicks change
-function reset() { live = JSON.parse(JSON.stringify(STATES[opts.state])); if (opts.answer === 'submenu' && live.asks.length && !live.open) live.openAsk = 0; }
+function reset() { live = JSON.parse(JSON.stringify(STATES[opts.state])); if (opts.drop !== undefined && live.asks[+opts.drop]) live.drop = +opts.drop; }
 
 // ---------- Rendering ----------
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -265,6 +315,7 @@ function row({ title, sub, icon = '', chk = false, rt = '', arrow = false, cls =
 }
 const hdr = t => `<div class="row hdr"><span class="chk"></span><span class="txt">${t}</span></div>`;
 const sep = '<div class="sepr"></div>';
+const quit = () => row({ title: 'Quit', sub: 'Agents keep running', icon: I.quit, cls: 'act', data: 'data-do="quit"' });
 function summary(st) {
   const all = st.repos.flatMap(r => r.agents);
   const n = { working: all.filter(x => x.status === 'working' || x.status === 'needs').length, review: all.filter(x => x.status === 'review').length, idle: all.filter(x => x.status === 'idle').length };
@@ -273,21 +324,22 @@ function summary(st) {
 function mainMenu(st) {
   if (st.stopped) {
     return row({ title: 'Overseer isn’t running', cls: 'dis', icon: null }) + sep +
-      row({ title: 'Start Overseer', icon: I.play, cls: 'act', data: 'data-do="start"' });
+      row({ title: 'Start Overseer', icon: I.play, cls: 'act', data: 'data-do="start"' }) + sep + quit();
   }
   let h = '';
+  if (st.dev) h += row({ title: `Dev daemon: ${esc(st.dev)}`, cls: 'dis', icon: null }) + sep;
   if (st.asks.length) {
     h += hdr('Needs you');
-    st.asks.forEach((k, i) => {
-      if (opts.answer === 'buttons') {
-        h += `<div class="ask"><span class="chk"></span><span class="ico">${I.warn}</span><div class="body">` +
-          `<div class="t"><span>${esc(k.q)}</span><em>${k.ago}</em></div>` +
-          `<span class="sub">${esc(k.repo)} · ${esc(k.agent)}</span><span class="sub">${esc(k.account)}</span>` +
-          `<div class="btns"><button class="btn" data-do="allow" data-i="${i}">Allow once</button><button class="btn" data-do="deny" data-i="${i}">Deny</button></div></div></div>`;
-      } else {
-        h += row({ title: esc(k.q), sub: `${esc(k.repo)} · ${esc(k.agent)}`, icon: I.warn, arrow: true, cls: 'act' + (st.openAsk === i ? ' open' : ''), data: `data-ask="${i}"` });
-      }
+    st.asks.slice(0, CAP).forEach((k, i) => {
+      h += `<div class="ask"><span class="chk"></span><span class="ico">${I.warn}</span><div class="body">` +
+        `<div class="t"><span>${esc(k.q)}</span><em>${k.ago}</em></div>` +
+        `<span class="sub">${esc(k.repo)} · ${esc(k.agent)}</span><span class="sub">${esc(k.account)}</span>` +
+        `<div class="btns"><span class="split"><button class="btn" data-do="allow" data-i="${i}">Allow once</button>` +
+        `<button class="btn caret${st.drop === i ? ' on' : ''}" data-do="drop" data-i="${i}" aria-label="More ways to allow">${I.caret}</button></span>` +
+        `<button class="btn" data-do="deny" data-i="${i}">Deny</button></div></div></div>`;
     });
+    const more = st.asks.length - CAP;
+    if (more > 0) h += row({ title: `${more} more waiting · Show all in Overseer…`, icon: I.more, cls: 'act', data: 'data-do="morewaiting"' });
     h += sep;
   }
   h += row({ title: summary(st), cls: 'dis', icon: null }) + sep;
@@ -301,55 +353,85 @@ function mainMenu(st) {
   h += sep;
   h += row({ title: 'Open Overseer', icon: I.columns, cls: 'act', data: 'data-do="open"' });
   h += row({ title: 'Talk to Overseer', icon: I.talk, cls: 'act', data: 'data-do="talk"' });
+  h += sep + quit();
   return h;
 }
 function subMenu(st) {
-  if (st.open) {
-    const r = st.repos.find(x => x.name === st.open);
-    const shown = r.agents.slice(0, 8);
-    let h = hdr(r.agents.length > 8 ? `8 most recent of ${r.agents.length}` : 'Most recent first');
-    shown.forEach((ag, i) => { h += row({ title: esc(ag.title), sub: `${statusText(ag)} · ${esc(ag.account)}`, icon: I.status[ag.status], cls: 'act', data: `data-agent="${i}"` }); });
-    h += sep + row({ title: 'Show all in Overseer…', icon: I.showall, cls: 'act', data: 'data-do="showall"' });
-    return h;
-  }
-  if (st.openAsk !== undefined && st.asks[st.openAsk]) {
-    const k = st.asks[st.openAsk];
-    return hdr(esc(k.account)) +
-      row({ title: 'Allow once', icon: I.allow, cls: 'act', data: `data-do="allow" data-i="${st.openAsk}"` }) +
-      row({ title: 'Deny', icon: I.deny, cls: 'act', data: `data-do="deny" data-i="${st.openAsk}"` }) + sep +
-      row({ title: 'Open in VS Code', icon: I.code, cls: 'act', data: `data-do="openask" data-i="${st.openAsk}"` });
-  }
-  return '';
+  if (!st.open) return '';
+  const r = st.repos.find(x => x.name === st.open);
+  const shown = r.agents.slice(0, 8);
+  let h = hdr(r.agents.length > 8 ? `8 most recent of ${r.agents.length}` : 'Most recent first');
+  shown.forEach((ag, i) => { h += row({ title: esc(ag.title), sub: `${statusText(ag)} · ${esc(ag.account)}`, icon: I.status[ag.status], cls: 'act', data: `data-agent="${i}"` }); });
+  h += sep + row({ title: 'Show all in Overseer…', icon: I.showall, cls: 'act', data: 'data-do="showall"' });
+  return h;
 }
-function screenHTML(theme) {
+function popMenu(st) {
+  if (st.drop === undefined || !st.asks[st.drop]) return '';
+  const k = st.asks[st.drop];
+  return row({ title: 'Always allow', sub: esc(k.rule), icon: I.always, cls: 'act', data: `data-do="always" data-i="${st.drop}"` });
+}
+function markHTML(asks, stopped, dev) {
+  const bang = dev ? '<u>!</u>' : '', d = dev ? ' dev' : '';
+  if (stopped) return '<span class="mark stopped"><i></i></span>';
+  if (asks > 0 && opts.badge === 'number') return `<span class="mark${d}"><i></i>${bang}</span><span class="num">${asks}</span>`;
+  return `<span class="mark${d} ${asks > 0 ? 'has-dot' : ''}"><i></i>${asks > 0 ? '<b></b>' : ''}${bang}</span>`;
+}
+function screenHTML() {
   const st = live;
-  const dot = st.asks.length > 0;
-  const markCls = st.stopped ? 'stopped' : dot ? 'has-dot' : '';
-  const sub = subMenu(st);
-  return `<div class="bar"><div class="left"><span class="apple"></span><span class="app">Code</span><span>File</span><span>Edit</span><span>Selection</span><span>View</span><span>Go</span></div>` +
-    `<div class="right"><span class="si open" data-si="overseer" title="Overseer"><span class="mark ${markCls}"><i></i>${dot ? '<b></b>' : ''}</span></span>` +
-    `<span class="si">${I.wifi}</span><span class="si">${I.battery}</span><span class="si">${I.search}</span><span class="si">${I.cc}</span><span class="clock">Tue Sep 29&nbsp;&nbsp;9:41 AM</span></div></div>` +
-    `<div class="menu main">${mainMenu(st)}</div>${sub ? `<div class="menu sub">${sub}</div>` : ''}<div class="toast"></div>`;
+  const sub = subMenu(st), pop = popMenu(st);
+  const items = st.dev
+    ? `<span class="si${st.hover ? '' : ' open'}" data-si="menu" title="Dev daemon: ${esc(st.dev)}">${markHTML(st.asks.length, false, true)}</span>` +
+      `<span class="si" title="Overseer">${markHTML(st.prod.asks, false)}</span>`
+    : `<span class="si open" data-si="menu" title="Overseer">${markHTML(st.asks.length, st.stopped)}</span>`;
+  const left = '<span class="apple">\uF8FF</span><span class="app">Code</span><span>File</span><span>Edit</span><span>Selection</span><span>View</span><span>Go</span>';
+  if (st.hover) {
+    return `<div class="bar"><div class="left">${left}</div>` +
+      `<div class="right">${items}<span class="si">${I.wifi}</span><span class="si">${I.battery}</span><span class="si">${I.search}</span><span class="si">${I.cc}</span><span class="clock">Tue Sep 29&nbsp;&nbsp;9:41 AM</span></div></div>` +
+      `<div class="tip">Dev daemon: ${esc(st.dev)}</div>${CURSOR}<div class="toast"></div>`;
+  }
+  return `<div class="bar"><div class="left">${left}</div>` +
+    `<div class="right">${items}<span class="si">${I.wifi}</span><span class="si">${I.battery}</span><span class="si">${I.search}</span><span class="si">${I.cc}</span><span class="clock">Tue Sep 29&nbsp;&nbsp;9:41 AM</span></div></div>` +
+    `<div class="menu main">${mainMenu(st)}</div>${sub ? `<div class="menu sub">${sub}</div>` : ''}${pop ? `<div class="menu pop">${pop}</div>` : ''}<div class="toast"></div>`;
 }
 
+const CURSOR = '<svg class="cursor" viewBox="0 0 13 20"><path d="M1 1v15.2l3.6-3.4 2.3 5.3 2.3-1-2.3-5.2h5z" fill="#000" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></svg>';
 // Place the menu under the item the way AppKit does: left edges aligned, pushed left to stay on
-// screen; a submenu opens to the right if it fits, else to the left, level with its row.
+// screen; a submenu opens to the right if it fits, else to the left, level with its row; the
+// split button's menu drops from its ▾. Returns the height the screen needs.
 function place(screen) {
-  const W = screen.offsetWidth, sc = screen.getBoundingClientRect().width / W;
-  const item = screen.querySelector('[data-si="overseer"]'), menu = screen.querySelector('.menu.main');
-  const x = (item.getBoundingClientRect().left - screen.getBoundingClientRect().left) / sc;
+  const W = screen.offsetWidth, sr = screen.getBoundingClientRect(), sc = sr.width / W;
+  const item = screen.querySelector('[data-si="menu"]'), menu = screen.querySelector('.menu.main');
+  const x = (item.getBoundingClientRect().left - sr.left) / sc;
+  const tip = screen.querySelector('.tip');
+  if (tip) {  // hovering: the pointer on the item, the tooltip just below it
+    const cx = x + item.offsetWidth / 2 - 6;
+    screen.querySelector('.cursor').style.cssText = `left:${cx}px;top:18px`;
+    tip.style.left = Math.min(cx + 4, W - tip.offsetWidth - 6) + 'px'; tip.style.top = '40px';
+    return 0;
+  }
   const left = Math.min(x - 1, W - menu.offsetWidth - 6);
   menu.style.left = left + 'px';
+  let bottom = menu.offsetTop + menu.offsetHeight;
   const sub = screen.querySelector('.menu.sub'), openRow = menu.querySelector('.row.open');
   if (sub && openRow) {
     let sl = left + menu.offsetWidth - 4;
     if (sl + sub.offsetWidth > W - 4) sl = left - sub.offsetWidth + 4;
     sub.style.left = sl + 'px';
     sub.style.top = (menu.offsetTop + openRow.offsetTop - 5) + 'px';
+    bottom = Math.max(bottom, sub.offsetTop + sub.offsetHeight);
   }
+  const pop = screen.querySelector('.menu.pop'), caret = screen.querySelector('.btn.caret.on');
+  if (pop && caret) {
+    const cr = caret.getBoundingClientRect();
+    const split = caret.parentElement.getBoundingClientRect();
+    pop.style.left = ((split.left - sr.left) / sc - 5) + 'px';
+    pop.style.top = ((cr.bottom - sr.top) / sc + 3) + 'px';
+    bottom = Math.max(bottom, pop.offsetTop + pop.offsetHeight);
+  }
+  return bottom;
 }
 
-const DESIGN_W = 680, DESIGN_H = 548;
+const DESIGN_W = 680, MIN_H = 548;
 function render() {
   document.querySelectorAll('.seg').forEach(seg => seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(opts[seg.dataset.key] === b.dataset.v))));
   document.getElementById('caption').innerHTML = CAPTIONS[opts.state];
@@ -359,10 +441,13 @@ function render() {
   const perRow = themes.length === 2 && avail >= DESIGN_W * 2 + 16 ? 2 : 1;
   const s = Math.min(1, (perRow === 2 ? (avail - 16) / 2 : avail) / DESIGN_W);
   box.innerHTML = themes.map(t => `<div><div class="label">${t === 'light' ? 'Light menu bar' : 'Dark menu bar'}</div>` +
-    `<div class="stage" style="width:${DESIGN_W * s}px;height:${DESIGN_H * s}px"><div class="screen ${t} dot-${opts.dot}" style="transform:scale(${s})">${screenHTML(t)}</div></div></div>`).join('');
-  box.querySelectorAll('.screen').forEach(place);
-  const hash = [opts.state, ...['bars', 'answer', 'dot'].filter(k => opts[k] !== { bars: 'both', answer: 'buttons', dot: 'accent' }[k]).map(k => `${k}=${opts[k]}`)].join('&');
-  history.replaceState(null, '', '#' + hash);
+    `<div class="stage" style="width:${DESIGN_W * s}px"><div class="screen ${t}" style="transform:scale(${s})">${screenHTML()}</div></div></div>`).join('');
+  const screens = [...box.querySelectorAll('.screen')];
+  const H = Math.max(MIN_H, ...screens.map(place).map(b => b + 28));
+  screens.forEach(sc => { sc.style.height = H + 'px'; sc.parentElement.style.height = H * s + 'px'; });
+  const extra = ['bars', 'badge'].filter(k => opts[k] !== DEFAULTS[k]).map(k => `${k}=${opts[k]}`);
+  if (live.drop !== undefined) extra.push(`drop=${live.drop}`);
+  history.replaceState(null, '', '#' + [opts.state, ...extra].join('&'));
 }
 function toast(msg) {
   document.querySelectorAll('.screen .toast').forEach(t => { t.textContent = msg; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2600); });
@@ -371,32 +456,33 @@ function toast(msg) {
 document.querySelectorAll('.seg').forEach(seg => seg.addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   opts[seg.dataset.key] = b.dataset.v;
-  if (seg.dataset.key === 'state' || seg.dataset.key === 'answer') reset();
+  if (seg.dataset.key === 'state') { delete opts.drop; reset(); }
   render();
 }));
 document.getElementById('screens').addEventListener('click', e => {
-  const el = e.target.closest('[data-do],[data-repo],[data-agent],[data-ask]'); if (!el) return;
+  const el = e.target.closest('[data-do],[data-repo],[data-agent]'); if (!el) return;
   const st = live;
-  if (el.dataset.repo) { st.open = st.open === el.dataset.repo ? undefined : el.dataset.repo; delete st.openAsk; return render(); }
-  if (el.dataset.ask !== undefined) { st.openAsk = +el.dataset.ask; delete st.open; return render(); }
+  if (el.dataset.repo) { st.open = st.open === el.dataset.repo ? undefined : el.dataset.repo; delete st.drop; return render(); }
   if (el.dataset.agent !== undefined) {
     const ag = st.repos.find(r => r.name === st.open).agents[+el.dataset.agent];
     return toast(`Opens “${ag.title}” in VS Code (vscode://beelol.overseer/open-agent?run=…)`);
   }
   const d = el.dataset.do, k = st.asks[+el.dataset.i];
-  if (d === 'allow' || d === 'deny') {
-    st.asks.splice(+el.dataset.i, 1); delete st.openAsk;
+  if (d === 'drop') { st.drop = st.drop === +el.dataset.i ? undefined : +el.dataset.i; delete st.open; return render(); }
+  if (d === 'allow' || d === 'deny' || d === 'always') {
+    st.asks.splice(+el.dataset.i, 1); delete st.drop;
     for (const r of st.repos) for (const ag of r.agents) if (ag.title === k.agent && ag.status === 'needs') { ag.status = 'working'; ag.age = ag.age || '1m'; }
     render();
-    return toast(d === 'allow' ? `Allowed once: ${k.agent} goes on` : `Denied: ${k.agent} is told no`);
+    return toast(d === 'allow' ? `Allowed once: ${k.agent} goes on` : d === 'always' ? `Always allowed (${k.rule}): ${k.agent} goes on` : `Denied: ${k.agent} is told no`);
   }
   if (d === 'voice') { st.voice = !st.voice; render(); return toast(st.voice ? 'Voice Mode on' : 'Voice Mode off'); }
   if (d === 'mute') { st.muted = !st.muted; render(); return toast(st.muted ? 'Muted: Overseer stops listening' : 'Listening again'); }
   if (d === 'open') return toast('Opens the three-column Overseer workspace in VS Code');
   if (d === 'talk') return toast('Opens Talk to Overseer');
   if (d === 'showall') return toast(`Opens Overseer filtered to ${st.open}`);
-  if (d === 'openask') return toast(`Opens “${k.agent}” in VS Code at its request`);
+  if (d === 'morewaiting') return toast('Opens Overseer at everything waiting on you');
   if (d === 'start') return toast('Starts the daemon (overseerd serve)');
+  if (d === 'quit') return toast('Hides the item until the next login; the daemon and agents keep running');
 });
 addEventListener('resize', render);
 reset();
