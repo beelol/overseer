@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overseer Menu Bar</title>
+<!--
+  The mockup for AC-262: Overseer's item in the Mac's menu bar, in four states, on a light and a
+  dark menu bar. Open this file in a browser. Nothing here talks to a daemon; the data is made up.
+  The item is the brand silhouette (../brand/exports/overseer-icon-flat-64.png, inlined below as
+  --mark) drawn as a template image: one colour, the menu bar's own. The menus use macOS's colours.
+  URL hash picks the state and options, e.g. #crowd, #needs&answer=submenu&dot=mono&bars=dark.
+-->
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #FBFAFD; --raised: #FFFFFF; --border: #E4E2EC; --border-strong: #D2CFDE;
+    --text: #1C1A26; --muted: #5C576F; --faint: #9A96AC; --accent: #6B47E0; --on-accent: #FFFFFF;
+    --mark: url("data:image/png;base64,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");
+    --sys: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #17161D; --raised: #211F2A; --border: #2A2835; --border-strong: #38354A;
+      --text: #E8E6F0; --muted: #A7A3B9; --faint: #6C687F; --accent: #A48BFF; --on-accent: #17161D;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #17161D; --raised: #211F2A; --border: #2A2835; --border-strong: #38354A;
+    --text: #E8E6F0; --muted: #A7A3B9; --faint: #6C687F; --accent: #A48BFF; --on-accent: #17161D;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.45 var(--sys); -webkit-font-smoothing: antialiased; }
+  .page { max-width: 1408px; margin: 0 auto; padding: 20px 16px 32px; }
+  header h1 { font-size: 20px; margin: 0 0 4px; font-weight: 650; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--muted); max-width: 820px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; margin: 14px 0 14px; align-items: center; }
+  .control { display: flex; align-items: center; gap: 8px; }
+  .control > span { color: var(--muted); font-size: 12px; }
+  .seg { display: inline-flex; background: var(--raised); border: 1px solid var(--border-strong); border-radius: 8px; padding: 2px; flex-wrap: wrap; }
+  .seg button { font: 500 12.5px var(--sys); color: var(--text); background: none; border: 0; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+  .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .caption { color: var(--muted); margin: 0 0 14px; max-width: 900px; min-height: 2.9em; }
+  .caption b { color: var(--text); font-weight: 600; }
+  .screens { display: flex; flex-wrap: wrap; gap: 16px; }
+  .stage { position: relative; overflow: hidden; border-radius: 10px; box-shadow: 0 0 0 1px var(--border), 0 6px 24px rgba(0,0,0,.10); flex: 0 0 auto; }
+  .label { font-size: 12px; color: var(--muted); margin: 0 0 6px 2px; }
+  footer { margin-top: 18px; color: var(--muted); font-size: 12.5px; max-width: 900px; }
+  footer code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  /* ---------- A slice of a Mac screen, drawn at 1 CSS px = 1 pt ---------- */
+  .screen { position: absolute; top: 0; left: 0; width: 680px; height: 548px; transform-origin: 0 0; overflow: hidden;
+    font-family: var(--sys); -webkit-font-smoothing: antialiased; cursor: default; user-select: none; }
+  .screen.light { --wall: radial-gradient(120% 90% at 85% 0%, #f6d9e8 0%, rgba(246,217,232,0) 55%), radial-gradient(90% 80% at 10% 100%, #bfe0f5 0%, rgba(191,224,245,0) 60%), linear-gradient(160deg, #dfe9f7 0%, #e8e2f4 55%, #d6e9f2 100%);
+    --bar-fg: rgba(0,0,0,.86); --bar-hl: rgba(0,0,0,.10);
+    --menu-bg: rgba(242,242,244,.80); --menu-edge: rgba(0,0,0,.14); --menu-inner: rgba(255,255,255,.55);
+    --fg: rgba(0,0,0,.86); --fg2: rgba(0,0,0,.52); --fg3: rgba(0,0,0,.26); --sep: rgba(0,0,0,.10);
+    --sel: #0A63D8; --on-sel: #fff;
+    --green: #28CD41; --orange: #FF9500; --blue: #007AFF; --red: #FF3B30;
+    --btn-bg: #fff; --btn-edge: rgba(0,0,0,.14); --btn-shadow: 0 .5px 1.5px rgba(0,0,0,.16);
+    --dot: #6B47E0; --shadow: 0 10px 34px rgba(0,0,0,.20), 0 0 0 .5px rgba(0,0,0,.12); }
+  .screen.dark { --wall: radial-gradient(110% 90% at 85% 0%, #3b2468 0%, rgba(59,36,104,0) 55%), radial-gradient(90% 80% at 10% 100%, #0f3b5c 0%, rgba(15,59,92,0) 60%), linear-gradient(160deg, #101a33 0%, #1c1535 55%, #0c1f2e 100%);
+    --bar-fg: #fff; --bar-hl: rgba(255,255,255,.20);
+    --menu-bg: rgba(38,38,42,.78); --menu-edge: rgba(0,0,0,.55); --menu-inner: rgba(255,255,255,.14);
+    --fg: rgba(255,255,255,.88); --fg2: rgba(255,255,255,.55); --fg3: rgba(255,255,255,.25); --sep: rgba(255,255,255,.12);
+    --sel: #0A5BD0; --on-sel: #fff;
+    --green: #30D158; --orange: #FF9F0A; --blue: #0A84FF; --red: #FF453A;
+    --btn-bg: rgba(255,255,255,.16); --btn-edge: rgba(255,255,255,.08); --btn-shadow: 0 .5px 1px rgba(0,0,0,.4);
+    --dot: #A48BFF; --shadow: 0 10px 34px rgba(0,0,0,.55), 0 0 0 .5px rgba(0,0,0,.6); }
+  .screen.dot-red { --dot: var(--red); }
+  .screen.dot-mono { --dot: var(--bar-fg); }
+  .screen { background: var(--wall); }
+
+  /* The menu bar (macOS 26 Tahoe: no bar background, items straight on the wallpaper). */
+  .bar { height: 24px; display: flex; align-items: center; justify-content: space-between; padding: 0 6px 0 10px;
+    color: var(--bar-fg); font-size: 13px; white-space: nowrap; }
+  .bar .left, .bar .right { display: flex; align-items: center; height: 100%; }
+  .bar .left span { padding: 0 9px; }
+  .bar .left .apple { font-size: 15px; padding: 0 12px 0 6px; line-height: 1; }
+  .bar .left .app { font-weight: 700; }
+  .bar .si { height: 22px; min-width: 30px; padding: 0 7px; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
+  .bar .si svg { display: block; }
+  .bar .si.open { background: var(--bar-hl); }
+  .bar .clock { padding: 0 8px; }
+  /* Overseer: the silhouette as a template image, with a knocked-out corner for the dot. */
+  .mark { position: relative; width: 18px; height: 18px; }
+  .mark i { position: absolute; inset: 0; background: var(--bar-fg);
+    -webkit-mask: var(--mark) center / contain no-repeat; mask: var(--mark) center / contain no-repeat; }
+  .mark.has-dot i { -webkit-mask: var(--mark) center / contain no-repeat, radial-gradient(circle at 15.3px 3.3px, transparent 4.8px, #000 5.3px);
+    -webkit-mask-composite: source-in; mask: var(--mark) center / contain no-repeat, radial-gradient(circle at 15.3px 3.3px, transparent 4.8px, #000 5.3px); mask-composite: intersect; }
+  .mark b { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: var(--dot); left: 11.8px; top: -.2px; }
+  .mark.stopped i { opacity: .38; }
+
+  /* Menus (NSMenu, macOS 26 look: rounder panel, inset rounded selection). */
+  .menu { position: absolute; top: 29px; padding: 5px; border-radius: 12px; background: var(--menu-bg);
+    -webkit-backdrop-filter: blur(28px) saturate(1.7); backdrop-filter: blur(28px) saturate(1.7);
+    box-shadow: var(--shadow), inset 0 0 0 .5px var(--menu-inner); color: var(--fg); font-size: 13px; line-height: 16px; min-width: 250px; width: max-content; }
+  .menu.sub { z-index: 3; }
+  .row { display: flex; align-items: center; min-height: 22px; padding: 3px 9px 3px 0; border-radius: 7px; gap: 0; position: relative; }
+  .row .chk { width: 22px; flex: 0 0 22px; display: flex; justify-content: center; }
+  .row .ico { width: 16px; flex: 0 0 16px; height: 16px; display: flex; align-items: center; justify-content: center; margin-right: 7px; color: var(--fg); }
+  .row .ico svg { display: block; }
+  .row .txt { flex: 1 1 auto; min-width: 0; }
+  .row .sub { display: block; font-size: 11px; line-height: 14px; color: var(--fg2); }
+  .row .rt { margin-left: 22px; color: var(--fg2); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .row .arrow { margin-left: 10px; color: var(--fg2); display: flex; }
+  .row.dis, .row.dis .ico { color: var(--fg3); }
+  .row.hdr { min-height: 18px; padding-top: 4px; padding-bottom: 1px; font-size: 11px; font-weight: 600; color: var(--fg2); }
+  .row.act:hover, .row.open { background: var(--sel); color: var(--on-sel); }
+  .row.act:hover .sub, .row.open .sub, .row.act:hover .rt, .row.open .rt, .row.act:hover .arrow, .row.open .arrow, .row.act:hover .ico, .row.open .ico { color: rgba(255,255,255,.86); }
+  .row.act { cursor: default; }
+  .sepr { height: 1px; background: var(--sep); margin: 5px 10px; }
+  .pip { width: 7px; height: 7px; border-radius: 50%; background: var(--orange); display: inline-block; }
+  .count { font-variant-numeric: tabular-nums; }
+
+  /* A Needs-you request as a custom menu-item view with two buttons. */
+  .ask { padding: 4px 10px 8px 0; display: flex; }
+  .ask .chk { width: 22px; flex: 0 0 22px; }
+  .ask .ico { width: 16px; flex: 0 0 16px; margin-right: 7px; padding-top: 1px; }
+  .ask .body { flex: 1; min-width: 0; }
+  .ask .t { display: flex; justify-content: space-between; gap: 14px; font-weight: 600; }
+  .ask .t em { font-style: normal; font-weight: 400; color: var(--fg2); font-size: 11px; }
+  .ask .sub { display: block; font-size: 11px; line-height: 14px; color: var(--fg2); }
+  .ask .btns { display: flex; gap: 6px; margin-top: 7px; }
+  .ask .btn { font: 500 12px/20px var(--sys); height: 22px; padding: 0 12px; border-radius: 11px; background: var(--btn-bg);
+    box-shadow: var(--btn-shadow), inset 0 0 0 .5px var(--btn-edge); color: var(--fg); cursor: default; border: 0; }
+  .ask .btn:active { filter: brightness(.9); }
+  .ask .btn.primary { background: var(--sel); color: #fff; box-shadow: var(--btn-shadow); }
+
+  .toast { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); background: rgba(20,20,24,.82); color: #fff;
+    font-size: 12px; padding: 7px 12px; border-radius: 9px; white-space: nowrap; opacity: 0; transition: opacity .2s; pointer-events: none;
+    -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+  .toast.on { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1>Overseer in the menu bar</h1>
+    <p>Mockup for AC-262. The item runs while the daemon does, with or without VS Code. Hover rows, open a repository, answer a request or pick an agent: the mockup says what the real item would do.</p>
+  </header>
+
+  <div class="controls" role="group" aria-label="Mockup options">
+    <div class="control"><span>State</span><div class="seg" data-key="state">
+      <button data-v="quiet">1 · Quiet</button><button data-v="needs">2 · Needs you</button><button data-v="crowd">3 · 30 agents</button><button data-v="stopped">4 · Daemon stopped</button>
+    </div></div>
+    <div class="control"><span>Menu bar</span><div class="seg" data-key="bars">
+      <button data-v="both">Light and dark</button><button data-v="light">Light</button><button data-v="dark">Dark</button>
+    </div></div>
+    <div class="control"><span>Answer a request</span><div class="seg" data-key="answer">
+      <button data-v="buttons">Buttons in the menu</button><button data-v="submenu">Submenu</button>
+    </div></div>
+    <div class="control"><span>Dot</span><div class="seg" data-key="dot">
+      <button data-v="accent">Violet</button><button data-v="mono">Menu-bar colour</button><button data-v="red">Red</button>
+    </div></div>
+  </div>
+
+  <p class="caption" id="caption"></p>
+  <div class="screens" id="screens"></div>
+
+  <footer>
+    Drawn at the Mac's own size (1 px here is 1 pt on screen). The icon is <code>overseer-icon-flat.png</code> as a template image, so macOS paints it the menu bar's colour; only the dot has a colour of its own.
+    Menu colours are macOS's (selection blue, system green, orange and blue for status). Dot colours: violet is the accent in <code>extension/design/tokens.js</code> (<code>#6B47E0</code> light, <code>#A48BFF</code> dark). Orange is left out on purpose: macOS uses an orange dot in the menu bar for "microphone in use", which Voice Mode triggers.
+  </footer>
+</div>
+
+<script>
+// ---------- Icons (SF Symbols-like, drawn in currentColor) ----------
+const I = {
+  folder: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M1.8 4.3c0-.7.5-1.2 1.2-1.2h3l1.4 1.5h5.6c.7 0 1.2.5 1.2 1.2v6.4c0 .7-.5 1.2-1.2 1.2H3c-.7 0-1.2-.5-1.2-1.2z"/><path d="M1.8 6.3h12.4"/></svg>',
+  wave: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M2 7v2M4.6 5v6M7.2 2.5v11M9.8 4.5v7M12.4 6v4M15 7.3v1.4"/></svg>',
+  mute: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><rect x="5.8" y="1.6" width="4.4" height="8" rx="2.2"/><path d="M3.6 7.6a4.4 4.4 0 0 0 8.8 0M8 12v2.2M2.2 2l11.6 12"/></svg>',
+  columns: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="1.6" y="2.6" width="12.8" height="10.8" rx="2"/><path d="M5.8 2.6v10.8M10.2 2.6v10.8"/></svg>',
+  talk: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M8 2.2c3.5 0 6.2 2.2 6.2 5s-2.7 5-6.2 5c-.7 0-1.4-.1-2-.3L3 13.4l.7-2.6C2.6 9.9 1.8 8.6 1.8 7.2c0-2.8 2.7-5 6.2-5z"/></svg>',
+  play: '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4.6 2.9v10.2c0 .5.5.8.9.5l8-5.1c.4-.2.4-.8 0-1L5.5 2.4c-.4-.3-.9 0-.9.5z"/></svg>',
+  showall: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M5.5 4h8M5.5 8h8M5.5 12h8"/><circle cx="2.6" cy="4" r=".6" fill="currentColor"/><circle cx="2.6" cy="8" r=".6" fill="currentColor"/><circle cx="2.6" cy="12" r=".6" fill="currentColor"/></svg>',
+  allow: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.4l3.2 3.1L13 4.6"/></svg>',
+  deny: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
+  code: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 4.5L2 8l3.5 3.5M10.5 4.5L14 8l-3.5 3.5"/></svg>',
+  warn: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.6" fill="var(--orange)"/><path d="M8 4.4v4.3" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.2" r=".95" fill="#fff"/></svg>',
+  check: '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.4l2.6 2.6L10 3.4"/></svg>',
+  chev: '<svg width="7" height="11" viewBox="0 0 7 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 1.5l4 4-4 4"/></svg>',
+  status: {
+    working: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.2" fill="var(--green)"/></svg>',
+    needs:   '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.2" fill="var(--orange)"/></svg>',
+    review:  '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.2" fill="var(--blue)"/></svg>',
+    idle:    '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.8" fill="none" stroke="var(--fg2)" stroke-width="1.2"/></svg>',
+  },
+  wifi: '<svg width="17" height="13" viewBox="0 0 17 13" fill="currentColor"><path d="M8.5 2.2c2.5 0 4.8.9 6.6 2.5.2.2.5.2.7 0l.8-.8c.2-.2.2-.5 0-.7A11.4 11.4 0 0 0 8.5.2 11.4 11.4 0 0 0 .4 3.2c-.2.2-.2.5 0 .7l.8.8c.2.2.5.2.7 0a9.7 9.7 0 0 1 6.6-2.5z"/><path d="M8.5 5.5c1.6 0 3 .6 4.2 1.6.2.2.5.2.7 0l.8-.8c.2-.2.2-.5 0-.7a8 8 0 0 0-11.4 0c-.2.2-.2.5 0 .7l.8.8c.2.2.5.2.7 0 1.2-1 2.6-1.6 4.2-1.6z"/><path d="M8.5 8.8c.8 0 1.5.3 2 .8.2.2.2.5 0 .7l-1.6 1.6c-.2.2-.6.2-.8 0l-1.6-1.6c-.2-.2-.2-.5 0-.7.5-.5 1.2-.8 2-.8z"/></svg>',
+  battery: '<svg width="26" height="12" viewBox="0 0 26 12"><rect x=".6" y=".6" width="22" height="10.8" rx="3.2" fill="none" stroke="currentColor" stroke-opacity=".45" stroke-width="1.1"/><rect x="2.2" y="2.2" width="15.4" height="7.6" rx="1.8" fill="currentColor"/><path d="M24.2 4v4c.7-.2 1.2-1 1.2-2s-.5-1.8-1.2-2z" fill="currentColor" fill-opacity=".45"/></svg>',
+  search: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="6.2" cy="6.2" r="4.6"/><path d="M9.6 9.6l4 4"/></svg>',
+  cc: '<svg width="17" height="14" viewBox="0 0 17 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x=".9" y=".9" width="15.2" height="5.2" rx="2.6"/><circle cx="3.6" cy="3.5" r="1.5" fill="currentColor" stroke="none"/><rect x=".9" y="7.9" width="15.2" height="5.2" rx="2.6"/><circle cx="13.4" cy="10.5" r="1.5" fill="currentColor" stroke="none"/></svg>',
+};
+
+// ---------- Data (made up; accounts in AC-235's shortened form) ----------
+const MAX = 'Claude Max · bil…@testbox.com', PRO = 'ChatGPT Pro · bil…@testbox.com', PLUS = 'ChatGPT Plus · ana…@personal.example';
+const a = (title, status, account, age) => ({ title, status, account, age });
+const STATES = {
+  quiet: {
+    voice: false, muted: false, open: 'overseer',
+    repos: [
+      { name: 'overseer', agents: [a('Gateway reconnect backoff', 'working', MAX, '4m'), a('TUI grid resize flicker', 'working', PRO, '23m')] },
+      { name: 'site', agents: [a('Pricing table copy', 'working', MAX, '15m')] },
+    ],
+    asks: [],
+  },
+  needs: {
+    voice: true, muted: false,
+    repos: [
+      { name: 'overseer', agents: [a('Gateway reconnect backoff', 'needs', MAX, '6m'), a('Menu-bar status item', 'working', PLUS, '11m'), a('Voice Mode wake word', 'review', MAX), a('TUI grid resize flicker', 'working', PRO, '23m'), a('Ledger link check', 'idle', PRO, '1h')] },
+      { name: 'site', agents: [a('Checkout page redesign', 'needs', PLUS, '2m'), a('Pricing table copy', 'working', MAX, '15m'), a('Hero animation', 'review', MAX)] },
+    ],
+    asks: [
+      { q: 'Run npm test?', repo: 'site', agent: 'Checkout page redesign', account: PLUS, ago: 'now' },
+      { q: 'Run cargo test -p overseerd?', repo: 'overseer', agent: 'Gateway reconnect backoff', account: MAX, ago: '3m' },
+    ],
+  },
+  crowd: {
+    voice: true, muted: true, open: 'overseer',
+    repos: [
+      { name: 'overseer', agents: [
+        a('Fix flaky gateway test', 'needs', MAX, '9m'), a('Gateway reconnect backoff', 'working', MAX, '4m'), a('Menu-bar status item', 'working', PLUS, '11m'),
+        a('Voice Mode wake word', 'review', MAX), a('TUI grid resize flicker', 'working', PRO, '23m'), a('Phone door timing', 'review', PLUS),
+        a('Swarm admission limits', 'working', MAX, '38m'), a('Ledger link check', 'idle', PRO, '1h'),
+        a('Account booking race', 'working', MAX, '52m'), a('Review opens on task start', 'review', PRO), a('Merge from the agent', 'idle', MAX, '3h'),
+        a('Offline replay order', 'working', PLUS, '1h'), a('Auto quota refresh', 'working', PRO, '1h'), a('Brand exports', 'idle', MAX, '5h'),
+        a('Dev daemon clean-up', 'idle', PRO, '6h'), a('Deploy guard', 'idle', MAX, '1d'), a('Talk to Overseer latency', 'idle', PLUS, '1d'), a('Notifier thread ids', 'idle', MAX, '2d')] },
+      { name: 'site', agents: [
+        a('Checkout page redesign', 'working', PLUS, '6m'), a('Pricing table copy', 'working', MAX, '15m'), a('Blog RSS feed', 'working', PRO, '31m'),
+        a('Hero animation', 'review', MAX), a('Footer links', 'idle', MAX, '2h'), a('Lighthouse fixes', 'idle', PRO, '4h'), a('Sitemap', 'idle', PLUS, '1d')] },
+      { name: 'notes', agents: [
+        a('Weekly notes digest', 'working', MAX, '9m'), a('Tag search', 'review', PLUS), a('Markdown export', 'idle', PRO, '3h'), a('Daily template', 'idle', MAX, '1d'), a('Backlinks', 'idle', PLUS, '2d')] },
+    ],
+    asks: [ { q: 'Run npm test?', repo: 'overseer', agent: 'Fix flaky gateway test', account: MAX, ago: '1m' } ],
+  },
+  stopped: { stopped: true, repos: [], asks: [] },
+};
+const CAPTIONS = {
+  quiet: '<b>Quiet.</b> Three agents working, nothing needs you: the icon has no dot. The summary leaves out zero counts. The overseer submenu is open to show how an agent reads: status, then the account it runs on. Voice Mode is off, so Mute is greyed out.',
+  needs: '<b>Needs you.</b> Two agents are waiting on a permission. The icon carries the dot, and both requests sit at the top of the menu, answerable there. A repository holding a waiting agent gets an orange pip.',
+  crowd: '<b>30 agents in 3 repositories.</b> The menu stays the same height whatever the number of agents: one row per repository with its count, and each submenu lists the 8 most recent agents, then "Show all in Overseer…" for the other 10.',
+  stopped: '<b>Daemon stopped.</b> The item stays in the menu bar, dimmed, says so, and offers to start Overseer.',
+};
+
+// ---------- Options (URL hash: #crowd&answer=submenu&dot=mono&bars=dark) ----------
+const opts = { state: 'crowd', bars: 'both', answer: 'buttons', dot: 'accent' };
+for (const part of location.hash.slice(1).split('&').filter(Boolean)) {
+  const [k, v] = part.split('=');
+  if (v === undefined) opts.state = k; else opts[k] = v;
+}
+if (!STATES[opts.state]) opts.state = 'crowd';
+let live = null;   // a working copy of the current state that the owner's clicks change
+function reset() { live = JSON.parse(JSON.stringify(STATES[opts.state])); if (opts.answer === 'submenu' && live.asks.length && !live.open) live.openAsk = 0; }
+
+// ---------- Rendering ----------
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const statusText = ag => ({ working: `Working · ${ag.age}`, needs: 'Needs you', review: 'To review', idle: `Idle · ${ag.age}` }[ag.status]);
+function row({ title, sub, icon = '', chk = false, rt = '', arrow = false, cls = '', data = '' }) {
+  return `<div class="row ${cls}" ${data}><span class="chk">${chk ? I.check : ''}</span>${icon !== null ? `<span class="ico">${icon}</span>` : ''}` +
+    `<span class="txt">${title}${sub ? `<span class="sub">${sub}</span>` : ''}</span>${rt ? `<span class="rt">${rt}</span>` : ''}${arrow ? `<span class="arrow">${I.chev}</span>` : ''}</div>`;
+}
+const hdr = t => `<div class="row hdr"><span class="chk"></span><span class="txt">${t}</span></div>`;
+const sep = '<div class="sepr"></div>';
+function summary(st) {
+  const all = st.repos.flatMap(r => r.agents);
+  const n = { working: all.filter(x => x.status === 'working' || x.status === 'needs').length, review: all.filter(x => x.status === 'review').length, idle: all.filter(x => x.status === 'idle').length };
+  return [n.working && `${n.working} working`, n.review && `${n.review} to review`, n.idle && `${n.idle} idle`].filter(Boolean).join(' · ');
+}
+function mainMenu(st) {
+  if (st.stopped) {
+    return row({ title: 'Overseer isn’t running', cls: 'dis', icon: null }) + sep +
+      row({ title: 'Start Overseer', icon: I.play, cls: 'act', data: 'data-do="start"' });
+  }
+  let h = '';
+  if (st.asks.length) {
+    h += hdr('Needs you');
+    st.asks.forEach((k, i) => {
+      if (opts.answer === 'buttons') {
+        h += `<div class="ask"><span class="chk"></span><span class="ico">${I.warn}</span><div class="body">` +
+          `<div class="t"><span>${esc(k.q)}</span><em>${k.ago}</em></div>` +
+          `<span class="sub">${esc(k.repo)} · ${esc(k.agent)}</span><span class="sub">${esc(k.account)}</span>` +
+          `<div class="btns"><button class="btn" data-do="allow" data-i="${i}">Allow once</button><button class="btn" data-do="deny" data-i="${i}">Deny</button></div></div></div>`;
+      } else {
+        h += row({ title: esc(k.q), sub: `${esc(k.repo)} · ${esc(k.agent)}`, icon: I.warn, arrow: true, cls: 'act' + (st.openAsk === i ? ' open' : ''), data: `data-ask="${i}"` });
+      }
+    });
+    h += sep;
+  }
+  h += row({ title: summary(st), cls: 'dis', icon: null }) + sep;
+  st.repos.forEach(r => {
+    const waiting = r.agents.some(x => x.status === 'needs');
+    h += row({ title: esc(r.name), icon: I.folder, rt: `${waiting ? '<span class="pip" title="An agent here needs you"></span>' : ''}<span class="count">${r.agents.length}</span>`, arrow: true, cls: 'act' + (st.open === r.name ? ' open' : ''), data: `data-repo="${esc(r.name)}"` });
+  });
+  h += sep;
+  h += row({ title: 'Voice Mode', icon: I.wave, chk: st.voice, cls: 'act', data: 'data-do="voice"' });
+  h += row({ title: 'Mute', icon: I.mute, chk: st.voice && st.muted, cls: st.voice ? 'act' : 'dis', data: st.voice ? 'data-do="mute"' : '' });
+  h += sep;
+  h += row({ title: 'Open Overseer', icon: I.columns, cls: 'act', data: 'data-do="open"' });
+  h += row({ title: 'Talk to Overseer', icon: I.talk, cls: 'act', data: 'data-do="talk"' });
+  return h;
+}
+function subMenu(st) {
+  if (st.open) {
+    const r = st.repos.find(x => x.name === st.open);
+    const shown = r.agents.slice(0, 8);
+    let h = hdr(r.agents.length > 8 ? `8 most recent of ${r.agents.length}` : 'Most recent first');
+    shown.forEach((ag, i) => { h += row({ title: esc(ag.title), sub: `${statusText(ag)} · ${esc(ag.account)}`, icon: I.status[ag.status], cls: 'act', data: `data-agent="${i}"` }); });
+    h += sep + row({ title: 'Show all in Overseer…', icon: I.showall, cls: 'act', data: 'data-do="showall"' });
+    return h;
+  }
+  if (st.openAsk !== undefined && st.asks[st.openAsk]) {
+    const k = st.asks[st.openAsk];
+    return hdr(esc(k.account)) +
+      row({ title: 'Allow once', icon: I.allow, cls: 'act', data: `data-do="allow" data-i="${st.openAsk}"` }) +
+      row({ title: 'Deny', icon: I.deny, cls: 'act', data: `data-do="deny" data-i="${st.openAsk}"` }) + sep +
+      row({ title: 'Open in VS Code', icon: I.code, cls: 'act', data: `data-do="openask" data-i="${st.openAsk}"` });
+  }
+  return '';
+}
+function screenHTML(theme) {
+  const st = live;
+  const dot = st.asks.length > 0;
+  const markCls = st.stopped ? 'stopped' : dot ? 'has-dot' : '';
+  const sub = subMenu(st);
+  return `<div class="bar"><div class="left"><span class="apple"></span><span class="app">Code</span><span>File</span><span>Edit</span><span>Selection</span><span>View</span><span>Go</span></div>` +
+    `<div class="right"><span class="si open" data-si="overseer" title="Overseer"><span class="mark ${markCls}"><i></i>${dot ? '<b></b>' : ''}</span></span>` +
+    `<span class="si">${I.wifi}</span><span class="si">${I.battery}</span><span class="si">${I.search}</span><span class="si">${I.cc}</span><span class="clock">Tue Sep 29&nbsp;&nbsp;9:41 AM</span></div></div>` +
+    `<div class="menu main">${mainMenu(st)}</div>${sub ? `<div class="menu sub">${sub}</div>` : ''}<div class="toast"></div>`;
+}
+
+// Place the menu under the item the way AppKit does: left edges aligned, pushed left to stay on
+// screen; a submenu opens to the right if it fits, else to the left, level with its row.
+function place(screen) {
+  const W = screen.offsetWidth, sc = screen.getBoundingClientRect().width / W;
+  const item = screen.querySelector('[data-si="overseer"]'), menu = screen.querySelector('.menu.main');
+  const x = (item.getBoundingClientRect().left - screen.getBoundingClientRect().left) / sc;
+  const left = Math.min(x - 1, W - menu.offsetWidth - 6);
+  menu.style.left = left + 'px';
+  const sub = screen.querySelector('.menu.sub'), openRow = menu.querySelector('.row.open');
+  if (sub && openRow) {
+    let sl = left + menu.offsetWidth - 4;
+    if (sl + sub.offsetWidth > W - 4) sl = left - sub.offsetWidth + 4;
+    sub.style.left = sl + 'px';
+    sub.style.top = (menu.offsetTop + openRow.offsetTop - 5) + 'px';
+  }
+}
+
+const DESIGN_W = 680, DESIGN_H = 548;
+function render() {
+  document.querySelectorAll('.seg').forEach(seg => seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(opts[seg.dataset.key] === b.dataset.v))));
+  document.getElementById('caption').innerHTML = CAPTIONS[opts.state];
+  const themes = opts.bars === 'both' ? ['light', 'dark'] : [opts.bars];
+  const box = document.getElementById('screens');
+  const avail = box.clientWidth;
+  const perRow = themes.length === 2 && avail >= DESIGN_W * 2 + 16 ? 2 : 1;
+  const s = Math.min(1, (perRow === 2 ? (avail - 16) / 2 : avail) / DESIGN_W);
+  box.innerHTML = themes.map(t => `<div><div class="label">${t === 'light' ? 'Light menu bar' : 'Dark menu bar'}</div>` +
+    `<div class="stage" style="width:${DESIGN_W * s}px;height:${DESIGN_H * s}px"><div class="screen ${t} dot-${opts.dot}" style="transform:scale(${s})">${screenHTML(t)}</div></div></div>`).join('');
+  box.querySelectorAll('.screen').forEach(place);
+  const hash = [opts.state, ...['bars', 'answer', 'dot'].filter(k => opts[k] !== { bars: 'both', answer: 'buttons', dot: 'accent' }[k]).map(k => `${k}=${opts[k]}`)].join('&');
+  history.replaceState(null, '', '#' + hash);
+}
+function toast(msg) {
+  document.querySelectorAll('.screen .toast').forEach(t => { t.textContent = msg; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2600); });
+}
+
+document.querySelectorAll('.seg').forEach(seg => seg.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  opts[seg.dataset.key] = b.dataset.v;
+  if (seg.dataset.key === 'state' || seg.dataset.key === 'answer') reset();
+  render();
+}));
+document.getElementById('screens').addEventListener('click', e => {
+  const el = e.target.closest('[data-do],[data-repo],[data-agent],[data-ask]'); if (!el) return;
+  const st = live;
+  if (el.dataset.repo) { st.open = st.open === el.dataset.repo ? undefined : el.dataset.repo; delete st.openAsk; return render(); }
+  if (el.dataset.ask !== undefined) { st.openAsk = +el.dataset.ask; delete st.open; return render(); }
+  if (el.dataset.agent !== undefined) {
+    const ag = st.repos.find(r => r.name === st.open).agents[+el.dataset.agent];
+    return toast(`Opens “${ag.title}” in VS Code (vscode://beelol.overseer/open-agent?run=…)`);
+  }
+  const d = el.dataset.do, k = st.asks[+el.dataset.i];
+  if (d === 'allow' || d === 'deny') {
+    st.asks.splice(+el.dataset.i, 1); delete st.openAsk;
+    for (const r of st.repos) for (const ag of r.agents) if (ag.title === k.agent && ag.status === 'needs') { ag.status = 'working'; ag.age = ag.age || '1m'; }
+    render();
+    return toast(d === 'allow' ? `Allowed once: ${k.agent} goes on` : `Denied: ${k.agent} is told no`);
+  }
+  if (d === 'voice') { st.voice = !st.voice; render(); return toast(st.voice ? 'Voice Mode on' : 'Voice Mode off'); }
+  if (d === 'mute') { st.muted = !st.muted; render(); return toast(st.muted ? 'Muted: Overseer stops listening' : 'Listening again'); }
+  if (d === 'open') return toast('Opens the three-column Overseer workspace in VS Code');
+  if (d === 'talk') return toast('Opens Talk to Overseer');
+  if (d === 'showall') return toast(`Opens Overseer filtered to ${st.open}`);
+  if (d === 'openask') return toast(`Opens “${k.agent}” in VS Code at its request`);
+  if (d === 'start') return toast('Starts the daemon (overseerd serve)');
+});
+addEventListener('resize', render);
+reset();
+render();
+</script>
+</body>
+</html>
