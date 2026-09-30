@@ -107,6 +107,13 @@ Mergeability against main, checked 2026-09-30 00:00 with `git merge-tree --write
 
 Merged on 2026-09-29: #31, #33, #34, #35, #36. Deployed to the owner: b3b7133d (#31, #33, #34). #35, #36 and later are **not deployed**; deploy after the next merges (`scripts/deploy --yes --no-fetch --ref <main>`; it waits for quiet).
 
+## New from the owner (2026-09-30)
+
+- **TUI parity:** the terminal UI should do everything VS Code Overseer does, with a separate diff viewer and editor (maybe Overseer's own review without the rest of VS Code, or an external tool). A design sub-agent is writing the gap list, criteria in `docs/rfcs/tui.md` and a preview under `docs/design/tui-parity/`; the owner picks the viewer from the preview, and the build queues after the current PRs. Tracker row: "TUI parity".
+- **Merges are refused by Claude Code's auto-mode check** (`gh pr merge` counts as merging without review). Asked the owner whether this goal may merge and deploy on its own overnight. Until they say so, take each PR as far as ready-to-merge (throwaway merge, full run, marked ready) and list it for the owner.
+- **#39 (menu-bar mockup):** docs only, the throwaway merge passes the link check (871 links, 0 broken); it is ready to squash-merge, and #42 does not carry these files.
+- Asked the owner whether #42's 3-minute menu-bar check may run overnight while the Mac is unused.
+
 ## Owner decisions on record
 
 - Menu bar (AC-262):
