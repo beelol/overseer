@@ -12,7 +12,7 @@ Updated 2026-09-30 00:00 by the third coordinator session, which took over at 23
   - starting #32's third full run;
   - stopping its layout builder once #40 was pushed (f0182365).
 - **23:45 to 23:55:** a second session ("overseer-fe") took over. It read the hand-off, created the worktree `.claude/worktrees/coord` (branch `coord-main`, clean, safe to reuse or remove) and pushed one hand-off update (072db9f2), then crashed. It changed nothing else.
-- **23:57 on:** a third session is coordinating from the worktree `.claude/worktrees/coord` (branch `coord-main`, fast-forwarded to main). #32's third run was still alive then (pid 96715, past Rust, unit, dev, guided and deploy, building the VSIX); it watches the log for the `EXIT` line, then merges #32 and deploys. The first session only keeps that run's shell alive.
+- **23:57 on:** a third session is coordinating from the worktree `.claude/worktrees/coord` (branch `coord-main`, fast-forwarded to main). #32's third run was still alive then (pid 96715, past Rust, unit, dev, guided and deploy, building the VSIX); it watches the log for the `EXIT` line, then merges #32 and deploys. The first session only keeps that run's shell alive. One builder is on #40 (worktree `.claude/worktrees/one-layout-b`, pushing to `claude/one-layout`): Follow mode's All files list, then #40's nine untested scenarios one at a time, never while the test-all lock is held; the coordinator does #40's full run after #32 merges.
 
 ## How to pick up
 
