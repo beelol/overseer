@@ -265,6 +265,10 @@ button.open-native, button.close-file { height: 24px; min-width: 24px; padding: 
 #land[hidden], #land button[hidden] { display: none; }
 #land-text { font-size: var(--ov-font-sm, 12px); color: var(--ov-muted, var(--vscode-descriptionForeground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 30ch; min-width: 0; flex: 0 1 auto; }
 button.land .codicon { font-size: 14px; }
+/* AC-76, AC-264: a narrow review (beside the chat) keeps the Follow | Diffs only switch as two icons,
+   their words in tooltips, and a shorter scope list, so the agent's name and Merge keep their room. */
+@media (max-width: 700px) { #view-mode .seg-word { display: none; } #view-mode .seg { padding: 0 6px; } }
+@media (max-width: 440px) { #scope { max-width: 5em; } #view-mode .seg { padding: 0 5px; } #land { margin-right: 0; } #land-text:empty { display: none; } #loading-stage:empty { position: absolute; } }
 @media (max-width: 640px) { button.land .land-word { display: none; } button.land { padding: 0 6px; } #land-text { max-width: 12ch; } }
 #land[data-state="merged"] #land-text { color: var(--ov-done, var(--vscode-testing-iconPassed)); }
 #land[data-state="conflicts"] #land-text { color: var(--ov-waiting, var(--vscode-editorWarning-foreground)); }
