@@ -296,6 +296,20 @@ pub fn failover_targets(d: &Daemon, run: &Run, status: &Status) -> Vec<Target> {
     found
 }
 
+/// Where Overseer moves an agent that stopped (AC-239: continue on another account or model):
+/// the harness, account and model it names, with the agent's permission mode carried and never
+/// loosened. A move that would loosen the mode is refused with the difference.
+pub fn overseer_target(d: &Daemon, run: &Run, harness: &str, profile_id: Option<String>, model: Option<String>) -> Result<Target> {
+    ensure_not_swarm(d, run)?;
+    let (mode, difference) = if d.own_read_only(&run.id) == Some(true) { (None, None) } else { carry_mode(&run.harness, mode_of(d, run).as_deref(), harness) };
+    if let Some(diff) = difference {
+        bail!("{diff}; move it by hand from its menu if that is what you want");
+    }
+    let account = profile_id.as_deref().and_then(|p| d.profile(p).ok()).map(|p| p.name);
+    let label = format!("{}{}{}", harness_name(harness), model.as_deref().map(|m| format!(" · {m}")).unwrap_or_default(), account.as_deref().map(|a| format!(" (account {a})")).unwrap_or_default());
+    Ok(Target { to: provider_of(harness).to_string(), harness: harness.to_string(), profile_id, account, model, mode, resume: None, difference: None, label })
+}
+
 /// The local model that would take the work, or why none can.
 pub fn local_target(d: &Arc<Daemon>, run: &Run) -> Result<Target> {
     let Some(opencode) = crate::adapters::resolve_program(opencode_bridge::HARNESS) else {
@@ -391,6 +405,7 @@ pub fn handoff(d: &Arc<Daemon>, predecessor: &Run, target: &Target, reason: &str
     let why = match reason {
         "back_online" => "the connection is back and the work returns to its first agent".to_string(),
         "user" => "the user moved the work here".to_string(),
+        "overseer" => "the previous agent stopped (a usage limit, a sign-in or a failure) and Overseer moved the work here".to_string(),
         _ => "its model became unreachable".to_string(),
     };
     let repo = Path::new(&task.repo_root).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
@@ -453,6 +468,7 @@ pub fn handoff(d: &Arc<Daemon>, predecessor: &Run, target: &Target, reason: &str
     let status = continuity::status();
     let said = match (target.to.as_str(), reason) {
         (_, "back_online") => format!("Back online. Continuing with **{}**.", target.label),
+        (_, "overseer") => format!("Continuing with **{}**, as Overseer proposed. Work continues in the same worktree.", target.label),
         ("local", "user") => format!("Moving to **{}** (local, Ollama) as you asked. Work continues in the same worktree.", target.label),
         ("local", _) if status.as_ref().is_some_and(|s| s.state == Conn::Offline) => format!("Transitioning to **{}** (local, Ollama) because you've disconnected. Work continues in the same worktree.", target.label),
         ("local", _) => format!("Transitioning to **{}** (local, Ollama) because no provider can be reached. Work continues in the same worktree.", target.label),
@@ -460,7 +476,7 @@ pub fn handoff(d: &Arc<Daemon>, predecessor: &Run, target: &Target, reason: &str
     };
     let opened = match reason {
         "back_online" => format!("Continued from \"{}\" now that the connection is back.", clip(&predecessor.title, 60)),
-        "user" => format!("Continued from \"{}\".", clip(&predecessor.title, 60)),
+        "user" | "overseer" => format!("Continued from \"{}\".", clip(&predecessor.title, 60)),
         _ => format!("Continued from \"{}\" after the connection was lost at {}.", clip(&predecessor.title, 60), clock(lost)),
     };
     let detail = json!({"predecessor": predecessor.id, "successor": successor.id, "reason": reason, "target": target, "at_ms": at, "pending_message": pending.is_some(), "connection": status.as_ref().map(|s| json!({"state": s.state, "reason": s.reason}))});

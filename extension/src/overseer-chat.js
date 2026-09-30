@@ -33,7 +33,8 @@ class OverseerChat {
     this.view = view;
     view.webview.options = { enableScripts: true, localResourceRoots: localRoots(this.context.extensionUri) };
     view.onDidDispose(() => { if (this.view === view) this.view = undefined; });
-    this.load().catch(() => undefined).then(async () => {
+    // Opening Talk to Overseer is a visit: what happened while the owner was away leads (AC-253).
+    this.client.request('overseer.visit', { surface: 'vscode' }).catch(() => undefined).then(() => this.load()).catch(() => undefined).then(async () => {
       if (this.session?.run_id && !this.model.run(this.session.run_id)) await this.model.refresh();
       if (this.session?.run_id && this.model.run(this.session.run_id)) await this.outputs.attach(this.session.run_id, view);
       else this.intro(view);

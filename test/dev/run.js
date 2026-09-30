@@ -201,8 +201,8 @@ async function snapshot(socket) {
   // ---------------------------------------------------------------- phase B
   const homeB = path.join(tmp, 'hb'); fs.mkdirSync(homeB);
   const rootB = path.join(tmp, 'rb');
-  // The daemon scripts/dev built: under CARGO_TARGET_DIR when it is set, as scripts/dev puts it.
-  const bin = path.join(process.env.CARGO_TARGET_DIR ? path.resolve(repo, process.env.CARGO_TARGET_DIR) : path.join(repo, 'target'), 'debug', 'overseerd');
+  // Where cargo put it: CARGO_TARGET_DIR when set (as scripts/dev resolves it), else <repo>/target.
+  const bin = path.join(process.env.CARGO_TARGET_DIR ? path.resolve(repo, process.env.CARGO_TARGET_DIR) : path.join(repo, 'target'), 'debug/overseerd');
   const stdEnv = { ...process.env, HOME: homeB, OVERSEER_CONTINUITY_PROBES: 'off', OVERSEER_CODEX_PATH: '/nonexistent/x', OVERSEER_CLAUDE_PATH: '/nonexistent/x', OVERSEER_OPENCODE_PATH: '/nonexistent/x' };
   for (const k of ['OVERSEER_HOME', 'OVERSEER_SOCKET', 'OVERSEER_INSTANCE']) delete stdEnv[k];
   let std, stdSocket, stdData, before, filesBefore;
