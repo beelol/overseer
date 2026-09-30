@@ -110,7 +110,7 @@
       "name": "AC-233: an edit typed in the head and saved lands in the agent's worktree, not the window's folder",
       "ok": true,
       "detail": {
-        "worktree": "/private/tmp/ovs-ui-H1a6rU/overseer-home/worktrees/head-repo-f9c83fa5/head-agent",
+        "worktree": "/private/tmp/ovs-ui-yXITWq/overseer-home/worktrees/head-repo-5e6d9f75/head-agent",
         "line10": "owner edit: L10: original"
       }
     },
@@ -403,7 +403,7 @@
         "conv4": "composer",
         "mode5": {
           "mode": "chat",
-          "selected": "r-2cb57a2363b1"
+          "selected": "r-fcacd9036fb8"
         },
         "left2": {
           "head": {

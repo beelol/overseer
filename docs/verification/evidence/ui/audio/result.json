@@ -35,10 +35,11 @@
           "Collapse All"
         ],
         "overflow": [
+          "Filter Agents…",
           "Show Archived Agents",
-          "Open Dashboard",
+          "Workspace: Open or Close the Overseer Layout",
           "Switch Agent…",
-          "New Task…",
+          "Start an Agent with the Full Form…",
           "Clean Up Archived Worktrees…",
           "Refresh",
           "Show Harness Capabilities",

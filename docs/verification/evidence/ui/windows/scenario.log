@@ -1,13 +1,13 @@
-[2026-09-28T16:36:24.472Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-28T16:36:58.953Z] screenshot docs/verification/evidence/ui/windows/01-everything-open.png
-[2026-09-28T16:36:58.954Z] PASS after opening each view twice, one of each remains (Overseer view, review, the chat taken out, New Task) and no editor group is empty {"k":{"overseer":1,"review":1,"chatOut":1,"newTask":1},"opened":{"tabs":["Review: Alpha agent (1), Editor Group 1","Overseer, Editor Group 2","Alpha agent, Editor Group 2","New Task, Editor Group 3"],"groups":3,"empty":0}}
-[2026-09-28T16:36:59.133Z] screenshot docs/verification/evidence/ui/windows/02-where-am-i.png
-[2026-09-28T16:36:59.134Z] PASS ⌥⌘M opens Where am I, listing the Overseer view, the review and New Task, and where you are {"rows":["diff-multiple  Review, Alpha agent (1), Editor group 1","comment-discussion  Chat, Alpha agent, Editor group 2","comment  Chat, taken out, Alpha agent, Editor group 2","new-file  New task, the full form, Editor group 3 · you are here"]}
-[2026-09-28T16:37:08.517Z] PASS picking a view in the map goes to it (review, New Task, the Overseer view) [{"want":"Review","active":"Review: Alpha agent (1), Editor Group 1"},{"want":"New task","active":"New Task, Editor Group 3"},{"want":"Chat","active":"Overseer, Editor Group 2"}]
-[2026-09-28T16:37:08.572Z] PASS the chat and the review each have a Where am I control in their own header {"chat":true,"review":true}
-[2026-09-28T16:37:11.271Z] before closing New task {"active":"New Task, Editor Group 3","tabs":["Review: Alpha agent (1), Editor Group 1","Overseer, Editor Group 2","Alpha agent, Editor Group 2","New Task, Editor Group 3"]}
-[2026-09-28T16:37:12.844Z] after closing New task ["Review: Alpha agent (1), Editor Group 1","Overseer, Editor Group 2","Alpha agent, Editor Group 2"]
-[2026-09-28T16:37:15.572Z] before closing Review {"active":"Review: Alpha agent (1), Editor Group 1","tabs":["Review: Alpha agent (1), Editor Group 1","Overseer, Editor Group 2","Alpha agent, Editor Group 2"]}
-[2026-09-28T16:37:17.145Z] after closing Review ["Overseer, Editor Group 2","Alpha agent, Editor Group 2"]
-[2026-09-28T16:37:17.214Z] screenshot docs/verification/evidence/ui/windows/03-after-closing.png
-[2026-09-28T16:37:17.214Z] PASS closing views leaves no empty editor group behind, and the other views stay open {"tabs":["Overseer, Editor Group 2","Alpha agent, Editor Group 2"],"groups":1,"empty":0}
+[2026-09-30T10:04:47.058Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-30T10:05:15.789Z] screenshot docs/verification/evidence/ui/windows/01-everything-open.png
+[2026-09-30T10:05:15.819Z] PASS after opening each view twice, one of each remains (Overseer view, review, the chat taken out, New Task) and no editor group is empty {"k":{"overseer":1,"review":1,"chatOut":1,"newTask":1},"opened":{"tabs":["Review: Alpha agent (1), Editor Group 1","Overseer, Editor Group 2","Alpha agent, Editor Group 2","New Agent, Editor Group 3"],"groups":3,"empty":0}}
+[2026-09-30T10:05:16.000Z] screenshot docs/verification/evidence/ui/windows/02-where-am-i.png
+[2026-09-30T10:05:16.031Z] PASS ⌥⌘M opens Where am I, listing the Overseer view, the review and New Task, and where you are {"rows":["diff-multiple  Review, Alpha agent (1), Editor group 1","comment-discussion  Chat, Alpha agent, Editor group 2","comment  Chat, taken out, Alpha agent, Editor group 2","new-file  Full form, a new agent with every option, Editor group 3 · you are here"]}
+[2026-09-30T10:05:24.258Z] PASS picking a view in the map goes to it (review, New Task, the Overseer view) [{"want":"Review","active":"Review: Alpha agent (1), Editor Group 1"},{"want":"Full form","active":"New Agent, Editor Group 3"},{"want":"Chat","active":"Overseer, Editor Group 2"}]
+[2026-09-30T10:05:24.297Z] PASS the chat and the review each have a Where am I control in their own header {"chat":true,"review":true}
+[2026-09-30T10:05:26.619Z] before closing Full form {"active":"New Agent, Editor Group 3","tabs":["Review: Alpha agent (1), Editor Group 1","Overseer, Editor Group 2","Alpha agent, Editor Group 2","New Agent, Editor Group 3"]}
+[2026-09-30T10:05:28.193Z] after closing Full form ["Review: Alpha agent (1), Editor Group 1","Overseer, Editor Group 2","Alpha agent, Editor Group 2"]
+[2026-09-30T10:05:30.519Z] before closing Review {"active":"Review: Alpha agent (1), Editor Group 1","tabs":["Review: Alpha agent (1), Editor Group 1","Overseer, Editor Group 2","Alpha agent, Editor Group 2"]}
+[2026-09-30T10:05:32.092Z] after closing Review ["Overseer, Editor Group 2","Alpha agent, Editor Group 2"]
+[2026-09-30T10:05:32.164Z] screenshot docs/verification/evidence/ui/windows/03-after-closing.png
+[2026-09-30T10:05:32.201Z] PASS closing views leaves no empty editor group behind, and the other views stay open {"tabs":["Overseer, Editor Group 2","Alpha agent, Editor Group 2"],"groups":1,"empty":0}

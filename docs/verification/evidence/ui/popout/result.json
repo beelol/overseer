@@ -151,45 +151,33 @@
       "detail": {
         "events": [
           {
-            "ms": 222,
+            "ms": 157,
             "what": "window created",
             "show": true
           },
           {
-            "ms": 287,
-            "what": "window shown"
-          },
-          {
-            "ms": 8707,
+            "ms": 8587,
             "what": "floating window opened hidden"
           },
           {
-            "ms": 8726,
+            "ms": 8598,
             "what": "window created",
             "show": true
           },
           {
-            "ms": 8750,
-            "what": "window shown"
-          },
-          {
-            "ms": 19326,
+            "ms": 18983,
             "what": "floating window opened hidden"
           },
           {
-            "ms": 19339,
+            "ms": 18992,
             "what": "window created",
             "show": true
-          },
-          {
-            "ms": 19359,
-            "what": "window shown"
           }
         ]
       }
     }
   ],
   "frontmost": {
-    "ChatGPT": 87
+    "loginwindow": 86
   }
 }

@@ -1,10 +1,10 @@
-[2026-09-30T08:22:52.472Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-30T08:23:01.545Z] PASS the owner's layout: two editor groups of their files and the secondary side bar open {"auxiliary":true,"panel":false,"tabStrips":2,"groups":[{"tabs":["a.txt","b.txt"],"active":"b.txt"},{"tabs":["b.txt","c.txt"],"active":"c.txt"}]}
-[2026-09-30T08:23:01.640Z] screenshot docs/verification/evidence/ui/own-layout/01-owner-layout.png
-[2026-09-30T08:23:04.250Z] screenshot docs/verification/evidence/ui/own-layout/02-agent-chat-beside.png
-[2026-09-30T08:23:04.263Z] PASS selecting an agent keeps both of the owner's groups (their tabs, nothing of Overseer's in them) and the secondary side bar; its chat opens beside them {"auxiliary":true,"panel":false,"tabStrips":3,"groups":[{"tabs":["a.txt","b.txt"],"active":"b.txt"},{"tabs":["b.txt","c.txt"],"active":"c.txt"},{"tabs":["Overseer"],"active":"Overseer"}]}
-[2026-09-30T08:23:06.956Z] screenshot docs/verification/evidence/ui/own-layout/03-review-and-chat-beside.png
-[2026-09-30T08:23:06.973Z] PASS an agent with changes: its review and chat open beside the owner's groups, which stay as they were {"auxiliary":true,"panel":false,"tabStrips":4,"groups":[{"tabs":["a.txt","b.txt"],"active":"b.txt"},{"tabs":["b.txt","c.txt"],"active":"c.txt"},{"tabs":["Review: Edit a file (1)"],"active":"Review: Edit a file (1)"},{"tabs":["Overseer"],"active":"Overseer"}]}
-[2026-09-30T08:23:09.043Z] PASS opening home keeps them too (the review closes; the owner's groups stay) {"auxiliary":true,"panel":false,"tabStrips":3,"groups":[{"tabs":["a.txt","b.txt"],"active":"b.txt"},{"tabs":["b.txt","c.txt"],"active":"c.txt"},{"tabs":["Overseer"],"active":"Overseer"}]}
-[2026-09-30T08:23:09.118Z] screenshot docs/verification/evidence/ui/own-layout/04-home-beside.png
-[2026-09-30T08:23:09.136Z] PASS no user setting changed at any point
+[2026-09-30T09:44:28.996Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-30T09:44:38.073Z] PASS the owner's layout: two editor groups of their files and the secondary side bar open {"auxiliary":true,"panel":false,"tabStrips":2,"groups":[{"tabs":["a.txt","b.txt"],"active":"b.txt"},{"tabs":["b.txt","c.txt"],"active":"c.txt"}]}
+[2026-09-30T09:44:38.167Z] screenshot docs/verification/evidence/ui/own-layout/01-owner-layout.png
+[2026-09-30T09:44:40.797Z] screenshot docs/verification/evidence/ui/own-layout/02-agent-chat-beside.png
+[2026-09-30T09:44:40.809Z] PASS selecting an agent keeps both of the owner's groups (their tabs, nothing of Overseer's in them) and the secondary side bar; its chat opens beside them {"auxiliary":true,"panel":false,"tabStrips":3,"groups":[{"tabs":["a.txt","b.txt"],"active":"b.txt"},{"tabs":["b.txt","c.txt"],"active":"c.txt"},{"tabs":["Overseer"],"active":"Overseer"}]}
+[2026-09-30T09:44:43.500Z] screenshot docs/verification/evidence/ui/own-layout/03-review-and-chat-beside.png
+[2026-09-30T09:44:43.516Z] PASS an agent with changes: its review and chat open beside the owner's groups, which stay as they were {"auxiliary":true,"panel":false,"tabStrips":4,"groups":[{"tabs":["a.txt","b.txt"],"active":"b.txt"},{"tabs":["b.txt","c.txt"],"active":"c.txt"},{"tabs":["Review: Edit a file (1)"],"active":"Review: Edit a file (1)"},{"tabs":["Overseer"],"active":"Overseer"}]}
+[2026-09-30T09:44:45.587Z] PASS opening home keeps them too (the review closes; the owner's groups stay) {"auxiliary":true,"panel":false,"tabStrips":3,"groups":[{"tabs":["a.txt","b.txt"],"active":"b.txt"},{"tabs":["b.txt","c.txt"],"active":"c.txt"},{"tabs":["Overseer"],"active":"Overseer"}]}
+[2026-09-30T09:44:45.660Z] screenshot docs/verification/evidence/ui/own-layout/04-home-beside.png
+[2026-09-30T09:44:45.677Z] PASS no user setting changed at any point

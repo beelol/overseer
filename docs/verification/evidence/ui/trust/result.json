@@ -8,11 +8,11 @@
       "name": "New Task is not offered/enabled in Restricted Mode",
       "ok": true,
       "detail": [
-        "Overseer: Focus on Talk to Overseer View, similar commands",
-        "Create New Terminal (With Profile)",
-        "File: Compare New Untitled Text Files",
-        "Search Editor: New Search Editor",
-        "Terminal: Create New Terminal Starting in a Custom Working Directory"
+        "File: Compare Active File with Clipboard, Command+K C, similar commands",
+        "Developer: Reset Welcome Page Walkthrough Progress",
+        "File: Compare Active File with Saved, Command+K D",
+        "Overseer: Switch Between the Agent and Overseer, Option+Command+U",
+        "View: Toggle Full Screen, Control+Command+F"
       ]
     },
     {
@@ -21,13 +21,13 @@
       "detail": {
         "title": " ",
         "rows": [
-          "Overseer: Focus on Talk to Overseer View, similar commands",
-          "Create New Terminal (With Profile)",
-          "File: Compare New Untitled Text Files",
-          "Search Editor: New Search Editor",
-          "Terminal: Create New Terminal Starting in a Custom Working Directory"
+          "File: Compare Active File with Clipboard, Command+K C, similar commands",
+          "Developer: Reset Welcome Page Walkthrough Progress",
+          "File: Compare Active File with Saved, Command+K D",
+          "Overseer: Switch Between the Agent and Overseer, Option+Command+U",
+          "View: Toggle Full Screen, Control+Command+F"
         ],
-        "value": ">Overseer: New Task"
+        "value": ">Overseer: Start an Agent with the Full Form"
       }
     },
     {

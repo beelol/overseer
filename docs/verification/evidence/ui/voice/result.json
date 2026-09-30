@@ -29,9 +29,9 @@
       "name": "hearing: the star grows with the voice and swings with its syllables",
       "ok": true,
       "detail": {
-        "frames": 176,
-        "max": 1.7928473724432887,
-        "min": 1.4414030048998543
+        "frames": 177,
+        "max": 1.8080889127036912,
+        "min": 1.3938262663085805
       }
     },
     {
@@ -39,7 +39,7 @@
       "ok": true,
       "detail": {
         "jumps": 77,
-        "spacing": 44.10000002384186
+        "spacing": 46.5
       }
     },
     {
@@ -48,7 +48,7 @@
       "detail": {
         "lag": 40,
         "r": 0.9,
-        "frames": 176,
+        "frames": 177,
         "levels": 77
       }
     },
@@ -56,8 +56,8 @@
       "name": "speaking: rings of light cross the core and the star stays under 1.3x",
       "ok": true,
       "detail": {
-        "scale": 1.2032605584007563,
-        "glow": 0.415391442717739,
+        "scale": 1.1840759410849002,
+        "glow": 0.393390714975921,
         "rings": 1,
         "still": false,
         "meter": null,
@@ -68,8 +68,8 @@
       "name": "thinking: the star turns, 12% larger",
       "ok": true,
       "detail": {
-        "scale": 1.1875118985351905,
-        "glow": 0.32862904622032735,
+        "scale": 1.1917891821292823,
+        "glow": 0.3441212966756254,
         "rings": 0,
         "still": false,
         "meter": null,
@@ -82,16 +82,16 @@
       "detail": {
         "words": "Tell Phone to use the new wire format.",
         "stage": "Phone is working · 0s",
-        "row": "Phonenamed · adddelivered12:59:45 AM",
-        "full": "(voice, request V-0001) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.\n\nWhy: named · delivery: add\nheld 12:59:45 AM · sent 12:59:45 AM · delivered 12:59:45 AM"
+        "row": "Phoneyou named it · added to its workdelivered02:59:57 AM",
+        "full": "(voice, request V-0001) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.\n\nWhy: you named it · added to its work\nheld 02:59:57 AM · sent 02:59:57 AM · delivered 02:59:57 AM"
       }
     },
     {
       "name": "muted: the mark is still with the mute sign, and no listener runs",
       "ok": true,
       "detail": {
-        "scale": 1.0003685325842384,
-        "glow": 0.1804298074287741,
+        "scale": 1.000415763098464,
+        "glow": 0.1804849200170352,
         "rings": 0,
         "still": true,
         "meter": null,
@@ -106,10 +106,10 @@
       "name": "beside a streaming chat, the animation keeps up at 60 frames a second: work per frame p95 under 16 ms, and frames arrive at the display's rate",
       "ok": true,
       "detail": {
-        "n": 226,
-        "work_p95": 0.10000002384185791,
+        "n": 228,
+        "work_p95": 0.10000000149011612,
         "interval_median": 16.69999999999709,
-        "interval_p95": 18.30000000000291,
+        "interval_p95": 18.5,
         "dropped": 0,
         "groups": 2
       }
@@ -119,19 +119,19 @@
       "ok": true,
       "detail": {
         "visibility": "not shown",
-        "f1": 5534,
-        "f2": 5534
+        "f1": 5435,
+        "f2": 5435
       }
     },
     {
       "name": "reduced motion: a still mark and a level meter",
       "ok": true,
       "detail": {
-        "scale": 1.6899538582786167,
-        "glow": 0.829061892956929,
+        "scale": 1.6882609079008575,
+        "glow": 0.828526108898096,
         "rings": 0,
         "still": true,
-        "meter": 0.8117104215042551,
+        "meter": 0.8097187151774794,
         "state": "hearing"
       }
     },
@@ -233,47 +233,47 @@
         "chats": [
           {
             "tag": "overseer",
-            "id": "r-cf8d15f5aaa5",
+            "id": "r-d76fac0e61e9",
             "shows": true
           },
           {
             "tag": "overseer",
-            "id": "r-c022e08158af",
+            "id": "r-05742e944f19",
             "shows": true
           },
           {
             "tag": "overseer",
-            "id": "r-554d070247dc",
+            "id": "r-fb2283d5c096",
             "shows": true
           },
           {
             "tag": "dark",
-            "id": "r-cf8d15f5aaa5",
+            "id": "r-d76fac0e61e9",
             "shows": true
           },
           {
             "tag": "dark",
-            "id": "r-c022e08158af",
+            "id": "r-05742e944f19",
             "shows": true
           },
           {
             "tag": "dark",
-            "id": "r-554d070247dc",
+            "id": "r-fb2283d5c096",
             "shows": true
           },
           {
             "tag": "light",
-            "id": "r-cf8d15f5aaa5",
+            "id": "r-d76fac0e61e9",
             "shows": true
           },
           {
             "tag": "light",
-            "id": "r-c022e08158af",
+            "id": "r-05742e944f19",
             "shows": true
           },
           {
             "tag": "light",
-            "id": "r-554d070247dc",
+            "id": "r-fb2283d5c096",
             "shows": true
           }
         ]
@@ -284,12 +284,12 @@
       "ok": true,
       "detail": {
         "label": "write the migration",
-        "description": "now",
+        "description": "now · Fixture · fix…@example.test",
         "level": 2,
         "expanded": null,
         "selected": true,
         "focused": false,
-        "aria": "write the migration, done, claude, Your login"
+        "aria": "write the migration, done, to review, Claude Code, Claude Fixture · fix…@example.test · Mac's default login"
       }
     },
     {

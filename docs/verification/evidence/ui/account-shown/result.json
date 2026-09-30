@@ -7,7 +7,7 @@
         "system-claude": "Claude Max · bil…@testbox.com · Mac's default login",
         "system-codex": "ChatGPT · Mac's default login",
         "system-opencode": "OpenCode · Mac's default login",
-        "p-b4d43d27787c": "Claude Pro · ana…@personal.example · Personal"
+        "p-21d4c2e26de1": "Claude Pro · ana…@personal.example · Personal"
       }
     },
     {
@@ -101,7 +101,7 @@
         "qwen2.5-coder:3b fits at 32k · failed its check",
         "qwen2.5-coder:1.5b fits at 32k · failed its check",
         "qwen2.5:0.5b fits at 32k · unverified",
-        "qwen3.5:122b too big · 77.2 GiB of 44.7 GiB · unverified"
+        "qwen3.5:122b too big · 77.2 GiB of 51.2 GiB · unverified"
       ]
     },
     {

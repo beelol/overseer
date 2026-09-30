@@ -1,9 +1,9 @@
-[2026-09-28T16:35:10.705Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-28T16:35:16.000Z] screenshot docs/verification/evidence/ui/trust/01-trust-editor.png
-[2026-09-28T16:35:16.068Z] PASS workspace opened in Restricted Mode
-[2026-09-28T16:35:17.580Z] screenshot docs/verification/evidence/ui/trust/02-palette.png
-[2026-09-28T16:35:17.580Z] PASS New Task is not offered/enabled in Restricted Mode ["Overseer: Focus on Talk to Overseer View, similar commands","Create New Terminal (With Profile)","File: Compare New Untitled Text Files","Search Editor: New Search Editor","Terminal: Create New Terminal Starting in a Custom Working Directory"]
-[2026-09-28T16:35:17.646Z] PASS no task flow started {"title":" ","rows":["Overseer: Focus on Talk to Overseer View, similar commands","Create New Terminal (With Profile)","File: Compare New Untitled Text Files","Search Editor: New Search Editor","Terminal: Create New Terminal Starting in a Custom Working Directory"],"value":">Overseer: New Task"}
-[2026-09-28T16:35:19.259Z] PASS view explains that launching requires trust
-[2026-09-28T16:35:19.264Z] PASS no task or harness launched 0
-[2026-09-28T16:35:19.319Z] screenshot docs/verification/evidence/ui/trust/03-restricted.png
+[2026-09-30T09:58:53.647Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-30T09:58:58.498Z] screenshot docs/verification/evidence/ui/trust/01-trust-editor.png
+[2026-09-30T09:58:58.578Z] PASS workspace opened in Restricted Mode
+[2026-09-30T09:59:00.121Z] screenshot docs/verification/evidence/ui/trust/02-palette.png
+[2026-09-30T09:59:00.132Z] PASS New Task is not offered/enabled in Restricted Mode ["File: Compare Active File with Clipboard, Command+K C, similar commands","Developer: Reset Welcome Page Walkthrough Progress","File: Compare Active File with Saved, Command+K D","Overseer: Switch Between the Agent and Overseer, Option+Command+U","View: Toggle Full Screen, Control+Command+F"]
+[2026-09-30T09:59:00.198Z] PASS no task flow started {"title":" ","rows":["File: Compare Active File with Clipboard, Command+K C, similar commands","Developer: Reset Welcome Page Walkthrough Progress","File: Compare Active File with Saved, Command+K D","Overseer: Switch Between the Agent and Overseer, Option+Command+U","View: Toggle Full Screen, Control+Command+F"],"value":">Overseer: Start an Agent with the Full Form"}
+[2026-09-30T09:59:01.808Z] PASS view explains that launching requires trust
+[2026-09-30T09:59:01.817Z] PASS no task or harness launched 0
+[2026-09-30T09:59:01.871Z] screenshot docs/verification/evidence/ui/trust/03-restricted.png

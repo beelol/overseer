@@ -6,57 +6,57 @@
       "detail": {
         "claude": {
           "limited": false,
-          "observed_ms": 1790613325718,
+          "observed_ms": 1790762347674,
           "reported": true,
           "source": "Claude rate_limit_event",
           "status": "allowed",
           "windows": [
             {
               "label": "5 hours",
-              "resets_at_ms": 1790616925000,
+              "resets_at_ms": 1790765947000,
               "used": 0.95
             },
             {
               "label": "week",
-              "resets_at_ms": 1790876125000,
+              "resets_at_ms": 1791025147000,
               "used": 0.4
             }
           ]
         },
         "second": {
           "limited": false,
-          "observed_ms": 1790613326709,
+          "observed_ms": 1790762348451,
           "reported": true,
           "source": "Claude rate_limit_event",
           "status": "allowed",
           "windows": [
             {
               "label": "5 hours",
-              "resets_at_ms": 1790616926000,
+              "resets_at_ms": 1790765948000,
               "used": 0.12
             },
             {
               "label": "week",
-              "resets_at_ms": 1790876126000,
+              "resets_at_ms": 1791025148000,
               "used": 0.4
             }
           ]
         },
         "codex": {
           "limited": false,
-          "observed_ms": 1790613328794,
+          "observed_ms": 1790762350142,
           "plan": "plus",
           "reported": true,
           "source": "Codex session log",
           "windows": [
             {
               "label": "5 hours",
-              "resets_at_ms": 1790616928000,
+              "resets_at_ms": 1790765950000,
               "used": 0.2
             },
             {
               "label": "week",
-              "resets_at_ms": 1790876128000,
+              "resets_at_ms": 1791025150000,
               "used": 0.4
             }
           ]
@@ -70,8 +70,8 @@
       "name": "the Accounts view shows reported usage per account, with reset times, on hover",
       "ok": true,
       "detail": {
-        "claudeHover": "Your login — Anthropic / Claude\n\nFollows the Claude app login (~/.claude). It changes when that app switches accounts; Overseer never signs it out.\n\nUsable by: claude\n\nLast used 9/28/2026, 9:35:27 AM\n\nUsage (Claude rate_limit_event): 5 hours 95%, resets 9/28/2026, 10:35:25 AM; week 40%, resets 10/1/2026, 10:35:25 AM",
-        "codexHover": "Your login — OpenAI / ChatGPT\n\nFollows the ChatGPT / Codex app login (~/.codex). It changes when that app switches accounts; Overseer never signs it out.\n\nUsable by: codex, codex-app\n\nLast used 9/28/2026, 9:35:28 AM\n\nUsage (Codex session log): 5 hours 20%, resets 9/28/2026, 10:35:28 AM; week 40%, resets 10/1/2026, 10:35:28 AM\n\nLogged in using ChatGPT"
+        "claudeHover": "Mac's default login — Anthropic / Claude\n\nClaude Fixture · fix…@example.test · Mac's default login\n\nFollows the Claude app login (~/.claude). It changes when that app switches accounts; Overseer never signs it out.\n\nUsable by: Claude Code\n\nLast used 9/30/2026, 2:59:08 AM\n\nUsage (Claude rate_limit_event): 5 hours 95%, resets 9/30/2026, 3:59:07 AM; week 40%, resets 10/3/2026, 3:59:07 AM",
+        "codexHover": "Mac's default login — OpenAI / ChatGPT\n\nChatGPT Pro · des…@example.invalid · Mac's default login\n\nFollows the ChatGPT / Codex app login (~/.codex). It changes when that app switches accounts; Overseer never signs it out.\n\nUsable by: Codex, Codex\n\nLast used 9/30/2026, 2:59:09 AM\n\nUsage (Codex session log): 5 hours 20%, resets 9/30/2026, 3:59:10 AM; week 40%, resets 10/3/2026, 3:59:10 AM"
       }
     },
     {
@@ -87,17 +87,17 @@
       "ok": true,
       "detail": {
         "warn": {
-          "text": "Your login is at 95% of its 5 hours limit (resets 10:35 AM).Use Claude Second",
+          "text": "Mac's default login is at 95% of its 5 hours limit (resets 3:59 AM).Use Claude Second",
           "fix": "Use Claude Second",
           "cls": "composer-note warn",
           "startDisabled": false
         },
-        "switched": "Agent: Claude Code · Claude Second",
+        "switched": "Agent: Claude Code · Fixture · fix…@example.test | Claude Code claude-fixture 0.0.0 (synthetic)\nClaude Fixture · fix…@example.test · Claude Second: signed in\nUsage (Claude rate_limit_event)\n5 hours: 12% used, resets Wed 3:59 AM\nweek: 40% used, resets Sat 3:59 AM\nAs of Wed 2:59 AM",
         "agentMenu": [
-          "Your login | 5 hours 20% · week 40%",
-          "Your login | 5 hours 95% · week 40%",
-          "Claude Second | 5 hours 12% · week 40%",
-          "Your login | signed out",
+          "Mac's default login | ChatGPT Pro · des…@example.invalid · 5 hours 20% · week 40%",
+          "Mac's default login | Claude Fixture · fix…@example.test · 5 hours 95% · week 40%",
+          "Claude Second | Claude Fixture · fix…@example.test · 5 hours 12% · week 40%",
+          "Mac's default login | signed out",
           "Run a program | ",
           "Best fit · qwen3-coder:30b | 64k",
           "qwen3-coder:30b | fits at 64k",
@@ -109,7 +109,7 @@
           "qwen2.5-coder:3b | fits at 32k · failed its check",
           "qwen2.5-coder:1.5b | fits at 32k · failed its check",
           "qwen2.5:0.5b | fits at 32k · unverified",
-          "qwen3.5:122b | too big · 77.2 GiB of 39.2 GiB · unverified"
+          "qwen3.5:122b | too big · 77.2 GiB of 51.2 GiB · unverified"
         ]
       }
     },
@@ -117,18 +117,19 @@
       "name": "the Accounts view marks an account near its limit",
       "ok": true,
       "detail": [
-        "usage-repo | ",
-        "Codex usage | now",
-        "Costed run | now",
-        "Plenty left | now",
-        "Near the limit | now",
+        "3 to review · 1 reviewed | ",
+        "usage-repo | 3 to review",
+        "Codex usage | now · Pro · des…@example.invalid",
+        "Costed run | now · Fixture · fix…@example.test",
+        "Plenty left | now · Fixture · fix…@example.test",
+        "Near the limit | now · Fixture · fix…@example.test",
         "ChatGPT | ",
-        "Your login | pro · 55b9da0f · desktop",
+        "Mac's default login | Pro · des…@example.invalid · desktop",
         "Claude | ",
-        "Your login | max · cc6d9661 · desktop · 95% of 5 hours",
-        "Claude Second | max · cc6d9661",
+        "Mac's default login | Fixture · fix…@example.test · desktop · 95% of 5 hours",
+        "Claude Second | Fixture · fix…@example.test",
         "OpenCode | ",
-        "Your login | signed out · desktop"
+        "Mac's default login | signed out · desktop"
       ]
     }
   ]

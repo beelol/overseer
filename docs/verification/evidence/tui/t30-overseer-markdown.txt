@@ -56,5 +56,5 @@
 │                                            │                                                                                                            │                                            │
 │                                            │                                                                                                            │                                            │
 │                                            │                                                                                                            │                                            │
-╰ ◆ Write perm.txt  a allow d deny ──────────╰────────────────────────────────────────────── enter sends · ctrl+y / ctrl+n answer a proposal · esc closes ╯────────────────────────────────────────────╯
+╰ ◆ Write perm.txt  a allow d deny ──────────╰────────────────────────────────────────────── enter sends · ctrl+y / ctrl+n answer a proposal · esc closes ╯──────── Claude Fixture · fix…@example.test ╯
  type to Overseer   enter send   ctrl+y/n yes/no to a proposal   j/k scroll   esc close                                                                                                                 

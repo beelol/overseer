@@ -1,8 +1,8 @@
-[2026-09-30T08:18:30.292Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-30T08:18:40.641Z] PASS composer: after focus in the side bar, one click on the agent choice opens its menu {"label":"composer agent chip","ok":true}
-[2026-09-30T08:18:44.930Z] PASS chat: after focus in the review (another editor group), one click on More opens its menu {"label":"chat more","ok":true}
-[2026-09-30T08:18:45.992Z] PASS review: after focus in the side bar, one click on Changes only flips it {"label":"review toggle","ok":true}
-[2026-09-30T08:18:46.810Z] PASS review: after focus in the chat (another editor group), one click flips it back {"label":"review toggle back","ok":true}
-[2026-09-30T08:18:48.968Z] PASS search: after focus in the chat, one click on the Agents view's search button puts the cursor in the search box and typing filters {"searchButton":{"x":257,"y":82},"focused":true,"typed":"Busy"}
-[2026-09-30T08:18:53.213Z] PASS grid: after focus in the side bar, one click on a tile's pin toggles it {"label":"grid pin","ok":true}
-[2026-09-30T08:18:55.356Z] screenshot docs/verification/evidence/ui/first-click/01-after.png
+[2026-09-30T09:20:15.328Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-30T09:20:25.690Z] PASS composer: after focus in the side bar, one click on the agent choice opens its menu {"label":"composer agent chip","ok":true}
+[2026-09-30T09:20:29.985Z] PASS chat: after focus in the review (another editor group), one click on More opens its menu {"label":"chat more","ok":true}
+[2026-09-30T09:20:31.049Z] PASS review: after focus in the side bar, one click on Changes only flips it {"label":"review toggle","ok":true}
+[2026-09-30T09:20:31.864Z] PASS review: after focus in the chat (another editor group), one click flips it back {"label":"review toggle back","ok":true}
+[2026-09-30T09:20:34.014Z] PASS search: after focus in the chat, one click on the Agents view's search button puts the cursor in the search box and typing filters {"searchButton":{"x":257,"y":82},"focused":true,"typed":"Busy"}
+[2026-09-30T09:20:38.261Z] PASS grid: after focus in the side bar, one click on a tile's pin toggles it {"label":"grid pin","ok":true}
+[2026-09-30T09:20:40.404Z] screenshot docs/verification/evidence/ui/first-click/01-after.png

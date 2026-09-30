@@ -1,5 +1,5 @@
  ◆ Overseer  page 1/2 · 12 agents                                                                                                                    phone access off · ● connected 
-┏ 1 ✓ agent 12 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 0s ┓╭ 2 ✓ agent 11 ────────────────────────────── generic · 0s ╮╭ 3 ✓ agent 10 ────────────────────────────── generic · 0s ╮
+┏ 1 ✓ agent 12 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Program · 0s ┓╭ 2 ✓ agent 11 ────────────────────────────── Program · 0s ╮╭ 3 ✓ agent 10 ────────────────────────────── Program · 0s ╮
 ┃ hi                                                       ┃│ hi                                                       ││ hi                                                       │
 ┃                                                          ┃│                                                          ││                                                          │
 ┃                                                          ┃│                                                          ││                                                          │
@@ -16,7 +16,7 @@
 ┃                                                          ┃││  ←↓↑→  h j k l     move between agents                 │││                                                          │
 ┃                                                          ┃││  1 – 9             focus agent n on this page          │││                                                          │
 ┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰│  tab / shift+tab   next / previous agent               │╯╰ completed ───────────────────────────────────────────────╯
-╭ 4 ✓ agent 09 ────────────────────────────── generic · 0s ╮╭│  ] [   pgdn pgup   next / previous page                │╮╭ 6 ✓ agent 07 ────────────────────────────── generic · 0s ╮
+╭ 4 ✓ agent 09 ────────────────────────────── Program · 0s ╮╭│  ] [   pgdn pgup   next / previous page                │╮╭ 6 ✓ agent 07 ────────────────────────────── Program · 0s ╮
 │ hi                                                       │││  i  enter          message the focused agent           │││ hi                                                       │
 │                                                          │││  z                 zoom: full screen with scrollback   │││                                                          │
 │                                                          │││  v                 changes: files and diffs            │││                                                          │
@@ -34,7 +34,7 @@
 │                                                          │││  O                 phone access on / off               │││                                                          │
 │                                                          │││  D                 devices: pair a phone, revoke, scope│││                                                          │
 ╰ completed ───────────────────────────────────────────────╯╰│  S                 Audio Mode: settings and preview    │╯╰ completed ───────────────────────────────────────────────╯
-╭ 7 ✓ agent 06 ────────────────────────────── generic · 0s ╮╭│  r                 reload (after X: start the daemon)  │╮╭ 9 ✓ agent 04 ────────────────────────────── generic · 0s ╮
+╭ 7 ✓ agent 06 ────────────────────────────── Program · 0s ╮╭│  r                 reload (after X: start the daemon)  │╮╭ 9 ✓ agent 04 ────────────────────────────── Program · 0s ╮
 │ hi                                                       │││  X                 stop all agents and the daemon      │││ hi                                                       │
 │                                                          │││  q                 quit (agents keep running)          │││                                                          │
 │                                                          │││                                                        │││                                                          │

@@ -21,7 +21,7 @@
                                                                                 
                ╭ pair a phone ──────────────────────────────────╮               
                │                                                │               
-               │ With MacBook-Pro                               │               
+               │ With Mac                                       │               
                │                                                │               
                │ This code has expired.                         │               
                │ p makes a new code · esc closes                │               

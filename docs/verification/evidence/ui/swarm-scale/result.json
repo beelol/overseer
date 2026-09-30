@@ -54,7 +54,7 @@
         "reason": "beneficial",
         "replay": false,
         "revision": 1,
-        "run_id": "sw-5f16b950f4a8",
+        "run_id": "sw-533153c9c6fb",
         "serial": {
           "affordable": true,
           "elapsed_ms": 3240,
@@ -101,7 +101,7 @@
       "name": "supervised category director is running alongside 32 workers",
       "ok": true,
       "detail": {
-        "overseer_run_id": "r-40486fdc8e53",
+        "overseer_run_id": "r-d6d2fab3e8f8",
         "owner_status": "active",
         "process_status": "running"
       }
@@ -112,7 +112,7 @@
       "detail": {
         "last_admission": {
           "job_id": "j036",
-          "observed_ms": 1790527199313,
+          "observed_ms": 1790762269915,
           "reason": "worker_limit",
           "status": "blocked",
           "target_id": "fixture-local"
@@ -306,7 +306,7 @@
           "expanded": null,
           "selected": false,
           "focused": false,
-          "aria": "Job j036 · target fixture-local\nworker limit\nRecorded 9/27/2026, 9:39:59 AM. Current eligibility may have changed."
+          "aria": "Job j036 · target fixture-local\nworker limit\nRecorded 9/30/2026, 2:57:49 AM. Current eligibility may have changed."
         },
         {
           "label": "Provider usage unknown",
@@ -330,7 +330,7 @@
           "expanded": null,
           "selected": false,
           "focused": false,
-          "aria": "Worker, generic · running"
+          "aria": "Worker, Program · running"
         }
       ]
     },
@@ -344,7 +344,7 @@
       "detail": {
         "status": "paused",
         "active_worker_processes": 32,
-        "pause_ms": 94
+        "pause_ms": 102
       }
     },
     {
@@ -388,19 +388,19 @@
       "ok": true,
       "detail": {
         "status": "stopping",
-        "unconfirmed_exit_count": 6,
-        "stop_ms": 76
+        "unconfirmed_exit_count": 7,
+        "stop_ms": 74
       }
     },
     {
       "name": "the SIGINT-resistant fixture worker remains unconfirmed with its estimate reserved",
       "ok": true,
       "detail": {
-        "unconfirmed_exit_count": 6,
+        "unconfirmed_exit_count": 7,
         "capacity": {
           "last_admission": {
             "job_id": "j036",
-            "observed_ms": 1790527208844,
+            "observed_ms": 1790762278476,
             "reason": "run_not_admitting",
             "status": "blocked",
             "target_id": "fixture-local"
@@ -487,7 +487,7 @@
       "ok": true,
       "detail": {
         "status": "interrupted",
-        "ended_ms": 1790527209469
+        "ended_ms": 1790762279155
       }
     },
     {

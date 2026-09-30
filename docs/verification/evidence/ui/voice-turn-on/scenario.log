@@ -1,20 +1,20 @@
-[2026-09-29T14:47:19.921Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-29T14:47:22.668Z] ffmpeg "found"
-[2026-09-29T14:47:26.448Z] screenshot docs/verification/evidence/ui/voice-turn-on/01-before-overseer.png
-[2026-09-29T14:47:29.993Z] PASS Overseer: the mark's stage grows in when Voice Mode is turned on (opacity and scale move to rest) [{"opacity":0.827791,"scale":0.951782},{"opacity":0.989381,"scale":0.997027},{"opacity":1,"scale":1},{"opacity":1,"scale":1}]
-[2026-09-29T14:47:30.021Z] overseer frames {"first":1790693246.588651,"clicked":1790693246.836,"during":1790693246.976693,"count":87}
-[2026-09-29T14:47:31.641Z] PASS Overseer: turning it on is recorded (87 frames), with frames before, during and after {"frames":87,"seconds":3.33,"gif":"docs/verification/evidence/ui/voice-turn-on/turning-on-overseer.gif"}
-[2026-09-29T14:47:31.854Z] screenshot docs/verification/evidence/ui/voice-turn-on/02-after-overseer.png
-[2026-09-29T14:47:31.864Z] PASS Overseer: the line "Stop, mute and what's running still work" is absent
-[2026-09-29T14:47:36.526Z] screenshot docs/verification/evidence/ui/voice-turn-on/03-before-dark.png
-[2026-09-29T14:47:39.828Z] PASS Overseer Dark: the mark's stage grows in when Voice Mode is turned on (opacity and scale move to rest) [{"opacity":0.793636,"scale":0.942218},{"opacity":0.968577,"scale":0.991202},{"opacity":0.999882,"scale":0.999967},{"opacity":1,"scale":1}]
-[2026-09-29T14:47:39.861Z] dark frames {"first":1790693256.676089,"clicked":1790693256.918,"during":1790693257.070742,"count":199}
-[2026-09-29T14:47:41.326Z] PASS Overseer Dark: turning it on is recorded (199 frames), with frames before, during and after {"frames":199,"seconds":3.12,"gif":"docs/verification/evidence/ui/voice-turn-on/turning-on-dark.gif"}
-[2026-09-29T14:47:41.423Z] screenshot docs/verification/evidence/ui/voice-turn-on/04-after-dark.png
-[2026-09-29T14:47:41.437Z] PASS Overseer Dark: the line "Stop, mute and what's running still work" is absent
-[2026-09-29T14:47:46.099Z] screenshot docs/verification/evidence/ui/voice-turn-on/05-before-light.png
-[2026-09-29T14:47:49.408Z] PASS Overseer Light: the mark's stage grows in when Voice Mode is turned on (opacity and scale move to rest) [{"opacity":0.766253,"scale":0.934551},{"opacity":0.955461,"scale":0.987529},{"opacity":0.997806,"scale":0.999386},{"opacity":1,"scale":1}]
-[2026-09-29T14:47:49.434Z] light frames {"first":1790693266.249462,"clicked":1790693266.491,"during":1790693266.644964,"count":208}
-[2026-09-29T14:47:50.801Z] PASS Overseer Light: turning it on is recorded (208 frames), with frames before, during and after {"frames":208,"seconds":3.12,"gif":"docs/verification/evidence/ui/voice-turn-on/turning-on-light.gif"}
-[2026-09-29T14:47:50.893Z] screenshot docs/verification/evidence/ui/voice-turn-on/06-after-light.png
-[2026-09-29T14:47:50.907Z] PASS Overseer Light: the line "Stop, mute and what's running still work" is absent
+[2026-09-30T10:03:34.726Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-30T10:03:37.440Z] ffmpeg "found"
+[2026-09-30T10:03:41.245Z] screenshot docs/verification/evidence/ui/voice-turn-on/01-before-overseer.png
+[2026-09-30T10:03:44.818Z] PASS Overseer: the mark's stage grows in when Voice Mode is turned on (opacity and scale move to rest) [{"opacity":0.826439,"scale":0.951403},{"opacity":0.986235,"scale":0.996146},{"opacity":1,"scale":1},{"opacity":1,"scale":1}]
+[2026-09-30T10:03:44.882Z] overseer frames {"first":1790762621.386381,"clicked":1790762621.635,"during":1790762621.781416,"count":95}
+[2026-09-30T10:03:46.562Z] PASS Overseer: turning it on is recorded (95 frames), with frames before, during and after {"frames":95,"seconds":3.36,"gif":"docs/verification/evidence/ui/voice-turn-on/turning-on-overseer.gif"}
+[2026-09-30T10:03:46.785Z] screenshot docs/verification/evidence/ui/voice-turn-on/02-after-overseer.png
+[2026-09-30T10:03:46.798Z] PASS Overseer: the line "Stop, mute and what's running still work" is absent
+[2026-09-30T10:03:51.464Z] screenshot docs/verification/evidence/ui/voice-turn-on/03-before-dark.png
+[2026-09-30T10:03:54.780Z] PASS Overseer Dark: the mark's stage grows in when Voice Mode is turned on (opacity and scale move to rest) [{"opacity":0.681455,"scale":0.910807},{"opacity":0.94609,"scale":0.984905},{"opacity":0.996464,"scale":0.99901},{"opacity":1,"scale":1}]
+[2026-09-30T10:03:54.818Z] dark frames {"first":1790762631.608307,"clicked":1790762631.856,"during":1790762632.014531,"count":174}
+[2026-09-30T10:03:56.154Z] PASS Overseer Dark: turning it on is recorded (174 frames), with frames before, during and after {"frames":174,"seconds":3.14,"gif":"docs/verification/evidence/ui/voice-turn-on/turning-on-dark.gif"}
+[2026-09-30T10:03:56.243Z] screenshot docs/verification/evidence/ui/voice-turn-on/04-after-dark.png
+[2026-09-30T10:03:56.256Z] PASS Overseer Dark: the line "Stop, mute and what's running still work" is absent
+[2026-09-30T10:04:00.931Z] screenshot docs/verification/evidence/ui/voice-turn-on/05-before-light.png
+[2026-09-30T10:04:04.223Z] PASS Overseer Light: the mark's stage grows in when Voice Mode is turned on (opacity and scale move to rest) [{"opacity":0.684483,"scale":0.911655},{"opacity":0.946764,"scale":0.985094},{"opacity":0.99658,"scale":0.999042},{"opacity":1,"scale":1}]
+[2026-09-30T10:04:04.255Z] light frames {"first":1790762641.077238,"clicked":1790762641.324,"during":1790762641.480421,"count":174}
+[2026-09-30T10:04:05.467Z] PASS Overseer Light: turning it on is recorded (174 frames), with frames before, during and after {"frames":174,"seconds":3.12,"gif":"docs/verification/evidence/ui/voice-turn-on/turning-on-light.gif"}
+[2026-09-30T10:04:05.576Z] screenshot docs/verification/evidence/ui/voice-turn-on/06-after-light.png
+[2026-09-30T10:04:05.591Z] PASS Overseer Light: the line "Stop, mute and what's running still work" is absent

@@ -18,7 +18,7 @@
             "status": "running"
           }
         ],
-        "summary": "Started API tests (claude) in talk-repo\nwrite the API\nAsk Overseer instead\nStarted Frontend fixer (claude) in talk-repo\nfix the header\nAsk Overseer instead\nStarted Build watcher (generic) in talk-repo\nAsk Overseer instead\nYou\nWhat is everyone doing?\nOverseer is still thinking\nStart as an agent\nOverseer\n\nHere is what everyone is doing:\n\nBuild watcher: running\nFrontend fixer: completed\nAPI tests: completed"
+        "summary": "Started API tests (claude) in talk-repo\nClaude Fixture · fix…@example.test · write the API\nAsk Overseer instead\nStarted Frontend fixer (claude) in talk-repo\nClaude Fixture · fix…@example.test · fix the header\nAsk Overseer instead\nStarted Build watcher (generic) in talk-repo\nAsk Overseer instead\nYou\nWhat is everyone doing?\nOverseer is still thinking\nStart as an agent\nOverseer\n\nHere is what everyone is doing:\n\nBuild watcher: running\nFrontend fixer: completed\nAPI tests: completed"
       }
     },
     {
@@ -32,12 +32,13 @@
       "name": "Overseer's own conversation is not listed as an agent",
       "ok": true,
       "detail": [
+        "1 working · 2 to review",
         "talk-repo",
         "Build watcher",
         "Frontend fixer",
         "API tests",
         "Claude",
-        "Your login"
+        "Mac's default login"
       ]
     },
     {

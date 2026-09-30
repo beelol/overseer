@@ -19,7 +19,7 @@
                                                                                                                                             
                                              ╭ pair a phone ──────────────────────────────────╮                                             
                                              │                                                │                                             
-                                             │ With MacBook-Pro                               │                                             
+                                             │ With Mac                                       │                                             
                                              │                                                │                                             
                                              │ "Unknown Pixel" was not paired.                │                                             
                                              │ p makes a new code · esc closes                │                                             

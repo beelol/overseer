@@ -23,21 +23,21 @@
           "globe  Sign in with ChatGPT in the browser, Opens the ChatGPT sign-in page on this Mac.",
           "device-mobile  Sign in with a device code, Shows a code to enter on another browser or device (needs device-code sign-in enabled in ChatGPT security settings)."
         ],
-        "work1": "team · c4a1579f",
+        "work1": "Team · wor…@example.invalid",
         "terminal": ""
       }
     },
     {
       "name": "Anthropic account added and signed in through its own flow",
       "ok": true,
-      "detail": "max · f03ab3f8"
+      "detail": "Max · cla…@example.invalid"
     },
     {
       "name": "desktop logins are labeled as following the app; fixed accounts are not",
       "ok": true,
       "detail": {
-        "desk1": "pro · bc92d05b · desktop",
-        "work1": "team · c4a1579f"
+        "desk1": "Pro · des…@example.invalid · desktop",
+        "work1": "Team · wor…@example.invalid"
       }
     },
     {
@@ -45,12 +45,12 @@
       "ok": true,
       "detail": {
         "codexChoices": [
-          "Your login, signed in · pro · follows the desktop app (can change), Logged in using ChatGPT",
-          "Work ChatGPT, signed in · team · fixed account, Logged in using ChatGPT"
+          "Mac's default login, signed in · ChatGPT Pro · des…@example.invalid · follows the desktop app (can change), Logged in using ChatGPT",
+          "Work ChatGPT, signed in · ChatGPT Team · wor…@example.invalid · fixed account, Logged in using ChatGPT"
         ],
         "claudeChoices": [
-          "Your login, signed in · max · follows the desktop app (can change)",
-          "Claude fixed, signed in · max · fixed account"
+          "Mac's default login, signed in · Claude Max · des…@example.invalid · follows the desktop app (can change)",
+          "Claude fixed, signed in · Claude Max · cla…@example.invalid · fixed account"
         ]
       }
     },
@@ -58,10 +58,10 @@
       "name": "switching the desktop app account changes only the desktop-linked account",
       "ok": true,
       "detail": {
-        "desk1": "pro · bc92d05b · desktop",
-        "desk2": "plus · d1dddc49 · desktop",
-        "work1": "team · c4a1579f",
-        "work2": "team · c4a1579f"
+        "desk1": "Pro · des…@example.invalid · desktop",
+        "desk2": "Plus · des…@example.invalid · desktop",
+        "work1": "Team · wor…@example.invalid",
+        "work2": "Team · wor…@example.invalid"
       }
     },
     {
@@ -78,10 +78,10 @@
       "ok": true,
       "detail": {
         "signedOut": "signed out",
-        "resigned": "plus · 5ac9196f",
+        "resigned": "Plus · wor…@example.invalid",
         "othersAfterOut": [
-          "max · f03ab3f8",
-          "plus · d1dddc49 · desktop"
+          "Max · cla…@example.invalid",
+          "Plus · des…@example.invalid · desktop"
         ]
       }
     },
@@ -91,13 +91,13 @@
       "detail": {
         "removeText": "Cancel\nRemove Account\nRemove the account Claude fixed?\nIts own credential folder is deleted. Runs keep their history. No other account, and no desktop-app login, is affected.",
         "afterRemove": [
-          "OpenAI / ChatGPT\nSign-in: ChatGPT sign-in in the browser, or a device code. Account login only; no API keys., has actions",
-          "Your login, signed in, plus · d1dddc49, follows the desktop app",
-          "Work ChatGPT, signed in, plus · 5ac9196f",
-          "Anthropic / Claude\nSign-in: Claude account sign-in (claude auth login). Account login only; no API keys., has actions",
-          "Your login, signed in, max · 49d8e90c, follows the desktop app",
-          "OpenCode (local models)\nSign-in: none: local providers and mocks (owner decision 2026-09-25). Account login only; no API keys.",
-          "Your login, not signed in, follows the desktop app"
+          "OpenAI / ChatGPT\nAccount login only; no API keys., has actions",
+          "Mac's default login, signed in, Plus · des…@example.invalid, follows the desktop app",
+          "Work ChatGPT, signed in, Plus · wor…@example.invalid",
+          "Anthropic / Claude\nAccount login only; no API keys., has actions",
+          "Mac's default login, signed in, Max · des…@example.invalid, follows the desktop app",
+          "OpenCode (local models)\nAccount login only; no API keys.",
+          "Mac's default login, not signed in, follows the desktop app"
         ]
       }
     },

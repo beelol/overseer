@@ -1,7 +1,7 @@
  ◆ Overseer  page 1/1 · 2 agents · ● 1 active                                                                                                        phone access off · ● connected 
-┏ 1 ● Sleeper ━━━━━━━━━━━━━━━━━━━━━╭ ◆ Overseer · Ask first ────────────────────────────────────────────────────────────────────────────────────╮───────────────────── claude · 0s ╮
-┃ working…                         │ ▶ started: Started API tests (claude) in repo                                                              │                                  │
-┃                                  │ ▶ started: Started Sleeper (generic) in repo                                                               │                                  │
+┏ 1 ● Sleeper ━━━━━━━━━━━━━━━━━━━━━╭ ◆ Overseer · Ask first ────────────────────────────────────────────────────────────────────────────────────╮──────────────── Claude Code · 0s ╮
+┃ working…                         │ ▶ Started API tests (Claude Code) in repo                                                                  │                                  │
+┃                                  │ ▶ Started Sleeper (generic) in repo                                                                        │                                  │
 ┃                                  │ you › Tell API tests to add tests                                                                          │t-format","stream-json","--verbose│
 ┃                                  │ Overseer will:                                                                                             │],"text":"write the API"}         │
 ┃                                  │   • Send API tests: “Please add tests.”                                                                    │                                  │
@@ -46,5 +46,5 @@
 ┃                                  │                                                                                                            │                                  │
 ┃                                  │                                                                                                            │                                  │
 ┃                                  │                                                                                                            │                                  │
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╰────────────────────────────────────────────── enter sends · ctrl+y / ctrl+n answer a proposal · esc closes ╯──────────────────────────────────╯
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╰────────────────────────────────────────────── enter sends · ctrl+y / ctrl+n answer a proposal · esc closes ╯laude Fixture · fix…@example.test ╯
  type to Overseer   enter send   ctrl+y/n yes/no to a proposal   j/k scroll   esc close                                                                                             

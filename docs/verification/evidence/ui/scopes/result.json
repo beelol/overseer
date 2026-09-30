@@ -4,7 +4,6 @@
       "name": "the Workspace Dirty view is gone; the side bar shows Agents and Accounts",
       "ok": true,
       "detail": [
-        "Search",
         "Agents",
         "Accounts",
         "Devices"

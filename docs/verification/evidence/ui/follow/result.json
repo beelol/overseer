@@ -6,22 +6,27 @@
       "detail": {
         "files": [
           "a.txt",
-          "b.txt",
-          "c.txt"
+          "c.txt",
+          "b.txt"
         ],
         "seen": [
-          "Following: a.txt:20 (agent tool input (tool-input))",
-          "Following: b.txt:280 (agent tool input (tool-input))",
-          "Following: c.txt:60 (agent tool input (tool-input))"
+          "Following: a.txt:20 (from what the agent asked to change)",
+          "Following agent edits (from what the agent asked to change)",
+          "Following: c.txt:60 (from what the agent asked to change)",
+          "Following: a.txt:240 (from what the agent asked to change)",
+          "Following agent edits (from what the agent asked to change)",
+          "Following: c.txt:200 (from what the agent asked to change)",
+          "Following agent edits (from what the agent asked to change)",
+          "Following: a.txt:100 (from what the agent asked to change)"
         ],
         "icon": {
           "state": "following",
           "pressed": "true",
           "name": "Following the agent",
-          "text": "Following: c.txt:60 (agent tool input (tool-input))",
-          "top": 46,
-          "view": "a.txt@-34",
-          "active": "a.txt+1−1M"
+          "text": "Following agent edits (from what the agent asked to change)",
+          "top": 486,
+          "view": "a.txt@-474",
+          "active": "a.txt+3−3M"
         }
       }
     },
@@ -34,13 +39,13 @@
           "pressed": "false",
           "name": "Follow the agent",
           "text": "",
-          "top": 46,
-          "view": "a.txt@-34",
-          "active": "a.txt+1−1M"
+          "top": 486,
+          "view": "a.txt@-474",
+          "active": "a.txt+3−3M"
         },
         "editsDuring": 3,
         "view": [
-          "a.txt@-34"
+          "a.txt@-474"
         ]
       }
     },

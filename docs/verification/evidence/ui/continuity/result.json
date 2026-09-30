@@ -70,7 +70,7 @@
           "allow_ollama_install": false,
           "enabled": true,
           "show": false,
-          "shown_ms": 1790612557903
+          "shown_ms": 1790759786998
         }
       }
     },
@@ -94,13 +94,13 @@
           "label": "qwen2.5-coder:14b",
           "hint": "fits at 32k · failed its check",
           "disabled": false,
-          "title": "qwen2.5-coder:14b fits at a 32k context: 15.4 GiB of 51.2 GiB. Failed its check with opencode: wrote its tool calls as text, or said done without calling a tool; nothing ran."
+          "title": "qwen2.5-coder:14b fits at a 32k context: 15.4 GiB of 51.2 GiB. Failed its check with OpenCode: wrote its tool calls as text, or said done without calling a tool; nothing ran."
         },
         {
           "label": "qwen3.5:122b",
           "hint": "too big · 78.3 GiB of 51.2 GiB · unverified",
           "disabled": true,
-          "title": "qwen3.5:122b is too big to load: 78.3 GiB at a 16k context is over the budget of 51.2 GiB (40% of 128 GiB is 51.2 GiB; 115 GiB available minus 12.8 GiB headroom is 102.2 GiB) Not in the catalogue, so not verified with opencode."
+          "title": "qwen3.5:122b is too big to load: 78.3 GiB at a 16k context is over the budget of 51.2 GiB (40% of 128 GiB is 51.2 GiB; 115 GiB available minus 12.8 GiB headroom is 102.2 GiB) Not in the catalogue, so not verified with OpenCode."
         }
       ]
     },
@@ -183,7 +183,7 @@
       "detail": [
         "Local model qwen3-coder:30b at a 64k context · 23.7 GiB, already loaded.",
         "This agent continues the work of another.Open the first agent",
-        "Continued from \"Rename the helpers\" after the connection was lost at 09:22."
+        "Continued from \"Rename the helpers\" after the connection was lost at 02:16."
       ]
     },
     {
@@ -221,8 +221,8 @@
       "ok": true,
       "detail": {
         "title": "Waiting for a connection",
-        "line": "The connection to OpenAI failed: stream disconnected before completion: error sending request for url (https://chatgpt.com/backend-api/codex/responses): client error (Connect): dns error: failed to lookup address information. Your message is kept.",
-        "foot": "Next check in 8 s · waiting 5 s · gives up after 36 hours",
+        "line": "The connection to OpenAI failed: stream disconnected before completion: could not reach it: client error (Connect): dns failed to lookup address information. Your message is kept.",
+        "foot": "Next check in 7 s · waiting 5 s · gives up after 36 hours",
         "actions": [
           "Use a local model now",
           "Retry now",
@@ -269,12 +269,12 @@
       "ok": true,
       "detail": {
         "taken": {
-          "at_ms": 1790612586776,
+          "at_ms": 1790759814189,
           "offered_ms": null,
-          "predecessor": "r-bd95f6fea709",
+          "predecessor": "r-1c643239eb4e",
           "reason": "user",
           "stay": false,
-          "successor": "r-e2d1043b42d9"
+          "successor": "r-d71d19d682d6"
         },
         "takenDone": "completed",
         "shownNext": true
@@ -304,35 +304,35 @@
       "ok": true,
       "detail": {
         "backDone": "completed",
-        "session": "fixture-thread-25707",
+        "session": "fixture-thread-90190",
         "args": [
           "exec",
           "resume",
-          "fixture-thread-25707"
+          "fixture-thread-90190"
         ]
       }
     },
     {
       "name": "back online, a new agent defaults to the online agent again, not the local one",
       "ok": true,
-      "detail": "Agent: Codex · Your login"
+      "detail": "Agent: Codex · Mac's default login"
     },
     {
       "name": "offline, no view overflows sideways, no unbroken run over 80 characters outside code, every icon-only control has a name",
       "ok": true,
       "detail": {
         "chat": {
-          "chars": 604,
+          "chars": 555,
           "longRuns": [],
           "overflow": 0,
           "unnamed": 0
         },
         "agents": {
-          "chars": 432,
+          "chars": 449,
           "overflow": 0,
           "offlineLine": 58,
           "waitingRow": 32,
-          "rows": 11
+          "rows": 10
         }
       }
     },
@@ -341,17 +341,17 @@
       "ok": true,
       "detail": {
         "chat": {
-          "chars": 604,
+          "chars": 555,
           "longRuns": [],
           "overflow": 0,
           "unnamed": 0
         },
         "agents": {
-          "chars": 432,
+          "chars": 449,
           "overflow": 0,
           "offlineLine": 58,
           "waitingRow": 32,
-          "rows": 11
+          "rows": 10
         }
       }
     },
@@ -365,17 +365,17 @@
   ],
   "textBudget": {
     "chat": {
-      "chars": 604,
+      "chars": 555,
       "longRuns": [],
       "overflow": 0,
       "unnamed": 0
     },
     "agents": {
-      "chars": 432,
+      "chars": 449,
       "overflow": 0,
       "offlineLine": 58,
       "waitingRow": 32,
-      "rows": 11
+      "rows": 10
     }
   }
 }

@@ -1,12 +1,12 @@
-[2026-09-29T07:59:15.735Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-29T07:59:24.399Z] screenshot docs/verification/evidence/ui/talk/01-summary.png
-[2026-09-29T07:59:24.399Z] PASS "What is everyone doing?" gets a summary that matches the daemon's state (each agent and its status) {"wanted":[{"title":"API tests","status":"completed"},{"title":"Frontend fixer","status":"completed"},{"title":"Build watcher","status":"running"}],"summary":"Started API tests (claude) in talk-repo\nwrite the API\nAsk Overseer instead\nStarted Frontend fixer (claude) in talk-repo\nfix the header\nAsk Overseer instead\nStarted Build watcher (generic) in talk-repo\nAsk Overseer instead\nYou\nWhat is everyone doing?\nOverseer is still thinking\nStart as an agent\nOverseer\n\nHere is what everyone is doing:\n\nBuild watcher: running\nFrontend fixer: completed\nAPI tests: completed"}
-[2026-09-29T07:59:24.409Z] PASS the agents' state goes with the message but is not shown as text {"sent":3816}
-[2026-09-29T07:59:26.318Z] PASS Overseer's own conversation is not listed as an agent ["talk-repo","Build watcher","Frontend fixer","API tests","Claude","Your login"]
-[2026-09-29T07:59:28.745Z] screenshot docs/verification/evidence/ui/talk/02-proposal.png
-[2026-09-29T07:59:28.753Z] PASS asking Overseer to act gets a proposal saying exactly what it will do, and nothing happens yet {"card":"Overseer will\nSend API tests: “Please add tests.”\nYes\nNo","turns":1}
-[2026-09-29T07:59:30.180Z] PASS on Yes, the follow-up goes to that agent as coming from Overseer {"turns":2,"prompt":"From Overseer: Please add tests."}
-[2026-09-29T07:59:33.016Z] screenshot docs/verification/evidence/ui/talk/03-agent-chat-from-overseer.png
-[2026-09-29T07:59:33.016Z] PASS the agent's chat shows the message as coming from Overseer {"who":"From Overseer","text":"Please add tests."}
-[2026-09-29T07:59:40.093Z] screenshot docs/verification/evidence/ui/talk/04-declined.png
-[2026-09-29T07:59:40.105Z] PASS a declined proposal changes nothing {"turns":1}
+[2026-09-30T09:58:25.971Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-30T09:58:33.370Z] screenshot docs/verification/evidence/ui/talk/01-summary.png
+[2026-09-30T09:58:33.384Z] PASS "What is everyone doing?" gets a summary that matches the daemon's state (each agent and its status) {"wanted":[{"title":"API tests","status":"completed"},{"title":"Frontend fixer","status":"completed"},{"title":"Build watcher","status":"running"}],"summary":"Started API tests (claude) in talk-repo\nClaude Fixture · fix…@example.test · write the API\nAsk Overseer instead\nStarted Frontend fixer (claude) in talk-repo\nClaude Fixture · fix…@example.test · fix the header\nAsk Overseer instead\nStarted Build watcher (generic) in talk-repo\nAsk Overseer instead\nYou\nWhat is everyone doing?\nOverseer is still thinking\nStart as an agent\nOverseer\n\nHere is what everyone is doing:\n\nBuild watcher: running\nFrontend fixer: completed\nAPI tests: completed"}
+[2026-09-30T09:58:33.392Z] PASS the agents' state goes with the message but is not shown as text {"sent":3816}
+[2026-09-30T09:58:35.294Z] PASS Overseer's own conversation is not listed as an agent ["1 working · 2 to review","talk-repo","Build watcher","Frontend fixer","API tests","Claude","Mac's default login"]
+[2026-09-30T09:58:37.744Z] screenshot docs/verification/evidence/ui/talk/02-proposal.png
+[2026-09-30T09:58:37.766Z] PASS asking Overseer to act gets a proposal saying exactly what it will do, and nothing happens yet {"card":"Overseer will\nSend API tests: “Please add tests.”\nYes\nNo","turns":1}
+[2026-09-30T09:58:39.203Z] PASS on Yes, the follow-up goes to that agent as coming from Overseer {"turns":2,"prompt":"From Overseer: Please add tests."}
+[2026-09-30T09:58:42.035Z] screenshot docs/verification/evidence/ui/talk/03-agent-chat-from-overseer.png
+[2026-09-30T09:58:42.048Z] PASS the agent's chat shows the message as coming from Overseer {"who":"From Overseer","text":"Please add tests."}
+[2026-09-30T09:58:49.163Z] screenshot docs/verification/evidence/ui/talk/04-declined.png
+[2026-09-30T09:58:49.185Z] PASS a declined proposal changes nothing {"turns":1}

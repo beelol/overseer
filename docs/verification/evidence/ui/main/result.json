@@ -4,7 +4,7 @@
       "name": "profile created from UI",
       "ok": true,
       "detail": {
-        "id": "p-f7cc659aa7de",
+        "id": "p-ebb750f21da9",
         "harness": "opencode"
       }
     },
@@ -12,8 +12,8 @@
       "name": "run created in isolated worktree",
       "ok": true,
       "detail": {
-        "run": "r-c03aabb9e287",
-        "workspace": "/private/tmp/ovs-ui-ALq38g/overseer-home/worktrees/repo-1876e354/sequence-8",
+        "run": "r-7e18f427ddc1",
+        "workspace": "/private/tmp/ovs-ui-m8I9z7/overseer-home/worktrees/repo-a54d1c3b/sequence-8",
         "branch": "overseer/sequence-8"
       }
     },
@@ -25,10 +25,10 @@
       "name": "follow navigated across files",
       "ok": true,
       "detail": [
-        "Following: a.txt:20 (agent tool input (tool-input))",
-        "Following: a.txt:60 (agent tool input (tool-input))",
-        "Following: b.txt:240 (agent tool input (tool-input))",
-        "Following: b.txt:200 (agent tool input (tool-input))"
+        "Following: a.txt:20 (from what the agent asked to change)",
+        "Following: b.txt:280 (from what the agent asked to change)",
+        "Following: a.txt:60 (from what the agent asked to change)",
+        "Following: b.txt:240 (from what the agent asked to change)"
       ]
     },
     {
@@ -44,7 +44,7 @@
     {
       "name": "output panel streams events",
       "ok": true,
-      "detail": "sequence 8\na.txt\n6 steps\nedit 6×\nb.txt\na.txt\nb.txt\na.txt\nb.txt\n15 tokens\nedit…"
+      "detail": "sequence 8\na.txt\n4 steps\nedit 4×\nb.txt\na.txt\nb.txt\n15 tokens\nedit…"
     },
     {
       "name": "scroll pauses follow with visible Resume",
@@ -52,7 +52,7 @@
       "detail": {
         "state": "Follow paused by your navigation",
         "resume": true,
-        "top": 614
+        "top": 234
       }
     },
     {
@@ -60,14 +60,14 @@
       "ok": true,
       "detail": {
         "state": "Follow paused by your navigation",
-        "top": 614
+        "top": 234
       }
     },
     {
       "name": "resume restarts follow",
       "ok": true,
       "detail": {
-        "state": "Following agent edits (agent tool input (tool-input))",
+        "state": "Following: a.txt:100 (from what the agent asked to change)",
         "resume": false
       }
     },
@@ -82,14 +82,14 @@
     {
       "name": "base icon identifies snapshot and provenance",
       "ok": true,
-      "detail": "Latest run\nBase: a466daf8907fdc4181cd5dcf3ad863f5651f6cd9\nrun-start snapshot s-84c42d09c361 (turn 1 of r-c03aabb9e287, 1790612958908), captured including dirty and untracked files\nProvenance: recorded\nClick to choose another comparison.\nWorktree: …/repo-1876e354/sequence-8"
+      "detail": "Latest run\nBase: 361f9ece0ec5059ce1cb08d2808f039079d47832\nsnapshot s-806cd66e63c9 taken as turn 1 started, including uncommitted and untracked files\nProvenance: recorded\nClick to choose another comparison.\nWorktree: …/repo-a54d1c3b/sequence-8"
     },
     {
       "name": "follow off preserves position",
       "ok": true,
       "detail": {
-        "offTop": 862,
-        "top": 862,
+        "offTop": 614,
+        "top": 614,
         "checked": false
       }
     },
@@ -128,12 +128,12 @@
         {
           "n": 1,
           "status": "completed",
-          "snapshot": "s-84c42d09c361"
+          "snapshot": "s-806cd66e63c9"
         },
         {
           "n": 2,
           "status": "interrupted",
-          "snapshot": "s-e6428c3c9479"
+          "snapshot": "s-5dee25c8ca5a"
         }
       ]
     },
@@ -153,7 +153,7 @@
         "send": true,
         "why": "Sub-agents are steered through their parent",
         "sendWhy": "Sub-agents are steered through their parent",
-        "worktree": "StatusDoneHarnessOpenCode 1.15.13AccountOpenCode mockBranchoverseer/delegationWorktree/private/tmp/ovs-ui-ALq38g/overseer-home/worktrees/repo-1876e354/delegationRunr-7f3fba8d517eSessionses_f1725db09ffeI9oV7U4Tkma32xCapabilitiescontrol: through parent harness only\nworkspace: shared with parent"
+        "worktree": "StatusDoneHarnessOpenCode 1.15.13AccountOpenCode · OpenCode mockBranchoverseer/delegationWorktree/private/tmp/ovs-ui-m8I9z7/overseer-home/worktrees/repo-a54d1c3b/delegationRunr-e4dfa7f62177Sessionses_f0e53cae7ffelxrFkNn81kiAZwCapabilitiescontrol: through parent harness only\nworkspace: shared with parent"
       }
     },
     {
@@ -161,12 +161,12 @@
       "ok": true,
       "detail": {
         "sawDisconnect": true,
-        "oldPid": 30244,
-        "newPid": 54592,
+        "oldPid": 26437,
+        "newPid": 79674,
         "tasks": 2
       }
     }
   ],
-  "run": "r-c03aabb9e287",
-  "workspace": "/private/tmp/ovs-ui-ALq38g/overseer-home/worktrees/repo-1876e354/sequence-8"
+  "run": "r-7e18f427ddc1",
+  "workspace": "/private/tmp/ovs-ui-m8I9z7/overseer-home/worktrees/repo-a54d1c3b/sequence-8"
 }

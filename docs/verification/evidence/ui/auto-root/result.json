@@ -8,7 +8,7 @@
       "name": "the UI enabled Auto and the daemon chose one model and effort before the fixture turn",
       "ok": true,
       "detail": {
-        "run": "r-ec5430b77c8f4eef9af343c72ad17a86",
+        "run": "r-b9945038ea6e4ac6a16d43e34ceae4f6",
         "status": "completed",
         "model": "gpt-6-sol",
         "effort": "medium",
@@ -29,17 +29,17 @@
       "name": "Auto parent receives a browser-labelled child result and assigns a stronger diagnosis unit while healthy",
       "ok": true,
       "detail": {
-        "parent": "r-61c03ae41c534e2cb729be96f2e89410",
+        "parent": "r-5d30e012fa394bc8ae191f62eae5a420",
         "status": "completed",
         "children": [
           {
-            "id": "r-a63e3b82de9b",
+            "id": "r-7c9fb2a52f30",
             "model": "gpt-6-sol",
             "effort": "medium",
             "status": "completed"
           },
           {
-            "id": "r-32dc01f3306d",
+            "id": "r-bb774337e5e6",
             "model": "gpt-6-astra",
             "effort": "high",
             "status": "completed"
@@ -67,14 +67,14 @@
       "ok": true,
       "detail": [
         {
-          "run": "r-a63e3b82de9b",
+          "run": "r-7c9fb2a52f30",
           "text": "browser check49 reported tokens",
-          "title": "browser check\nDone\n42 input · 7 output · activity, not subscription allowance\nmanaged-delegation"
+          "title": "browser check\nDone\n42 input · 7 output · activity, not subscription allowance"
         },
         {
-          "run": "r-32dc01f3306d",
+          "run": "r-bb774337e5e6",
           "text": "diagnosis49 reported tokens",
-          "title": "diagnosis\nDone\n42 input · 7 output · activity, not subscription allowance\nmanaged-delegation"
+          "title": "diagnosis\nDone\n42 input · 7 output · activity, not subscription allowance"
         }
       ]
     },
@@ -84,12 +84,12 @@
       "detail": {
         "title": "Auto usage",
         "rows": [
-          "gpt-6-sol · medium, completed · 9/27/2026, 1:04:47 PM, Token activity unavailable · subscription draw unverified",
-          "gpt-6-astra · high, completed · 9/27/2026, 1:04:47 PM, 49 reported tokens · subscription draw unverified",
-          "gpt-6-sol · medium, completed · 9/27/2026, 1:04:45 PM, 49 reported tokens · subscription draw unverified",
-          "gpt-6-sol · medium, completed · 9/27/2026, 1:04:41 PM, 49 reported tokens · subscription draw unverified",
+          "gpt-6-sol · medium, completed · 9/30/2026, 2:12:47 AM, Token activity unavailable · subscription draw unverified",
+          "gpt-6-astra · high, completed · 9/30/2026, 2:12:47 AM, 49 reported tokens · subscription draw unverified",
+          "gpt-6-sol · medium, completed · 9/30/2026, 2:12:46 AM, 49 reported tokens · subscription draw unverified",
+          "gpt-6-sol · medium, completed · 9/30/2026, 2:12:43 AM, 49 reported tokens · subscription draw unverified",
           "Export local usage…, Save a redacted JSON file on this Mac; nothing is uploaded.",
-          "Clear local usage…, Remove learning records and summaries; agents and task history stay."
+          "Clear local usage…, Remove learning records and summaries; agents and their history stay."
         ],
         "value": ""
       }
@@ -109,7 +109,7 @@
     {
       "name": "clearing local Auto learning asks for confirmation",
       "ok": true,
-      "detail": "Cancel\nClear local Auto usage\nClear local Auto usage and learning? Agents and task history stay available."
+      "detail": "Cancel\nClear local Auto usage\nClear local Auto usage and learning? Agents and their history stay available."
     },
     {
       "name": "cancelling Clear preserves the local work records",
@@ -147,14 +147,14 @@
       "ok": true,
       "detail": [
         {
-          "run": "r-a63e3b82de9b",
+          "run": "r-7c9fb2a52f30",
           "text": "browser check49 reported tokens",
-          "title": "browser check\nDone\n42 input · 7 output · activity, not subscription allowance\nmanaged-delegation"
+          "title": "browser check\nDone\n42 input · 7 output · activity, not subscription allowance"
         },
         {
-          "run": "r-32dc01f3306d",
+          "run": "r-bb774337e5e6",
           "text": "diagnosis49 reported tokens",
-          "title": "diagnosis\nDone\n42 input · 7 output · activity, not subscription allowance\nmanaged-delegation"
+          "title": "diagnosis\nDone\n42 input · 7 output · activity, not subscription allowance"
         }
       ]
     },
@@ -163,7 +163,7 @@
       "ok": true,
       "detail": {
         "runs": [
-          "r-ec5430b77c8f4eef9af343c72ad17a86"
+          "r-b9945038ea6e4ac6a16d43e34ceae4f6"
         ],
         "remembered": "Agent: Auto routing"
       }
