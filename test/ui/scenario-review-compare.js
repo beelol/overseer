@@ -10,6 +10,11 @@
 //    any edits made in this folder; Latest run is c2.txt; Entire worktree is the feature branch
 //    against main (feature.txt and a.txt too).
 // Each time the header names the comparison shown (the pressed button) and the file count matches.
+// 3. The agent's changes are Accepted or Rejected, per change and per file, never Keep, Undo or Save
+//    (the owner, 2026-09-29): an agent edits two lines of a.txt and two of b.txt. One change of a.txt
+//    is accepted (it reads Accepted) and one rejected (the file on disk has the line back); all of
+//    b.txt is accepted (Accepted) and then rejected (b.txt is as before, and leaves the review).
+//    "Save your edits" shows only once the owner types, and saving writes what they typed.
 const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay, git } = require('./harness');
@@ -97,6 +102,69 @@ const { Session, makeRepo, latestVsix, delay, git } = require('./harness');
     const w5 = await reviewOf('Worktree agent', w.run.id);
     const again = await shown(w5, 'task_start', 2);
     check('each agent keeps its own choice (the worktree agent is still on Since task start)', same(again.pressed, ['Since task start']), again);
+
+    // ---- 3. Accepted or Rejected, per change and per file; "Save your edits" only after typing.
+    const edits = agent('Accept agent', 'worktree', "sed -i '' -e 's/^L10: original$/L10: agent edit/' -e 's/^L100: original$/L100: agent edit/' a.txt; sed -i '' -e 's/^L50: original$/L50: agent edit/' -e 's/^L250: original$/L250: agent edit/' b.txt");
+    await waitDone(edits.run.id);
+    const E = edits.workspace.path, line = (file, n) => fs.readFileSync(path.join(E, file), 'utf8').split('\n')[n - 1];
+    const bBefore = git(E, 'show', 'HEAD:b.txt') + '\n';
+    const er = await reviewOf('Accept agent', edits.run.id);
+    await shown(er, 'task_start', 2);
+    const fileOf = file => `[...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === ${JSON.stringify(file)})`;
+    const fileWords = (frame, file) => frame.eval(`(() => { const e = ${fileOf(file)}; if (!e) return null; const b = s => e.querySelector(s); const vis = x => !!x && !x.hidden;
+      return { load: e.dataset.loadState, hunks: Number(e.dataset.hunks || 0), accepted: Number(e.dataset.reviewed || 0), accept: vis(b('.file-accept')) ? b('.file-accept').textContent : null, acceptPressed: b('.file-accept')?.getAttribute('aria-pressed'),
+        reject: vis(b('.file-reject')) ? b('.file-reject').textContent : null, rejectDisabled: b('.file-reject')?.disabled, save: vis(b('.save-file')) ? b('.save-file').textContent : null,
+        hunkWords: [...e.querySelectorAll('.hunk-actions')].map(h => [...h.querySelectorAll('button')].map(x => x.textContent.trim())), notice: document.getElementById('notice').textContent }; })()`);
+    const waitWords = (frame, file, pred, ms = 20000) => frame.waitFor(`(() => { const e = ${fileOf(file)}; if (!e) return false; e.scrollIntoView({ block: 'start' }); return e.dataset.loadState === 'rendered' && (${pred}); })()`, ms).then(() => true, () => false);
+    const clickIn = async (frame, file, selector) => {
+      await frame.eval(`(() => { document.getElementById('click-target')?.removeAttribute('id'); const e = ${fileOf(file)}; e.scrollIntoView({ block: 'start' }); e.querySelector(${JSON.stringify(selector)}).id = 'click-target'; })()`);
+      await delay(300); await click(frame, '#click-target');
+    };
+    // A change's button, the change chosen by the text of its first line.
+    const hunkClick = async (frame, file, text, which) => {
+      await frame.waitFor(`(() => { const e = ${fileOf(file)}; if (!e || e.dataset.loadState !== 'rendered') return false; e.scrollIntoView({ block: 'start' });
+        const target = [...e.querySelectorAll('.editor.modified .view-line')].find(l => l.textContent.replace(/ /g, ' ').includes(${JSON.stringify(text)})); if (!target) return false;
+        const top = target.getBoundingClientRect().top; const bar = [...e.querySelectorAll('.hunk-actions')].sort((a, b) => Math.abs(a.getBoundingClientRect().top - top) - Math.abs(b.getBoundingClientRect().top - top))[0]; if (!bar) return false;
+        document.getElementById('click-target')?.removeAttribute('id'); bar.querySelector('.hunk-${which}').id = 'click-target'; document.getElementById('diffs').scrollTop += bar.getBoundingClientRect().top - 200; return true; })()`, 20000);
+      await delay(300); await click(frame, '#click-target');
+    };
+    await waitWords(er, 'a.txt', "Number(e.dataset.hunks) === 2");
+    const start = await fileWords(er, 'a.txt');
+    check('each file offers Accept file and Reject file, each change Accept and Reject; no Keep, Undo or Save before typing', start && start.accept === 'Accept file' && start.reject === 'Reject file' && !start.rejectDisabled && start.save === null && start.hunks === 2 && start.hunkWords.every(w => JSON.stringify(w) === '["Accept","Reject"]'), start);
+    await hunkClick(er, 'a.txt', 'L10: agent edit', 'accept');
+    const oneAccepted = await waitWords(er, 'a.txt', "Number(e.dataset.reviewed) === 1 && [...e.querySelectorAll('.hunk-accept')].some(b => b.getAttribute('aria-pressed') === 'true' && b.textContent.trim() === 'Accepted')");
+    const afterAccept = await fileWords(er, 'a.txt');
+    await s.screenshot('change-accepted');
+    check('a change accepted reads Accepted; the file on disk keeps the agent\'s line', oneAccepted && line('a.txt', 10) === 'L10: agent edit' && afterAccept.accept === 'Accept file' && afterAccept.save === null, afterAccept);
+    await hunkClick(er, 'a.txt', 'L100: agent edit', 'reject');
+    const oneRejected = await waitWords(er, 'a.txt', "Number(e.dataset.hunks) === 1");
+    const afterReject = await fileWords(er, 'a.txt');
+    await s.screenshot('change-rejected');
+    check('a change rejected: the line is back on disk, the review says Rejected, and "Save your edits" does not appear', oneRejected && line('a.txt', 100) === 'L100: original' && line('a.txt', 10) === 'L10: agent edit' && /^Rejected: the agent's change at lines 100–100 of a\.txt was taken out\.$/.test(afterReject.notice) && afterReject.save === null, { afterReject, l100: line('a.txt', 100) });
+    await waitWords(er, 'b.txt', "Number(e.dataset.hunks) === 2");
+    await clickIn(er, 'b.txt', '.file-accept');
+    const fileAccepted = await waitWords(er, 'b.txt', "Number(e.dataset.reviewed) === 2 && e.querySelector('.file-accept').textContent === 'Accepted' && e.querySelector('.file-accept').getAttribute('aria-pressed') === 'true'");
+    const bAccepted = await fileWords(er, 'b.txt');
+    await s.screenshot('file-accepted');
+    check('a whole file accepted: every change reads Accepted and the file\'s button reads Accepted', fileAccepted && bAccepted.hunkWords.every(w => w[0] === 'Accepted') && bAccepted.save === null, bAccepted);
+    await clickIn(er, 'b.txt', '.file-reject');
+    const bGone = await er.waitFor(`!${fileOf('b.txt')}`, 20000).then(() => true, () => false);
+    const bText = fs.readFileSync(path.join(E, 'b.txt'), 'utf8');
+    const afterFileReject = await er.eval(`({ notice: document.getElementById('notice').textContent, count: document.getElementById('total').dataset.count, saves: [...document.querySelectorAll('.save-file')].filter(b => !b.hidden).length })`);
+    await s.screenshot('file-rejected');
+    check('a whole file rejected: b.txt is as it was before the agent, leaves the review, and the review says Rejected', bGone && bText === bBefore && afterFileReject.notice === "Rejected: the agent's changes to b.txt were taken out." && afterFileReject.count === '1' && afterFileReject.saves === 0, { ...afterFileReject, same: bText === bBefore });
+    // Typing shows "Save your edits"; saving writes what was typed and hides it again.
+    await er.waitFor(`(() => { const e = ${fileOf('a.txt')}; if (!e || e.dataset.loadState !== 'rendered') return false; e.scrollIntoView(); const l = [...e.querySelectorAll('.editor.modified .view-lines .view-line')].find(l => /L10: agent edit/.test(l.textContent)); if (!l) return false; l.scrollIntoView({ block: 'center' }); document.getElementById('click-target')?.removeAttribute('id'); l.id = 'click-target'; return true; })()`, 15000);
+    await delay(500);
+    const p = await s.webviewPoint(er, '#click-target');
+    await cdp.click(p.x - 20, p.y); await cdp.key('End'); await cdp.type(' OWNER-TYPED'); await delay(800);
+    const typed = await er.waitFor(`(() => { const e = ${fileOf('a.txt')}; const b = e && e.querySelector('.save-file'); return b && !b.hidden && !b.disabled ? b.textContent : null; })()`, 10000).catch(() => null);
+    await s.screenshot('save-your-edits');
+    check('"Save your edits" appears once the owner types', typed === 'Save your edits', typed);
+    await clickIn(er, 'a.txt', '.save-file');
+    const saved = await (async () => { for (let i = 0; i < 40; i++) { if (line('a.txt', 10) === 'L10: agent edit OWNER-TYPED') return true; await delay(250); } return false; })();
+    const hiddenAgain = await er.waitFor(`(() => { const e = ${fileOf('a.txt')}; return !!e && e.querySelector('.save-file').hidden; })()`, 10000).then(() => true, () => false);
+    check('Save your edits writes what was typed, then goes away', saved && hiddenAgain, { l10: line('a.txt', 10), hiddenAgain });
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}

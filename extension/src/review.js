@@ -208,7 +208,7 @@ class Review {
     if (open?.isDirty) {
       const lines = open.getText().split(/\r?\n/);
       const same = end ? lines.slice(start - 1, end).join('\n') === modified.join('\n') : (start === 0 || lines[start - 1] === msg.anchor);
-      if (!same) throw new Error(`Not marked reviewed: ${msg.path} changed while you were accepting this hunk (conflict). Review the current content.`);
+      if (!same) throw new Error(`Not accepted: ${msg.path} changed while you were accepting this change (conflict). Review the current content.`);
       // The unsaved text is what was reviewed; the file on disk may differ until it is saved.
       await this.client.request('review.accept', { run_id: runId, path: msg.path, key: msg.key, modified_start: 0, modified_lines: [] });
     } else {

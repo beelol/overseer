@@ -282,7 +282,7 @@ class Editing {
         stream.sequence = message.sequence;
         await this.handoff(stream); await this.clearJournal(stream);
         send({ type: 'saveFailed', id: stream.id, stream: message.stream, sequence: stream.sequence,
-          documentVersion: stream.doc.version, message: 'Save failed. Your unsaved text is retained; retry Save or use Open in Native Diff.' });
+          documentVersion: stream.doc.version, message: 'Save failed. Your unsaved text is retained; retry Save your edits or use Open in Native Diff.' });
         return;
       }
       stream.version = stream.doc.version; stream.sequence = message.sequence;

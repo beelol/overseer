@@ -260,20 +260,25 @@ function makeRow(entry) {
   const status = node('span', 'status'); const unsaved = node('span', 'unsaved');
   const stats = node('span', 'stats', '…');
   const open = node('button', 'open-native', '↗'); open.title = 'Open in native diff (undo, redo, Git gutters)'; open.setAttribute('aria-label', 'Open ' + entry.path + ' in native diff');
-  // Overseer (AC-232): Save says what it does; it writes your edits, it does not keep or undo the agent's change.
-  const save = node('button', 'save-file', "Save your changes to the agent's copy"); save.disabled = true; save.hidden = true;
-  save.title = "Save your changes to the agent's copy (Cmd+S): writes your edits to this file in the agent's worktree. It does not keep or undo the agent's change.";
+  // Overseer (AC-263): the agent's changes are Accepted or Rejected, per change and per file; saving
+  // what the owner typed is a separate "Save your edits", shown only once they have typed.
+  const acceptFile = node('button', 'file-accept'); acceptFile.hidden = true;
+  const rejectFile = node('button', 'file-reject'); rejectFile.hidden = true;
+  const save = node('button', 'save-file', 'Save your edits'); save.disabled = true; save.hidden = true;
+  save.title = "Save your edits (Cmd+S): writes what you typed to this file. It does not accept or reject the agent's changes.";
   // An unchanged file opened from the navigator can be closed again (AC-99).
   const close = node('button', 'close-file'); close.title = 'Close this file (it has no changes)'; close.setAttribute('aria-label', 'Close ' + entry.path);
   const closeIcon = node('span', 'codicon codicon-close'); closeIcon.setAttribute('aria-hidden', 'true'); close.append(closeIcon);
   close.addEventListener('click', () => vscode.postMessage({ type: 'unbrowse', path: row.entry.path }));
   const editStatus = node('span', 'edit-status'); editStatus.setAttribute('role', 'status');
   const host = node('div', 'diff-body'); host.style.height = '220px';
-  header.append(toggle, status, title, unsaved, editStatus, stats, save, open, close); element.append(header, host);
+  header.append(toggle, status, title, unsaved, editStatus, stats, acceptFile, rejectFile, save, open, close); element.append(header, host);
   const progress = node('span', 'file-loading'); progress.setAttribute('role', 'status'); progress.hidden = true; header.insertBefore(progress, stats);
-  const row = { entry, element, header, toggle, title, status, unsaved, stats, host, progress, open, save, close, editStatus, nearby: false };
+  const row = { entry, element, header, toggle, title, status, unsaved, stats, host, progress, open, save, close, editStatus, acceptFile, rejectFile, nearby: false };
   loading(row, true);
   save.addEventListener('click', () => editing.save(row));
+  acceptFile.addEventListener('click', () => acceptWholeFile(row));
+  rejectFile.addEventListener('click', () => rejectWholeFile(row));
   title.addEventListener('click', event => {
     event.preventDefault();
     if (!row.entry.pending && !snapshot.cached) vscode.postMessage({ type: 'openFile', id: row.entry.id, version: snapshot.version });
@@ -300,6 +305,7 @@ function release(row) {
   row.listeners.forEach(l => l.dispose());
   row.editor.dispose(); row.original.dispose(); row.modified.dispose();
   row.editor = undefined; row.body = undefined; row.renderedRevision = undefined; row.save.disabled = true;
+  row.acceptFile.hidden = true; row.rejectFile.hidden = true;
   loading(row, true);
 }
 function relevant(row) { return !stopped && rows.get(row.entry.id) === row && row.nearby && !closedFiles.has(row.entry.id); }
@@ -526,16 +532,17 @@ function renderHunks(row) {
     const where = change.modifiedEndLineNumber ? `lines ${change.modifiedStartLineNumber}–${change.modifiedEndLineNumber}` : `deletion after line ${change.modifiedStartLineNumber}`;
     dom.setAttribute('role', 'group'); dom.setAttribute('aria-label', `Hunk ${index + 1} of ${row.entry.path}, ${where}`);
     const glyph = name => { const g = node('span', 'codicon codicon-' + name); g.setAttribute('aria-hidden', 'true'); return g; };
-    if (reviewed) { const badge = node('span', 'hunk-badge'); badge.append(glyph('pass-filled')); badge.title = 'Reviewed'; dom.append(badge); }
-    // Overseer (AC-232): keeping or undoing the agent's change is a choice in words, Keep or Undo.
-    const accept = node('button', 'hunk-accept'); accept.append(glyph(reviewed ? 'close' : 'check'), node('span', 'hunk-word', reviewed ? 'Unmark' : 'Keep'));
-    accept.title = reviewed ? "Kept and marked reviewed. Click to mark it not reviewed (the change stays either way)" : "Keep: the agent's change stays, and this hunk is marked reviewed (nothing is committed or staged)";
-    accept.setAttribute('aria-label', reviewed ? `Unmark reviewed hunk ${index + 1}` : `Accept hunk ${index + 1}`);
+    // Overseer (AC-263): the agent's change is Accepted or Rejected, never Keep or Undo. An accepted
+    // change reads Accepted (pressed); clicking it again takes the accept back.
+    const accept = node('button', 'hunk-accept'); accept.append(glyph('check'), node('span', 'hunk-word', reviewed ? 'Accepted' : 'Accept'));
+    accept.setAttribute('aria-pressed', String(reviewed));
+    accept.title = reviewed ? "Accepted. Click to take the accept back (the change stays in the file either way)" : "Accept: the agent's change stays and is marked accepted (nothing is committed or staged)";
+    accept.setAttribute('aria-label', reviewed ? `Hunk ${index + 1} accepted; click to take the accept back` : `Accept hunk ${index + 1}`);
     accept.addEventListener('click', () => vscode.postMessage({ type: 'hunkReview', reviewed: !reviewed, key, path: row.entry.path, version: snapshot?.version,
       modifiedStart: change.modifiedStartLineNumber, modifiedEnd: change.modifiedEndLineNumber, modified: mod, anchor: row.modified.getLineContent(Math.max(1, Math.min(change.modifiedStartLineNumber || 1, row.modified.getLineCount()))) }));
-    const reject = node('button', 'hunk-reject'); reject.append(glyph('discard'), node('span', 'hunk-word', 'Undo'));
+    const reject = node('button', 'hunk-reject'); reject.append(glyph('discard'), node('span', 'hunk-word', 'Reject'));
     reject.disabled = !canEdit;
-    reject.title = canEdit ? "Undo: put back what was there before the agent's change, in the agent's copy (Cmd+Z in the native editor brings it back)" : 'Undo is unavailable: this file cannot be edited in the review (see Open in Native Diff)';
+    reject.title = canEdit ? "Reject: take the agent's change out and put back what was there before (Cmd+Z in the native editor brings it back)" : 'Reject is unavailable: this file cannot be edited in the review (see Open in Native Diff)';
     reject.setAttribute('aria-label', `Reject hunk ${index + 1}`);
     reject.addEventListener('click', () => rejectHunk(row, change, key));
     dom.append(accept, reject);
@@ -548,7 +555,41 @@ function renderHunks(row) {
   row.hunkDecorations.set(reviewedRanges);
   row.element.dataset.hunks = String(changes.length);
   row.element.dataset.reviewed = String(row.hunks.filter(h => reviewedHunks.has(h.key)).length);
+  fileActions(row, canEdit);
   placeHunks(row);
+}
+// Overseer (AC-263): Accept file and Reject file act on every change of the file at once.
+function fileActions(row, canEdit) {
+  const hunks = row.hunks || [], all = hunks.length > 0 && hunks.every(h => reviewedHunks.has(h.key));
+  const { acceptFile, rejectFile } = row, name = row.entry.path;
+  acceptFile.hidden = rejectFile.hidden = !hunks.length;
+  acceptFile.textContent = all ? 'Accepted' : 'Accept file';
+  acceptFile.setAttribute('aria-pressed', String(all));
+  acceptFile.title = all ? `All of the agent's changes to ${name} are accepted. Click to take the accepts back (the changes stay either way)` : `Accept file: every change the agent made to ${name} stays and is marked accepted (nothing is committed or staged)`;
+  acceptFile.setAttribute('aria-label', all ? `${name} accepted; click to take the accepts back` : `Accept every change to ${name}`);
+  // A new or deleted file has nothing to put back line by line; Reject file needs an editable file with lines on both sides.
+  const whole = canEdit && !['A', 'D', '?'].includes(String(row.entry.status || '').charAt(0));
+  rejectFile.textContent = 'Reject file';
+  rejectFile.disabled = !whole;
+  rejectFile.title = whole ? `Reject file: take out every change the agent made to ${name} and put back what was there before` : 'Reject file is unavailable here: a new or deleted file, or one the review cannot edit (use Open in Native Diff)';
+  rejectFile.setAttribute('aria-label', `Reject every change to ${name}`);
+}
+function acceptWholeFile(row) {
+  const hunks = row.hunks || []; if (!hunks.length) return;
+  const all = hunks.every(h => reviewedHunks.has(h.key));
+  for (const h of hunks) {
+    if (reviewedHunks.has(h.key) !== all) continue;
+    const { mod } = hunkTexts(row, h.change);
+    vscode.postMessage({ type: 'hunkReview', reviewed: !all, key: h.key, path: row.entry.path, version: snapshot?.version,
+      modifiedStart: h.change.modifiedStartLineNumber, modifiedEnd: h.change.modifiedEndLineNumber, modified: mod,
+      anchor: row.modified.getLineContent(Math.max(1, Math.min(h.change.modifiedStartLineNumber || 1, row.modified.getLineCount()))) });
+  }
+}
+function rejectWholeFile(row) {
+  if (row.rejectFile.disabled || !row.hunks?.length) return;
+  if (!editing.enabled(row) || editing.held(row)) { message('This file cannot be rejected in the review right now. Use Open in Native Diff.'); return; }
+  editing.reject(row, row.original.getValue(), row.hunks[0].key);
+  message(`Rejected: the agent's changes to ${row.entry.path} were taken out.`);
 }
 function placeHunks(row) {
   const editor = row.editor?.getModifiedEditor();
@@ -567,9 +608,8 @@ function rejectHunk(row, change, key) {
   const b = change.modifiedEndLineNumber ? change.modifiedEndLineNumber : change.modifiedStartLineNumber;
   const seg = change.originalEndLineNumber ? o.slice(change.originalStartLineNumber - 1, change.originalEndLineNumber) : [];
   const next = [...m.slice(0, a), ...seg, ...m.slice(b)].join(row.modified.getEOL());
-  editing.hunkOperation(row, key);
-  replaceText(row.modified, next);
-  editing.save(row);
+  editing.reject(row, next, key);
+  message(`Rejected: the agent's change at ${change.modifiedEndLineNumber ? `lines ${change.modifiedStartLineNumber}–${change.modifiedEndLineNumber}` : `line ${change.modifiedStartLineNumber}`} of ${row.entry.path} was taken out.`);
 }
 // Theme variables arrive as hex or rgb()/rgba(); Monaco themes take hex. Without this an rgba value
 // was dropped and Monaco's own olive inserted-text color showed through (Overseer, AC-101).

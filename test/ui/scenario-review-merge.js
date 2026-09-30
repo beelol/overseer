@@ -2,7 +2,7 @@
 // and it reads merged afterwards), with generic fixture agents in a disposable repository (no paid turns).
 // 1. An agent commits a new file (data/features.js) and leaves an untracked .env, then a second
 //    turn changes nothing (the owner's "0 files" case): its review counts both files, the new one
-//    all added; Save says "Save your changes to the agent's copy"; each hunk offers Keep or Undo.
+//    all added; "Save your edits" waits until you type; each change offers Accept or Reject (AC-263).
 // 2. The repository has no remote: the chat offers Merge into main and Publish to GitHub, not
 //    Open PR; Open PR from the palette offers the local merge in the window, never a dialog.
 // 3. Merge from the chat's button: one confirmation listing the files, the .env apart; the
@@ -61,10 +61,10 @@ const { Session, makeRepo, latestVsix, delay, git } = require('./harness');
     const row = shown && shown.rows.find(r => r.path === 'data/features.js');
     check('the review counts the committed new file (never "0 files") and shows it added, every line', shown && shown.count === '2' && /^2 files/.test(shown.total) && row.status === 'A' && !row.browsed && row.added === '2' && row.removed === '0' && shown.rows.some(r => r.path === '.env' && r.status === 'A'), shown);
     const words = await review.waitFor(`(() => { const e = [...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === 'data/features.js'); const s = e && e.querySelector('.save-file'); const hunk = e && e.querySelector('.hunk-actions'); if (!s || !hunk) return null; return { save: s.textContent, saveHidden: s.hidden, saveTitle: s.title, keep: hunk.querySelector('.hunk-accept').textContent, undo: hunk.querySelector('.hunk-reject').textContent, keepTitle: hunk.querySelector('.hunk-accept').title, undoTitle: hunk.querySelector('.hunk-reject').title }; })()`, 20000).catch(() => null);
-    check('Save says what it does ("Save your changes to the agent\'s copy") and shows only once you have edits', words && words.save === "Save your changes to the agent's copy" && words.saveHidden && /does not keep or undo/.test(words.saveTitle), words);
+    check('Save says what it does ("Save your edits") and shows only once you have typed', words && words.save === 'Save your edits' && words.saveHidden && /does not accept or reject/.test(words.saveTitle), words);
     const newFile = await review.eval(`(() => { const e = [...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === 'data/features.js'); return { deleted: e.querySelectorAll('.line-delete, .inline-deleted-margin-view-zone').length, inserted: e.querySelectorAll('.line-insert').length, hunks: e.dataset.hunks, lines: [...e.querySelectorAll('.editor.modified .view-lines .view-line')].map(l => l.textContent) }; })()`);
     check('the new file is all added lines: no removed line above them, one hunk', newFile.deleted === 0 && newFile.inserted >= 2 && newFile.hunks === '1', newFile);
-    check("each hunk is a clear choice: Keep (the agent's change stays) or Undo (put back what was there)", words && words.keep === 'Keep' && words.undo === 'Undo' && /change stays/.test(words.keepTitle) && /put back/.test(words.undoTitle), words);
+    check("each change is a clear choice: Accept (the agent's change stays) or Reject (put back what was there)", words && words.keep === 'Accept' && words.undo === 'Reject' && /change stays/.test(words.keepTitle) && /put back/.test(words.undoTitle), words);
 
     // ---- 2. No remote: Merge into main and Publish to GitHub, never Open PR or a dialog.
     const land = () => chat.eval(`(() => { const b = document.getElementById('land'); return { hidden: b.hidden, state: b.dataset.state, text: document.getElementById('land-text')?.textContent, buttons: [...b.querySelectorAll('button')].map(x => x.id + ':' + x.textContent.trim()) }; })()`);
