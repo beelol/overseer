@@ -1,6 +1,6 @@
-// The agent's head (AC-233, AC-257). Opening an agent gives its whole worktree in this window: the
-// Files view ("Files in <agent>") in Overseer's side bar is its file tree, and its files open as ordinary editors on
-// their real paths (file: URIs), so they are edited, saved, searched and language-served like any
+// The agent's head (AC-233, AC-257). Opening an agent gives its whole worktree in this window: its
+// files are listed by the review's own file list ("Changed | All files", AC-264; there is no
+// separate tree view), and they open as ordinary editors on their real paths (file: URIs), so they are edited, saved, searched and language-served like any
 // file and every save lands in the agent's worktree. The window's own folder never changes (no
 // workspace folder is added; nothing opens a new window).
 //
@@ -47,8 +47,6 @@ class AgentHead {
     this.quiet = 0;
     this.annotations = new Map(); // abs path -> { added, changed, removed }
 
-    this.tree = new WorktreeTree(this);
-    this.view = vscode.window.createTreeView('overseer.worktree', { treeDataProvider: this.tree, showCollapseAll: true });
     this.decorationsEmitter = new vscode.EventEmitter();
     const color = id => new vscode.ThemeColor(id);
     this.types = {
@@ -61,10 +59,10 @@ class AgentHead {
     this.status = vscode.window.createStatusBarItem('overseer.head', vscode.StatusBarAlignment.Left, 48);
     this.status.name = 'Overseer: the agent\'s head';
     this.timers = new Map();
-    context.subscriptions.push(this.view, this.status, this.decorationsEmitter, ...Object.values(this.types),
+    context.subscriptions.push(this.status, this.decorationsEmitter, ...Object.values(this.types),
       vscode.window.registerFileDecorationProvider({ onDidChangeFileDecorations: this.decorationsEmitter.event, provideFileDecoration: uri => this.fileDecoration(uri) }),
       vscode.window.onDidChangeVisibleTextEditors(editors => { for (const e of editors) this.annotate(e); this.updateStatus(); }),
-      vscode.window.onDidChangeActiveTextEditor(e => { this.updateContext(e); this.revealInTree(e); }),
+      vscode.window.onDidChangeActiveTextEditor(e => this.updateContext(e)),
       vscode.workspace.onDidChangeTextDocument(e => this.onDocumentChange(e)),
       vscode.workspace.onDidSaveTextDocument(doc => { if (this.root && within(this.root, doc.uri.fsPath)) this.refreshSoon(); }),
       vscode.window.onDidChangeTextEditorSelection(e => this.remember(e.textEditor)),
@@ -123,7 +121,7 @@ class AgentHead {
     return ws && !ws.removed_ms ? ws.path : undefined;
   }
 
-  /** The Worktree view shows this agent's worktree (the side bar's selection; no editor opens). */
+  /** The agent the head is about: its worktree is read (the side bar's selection; no editor opens). */
   async select(runId) {
     const run = runId && this.model.run(runId);
     const root = run && (this.model.rootRun(run) || run);
@@ -132,16 +130,12 @@ class AgentHead {
     if (!ws || ws.removed_ms) {
       // Its worktree is gone: the view says so rather than showing another agent's files.
       this.runId = root.id; this.root = undefined; this.files = []; this.changed = new Map();
-      this.view.title = this.filesTitle(root); this.view.description = ''; this.view.message = 'This agent\'s worktree was removed.';
-      this.tree.rebuild();
       this.onSelect?.(root);
       return;
     }
     if (this.runId === root.id && this.root === ws.path) { this.refreshSoon(); return; }
     this.runId = root.id; this.root = ws.path; this.workspaceId = ws.id;
     this.files = []; this.changed = new Map(); this.base = undefined;
-    this.view.title = this.filesTitle(root);
-    this.view.description = '';
     this.updateContext(vscode.window.activeTextEditor);
     this.onSelect?.(root);
     this.loading = this.refresh();
@@ -172,9 +166,6 @@ class AgentHead {
     this.files = [...all].sort();
     const before = this.changed;
     this.changed = changed;
-    this.view.description = changed.size ? `${changed.size} changed` : '';
-    this.view.message = this.files.length ? undefined : 'No files in this worktree.';
-    this.tree.rebuild();
     const touched = [...new Set([...before.keys(), ...changed.keys()])];
     if (touched.length) this.decorationsEmitter.fire(touched.map(rel => vscode.Uri.file(path.join(root, rel))));
     for (const e of vscode.window.visibleTextEditors) this.annotate(e);
@@ -231,7 +222,6 @@ class AgentHead {
     if (!root || this.runId !== runId) { this.log(`head: ${runId} has no worktree to open`); return false; }
     if (viewColumn) this.column = viewColumn;
     this.openRoots.set(runId, root);
-    this.showView(true);
     const open = this.headTabs(root);
     if (open.length && !reveal) {
       // Already open: bring its active file forward where it is.
@@ -266,15 +256,12 @@ class AgentHead {
   }
 
   /** Opens a file of the agent's worktree in the head, at `line` (1-based). */
-  async openFile(runId, rel, { line, preserveFocus = false, preview = false, fromTree = false } = {}) {
+  async openFile(runId, rel, { line, preserveFocus = false, preview = false } = {}) {
     runId = runId || this.runId;
     if (runId !== this.runId) await this.select(runId);
     const root = this.root;
     if (!root || !rel || rel.startsWith('/') || rel.startsWith('..')) return;
-    // Opened from the Worktree view while only the chat is on screen: the head comes in first.
-    if (fromTree && !this.tabs(root).length && this.handlers.ensureShown) await this.handlers.ensureShown(runId);
     this.openRoots.set(runId, root);
-    this.showView(true);
     const abs = path.join(root, rel);
     if (this.changed.get(rel) === 'D' || !fs.existsSync(abs)) {
       // A file the agent removed: its last text against nothing.
@@ -356,7 +343,6 @@ class AgentHead {
       for (const t of this.tabs(root)) if (!t.tab.isDirty) closing.push(t.tab);
       this.openRoots.delete(runId);
     }
-    if (!this.openRoots.size) this.showView(false);
     if (!closing.length) return;
     this.quiet++;
     vscode.window.tabGroups.close(closing, true).then(() => {}, error => this.log('head: close: ' + error.message)).finally(() => setTimeout(() => this.quiet--, 600));
@@ -371,36 +357,9 @@ class AgentHead {
     this.closedTimer = setTimeout(() => {
       if (this.quiet || this.openRoots.get(runId) !== root || this.tabs(root).length) return;
       this.openRoots.delete(runId);
-      if (!this.openRoots.size) this.showView(false);
-      this.places.delete(runId); this.savePlaces();
+        this.places.delete(runId); this.savePlaces();
       this.review.onClosed?.(runId);
     }, 500);
-  }
-
-  /** The view's title in plain words: whose files these are (AC-264). */
-  filesTitle(root) { return `Files in ${this.model.task?.(root.task_id)?.title || root.title || 'the agent'}`; }
-
-  /** The Files view is in the side bar while an agent's files are open in Follow (not in Diffs only, whose review lists them). */
-  showView(on) {
-    if (this.viewShown === on) return;
-    this.viewShown = on;
-    if (on) this.place().catch(error => this.log('head: place: ' + error.message));
-    vscode.commands.executeCommand('setContext', 'overseer.headOpen', on);
-  }
-
-  /**
-   * AC-264: the Files view always sits in Overseer's side bar under the agents list, never over
-   * Overseer's panel on the right. VS Code keeps a view where it was last dragged (the secondary
-   * side bar, the panel), so once a session it is moved back into Overseer's view container (VS
-   * Code's own Move Views; nothing moves when it is already there). Moving opens that container, so
-   * the keyboard goes back to the editor after.
-   */
-  async place() {
-    if (this.placed) return;
-    this.placed = true;
-    const focused = vscode.window.activeTextEditor || vscode.window.tabGroups.activeTabGroup.activeTab;
-    await vscode.commands.executeCommand('vscode.moveViews', { viewIds: ['overseer.worktree'], destinationId: 'workbench.view.extension.overseer' });
-    if (focused) await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup').then(undefined, () => {});
   }
 
   // ------------------------------------------------------------ where the owner was
@@ -536,11 +495,7 @@ class AgentHead {
     vscode.commands.executeCommand('setContext', 'overseer.headMode', this.runId ? this.modeFor(this.runId) : '');
   }
 
-  revealInTree(editor) {
-    if (!editor || !this.root || !this.view.visible || editor.document.uri.scheme !== 'file' || !within(this.root, editor.document.uri.fsPath)) return;
-    const node = this.tree.node(toRel(this.root, editor.document.uri.fsPath));
-    if (node) this.view.reveal(node, { select: true, focus: false, expand: true }).then(undefined, () => {});
-  }
+
 
   updateStatus() {
     const runId = this.runId;
@@ -557,52 +512,6 @@ class AgentHead {
       this.status.command = 'overseer.head.toggleMode';
     }
     this.status.show();
-  }
-}
-
-/** The Worktree view: the agent's files as a tree (git's tracked and untracked files, not ignored ones). */
-class WorktreeTree {
-  constructor(head) {
-    this.head = head;
-    this.emitter = new vscode.EventEmitter();
-    this.onDidChangeTreeData = this.emitter.event;
-    this.nodes = new Map(); // rel -> node
-    this.children = new Map(); // dir rel ('' for the root) -> [node]
-  }
-
-  rebuild() {
-    const nodes = new Map(), children = new Map([['', []]]);
-    const add = (rel, dir) => {
-      if (nodes.has(rel)) return nodes.get(rel);
-      const parent = rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '';
-      if (parent && !nodes.has(parent)) add(parent, true);
-      const node = { rel, dir, name: rel.split('/').pop(), parent };
-      nodes.set(rel, node);
-      if (!children.has(parent)) children.set(parent, []);
-      children.get(parent).push(node);
-      if (dir) children.set(rel, children.get(rel) || []);
-      return node;
-    };
-    for (const rel of this.head.files) add(rel, false);
-    for (const list of children.values()) list.sort((a, b) => (b.dir - a.dir) || a.name.localeCompare(b.name));
-    this.nodes = nodes; this.children = children;
-    this.emitter.fire();
-  }
-
-  node(rel) { return this.nodes.get(rel); }
-  getChildren(node) { return this.children.get(node ? node.rel : '') || []; }
-  getParent(node) { return node.parent ? this.nodes.get(node.parent) : undefined; }
-
-  getTreeItem(node) {
-    const uri = vscode.Uri.file(path.join(this.head.root, node.rel));
-    const item = new vscode.TreeItem(uri, node.dir ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
-    item.id = `${this.head.runId}:${node.rel}`;
-    if (node.dir) { item.contextValue = 'head-dir'; return item; }
-    const status = this.head.changed.get(node.rel);
-    item.contextValue = status === 'D' ? 'head-removed' : 'head-file';
-    item.tooltip = `${node.rel}${status ? ` — ${{ A: 'added', D: 'removed', R: 'renamed' }[status] || 'changed'} by the agent` : ''}`;
-    item.command = { command: 'overseer.head.openFile', title: 'Open', arguments: [node.rel] };
-    return item;
   }
 }
 

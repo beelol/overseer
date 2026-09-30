@@ -150,8 +150,8 @@ async function activate(context) {
     backToAgent: runId => backToAgent(runId) });
   centerRef = center;
   const arrangement = new Arrangement({ context, center, review, model, client, outputs, log: say });
-  // The agent's head (AC-233): its worktree in this window, Follow or Diffs only. A file opened from
-  // the Worktree view while only the chat is shown brings the head in first.
+  // The agent's head (AC-233): its worktree in this window, Follow or Diffs only. Switching between
+  // them while only the chat is shown brings the head in first.
   const head = new AgentHead({ context, client, model, review, log: say, handlers: { ensureShown: runId => arrangement.openReview(runId) } });
   review.head = head;
   outputs.column = () => vscode.ViewColumn.Beside;
@@ -479,7 +479,7 @@ async function activate(context) {
     // Opening an agent at its end opens its review when it has changes (Gate K): it is reviewed (AC-254).
     if (!ACTIVE.has(picked.status)) markReviewed(model.rootRun(picked)?.id || runId);
     context.workspaceState.update('overseer.selectedRun', runId);
-    // The Worktree view shows the selected agent's worktree (AC-233).
+    // The head knows the selected agent's worktree (AC-233).
     head.select(model.rootRun(picked)?.id || runId).catch(error => say('head: ' + error.message));
     await arrangement.show(runId, { follow, force });
     say(`selected ${runId} (${arrangement.current}${keepConversation ? ', beside the conversation' : ''})`);
@@ -938,8 +938,6 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.head.toggleMode', guard(() => head.toggleMode(head.runId || selectedRun))),
     vscode.commands.registerCommand('overseer.head.follow', guard(() => head.setMode(head.runId || selectedRun, 'follow'))),
     vscode.commands.registerCommand('overseer.head.diffsOnly', guard(() => head.setMode(head.runId || selectedRun, 'diffs'))),
-    vscode.commands.registerCommand('overseer.head.openFile', guard(rel => head.openFile(head.runId, typeof rel === 'string' ? rel : rel?.rel, { fromTree: true }))),
-    vscode.commands.registerCommand('overseer.head.refresh', guard(() => head.refresh())),
     vscode.commands.registerCommand('overseer.head.catchUp', guard(() => head.catchUp())),
     vscode.commands.registerCommand('overseer.backToOverseer', guard(() => backToOverseer())),
     vscode.commands.registerCommand('overseer.backToAgent', guard(() => backToAgent())),

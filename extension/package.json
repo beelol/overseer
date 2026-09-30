@@ -48,7 +48,6 @@
       "overseer": [
         { "type": "webview", "id": "overseer.search", "name": "Search", "initialSize": 1 },
         { "id": "overseer.agents", "name": "Agents", "initialSize": 14 },
-        { "id": "overseer.worktree", "name": "Files", "initialSize": 10, "when": "overseer.headOpen" },
         { "id": "overseer.accounts", "name": "Accounts", "initialSize": 5 },
         { "id": "overseer.devices", "name": "Devices", "visibility": "collapsed", "initialSize": 3 }
       ]
@@ -146,8 +145,6 @@
       { "command": "overseer.head.toggleMode", "title": "Switch Between Follow and Diffs Only", "category": "Overseer", "icon": "$(eye)" },
       { "command": "overseer.head.follow", "title": "Follow the Agent in Its Files", "category": "Overseer", "icon": "$(eye)" },
       { "command": "overseer.head.diffsOnly", "title": "Diffs Only", "category": "Overseer", "icon": "$(diff-multiple)" },
-      { "command": "overseer.head.openFile", "title": "Open in the Agent's Worktree", "category": "Overseer" },
-      { "command": "overseer.head.refresh", "title": "Refresh the Worktree", "category": "Overseer", "icon": "$(refresh)" },
       { "command": "overseer.head.catchUp", "title": "Go to the Agent's Latest Edit", "category": "Overseer" },
       { "command": "overseer.backToOverseer", "title": "Back to Overseer's Conversation", "category": "Overseer", "icon": "$(comment-discussion)" },
       { "command": "overseer.backToAgent", "title": "Back to the Agent", "category": "Overseer", "icon": "$(eye)" },
@@ -196,10 +193,6 @@
         { "command": "overseer.showCapabilities", "when": "view == overseer.agents", "group": "4_info@1" },
         { "command": "overseer.audioMode", "when": "view == overseer.agents", "group": "5_audio@1" },
         { "command": "overseer.stopAll", "when": "view == overseer.agents", "group": "9_stop@1" },
-        { "command": "overseer.head.diffsOnly", "when": "view == overseer.worktree && overseer.headMode == follow", "group": "navigation@1" },
-        { "command": "overseer.head.follow", "when": "view == overseer.worktree && overseer.headMode == diffs", "group": "navigation@1" },
-        { "command": "overseer.backToOverseer", "when": "view == overseer.worktree", "group": "navigation@2" },
-        { "command": "overseer.head.refresh", "when": "view == overseer.worktree", "group": "navigation@3" },
         { "command": "overseer.addProfile", "when": "view == overseer.accounts", "group": "navigation@1" },
         { "command": "overseer.refreshAccounts", "when": "view == overseer.accounts", "group": "navigation@2" },
         { "command": "overseer.pairPhone", "when": "view == overseer.devices", "group": "navigation@1" },
@@ -253,7 +246,6 @@
       ],
       "commandPalette": [
         { "command": "overseer.openEdit", "when": "false" },
-        { "command": "overseer.head.openFile", "when": "false" },
         { "command": "overseer.head.catchUp", "when": "false" },
         { "command": "overseer.startSwarm", "when": "config.overseer.experimental.swarm" },
         { "command": "overseer.filterSwarmJobs", "when": "config.overseer.experimental.swarm" },

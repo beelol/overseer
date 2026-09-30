@@ -5,11 +5,13 @@
 //   conversation, which keeps its tab. ⌥⌘U goes to the conversation leaving the head as it was; the
 //   conversation's "Back to" chip returns to the head exactly where it was left; the same from an
 //   agent opened in the side bar, whose chat the Overseer tab shows again on the way back.
-//   AC-233: the Worktree view lists the agent's worktree; Follow opens the file the agent edits at
+//   AC-233: Follow opens the file the agent edits at
 //   the changed line with inline annotations (tint and gutter bar, "was:" on changed lines, a marker
 //   for removed lines); screenshots in the three themes; an edit typed and saved in the head lands
 //   in the agent's worktree (not the window's folder); the toggle switches to Diffs only (the
 //   review) and back to the same file and line; the window's folder and window count never change.
+//   AC-264: there is no separate tree view of the agent's files: the review's file list is a
+//   "Changed | All files" switch, and All files lists the whole worktree (the changed file marked).
 const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay, repoRoot, git } = require('./harness');
@@ -72,16 +74,6 @@ const THEMES = ['Overseer Dark', 'Overseer Light', 'Overseer'];
       for (let t = 0; t < ms; t += 250) { const g = await headGroup(file); if (g && extra(g)) return g; await delay(250); }
       return headGroup(file);
     };
-    const worktreeRows = () => cdp.evalWorkbench(`(() => {
-      const pane = [...document.querySelectorAll('.pane')].find(p => /^Files in /i.test(p.querySelector('.pane-header .title')?.textContent.trim() || ''));
-      if (!pane) return null;
-      return { title: pane.querySelector('.pane-header .title')?.textContent.trim() || '', inSideBar: !!pane.closest('.part.sidebar'), description: pane.querySelector('.pane-header .description')?.textContent || '', rows: [...pane.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).map(r => {
-        const label = r.querySelector('.monaco-icon-label');
-        const badge = label ? getComputedStyle(label, '::after').content.replace(/^"|"$/g, '') : '';
-        return { name: r.querySelector('.label-name')?.textContent || '', badge: badge === 'none' ? '' : badge, selected: r.classList.contains('selected'),
-          color: getComputedStyle(r.querySelector('.label-name') || r).color, title: [label?.title, label?.getAttribute('aria-label'), r.getAttribute('aria-label')].filter(Boolean).join(' | ') };
-      }) };
-    })()`);
 
     // Overseer's conversation, with some history: a question and Overseer's answer.
     await cdp.command('Overseer: Open Overseer View'); await delay(2000);
@@ -108,9 +100,8 @@ const THEMES = ['Overseer Dark', 'Overseer Light', 'Overseer'];
     check('AC-257: opening the agent from its card in the conversation opens its head (a file of its worktree) beside the conversation, which keeps its tab and its history',
       !!head && g1.length === 2 && g1.some(g => /^Overseer/.test(g.tab)) && conv1.mode === 'composer' && conv1.visible && JSON.stringify(conv1.items) === JSON.stringify(conv0.items), { groups: g1, conv1 });
     await s.openOverseerView();
-    const rows = await worktreeRows();
-    check('AC-233, AC-264: the Files view, in the side bar under the agents, shows the agent\'s worktree (its title: "Files in <agent>")',
-      !!rows && /^Files in Head agent/i.test(rows.title) && rows.inSideBar && ['a.txt', 'b.txt', 'README.md'].every(n => rows.rows.some(r => r.name === n)), rows);
+    const panes = await cdp.evalWorkbench(`[...document.querySelectorAll('.part.sidebar .pane-header, .part.auxiliarybar .pane-header, .part.panel .pane-header')].filter(h => h.offsetParent).map(h => h.querySelector('.title')?.textContent.trim() || '')`);
+    check('AC-264: no separate tree view of the agent\'s files anywhere (the side bar is the agents and Accounts)', !panes.some(t => /^(Worktree|Files)/i.test(t)), panes);
     await s.screenshot('opened-from-conversation');
 
     // ---- AC-233: Follow goes to the file the agent edits, at the line, annotated.
@@ -119,17 +110,6 @@ const THEMES = ['Overseer Dark', 'Overseer Light', 'Overseer'];
     const c1 = await cursor();
     check('AC-233: Follow opens the file the agent is editing (a.txt) at the changed line, the line tinted and saying what it was',
       !!head && head.first <= 40 && head.last >= 40 && head.tinted >= 1 && head.after.some(a => /^was: L40: original/.test(a)) && c1?.line === 40, { head, cursor: c1 });
-    // The tree catches up with the agent's edit within a moment (it refreshes on the agent's events).
-    let rows1;
-    for (let t = 0; t < 8000; t += 250) {
-      rows1 = await worktreeRows();
-      const plain = rows1?.rows.find(r => r.name === 'c.txt')?.color;
-      if (rows1?.rows.some(r => r.name === 'a.txt' && (/M/.test(r.badge) || r.color !== plain))) break;
-      await delay(250);
-    }
-    // Marked: git's or Overseer's "M", or the changed colour (Overseer leaves the letter to git when git knows the worktree).
-    const plainColor = rows1?.rows.find(r => r.name === 'c.txt')?.color;
-    check('AC-233: the changed file is marked in the Worktree view', rows1?.rows.some(r => r.name === 'a.txt' && (/M/.test(r.badge) || r.color !== plainColor)), rows1?.rows.filter(r => /txt|md/.test(r.name)));
     for (const [i, theme] of THEMES.entries()) {
       if (i) await setTheme(theme);
       await s.screenshot(`follow-${theme.toLowerCase().replace(/\s+/g, '-')}`);
@@ -165,6 +145,18 @@ const THEMES = ['Overseer Dark', 'Overseer Light', 'Overseer'];
     check('AC-233: the toggle switches to Diffs only: the review of what changed takes the head\'s place and the files close',
       g3.some(g => /^Review/.test(g.tab)) && !g3.some(g => /^(a|b)\.txt/.test(g.title)), g3);
     await s.screenshot('diffs-only');
+    // AC-264: the review's file list is the switch "Changed | All files"; All files lists the whole worktree.
+    const list = () => review.eval(`({ on: [...document.querySelectorAll('#changes-only .seg.on')].map(x => x.textContent), segs: [...document.querySelectorAll('#changes-only .seg')].map(x => x.textContent),
+      files: [...document.querySelectorAll('#tree .file')].map(f => ({ name: f.querySelector('.file-name')?.textContent, changed: f.classList.contains('changed') })) })`);
+    const changedList = await list();
+    await review.eval(`document.getElementById('changes-only').click()`);
+    await review.waitFor(`[...document.querySelectorAll('#tree .file')].some(f => f.querySelector('.file-name')?.textContent === 'c.txt')`, 10000).catch(() => {});
+    const allList = await list();
+    await s.screenshot('review-all-files');
+    check('AC-264: the review\'s file list is a two-way switch "Changed | All files": Changed lists the changed files, All files the whole worktree with the changed files marked',
+      JSON.stringify(changedList.segs) === '["Changed","All files"]' && changedList.on[0] === 'Changed' && !changedList.files.some(f => f.name === 'c.txt') && changedList.files.some(f => f.name === 'a.txt') &&
+      allList.on[0] === 'All files' && ['a.txt', 'b.txt', 'c.txt', 'README.md'].every(n => allList.files.some(f => f.name === n)) && allList.files.find(f => f.name === 'a.txt')?.changed && !allList.files.find(f => f.name === 'c.txt')?.changed, { changedList, allList });
+    await review.eval(`document.getElementById('changes-only').click()`); await delay(400);
     const back = await s.webviewPoint(review, '#head-follow');
     await cdp.click(back.x, back.y);
     const again = await waitHead('a.txt', () => true, 20000);

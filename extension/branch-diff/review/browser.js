@@ -173,8 +173,10 @@ function listDir(dirPath) {
 function renderTree() {
   const only = changesOnly();
   changesOnlyButton.setAttribute('aria-pressed', String(only));
-  changesOnlyButton.title = only ? 'Changes only: showing changed files. Click to browse every file in the worktree.' : 'All files: showing the whole worktree. Click to show only changed files.';
-  changesOnlyButton.setAttribute('aria-label', only ? 'Changes only' : 'All files');
+  // AC-264: a two-way switch at the top of the list, "Changed | All files"; a click flips it.
+  changesOnlyButton.title = only ? 'Showing the changed files. Click for all the files in the agent\'s worktree.' : 'Showing all the files in the agent\'s worktree. Click for the changed files only.';
+  changesOnlyButton.setAttribute('aria-label', only ? 'Changed files (click for all files)' : 'All files (click for changed files)');
+  for (const seg of changesOnlyButton.querySelectorAll('.seg')) seg.classList.toggle('on', (seg.dataset.mode === 'changes') === only);
   document.body.dataset.nav = only ? 'changes' : 'all';
   const fragment = document.createDocumentFragment();
   if (only) populateChanges(fragment); else populateAll('', fragment);

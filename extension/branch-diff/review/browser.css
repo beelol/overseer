@@ -126,10 +126,12 @@ button.open-native { min-width: 26px; }
 .file-header .file-path { flex: 0 1 auto; }
 /* Overseer (AC-99): the navigator covers the whole worktree. Changes only / All files toggle,
    counts beside changed files, folders holding changes marked, unchanged files opened as plain text. */
-#nav-head { display: flex; align-items: center; gap: 4px; margin: 0 4px 10px; }
-#nav-head #filter { flex: 1; min-width: 0; width: auto; margin: 0; }
-#changes-only { flex: none; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border-radius: 3px; background: transparent; border: 1px solid transparent; color: var(--vscode-icon-foreground); }
-#changes-only[aria-pressed="true"] { background: var(--vscode-inputOption-activeBackground, var(--vscode-list-inactiveSelectionBackground)); border-color: var(--vscode-inputOption-activeBorder, transparent); color: var(--vscode-inputOption-activeForeground, var(--vscode-foreground)); }
+#nav-head { display: flex; flex-direction: column; align-items: stretch; gap: 6px; margin: 0 4px 10px; }
+#nav-head #filter { min-width: 0; width: auto; margin: 0; }
+/* AC-264: "Changed | All files", a two-way switch at the top of the file list. */
+#changes-only { display: flex; align-items: stretch; width: 100%; height: 28px; padding: 2px; gap: 2px; border-radius: 3px; background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); color: var(--vscode-foreground); }
+#changes-only .seg { flex: 1; display: flex; align-items: center; justify-content: center; border-radius: 2px; font-size: 12px; white-space: nowrap; color: var(--vscode-descriptionForeground); }
+#changes-only .seg.on { background: var(--vscode-inputOption-activeBackground, var(--vscode-list-inactiveSelectionBackground)); color: var(--vscode-inputOption-activeForeground, var(--vscode-foreground)); }
 .file .counts { display: flex; gap: 4px; margin-left: auto; font-size: 11px; font-variant-numeric: tabular-nums; }
 .file .counts:empty { display: none; }
 .file .counts + .status { margin-left: 0; }
@@ -170,8 +172,9 @@ button.base { height: 28px; padding: 0 var(--ov-space-2); color: var(--ov-text);
 #resize:hover, #resize:focus { background: var(--ov-accent-soft); }
 #filter { height: 28px; padding: 0 var(--ov-space-2); background: var(--ov-input-bg); color: var(--ov-input-fg); border: 1px solid var(--ov-border); border-radius: var(--ov-radius-control); font-size: var(--ov-font-sm); }
 #filter:focus { outline: 0; border-color: var(--ov-focus); }
-#changes-only { width: 28px; height: 28px; border-radius: var(--ov-radius-control); color: var(--ov-icon); }
-#changes-only[aria-pressed="true"] { background: var(--ov-accent-soft); color: var(--ov-accent); border-color: transparent; }
+#changes-only { height: 28px; border-radius: var(--ov-radius-control); background: var(--ov-input-bg); border-color: var(--ov-border); }
+#changes-only .seg { border-radius: calc(var(--ov-radius-control) - 2px); font-size: var(--ov-font-sm); color: var(--ov-muted); }
+#changes-only .seg.on { background: var(--ov-accent-soft); color: var(--ov-accent); font-weight: var(--ov-weight-semibold); }
 .folder summary, .file { min-height: 26px; padding: 3px var(--ov-space-2); border-radius: var(--ov-radius-control); font-size: var(--ov-font-md); color: var(--ov-text); transition: background-color var(--ov-motion-fast) var(--ov-ease); }
 .folder summary:hover, .file:hover { background: var(--ov-hover); }
 .file.active { background: var(--ov-selected-strong); color: var(--ov-selected-fg); }
