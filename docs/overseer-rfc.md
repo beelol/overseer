@@ -539,7 +539,7 @@ From the friction research of 2026-09-28 ([report](audits/2026-09-28-friction-re
 
 From the owner, 2026-09-29:
 
-- [ ] **AC-262 — Overseer in the Mac's menu bar.** A menu-bar item with the Overseer silhouette (`docs/design/brand/overseer-icon-flat.png` as a template image, AC-179) runs while the daemon does, with or without VS Code.
+- [x] **AC-262 — Overseer in the Mac's menu bar.** A menu-bar item with the Overseer silhouette (`docs/design/brand/overseer-icon-flat.png` as a template image, AC-179) runs while the daemon does, with or without VS Code.
   - The icon carries a dot (Overseer's violet) while an agent needs the owner.
   - Its menu shows, in order:
     - the Needs-you requests, newest first, at most four, then "N more waiting · Show all in Overseer…"; each answerable there: Allow once, whose arrow holds Always allow (the harness's own session rule), and Deny;
