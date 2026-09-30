@@ -324,9 +324,12 @@ and Verify clauses. Both lists are generated from the records by
   staged/unstaged/untracked/unsaved work recorded and preserved. Single writer per checkout;
   cleanup reports dirty files and active runs and never removes the current checkout.
 - **Review** — Branch Diff's editable Monaco review opened on the selected run's worktree.
-  Default comparison is **Latest run** (a snapshot taken at the start of every turn,
-  including dirty and untracked files, without touching your index/stash); also since
-  earlier turns, **Since task start**, **Original fork**, and any branch (merge-base or tip).
+  A finished agent's review opens on **Since task start**; **Latest run** (a snapshot taken
+  at the start of every turn, including dirty and untracked files, without touching your
+  index/stash; the default while the agent works) and **Entire worktree** (its branch against
+  the commit it started from) are one click each in the review's header, which names the one
+  shown; **More…** has earlier turns, **Original fork** and any branch (merge-base or tip).
+  In your own checkout the header says the changes include any edits made in that folder.
   A separate **Workspace Dirty** view always shows staged, unstaged, untracked, conflicted
   and unsaved work. **Follow** jumps to agent-reported edits across and within files and
   pauses when you scroll or select a file until you press **Resume**. Each hunk has
