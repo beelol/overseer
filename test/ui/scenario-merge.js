@@ -59,13 +59,12 @@ const MODEL = process.env.CODEX_MODEL || 'gpt-5.6-luna';
     // --- Clean merge back through the run panel.
     await selectRun('merge clean');
     await clickMerge(clean.run.id);
-    const prepText = await dialog('Prepare Merge Back');
-    const completeText = await dialog('Complete Merge Back', 60000);
-    const reviewLanding = await cdp.webview(`document.getElementById('base-label')?.textContent.includes('Merge-base with main') && document.getElementById('workspace-note').textContent.includes(${JSON.stringify(clean.workspace.path)})`, 20000).then(() => true, () => false);
-    await toast('/Merged overseer\\/merge-clean into main/');
-    check('clean merge back: explained, prepared, reviewed (merge-base with main), then merged on confirmation',
-      /Commit 1 uncommitted worktree file/.test(prepText) && /exactly what lands on main/.test(completeText) && reviewLanding && /feature from agent/.test(fs.readFileSync(path.join(repo, 'b.txt'), 'utf8')) && /Overseer merge back/.test(git(repo, 'log', '-1', '--format=%s')) && git(repo, 'status', '--porcelain') === '',
-      { prepText, completeText, reviewLanding, log: git(repo, 'log', '--oneline', '-4') });
+    // AC-243: one confirmation that lists the files that land, then the merge.
+    const confirmText = await dialog('Merge into main');
+    await toast('/Merged into main/');
+    check('clean merge: one confirmation listing the files, then merged',
+      /b\.txt/.test(confirmText) && /feature from agent/.test(fs.readFileSync(path.join(repo, 'b.txt'), 'utf8')) && /Overseer merge back/.test(git(repo, 'log', '-1', '--format=%s')) && git(repo, 'status', '--porcelain') === '',
+      { confirmText, log: git(repo, 'log', '--oneline', '-4') });
     await s.screenshot('clean-merged');
     await clearToasts();
 
@@ -73,18 +72,18 @@ const MODEL = process.env.CODEX_MODEL || 'gpt-5.6-luna';
     await selectRun('merge conflict');
     const turnsBefore = s.ctl('run.turns', { run_id: conflict.run.id }).length;
     await clickMerge(conflict.run.id);
-    await dialog('Prepare Merge Back');
-    const conflictToast = await toast('/conflicts in a\\.txt/');
+    await dialog('Merge into main');
+    const conflictToast = await (await panel(conflict.run.id)).waitFor(`/combine them/.test(document.getElementById('notice').textContent) && document.getElementById('notice').textContent`, 60000).catch(() => null);
     const main1 = git(repo, 'rev-parse', 'main');
     for (let i = 0; i < 20 && s.ctl('run.turns', { run_id: conflict.run.id }).length === turnsBefore; i++) await delay(500);
     const resolved = await waitDone(conflict.run.id);
     const turns = s.ctl('run.turns', { run_id: conflict.run.id });
     check('conflicts are handed to the same run/session as a follow-up and main is untouched meanwhile',
-      /Sent to codex as a follow-up/.test(conflictToast || '') && turns.length === turnsBefore + 1 && resolved.status === 'completed' && git(repo, 'rev-parse', 'main') === main1,
+      /asked to combine them/.test(conflictToast || '') && turns.length === turnsBefore + 1 && resolved.status === 'completed' && git(repo, 'rev-parse', 'main') === main1,
       { conflictToast, turns: turns.map(t => ({ n: t.n, status: t.status, prompt: t.prompt.slice(0, 80) })), native: resolved.native_id });
     await clearToasts();
     await clickMerge(conflict.run.id);
-    const landingText = await dialog('Complete Merge Back', 60000);
+    const landingText = await dialog('Merge into main', 60000);
     const l5 = fs.readFileSync(path.join(repo, 'a.txt'), 'utf8').split('\n')[4];
     const markers = /^(<<<<<<<|=======|>>>>>>>)/m.test(fs.readFileSync(path.join(repo, 'a.txt'), 'utf8'));
     check('resolved merge reviewed then completed: no conflict markers land on main', /a\.txt/.test(landingText) && !markers && /Overseer merge back/.test(git(repo, 'log', '-1', '--format=%s')), { l5, markers, landingText: landingText.slice(0, 300) });
@@ -98,9 +97,8 @@ const MODEL = process.env.CODEX_MODEL || 'gpt-5.6-luna';
     const before = fingerprint(repo);
     await selectRun('merge dirty target');
     await clickMerge(dirty.run.id);
-    const dirtyPrep = await dialog('Prepare Merge Back');
-    const blocked = await toast('/ready but blocked/');
-    check('dirty target checkout: refused with an explanation, checkout untouched', /uncommitted changes/.test(dirtyPrep) && /never disturbs/.test(blocked || '') && fingerprint(repo) === before, { blocked, dirtyPrep: dirtyPrep.slice(0, 300) });
+    const blocked = await dialog('OK');
+    check('dirty target checkout: refused with an explanation, checkout untouched', /Cannot merge into main yet/.test(blocked) && /never disturbs/.test(blocked || '') && fingerprint(repo) === before, { blocked });
     await clearToasts();
     fs.writeFileSync(path.join(repo, 'README.md'), fs.readFileSync(path.join(repo, 'README.md'), 'utf8').replace('user work in progress\n', ''));
 

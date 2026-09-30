@@ -40,6 +40,8 @@ const ACCOUNTS = NINE.profiles.map((profile) => ({
   harness_family: profile.harness,
   harnesses: profile.harness === 'codex' ? ['codex', 'codex-app'] : [profile.harness],
   kind: profile.is_system ? 'follows-app' : 'fixed',
+  // How the daemon names the account (AC-235, synthetic): the work account's plan and shortened email.
+  ...(profile.id === WORK ? { account: { provider: 'Claude', plan: 'Max', email: 'wor…@acme.example', default: false, name: profile.name, label: `Claude Max · wor…@acme.example · ${profile.name}`, short: 'Claude Max · wor…@acme.example' } } : {}),
 }));
 
 /** Who is signed in on the Mac: the work account and Codex; Claude's own login is not. */
@@ -78,7 +80,7 @@ describe('the New agent form', () => {
     expect(valueOf('new.repo')).toBe('Repository, shop, main');
     expect(valueOf('new.agent')).toBe('Agent, Claude Code');
     // Claude's own login is signed out on the Mac: the signed-in account comes first.
-    expect(valueOf('new.account')).toBe('Account, Work account, signed in · max');
+    expect(valueOf('new.account')).toBe('Account, Work account, signed in · Max · wor…@acme.example');
     expect(valueOf('new.model')).toBe('Model, Default');
     expect(valueOf('new.effort')).toBe('Effort, Default');
     expect(valueOf('new.mode')).toBe('Permissions, Default');
@@ -106,15 +108,15 @@ describe('the New agent form', () => {
 
     await fireEvent.press(screen.getByTestId('new.account'));
     const accounts = screen.getAllByTestId(/^new\.account\.(system-|p-)/).map((node) => String(node.props.accessibilityLabel));
-    expect(accounts).toEqual(['Work account, signed in · max', 'claude (existing login), not signed in']);
+    expect(accounts).toEqual(['Work account, signed in · Max · wor…@acme.example', "Mac's default login, not signed in"]);
   });
 
   test('a signed-out account says so and offers Sign in', async () => {
     const app = await open();
     await fireEvent.press(screen.getByTestId('new.account'));
     await fireEvent.press(screen.getByTestId('new.account.system-claude'));
-    expect(valueOf('new.account')).toBe('Account, claude (existing login), not signed in');
-    expect(screen.getByTestId('new.account.signin').props.accessibilityLabel).toBe('Sign in, claude (existing login) is not signed in.');
+    expect(valueOf('new.account')).toBe("Account, Mac's default login, not signed in");
+    expect(screen.getByTestId('new.account.signin').props.accessibilityLabel).toBe("Sign in, Mac's default login is not signed in.");
 
     await fireEvent.changeText(screen.getByTestId('new.task'), 'Fix the login page');
     await fireEvent.press(screen.getByTestId('new.start'));
@@ -204,7 +206,7 @@ describe('the New agent form', () => {
     const first = await open();
     await fireEvent.press(screen.getByTestId('new.agent'));
     await fireEvent.press(screen.getByTestId('new.agent.codex'));
-    expect(valueOf('new.account')).toBe('Account, codex (existing login), signed in');
+    expect(valueOf('new.account')).toBe("Account, Mac's default login, signed in");
     await fireEvent.press(screen.getByTestId('new.mode'));
     await fireEvent.press(screen.getByTestId('new.mode.read-only'));
     await fireEvent.press(screen.getByTestId('new.where'));
@@ -219,7 +221,7 @@ describe('the New agent form', () => {
     // The next launch: another app, the same storage.
     await open({}, (app) => last && kept(app).set('last', last));
     expect(valueOf('new.agent')).toBe('Agent, Codex');
-    expect(valueOf('new.account')).toBe('Account, codex (existing login), signed in');
+    expect(valueOf('new.account')).toBe("Account, Mac's default login, signed in");
     expect(valueOf('new.mode')).toBe('Permissions, Read only');
     expect(valueOf('new.where')).toBe('Workspace, Current checkout');
     expect(screen.getByTestId('new.task').props.value).toBe('');
@@ -338,7 +340,7 @@ describe('while the Mac is away', () => {
 
   test('the form opens on what the Mac said the last time', async () => {
     const first = await open();
-    await waitFor(() => expect(valueOf('new.account')).toBe('Account, Work account, signed in · max'));
+    await waitFor(() => expect(valueOf('new.account')).toBe('Account, Work account, signed in · Max · wor…@acme.example'));
     const offered = first.platform.fakes.keyValue.items.get('new.offered');
     screen.unmount();
 
@@ -349,7 +351,7 @@ describe('while the Mac is away', () => {
     await fireEvent.press(screen.getByTestId('new.agent'));
     expect(screen.getByTestId('new.agent.codex')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('new.agent.claude'));
-    expect(valueOf('new.account')).toBe('Account, Work account, signed in · max');
+    expect(valueOf('new.account')).toBe('Account, Work account, signed in · Max · wor…@acme.example');
     expect(app.connection.asked).toEqual([]);
   });
 
@@ -361,7 +363,7 @@ describe('while the Mac is away', () => {
     expect(app.connection.calls('task.create')).toEqual([]);
     expect(valueOf('new.repo')).toBe('Repository, shop');
     expect(valueOf('new.agent')).toBe('Agent, Claude Code');
-    expect(valueOf('new.account')).toBe('Account, claude (existing login)');
+    expect(valueOf('new.account')).toBe("Account, Mac's default login");
     expect(valueOf('new.mode')).toBe('Permissions, Default');
     await fireEvent.press(screen.getByTestId('new.repo'));
     expect(screen.getByTestId('new.repo.billing-service')).toBeTruthy();

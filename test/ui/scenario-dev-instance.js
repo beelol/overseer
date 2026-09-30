@@ -74,7 +74,7 @@ function call(socket, method, params = {}) {
     await cdp.command('Overseer: Merge Back…');
     const dialog = await cdp.waitFor(`(() => { const d = document.querySelector('.monaco-dialog-box'); return d && d.offsetParent !== null ? d.innerText : null; })()`, 20000, 'the Merge Back dialog in the page').catch(() => null);
     await s.screenshot('merge-back-dialog-in-window');
-    check("Merge Back's modal confirmation appears in the window's DOM", /Merge back/.test(dialog || ''), dialog);
+    check("Merge Back's modal confirmation appears in the window's DOM", /Merge into main/.test(dialog || ''), dialog);
     await cdp.key('Escape');
     const closed = await cdp.waitFor(`!document.querySelector('.monaco-dialog-box')`, 10000).then(() => true, () => false);
     check('Escape cancels it; nothing was merged', closed && !fs.existsSync(path.join(repoA, 'merged.txt')), { closed });

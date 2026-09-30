@@ -179,7 +179,10 @@
       tile.status.replaceChildren(ui.status(run.status, run.attention?.kind));
       tile.title.textContent = run.title; tile.title.title = `Open ${run.title}`;
       const p = run.profile_id && state.profiles.find(x => x.id === run.profile_id);
-      tile.who.replaceChildren(ui.harnessMark(run.harness, 12)); tile.who.title = [ui.HARNESS[run.harness] || run.harness, p?.name, run.model].filter(Boolean).join(' · ');
+      // The account it runs on (AC-235): provider and plan, the shortened email.
+      const acct = p ? (p.account && p.account.short) || p.name : '';
+      tile.who.replaceChildren(ui.harnessMark(run.harness, 12), ...(acct ? [el('span', 'tile-account', acct)] : []));
+      tile.who.title = [ui.HARNESS[run.harness] || run.harness, p ? (p.account && p.account.label) || p.name : '', run.model].filter(Boolean).join(' · ');
       const pinned = (state.pinned || []).includes(run.id);
       tile.pin.setAttribute('aria-pressed', String(pinned)); tile.pin.title = pinned ? 'Unpin' : 'Pin to grid'; tile.pin.setAttribute('aria-label', tile.pin.title);
       tile.el.classList.toggle('needs', run.status === 'waiting_for_user');
@@ -189,6 +192,11 @@
       if (!tile.marks) { tile.marks = el('span', 'tile-marks'); tile.who.after(tile.marks); }
       tile.marks.replaceChildren(...marks.map(([icon, text]) => { const s = el('span', 'tile-mark'); s.append(ui.icon(icon, 'xs'), el('span', null, text)); return s; }));
       tile.el.classList.toggle('held', !!o.held); tile.el.classList.toggle('watched', !!o.watched); tile.el.classList.toggle('conflict', !!o.conflicts);
+      // AC-243: what a finished agent's work became: "Merged into main (1a2b3c4)".
+      const landed = !ACTIVE.has(run.status) && window.OverseerLanding ? window.OverseerLanding.text((state.landings || {})[run.workspace_id]) : '';
+      if (!tile.landed) { tile.landed = el('span', 'tile-landed'); tile.marks.after(tile.landed); }
+      tile.landed.hidden = !landed; tile.landed.textContent = landed; tile.landed.title = landed;
+      tile.el.classList.toggle('merged', /^Merged/.test(landed));
       const att = run.attention && run.attention.kind === 'permission' ? run.attention : undefined;
       tile.perm.hidden = !att;
       if (att) {

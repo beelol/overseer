@@ -191,7 +191,8 @@ export const TEXT = {
     currentCheckout: from(CHAT, 'current checkout'),
     currentCheckoutTitle: from(CHAT, 'Current checkout'),
     whenItFinishes: from(CHAT, 'Message for when it finishes'),
-    mergeBack: from(CHAT, 'Merge back…'),
+    // AC-243: the chat's menu names the branch the work lands on.
+    mergeBack: shaped(CHAT, "`Merge into ${land.target || 'main'}…`", (target = 'main') => `Merge into ${target}…`),
     openPullRequest: from(CHAT, 'Open pull request…'),
     rawOutput: from(CHAT, 'Raw output'),
     details: from(CHAT, 'Details'),

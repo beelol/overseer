@@ -20,7 +20,8 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .composer .chips .chip { flex: 0 1 auto; }
 .generic-fields { display: flex; gap: var(--ov-space-2); }
 .generic-fields input { flex: 1; min-width: 0; height: 28px; padding: 0 var(--ov-space-2); }
-.composer-foot { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; color: var(--ov-muted); font-size: var(--ov-font-sm); }
+.composer-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--ov-space-3); padding: 0 4px; color: var(--ov-muted); font-size: var(--ov-font-sm); }
+.composer-foot .composer-account { flex: 1; min-width: 0; text-align: center; }
 .composer-note { display: flex; align-items: center; gap: 6px; }
 .composer-note .fix { margin-left: 4px; }
 /* AC-259: the moment a task is sent, the note says so beside the cleared field. */
@@ -70,7 +71,8 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .tile-status { display: inline-flex; }
 .tile-title { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--ov-weight-medium); padding: 0; }
 .tile-title:hover { color: var(--ov-link); }
-.tile-who { display: inline-flex; color: var(--ov-muted); }
+.tile-who { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 55%; color: var(--ov-muted); }
+.tile-account { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-size: var(--ov-font-xs); }
 .tile-pin[aria-pressed="false"] { opacity: 0; }
 .tile:hover .tile-pin, .tile:focus-within .tile-pin, .tile-pin[aria-pressed="true"] { opacity: 1; }
 .tile-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 10px 12px; font-size: var(--ov-font-sm); }
@@ -100,6 +102,7 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .home-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: var(--ov-space-2); padding: var(--ov-space-1) 0; background: var(--ov-bg); color: var(--ov-muted); font-size: var(--ov-font-sm); }
 .home-title { font-weight: var(--ov-weight-semibold); color: var(--ov-text); }
 .home-level { padding: 0 6px; border: 1px solid var(--ov-border); border-radius: 999px; }
+.home-account { color: var(--ov-muted); font-size: var(--ov-font-xs); max-width: 40%; }
 .home-list { display: flex; flex-direction: column; gap: var(--ov-space-2); max-height: 45vh; overflow: auto; padding: var(--ov-space-1); }
 .home-msg { padding: var(--ov-space-2) var(--ov-space-3); border-radius: var(--ov-radius-card); background: var(--ov-raised); }
 .home-msg.from-owner { align-self: flex-end; max-width: 80%; background: var(--ov-accent-soft); }
@@ -114,6 +117,8 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .composer-view { display: flex; flex-direction: column; }
 .tile-marks { display: inline-flex; gap: 6px; margin-left: 6px; font-size: var(--ov-font-xs); color: var(--ov-muted); }
 .tile-mark { display: inline-flex; align-items: center; gap: 2px; }
+.tile-landed { margin-left: 6px; font-size: var(--ov-font-xs); color: var(--ov-done); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.tile-landed[hidden] { display: none; }
 .tile.held .tile-head { border-left: 3px solid var(--ov-accent); }
 .tile.conflict .tile-marks .codicon-warning { color: var(--ov-accent); }
 .composer-view .composer.big { position: relative; }
@@ -220,6 +225,8 @@ body[data-conversation="1"] .home-stage .voice-mark { width: min(220px, 50vw, 22
 .composer-hint[hidden], body[data-conversation="1"] .composer-hint { display: none; }
 .composer-hero > .composer-choices .chip[data-chip="target"] { flex: 0 1 auto; }
 .composer-hero > .composer-choices .chip[data-chip="target"] .chip-label { flex: 0 1 auto; }
+/* The agent choice names the account it runs on (AC-235): room for the plan and the email. */
+.composer-hero > .composer-choices .chip[data-chip="agent"] { flex-grow: 2.2; }
 
 /* AC-255: the rollup by state in the grid's header (the side bar shows the same counts). */
 .grid-rollup { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap; color: var(--ov-muted); font-size: var(--ov-font-sm); font-variant-numeric: tabular-nums; }

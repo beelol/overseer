@@ -1,5 +1,12 @@
 # AC-146: merges
 
+## Pull requests #36 and #35 (the account every agent runs on; merge from the agent, and the review says what it shows), 2026-09-29
+
+- **Finished:** both marked ready by their agents. #36 (head `27a4564f`): AC-235 verified; the owner accepted (2026-09-29) that a long agent title can cut off the side bar row's account text (the hover and the accessible name keep it). #35 (head `994f78bf`): AC-232 and AC-243 verified; its question about the review's default in the owner's checkout became AC-263 (the owner chose Since task start everywhere).
+- **Throwaway copy:** current main, #36 (merged cleanly) and #35 in one copy. #35 conflicted with #36 in `extension/src/command-center.js` (the view's state now carries both Overseer's account and the landings) and `extension/src/views.js` (an agent's row reads what its work became, then the time, then its account). The generated protocol files were already current.
+- **Tests:** `scripts/test-all --jobs=3` under the machine lock: 76 of 80. UI audit, review and continuity (twice) passed alone. The Rust step stopped at `overseer`'s ac189, so the whole workspace was then run with `--no-fail-fast`: 1,382 passed, 3 failed (ac189, and protocol's two OpenCode Auto tests), and all three passed alone at load 8 (ac189 waits on fixed sleeps; its fix to wait for events is queued).
+- **Merged:** squash, #36 `7be5f462`, then #35 `0fad2bee` after main was merged into its branch with the same resolutions (the code identical to the tested copy).
+
 ## Pull requests #31, #33 and #34 (views polish; the layout command and pop-out; the agent's head), 2026-09-29
 
 - **Finished:** all three marked ready by their agents. #31 (head `eb5d1c6a`): AC-217, 236, 245, 247, 254, 255 and 256 verified, AC-246 partial; it changes Needs you to mean "waiting for your answer" and adds a separate "to review" mark (AC-254), which changes AC-61's meaning (told to the owner). #33 (head `7b6af3bf`): AC-250, 251 and 258 verified, AC-244 partial (a dashboard in a window without a workspace file still writes user settings: the owner's call). #34 (head `7b4a6829`): AC-233 and AC-257 verified.

@@ -31,12 +31,20 @@ const { Session, makeRepo, latestVsix, delay, git, repoRoot } = require('./harne
     await s.selectAgent('PR demo change', { settle: 2000 });
     const panel = await cdp.webview(`(document.body.dataset.runId === ${JSON.stringify(t.run.id)} || window.__overseer?.selected?.() === ${JSON.stringify(t.run.id)}) && !!document.getElementById('more')`, 30000);
     // Open pull request lives in the chat's … menu.
+    // The menu offers Open pull request only with a GitHub remote (AC-232); opening it checks the remote again.
+    const menuItems = async () => {
+      if (!(await panel.eval(`!!document.getElementById('merge')`))) { const m = await s.webviewPoint(panel, '#more'); await cdp.click(m.x, m.y); await delay(300); }
+      return panel.eval(`[...document.querySelectorAll('.menu .menu-item')].map(b => b.id).filter(Boolean)`);
+    };
+    const closeMenu = async () => { if (await panel.eval(`!!document.getElementById('merge')`)) { await panel.eval(`document.getElementById('more').click()`); await delay(300); } };
+    const menuUntil = async (want, tries = 20) => {
+      let ids = [];
+      for (let i = 0; i < tries; i++) { ids = await menuItems(); if (want(ids)) return ids; await closeMenu(); await delay(500); }
+      return ids;
+    };
     const clickPr = async () => {
-      for (let i = 0; i < 20; i++) {
-        if (!(await panel.eval(`!!document.getElementById('pr')`))) { const m = await s.webviewPoint(panel, '#more'); await cdp.click(m.x, m.y); await delay(300); }
-        if (await panel.eval(`!document.getElementById('pr').disabled`)) break;
-        await panel.eval(`document.getElementById('more').click()`); await delay(500);
-      }
+      await menuUntil(ids => ids.includes('pr'));
+      for (let i = 0; i < 20 && await panel.eval(`document.getElementById('pr')?.disabled !== false`); i++) { await closeMenu(); await delay(500); await menuItems(); }
       const p = await s.webviewPoint(panel, '#pr'); await cdp.click(p.x, p.y); await delay(1200);
     };
     // Open PR answers with dialogs, not toasts (VS Code's Do Not Disturb hides toasts). Read one, then close it.
@@ -50,17 +58,24 @@ const { Session, makeRepo, latestVsix, delay, git, repoRoot } = require('./harne
 
     // Like the owner's VS Code: Do Not Disturb on, which hides info and warning toasts.
     await cdp.command('Notifications: Toggle Do Not Disturb Mode'); await delay(500);
-    // No remote.
-    await clickPr();
-    const noRemote = await toast('/no Git remote/');
-    check('Open PR explains a missing remote', !!noRemote, noRemote);
-    await clear();
-    // A non-GitHub remote.
+    // No remote (AC-232): no Open pull request; Merge into main and Publish to GitHub instead, and the
+    // palette's Open PR offers them in the window, never a dialog.
+    const noRemote = await menuUntil(ids => ids.includes('publish-menu'));
+    await closeMenu();
+    await cdp.command('Overseer: Open Pull Request…');
+    const offered = await cdp.waitQuickTitle('no GitHub remote', 15000).then(() => cdp.quickInputState(), () => null);
+    const alert = await cdp.evalWorkbench(`!!document.querySelector('.monaco-dialog-box')`);
+    check('no remote: the menu offers Publish to GitHub instead of Open pull request; Open PR offers the local merge, never a dialog',
+      noRemote.includes('publish-menu') && noRemote.includes('merge') && !noRemote.includes('pr') && offered && offered.rows.some(r => /Merge into main/.test(r)) && !alert, { noRemote, offered, alert });
+    await cdp.key('Escape'); await delay(400);
+    // A non-GitHub remote: no Open pull request either; the palette's Open PR says why and offers the local merge.
     git(repo, 'remote', 'add', 'origin', 'https://gitlab.example.invalid/team/pr-demo.git');
-    await clickPr();
-    const notGitHub = await toast('/not on GitHub/');
-    check('Open PR explains a non-GitHub remote', !!notGitHub, notGitHub);
-    await clear();
+    const notGitHubMenu = await menuUntil(ids => !ids.includes('publish-menu') && !ids.includes('pr'));
+    await closeMenu();
+    await cdp.command('Overseer: Open Pull Request…');
+    const notGitHub = await cdp.waitQuickTitle('not on GitHub', 15000).then(() => cdp.quickInputState(), () => null);
+    check('a non-GitHub remote: no Open pull request in the menu; Open PR explains it and offers the local merge', !notGitHubMenu.includes('pr') && notGitHub && notGitHub.rows.some(r => /Merge into main/.test(r)), { notGitHubMenu, notGitHub });
+    await cdp.key('Escape'); await delay(400);
     // A GitHub remote, but VS Code is not signed in to GitHub (real API URL, so no test token).
     git(repo, 'remote', 'set-url', 'origin', 'https://github.com/test-owner/pr-demo.git');
     git(repo, 'config', `url.${bare}.insteadOf`, 'https://github.com/test-owner/pr-demo.git');

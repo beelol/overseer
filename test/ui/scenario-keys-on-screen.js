@@ -66,7 +66,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
 
     // Palette commands with no agent on screen ask which one.
     const pickers = {};
-    for (const [command, title] of [['Overseer: Merge Back…', 'Merge back which agent?'], ['Overseer: Stop Selected Agent', 'Stop which agent?'], ['Overseer: Clean Up Worktree…', 'Clean up which agent'], ['Overseer: Send Follow-up…', 'Send a follow-up to which agent?']]) {
+    for (const [command, title] of [['Overseer: Merge Back…', 'Merge which agent?'], ['Overseer: Stop Selected Agent', 'Stop which agent?'], ['Overseer: Clean Up Worktree…', 'Clean up which agent'], ['Overseer: Send Follow-up…', 'Send a follow-up to which agent?']]) {
       await key('n', { meta: true, alt: true });
       await cdp.command(command);
       const shown = await cdp.waitQuickTitle(title, 8000).then(() => true, () => false);

@@ -31,6 +31,8 @@ export interface AccountChoice {
   /** `null` while the Mac has not said. */
   readonly signedIn: boolean | null;
   readonly plan: string | null;
+  /** The email with its local part shortened ("bil…@testbox.com", AC-235), once the Mac has read it. */
+  readonly email?: string | null;
 }
 
 export interface Choices {

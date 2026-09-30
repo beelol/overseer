@@ -38,6 +38,8 @@ export class EditingClient {
   focused() { return [...this.rows.values()].find(row => row.editor?.getModifiedEditor().hasTextFocus()); }
   held(row) { return !!row.edit && (row.edit.sequence > row.edit.ack || !!row.edit.failed); }
   pending(row) { return !!row.edit && row.edit.sequence > row.edit.ack && !row.edit.failed; }
+  /** Overseer: whether this file has edits of yours not saved yet (typed, syncing, unsaved in VS Code, or a failed save). */
+  edited(row) { return !!row.entry?.unsaved || this.pending(row) || !!row.edit?.saving || !!row.edit?.saveError || !!row.edit?.typed; }
   state() { return [...this.drafts.values()]; }
   persist() { this.api.vscode.setState({ ...(this.api.vscode.getState() || {}), drafts: this.state() }); }
   enabled(row) {
@@ -50,8 +52,10 @@ export class EditingClient {
     const enabled = this.enabled(row);
     if (row.editor && row.editable !== enabled) { row.editor.updateOptions({ readOnly: !enabled, domReadOnly: !enabled, originalEditable: false }); row.editable = enabled; }
     row.save.disabled = !this.enabled(row) || !!row.edit?.saving;
-    // Overseer: read-only sides (a staged file's index) hide Save instead of showing it disabled.
-    row.save.hidden = this.api.snapshot()?.mode !== 'workingTree' || (!!row.body && !row.body.editable);
+    // Overseer: read-only sides (a staged file's index) hide Save instead of showing it disabled,
+    // and (AC-232) Save shows only once there are edits of yours to save, so it never reads as
+    // accepting the agent's change.
+    row.save.hidden = this.api.snapshot()?.mode !== 'workingTree' || (!!row.body && !row.body.editable) || !this.edited(row);
     row.element.dataset.editable = String(enabled);
     row.editStatus.textContent = row.edit?.failed ? 'Draft needs attention' : row.edit?.saveError ? 'Save failed' : row.edit?.saving ? 'Saving…' : this.pending(row) ? 'Syncing…' : '';
     row.editStatus.title = row.edit?.failed || row.edit?.saveError || '';
@@ -87,7 +91,7 @@ export class EditingClient {
       this.api.notice('This edit is unavailable or exceeds the 2 MiB preview limit. Use Open in Native Diff.'); return;
     }
     const edit = this.stream(row);
-    edit.sequence++;
+    edit.sequence++; edit.typed = true;
     const payload = { type: 'edit', repository: edit.repository, id: row.entry.id, stream: edit.stream,
       version: edit.version, revision: edit.revision, sequence: edit.sequence, documentVersion: edit.documentVersion,
       changes: event.changes.map(c => ({ offset: c.rangeOffset, length: c.rangeLength, text: c.text })) };
@@ -148,6 +152,7 @@ export class EditingClient {
       if (value.type === 'editAccepted' || value.type === 'saveFailed') {
         edit.ack = Math.max(edit.ack, value.sequence); edit.documentVersion = value.documentVersion;
         if (value.saved || value.type === 'saveFailed') edit.saving = false;
+        if (value.saved) edit.typed = false;
         if (value.type === 'saveFailed') { edit.saveError = value.message; this.api.notice(value.message); }
         if (edit.ack === edit.sequence) { this.drafts.delete(value.id); row.renderedRevision = undefined; this.api.changed(row); }
       } else if (edit.hunk) {
