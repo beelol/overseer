@@ -1,6 +1,8 @@
 # Handoff: where the everything goal stands
 
-Updated 2026-09-29, late evening, by the coordinator session. Read this first when you pick up the everything goal ([everything.md](everything.md)); keep it current as work lands.
+Updated 2026-09-29, late evening, by the coordinator session. Read this first when you pick up the everything goal ([everything.md](everything.md)).
+
+**Keep this file current, and tell whoever comes after you to do the same.** Update it and push it to main the moment anything changes: a merge or deploy, an owner decision, a builder started or finished, a PR opened or closed, a new criterion. Also update your own memory's resume note. The owner asked for both (2026-09-29), so the next agent never loses work when usage or a session runs out.
 
 ## How to pick up
 

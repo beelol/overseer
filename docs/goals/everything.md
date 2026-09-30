@@ -30,7 +30,7 @@ RULES
 - A timing test that fails under load is rerun alone before calling it a regression. Agree quiet windows with agents running measurements.
 - Paid turns only as AGENTS.md allows (gpt-5.6-luna at low effort; no Claude model for now). Never touch the owner's checkouts, logins or daemon. Leave nothing running.
 - Pace (the owner, after the Mac crashed on 2026-09-29): start with ONE builder sub-agent and ONE full test run (`--jobs=1`, `nice -n 20`, `CARGO_BUILD_JOBS=4 RUST_TEST_THREADS=4`); add a second or third builder only while `uptime` stays low; always leave room for the owner's own apps (games) and a couple of other agent tasks. Keep `$TMPDIR/overseer-test-jobs-max` at 1 (a reboot clears it).
-- Push often: /private/tmp is wiped on reboot, so unpushed work and scratch notes there are lost. Resume state lives in docs/goals/handoff.md on main.
+- Push often: /private/tmp is wiped on reboot, so unpushed work and scratch notes there are lost. Resume state lives in docs/goals/handoff.md on main: update it (and your own memory's resume note) the moment anything changes — a merge, a deploy, an owner decision, a builder started or finished, a PR opened or closed — and push it, so the next agent can pick up without losing work. The next agent keeps doing the same.
 - Tell the owner in a few lines: what landed, what is blocked, what they must do.
 
 DONE WHEN the tracker only has rows waiting on the owner, every pull request is merged or closed with a reason (AC-161), `scripts/test-all` passes on main, and the ledger is current.
