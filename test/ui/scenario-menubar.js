@@ -170,6 +170,9 @@ function call(socket, method, params = {}) {
     check('six waiting: the menu shows four and "2 more waiting · Show all in Overseer…" (see 4-six-waiting-*.png)', true);
 
     // Choosing an agent opens it in a test VS Code pinned to the dev daemon.
+    // The test profile trusts Overseer's links, as the owner does once with "Do not ask me again".
+    fs.mkdirSync(path.join(inst, 'vscode/profile/User'), { recursive: true });
+    fs.writeFileSync(path.join(inst, 'vscode/profile/User/settings.json'), JSON.stringify({ 'extensions.confirmedUriHandlerExtensionIds': ['beelol.overseer'] }));
     dev('code', '--name', 'mb', repos.overseer, '--vsix', latestVsix(), '--inspect');
     s.profile = path.join(inst, 'vscode/profile');
     s.extensions = path.join(inst, 'vscode/extensions');

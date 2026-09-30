@@ -100,6 +100,22 @@ struct Config {
     }
 }
 
+// MARK: - The main thread, also while a menu is open
+
+/// Work for the main thread that also runs while a menu is open: menu tracking runs the run loop in
+/// its event-tracking mode, where the main dispatch queue waits, so the daemon's answers and the
+/// menu's own refreshes go through the run loop's common modes instead.
+func onMain(_ work: @escaping () -> Void) {
+    RunLoop.main.perform(inModes: [.common], block: work)
+    CFRunLoopWakeUp(CFRunLoopGetMain())
+}
+@discardableResult
+func after(_ seconds: Double, repeats: Bool = false, _ work: @escaping () -> Void) -> Timer {
+    let t = Timer(timeInterval: seconds, repeats: repeats) { _ in work() }
+    RunLoop.main.add(t, forMode: .common)
+    return t
+}
+
 // MARK: - The daemon's socket (JSON lines)
 
 final class Link {
@@ -138,11 +154,11 @@ final class Link {
                 let line = buf.subdata(in: buf.startIndex..<nl)
                 buf.removeSubrange(buf.startIndex...nl)
                 if let obj = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any] {
-                    DispatchQueue.main.async { self.onMessage?(obj) }
+                    onMain { self.onMessage?(obj) }
                 }
             }
         }
-        DispatchQueue.main.async { self.close() }
+        onMain { self.close() }
     }
 
     func send(_ obj: [String: Any]) {
@@ -378,6 +394,7 @@ final class Controller: NSObject, NSMenuDelegate {
     var refreshQueued = false
     var retry: Timer?
     var onSnapshot: [(Snapshot) -> Bool] = []   // --capture/--press wait for a first answer
+    var shownKey = Data()
     var frozen = false                          // --capture/--press: the menu keeps what it showed
 
     override init() {
@@ -389,7 +406,7 @@ final class Controller: NSObject, NSMenuDelegate {
         dot.isHidden = true
         render()
         connect()
-        Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in self?.refresh() }
+        after(15, repeats: true) { [weak self] in self?.refresh() }
     }
 
     // The daemon, reached again every 2 s while it is not there.
@@ -400,7 +417,7 @@ final class Controller: NSObject, NSMenuDelegate {
             snapshot = nil
             problem = "Overseer isn’t running"
             render()
-            retry = Timer.scheduledTimer(withTimeInterval: 2, repeats: false) { [weak self] _ in self?.connect() }
+            retry = after(2) { [weak self] in self?.connect() }
             return
         }
         link = l
@@ -410,7 +427,7 @@ final class Controller: NSObject, NSMenuDelegate {
             self.link = nil; self.pending.removeAll()
             self.snapshot = nil; self.problem = "Overseer isn’t running"
             self.render()
-            self.retry = Timer.scheduledTimer(withTimeInterval: 2, repeats: false) { [weak self] _ in self?.connect() }
+            self.retry = after(2) { [weak self] in self?.connect() }
         }
         call("hello", ["client": "menubar"]) { [weak self] r in
             guard let self else { return }
@@ -441,7 +458,7 @@ final class Controller: NSObject, NSMenuDelegate {
     func queueRefresh() {
         if refreshQueued { return }
         refreshQueued = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + (menuOpen ? 0.25 : 1)) { [weak self] in self?.refreshQueued = false; self?.refresh() }
+        after((menuOpen ? 0.25 : 1)) { [weak self] in self?.refreshQueued = false; self?.refresh() }
     }
 
     func refresh(_ then: ((Snapshot) -> Void)? = nil) {
@@ -449,8 +466,13 @@ final class Controller: NSObject, NSMenuDelegate {
         call("menubar.snapshot") { [weak self] r in
             guard let self, let j = r["result"] as? [String: Any] else { return }
             let s = Snapshot(j)
+            // Rebuilt only when what it shows changed: an open menu keeps its highlight and submenu.
+            var shown = j; shown.removeValue(forKey: "cursor")
+            let key = (try? JSONSerialization.data(withJSONObject: shown, options: [.sortedKeys])) ?? Data()
+            let changed = key != self.shownKey || self.snapshot == nil
+            self.shownKey = key
             self.snapshot = s
-            self.render()
+            if changed { self.render() }
             then?(s)
             self.onSnapshot = self.onSnapshot.filter { !$0(s) }
         }
@@ -610,7 +632,7 @@ final class Controller: NSObject, NSMenuDelegate {
         problem = "Starting Overseer…"
         render()
         retry?.invalidate()
-        retry = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { [weak self] _ in self?.connect() }
+        retry = after(0.5) { [weak self] in self?.connect() }
     }
     @objc func quit() { NSApp.terminate(nil) }
 }
@@ -660,12 +682,12 @@ final class Evidence {
         c.onSnapshot.append { [weak self] s in
             guard let self else { return true }
             if let w = when, !s.summary.contains(w) && !(s.waiting.first?.question.contains(w) ?? false) && Date() < deadline { return false }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.go() }
+            after(0.3) { self.go() }
             return true
         }
         // A stopped daemon: act on the "not running" menu after the first attempt.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in if let self, self.c.snapshot == nil, !self.started { self.go() } }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { fail("no answer from the daemon in 30 s", 3) }
+        after(3) { [weak self] in if let self, self.c.snapshot == nil, !self.started { self.go() } }
+        after(30) { fail("no answer from the daemon in 30 s", 3) }
     }
 
     var started = false
@@ -697,7 +719,7 @@ final class Evidence {
         trace("the menu closed (it was shown: \(shown))")
         if !done {
             if attempts >= 3 { fail("the menu closed before it could be captured") }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.open() }
+            after(0.5) { [weak self] in self?.open() }
         }
     }
 
@@ -709,8 +731,8 @@ final class Evidence {
         trace("inside the menu: \(c.menu.items.count) items, windows \(ownMenuWindows())")
         if let repo = submenuWanted, let idx = c.menu.items.firstIndex(where: { $0.title == repo || $0.title.hasPrefix(repo + "  ") }) {
             // Walk the keyboard to the repository and open its submenu, as the owner would.
-            // Keyboard stops: enabled items, the requests' views among them.
-            let enabled = c.menu.items.enumerated().filter { $0.element.isEnabled && !$0.element.isSeparatorItem && !$0.element.isSectionHeaderCompat }.map { $0.offset }
+            // Keyboard stops: enabled items with a title (the arrow keys pass over the requests' views and headers).
+            let enabled = c.menu.items.enumerated().filter { $0.element.isEnabled && !$0.element.isSeparatorItem && !$0.element.isSectionHeaderCompat && $0.element.view == nil }.map { $0.offset }
             let steps = (enabled.firstIndex(of: idx) ?? 0) + 1
             for k in 0..<steps { post(125, delay: Double(k) * 0.12) }   // down arrow
             post(124, delay: Double(steps) * 0.12 + 0.1)                 // right arrow
@@ -738,7 +760,8 @@ final class Evidence {
 
     func captureAndAct() {
         trace("capture: windows \(ownMenuWindows())")
-        if submenuWanted != nil && ownMenuWindows().count < 2 {
+        if let repo = submenuWanted, ownMenuWindows().count < 2 || c.menu.highlightedItem?.submenu?.title != repo {
+            trace("highlighted: \(c.menu.highlightedItem?.title ?? "none")")
             trace("the submenu is not open; again")
             c.menu.cancelTracking()
             return
@@ -755,7 +778,7 @@ final class Evidence {
                 trace("answered")
                 say(String(data: (try? JSONSerialization.data(withJSONObject: r, options: [.sortedKeys])) ?? Data(), encoding: .utf8) ?? "")
                 let code: Int32 = r["error"] == nil ? 0 : 4
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                after(0.6) {
                     trace("after the answer: \(ownMenuWindows().count) menus open")
                     // The menu after the answer, when it is still open (pressing a control can close it).
                     if let prefix = self.prefix, !ownMenuWindows().isEmpty { self.write(prefix + "-after") }
@@ -777,7 +800,7 @@ final class Evidence {
             return
         }
         c.menu.cancelTracking()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { exit(0) }
+        after(0.2) { exit(0) }
     }
 
     func chooseItem(_ title: String) {
@@ -785,7 +808,7 @@ final class Evidence {
         opened = { url in say(url) }
         trace("chose \(title)")
         c.menu.performActionForItem(at: idx)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { exit(0) }
+        after(1) { exit(0) }
     }
 
     func choose(_ repo: String, _ index: Int) {
@@ -795,7 +818,7 @@ final class Evidence {
         opened = { url in say(url) }
         trace("chose \(repo) \(index)")
         sub.performActionForItem(at: agents[index].offset)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { exit(0) }
+        after(1.5) { exit(0) }
     }
 
     /// The item on a menu bar strip, with the open menu (and submenu) below it, as on screen.
