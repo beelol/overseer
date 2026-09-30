@@ -2480,7 +2480,7 @@ rec(236, "Home talks to Overseer first", "verified", date="2026-09-29", commit="
     evidence="`test/ui/scenario-home-overseer.js` and its evidence folder `docs/verification/evidence/ui/home-overseer/` on the branch, pull request #31",
     live="Fixtures only; no paid turn.",
     limits="Existing scenarios that start agents by typing at home choose \"Start directly\" (`overseer.home.sendTo: agent`) in their profile.")
-rec(237, "Overseer starts agents on the right harness, model and account", "verified", date="2026-09-29", commit="ebb245e2 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(237, "Overseer starts agents on the right harness, model and account", "verified", date="2026-09-29", commit="3ab9c1f7 (pull request #32, merged 2026-09-30)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the whole Verify clause with the fixture as Overseer's model: starts on a named model, a named account and a named harness, each confirmed on the run; an unnamed start on Auto's route pick with its reason on the card; the tool schema's fields",
     steps="""1. `cargo test --test overseer_brain ac237` (3 tests, real daemon binary, Claude fixture as Overseer and agents, Codex app-server fixture with listed models).
@@ -2495,7 +2495,7 @@ rec(237, "Overseer starts agents on the right harness, model and account", "veri
     evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/ebb245e2/daemon/tests/overseer_brain.rs) (`ac237_*`)",
     live="Fixtures only; a live model choosing the fields from free wording was not exercised.",
     limits="Auto routing is used when Auto Mode is on; Auto Mode stays off by default until its own checks pass (docs/rfcs/auto-mode.md), which is the owner's switch. Within the owner's allowed accounts means Auto's allowed set (the default accounts) or an account the owner names; there is no separate allowed-accounts setting for Overseer yet.")
-rec(238, "Overseer checks finished work and offers the next step", "verified", date="2026-09-29", commit="ebb245e2 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(238, "Overseer checks finished work and offers the next step", "verified", date="2026-09-29", commit="3ab9c1f7 (pull request #32, merged 2026-09-30)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the whole Verify clause with the fixture as Overseer's model",
     steps="""1. `cargo test --test overseer_brain ac238_overseer_checks_finished_work_and_offers_the_next_step`.
@@ -2507,7 +2507,7 @@ rec(238, "Overseer checks finished work and offers the next step", "verified", d
 - Nothing happened without a yes: the repository's HEAD did not move and the failing agent got no turn; the owner's yes sent the fix. A check-in may propose merge_back or pull_request only for a finished agent and they always wait for a yes; archive and the other Confirm actions stay the owner's own to ask for.""",
     evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/ebb245e2/daemon/tests/overseer_brain.rs) (`ac238_*`)",
     live="Fixtures only: the verdict's quality with a live model is not judged here.")
-rec(239, "Stuck, failed and limited agents come back to Overseer", "partial", date="2026-09-29", commit="ebb245e2 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(239, "Stuck, failed and limited agents come back to Overseer", "partial", date="2026-09-29", commit="3ab9c1f7 (pull request #32, merged 2026-09-30)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the daemon side of the Verify clause: ratelimit, failed-reason and a silent agent each give one Overseer turn and a card with a plain reason; continuing on the other account carries the work on a second fixture profile in the same worktree; neither the conversation nor the daemon's state shows an error class or HTTP code",
     steps="""1. `cargo test --test overseer_brain ac239_stuck_failed_and_limited_agents_come_back_to_overseer`, plus the unit test `overseer::trouble::tests::reasons_are_plain`.
@@ -2606,7 +2606,7 @@ rec(247, "Home's input is always on screen", "verified", date="2026-09-29", comm
 - Continuity's notice, folded, is one compact line (44 px at most; it was 51 px on main, which the scenario failed first). One view for talking to Overseer (#27) had already pinned the box to the foot.""",
     evidence="`test/ui/scenario-home-input.js` and `docs/verification/evidence/ui/home-input/` on the branch, pull request #31",
     live="Fixtures only.")
-rec(248, "Overseer's session never drops what it was told", "verified", date="2026-09-29", commit="ebb245e2 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(248, "Overseer's session never drops what it was told", "verified", date="2026-09-29", commit="3ab9c1f7 (pull request #32, merged 2026-09-30)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the whole Verify clause: a forced Lagged error, an ask before Overseer's first turn, a failed turn start, a proposal after its spoken request closed",
     steps="""1. From pull request #28 (merged): `cargo test --test overseer ac181_the_session_loop_catches_up_after_falling_behind` (a 64-event bus flooded with 800,000 output events) and `ac190_a_question_waits_for_overseers_first_turn_and_survives_start_fresh`.
@@ -2659,7 +2659,7 @@ rec(252, "Zero-friction loop, measured", "not started", date="—", commit="—"
     expected="See the RFC criterion (the owner's zero-friction goal, 2026-09-28).",
     actual="Not started: added for the overnight zero-friction goal (docs/goals/zero-friction.md).", live="—", blocker="Overnight goal.")
 
-rec(253, "Overseer leads with what happened while you were away", "verified", date="2026-09-29", commit="ebb245e2 (branch claude/overseer-brain, pull request #32, not merged yet)",
+rec(253, "Overseer leads with what happened while you were away", "verified", date="2026-09-29", commit="3ab9c1f7 (pull request #32, merged 2026-09-30)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the whole Verify clause: a packaged-UI scenario and a daemon test",
     steps="""1. `cargo test --test overseer_brain ac253_overseer_leads_with_what_happened_while_you_were_away`.
