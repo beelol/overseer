@@ -573,3 +573,68 @@ fn ac248_a_question_at_the_daily_cap_is_kept() {
 fn now_ms() -> i64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64
 }
+
+// ---------------------------------------------------------------------- AC-231
+
+/// The first turn's prompt of an agent Overseer started (what the harness received: the fixture
+/// in echo mode says it back).
+fn echoed_prompt(d: &Daemon, run: &str) -> String {
+    d.wait_done(run, 30);
+    let said = d.events(run).iter().find(|e| e["kind"] == "output" && e["payload"]["text"].as_str().unwrap_or("").starts_with("ECHO ")).map(|e| e["payload"]["text"].as_str().unwrap().to_string()).unwrap_or_else(|| panic!("no echo from {run}"));
+    let echo: Value = serde_json::from_str(said.trim_start_matches("ECHO ")).unwrap();
+    echo["text"].as_str().unwrap().to_string()
+}
+
+/// AC-231: a conversation that names a file in another repository, then starts an agent: the
+/// agent's prompt cites the file, names the repository and carries what the owner said, though
+/// the request itself ("Please add the login page.") says none of it. The agent's chat shows what
+/// was added. Both start paths: Auto's pick and Overseer's own harness.
+#[test]
+fn ac231_agents_start_with_what_overseer_knows() {
+    let _one = heavy();
+    let r = tmp();
+    let site = repo(&r.path().join("site"));
+    let api = repo(&r.path().join("api"));
+    std::fs::create_dir_all(api.join("src")).unwrap();
+    std::fs::write(api.join("src/login.rs"), "pub fn login() {}\n").unwrap();
+    std::fs::write(api.join("src/session.rs"), "pub fn session() {}\n").unwrap();
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file, &[]);
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    // An agent in the site, so Overseer knows where new work goes.
+    let seed = claude_task(&d, &site, &mode_file, "echo", "Seed", "look around");
+    d.wait_done(&seed, 30);
+    std::fs::write(&mode_file, "overseer").unwrap();
+    let login = api.join("src/login.rs").display().to_string();
+    d.call("overseer.send", json!({"text": format!("The login endpoint lives in {login}. The page must call it, not guess."), "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+
+    // A start on Auto's pick (or Overseer's own harness when Auto has none).
+    std::fs::write(&mode_file, "echo").unwrap();
+    let p = ask_overseer(&d, "start an agent to add the login page");
+    let run = yes_start(&d, &p);
+    let run_id = run["id"].as_str().unwrap().to_string();
+    let prompt = echoed_prompt(&d, &run_id);
+    assert!(prompt.contains("Please add the login page."), "the request itself: {prompt}");
+    assert!(prompt.contains(&login), "the file named in another repository is cited: {prompt}");
+    assert!(prompt.contains(&format!("api at {} (another repository)", api.display())), "the other repository is named: {prompt}");
+    assert!(prompt.contains("The page must call it, not guess."), "what the owner said: {prompt}");
+    // Shown in the agent's chat, like a briefing; nothing added unseen.
+    let shown = d.events(&run_id).into_iter().find(|e| e["kind"] == "briefing" && e["payload"]["how"] == "context").expect("the context is shown in the agent's chat");
+    assert!(shown["payload"]["text"].as_str().unwrap().contains(&login));
+    assert_eq!(shown["payload"]["line"], "Overseer added what it knows");
+
+    // Auto routing off: the start runs on Overseer's own harness; a file named by its
+    // repository's name ("api/src/session.rs") is found there.
+    d.call("auto.mode.set", json!({"enabled": false}));
+    std::fs::write(&mode_file, "overseer").unwrap();
+    d.call("overseer.send", json!({"text": "Sessions are kept by api/src/session.rs.", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    std::fs::write(&mode_file, "echo").unwrap();
+    let p = ask_overseer(&d, "start an agent to add the sign-out button");
+    assert_eq!(p["actions"][0]["route"]["how"], "default", "{p}");
+    let run = yes_start(&d, &p);
+    let prompt = echoed_prompt(&d, run["id"].as_str().unwrap());
+    assert!(prompt.contains(&format!("{}/src/session.rs", api.display())) && prompt.contains(&login), "both files, in full: {prompt}");
+    assert!(!prompt.contains(&format!("{}/src/session.rs", site.display())), "never placed in the wrong repository: {prompt}");
+}
