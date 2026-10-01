@@ -92,7 +92,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     // The page follows the focused agent when the room changes (a resize, the list, a conversation).
     app.settle_focus();
     let composing = matches!(app.mode, Mode::Compose) || matches!(app.mode, Mode::Confirm(_));
-    let composer_h = if matches!(app.mode, Mode::Compose) { composer_height(app, area.width) } else if matches!(app.mode, Mode::DenyNote { .. }) { 3 } else if composing { 2 } else { 0 };
+    let composer_h = if matches!(app.mode, Mode::Compose) { composer_height(app, area.width) } else if matches!(app.mode, Mode::DenyNote { .. }) { 3 } else if composing { confirm_height(app, area.width) } else { 0 };
     let [head, body, comp, foot] = Layout::vertical([Constraint::Length(1), Constraint::Min(3), Constraint::Length(composer_h), Constraint::Length(1)]).areas(area);
     header(f, app, head);
     match app.mode {
@@ -110,7 +110,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         let text = match c {
             Confirm::Interrupt(id) => format!(" Interrupt {}? y / n", short(&app.state.run(id).map(|r| r.title.clone()).unwrap_or_default(), 50)),
             Confirm::Quit => " Unsent drafts will be lost. Quit? y / n".to_string(),
-            Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::OpenPr { text, .. } | Confirm::Reject { text, .. } => format!(" {text} y / n"),
+            Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::MergeCancel { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::OpenPr { text, .. } | Confirm::Reject { text, .. } => format!(" {text} y / n"),
             Confirm::PhoneOff { text } | Confirm::Revoke { text, .. } | Confirm::Pair { text, .. } => format!(" {text} y / n"),
             Confirm::PhoneOnAndPair => " Phone access is off. Turn it on and pair a phone? y / n".to_string(),
         };
@@ -800,6 +800,15 @@ fn composer_height(app: &App, width: u16) -> u16 {
     let w = width.saturating_sub(4).max(10) as usize;
     let lines: usize = draft.split('\n').map(|l| l.width().max(1).div_ceil(w)).sum::<usize>().max(1);
     (lines as u16 + 2).min(8)
+}
+
+/// A question's lines: a long one (every file a merge commits, T-33) wraps instead of being cut.
+fn confirm_height(app: &App, width: u16) -> u16 {
+    let text = match &app.mode {
+        Mode::Confirm(Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::MergeCancel { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::OpenPr { text, .. } | Confirm::Reject { text, .. }) => text.as_str(),
+        _ => "",
+    };
+    ((text.width() + 8).div_ceil(width.max(20) as usize) as u16).clamp(2, 8)
 }
 
 /// Denying a permission (T-31): the note the agent gets as the reason; empty is fine.

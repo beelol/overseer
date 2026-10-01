@@ -1245,3 +1245,61 @@ fn t32_new_agent_with_every_choice_vs_code_has() {
     assert!(!seen.contains(&NewAgentForm::EFFORT) && !seen.contains(&NewAgentForm::MODE), "{seen:?}");
     tui.key(KeyCode::Esc);
 }
+
+fn git_in(dir: &Path, args: &[&str]) -> String {
+    let out = std::process::Command::new("git").args(args).current_dir(dir).output().unwrap();
+    String::from_utf8_lossy(&out.stdout).trim().to_string()
+}
+
+/// T-33: the merge confirmation names every file it will commit, the untracked `.env` included;
+/// merge back stops on a conflict with main; `M` then offers to cancel the merge, and cancelling
+/// puts the worktree back at its pre-merge HEAD with its files as they were (uncommitted again).
+#[test]
+fn t33_cancel_a_conflicted_merge() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let r = five_files(&t.path().join("conflict"));
+    let run = d.sh(&r, "Conflicts with main", "printf 'line 1\\nline 2 from the agent\\n' > a.txt; printf 'SECRET=1\\n' > .env; echo edited");
+    d.wait_status(&run, |s| s == "completed", 20);
+    // Meanwhile main changes the same line.
+    std::fs::write(r.join("a.txt"), "line 1\nline 2 from main\n").unwrap();
+    git_in(&r, &["commit", "-qam", "main edits line 2"]);
+    let wt = worktree(&d, &run);
+    let head_before = git_in(&wt, &["rev-parse", "HEAD"]);
+    let status_before = git_in(&wt, &["status", "--porcelain", "-uall"]);
+    assert!(status_before.contains("?? .env") && status_before.contains("M a.txt"), "{status_before}");
+
+    let mut tui = Tui::attach(&d, 160, 44);
+    tui.until(10, |a| a.visible().len() == 1 && a.focus.is_some());
+    tui.key(KeyCode::Char('M'));
+    tui.until(10, |a| matches!(a.mode, Mode::Confirm(overseer_tui::app::Confirm::MergePrepare { .. })));
+    let s = tui.screen();
+    let flat: String = s.lines().map(|l| l.trim_end()).collect::<Vec<_>>().join(" ");
+    assert!(flat.contains("commit 2 worktree files (") && flat.contains(".env [new, untracked]") && flat.contains("a.txt"), "the untracked .env is named:\n{s}");
+    tui.snapshot("parity-t33-confirm-names-untracked");
+    tui.key(KeyCode::Char('y'));
+    tui.until_screen(10, "Merge back: conflicts in a.txt");
+    assert!(wt.join(".git").exists() && git_in(&wt, &["rev-parse", "-q", "--verify", "MERGE_HEAD"]).len() == 40, "a merge is in progress in the worktree");
+
+    // M again: the merge stopped on conflicts; n keeps it.
+    tui.app.notice = None;
+    tui.key(KeyCode::Char('M'));
+    tui.until(10, |a| matches!(a.mode, Mode::Confirm(overseer_tui::app::Confirm::MergeCancel { .. })));
+    let s = tui.screen();
+    assert!(s.contains("Merge back stopped on conflicts in a.txt. Cancel the merge and put the worktree back as it was before it?"), "{s}");
+    tui.snapshot("parity-t33-cancel-asks");
+    tui.key(KeyCode::Char('n'));
+    assert!(tui.screen().contains("The merge stays"));
+    assert_eq!(git_in(&wt, &["rev-parse", "-q", "--verify", "MERGE_HEAD"]).len(), 40, "n keeps the merge");
+    // y cancels it: the pre-merge HEAD, the agent's files, uncommitted as before.
+    tui.key(KeyCode::Char('M'));
+    tui.until(10, |a| matches!(a.mode, Mode::Confirm(overseer_tui::app::Confirm::MergeCancel { .. })));
+    tui.key(KeyCode::Char('y'));
+    tui.until_screen(10, "Merge cancelled");
+    assert_eq!(git_in(&wt, &["rev-parse", "HEAD"]), head_before, "the worktree's pre-merge HEAD");
+    assert_eq!(git_in(&wt, &["rev-parse", "-q", "--verify", "MERGE_HEAD"]), "", "no merge in progress");
+    assert_eq!(std::fs::read_to_string(wt.join("a.txt")).unwrap(), "line 1\nline 2 from the agent\n");
+    assert_eq!(std::fs::read_to_string(wt.join(".env")).unwrap(), "SECRET=1\n");
+    assert_eq!(git_in(&wt, &["status", "--porcelain", "-uall"]), status_before, "the files as they were");
+    tui.snapshot("parity-t33-cancelled");
+}

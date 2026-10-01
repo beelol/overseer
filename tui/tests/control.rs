@@ -272,7 +272,7 @@ fn t18_merge_back_from_the_terminal_asks_before_each_step() {
     tui.key(KeyCode::Char('M'));
     tui.until(10, |a| matches!(a.mode, Mode::Confirm(Confirm::MergePrepare { .. })));
     let s = tui.screen();
-    assert!(s.contains("Merge back overseer/document-sessions → main: commit 1 worktree file and merge main into overseer/document-sessions"), "{s}");
+    assert!(s.contains("Merge back overseer/document-sessions → main: commit 1 worktree file (README.md) and merge main into overseer/document-sessions"), "{s}");
     tui.snapshot("t18-merge-step-1");
     tui.key(KeyCode::Char('y'));
     // Step 2: exactly what lands, then merge into main in the source checkout.

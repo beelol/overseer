@@ -122,6 +122,8 @@ pub enum Confirm {
     MergePrepare { run: String, text: String },
     /// Merge back, step 2: merge the agent's branch into the target in the source checkout.
     MergeComplete { run: String, text: String },
+    /// A merge back stopped on conflicts: cancel it, the worktree back as before (T-33).
+    MergeCancel { run: String, text: String },
     /// Reject changes in the review: the comparison's lines go back into the worktree (T-29).
     Reject { path: String, keys: Vec<String>, text: String },
     /// Remove a finished agent's worktree (its branch is kept).
@@ -168,6 +170,7 @@ enum Pending {
     MergeLanding { run: String, branch: String, target: String, repo: String },
     MergeFiles { run: String, text: String },
     MergeComplete,
+    MergeAbort,
     /// `review.seen`: a reviewed mark shared with VS Code and the menu bar (T-26).
     Seen,
     CleanupPlan { run: String },
@@ -1678,6 +1681,10 @@ impl App {
                 let n = v["changes"].as_array().map(|a| a.len()).unwrap_or(0);
                 self.mode = Mode::Confirm(Confirm::MergeComplete { run, text: format!("{text} {n} file{} land{}. The worktree and branch are kept.", if n == 1 { "" } else { "s" }, if n == 1 { "s" } else { "" }) });
             }
+            (Pending::MergeAbort, Ok(v)) => {
+                self.say(if v["uncommitted"] == true { "Merge cancelled: the worktree is as it was before, its work uncommitted again" } else { "Merge cancelled: the worktree is as it was before" }, false);
+                self.request_state();
+            }
             (Pending::MergeComplete, Ok(v)) => {
                 self.say(format!("Merged {} into {} ({}). The worktree and branch are kept.", v["branch"].as_str().unwrap_or("the branch"), v["target"].as_str().unwrap_or("the target"), v["commit"].as_str().unwrap_or_default().chars().take(10).collect::<String>()), false);
                 self.request_state();
@@ -2142,11 +2149,27 @@ impl App {
         let repo = plan["repo"].as_str().unwrap_or_default().to_string();
         match plan["state"].as_str().unwrap_or_default() {
             "idle" => {
-                let n = plan["worktree_uncommitted"].as_array().map(|a| a.len()).unwrap_or(0);
-                let commit = if n > 0 { format!("commit {n} worktree file{} and ", if n == 1 { "" } else { "s" }) } else { String::new() };
+                // T-33: every file that will be committed, the untracked ones named as new.
+                let files: Vec<String> = plan["worktree_uncommitted"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
+                let untracked: Vec<String> = plan["untracked"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
+                let mut named: Vec<String> = Vec::new();
+                for f in &files {
+                    let f = if untracked.contains(f) { format!("{f} [new, untracked]") } else { f.clone() };
+                    if !named.contains(&f) {
+                        named.push(f);
+                    }
+                }
+                let n = named.len();
+                let commit = if n > 0 { format!("commit {n} worktree file{} ({}) and ", if n == 1 { "" } else { "s" }, named.join(", ")) } else { String::new() };
                 self.mode = Mode::Confirm(Confirm::MergePrepare { run, text: format!("Merge back {branch} → {target}: {commit}merge {target} into {branch} in the worktree (conflicts go back to the agent)?") });
             }
-            "resolving" | "resolved" => {
+            "resolving" => {
+                // T-33: stopped on conflicts; offer to cancel, as VS Code's Cancel merge does.
+                let files: Vec<String> = plan["conflicts"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().or(x["path"].as_str()).map(str::to_string)).collect()).unwrap_or_default();
+                let text = format!("Merge back stopped on conflicts in {}. Cancel the merge and put the worktree back as it was before it? (n keeps it to resolve)", if files.is_empty() { "the worktree".to_string() } else { files.join(", ") });
+                self.mode = Mode::Confirm(Confirm::MergeCancel { run, text });
+            }
+            "resolved" => {
                 let ws = self.state.run(&run).map(|r| r.workspace_id.clone()).unwrap_or_default();
                 self.request("workspace.merge_resolved", json!({ "workspace_id": ws }), Pending::MergeResolved { run });
             }
@@ -2496,12 +2519,22 @@ impl App {
                                 self.request("workspace.merge_complete", json!({ "workspace_id": ws }), Pending::MergeComplete);
                             }
                         }
+                        Confirm::MergeCancel { run, .. } => {
+                            if let Some(ws) = self.state.run(&run).map(|r| r.workspace_id.clone()) {
+                                self.request("workspace.merge_abort", json!({ "workspace_id": ws }), Pending::MergeAbort);
+                            }
+                        }
                         // The phone questions are answered in `phone_confirm`; Reject above.
                         Confirm::Reject { .. } => {}
                         Confirm::PhoneOff { .. } | Confirm::PhoneOnAndPair | Confirm::Revoke { .. } | Confirm::Pair { .. } => {}
                     }
                 }
-                _ => self.mode = Mode::Grid,
+                _ => {
+                    self.mode = Mode::Grid;
+                    if matches!(c, Confirm::MergeCancel { .. }) {
+                        self.say("The merge stays: resolve the conflicts in the worktree (or ask the agent), then press M again", false);
+                    }
+                }
             },
             Mode::Compose => self.compose_key(k),
             Mode::NewAgent => self.form_key(k),

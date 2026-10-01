@@ -64,7 +64,7 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | a / s / d | Answer the focused agent's pending permission: Allow once, Allow for this session (the harness's own rule, when it offers one), Deny with a note (a one-line note; Enter sends, empty is fine) (T-31) |
 | w | Jump to the next agent waiting for you |
 | x | Interrupt the focused agent (asks y/n) |
-| M | Merge back: commit the worktree and merge the target in (y/n), then merge into the target (y/n) |
+| M | Merge back: commit the worktree (the confirmation names every file it commits, untracked ones included) and merge the target in (y/n), then merge into the target (y/n); on a merge stopped by conflicts, cancel it (y/n), the worktree back as before (T-33) |
 | P | Open a GitHub pull request (y/n): commit, push with your Git credentials, create it with `gh` |
 | C | Remove a finished agent's worktree (its branch is kept; lists uncommitted files first) |
 | X | Stop all agents and the daemon (y/n); the TUI does not restart it until `r` |
