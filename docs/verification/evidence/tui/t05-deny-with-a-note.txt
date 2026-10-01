@@ -1,5 +1,5 @@
  ◆ Overseer  page 1/1 · 3 agents · ● 2 working · ◆ 1 needs you                                                                                       phone access off · ● connected 
-╭ agents ──────────────────────────╮┏ 1 ◆ Busy Claude ━━━━━━━━━━━ Claude Code · 1s ┓╭ 2 ● Agent B ─────────────────── Program · 2s ╮╭ 3 ● Agent A ─────────────────── Program · 2s ╮
+╭ agents ──────────────────────────╮┏ 1 ◆ Busy Claude ━━━━━━━━━━━ Claude Code · 2s ┓╭ 2 ● Agent B ─────────────────── Program · 2s ╮╭ 3 ● Agent A ─────────────────── Program · 3s ╮
 │ talk  2 working · 1 needs you    │┃ › write perm.txt                             ┃│ › draft for B                                ││ › for A only                                 │
 │›◆ Busy Claude     Claude Fixt… ◆ │┃ ✎ perm.txt                                   ┃│   second line                                ││ A heard: for A only                          │
 │ ● Agent B                        │┃ ⚙ Write perm.txt …                           ┃│ B heard: draft for B                         ││                                              │
@@ -43,7 +43,7 @@
 │                                  │┃                                              ┃│                                              ││                                              │
 │                                  │┃                                              ┃│                                              ││                                              │
 │                                  │┃                                              ┃│                                              ││                                              │
-╰ ◆ needs you ✦ to review ✓ merged ╯┗ ◆ Write perm.txt  a allow d deny i reply ━━━━┛╰──────────────────────────────────────────────╯╰──────────────────────────────────────────────╯
+╰ ◆ needs you ✦ to review ✓ merged ╯┗ ◆ Write perm.txt  a allow d deny ━━━━━━━━━━━━┛╰──────────────────────────────────────────────╯╰──────────────────────────────────────────────╯
 ╭ deny with a note → Busy Claude ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ not perm.txt; write notes.md instead▌                                                                                                                                            │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

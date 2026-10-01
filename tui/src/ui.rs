@@ -572,7 +572,7 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
         let what = feed.and_then(|f| f.pending_permission().map(|p| p.1.to_string())).or_else(|| run.attention.as_ref().and_then(|a| a["tool"].as_str().map(str::to_string))).unwrap_or_default();
         Some(Line::from(vec![Span::styled(" ◆ ", Style::new().fg(waiting())), Span::styled(fit(&what, (area.width as usize).saturating_sub(24)), Style::new().fg(waiting()).add_modifier(Modifier::BOLD)), Span::styled("  a", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(" allow ", Style::new().fg(MUTED))].into_iter()
             .chain(run.attention.as_ref().filter(|a| !a["always"].is_null()).map(|_| vec![Span::styled("s", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(" this session ", Style::new().fg(MUTED))]).unwrap_or_default())
-            .chain([Span::styled("d", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(" deny ", Style::new().fg(MUTED)), Span::styled("i", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(" reply ", Style::new().fg(MUTED))])
+            .chain([Span::styled("d", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(" deny ", Style::new().fg(MUTED))])
             .collect::<Vec<_>>()))
     } else if app.drafts.get(&run.id).is_some_and(|d| !d.trim().is_empty()) && !matches!(app.mode, Mode::Compose) {
         Some(Line::from(Span::styled(" ✎ draft ", Style::new().fg(accent()))))
@@ -817,7 +817,7 @@ fn help(f: &mut Frame, area: Rect) {
         ("home / G", "in the full view: top / bottom"),
         ("v", "review: Accept / Reject changes"),
         ("e  (in zoom)", "expand tool inputs and results"),
-        ("a / s / d", "allow once / allow for this session / deny its permission request"),
+        ("a / d / s", "allow / deny its permission request; s allows it for this session"),
         ("i  (waiting)", "deny it with a note: the agent reads it as the reason"),
         ("w", "next agent waiting for you"),
         ("x", "interrupt the focused agent"),

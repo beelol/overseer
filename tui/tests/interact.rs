@@ -208,7 +208,7 @@ fn t05_messages_go_to_the_focused_agent_only_and_drafts_are_kept() {
     // agent reads the reply as the reason.
     focus(&mut tui, &busy);
     let s = tui.screen();
-    assert!(s.contains("a allow") && s.contains("d deny") && s.contains("i reply"), "the tile offers the answers: {s}");
+    assert!(s.contains("a allow") && s.contains("d deny"), "the tile offers the answers: {s}");
     tui.key(KeyCode::Char('i'));
     tui.type_text("not perm.txt; write notes.md instead");
     let s = tui.screen();
