@@ -1,5 +1,11 @@
 # AC-146: merges
 
+## Pull request #37 (the phone model brought up to the extension; test-all runs the phone's tests), 2026-10-01
+
+- **Finished:** its first builder stopped mid-way on 2026-09-29; a builder merged main in (clean) and brought the phone model up to #32, #38, #40 and #42 (Accept / Accepted on hunks, "N of M accepted", the review tree drawn in Diffs, the search hint copied from `agent-search.js`), then marked it ready.
+- **Throwaway copy:** #37 with main (clean). It changes only `phone/` and two steps in `scripts/test-all`, so the check is the phone's suites: `npm test --prefix phone/model` 152 of 152 (15 files, tsc clean), `npm run check --prefix phone` 32 suites, 477 of 477 (tokens, icons, assets, lint, types). The e2e flows were updated, not run (no simulators).
+- **Merged:** squash, `e2806565`. scripts/test-all now runs the phone model's tests and the phone app's check (AC-147).
+
 ## Pull request #38 (the review opens on Since task start; Accept and Reject), 2026-09-30
 
 - **Finished:** built by its agent; main (with #40 and #42) merged in by a builder (`acf519dc`: #40's Follow | Diffs only toolbar kept, #38's comparison row under it), the owner's coloured check and X for narrow cards (`78371acd`).

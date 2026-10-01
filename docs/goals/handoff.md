@@ -98,13 +98,12 @@ Five builders plus merge checks at once pushed the load past 100 and crashed the
 | PR | Branch (head) | What | State and next step |
 |---|---|---|---|
 | #41 | `claude/steady-tests` | Timing tests wait for events, not fixed sleeps (AC-149) | ac185 and ac189, protocol's Auto/OpenCode tests, and the UI center, continuity, review, sidebar, audit, main, modes and keyboard scenarios. **No artificial load.** |
-| #37 | `claude/phone-parity` | The phone model's 12 failing parity tests; test-all runs the phone's tests | **00:15 Oct 1: a builder is finishing it** (worktree `.claude/worktrees/phone-parity-m`): main merged in, the phone model brought up to the extension (#32, #38, #40, #42 changed what it draws), the phone steps in test-all passing; node only, no simulators. |
 
 **The owner allowed merging main into branches and copies (2026-09-30): "you don't need to ask you just need to do it yourself."** #41 (`97342c05`) and #37 (`70d51ef6`) have main merged in (the same `CARGO_TARGET_DIR` fix on both sides; main's side kept); both now merge cleanly.
 
 Mergeability against main, checked 2026-09-30 00:00 with `git merge-tree --write-tree`: #32, #40, #42, #39, #38 merge cleanly; **#41 (`claude/steady-tests`) and #37 (`claude/phone-parity`) now conflict** and need main merged into them before their turn.
 
-Merged on 2026-09-30: #38 (`31e1a39c`, Accept / Reject and Since task start), #40 (`4da1640e`, one layout with Follow inside the review), #42 (`86e993fd`, the menu bar; two class-table gaps fixed in the merge check), #39 (`ac7a4143`), #32 (`3ab9c1f7`; talk, conversation and review missed in the full run and passed alone). Merged on 2026-09-29: #31, #33, #34, #35, #36. Deployed to the owner: b3b7133d (#31, #33, #34). **Deployed to the owner: `fbc7c663`** (#38 Accept / Reject, plus #40, #42 and everything before) on 2026-09-30 at 23:58: daemon restarted, the menu-bar item running; VS Code windows need a reload. Earlier: `c42ad18c` (17:07), `9a4a2c0b` (16:45), `ed747bc7` (01:03).
+Merged on 2026-10-01: #37 (`e2806565`, the phone's tests pass and test-all runs them). Merged on 2026-09-30: #38 (`31e1a39c`, Accept / Reject and Since task start), #40 (`4da1640e`, one layout with Follow inside the review), #42 (`86e993fd`, the menu bar; two class-table gaps fixed in the merge check), #39 (`ac7a4143`), #32 (`3ab9c1f7`; talk, conversation and review missed in the full run and passed alone). Merged on 2026-09-29: #31, #33, #34, #35, #36. Deployed to the owner: b3b7133d (#31, #33, #34). **Deployed to the owner: `fbc7c663`** (#38 Accept / Reject, plus #40, #42 and everything before) on 2026-09-30 at 23:58: daemon restarted, the menu-bar item running; VS Code windows need a reload. Earlier: `c42ad18c` (17:07), `9a4a2c0b` (16:45), `ed747bc7` (01:03).
 
 ## New from the owner (2026-09-30)
 
