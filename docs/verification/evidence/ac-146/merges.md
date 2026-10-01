@@ -1,5 +1,11 @@
 # AC-146: merges
 
+## Pull request #41 (tests wait for what they check; AC-149), 2026-10-01
+
+- **Finished:** its first builder converted the daemon tests; a builder finished it (main merged in, ac185 against a measured baseline, the harness's screenshot and port-file waits, 13 scenarios waiting on what they check) and marked it ready. Real fixes found: the review now marks a conflict that arrives after the file's own change (`comparison.js`), two OpenCode runs no longer race its first-start migration in scenario-review, a context-menu click is retried.
+- **Throwaway copy:** #41 with main (clean). `test-all --no-ui`: Rust 1,428 passed, phone 152 and 477, dev 12/12, guided 7/7, deploy 6/6, links. UI one at a time (LIVE, ON SCREEN, perf skipped): 68 of 72; scopes and sidebar-search passed alone; notify-agents and popout (the test window must never take the focus from the owner's apps) failed alone and fail the same on a build of main while the owner was at the Mac (idle 64 s): they need a quiet machine.
+- **Merged:** squash, `9297b347`. AC-149 stays partial: three clean full runs on a quiet machine.
+
 ## Pull request #45 (the TUI's dashboard mode and a grid-only terminal; T-40, T-41), 2026-10-01
 
 - **Finished:** built by a builder on the coordinator's brief; changes only `tui/` and its evidence (and the phone Devices key in the TUI, `D` to Ctrl-O, said in the PR: Gate N's area).
