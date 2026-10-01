@@ -127,6 +127,17 @@ async function activate(context) {
     model.emitter.fire();
   };
   client.on('connected', () => { if (reviewed.size) client.request('review.seen', { marks: Object.fromEntries([...reviewed].slice(-2000)) }).catch(() => {}); });
+  // The daemon's marks (T-26): a review opened in the terminal or on another surface, or a merge,
+  // clears the mark here too. The later time wins, as in the daemon. Returns whether any moved.
+  const takeMarks = marks => {
+    let moved = false;
+    for (const [id, ms] of Object.entries(marks || {})) if (typeof ms === 'number' && ms > (reviewed.get(id) || 0)) { reviewed.set(id, ms); moved = true; }
+    if (moved) context.globalState.update('overseer.reviewed', Object.fromEntries([...reviewed].slice(-2000)));
+    return moved;
+  };
+  // `state` carries them on every refresh; a `review_seen` event carries the ones that just moved.
+  model.onDidChange(() => { if (takeMarks(model.all?.reviewed)) model.emitter.fire(); });
+  client.on('event', event => { if (event.kind === 'review_seen' && takeMarks(event.payload?.marks)) model.emitter.fire(); });
   const archivedTasks = () => (model.state.tasks || []).filter(t => t.archived_ms).map(t => t.id);
   // Needs you (AC-61, AC-246): what waits for the owner's answer, counted as the TUI and the phone
   // count it (media/rollup.js); failed and finished agents carry the "to review" mark instead (AC-254).

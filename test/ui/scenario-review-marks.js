@@ -8,6 +8,8 @@
 //   AC-255  with 11 agents at their end and none working, the rollup reads nonzero counts in the
 //           side bar while the grid shows no tile (the grid command goes home, and its note gives the
 //           same counts); with one agent pinned, the grid's header shows the same rollup as the side bar.
+//   T-26    a review opened in the terminal (`review.seen` through the daemon) clears VS Code's mark
+//           within 2 s; the reviews opened in VS Code are in the daemon's marks, which the TUI counts.
 const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
@@ -111,6 +113,25 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     v = await rows();
     check('with one agent pinned, the grid\'s header shows the same rollup as the side bar', !!grid && grid.text === rollupRow(v)?.label, { grid, side: rollupRow(v)?.label });
     await s.screenshot('grid-header-rollup');
+
+    // ---------- T-26: the daemon keeps the marks for every surface. A review opened in the terminal
+    // (the TUI sends `review.seen` as below) clears VS Code's mark; one opened in VS Code reaches the daemon.
+    const tags = more[1];
+    v = await settle(x => agentRow(x, 'Notes tags')?.badge === '✦');
+    const beforeTui = { badge: agentRow(v, 'Notes tags')?.badge, side: rollupRow(v)?.label };
+    await s.screenshot('t26-before-terminal-review');
+    const sentAt = Date.now();
+    s.ctl('review.seen', { marks: { [tags]: sentAt } });
+    v = await settle(x => agentRow(x, 'Notes tags')?.badge === '✓' && /6 to review/.test(rollupRow(x)?.label || ''));
+    const tookMs = Date.now() - sentAt;
+    const afterTui = { badge: agentRow(v, 'Notes tags')?.badge, side: rollupRow(v)?.label, others: v.rows.filter(r => r.badge === '✦').length, tookMs };
+    check('T-26: a review opened in the terminal (review.seen through the daemon) clears only that mark in VS Code\'s side bar within 2 s', beforeTui.badge === '✦' && afterTui.badge === '✓' && afterTui.side === '6 to review · 5 reviewed · 1 failed' && afterTui.others === 6 && tookMs <= 2000, { beforeTui, afterTui });
+    await s.screenshot('t26-after-terminal-review');
+    const st = s.ctl('state');
+    const Rollup = require(path.join(repoRoot, 'extension/media/rollup.js'));
+    const opened = ['Site header', 'Site footer', 'Site pricing', 'Notes index'].map(t => st.runs.find(r => !r.parent_run_id && st.tasks.find(k => k.id === r.task_id)?.title === t));
+    const daemonText = Rollup.text(Rollup.counts(st, st.reviewed || {}));
+    check('T-26: the reviews opened in VS Code are marked in the daemon, so the terminal counts what the side bar counts', opened.every(r => r && (st.reviewed || {})[r.id] >= (r.ended_ms || r.created_ms)) && daemonText === rollupRow(v)?.label, { daemonText, side: rollupRow(v)?.label, marks: opened.map(r => r && [r.id, (st.reviewed || {})[r.id], r.ended_ms]) });
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}
