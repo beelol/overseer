@@ -87,6 +87,8 @@ pub enum Mode {
     AudioImport,
     /// The conversation with Overseer (`o`): its messages, the proposals that wait, a composer.
     Overseer,
+    /// Denying a permission (T-31): a one-line note for the agent; Enter sends, empty is fine.
+    DenyNote { run: String, request: String },
 }
 
 /// A program to run in the terminal with the TUI suspended (a provider's own sign-in).
@@ -144,7 +146,7 @@ enum Pending {
     State,
     History { root: String, run: String, page: usize },
     FollowUp { run: String, text: String },
-    Permission { allow: bool },
+    Permission { allow: bool, session: bool },
     Interrupt,
     Harnesses,
     Accounts,
@@ -521,6 +523,8 @@ pub struct App {
     pub last_edit: HashMap<String, String>,
     /// Follow looks again when an edit was reported before it reached the disk.
     follow_due: Option<Instant>,
+    /// The note typed while denying a permission (T-31).
+    pub deny_note: String,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -599,6 +603,7 @@ impl App {
             pairing_shown: 0,
             last_edit: HashMap::new(),
             follow_due: None,
+            deny_note: String::new(),
         }
     }
 
@@ -1271,8 +1276,8 @@ impl App {
                 }
                 self.say(format!("Not sent: {e}"), true);
             }
-            (Pending::Permission { allow }, Ok(_)) => {
-                self.say(if allow { "Allowed" } else { "Denied" }, false);
+            (Pending::Permission { allow, session }, Ok(_)) => {
+                self.say(if session { "Allowed for this session" } else if allow { "Allowed once" } else { "Denied" }, false);
                 self.state_due = Some(Instant::now() + Duration::from_millis(60));
             }
             (Pending::Interrupt, Ok(_)) => self.say("Interrupt sent", false),
@@ -1678,14 +1683,58 @@ impl App {
         self.mode = if matches!(self.mode, Mode::Compose) { Mode::Grid } else { self.mode.clone() };
     }
 
-    fn answer(&mut self, allow: bool) {
-        let Some(run) = self.focused().cloned() else { return };
+    /// The focused agent's pending permission request.
+    fn pending_request(&mut self) -> Option<(Run, String)> {
+        let run = self.focused().cloned()?;
         let request_id = run.permission_request().or_else(|| self.feeds.get(&run.id).and_then(|f| f.pending_permission().map(|p| p.0.to_string())));
-        let Some(request_id) = request_id else {
-            self.say("Nothing to answer for this agent", false);
+        match request_id {
+            Some(r) => Some((run, r)),
+            None => {
+                self.say("Nothing to answer for this agent", false);
+                None
+            }
+        }
+    }
+
+    /// `a` Allow once (T-31).
+    fn answer(&mut self, allow: bool) {
+        let Some((run, request_id)) = self.pending_request() else { return };
+        self.request("run.permission", json!({ "run_id": run.id, "request_id": request_id, "allow": allow }), Pending::Permission { allow, session: false });
+    }
+
+    /// `s` Allow for this session (T-31): the harness's own rule, so the same tool is not asked again.
+    fn answer_session(&mut self) {
+        let Some((run, request_id)) = self.pending_request() else { return };
+        let offered = run.attention.as_ref().filter(|a| a["request_id"].as_str() == Some(request_id.as_str())).is_some_and(|a| !a["always"].is_null());
+        if !offered {
+            self.say("This request offers no Allow for this session: a allows once", false);
             return;
-        };
-        self.request("run.permission", json!({ "run_id": run.id, "request_id": request_id, "allow": allow }), Pending::Permission { allow });
+        }
+        self.request("run.permission", json!({ "run_id": run.id, "request_id": request_id, "allow": true, "always": true }), Pending::Permission { allow: true, session: true });
+    }
+
+    /// `d` Deny with a note (T-31): a one-line note, sent to the agent as the reason.
+    fn open_deny(&mut self) {
+        let Some((run, request)) = self.pending_request() else { return };
+        self.deny_note.clear();
+        self.mode = Mode::DenyNote { run: run.id, request };
+    }
+
+    fn deny_key(&mut self, k: KeyEvent, run: String, request: String) {
+        match k.code {
+            KeyCode::Esc => self.mode = Mode::Grid,
+            KeyCode::Enter => {
+                let note = self.deny_note.trim().to_string();
+                self.mode = Mode::Grid;
+                self.request("run.permission", json!({ "run_id": run, "request_id": request, "allow": false, "message": note }), Pending::Permission { allow: false, session: false });
+            }
+            KeyCode::Backspace => {
+                self.deny_note.pop();
+            }
+            KeyCode::Char('u') if k.modifiers.contains(KeyModifiers::CONTROL) => self.deny_note.clear(),
+            KeyCode::Char(c) if !c.is_control() && self.deny_note.chars().count() < 500 => self.deny_note.push(c),
+            _ => {}
+        }
     }
 
     fn next_waiting(&mut self) {
@@ -2398,6 +2447,7 @@ impl App {
             Mode::Audio => self.audio_key(k),
             Mode::Overseer => self.overseer_key(k),
             Mode::AudioImport => self.audio_import_key(k),
+            Mode::DenyNote { run, request } => self.deny_key(k, run, request),
             Mode::Grid if self.dashboard_shown() => self.dashboard_key(k),
             Mode::Grid | Mode::Zoom { .. } => self.nav_key(k),
         }
@@ -2484,7 +2534,8 @@ impl App {
                 }
             }
             KeyCode::Char('a') => self.answer(true),
-            KeyCode::Char('d') => self.answer(false),
+            KeyCode::Char('s') => self.answer_session(),
+            KeyCode::Char('d') => self.open_deny(),
             KeyCode::Char('w') => self.next_waiting(),
             KeyCode::Char('x') => {
                 if let Some(run) = self.focused() {
@@ -2651,6 +2702,7 @@ impl App {
                     s.push_str(text);
                 }
             }
+            Mode::DenyNote { .. } => self.deny_note.push_str(&text.replace('\n', " ")),
             Mode::AudioImport => {
                 let remaining = MAX_AUDIO_IMPORT_PATH.saturating_sub(self.audio.import_path.chars().count());
                 self.audio.import_path.extend(text.chars().take(remaining));

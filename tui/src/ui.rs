@@ -92,7 +92,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     // The page follows the focused agent when the room changes (a resize, the list, a conversation).
     app.settle_focus();
     let composing = matches!(app.mode, Mode::Compose) || matches!(app.mode, Mode::Confirm(_));
-    let composer_h = if matches!(app.mode, Mode::Compose) { composer_height(app, area.width) } else if composing { 2 } else { 0 };
+    let composer_h = if matches!(app.mode, Mode::Compose) { composer_height(app, area.width) } else if matches!(app.mode, Mode::DenyNote { .. }) { 3 } else if composing { 2 } else { 0 };
     let [head, body, comp, foot] = Layout::vertical([Constraint::Length(1), Constraint::Min(3), Constraint::Length(composer_h), Constraint::Length(1)]).areas(area);
     header(f, app, head);
     match app.mode {
@@ -104,6 +104,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     }
     if matches!(app.mode, Mode::Compose) {
         composer(f, app, comp);
+    } else if let Mode::DenyNote { run, .. } = &app.mode {
+        deny_note(f, app, run, comp);
     } else if let Mode::Confirm(c) = &app.mode {
         let text = match c {
             Confirm::Interrupt(id) => format!(" Interrupt {}? y / n", short(&app.state.run(id).map(|r| r.title.clone()).unwrap_or_default(), 50)),
@@ -284,8 +286,9 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         return;
     }
     let keys: &[(&str, &str)] = match app.mode {
+        Mode::DenyNote { .. } => &[("type", "a note for the agent"), ("enter", "deny"), ("esc", "cancel")],
         Mode::Compose => &[("enter", "send"), ("alt+enter", "new line"), ("esc", "close (keeps draft)"), ("ctrl+u", "clear")],
-        Mode::Zoom { .. } => &[("e", if app.expand_tools { "fold tools" } else { "expand tools" }), ("j/k", "scroll"), ("home/G", "top/bottom"), ("i", "message"), ("a/d", "allow/deny"), ("x", "interrupt"), ("g/z", "grid"), ("?", "help")],
+        Mode::Zoom { .. } => &[("e", if app.expand_tools { "fold tools" } else { "expand tools" }), ("j/k", "scroll"), ("home/G", "top/bottom"), ("i", "message"), ("a/s/d", "allow once/session/deny"), ("x", "interrupt"), ("g/z", "grid"), ("?", "help")],
         Mode::NewAgent => &[("tab", "next field"), ("←/→", "choose"), ("enter", "start"), ("esc", "cancel")],
         Mode::Accounts => &[("j/k", "select"), ("s", "sign in"), ("S", "device code (ChatGPT)"), ("r", "refresh"), ("esc", "close")],
         Mode::Devices => &[("p", "pair a phone"), ("j/k", "select"), ("s", "scope"), ("x", "revoke"), ("N", "notifications"), ("O", "on/off"), ("esc", "close")],
@@ -296,13 +299,13 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         Mode::Overseer => &[("type", "to Overseer"), ("enter", "send"), ("ctrl+y/n", "yes/no to a proposal"), ("j/k", "scroll"), ("esc", "close")],
         Mode::Search => &[("type", "to search title, repo, harness, model, prompt"), ("enter", "keep"), ("esc", "clear")],
         Mode::Changes => &[("F", "Follow"), ("n/p", "change"), ("a/A", "Accept change/file"), ("r/R", "Reject change/file"), ("j/k", "file"), ("t", "Changed | All files"), ("1/2/3 c", "comparison"), ("e", "your editor"), ("J/K", "scroll"), ("ctrl+r", "reload"), ("esc", "back")],
-        Mode::Grid if app.dashboard_shown() && app.dash_col == 0 => &[("J/K j/k", "next / previous agent"), ("tab", "review, conversation"), ("i", "message"), ("a/d", "allow/deny"), ("g", "full view"), ("w", "next waiting"), ("n", "new"), ("D", "grid"), ("?", "help"), ("q", "quit")],
+        Mode::Grid if app.dashboard_shown() && app.dash_col == 0 => &[("J/K j/k", "next / previous agent"), ("tab", "review, conversation"), ("i", "message"), ("a/s/d", "allow once/session/deny"), ("g", "full view"), ("w", "next waiting"), ("n", "new"), ("D", "grid"), ("?", "help"), ("q", "quit")],
         Mode::Grid if app.dashboard_shown() && app.dash_col == 1 => &[("J/K", "agent"), ("F", "Follow"), ("n/p", "change"), ("a/A", "Accept change/file"), ("r/R", "Reject change/file"), ("j/k", "file"), ("t", "Changed | All files"), ("1/2/3 c", "comparison"), ("e", "your editor"), ("pgup/pgdn", "scroll"), ("tab", "conversation"), ("D", "grid")],
-        Mode::Grid if app.dashboard_shown() => &[("J/K", "agent"), ("j/k pgup/pgdn", "scroll"), ("e", if app.expand_tools { "fold tools" } else { "tool details" }), ("i", "message"), ("a/d", "allow/deny"), ("tab", "list"), ("D", "grid"), ("?", "help")],
+        Mode::Grid if app.dashboard_shown() => &[("J/K", "agent"), ("j/k pgup/pgdn", "scroll"), ("e", if app.expand_tools { "fold tools" } else { "tool details" }), ("i", "message"), ("a/s/d", "allow once/session/deny"), ("tab", "list"), ("D", "grid"), ("?", "help")],
         Mode::Grid if app.picked && app.focused().is_some() => &[("J/K", "next / previous agent"), ("esc", "close the conversation"), ("pgup/pgdn", "scroll"), ("e", if app.expand_tools { "fold tools" } else { "tool details" }), ("i", "message"), ("v", "changes"), ("?", "help")],
         _ if area.width < 110 => &[("i", "message"), ("g", "full view"), ("a/d", "answer"), ("n", "new"), ("o", "Overseer"), ("?", "keys"), ("q", "quit")],
-        _ if app.grid_only => &[("←↑↓→", "move"), ("tab", "next agent"), ("i", "message"), ("g", "full view"), ("v", "changes"), ("a/d", "allow/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
-        _ => &[("←↑↓→", "move"), ("J/K", "pick in the list"), ("i", "message"), ("g", "full view"), ("v", "changes"), ("a/d", "allow/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
+        _ if app.grid_only => &[("←↑↓→", "move"), ("tab", "next agent"), ("i", "message"), ("g", "full view"), ("v", "changes"), ("a/s/d", "allow once/session/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
+        _ => &[("←↑↓→", "move"), ("J/K", "pick in the list"), ("i", "message"), ("g", "full view"), ("v", "changes"), ("a/s/d", "allow once/session/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
     };
     // Dashboard mode asked for (`--dashboard`) in a terminal too narrow for it: say so, on the grid.
     if app.dashboard && !app.dashboard_shown() && matches!(app.mode, Mode::Grid) {
@@ -565,7 +568,24 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     let pending = run.permission_request().is_some() || feed.and_then(|f| f.pending_permission()).is_some();
     let bottom = if pending {
         let what = feed.and_then(|f| f.pending_permission().map(|p| p.1.to_string())).or_else(|| run.attention.as_ref().and_then(|a| a["tool"].as_str().map(str::to_string))).unwrap_or_default();
-        Some(Line::from(vec![Span::styled(" ◆ ", Style::new().fg(waiting())), Span::styled(fit(&what, (area.width as usize).saturating_sub(24)), Style::new().fg(waiting()).add_modifier(Modifier::BOLD)), Span::styled("  a", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(" allow ", Style::new().fg(MUTED)), Span::styled("d", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(" deny ", Style::new().fg(MUTED))]))
+        // T-31: Allow once, Allow for this session (when the harness offers its rule), Deny with a note.
+        let session = run.attention.as_ref().is_some_and(|a| a["kind"] == "permission" && !a["always"].is_null());
+        let key = |k: &'static str| Span::styled(k, Style::new().fg(accent()).add_modifier(Modifier::BOLD));
+        let word = |w: &'static str| Span::styled(w, Style::new().fg(MUTED));
+        let words = |long: bool| {
+            let mut answers = vec![key("  a"), word(if long { " allow once " } else { " once " }), key("d"), word(" deny… ")];
+            if session {
+                answers.splice(2..2, [key("s"), word(if long { " this session " } else { " session " })]);
+            }
+            answers
+        };
+        // The short words when the long ones leave the request no room (a small tile).
+        let long = (area.width as usize) >= Line::from(words(true)).width() + 4 + 14;
+        let answers = words(long);
+        let room = (area.width as usize).saturating_sub(Line::from(answers.clone()).width() + 4);
+        let mut spans = vec![Span::styled(" ◆ ", Style::new().fg(waiting())), Span::styled(fit(&what, room.max(8)), Style::new().fg(waiting()).add_modifier(Modifier::BOLD))];
+        spans.extend(answers);
+        Some(Line::from(spans))
     } else if app.drafts.get(&run.id).is_some_and(|d| !d.trim().is_empty()) && !matches!(app.mode, Mode::Compose) {
         Some(Line::from(Span::styled(" ✎ draft ", Style::new().fg(accent()))))
     } else if let Some(landed) = app.state.landing_text(&run.workspace_id).filter(|_| !run.active()) {
@@ -782,6 +802,17 @@ fn composer_height(app: &App, width: u16) -> u16 {
     (lines as u16 + 2).min(8)
 }
 
+/// Denying a permission (T-31): the note the agent gets as the reason; empty is fine.
+fn deny_note(f: &mut Frame, app: &App, run: &str, area: Rect) {
+    let title = short(&app.state.run(run).map(|r| r.title.clone()).unwrap_or_default(), 50);
+    let what = app.feeds.get(run).and_then(|f| f.pending_permission().map(|p| p.1.to_string())).unwrap_or_default();
+    let block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(waiting()))
+        .title(Line::from(vec![Span::styled(" deny → ", Style::new().fg(MUTED)), Span::styled(title, Style::new().fg(waiting()).add_modifier(Modifier::BOLD)), Span::styled(format!(" · {} ", fit(&what, 60)), Style::new().fg(MUTED))]))
+        .title_bottom(Line::from(Span::styled(" a note for the agent (optional) · enter denies · esc cancels ", Style::new().fg(MUTED))).right_aligned());
+    let text = if app.deny_note.is_empty() { Line::from(vec![Span::styled("▌", Style::new().fg(accent())), Span::styled(" why, or what to do instead", Style::new().fg(MUTED))]) } else { Line::from(vec![Span::raw(app.deny_note.clone()), Span::styled("▌", Style::new().fg(accent()))]) };
+    f.render_widget(Paragraph::new(text).block(block.padding(ratatui::widgets::Padding::horizontal(1))), area);
+}
+
 fn composer(f: &mut Frame, app: &App, area: Rect) {
     let Some(run) = app.focused() else { return };
     let draft = app.drafts.get(&run.id).cloned().unwrap_or_default();
@@ -815,7 +846,7 @@ fn help(f: &mut Frame, area: Rect) {
         ("v", "review: Accept / Reject changes"),
         ("F  (review)", "Follow the agent's edits (a move pauses)"),
         ("e  (in zoom)", "expand tool inputs and results"),
-        ("a / d", "allow / deny its permission request"),
+        ("a  s  d", "allow / deny: once, this session, with a note"),
         ("w", "next agent waiting for you"),
         ("x", "interrupt the focused agent"),
         ("n", "start a new agent"),
@@ -832,7 +863,7 @@ fn help(f: &mut Frame, area: Rect) {
         ("X", "stop all agents and the daemon"),
         ("q", "quit (agents keep running)"),
     ];
-    let w = 58.min(area.width.saturating_sub(4));
+    let w = 72.min(area.width.saturating_sub(4));
     let h = (rows.len() as u16 + 4).min(area.height.saturating_sub(2));
     let r = Rect { x: area.x + (area.width.saturating_sub(w)) / 2, y: area.y + (area.height.saturating_sub(h)) / 2, width: w, height: h };
     let mut lines = vec![Line::raw("")];

@@ -1073,3 +1073,81 @@ fn t30_follow_in_the_review() {
     tui.key(KeyCode::Char('?'));
     assert!(tui.screen().contains("Follow the agent's edits"));
 }
+
+/// T-31: on the Claude fixture, every waiting agent can be answered from the terminal: `a` Allow
+/// once (asked again for the same tool), `s` Allow for this session (Claude Code's own session
+/// rule: not asked again), `d` Deny with a note (the note reaches the fixture as the reason).
+#[test]
+fn t31_a_waiting_agent_can_always_be_answered() {
+    let t = tempfile::tempdir().unwrap();
+    let log = t.path().join("stdin");
+    std::fs::create_dir_all(&log).unwrap();
+    let log_s = log.display().to_string();
+    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture("claude-fixture.js")), ("CLAUDE_FIXTURE_MODE", "session-rule"), ("FIXTURE_STDIN_LOG_DIR", &log_s), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE,FIXTURE_STDIN_LOG_DIR")]);
+    let r = five_files(&t.path().join("answers"));
+    let start = |title: &str| d.ctl("task.create", json!({ "repo": r, "harness": "claude", "prompt": "twice: npm test", "title": title }))["run"]["id"].as_str().unwrap().to_string();
+    let session = start("Allowed for the session");
+    let once = start("Allowed once");
+    let denied = start("Denied with a note");
+    for id in [&session, &once, &denied] {
+        d.wait_status(id, |s| s == "waiting_for_user", 20);
+    }
+    let mut tui = Tui::attach(&d, 240, 44);
+    tui.until(10, |a| a.visible().iter().filter(|r| r.needs_you()).count() == 3);
+    let focus = |tui: &mut Tui, id: &str| {
+        for _ in 0..10 {
+            if tui.app.focus.as_deref() == Some(id) {
+                return;
+            }
+            tui.key(KeyCode::Tab);
+        }
+        panic!("could not focus {id}");
+    };
+    let asked = |id: &str| d.events(id).iter().filter(|e| e["kind"] == "permission").count();
+
+    // The prompt: the three answers, with Allow for this session because Claude Code offers its rule.
+    focus(&mut tui, &session);
+    let s = tui.until_screen(10, "s this session");
+    assert!(s.lines().any(|l| l.contains("◆ Bash npm test") && l.contains("a allow once s this session d deny…")), "{s}");
+    tui.snapshot("parity-t31-prompt");
+
+    // s: allowed for this session; the second npm test is not asked again.
+    tui.key(KeyCode::Char('s'));
+    d.wait_status(&session, |s| s == "completed", 20);
+    assert_eq!(asked(&session), 1, "Allow for this session is not asked again for the same tool");
+    let said: Vec<String> = d.events(&session).iter().filter_map(|e| e["payload"]["text"].as_str().map(str::to_string)).collect();
+    assert!(said.iter().any(|t| t.contains("npm test --again (allowed for this session, not asked again)")), "{said:?}");
+    let answered = d.events(&session).into_iter().find(|e| e["kind"] == "permission_answered").unwrap();
+    assert_eq!(answered["payload"]["always"], "Bash(npm test:*) · this session", "{answered}");
+
+    // a: allowed once; the same tool is asked again, and a allows it again.
+    focus(&mut tui, &once);
+    tui.key(KeyCode::Char('a'));
+    tui.until(10, |a| a.state.run(&once).is_some_and(|r| r.permission_request().is_some_and(|q| q == "req-bash-2")));
+    assert_eq!(asked(&once), 2, "Allow once asks again");
+    tui.key(KeyCode::Char('a'));
+    d.wait_status(&once, |s| s == "completed", 20);
+
+    // d: a one-line note; Enter sends it as the reason.
+    focus(&mut tui, &denied);
+    tui.key(KeyCode::Char('d'));
+    assert!(matches!(tui.app.mode, Mode::DenyNote { .. }));
+    tui.type_text("use the staging database instead");
+    let s = tui.screen();
+    assert!(s.contains("deny → Denied with a note") && s.contains("use the staging database instead") && s.contains("enter denies"), "{s}");
+    tui.snapshot("parity-t31-deny-note");
+    tui.key(KeyCode::Enter);
+    assert_eq!(tui.app.mode, Mode::Grid);
+    d.wait_status(&denied, |s| s == "completed", 20);
+    let wt = worktree(&d, &denied);
+    let input = std::fs::read_to_string(log.join(format!("{}.log", wt.file_name().unwrap().to_string_lossy()))).unwrap();
+    let reply = input.lines().find(|l| l.contains("control_response")).expect("the denial reached the fixture");
+    assert!(reply.contains("\"behavior\":\"deny\"") && reply.contains("\"message\":\"use the staging database instead\""), "{reply}");
+    tui.until(10, |a| a.state.run(&denied).is_some_and(|r| !r.needs_you() && !r.active()));
+    let s = tui.until_screen(10, "permission denied: use the staging database instead");
+    assert!(!s.lines().next().unwrap().contains("need"), "no one waits:\n{s}");
+    tui.snapshot("parity-t31-answered");
+    // `?` names all three.
+    tui.key(KeyCode::Char('?'));
+    assert!(tui.screen().contains("allow / deny: once, this session, with a note"));
+}

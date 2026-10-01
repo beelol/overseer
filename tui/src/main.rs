@@ -41,12 +41,13 @@ KEYS:
     D               dashboard mode <-> the grid, on the picked agent (tab: list, review,
                     conversation; J / K pick another agent from any column)
     i / enter       message the focused agent  g / z grid <-> the focused agent's full view
-    a / d           allow / deny a permission  w     next agent waiting for you
+    a / s / d       allow / deny a permission: a once, s for this session, d with a note
+    w               next agent waiting for you
     x               interrupt                  n     new agent
     C               remove a finished agent's worktree (branch kept)
     P               open a GitHub pull request (your git credentials and gh)
     X               stop all agents and the daemon (r starts it again)
-    v               review: comparisons, files, Accept / Reject (e: your $EDITOR)
+    v               review: comparisons, files, Accept / Reject (e: your $EDITOR; F: Follow)
     M               merge back (asks each step)
     /               search agents              A     accounts and sign-in
     O               phone access on / off      ctrl+o devices: pair a phone, revoke, scope

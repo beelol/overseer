@@ -61,7 +61,7 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | F (review) | Follow: the review moves to the file the agent is editing and to that change; a move by hand pauses it ("Paused"), `F` resumes it (T-30) |
 | Ctrl-R (review) | Reload the review (T-29) |
 | e (zoom) | Expand or fold every tool call's input and result |
-| a / d | Allow / deny the focused agent's pending permission |
+| a / s / d | Answer the focused agent's pending permission: Allow once, Allow for this session (the harness's own rule, when it offers one), Deny with a note (a one-line note; Enter sends, empty is fine) (T-31) |
 | w | Jump to the next agent waiting for you |
 | x | Interrupt the focused agent (asks y/n) |
 | M | Merge back: commit the worktree and merge the target in (y/n), then merge into the target (y/n) |
