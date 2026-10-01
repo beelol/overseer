@@ -295,9 +295,9 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         Mode::AudioImport => &[("type", "private folder path"), ("enter", "import"), ("esc", "back")],
         Mode::Overseer => &[("type", "to Overseer"), ("enter", "send"), ("ctrl+y/n", "yes/no to a proposal"), ("j/k", "scroll"), ("esc", "close")],
         Mode::Search => &[("type", "to search title, repo, harness, model, prompt"), ("enter", "keep"), ("esc", "clear")],
-        Mode::Changes => &[("n/p", "change"), ("a/A", "Accept change/file"), ("r/R", "Reject change/file"), ("j/k", "file"), ("t", "Changed | All files"), ("1/2/3 c", "comparison"), ("e", "your editor"), ("J/K", "scroll"), ("ctrl+r", "reload"), ("esc", "back")],
+        Mode::Changes => &[("F", "Follow"), ("n/p", "change"), ("a/A", "Accept change/file"), ("r/R", "Reject change/file"), ("j/k", "file"), ("t", "Changed | All files"), ("1/2/3 c", "comparison"), ("e", "your editor"), ("J/K", "scroll"), ("ctrl+r", "reload"), ("esc", "back")],
         Mode::Grid if app.dashboard_shown() && app.dash_col == 0 => &[("J/K j/k", "next / previous agent"), ("tab", "review, conversation"), ("i", "message"), ("a/d", "allow/deny"), ("g", "full view"), ("w", "next waiting"), ("n", "new"), ("D", "grid"), ("?", "help"), ("q", "quit")],
-        Mode::Grid if app.dashboard_shown() && app.dash_col == 1 => &[("J/K", "agent"), ("n/p", "change"), ("a/A", "Accept change/file"), ("r/R", "Reject change/file"), ("j/k", "file"), ("t", "Changed | All files"), ("1/2/3 c", "comparison"), ("e", "your editor"), ("pgup/pgdn", "scroll"), ("tab", "conversation"), ("D", "grid")],
+        Mode::Grid if app.dashboard_shown() && app.dash_col == 1 => &[("J/K", "agent"), ("F", "Follow"), ("n/p", "change"), ("a/A", "Accept change/file"), ("r/R", "Reject change/file"), ("j/k", "file"), ("t", "Changed | All files"), ("1/2/3 c", "comparison"), ("e", "your editor"), ("pgup/pgdn", "scroll"), ("tab", "conversation"), ("D", "grid")],
         Mode::Grid if app.dashboard_shown() => &[("J/K", "agent"), ("j/k pgup/pgdn", "scroll"), ("e", if app.expand_tools { "fold tools" } else { "tool details" }), ("i", "message"), ("a/d", "allow/deny"), ("tab", "list"), ("D", "grid"), ("?", "help")],
         Mode::Grid if app.picked && app.focused().is_some() => &[("J/K", "next / previous agent"), ("esc", "close the conversation"), ("pgup/pgdn", "scroll"), ("e", if app.expand_tools { "fold tools" } else { "tool details" }), ("i", "message"), ("v", "changes"), ("?", "help")],
         _ if area.width < 110 => &[("i", "message"), ("g", "full view"), ("a/d", "answer"), ("n", "new"), ("o", "Overseer"), ("?", "keys"), ("q", "quit")],
@@ -651,6 +651,13 @@ fn changes(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
         Span::styled(format!("+{} ", total.0), Style::new().fg(Color::Green)),
         Span::styled(format!("−{} ", total.1), Style::new().fg(Color::Red)),
     ]);
+    // Follow (T-30): on, or paused by a move made by hand.
+    let mut title = title;
+    match c.follow {
+        crate::app::Follow::On => title.spans.push(Span::styled("· ◉ Following the agent ", Style::new().fg(accent()).add_modifier(Modifier::BOLD))),
+        crate::app::Follow::Paused => title.spans.push(Span::styled("· Follow Paused (F resumes) ", Style::new().fg(waiting()).add_modifier(Modifier::BOLD))),
+        crate::app::Follow::Off => {}
+    }
     let block = if active { Block::bordered().border_type(BorderType::Thick).border_style(Style::new().fg(accent())) } else { Block::bordered().border_type(BorderType::Rounded).border_style(muted) }.title(title);
     let inner = block.inner(area);
     f.render_widget(Clear, area);
@@ -806,6 +813,7 @@ fn help(f: &mut Frame, area: Rect) {
         ("g  z", "zoom: one agent's full view ⇄ grid"),
         ("home / G", "in the full view: top / bottom"),
         ("v", "review: Accept / Reject changes"),
+        ("F  (review)", "Follow the agent's edits (a move pauses)"),
         ("e  (in zoom)", "expand tool inputs and results"),
         ("a / d", "allow / deny its permission request"),
         ("w", "next agent waiting for you"),

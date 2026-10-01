@@ -987,3 +987,89 @@ fn t41_two_real_terminals_on_one_daemon() {
     assert!(g.contains("Pty newcomer") && s.contains("Pty newcomer"), "the new agent in both");
     d.ctl("run.interrupt", json!({ "run_id": newcomer }));
 }
+
+/// T-30: a fixture agent edits three files in turn (the Claude fixture's editor mode, one edit per
+/// barrier file); with Follow on, the review moves to each file and to the change being made
+/// within 250 ms of the edit reaching the disk; `j` pauses it ("Paused"); `F` resumes it.
+#[test]
+fn t30_follow_in_the_review() {
+    let t = tempfile::tempdir().unwrap();
+    let barrier = t.path().join("barrier");
+    std::fs::create_dir_all(&barrier).unwrap();
+    let barrier_s = barrier.display().to_string();
+    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture("claude-fixture.js")), ("CLAUDE_FIXTURE_MODE", "editor"), ("FIXTURE_EDIT_BARRIER", &barrier_s), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE,FIXTURE_EDIT_BARRIER")]);
+    let r = five_files(&t.path().join("follow"));
+    let run = d.ctl("task.create", json!({ "repo": r, "harness": "claude", "prompt": "edit a.txt:8 edit b.txt:1 edit c.txt:1 edit d.txt:1 edit a.txt:2", "title": "Edits three files in turn" }))["run"]["id"].as_str().unwrap().to_string();
+    d.wait_status(&run, |s| s == "running", 20);
+    let wt = worktree(&d, &run);
+    let mut tui = Tui::attach(&d, 160, 44);
+    tui.until(10, |a| a.visible().len() == 1);
+    tui.key(KeyCode::Char('v'));
+    assert_eq!(tui.app.mode, Mode::Changes);
+    tui.until(10, |a| !a.changes.loading && !a.changes.options.is_empty());
+    tui.key(KeyCode::Char('F'));
+    assert_eq!(tui.app.changes.follow, overseer_tui::app::Follow::On);
+    assert!(tui.screen().contains("◉ Following the agent"));
+
+    // Each edit: the review shows that file, at the change the agent made (the line it edited).
+    let edit = |tui: &mut Tui, step: usize, file: &str, line: &str| -> std::time::Duration {
+        let before = std::fs::read_to_string(wt.join(file)).unwrap();
+        std::fs::write(barrier.join(format!("go-{step}")), "").unwrap();
+        let end = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        let mut written = None;
+        loop {
+            assert!(std::time::Instant::now() < end, "step {step}: the review did not move to {file}:\n{}", tui.screen());
+            if written.is_none() && std::fs::read_to_string(wt.join(file)).unwrap() != before {
+                written = Some(std::time::Instant::now());
+            }
+            let c = &tui.app.changes;
+            let there = c.path == file && !c.loading && c.hunks.get(c.change).is_some_and(|h| h.modified_lines.iter().any(|l| l == line)) && c.follow_to.is_none();
+            if there {
+                if let Some(at) = written {
+                    return at.elapsed();
+                }
+            }
+            tui.pump(5);
+        }
+    };
+    let mut took = Vec::new();
+    for (step, file, line) in [(1, "a.txt", "line 8 (edited by the agent)"), (2, "b.txt", "b one (edited by the agent)"), (3, "c.txt", "c one (edited by the agent)")] {
+        let dt = edit(&mut tui, step, file, line);
+        took.push((file, dt));
+        assert!(dt < std::time::Duration::from_millis(250), "{file}: the review moved {dt:?} after the edit");
+        tui.until(5, |a| !a.changes.loading && a.changes.files.iter().any(|f| f.1 == file && f.2 > 0));
+        let s = tui.screen();
+        assert!(s.contains(&format!("{file}  change")) && s.contains(&format!("+{line}")), "{s}");
+        tui.snapshot(&format!("parity-t30-follow-{step}"));
+    }
+    eprintln!("T-30 Follow latencies: {took:?}");
+
+    // j (a move by hand) pauses Follow: the next edit does not move the review.
+    tui.key(KeyCode::Char('j'));
+    assert_eq!(tui.app.changes.follow, overseer_tui::app::Follow::Paused);
+    let at = tui.app.changes.path.clone();
+    std::fs::write(barrier.join("go-4"), "").unwrap();
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    while !std::fs::read_to_string(wt.join("d.txt")).unwrap().contains("edited by the agent") {
+        assert!(std::time::Instant::now() < end);
+        tui.pump(20);
+    }
+    tui.until(10, |a| a.last_edit.values().any(|p| p == "d.txt"));
+    tui.pump(500);
+    assert_eq!(tui.app.changes.path, at, "paused: the review stays where it was moved by hand");
+    let s = tui.screen();
+    assert!(s.contains("Follow Paused (F resumes)"), "{s}");
+    tui.snapshot("parity-t30-paused");
+    // F resumes it: straight to the file the agent edited last, then on to the next edit.
+    tui.key(KeyCode::Char('F'));
+    assert_eq!(tui.app.changes.follow, overseer_tui::app::Follow::On);
+    tui.until(5, |a| a.changes.path == "d.txt" && !a.changes.loading && a.changes.follow_to.is_none() && !a.changes.hunks.is_empty());
+    let dt = edit(&mut tui, 5, "a.txt", "line 2 (edited by the agent)");
+    assert!(dt < std::time::Duration::from_millis(250), "after resuming, {dt:?}");
+    assert!(tui.screen().contains("◉ Following the agent"));
+    tui.snapshot("parity-t30-resumed");
+    // `?` names the key.
+    tui.key(KeyCode::Esc);
+    tui.key(KeyCode::Char('?'));
+    assert!(tui.screen().contains("Follow the agent's edits"));
+}

@@ -58,6 +58,7 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | a / A (review) | Accept the change / every change of the file (T-29) |
 | r / R (review) | Reject the change / every change of the file, after y/n (T-29) |
 | e (review) | Open the file at the change in `$EDITOR` (else `vi`); the review refreshes when it exits (T-39) |
+| F (review) | Follow: the review moves to the file the agent is editing and to that change; a move by hand pauses it ("Paused"), `F` resumes it (T-30) |
 | Ctrl-R (review) | Reload the review (T-29) |
 | e (zoom) | Expand or fold every tool call's input and result |
 | a / d | Allow / deny the focused agent's pending permission |

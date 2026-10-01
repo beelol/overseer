@@ -300,6 +300,25 @@ pub struct ChangesView {
     pub mine: HashMap<String, HashSet<String>>,
     /// The file as it was when the editor opened, to tell the owner's lines from the agent's.
     pub editing: Option<(String, String)>,
+    /// Follow (T-30): the review moves to the file the agent is editing and to that change.
+    pub follow: Follow,
+    /// The file Follow is moving to, the changes of it already seen (so the new one is found)
+    /// and how many more times to look when the edit is not on disk yet.
+    pub follow_to: Option<String>,
+    pub follow_known: Vec<String>,
+    pub follow_tries: u8,
+    /// The change to show once the file's lines are drawn.
+    pub follow_change: Option<usize>,
+}
+
+/// Follow in the review (T-30), as in VS Code: off, following the agent, or paused by a move made
+/// by hand (`F` resumes it).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Follow {
+    #[default]
+    Off,
+    On,
+    Paused,
 }
 
 impl ChangesView {
@@ -498,6 +517,10 @@ pub struct App {
     pairing_since: Option<Instant>,
     /// The seconds left last drawn (the clock redraws once a second).
     pairing_shown: u64,
+    /// The file each agent last edited (`file_activity`), for Follow (T-30).
+    pub last_edit: HashMap<String, String>,
+    /// Follow looks again when an edit was reported before it reached the disk.
+    follow_due: Option<Instant>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -574,6 +597,8 @@ impl App {
             pair_starting: 0,
             pairing_since: None,
             pairing_shown: 0,
+            last_edit: HashMap::new(),
+            follow_due: None,
         }
     }
 
@@ -1019,6 +1044,13 @@ impl App {
             }
         }
         changed |= self.phone_tick(now);
+        if self.follow_due.is_some_and(|due| now >= due) {
+            self.follow_due = None;
+            if let Some(path) = self.changes.follow_to.clone() {
+                self.follow_load(&path);
+                changed = true;
+            }
+        }
         // Dashboard mode (from `--dashboard`, or a terminal grown wide enough) loads its review.
         if self.dashboard && self.connected && self.dashboard_shown() {
             let unsynced = self.focused().is_some_and(|r| r.id != self.changes.run) || (self.focus.is_none() && !self.visible().is_empty());
@@ -1069,6 +1101,17 @@ impl App {
             Self::locate_feed(&self.state, &root, feed);
             feed.add(&ev, child.as_deref());
             self.last_event.insert(root, Instant::now());
+        }
+        // Follow (T-30): the file the agent is editing, and the review moves to it when Follow is on.
+        if kind == "file_activity" && !run_id.is_empty() {
+            let root = self.state.root_of(&run_id);
+            let paths: Vec<String> = ev["payload"]["paths"].as_array().map(|a| a.iter().filter_map(|x| x.as_str()).filter(|p| !p.starts_with('/') && !p.starts_with("..")).map(str::to_string).collect()).unwrap_or_default();
+            if let Some(path) = paths.last().cloned() {
+                self.last_edit.insert(root.clone(), path.clone());
+                if self.review_shown() && root == self.changes.run && self.changes.follow == Follow::On {
+                    self.follow_start(&path);
+                }
+            }
         }
         // The review follows marks and rejections made elsewhere (VS Code, the phone).
         if self.review_shown() && matches!(kind.as_str(), "review_mark" | "review_reject") && self.state.root_of(&run_id) == self.changes.run && !self.changes.loading {
@@ -1320,6 +1363,13 @@ impl App {
                     (c["status"].as_str().unwrap_or("M").to_string(), path, a, d)
                 }).collect();
                 self.changes.file = keep.and_then(|k| self.changes.shown().iter().position(|f| f.1 == k)).unwrap_or(0);
+                // Follow (T-30): the file the agent is editing, once it shows as changed.
+                if let Some(to) = self.changes.follow_to.clone() {
+                    match self.changes.shown().iter().position(|f| f.1 == to) {
+                        Some(i) => self.changes.file = i,
+                        None => self.follow_again(),
+                    }
+                }
                 self.changes.error = None;
                 self.load_file_diff();
             }
@@ -1337,6 +1387,21 @@ impl App {
                     reviewed: h["reviewed"] == true,
                 }).collect();
                 self.changes.change = self.changes.change.min(self.changes.hunks.len().saturating_sub(1));
+                if self.changes.follow_to.as_deref() == Some(path.as_str()) {
+                    // The change being made: the one not seen before the edit.
+                    let known = &self.changes.follow_known;
+                    match self.changes.hunks.iter().position(|h| !known.contains(&h.key)) {
+                        Some(i) => {
+                            self.changes.follow_change = Some(i);
+                            self.changes.follow_to = None;
+                        }
+                        None if self.changes.follow_tries > 0 => self.follow_again(),
+                        None => {
+                            self.changes.follow_change = self.changes.hunks.len().checked_sub(1);
+                            self.changes.follow_to = None;
+                        }
+                    }
+                }
                 if v["shown"] == false {
                     self.changes.diff = vec![format!("({})", v["why"].as_str().filter(|w| !w.is_empty()).unwrap_or("not shown as text"))];
                     self.changes.hunk_at.clear();
@@ -1368,6 +1433,9 @@ impl App {
                     self.changes.hunk_at.clear();
                 } else {
                     self.render_hunks(text.as_deref().unwrap_or_default());
+                    if let Some(i) = self.changes.follow_change.take() {
+                        self.go_to_change(i);
+                    }
                 }
             }
             (Pending::Tree { run }, Ok(v)) => {
@@ -1724,7 +1792,10 @@ impl App {
     fn load_review(&mut self, run: &Run) {
         self.mark_reviewed(&run.id);
         let keep = std::mem::take(&mut self.changes.mine);
-        self.changes = ChangesView { run: run.id.clone(), workspace: run.workspace_id.clone(), loading: true, mine: if self.changes.run == run.id { keep } else { HashMap::new() }, ..Default::default() };
+        let same = self.changes.run == run.id;
+        let follow = if same { self.changes.follow } else { Follow::Off };
+        self.changes = ChangesView { run: run.id.clone(), workspace: run.workspace_id.clone(), loading: true, mine: if same { keep } else { HashMap::new() }, follow, ..Default::default() };
+        self.follow_due = None;
         self.request("comparison.options", json!({ "run_id": run.id }), Pending::Comparisons { run: run.id.clone() });
     }
 
@@ -1821,6 +1892,70 @@ impl App {
         let ws = self.changes.workspace.clone();
         let Some(base) = self.changes.comparison().and_then(|c| c.base.clone()) else { return };
         self.request("review.reject", json!({ "workspace_id": ws, "path": path, "base": base, "key": key }), Pending::Reject { run: run.to_string(), path: path.to_string(), rest });
+    }
+
+    /// Follow (T-30) moves to `path`, the file the agent just edited: the changed files are
+    /// listed again and the change not seen before is shown.
+    fn follow_start(&mut self, path: &str) {
+        let c = &mut self.changes;
+        c.follow_known = if c.path == path { c.hunks.iter().map(|h| h.key.clone()).collect() } else { Vec::new() };
+        c.follow_to = Some(path.to_string());
+        c.follow_tries = 4;
+        self.follow_due = None;
+        self.follow_load(path);
+    }
+
+    /// Shows the file's changes at once (its counts come with the file list, asked for together).
+    fn follow_load(&mut self, path: &str) {
+        let c = &mut self.changes;
+        if !c.shown().iter().any(|f| f.1 == path) {
+            c.files.push(("M".into(), path.to_string(), 0, 0));
+        }
+        if let Some(i) = c.shown().iter().position(|f| f.1 == path) {
+            c.file = i;
+        }
+        self.load_file_diff();
+        self.load_diff();
+    }
+
+    /// The edit was reported before it reached the disk: look again shortly.
+    fn follow_again(&mut self) {
+        if self.changes.follow_tries == 0 {
+            self.changes.follow_to = None;
+            return;
+        }
+        self.changes.follow_tries -= 1;
+        self.follow_due = Some(Instant::now() + Duration::from_millis(60));
+    }
+
+    /// `F`: Follow on (or resumed, at the file the agent edited last) and off.
+    fn toggle_follow(&mut self) {
+        match self.changes.follow {
+            Follow::On => {
+                self.changes.follow = Follow::Off;
+                self.changes.follow_to = None;
+                self.follow_due = None;
+                self.say("Follow is off", false);
+            }
+            was => {
+                self.changes.follow = Follow::On;
+                let root = self.state.root_of(&self.changes.run);
+                if let Some(path) = self.last_edit.get(&root).cloned() {
+                    self.follow_start(&path);
+                }
+                self.say(if was == Follow::Paused { "Follow resumed: the review moves to the file the agent is editing" } else { "Follow is on: the review moves to the file the agent is editing" }, false);
+            }
+        }
+    }
+
+    /// A move made by hand pauses Follow (T-30).
+    fn pause_follow(&mut self) {
+        if self.changes.follow == Follow::On {
+            self.changes.follow = Follow::Paused;
+            self.changes.follow_to = None;
+            self.changes.follow_change = None;
+            self.follow_due = None;
+        }
     }
 
     /// `1`, `2`, `3` and `c`: another comparison; one that is not available says why (T-27).
@@ -2074,7 +2209,11 @@ impl App {
         let n = self.changes.shown().len();
         let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
         let page = (self.size.1 as usize).saturating_sub(8);
+        if matches!(k.code, KeyCode::Down | KeyCode::Up | KeyCode::PageDown | KeyCode::PageUp | KeyCode::Char('j' | 'k' | 'J' | 'K' | 'n' | 'p' | 'c' | 't' | '1' | '2' | '3')) {
+            self.pause_follow();
+        }
         match k.code {
+            KeyCode::Char('F') => self.toggle_follow(),
             KeyCode::Char('r') if ctrl => self.reload_review(),
             KeyCode::Esc | KeyCode::Char('v') | KeyCode::Char('q') => self.mode = Mode::Grid,
             KeyCode::Down | KeyCode::Char('j') if n > 0 => {
@@ -2289,7 +2428,7 @@ impl App {
             // The review column: the review's own keys (T-27 to T-29, T-39).
             KeyCode::Char('r') if ctrl && self.dash_col == 1 => self.changes_key(k),
             KeyCode::Down | KeyCode::Up | KeyCode::PageDown | KeyCode::PageUp
-            | KeyCode::Char('j' | 'k' | 'n' | 'p' | 'c' | '1' | '2' | '3' | 't' | 'a' | 'A' | 'r' | 'R' | 'e')
+            | KeyCode::Char('j' | 'k' | 'n' | 'p' | 'c' | '1' | '2' | '3' | 't' | 'a' | 'A' | 'r' | 'R' | 'e' | 'F')
                 if self.dash_col == 1 =>
             {
                 self.changes_key(k)
