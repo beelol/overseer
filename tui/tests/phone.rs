@@ -5,7 +5,7 @@
 //! scenarios (test/ui/ref-phone.js), which does the real pairing handshake.
 mod support;
 
-use crossterm::event::KeyCode;
+use crossterm::event::{KeyCode, KeyModifiers};
 use overseer_tui::app::{code_groups, fingerprint, Confirm, Mode, PairingState};
 use overseer_tui::ui::QR_PAPER;
 use ratatui::buffer::Buffer;
@@ -202,7 +202,7 @@ fn n01_phone_access_is_switched_with_a_key_and_shown_in_the_status_line() {
     let mut phone = RefPhone::pair(&code, "Test iPhone", "ios", 60);
     let request = waiting_request(&d, 10);
     let s = tui.until_screen(10, "asks to pair");
-    assert!(s.contains("\"Test iPhone\" asks to pair — press D to answer"), "{s}");
+    assert!(s.contains("\"Test iPhone\" asks to pair — press Ctrl-O to answer"), "{s}");
     assert_eq!(tui.app.mode, Mode::Grid);
     tui.key(KeyCode::Char('y'));
     assert!(d.ctl("gateway.devices", json!({}))["devices"].as_array().unwrap().is_empty(), "y in the grid pairs nothing");
@@ -249,7 +249,7 @@ fn n02_the_devices_panel_lists_phones_changes_scope_and_revokes() {
     tui.until(10, |a| a.phone.devices.len() == 2 && a.phone.connected() == 2);
     assert!(header(&tui.screen()).contains("phone access on · 2 phones"));
 
-    tui.key(KeyCode::Char('D'));
+    tui.key_mod(KeyCode::Char('o'), KeyModifiers::CONTROL);
     assert_eq!(tui.app.mode, Mode::Devices);
     tui.pump(300);
     let s = tui.screen();
@@ -330,7 +330,7 @@ fn n02_the_devices_panel_lists_phones_changes_scope_and_revokes() {
     let last = tui.app.phone.devices[0].id.clone();
     d.ctl("gateway.device_revoke", json!({ "id": last }));
     tui.until(10, |a| a.phone.devices.is_empty());
-    tui.key(KeyCode::Char('D'));
+    tui.key_mod(KeyCode::Char('o'), KeyModifiers::CONTROL);
     assert!(tui.screen().contains("No phone is paired. Press p to pair one."));
     tui.snapshot("phone-access/10-no-phone");
 }
@@ -340,7 +340,7 @@ fn n03_pairing_shows_the_code_and_the_owner_answers() {
     let (d, port) = phone_daemon(&[]);
     let mut tui = Tui::attach(&d, 140, 46);
     tui.until(10, |a| a.phone.available == Some(true));
-    tui.key(KeyCode::Char('D'));
+    tui.key_mod(KeyCode::Char('o'), KeyModifiers::CONTROL);
     // Pairing with phone access off offers to turn it on first.
     tui.key(KeyCode::Char('p'));
     assert_eq!(tui.app.mode, Mode::Confirm(Confirm::PhoneOnAndPair));
@@ -447,7 +447,7 @@ fn n04_a_code_expires_or_is_taken_back_and_a_small_terminal_shows_the_text() {
     d.ctl("gateway.enable", json!({}));
     let mut tui = Tui::attach(&d, 80, 24);
     tui.until(10, |a| a.phone.enabled);
-    tui.key(KeyCode::Char('D'));
+    tui.key_mod(KeyCode::Char('o'), KeyModifiers::CONTROL);
     tui.key(KeyCode::Char('p'));
     tui.until(10, |a| a.mode == Mode::Pairing && a.pairing.is_some());
     let code = tui.app.pairing.as_ref().unwrap().code.clone();
@@ -510,7 +510,7 @@ fn n05_the_real_binary_switches_phone_access_in_a_terminal() {
     // O turns it on, D opens Devices, p shows a code, esc twice and q leave.
     let out = Command::new("python3")
         .arg(helper)
-        .args(["46", "140", "2.5", "O", "1.5", "D", "1.0", "p", "2.0", "\u{1b}", "1.0", "\u{1b}", "0.8", "q", "--", bin, "--daemon"])
+        .args(["46", "140", "2.5", "O", "1.5", "\u{f}", "1.0", "p", "2.0", "\u{1b}", "1.0", "\u{1b}", "0.8", "q", "--", bin, "--daemon"])
         .arg(&d.bin)
         .arg("--home")
         .arg(d.home.path())

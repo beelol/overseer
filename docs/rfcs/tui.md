@@ -45,6 +45,10 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | J / K | Pick the next / previous agent in the agent list: its conversation opens in a column beside the grid (PgUp/PgDn, Home/End scroll it; e tool details) (T-25) |
 | Esc | Close the picked agent's conversation; the grid stays on that agent (T-25) |
 | L | Hide or show the agent list (T-25) |
+| D | The grid ⇄ dashboard mode, on the picked agent: the agent list, its review and its conversation side by side; needs 160 columns, below that it says so and stays on the grid (T-40). `overseer-tui --dashboard` starts in it |
+| Tab / Shift-Tab (dashboard) | Move the keys between the list, the review and the conversation; Esc gives them back to the list (T-40) |
+| J / K (dashboard) | Pick the next / previous agent from any column: the review and the conversation follow (T-40); in the list column j / k do the same, in the review column the review's keys apply (PgUp/PgDn scroll it), in the conversation column j / k scroll it |
+| `--grid` | `overseer-tui --grid` shows only the grid (no list, no conversation column; `L` and `D` say so), for a second terminal beside one in dashboard mode (T-41) |
 | i, Enter | Compose a message to the focused agent (Enter sends, Esc closes, Alt-Enter new line) |
 | g, z | The grid ⇄ the focused agent's full view: its whole conversation with scrollback (j/k, PgUp/PgDn, Home/G) and tool details; g, z or Esc returns to the grid on that agent (T-38) |
 | v | Review: the focused agent's changes through the daemon, opening on its default comparison (Since task start) (T-27) |
@@ -66,6 +70,7 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | n | New agent (repository, harness, account, model, prompt) |
 | f | Filter: All → Active → Needs you |
 | / | Search agents by title, repository, harness, model, account or prompt (Esc clears) |
+| O / Ctrl-O | Phone access on or off / Devices: pair a phone, revoke, scope (Devices moved from `D` to Ctrl-O when `D` became dashboard mode, T-40) |
 | A | Accounts: sign-in status; `s` signs in (the provider's own login, in this terminal), `S` device code for ChatGPT |
 | S | Audio Mode: on or off, track, system voice, a private Commander folder, preview (the daemon plays) |
 | ? | Help |
@@ -300,7 +305,7 @@ agent list, the review screen, and the two numbered ways of showing a picked age
 | Open a pull request | Has: `P` | Unchanged |
 | Archive a finished agent, show and restore archived ones | Missing | Archive, show archived, restore (T-34) |
 | Accounts and sign-in | Has: `A` | Unchanged |
-| Phone access, pairing, devices | Has: `O`, `D` | Unchanged |
+| Phone access, pairing, devices | Has: `O`, Ctrl-O (was `D`) | Unchanged |
 | Audio Mode | Has: `S` | Unchanged |
 | Pop the review out to another screen, the Overseer window layout, dragging the grid, themes | Not in a terminal | Stay in VS Code: the terminal is already its own window, and colours come from the terminal |
 | A command that VS Code gains later | — | The parity table fails its test until the command has a key or a reason (T-36) |

@@ -1,9 +1,9 @@
-//! Phone access from the terminal (Gate N): the switch (`O`), the Devices panel (`D`) with
+//! Phone access from the terminal (Gate N): the switch (`O`), the Devices panel (Ctrl-O) with
 //! revoke and scope, and pairing with the code as text and as a QR code. The daemon holds the
 //! state: one `gateway.status` per connection and one after each change it reports. Nothing polls.
 
 use super::{short, App, Confirm, Mode, Pending};
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde_json::{json, Value};
 use std::time::{Duration, Instant};
 
@@ -314,7 +314,7 @@ impl App {
     }
 
     /// A phone asks to pair. The question opens where the owner is looking at phones; elsewhere
-    /// a key typed for something else must never answer it, so a notice points to `D`.
+    /// a key typed for something else must never answer it, so a notice points to Ctrl-O.
     fn ask_to_pair(&mut self, request: PairRequest) {
         if request.request.is_empty() || self.pair_asked.contains(&request.request) {
             return;
@@ -328,7 +328,7 @@ impl App {
             self.mode = Mode::Confirm(Confirm::Pair { text: request.question(), request: request.request });
         } else if !matches!(self.mode, Mode::Confirm(Confirm::Pair { .. })) {
             self.bell = true;
-            self.say(format!("◆ \"{}\" asks to pair — press D to answer", short(&request.name, 40)), false);
+            self.say(format!("◆ \"{}\" asks to pair — press Ctrl-O to answer", short(&request.name, 40)), false);
         }
     }
 
@@ -443,7 +443,7 @@ impl App {
         self.mode = Mode::Confirm(Confirm::PhoneOff { text });
     }
 
-    /// `D`: the Devices panel.
+    /// Ctrl-O: the Devices panel (it was `D` until dashboard mode took `D`, T-40).
     pub(super) fn open_devices(&mut self) {
         if self.phone_missing() {
             return;
@@ -488,7 +488,8 @@ impl App {
     pub(super) fn devices_key(&mut self, k: KeyEvent) {
         let n = self.phone.devices.len();
         match k.code {
-            KeyCode::Esc | KeyCode::Char('D') | KeyCode::Char('q') => self.mode = Mode::Grid,
+            KeyCode::Esc | KeyCode::Char('q') => self.mode = Mode::Grid,
+            KeyCode::Char('o') if k.modifiers.contains(KeyModifiers::CONTROL) => self.mode = Mode::Grid,
             KeyCode::Down | KeyCode::Char('j') if n > 0 => self.phone.sel = (self.phone.sel + 1) % n,
             KeyCode::Up | KeyCode::Char('k') if n > 0 => self.phone.sel = (self.phone.sel + n - 1) % n,
             KeyCode::Char('r') => self.phone_request(),

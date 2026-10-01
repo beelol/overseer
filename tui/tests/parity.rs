@@ -680,3 +680,310 @@ fn t39_edit_in_your_own_editor() {
     assert!(after.rfind("\u{1b}[?1049l") > after.rfind("\u{1b}[?1049h"), "and leaves the terminal as it found it on quit");
     assert_eq!(std::fs::read_to_string(&file).unwrap().matches("written by the owner").count(), 2);
 }
+
+/// The display column where `needle` first starts on any line of the screen.
+fn column_of(s: &str, needle: &str) -> Option<usize> {
+    s.lines().find_map(|l| l.find(needle).map(|i| l[..i].width()))
+}
+
+/// Dashboard mode's three columns: the list from the left edge, the review in the middle and the
+/// conversation on the right, at the widths `ui::dashboard_widths` gives.
+fn assert_three_columns(s: &str, w: u16, title: &str) {
+    let (list_w, conv_w) = overseer_tui::ui::dashboard_widths(w, true);
+    let conv_x = (w - conv_w) as usize;
+    assert!(s.lines().nth(1).is_some_and(|l| l.starts_with("┏ agents ") || l.starts_with("╭ agents ")), "the list on the left:\n{s}");
+    let review = column_of(s, &format!("review · {title} · Since task start")).unwrap_or_else(|| panic!("the review of {title}:\n{s}"));
+    assert!(review > list_w as usize && review < conv_x, "the review in the middle ({review}, between {list_w} and {conv_x}):\n{s}");
+    let said = column_of(s, &format!("output of {}", title.to_lowercase())).unwrap_or_else(|| panic!("the conversation of {title}:\n{s}"));
+    assert!(said > conv_x, "the conversation on the right ({said}, from {conv_x}):\n{s}");
+}
+
+/// T-40: with 9 agents, `D` shows the list, the picked agent's review and its conversation side by
+/// side (at 240×70 and 200×60); `J` changes the review and the conversation together; Tab moves
+/// the keys between the columns (the review's own keys work in its column); `D` returns to the
+/// grid on that agent; below 160 columns it says it needs a wider terminal and stays on the grid;
+/// `--dashboard` (the app's `dashboard` flag) starts in it once the terminal is wide enough.
+#[test]
+fn t40_dashboard_mode_for_big_screens() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let r = five_files(&t.path().join("dash"));
+    let runs: Vec<String> = (1..=9)
+        .map(|i| d.sh(&r, &format!("Dashboard agent {i}"), &format!("printf 'agent {i} was here\\n' >> a.txt; printf 'note {i}\\n' > note{i}.txt; echo output of dashboard agent {i}")))
+        .collect();
+    for id in &runs {
+        d.wait_status(id, |s| s == "completed", 20);
+    }
+    let mut tui = Tui::attach(&d, 240, 70);
+    tui.until(10, |a| a.visible().len() == 9);
+    tui.pump(300);
+    tui.screen();
+
+    // D: the first agent in the list is picked; its review and its conversation show.
+    tui.key(KeyCode::Char('D'));
+    assert!(tui.app.dashboard_shown());
+    let order = tui.app.list_ids();
+    let first = order[0].clone();
+    assert_eq!(tui.app.focus.as_deref(), Some(first.as_str()));
+    tui.until(10, |a| a.changes.run == first && !a.changes.loading && !a.changes.diff.is_empty());
+    let title = tui.app.state.run(&first).unwrap().title.clone();
+    let s = tui.until_screen(10, &format!("output of {}", title.to_lowercase()));
+    assert!(s.lines().next().unwrap().contains(" dashboard "), "the header names the mode:\n{s}");
+    assert!(s.contains(&format!("review · {title} · Since task start · 2 files +2 −0")), "{s}");
+    assert_three_columns(&s, 240, &title);
+    no_line_wider(&s, 240);
+    tui.snapshot("parity-t40-dashboard-240x70");
+    tui.resize(200, 60);
+    let s = tui.screen();
+    assert_three_columns(&s, 200, &title);
+    no_line_wider(&s, 200);
+    tui.snapshot("parity-t40-dashboard-200x60");
+
+    // J: the next agent in the list; the review and the conversation both change to it.
+    tui.key(KeyCode::Char('J'));
+    let second = order[1].clone();
+    assert_eq!(tui.app.focus.as_deref(), Some(second.as_str()));
+    tui.until(10, |a| a.changes.run == second && !a.changes.loading && !a.changes.diff.is_empty());
+    let title2 = tui.app.state.run(&second).unwrap().title.clone();
+    let s = tui.until_screen(10, &format!("output of {}", title2.to_lowercase()));
+    assert_three_columns(&s, 200, &title2);
+    assert!(!s.contains(&format!("output of {}", title.to_lowercase())) && !s.contains(&format!("review · {title} ·")), "nothing of the first agent is left in the middle or on the right:\n{s}");
+    tui.snapshot("parity-t40-next-agent");
+    // K back and J again: the list's order both ways.
+    tui.key(KeyCode::Char('K'));
+    assert_eq!(tui.app.focus.as_deref(), Some(first.as_str()));
+    tui.key(KeyCode::Char('J'));
+    tui.until(10, |a| a.changes.run == second && !a.changes.loading && !a.changes.hunks.is_empty());
+
+    // Tab: list → review → conversation → list (Shift-Tab back); the review's keys in its column.
+    assert_eq!(tui.app.dash_col, 0);
+    tui.key(KeyCode::Tab);
+    assert_eq!(tui.app.dash_col, 1);
+    let s = tui.screen();
+    assert!(s.contains("┏ review · "), "the review column is drawn as focused:\n{s}");
+    let key = tui.app.changes.hunks[tui.app.changes.change].key.clone();
+    tui.key(KeyCode::Char('a'));
+    tui.until(10, |a| a.changes.hunks.iter().any(|h| h.key == key && h.reviewed));
+    let marks = d.ctl("review.marks", json!({ "run_id": second }));
+    assert!(marks["keys"].as_array().unwrap().iter().any(|k| k == key.as_str()), "accepted through the daemon: {marks}");
+    tui.until_screen(5, "✓ Accepted");
+    tui.app.notice = None;
+    let s = tui.screen();
+    assert!(s.contains("Accept change/file") && s.contains("tab conversation"), "the review's keys in the footer:\n{s}");
+    tui.snapshot("parity-t40-review-column");
+    tui.key(KeyCode::Tab);
+    assert_eq!(tui.app.dash_col, 2);
+    assert!(tui.screen().contains("tab list"));
+    tui.key(KeyCode::Tab);
+    assert_eq!(tui.app.dash_col, 0);
+    tui.key(KeyCode::BackTab);
+    assert_eq!(tui.app.dash_col, 2);
+    tui.key(KeyCode::Esc);
+    assert_eq!(tui.app.dash_col, 0, "esc gives the keys back to the list");
+
+    // `?` names D and Tab.
+    tui.key(KeyCode::Char('?'));
+    let s = tui.screen();
+    assert!(s.contains("dashboard mode ⇄ grid, same agent") && s.contains("list → review → conversation"), "{s}");
+    tui.key(KeyCode::Esc);
+
+    // D: back to the grid on that agent.
+    tui.key(KeyCode::Char('D'));
+    assert!(!tui.app.dashboard && !tui.app.dashboard_shown());
+    assert_eq!(tui.app.mode, Mode::Grid);
+    assert_eq!(tui.app.focus.as_deref(), Some(second.as_str()), "the grid on the agent picked in dashboard mode");
+    let s = tui.screen();
+    assert!(s.lines().next().unwrap().contains("page 1/1") && !s.contains("review · Dashboard"), "{s}");
+    assert!(s.lines().any(|l| l.contains("┏") && l.contains(&title2)), "its tile is the focused one:\n{s}");
+    tui.snapshot("parity-t40-back-to-grid");
+
+    // Below 160 columns: it says so and stays on the grid.
+    tui.resize(159, 50);
+    tui.screen();
+    tui.key(KeyCode::Char('D'));
+    assert!(!tui.app.dashboard && tui.app.mode == Mode::Grid);
+    let s = tui.screen();
+    assert!(s.contains("Dashboard mode needs a terminal at least 160 columns wide (this one is 159); staying on the grid"), "{s}");
+    assert!(!s.contains("review · Dashboard"));
+    no_line_wider(&s, 159);
+    tui.snapshot("parity-t40-too-narrow");
+
+    // --dashboard in a narrow terminal: the grid with a standing line; widened, dashboard mode.
+    let mut start = Tui::attach(&d, 150, 44);
+    start.app.dashboard = true;
+    start.until(10, |a| a.visible().len() == 9);
+    let s = start.screen();
+    assert!(s.contains("Dashboard mode needs a terminal at least 160 columns wide (this one is 150); showing the grid"), "{s}");
+    assert!(!start.app.dashboard_shown());
+    start.resize(200, 60);
+    start.screen();
+    start.until(10, |a| a.dashboard_shown() && a.focus.is_some() && a.changes.run == *a.focus.as_ref().unwrap() && !a.changes.loading && !a.changes.diff.is_empty());
+    let picked = start.app.focus.clone().unwrap();
+    let t1 = start.app.state.run(&picked).unwrap().title.clone();
+    let s = start.until_screen(10, &format!("output of {}", t1.to_lowercase()));
+    assert_three_columns(&s, 200, &t1);
+}
+
+/// T-40 and T-41 in the real binary: `--help` names both options and the keys; `--dashboard` and
+/// `--grid` together are refused.
+#[test]
+fn t40_t41_options_in_help() {
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_overseer-tui")).arg("--help").output().unwrap();
+    let text = String::from_utf8_lossy(&out.stdout);
+    for s in ["--dashboard", "--grid", "Show only the grid of agents", "dashboard mode <-> the grid", "ctrl+o devices"] {
+        assert!(text.contains(s), "--help lacks {s}:\n{text}");
+    }
+    let both = std::process::Command::new(env!("CARGO_BIN_EXE_overseer-tui")).args(["--dashboard", "--grid"]).output().unwrap();
+    assert!(!both.status.success() && String::from_utf8_lossy(&both.stderr).contains("pick one per terminal"));
+}
+
+fn claude_daemon(mode: &str) -> Daemon {
+    let claude = fixture("claude-fixture.js");
+    Daemon::start(&[("OVERSEER_CLAUDE_PATH", &claude), ("CLAUDE_FIXTURE_MODE", mode), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE")])
+}
+
+/// T-41: two TUIs on one daemon, one `--grid` (only the grid) and one `--dashboard`. Picking in
+/// one does not move the other; a new fixture agent appears in both; its permission answered in
+/// the grid-only terminal clears in the dashboard.
+#[test]
+fn t41_a_grid_only_terminal_beside_it() {
+    let t = tempfile::tempdir().unwrap();
+    let d = claude_daemon("permission");
+    let r = five_files(&t.path().join("two"));
+    for i in 1..=3 {
+        let id = d.sh(&r, &format!("Shared agent {i}"), &format!("printf 'agent {i}\\n' >> a.txt; echo output of shared agent {i}"));
+        d.wait_status(&id, |s| s == "completed", 20);
+    }
+    let mut grid = Tui::attach(&d, 160, 45);
+    grid.app.grid_only = true;
+    let mut dash = Tui::attach(&d, 240, 70);
+    dash.app.dashboard = true;
+    grid.until(10, |a| a.visible().len() == 3);
+    dash.until(10, |a| a.visible().len() == 3);
+    dash.screen();
+    dash.until(10, |a| a.dashboard_shown() && a.focus.is_some() && a.changes.run == *a.focus.as_ref().unwrap() && !a.changes.loading);
+
+    // The grid-only terminal: the grid and nothing else.
+    let s = grid.screen();
+    assert!(s.lines().next().unwrap().contains("grid only · page 1/1"), "{s}");
+    assert!(!s.contains("╭ agents ") && !s.contains("┏ agents ") && !s.contains("review · Shared"), "no list, no review:\n{s}");
+    grid.key(KeyCode::Char('J'));
+    assert!(!grid.app.picked, "no conversation column opens");
+    for k in ['L', 'D'] {
+        grid.key(KeyCode::Char(k));
+        assert!(grid.screen().contains("This terminal shows the grid only (--grid)"), "{k} in the grid-only terminal");
+    }
+    assert!(!grid.app.dashboard && !grid.app.list_shown());
+
+    // Picking in one does not move the other.
+    let dash_focus = dash.app.focus.clone();
+    let before = grid.app.focus.clone();
+    grid.key(KeyCode::Tab);
+    grid.key(KeyCode::Tab);
+    assert_ne!(grid.app.focus, before);
+    dash.pump(200);
+    assert_eq!(dash.app.focus, dash_focus, "the dashboard keeps its agent");
+    let grid_focus = grid.app.focus.clone();
+    dash.key(KeyCode::Char('J'));
+    assert_ne!(dash.app.focus, dash_focus);
+    grid.pump(200);
+    assert_eq!(grid.app.focus, grid_focus, "the grid keeps its agent");
+
+    // A new fixture agent appears in both; it waits for a permission.
+    let asks = d.ctl("task.create", json!({ "repo": r, "harness": "claude", "prompt": "Write the changelog", "title": "Write the changelog" }))["run"]["id"].as_str().unwrap().to_string();
+    d.wait_status(&asks, |s| s == "waiting_for_user", 20);
+    grid.until(10, |a| a.visible().len() == 4 && a.state.run(&asks).is_some_and(|r| r.needs_you()));
+    dash.until(10, |a| a.visible().len() == 4 && a.state.run(&asks).is_some_and(|r| r.needs_you()));
+    dash.until(10, |a| !a.changes.loading && !a.changes.files.is_empty());
+    let g = grid.until_screen(10, "Write the changelog");
+    let s = dash.until_screen(10, "Write the changelog");
+    assert!(g.lines().next().unwrap().contains("1 needs you") && s.lines().next().unwrap().contains("1 needs you"), "both count it:\n{g}\n{s}");
+    assert!(s.lines().any(|l| l.contains("◆ Write the") && (l.contains(" ◆ │") || l.contains(" ◆ ┃"))), "the dashboard's list marks it:\n{s}");
+    assert_eq!(grid.app.focus, grid_focus, "a new agent does not take the grid's focus");
+    no_line_wider(&g, 160);
+    no_line_wider(&s, 240);
+    grid.snapshot("parity-t41-grid-only-waiting");
+    dash.snapshot("parity-t41-dashboard-waiting");
+
+    // Answered in the grid-only terminal: it clears in the dashboard.
+    for _ in 0..8 {
+        if grid.app.focus.as_deref() == Some(asks.as_str()) {
+            break;
+        }
+        grid.key(KeyCode::Tab);
+    }
+    assert_eq!(grid.app.focus.as_deref(), Some(asks.as_str()));
+    grid.key(KeyCode::Char('a'));
+    d.wait_status(&asks, |s| s != "waiting_for_user", 20);
+    dash.until(10, |a| a.state.run(&asks).is_some_and(|r| !r.needs_you()));
+    grid.until(10, |a| a.state.run(&asks).is_some_and(|r| !r.needs_you()));
+    dash.pump(300);
+    grid.pump(300);
+    let s = dash.screen();
+    assert!(!s.lines().next().unwrap().contains("need"), "the dashboard's header has no one waiting:\n{s}");
+    assert!(!s.lines().any(|l| l.contains("Write the") && (l.contains(" ◆ │") || l.contains(" ◆ ┃"))), "its mark is gone:\n{s}");
+    assert!(!grid.screen().lines().next().unwrap().contains("need"));
+    grid.snapshot("parity-t41-grid-only");
+    dash.snapshot("parity-t41-dashboard");
+}
+
+/// Strips terminal escape sequences from a pseudo-terminal's output.
+fn plain(out: &str) -> String {
+    let mut s = String::new();
+    let mut chars = out.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\u{1b}' {
+            if chars.peek() == Some(&'[') {
+                chars.next();
+                for x in chars.by_ref() {
+                    if ('@'..='~').contains(&x) {
+                        break;
+                    }
+                }
+            } else {
+                chars.next();
+            }
+        } else {
+            s.push(c);
+        }
+    }
+    s
+}
+
+/// T-41 with the real binary: `overseer-tui --grid` and `overseer-tui --dashboard` in two
+/// pseudo-terminals on one daemon at the same time; an agent started while both run shows in both.
+#[test]
+fn t41_two_real_terminals_on_one_daemon() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let r = five_files(&t.path().join("pty"));
+    let first = d.sh(&r, "Already here", "printf 'x\\n' >> a.txt; echo output of already here");
+    d.wait_status(&first, |s| s == "completed", 20);
+    let bin = env!("CARGO_BIN_EXE_overseer-tui");
+    let helper = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/pty_run.py");
+    let start = |flag: &str| {
+        std::process::Command::new("python3")
+            .arg(&helper)
+            .args(["50", "200", "5", "q", "--", bin, flag, "--daemon"])
+            .arg(&d.bin)
+            .arg("--home")
+            .arg(d.home.path())
+            .env("TERM", "xterm-256color")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap()
+    };
+    let grid = start("--grid");
+    let dash = start("--dashboard");
+    std::thread::sleep(std::time::Duration::from_millis(2000));
+    let newcomer = d.sh(&r, "Pty newcomer", "echo output of pty newcomer; sleep 30");
+    let (g, s) = (grid.wait_with_output().unwrap(), dash.wait_with_output().unwrap());
+    assert!(g.status.success() && s.status.success(), "both quit cleanly");
+    let (g, s) = (plain(&String::from_utf8_lossy(&g.stdout)), plain(&String::from_utf8_lossy(&s.stdout)));
+    assert!(g.contains("grid only · page 1/1") && !g.contains("╭ agents ") && !g.contains("┏ agents ") && !g.contains("review · Already"), "--grid shows only the grid:\n{g}");
+    assert!(s.contains(" dashboard ") && (s.contains("┏ agents ") || s.contains("╭ agents ")) && s.contains("review · Already here"), "--dashboard starts in dashboard mode:\n{s}");
+    assert!(g.contains("Pty newcomer") && s.contains("Pty newcomer"), "the new agent in both");
+    d.ctl("run.interrupt", json!({ "run_id": newcomer }));
+}

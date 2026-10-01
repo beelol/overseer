@@ -1,0 +1,45 @@
+ ◆ Overseer  grid only · page 1/1 · 4 agents · ✦ 2 to review · 2 reviewed                                                        phone access off · ● connected 
+┏ 1 ✓ Write the changelog ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Claude Code · 0s ┓╭ 2 ✓ Shared agent 3 ──────────────────────────────────────────── Program · 0s ╮
+┃ › Write the changelog                                                        ┃│ output of shared agent 3                                                     │
+┃ ✎ perm.txt                                                                   ┃│                                                                              │
+┃ ⚙ Write perm.txt ✓                                                           ┃│                                                                              │
+┃ ✓ allowed Write perm.txt                                                     ┃│                                                                              │
+┃ wrote perm.txt                                                               ┃│                                                                              │
+┃ ■ done · 1 in / 1 out                                                        ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Claude Fixture · fix…@example.test ┛╰ completed ───────────────────────────────────────────────────────────────────╯
+╭ 3 ✓ Shared agent 2 ──────────────────────────────────────────── Program · 0s ╮╭ 4 ✓ Shared agent 1 ──────────────────────────────────────────── Program · 0s ╮
+│ output of shared agent 2                                                     ││ output of shared agent 1                                                     │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+╰ completed ───────────────────────────────────────────────────────────────────╯╰ completed ───────────────────────────────────────────────────────────────────╯
+ Allowed                                                                                                                                                        

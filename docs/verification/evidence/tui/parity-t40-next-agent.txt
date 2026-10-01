@@ -1,0 +1,60 @@
+ ◆ Overseer  dashboard · 9 agents · ✦ 7 to review · 2 reviewed                                                                                                           phone access off · ● connected 
+┏ agents ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓╭ review · Dashboard agent 8 · Since task start · 2 files +2 −0 ───────────────────────────────╮╭ ✓ Dashboard agent 8 ─────────────────────────── Program · 0s ╮
+┃ dash  7 to review                    ┃│ 1 [Since task start]   2 Latest run   3 Entire worktree   t [Changed] | All files            ││ output of dashboard agent 8                                  │
+┃ ✓ Dashboard agent 9                  ┃│                                                                                              ││                                                              │
+┃›✓ Dashboard agent 8                  ┃│› M a.txt +1 −0                │ a.txt  change 1 of 1 · 0 accepted                            ││                                                              │
+┃ ✓ Dashboard agent 7                ✦ ┃│  A note8.txt +1 −0            │ › @@ -10,0 +11,1 @@  a Accept · r Reject                     ││                                                              │
+┃ ✓ Dashboard agent 6                ✦ ┃│                               │    line 9                                                    ││                                                              │
+┃ ✓ Dashboard agent 5                ✦ ┃│                               │    line 10                                                   ││                                                              │
+┃ ✓ Dashboard agent 4                ✦ ┃│                               │   +agent 8 was here                                          ││                                                              │
+┃ ✓ Dashboard agent 3                ✦ ┃│                               │                                                              ││                                                              │
+┃ ✓ Dashboard agent 2                ✦ ┃│                               │                                                              ││                                                              │
+┃ ✓ Dashboard agent 1                ✦ ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┃                                      ┃│                               │                                                              ││                                                              │
+┗━━━━ ◆ needs you ✦ to review ✓ merged ┛╰──────────────────────────────────────────────────────────────────────────────────────────────╯╰ completed ───────────────────────────────────────────────────╯
+ J/K j/k next / previous agent   tab review, conversation   i message   a/d allow/deny   g full view   w next waiting   n new   D grid   ? help   q quit                                                

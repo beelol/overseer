@@ -1,40 +1,40 @@
  ◆ Overseer  page 1/1 · 0 agents                                                                              phone access on · ● connected 
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                    No agents yet. Press n to start one.                                                    
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
+╭ agents ────────────────────╮                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                     No agents yet. Press n to start one.                                     
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+╰─── ◆ you ✦ review ✓ merged ╯                                                                                                              
  Phone access is on                                                                                                                         

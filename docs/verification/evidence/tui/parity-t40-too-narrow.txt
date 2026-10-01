@@ -1,0 +1,50 @@
+ ◆ Overseer  page 1/1 · 9 agents · ✦ 7 to review · 2 reviewed                                                                   phone access off · ● connected 
+╭ agents ─────────────────────╮╭ 1 ✓ Dashboard agent 9 ──── Program · 0s ╮┏ 2 ✓ Dashboard agent 8 ━━━ Program · 0s ┓╭ 3 ✓ Dashboard agent 7 ──── Program · 0s ╮
+│ dash  7 to review           ││ output of dashboard agent 9             │┃ output of dashboard agent 8            ┃│ output of dashboard agent 7             │
+│ ✓ Dashboard agent 9         ││                                         │┃                                        ┃│                                         │
+│›✓ Dashboard agent 8         ││                                         │┃                                        ┃│                                         │
+│ ✓ Dashboard agent 7       ✦ ││                                         │┃                                        ┃│                                         │
+│ ✓ Dashboard agent 6       ✦ ││                                         │┃                                        ┃│                                         │
+│ ✓ Dashboard agent 5       ✦ ││                                         │┃                                        ┃│                                         │
+│ ✓ Dashboard agent 4       ✦ ││                                         │┃                                        ┃│                                         │
+│ ✓ Dashboard agent 3       ✦ ││                                         │┃                                        ┃│                                         │
+│ ✓ Dashboard agent 2       ✦ ││                                         │┃                                        ┃│                                         │
+│ ✓ Dashboard agent 1       ✦ ││                                         │┃                                        ┃│                                         │
+│                             ││                                         │┃                                        ┃│                                         │
+│                             ││                                         │┃                                        ┃│                                         │
+│                             ││                                         │┃                                        ┃│                                         │
+│                             ││                                         │┃                                        ┃│                                         │
+│                             │╰ completed ──────────────────────────────╯┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰ completed ──────────────────────────────╯
+│                             │╭ 4 ✓ Dashboard agent 6 ──── Program · 0s ╮╭ 5 ✓ Dashboard agent 5 ─── Program · 0s ╮╭ 6 ✓ Dashboard agent 4 ──── Program · 0s ╮
+│                             ││ output of dashboard agent 6             ││ output of dashboard agent 5            ││ output of dashboard agent 4             │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             │╰ completed ──────────────────────────────╯╰ completed ─────────────────────────────╯╰ completed ──────────────────────────────╯
+│                             │╭ 7 ✓ Dashboard agent 3 ──── Program · 0s ╮╭ 8 ✓ Dashboard agent 2 ─── Program · 0s ╮╭ 9 ✓ Dashboard agent 1 ──── Program · 0s ╮
+│                             ││ output of dashboard agent 3             ││ output of dashboard agent 2            ││ output of dashboard agent 1             │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+│                             ││                                         ││                                        ││                                         │
+╰──── ◆ you ✦ review ✓ merged ╯╰ completed ──────────────────────────────╯╰ completed ─────────────────────────────╯╰ completed ──────────────────────────────╯
+ Dashboard mode needs a terminal at least 160 columns wide (this one is 159); staying on the grid                                                              
