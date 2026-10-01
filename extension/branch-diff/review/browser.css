@@ -126,10 +126,34 @@ button.open-native { min-width: 26px; }
 .file-header .file-path { flex: 0 1 auto; }
 /* Overseer (AC-99): the navigator covers the whole worktree. Changes only / All files toggle,
    counts beside changed files, folders holding changes marked, unchanged files opened as plain text. */
-#nav-head { display: flex; align-items: center; gap: 4px; margin: 0 4px 10px; }
-#nav-head #filter { flex: 1; min-width: 0; width: auto; margin: 0; }
-#changes-only { flex: none; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border-radius: 3px; background: transparent; border: 1px solid transparent; color: var(--vscode-icon-foreground); }
-#changes-only[aria-pressed="true"] { background: var(--vscode-inputOption-activeBackground, var(--vscode-list-inactiveSelectionBackground)); border-color: var(--vscode-inputOption-activeBorder, transparent); color: var(--vscode-inputOption-activeForeground, var(--vscode-foreground)); }
+#nav-head { display: flex; flex-direction: column; align-items: stretch; gap: 6px; margin: 0 4px 10px; }
+#nav-head #filter { min-width: 0; width: auto; margin: 0; }
+/* AC-264: the list follows the view: "All files" in Follow, "Changed" in Diffs only. */
+#list-title { padding: 2px 3px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--vscode-descriptionForeground); }
+/* AC-233, AC-264: Follow | Diffs only, a two-way switch in the review's header. */
+#view-mode { display: inline-flex; align-items: stretch; flex: none; height: 28px; padding: 2px; gap: 2px; border-radius: 3px; background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); }
+#view-mode .seg { display: inline-flex; align-items: center; gap: 5px; padding: 0 9px; border: 0; border-radius: 2px; font-size: 12px; white-space: nowrap; color: var(--vscode-descriptionForeground); background: transparent; }
+#view-mode .seg.on { background: var(--vscode-inputOption-activeBackground, var(--vscode-list-inactiveSelectionBackground)); color: var(--vscode-inputOption-activeForeground, var(--vscode-foreground)); cursor: default; }
+#view-mode .seg .codicon { font-size: 13px; }
+/* Follow shows the agent's file where the diffs were; the diff-only controls step aside. */
+#diffs, #follow-view { grid-column: 3; grid-row: 1; }
+body[data-view="follow"] #diffs, body:not([data-view="follow"]) #follow-view { display: none; }
+body[data-view="follow"] #scope, body[data-view="follow"] #layout, body[data-view="follow"] #follow { display: none; }
+#follow-view { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+#follow-head { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 10px; border-bottom: 1px solid var(--vscode-panel-border); }
+#follow-head > * { flex: none; }
+#follow-path { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--vscode-editor-font-family); }
+#follow-why { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--vscode-descriptionForeground); }
+#follow-again { display: inline-flex; align-items: center; gap: 5px; }
+#follow-again[hidden] { display: none; }
+#follow-editor { flex: 1; min-height: 0; }
+#follow-editor[hidden] { display: none; }
+.follow-added, .follow-changed { background: var(--vscode-diffEditor-insertedLineBackground); }
+.follow-bar-added { border-left: 3px solid var(--vscode-editorGutter-addedBackground); margin-left: 4px; }
+.follow-bar-changed { border-left: 3px solid var(--vscode-editorGutter-modifiedBackground); margin-left: 4px; }
+.follow-bar-removed { border-bottom: 2px solid var(--vscode-editorGutter-deletedBackground); margin-left: 4px; }
+.follow-was { font-style: italic; color: var(--vscode-editorCodeLens-foreground); margin-left: 2em; }
+.follow-removed { font-style: italic; color: var(--vscode-editorGutter-deletedBackground); margin-left: 2em; }
 .file .counts { display: flex; gap: 4px; margin-left: auto; font-size: 11px; font-variant-numeric: tabular-nums; }
 .file .counts:empty { display: none; }
 .file .counts + .status { margin-left: 0; }
@@ -170,8 +194,23 @@ button.base { height: 28px; padding: 0 var(--ov-space-2); color: var(--ov-text);
 #resize:hover, #resize:focus { background: var(--ov-accent-soft); }
 #filter { height: 28px; padding: 0 var(--ov-space-2); background: var(--ov-input-bg); color: var(--ov-input-fg); border: 1px solid var(--ov-border); border-radius: var(--ov-radius-control); font-size: var(--ov-font-sm); }
 #filter:focus { outline: 0; border-color: var(--ov-focus); }
-#changes-only { width: 28px; height: 28px; border-radius: var(--ov-radius-control); color: var(--ov-icon); }
-#changes-only[aria-pressed="true"] { background: var(--ov-accent-soft); color: var(--ov-accent); border-color: transparent; }
+#list-title { font-size: var(--ov-font-xs); color: var(--ov-muted); }
+#view-mode { border-radius: var(--ov-radius-control); background: var(--ov-input-bg); border-color: var(--ov-border); }
+#view-mode .seg { border-radius: calc(var(--ov-radius-control) - 2px); font-size: var(--ov-font-sm); color: var(--ov-muted); }
+#view-mode .seg:hover:not(.on) { background: var(--ov-hover); color: var(--ov-text); }
+#view-mode .seg.on { background: var(--ov-accent-soft); color: var(--ov-accent); font-weight: var(--ov-weight-semibold); }
+#follow-head { background: var(--ov-raised); border-bottom-color: var(--ov-border); }
+#follow-path { font-family: var(--ov-mono); font-size: var(--ov-font-sm); color: var(--ov-text); }
+#follow-why { color: var(--ov-muted); font-size: var(--ov-font-sm); }
+#follow-icon { color: var(--ov-accent); }
+#follow-view[data-source="user"] #follow-icon { color: var(--ov-icon); }
+#follow-again { height: 24px; padding: 0 var(--ov-space-3); border-radius: var(--ov-radius-pill); background: var(--ov-accent-gradient); color: var(--ov-accent-fg); font-size: var(--ov-font-sm); }
+#follow-again:hover { background: var(--ov-accent-bg-hover); }
+#follow-problem { margin: var(--ov-space-10) auto; max-width: 460px; text-align: center; }
+.follow-bar-added { border-left-color: var(--ov-added); }
+.follow-bar-changed { border-left-color: var(--ov-modified); }
+.follow-bar-removed, .follow-removed { border-bottom-color: var(--ov-removed); }
+.follow-removed { color: var(--ov-removed); }
 .folder summary, .file { min-height: 26px; padding: 3px var(--ov-space-2); border-radius: var(--ov-radius-control); font-size: var(--ov-font-md); color: var(--ov-text); transition: background-color var(--ov-motion-fast) var(--ov-ease); }
 .folder summary:hover, .file:hover { background: var(--ov-hover); }
 .file.active { background: var(--ov-selected-strong); color: var(--ov-selected-fg); }
@@ -226,6 +265,10 @@ button.open-native, button.close-file { height: 24px; min-width: 24px; padding: 
 #land[hidden], #land button[hidden] { display: none; }
 #land-text { font-size: var(--ov-font-sm, 12px); color: var(--ov-muted, var(--vscode-descriptionForeground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 30ch; min-width: 0; flex: 0 1 auto; }
 button.land .codicon { font-size: 14px; }
+/* AC-76, AC-264: a narrow review (beside the chat) keeps the Follow | Diffs only switch as two icons,
+   their words in tooltips, and a shorter scope list, so the agent's name and Merge keep their room. */
+@media (max-width: 700px) { #view-mode .seg-word { display: none; } #view-mode .seg { padding: 0 6px; } }
+@media (max-width: 440px) { #scope { max-width: 5em; } #view-mode .seg { padding: 0 5px; } #land { margin-right: 0; } #land-text:empty { display: none; } #loading-stage:empty { position: absolute; } }
 @media (max-width: 640px) { button.land .land-word { display: none; } button.land { padding: 0 6px; } #land-text { max-width: 12ch; } }
 #land[data-state="merged"] #land-text { color: var(--ov-done, var(--vscode-testing-iconPassed)); }
 #land[data-state="conflicts"] #land-text { color: var(--ov-waiting, var(--vscode-editorWarning-foreground)); }

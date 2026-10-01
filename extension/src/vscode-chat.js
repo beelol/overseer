@@ -1,11 +1,10 @@
 // AC-258: VS Code's own chat view stays out of Overseer's way all session. The first time
 // Overseer's view is on screen in a window, VS Code's built-in chat view (the "Build with Agent"
-// panel in the secondary side bar) is closed, once. Overseer's own actions never reopen it (the
-// dashboard and the workspace see it closed before they note which parts were open); the owner
+// panel in the secondary side bar) is closed, once. Overseer's own actions never reopen it; the owner
 // opening it again is left alone.
 //
 // Extensions cannot read which view a part shows, so this measures Overseer's view (as
-// dashboard-mode.js does). VS Code's chat lives in the secondary side bar:
+// dashboard mode did). VS Code's chat lives in the secondary side bar:
 //   - Close Secondary Side Bar; if Overseer's view did not grow, the side bar was closed and there is
 //     nothing to do (nothing else moves, nothing takes the keyboard).
 //   - If it grew, the side bar was open on some view: it is reopened as it was, then VS Code's own

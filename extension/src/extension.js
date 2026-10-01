@@ -5,7 +5,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { DaemonClient, resolveBinary, isProductionInstall } = require('./daemon-client');
 const { Model, AgentsProvider, AccountsProvider, ACTIVE, accountName } = require('./views');
-const { SearchView } = require('./search-view');
+const { AgentSearch, FILTER_LABELS } = require('./agent-search');
 const { OutputPanels } = require('./output-panel');
 const { Review } = require('./review');
 const { CommandCenter } = require('./command-center');
@@ -16,9 +16,8 @@ const { PullRequests } = require('./pull-request');
 const { Landing } = require('./landing');
 const { TaskLauncher } = require('./task-launcher');
 const { Steering } = require('./run-actions');
-const { Dashboard } = require('./dashboard-mode');
 const { PhoneAccess } = require('./phone-access');
-const { Immersive } = require('./immersive');
+const { OverseerWindow, retireFocusMode } = require('./overseer-window');
 const { VsCodeChat } = require('./vscode-chat');
 const { OverseerChat } = require('./overseer-chat');
 const { SwarmControls } = require('./swarm-controls');
@@ -80,9 +79,10 @@ async function activate(context) {
   const agents = new AgentsProvider(model, context.workspaceState, context.extensionUri, { attention: () => attention(), pinned: () => pinned(), voiceTargeted: () => voiceTargeted(), reviewed: () => reviewed });
   const accounts = new AccountsProvider(model, context.extensionUri);
   const agentsView = vscode.window.createTreeView('overseer.agents', { treeDataProvider: agents, showCollapseAll: true, dragAndDropController: agentDrag() });
-  // The search field above the Agents list (AC-112): typing filters the list through the daemon's search.
-  const searchView = new SearchView(context.extensionUri, { onQuery: q => runAgentSearch(q), onFilter: kind => setStatusFilter(kind), onFilterMenu: () => filterMenu() });
-  /** The filter icon's menu (a native pick: a menu inside the short search pane would be clipped). */
+  // Searching agents (AC-112, AC-264): the Agents view's search button opens VS Code's input box;
+  // typing filters the list through the daemon's search. There is no Search section in the side bar.
+  const searchView = new AgentSearch({ onQuery: q => runAgentSearch(q), onFilterMenu: () => filterMenu() });
+  /** The status filters (All, Working, Needs you, To review, Done, Failed, Archived). */
   async function filterMenu() {
     const now = agents.showArchived ? 'archived' : agents.statusFilter;
     const items = [['all', 'All', 'list-flat'], ['working', 'Working', 'sync'], ['needs', 'Needs you', 'bell'], ['review', 'To review', 'sparkle'], ['done', 'Done', 'check'], ['failed', 'Failed', 'error'], ['archived', 'Archived', 'archive']]
@@ -98,7 +98,6 @@ async function activate(context) {
     vscode.commands.executeCommand('setContext', 'overseer.showArchived', agents.showArchived);
     setAgentFilter(agents.filter);
   }
-  context.subscriptions.push(vscode.window.registerWebviewViewProvider('overseer.search', searchView, { webviewOptions: { retainContextWhenHidden: true } }));
   const accountsView = vscode.window.createTreeView('overseer.accounts', { treeDataProvider: accounts });
   context.subscriptions.push(vscode.window.registerFileDecorationProvider(agents.decorations));
   const outputs = new OutputPanels(context, client, model);
@@ -143,7 +142,6 @@ async function activate(context) {
   const pinned = () => context.workspaceState.get('overseer.pinned', []).filter(id => model.run(id));
   const setPinned = (runId, on) => context.workspaceState.update('overseer.pinned', [...new Set([...pinned().filter(id => id !== runId), ...(on ? [runId] : [])])]);
   const search = async q => { try { return (await client.request('search', { query: q, limit: 200 })).task_ids || []; } catch { return []; } };
-  // With the dashboard open, the chat stays inside it and reviews go to the column on its right.
   const center = new CommandCenter(context, model, { select: (runId, opts) => selectRun(runId, opts), selected: () => selectedRun, client, model, launcher, attention, rollup, pinned, setPinned, archived: archivedTasks, search, steering,
     // A card, a request's stage or a Needs-you item opens its agent, or its finished work (AC-226).
     openAgent: (runId, opts) => openAgent(runId, opts),
@@ -156,13 +154,12 @@ async function activate(context) {
     backToAgent: runId => backToAgent(runId) });
   centerRef = center;
   const arrangement = new Arrangement({ context, center, review, model, client, outputs, log: say });
-  // The agent's head (AC-233): its worktree in this window, Follow or Diffs only. A file opened from
-  // the Worktree view while only the chat is shown brings the head in first.
+  // The agent's head (AC-233, AC-264): its review in the middle, Follow or Diffs only. Switching
+  // between them while only the chat is shown brings the review in first.
   const head = new AgentHead({ context, client, model, review, log: say, handlers: { ensureShown: runId => arrangement.openReview(runId) } });
   review.head = head;
   outputs.column = () => vscode.ViewColumn.Beside;
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.center', center));
-  const immersive = new Immersive(context, say);
   // AC-258: VS Code's own chat view is closed the first time Overseer's view is on screen here.
   const vsChat = new VsCodeChat(center, say);
   // It runs as Overseer's view comes on screen (part of the action that showed it), not later, when
@@ -173,23 +170,20 @@ async function activate(context) {
     setTimeout(() => { if (center.panel?.visible) vsChat.check().catch(error => say('vscode chat: ' + error.message)); }, 300);
   };
   context.subscriptions.push(vscode.window.tabGroups.onDidChangeTabs(checkVsChat));
-  // The agent the workspace shows (AC-250): the selected one, else the most recent working one, else the most recent.
+  // The agent the Overseer window shows first (AC-264): the selected one, else the most recent working one, else the most recent.
   const focusedAgent = () => {
     if (selectedRun && model.run(selectedRun)) return (model.rootRun(model.run(selectedRun)) || model.run(selectedRun)).id;
     const archived = new Set(archivedTasks());
-    const roots = (model.state.runs || []).filter(r => !r.parent_run_id && !archived.has(r.task_id)).sort((a, b) => (ACTIVE.has(b.status) - ACTIVE.has(a.status)) || b.created_ms - a.created_ms);
+    // Overseer's own run is no agent of the list (AC-182).
+    const overseer = r => r.id === model.state.overseer?.run_id || (model.state.oversight || {})[r.id]?.role === 'overseer';
+    const roots = (model.state.runs || []).filter(r => !r.parent_run_id && !archived.has(r.task_id) && !overseer(r)).sort((a, b) => (ACTIVE.has(b.status) - ACTIVE.has(a.status)) || b.created_ms - a.created_ms);
     return roots[0]?.id;
   };
-  const dashboard = new Dashboard(context, center, say, {
-    // The dashboard takes the whole editor area, the owner's groups included (it puts them back on exit).
-    arrange: () => { arrangement.takeover = true; return selectedRun && model.run(selectedRun) ? arrangement.show(selectedRun) : arrangement.chatOnly(); },
-    arrangeWorkspace: async sizes => { const id = focusedAgent(); if (id) selectedRun = id; await arrangement.workspace(id, { sizes }); },
-    leaveWorkspace: () => arrangement.leaveWorkspace(),
-    agentsVisible: () => agentsView.visible, immersive, vsChat });
-  if (dashboard.inWorkspace) arrangement.current = 'workspace';
-  arrangement.takeover = dashboard.inDashboard;
-  // Another dashboard window may have put the immersive settings back on its exit: apply them again here.
-  context.subscriptions.push(vscode.window.onDidChangeWindowState(s => { if (s.focused && dashboard.inDashboard) immersive.apply().catch(() => {}); }));
+  // AC-264: the one Overseer layout, this window reopened as the Overseer window (Workspace, ⌥⌘⇧O).
+  const overseerWindow = new OverseerWindow({ context, center, arrangement, log: say,
+    handlers: { focusedAgent, select: (id, opts) => { selectedRun = id; return selectRun(id, opts); }, backToOverseer: () => backToOverseer() } });
+  // In the Overseer window Overseer's views take the whole editor area (the owner's layout is their folder window's).
+  arrangement.takeover = overseerWindow.active;
   // AC-104: an agent dragged from the side bar onto the grid. VS Code's editor drop opens the agent's
   // chat editor (AC-71) in the grid's group, or in a group split off beside it; while the grid is shown
   // that editor (and a group the drop created) is closed again and the agent is placed on the grid's
@@ -294,17 +288,16 @@ async function activate(context) {
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.output', outputs),
     agentsView.onDidExpandElement(e => agents.setCollapsed(e.element, false)),
     agentsView.onDidCollapseElement(e => agents.setCollapsed(e.element, true)));
-  // AC-250: one button for the whole Overseer layout, beside Overseer's own item.
+  // AC-264: one button for the Overseer layout, beside Overseer's own item.
   const workspaceButton = vscode.window.createStatusBarItem('overseer.workspace', vscode.StatusBarAlignment.Left, 49);
   workspaceButton.name = 'Overseer Workspace';
   const updateWorkspaceButton = () => {
-    const on = dashboard.inWorkspace;
+    const on = overseerWindow.active;
     workspaceButton.text = on ? '$(layout-sidebar-left-off) Close Workspace' : '$(layout) Workspace';
-    workspaceButton.tooltip = on ? 'Close the Overseer workspace and put your layout back' : 'Open the Overseer workspace: Overseer, the agent\'s review and its chat, sized for the screen';
+    workspaceButton.tooltip = on ? 'Go back to your own layout of this folder (⌥⌘⇧O)' : 'Open the Overseer layout: your agents on the left, the review in the middle, Overseer on the right (⌥⌘⇧O)';
     workspaceButton.command = on ? 'overseer.closeWorkspace' : 'overseer.openWorkspace';
     workspaceButton.show();
   };
-  dashboard.onChange = () => { arrangement.takeover = dashboard.inDashboard; updateWorkspaceButton(); };
   updateWorkspaceButton();
   context.subscriptions.push(workspaceButton);
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
@@ -333,7 +326,7 @@ async function activate(context) {
       const run = session.overseer?.runId && model.run(session.overseer.runId);
       if (run && panel.visible && Rollup.unreviewed(run, reviewed)) markReviewed(run.id);
     }
-    agentsView.description = client.connected ? Rollup.reviewText(rollup()) : '';
+    agentsView.description = agentsDescription();
   });
   model.onDidChange(() => { autoArchive().catch(() => {}); });
   client.on('connected', () => { model.refresh(); updateStatus(); });
@@ -387,9 +380,11 @@ async function activate(context) {
   const gridHasAgents = () => (model.state.runs || []).some(r => !r.parent_run_id && ACTIVE.has(r.status)) || pinned().length > 0;
   /** The rollup (AC-255) for a one-line note where the grid would be: " Of the rest: 6 to review · 3 reviewed." */
   const rollupNote = () => { const t = Rollup.text({ ...rollup(), working: 0, needs: 0 }); return t ? ` Of the rest: ${t}.` : ''; };
-  /** The home view: the composer alone in the middle, with an optional one-line note. */
+  /** The home view: the composer alone in the middle, with an optional one-line note. In the Overseer
+   *  window home is the right panel: the review stays in the middle (AC-264). */
   async function goHome(note) {
-    await arrangement.chatOnly();
+    if (overseerWindow.active && center.panel && arrangement.current === 'split') await center.open({ column: center.panel.viewColumn });
+    else await arrangement.chatOnly();
     center.setMode('composer');
     if (note) center.panel?.webview.postMessage({ type: 'notice', scope: 'composer', kind: 'info', message: note });
   }
@@ -477,7 +472,7 @@ async function activate(context) {
   /** The Overseer view shows the agent's chat; in the workspace it keeps Overseer's conversation (AC-250). */
   async function showInCenter(runId) {
     // (Telling the view which agent is selected would switch it to that agent's chat.)
-    if (arrangement.current !== 'workspace') await center.select(runId);
+    await center.select(runId);
   }
 
   /** Shows an agent: its chat, and its review beside it when it has changes (Gate K). */
@@ -488,7 +483,7 @@ async function activate(context) {
     // Opening an agent at its end opens its review when it has changes (Gate K): it is reviewed (AC-254).
     if (!ACTIVE.has(picked.status)) markReviewed(model.rootRun(picked)?.id || runId);
     context.workspaceState.update('overseer.selectedRun', runId);
-    // The Worktree view shows the selected agent's worktree (AC-233).
+    // The head knows the selected agent's worktree (AC-233).
     head.select(model.rootRun(picked)?.id || runId).catch(error => say('head: ' + error.message));
     await arrangement.show(runId, { follow, force });
     say(`selected ${runId} (${arrangement.current}${keepConversation ? ', beside the conversation' : ''})`);
@@ -499,7 +494,7 @@ async function activate(context) {
   }
 
   // AC-257: Overseer's conversation and the agent's head are one action apart. Going to the
-  // conversation leaves the agent's head as it is (its files, cursor and scroll stay open beside);
+  // conversation leaves the agent's review as it is (open beside, in Follow or Diffs only);
   // going back focuses the head again and, when the Overseer tab showed the agent's chat, that chat.
   let leftAgent; // { runId, chat }: the agent the owner left for the conversation
   async function backToOverseer() {
@@ -518,7 +513,8 @@ async function activate(context) {
     const run = id && model.run(id);
     if (!run) { vscode.window.showInformationMessage('No agent to go back to: open one from the side bar or the conversation.'); return; }
     const root = model.rootRun(run) || run;
-    const chat = leftAgent?.runId === root.id && leftAgent.chat;
+    // In the Overseer window the right panel is the agent's chat again (AC-264).
+    const chat = (leftAgent?.runId === root.id && leftAgent.chat) || overseerWindow.active;
     leftAgent = undefined;
     if (chat) { selectedRun = root.id; await center.select(root.id); }
     // Its head is still open: straight back there. Closed meanwhile: opened again where it was left.
@@ -574,8 +570,9 @@ async function activate(context) {
     // How many agents the list shows, said in the search field while a search or a filter is on.
     const narrowed = filter || agents.statusFilter !== 'all' || agents.showArchived;
     const shown = narrowed ? agents.visibleTasks().length : 0;
-    agentsView.description = undefined;
+    // The count is said beside the Agents title (the side bar has no search field) and in the search box.
     searchView.setCount(narrowed ? `${shown} ${filter ? `match${shown === 1 ? '' : 'es'}` : `agent${shown === 1 ? '' : 's'}`}` : '');
+    agentsView.description = agentsDescription();
     vscode.commands.executeCommand('setContext', 'overseer.agentsFiltered', !!filter);
     // Keep the selected agent in view (and selected) when the list changes shape.
     if (selectedRun && (!filter || filter.taskIds.has(model.run(selectedRun)?.task_id))) setTimeout(() => revealInTree(selectedRun), 150);
@@ -592,8 +589,13 @@ async function activate(context) {
     const ids = await search(q);
     if (mine === searchSeq) setAgentFilter({ query: q, taskIds: new Set([...local, ...ids]) });
   }
-  /** Search Agents (⌥⌘F, command palette): puts the cursor in the side bar's search field. */
-  async function searchAgents() { await searchView.focus(); }
+  /** Search Agents (⌥⌘F, the Agents view's search button, command palette): VS Code's input box. */
+  async function searchAgents() { searchView.open(); }
+  /** Beside the Agents title: what a search or filter shows ("“beta” · 1 match"), else what is left to review. */
+  function agentsDescription() {
+    if (searchView.count) return [agents.filter?.query && `“${agents.filter.query}”`, agents.statusFilter !== 'all' || agents.showArchived ? FILTER_LABELS[agents.showArchived ? 'archived' : agents.statusFilter] : '', searchView.count].filter(Boolean).join(' · ');
+    return client.connected ? Rollup.reviewText(rollup()) : '';
+  }
 
   /** Read-only, empty files: the custom editor shows the chat instead of their content. */
   function chatFileSystem() {
@@ -957,9 +959,6 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.head.toggleMode', guard(() => head.toggleMode(head.runId || selectedRun))),
     vscode.commands.registerCommand('overseer.head.follow', guard(() => head.setMode(head.runId || selectedRun, 'follow'))),
     vscode.commands.registerCommand('overseer.head.diffsOnly', guard(() => head.setMode(head.runId || selectedRun, 'diffs'))),
-    vscode.commands.registerCommand('overseer.head.openFile', guard(rel => head.openFile(head.runId, typeof rel === 'string' ? rel : rel?.rel, { fromTree: true }))),
-    vscode.commands.registerCommand('overseer.head.refresh', guard(() => head.refresh())),
-    vscode.commands.registerCommand('overseer.head.catchUp', guard(() => head.catchUp())),
     vscode.commands.registerCommand('overseer.backToOverseer', guard(() => backToOverseer())),
     vscode.commands.registerCommand('overseer.backToAgent', guard(() => backToAgent())),
     vscode.commands.registerCommand('overseer.switchAgentOverseer', guard(() => switchAgentOverseer())),
@@ -1105,13 +1104,9 @@ async function activate(context) {
     // open-agent?run=<id> (AC-240): that agent's chat.
     vscode.window.registerUriHandler({ handleUri: uri => openUri(uri) }),
     vscode.commands.registerCommand('overseer.openCenter', guard(async () => { await model.refresh(); if (selectedRun && model.run(selectedRun)) await selectRun(selectedRun); else { await arrangement.chatOnly(); center.setMode('composer'); } })),
-    vscode.commands.registerCommand('overseer.openDashboard', guard(async () => { await model.refresh(); await dashboard.enter(); if (selectedRun && model.run(selectedRun)) await selectRun(selectedRun); })),
-    vscode.commands.registerCommand('overseer.exitDashboard', guard(() => dashboard.exit())),
-    vscode.commands.registerCommand('overseer.toggleDashboard', guard(async () => { if (dashboard.inDashboard) await dashboard.exit(); else { await model.refresh(); await dashboard.enter(); } })),
-    vscode.commands.registerCommand('overseer.openDashboardWindow', guard(() => dashboard.openWindow())),
-    // AC-250: the whole layout in one step; again (or Close Workspace) puts the owner's layout back.
-    vscode.commands.registerCommand('overseer.openWorkspace', guard(async () => { await model.refresh(); await dashboard.openWorkspace(); })),
-    vscode.commands.registerCommand('overseer.closeWorkspace', guard(async () => { if (dashboard.inWorkspace) await dashboard.exit(); })),
+    // AC-264: the Overseer layout in one step; again (or Close Workspace) the owner's own layout.
+    vscode.commands.registerCommand('overseer.openWorkspace', guard(async () => { await model.refresh(); await overseerWindow.toggle(); })),
+    vscode.commands.registerCommand('overseer.closeWorkspace', guard(async () => { if (overseerWindow.active) await overseerWindow.leave(); })),
     // AC-251: the review (Follow) in its own window, to put on another screen.
     vscode.commands.registerCommand('overseer.popOutReview', guard(async arg => {
       await model.refresh();
@@ -1194,12 +1189,14 @@ async function activate(context) {
     await model.refresh();
     refreshAccounts().catch(() => {});
     announceBackgroundAgents().catch(error => say('background notice check: ' + error.message));
-    dashboard.startup().catch(error => say('dashboard startup: ' + error.message));
-    setTimeout(() => offerSideBar(context).catch(error => say('side bar offer: ' + error.message)), 3000);
+    retireFocusMode(context, say).catch(error => say('focus mode: ' + error.message));
+    overseerWindow.startup().catch(error => say('overseer window: ' + (error.stack || error.message)));
+    // The first launch offers the Overseer layout, then (another time) the side bar.
+    setTimeout(() => overseerWindow.offer().catch(error => say('layout offer: ' + error.message)).then(() => offerSideBar(context)).catch(error => say('side bar offer: ' + error.message)), 3000);
     const remembered = context.workspaceState.get('overseer.selectedRun');
     // Reopen where the user left off (AC-80) when VS Code did not restore the Overseer editor itself.
     if (remembered && model.run(remembered) && context.workspaceState.get('overseer.editorOpen', false)) {
-      setTimeout(() => { if (!center.active && !dashboard.inDashboard) selectRun(remembered).catch(error => say('reopen: ' + error.message)); }, 2500);
+      setTimeout(() => { if (!center.active && !overseerWindow.active) selectRun(remembered).catch(error => say('reopen: ' + error.message)); }, 2500);
     }
     if (remembered && model.run(remembered)) {
       selectedRun = remembered;
@@ -1213,7 +1210,7 @@ async function activate(context) {
     // A pinned dev window says it once ('unreachable') and keeps waiting for its instance.
     if (pin && !client.refusal) { updateStatus(); client.reconnectLater(); } else vscode.window.showErrorMessage(`Overseer could not start its daemon: ${Plain.plain(error.message, 300)}`);
   }
-  return { client, model, review, outputs, selectRun, agents, agentsView, center, dashboard, arrangement, attention, phoneAccess, voice, openUri, selectedRun: () => selectedRun }; // exported for UI tests
+  return { client, model, review, outputs, selectRun, agents, agentsView, center, overseerWindow, arrangement, attention, phoneAccess, voice, openUri, selectedRun: () => selectedRun }; // exported for UI tests
 }
 
 function deactivate() { if (centerRef) centerRef.shuttingDown = true; client?.dispose(); }

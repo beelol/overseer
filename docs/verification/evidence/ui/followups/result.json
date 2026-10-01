@@ -28,15 +28,15 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-8SkA0o/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-2ynN1N/followups-repo\nOn main"
             },
             {
               "chip": "agent",
-              "tooltip": "A local model through Ollama and OpenCode.\nNo account, no network, no cost.\nOllama is running"
+              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nChatGPT Pro · des…@example.invalid · Mac's default login: signed in\nUsage: not reported by this harness"
             },
             {
               "chip": "model",
-              "tooltip": "qwen3-coder:30b at a 64k context: the best verified model that fits the memory free now"
+              "tooltip": "The harness default model"
             },
             {
               "chip": "mode",
@@ -59,15 +59,15 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-8SkA0o/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-2ynN1N/followups-repo\nOn main"
             },
             {
               "chip": "agent",
-              "tooltip": "A local model through Ollama and OpenCode.\nNo account, no network, no cost.\nOllama is running"
+              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nChatGPT Pro · des…@example.invalid · Mac's default login: signed in\nUsage: not reported by this harness"
             },
             {
               "chip": "model",
-              "tooltip": "qwen3-coder:30b at a 64k context: the best verified model that fits the memory free now"
+              "tooltip": "The harness default model"
             },
             {
               "chip": "mode",
@@ -90,15 +90,15 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-8SkA0o/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-2ynN1N/followups-repo\nOn main"
             },
             {
               "chip": "agent",
-              "tooltip": "A local model through Ollama and OpenCode.\nNo account, no network, no cost.\nOllama is running"
+              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nChatGPT Pro · des…@example.invalid · Mac's default login: signed in\nUsage: not reported by this harness"
             },
             {
               "chip": "model",
-              "tooltip": "qwen3-coder:30b at a 64k context: the best verified model that fits the memory free now"
+              "tooltip": "The harness default model"
             },
             {
               "chip": "mode",
@@ -121,11 +121,19 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-8SkA0o/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-2ynN1N/followups-repo\nOn main"
+            },
+            {
+              "chip": "agent",
+              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nChatGPT Pro · des…@example.invalid · Mac's default login: signed in\nUsage: not reported by this harness"
             },
             {
               "chip": "model",
-              "tooltip": "qwen3-coder:30b at a 64k context: the best verified model that fits the memory free now"
+              "tooltip": "The harness default model"
+            },
+            {
+              "chip": "mode",
+              "tooltip": "A new branch and worktree; your checkout is untouched"
             }
           ],
           "overflow": 0,
@@ -147,15 +155,15 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-8SkA0o/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-2ynN1N/followups-repo\nOn main"
             },
             {
               "chip": "agent",
-              "tooltip": "A local model through Ollama and OpenCode.\nNo account, no network, no cost.\nOllama is running"
+              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nChatGPT Pro · des…@example.invalid · Mac's default login: signed in\nUsage: not reported by this harness"
             },
             {
               "chip": "model",
-              "tooltip": "qwen3-coder:30b at a 64k context: the best verified model that fits the memory free now"
+              "tooltip": "The harness default model"
             },
             {
               "chip": "mode",
@@ -173,15 +181,15 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-8SkA0o/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-2ynN1N/followups-repo\nOn main"
             },
             {
               "chip": "agent",
-              "tooltip": "A local model through Ollama and OpenCode.\nNo account, no network, no cost.\nOllama is running"
+              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nChatGPT Pro · des…@example.invalid · Mac's default login: signed in\nUsage: not reported by this harness"
             },
             {
               "chip": "model",
-              "tooltip": "qwen3-coder:30b at a 64k context: the best verified model that fits the memory free now"
+              "tooltip": "The harness default model"
             },
             {
               "chip": "mode",
@@ -199,15 +207,15 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-8SkA0o/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-2ynN1N/followups-repo\nOn main"
             },
             {
               "chip": "agent",
-              "tooltip": "A local model through Ollama and OpenCode.\nNo account, no network, no cost.\nOllama is running"
+              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nChatGPT Pro · des…@example.invalid · Mac's default login: signed in\nUsage: not reported by this harness"
             },
             {
               "chip": "model",
-              "tooltip": "qwen3-coder:30b at a 64k context: the best verified model that fits the memory free now"
+              "tooltip": "The harness default model"
             },
             {
               "chip": "mode",
@@ -225,26 +233,34 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-8SkA0o/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-2ynN1N/followups-repo\nOn main"
+            },
+            {
+              "chip": "agent",
+              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nChatGPT Pro · des…@example.invalid · Mac's default login: signed in\nUsage: not reported by this harness"
             },
             {
               "chip": "model",
-              "tooltip": "qwen3-coder:30b at a 64k context: the best verified model that fits the memory free now"
+              "tooltip": "The harness default model"
+            },
+            {
+              "chip": "mode",
+              "tooltip": "A new branch and worktree; your checkout is untouched"
             }
           ]
         }
       ]
     },
     {
-      "name": "account names say the harness once (chat header, agent chip and menu, Accounts view); the machine's own login reads \"Your login\"",
+      "name": "account names say the harness once (chat header, agent chip and menu, Accounts view); the Mac's own login reads \"Mac's default login\" (AC-235)",
       "ok": true,
       "detail": {
-        "chatHeader": "Your login\n·\nname-check",
-        "agentChip": "Local model",
+        "chatHeader": "ChatGPT Pro · des…@example.invalid · Mac's default login\n·\nname-check",
+        "agentChip": "Codex · Pro · des…@example.invalid",
         "agentMenu": [
-          "Your login offline",
-          "Your login offline",
-          "Your login signed out",
+          "Mac's default login ChatGPT Pro · des…@example.invalid",
+          "Mac's default login Claude Max · des…@example.invalid",
+          "Mac's default login signed out",
           "Run a program",
           "Best fit · qwen3-coder:30b 64k",
           "qwen3-coder:30b fits at 64k",
@@ -256,46 +272,44 @@
           "qwen2.5-coder:3b fits at 32k · failed its check",
           "qwen2.5-coder:1.5b fits at 32k · failed its check",
           "qwen2.5:0.5b fits at 32k · unverified",
-          "qwen3.5:122b too big · 77.2 GiB of 40.9 GiB · unverified"
+          "qwen3.5:122b too big · 77.2 GiB of 51.2 GiB · unverified"
         ],
         "accounts": [
           "ChatGPT",
-          "Your loginpro · 55b9da0f · desktop",
+          "Mac's default loginPro · des…@example.invalid · desktop",
           "Claude",
-          "Your loginmax · 49d8e90c · desktop"
+          "Mac's default loginMax · des…@example.invalid · desktop"
         ]
       }
     },
     {
-      "name": "the side bar has a search field above the Agents list; ⌥⌘F from the editor puts the cursor in it; typing filters the list within 200 ms and the field says how many match",
+      "name": "there is no Search section (the side bar is the agents and Accounts); ⌥⌘F from the editor opens the search box; typing filters the list within 200 ms and the Agents title says how many match",
       "ok": true,
       "detail": {
         "openedFromEditor": true,
-        "typed": {
-          "value": "beta",
-          "focused": true,
-          "count": "1 match",
-          "clearShown": true,
-          "input": true,
-          "placeholder": "Search agents",
-          "border": "1px",
-          "height": 26
-        },
-        "ms": 32,
-        "shown": [
-          "followups-repo",
-          "Beta docs"
-        ],
         "panes": [
-          "Search",
           "Agents",
           "Accounts",
           "Devices"
+        ],
+        "typed": {
+          "title": "Search agents",
+          "value": "beta",
+          "focused": true,
+          "placeholder": "Title, message, file, repository, account or status",
+          "prompt": "1 match (Press 'Enter' to confirm or 'Escape' to cancel)",
+          "filterButton": true
+        },
+        "said": "“beta” · 1 match",
+        "ms": 8,
+        "shown": [
+          "followups-repo",
+          "Beta docs"
         ]
       }
     },
     {
-      "name": "⌥⌘F also works from the side bar; Escape and the field's ✕ each clear the search and bring the list back",
+      "name": "⌥⌘F also works from the side bar; Enter keeps the search; Escape in the box and the title bar's Clear Search each clear it and bring the list back",
       "ok": true,
       "detail": {
         "openedFromSide": true,
@@ -305,14 +319,14 @@
       }
     },
     {
-      "name": "the status filters under the field narrow the list (Working, Done, Archived) and All brings it back; the field says how many are shown",
+      "name": "the status filters narrow the list (Working, Done, Archived) and All brings it back; the Agents title says the filter and how many are shown",
       "ok": true,
       "detail": {
         "onlyWorking": [
           "followups-repo",
           "Still working"
         ],
-        "workingCount": "1 agent",
+        "workingSaid": "Working · 1 agent",
         "onlyDone": [
           "followups-repo",
           "Gamma tests",
@@ -324,6 +338,7 @@
           "Alpha refactor"
         ],
         "everything": [
+          "1 working · 3 to review",
           "followups-repo",
           "Still working",
           "Gamma tests",
@@ -333,27 +348,11 @@
       }
     },
     {
-      "name": "the search is one line with a filter icon (its menu picks the filter; the icon shows when one is on) and nothing under the field (AC-155); the pane keeps VS Code's minimum height for extension panes",
-      "ok": true,
-      "detail": {
-        "oneLine": {
-          "children": 1,
-          "fieldHeight": 26,
-          "filterIcon": true
-        },
-        "pane": {
-          "head": "Search",
-          "h": 148
-        },
-        "iconOnAfterAll": false
-      }
-    },
-    {
       "name": "with no agent working or pinned, the grid command goes to the home composer with a one-line note (no empty grid screen)",
       "ok": true,
       "detail": {
         "mode": "composer",
-        "note": "No agent is working or pinned yet, so the grid has nothing to show. Start one here.",
+        "note": "No agent is working or pinned yet, so the grid has nothing to show. Of the rest: 4 to review. Start one here.",
         "emptyText": false
       }
     },
@@ -362,11 +361,11 @@
       "ok": true,
       "detail": {
         "back": true,
-        "backNote": "The grid is empty: no agent is working or pinned. Start one here."
+        "backNote": "The grid is empty: no agent is working or pinned. Of the rest: 5 to review. Start one here."
       }
     },
     {
-      "name": "the grid and dashboard mode are captured with nine working agents in both Overseer themes (nine tiles each time)",
+      "name": "the grid is captured with nine working agents in both Overseer themes (nine tiles each time)",
       "ok": true,
       "detail": {
         "counts": [

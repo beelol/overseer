@@ -1,9 +1,9 @@
 // Packaged-UI scenario for the Gate K follow-ups from the owner's marks (AC-109 to AC-113), fixture
 // harnesses only: the composer's heading and mark (AC-111) in three themes; its choices sit under the
 // field at editor widths 360, 480, 640 and 900 px (AC-109); account names say the harness once on every
-// surface (AC-110); a side-bar search is visible as the list's first row, started by shortcut from the
-// editor and from the side bar and cleared by Escape or by mouse (AC-112); the grid never shows an empty
-// screen, and the grid and dashboard mode are captured with nine working agents (AC-113).
+// surface (AC-110); searching agents opens from the Agents view (⌥⌘F, from the editor and from the side bar;
+// no Search section since AC-264) and is cleared by Escape or by mouse (AC-112); the grid never shows an empty
+// screen, and the grid is captured with nine working agents (AC-113).
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
@@ -97,12 +97,12 @@ const { auditExpression } = require('./audit');
     await delay(2000);
     const agentsList = () => cdp.evalWorkbench(`(() => { const pane = [...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || '')); return [...pane.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).map(r => ({ label: r.querySelector('.label-name')?.textContent.trim(), description: r.querySelector('.label-description')?.textContent.trim() || '', icon: (r.querySelector('.custom-view-tree-node-item-icon')?.className.match(/codicon-([a-z-]+)/) || [])[1] || '' })); })()`);
     const agentLabels = async () => (await agentsList()).filter(r => r.label && !/^“/.test(r.label)).map(r => r.label);
-    // The field: where it sits, what it looks like.
-    const field = async () => (await s.searchFrame()).eval(`(() => { const i = document.getElementById('q'), box = document.querySelector('.search-field').getBoundingClientRect();
-      return { value: i.value, focused: document.activeElement === i, count: document.getElementById('count').textContent, clearShown: !document.getElementById('clear').hidden,
-        input: i.tagName === 'INPUT' && i.type === 'text', placeholder: i.placeholder, border: getComputedStyle(document.querySelector('.search-field')).borderTopWidth, height: Math.round(box.height) }; })()`);
-    const above = await cdp.evalWorkbench(`(() => { const heads = [...document.querySelectorAll('.part.sidebar .pane-header')].filter(h => h.offsetParent).map(h => h.textContent.trim()); return heads; })()`);
-    // From the editor: click into the composer, then ⌥⌘F puts the cursor in the field.
+    // AC-112 as AC-264 has it: no Search section; the Agents view's search button (⌥⌘F) opens VS Code's
+    // input box at the top of the window, and the Agents title says how many the list shows.
+    const box = () => cdp.evalWorkbench(`(() => { const w = document.querySelector('.quick-input-widget'); const i = w?.querySelector('input'); if (!w || w.style.display === 'none') return null;
+      return { title: w.querySelector('.quick-input-title')?.textContent || '', value: i?.value, focused: i === document.activeElement, placeholder: i?.placeholder || '', prompt: w.querySelector('.quick-input-message')?.textContent || '', filterButton: !!w.querySelector('.codicon-filter, .codicon-filter-filled') }; })()`);
+    const panes = await cdp.evalWorkbench(`[...document.querySelectorAll('.part.sidebar .pane-header')].filter(h => h.offsetParent).map(h => h.querySelector('.title')?.textContent.trim() || '')`);
+    // From the editor: click into the composer, then ⌥⌘F opens the search box.
     { const at = await s.webviewPoint(dash, '#task'); await cdp.click(at.x, at.y); await delay(300); }
     await cdp.key('f', { meta: true, alt: true });
     const openedFromEditor = await s.searchFocused().then(() => true, () => false);
@@ -111,52 +111,45 @@ const { auditExpression } = require('./audit');
     for (let i = 0; i < 200; i++) { shown = await agentLabels(); if (shown.includes('Beta docs') && !shown.includes('Alpha refactor')) break; await delay(5); }
     const ms = Date.now() - t0;
     await delay(300);
-    const typed = await field();
-    await s.screenshot('search-field');
-    check('the side bar has a search field above the Agents list; ⌥⌘F from the editor puts the cursor in it; typing filters the list within 200 ms and the field says how many match',
-      openedFromEditor && typed.input && typed.placeholder === 'Search agents' && parseFloat(typed.border) >= 1 && typed.height <= 32 && typed.value === 'beta' && typed.count === '1 match' && typed.clearShown &&
-      shown.includes('Beta docs') && !shown.includes('Alpha refactor') && ms < 200 && /Search/i.test(above[0] || '') && /Agents/.test(above[1] || ''), { openedFromEditor, typed, ms, shown, panes: above });
-    // Escape in the field clears it.
+    const typed = await box();
+    await s.screenshot('search-box');
+    const said = await s.agentsDescription();
+    check('there is no Search section (the side bar is the agents and Accounts); ⌥⌘F from the editor opens the search box; typing filters the list within 200 ms and the Agents title says how many match',
+      openedFromEditor && !panes.some(t => /^Search$/i.test(t)) && /^Agents/i.test(panes[0] || '') && typed?.value === 'beta' && /Search agents/.test(typed.title) && typed.filterButton && /1 match/.test(typed.prompt) &&
+      shown.includes('Beta docs') && !shown.includes('Alpha refactor') && ms < 200 && /“beta” · 1 match/.test(said), { openedFromEditor, panes, typed, said, ms, shown });
+    // Escape clears it.
     await cdp.key('Escape'); await delay(800);
-    const afterEsc = await field(); shown = await agentLabels();
-    const clearedByKey = afterEsc.value === '' && shown.includes('Alpha refactor') && shown.includes('Beta docs');
-    // From the side bar: ⌥⌘F, type, then clear with the field's ✕.
+    shown = await agentLabels();
+    const clearedByKey = !(await box()) && shown.includes('Alpha refactor') && shown.includes('Beta docs') && !/match/.test(await s.agentsDescription());
+    // From the side bar: ⌥⌘F, type, Enter keeps the filter; the title bar's Clear Search (the mouse) clears it.
     await cdp.command('Focus on Agents View'); await delay(400);
     await cdp.key('f', { meta: true, alt: true });
     const openedFromSide = await s.searchFocused().then(() => true, () => false);
-    await cdp.call('Input.insertText', { text: 'gamma' }, cdp.workbench); await delay(700);
+    await cdp.call('Input.insertText', { text: 'gamma' }, cdp.workbench); await delay(700); await cdp.key('Enter'); await delay(500);
     const narrowed = (await agentLabels()).includes('Gamma tests') && !(await agentLabels()).includes('Alpha refactor');
-    const sf = await s.searchFrame();
-    { const at = await s.webviewPoint(sf, '#clear'); await cdp.click(at.x, at.y); await delay(800); }
-    const afterX = await field(); shown = await agentLabels();
-    const clearedByMouse = afterX.value === '' && shown.includes('Alpha refactor');
-    check('⌥⌘F also works from the side bar; Escape and the field\'s ✕ each clear the search and bring the list back', openedFromSide && narrowed && clearedByKey && clearedByMouse, { openedFromSide, narrowed, clearedByKey, clearedByMouse });
+    const clearAt = await cdp.evalWorkbench(`(() => { const a = document.querySelector('.pane-header .action-label[aria-label^="Clear Search"]'); if (!a) return null; const r = a.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+    if (clearAt) { await cdp.click(clearAt.x, clearAt.y); await delay(800); }
+    shown = await agentLabels();
+    const clearedByMouse = !!clearAt && shown.includes('Alpha refactor');
+    check('⌥⌘F also works from the side bar; Enter keeps the search; Escape in the box and the title bar\'s Clear Search each clear it and bring the list back', openedFromSide && narrowed && clearedByKey && clearedByMouse, { openedFromSide, narrowed, clearedByKey, clearedByMouse });
 
-    // The space under the field holds the status filters (VS Code gives a webview pane a minimum height).
-    // Filters live behind the field's filter icon (a VS Code menu).
+    // The status filters: the box's filter button, or Filter Agents… (a VS Code menu).
     const LABEL = { all: 'All', working: 'Working', needs: 'Needs you', done: 'Done', failed: 'Failed', archived: 'Archived' };
-    const clickFilter = async value => { const f = await s.searchFrame(); const at = await s.webviewPoint(f, '#filter'); await cdp.click(at.x, at.y);
-      await cdp.waitQuickTitle('Show agents'); await cdp.type(LABEL[value]); await delay(300); await cdp.key('Enter'); await delay(900); return f; };
-    // AC-155: one line; nothing under the field.
-    const oneLine = await (await s.searchFrame()).eval(`({ children: [...document.body.children].filter(e => e.tagName !== 'SCRIPT' && e.offsetParent !== null).length, fieldHeight: Math.round(document.querySelector('.search-field').getBoundingClientRect().height), filterIcon: !!document.querySelector('#filter .codicon-filter') })`);
-    const pane = await cdp.evalWorkbench(`[...document.querySelectorAll('.part.sidebar .pane')].map(p => ({ head: p.querySelector('.pane-header')?.textContent.trim().slice(0, 12), h: Math.round(p.getBoundingClientRect().height) }))[0]`);
+    const pickFilter = async value => { await cdp.command('Overseer: Filter Agents…'); await cdp.waitQuickTitle('Show agents'); await cdp.type(LABEL[value]); await delay(300); await cdp.key('Enter'); await delay(900); };
     s.ctl('task.archive', { task_id: state().tasks.find(t => t.title === 'Alpha refactor').id, archived: true }); await delay(800);
     const running = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'sleep 60'], prompt: '', title: 'Still working' }); loops.push(running.run.id); await delay(1500);
-    let ff = await clickFilter('working'); const onlyWorking = await agentLabels(); const workingCount = await ff.eval(`window.__overseerSearch.count()`);
+    await pickFilter('working'); const onlyWorking = await agentLabels(); const workingSaid = await s.agentsDescription();
     await s.screenshot('filter-working');
-    ff = await clickFilter('done'); const onlyDone = await agentLabels();
-    ff = await clickFilter('archived'); const onlyArchived = await agentLabels();
-    ff = await clickFilter('all'); const everything = await agentLabels();
-    check('the status filters under the field narrow the list (Working, Done, Archived) and All brings it back; the field says how many are shown',
-      onlyWorking.includes('Still working') && !onlyWorking.includes('Beta docs') && workingCount === '1 agent' && onlyDone.includes('Beta docs') && !onlyDone.includes('Still working') &&
+    await pickFilter('done'); const onlyDone = await agentLabels();
+    await pickFilter('archived'); const onlyArchived = await agentLabels();
+    await pickFilter('all'); const everything = await agentLabels();
+    check('the status filters narrow the list (Working, Done, Archived) and All brings it back; the Agents title says the filter and how many are shown',
+      onlyWorking.includes('Still working') && !onlyWorking.includes('Beta docs') && /Working · 1 agent/.test(workingSaid) && onlyDone.includes('Beta docs') && !onlyDone.includes('Still working') &&
       onlyArchived.includes('Alpha refactor') && !onlyArchived.includes('Beta docs') && everything.includes('Beta docs') && everything.includes('Still working') && !everything.includes('Alpha refactor'),
-      { onlyWorking, workingCount, onlyDone, onlyArchived, everything });
-    const iconOn = await (await s.searchFrame()).eval(`document.querySelector('#filter').classList.contains('on')`);
-    check('the search is one line with a filter icon (its menu picks the filter; the icon shows when one is on) and nothing under the field (AC-155); the pane keeps VS Code\'s minimum height for extension panes',
-      oneLine.children === 1 && oneLine.fieldHeight <= 30 && oneLine.filterIcon && workingCount === '1 agent' && iconOn === false, { oneLine, pane, iconOnAfterAll: iconOn });
-    await clickFilter('working'); await s.screenshot('filter-on');
-    await clickFilter('all');
-    await theme('Overseer Light'); await s.screenshot('search-field-light'); await theme('Overseer Dark');
+      { onlyWorking, workingSaid, onlyDone, onlyArchived, everything });
+    await pickFilter('working'); await s.screenshot('filter-on');
+    await pickFilter('all');
+    await theme('Overseer Light'); await cdp.key('f', { meta: true, alt: true }); await s.searchFocused().catch(() => {}); await s.screenshot('search-box-light'); await cdp.key('Escape'); await theme('Overseer Dark');
     s.ctl('run.interrupt', { run_id: running.run.id }); await delay(1500);
 
     // AC-113: no empty grid. Nothing working and nothing pinned: the grid command goes home with a note.
@@ -176,7 +169,7 @@ const { auditExpression } = require('./audit');
     const backNote = await grid.eval(`document.querySelector('.view-composer .composer-note')?.innerText || ''`);
     check('when the last tile goes, the grid gives way to the home composer', back && /grid is empty/.test(backNote), { back, backNote });
 
-    // Nine working agents: the grid and dashboard mode, in both themes.
+    // Nine working agents: the grid, in both themes.
     for (let i = 1; i <= 9; i++) {
       const t = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', `i=0; while [ $i -lt 400 ]; do echo "step $i of task ${i}: checking module ${i}.$i"; i=$((i+1)); sleep 0.4; done`], prompt: '', title: ['Split payments', 'Refresh sessions', 'Migrate users', 'Fix flaky test', 'Upgrade deps', 'Docs pass', 'Cache warmup', 'Audit logs', 'Retry policy'][i - 1] });
       loops.push(t.run.id);
@@ -191,12 +184,9 @@ const { auditExpression } = require('./audit');
       counts.push(await cdp.webview(`document.body.dataset.mode === 'grid'`, 10000).then(v => v.eval(`document.querySelectorAll('.grid .tile').length`)).catch(() => 0));
       await s.screenshot('grid-nine-' + t.split(' ')[1].toLowerCase());
       await cdp.command('Overseer: Toggle Agent Grid'); await delay(1500);
-      await cdp.command('Overseer: Enter Focus Mode'); await delay(3500);
-      await s.screenshot('dashboard-nine-' + t.split(' ')[1].toLowerCase());
-      await cdp.command('Overseer: Exit Focus Mode'); await delay(2000);
     }
     await theme('Overseer Dark');
-    check('the grid and dashboard mode are captured with nine working agents in both Overseer themes (nine tiles each time)', counts.length === 2 && counts.every(n => n === 9), { counts });
+    check('the grid is captured with nine working agents in both Overseer themes (nine tiles each time)', counts.length === 2 && counts.every(n => n === 9), { counts });
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}

@@ -2,8 +2,9 @@
 // comparison/base control, Follow (off/following/paused), agent-edit reveal, restores
 // the saved scroll anchor once the rows above it have rendered (after reload/restart), and
 // per-hunk Accept (mark reviewed) / Reject (restore the base text through the native edit path),
-// and (AC-99) a file navigator over the whole worktree: Changes only or All files, where any file
-// opens inside the review (an unchanged one as plain editable text).
+// and (AC-99) a file navigator over the whole worktree. Overseer (AC-264) has two views: Follow shows
+// the file the agent is in, live, read-only with its changes marked, and its list is All files (a
+// file picked there shows in the same place); Diffs only shows the diffs, and its list is Changed.
 import './browser.css';
 import { StatisticsWorker } from './statistics-client';
 import { EditingClient, replaceText } from './editing-client';
@@ -31,12 +32,15 @@ let requestId = 0, clicked, classifying = false, renderFrame, stopped = false;
 let snapshot, settings = {}, selected = saved.selected, initialized = false, restoring = true;
 let rendering = false, nextSnapshot, pendingJump, hierarchy = saved.hierarchy;
 let frame, resizeFrame, persistTimer, progressTimer, pendingState;
-// AC-99: 'changes' or 'all' once the user picks; until then Changes only while the agent has changes.
-let navMode = saved.navMode === 'all' || saved.navMode === 'changes' ? saved.navMode : undefined;
+// AC-264: 'follow' (the agent's file, All files) or 'diffs' (the diffs, Changed); the host decides.
+let view = document.body.dataset.view === 'follow' ? 'follow' : 'diffs';
+// Follow's file (AC-264): its path, who put it there ('agent' or 'user') and the newest message's number.
+let viewChosenAt = 0;
+let followPath = '', followSource = 'agent', followSeq = 0, followEditor, followModel, followDecorations, followFlash;
 const openDirs = new Set(saved.openDirs || []);
 const dirCache = new Map(); // folder path -> { loading } | { entries } | { error }
 let pendingBrowse;
-const changesOnlyButton = document.getElementById('changes-only');
+const listTitle = document.getElementById('list-title');
 const editing = new EditingClient({ vscode, saved, repository: identity.repository, snapshot: () => snapshot, settings: () => settings, notice: stickyMessage, changed: row => { if (!rows.has(row.entry.id)) release(row); else { if (row.largeWhileEditing && !row.editor?.getModifiedEditor().hasTextFocus()) { row.largeWhileEditing = false; row.renderedRevision = undefined; } ensure(row); updateViewport(); } } });
 filter.value = saved.filter || '';
 layout.value = saved.layout === 'split' ? 'split' : 'unified';
@@ -57,12 +61,19 @@ toggleNavigator.addEventListener('click', () => { collapseNavigator(!document.bo
 function persist() {
   clearTimeout(persistTimer);
   if (!snapshot) return;
+  if (document.visibilityState === 'hidden') return;
+  // Overseer (AC-264): Follow hides the diffs; the list's state is kept and the diffs' position left as it was.
+  if (view === 'follow') {
+    pendingState = { ...(pendingState || saved), ...identity, navWidth, navCollapsed: document.body.classList.contains('nav-collapsed'), filter: filter.value, openDirs: [...openDirs] };
+    persistTimer = setTimeout(flushState, 100);
+    return;
+  }
   // Overseer: a hidden or zero-height view clamps scrollTop to 0; keep the last real position.
-  if (document.visibilityState === 'hidden' || !diffs.clientHeight) return;
+  if (!diffs.clientHeight) return;
   pendingState = { ...identity, layout: layout.value, closedFiles: [...closedFiles], closedFolders: [...closedFolders],
     navWidth, navCollapsed: document.body.classList.contains('nav-collapsed'), filter: filter.value,
     selected, scrollTop: diffs.scrollTop, anchor: restoreGoal ? { id: restoreGoal.id, offset: restoreGoal.offset } : anchor(), hierarchy,
-    navMode, openDirs: [...openDirs] };
+    openDirs: [...openDirs] };
   persistTimer = setTimeout(flushState, 100);
 }
 function flushState() {
@@ -133,18 +144,19 @@ function jump(id) {
   select(id); if (document.hasFocus()) row.header.focus({ preventScroll: true }); updateViewport(); persist();
 }
 function changedEntries() { return (snapshot?.entries || []).filter(e => !e.browsed); }
-function changesOnly() { return navMode ? navMode === 'changes' : changedEntries().length > 0; }
+function changesOnly() { return view !== 'follow'; }
 function countsText(id) {
   const data = id && rows.get(id)?.element.dataset;
   return data && data.additions !== undefined ? [data.additions, data.deletions] : undefined;
 }
 function fileButton(relPath, entry) {
   const changed = !!entry && !entry.browsed;
-  const button = node('button', 'file' + (entry && entry.id === selected ? ' active' : '') + (changed ? ' changed' : ''));
+  const shown = view === 'follow' ? relPath === followPath : !!entry && entry.id === selected;
+  const button = node('button', 'file' + (shown ? ' active' : '') + (changed ? ' changed' : ''));
   if (entry) button.dataset.id = entry.id;
   button.dataset.path = relPath;
   button.title = relPath + (entry?.unsaved ? ' (unsaved)' : '') + (entry?.conflicted ? ' (conflicted)' : '') + (entry?.readOnly ? ' (staged: read-only)' : '');
-  button.setAttribute('role', 'treeitem'); button.setAttribute('aria-selected', String(!!entry && entry.id === selected));
+  button.setAttribute('role', 'treeitem'); button.setAttribute('aria-selected', String(shown));
   button.setAttribute('aria-label', [relPath, changed && entry.status, entry?.unsaved && 'unsaved', entry?.conflicted && 'conflicted'].filter(Boolean).join(', '));
   // Codicon per file, plus markers: conflicted (warning) and unsaved (filled dot).
   const icon = node('span', 'codicon codicon-' + (entry?.conflicted ? 'warning' : 'file')); icon.setAttribute('aria-hidden', 'true');
@@ -159,8 +171,12 @@ function fileButton(relPath, entry) {
   button.addEventListener('click', () => openPath(relPath));
   return button;
 }
-/** Opens any worktree file in the review: jump to its row, or ask for it as a browsed file. */
+/**
+ * Changed (Diffs only): a file jumps to its diff. All files is Follow's list (AC-264, the owner
+ * 2026-09-30): every file of the worktree, each shown in the review's middle, in place of the agent's.
+ */
 function openPath(relPath) {
+  if (view === 'follow') { markFollowed(relPath); vscode.postMessage({ type: 'showFile', path: relPath }); return; }
   const entry = snapshot?.entries.find(e => e.path === relPath);
   if (entry) { jump(entry.id); return; }
   pendingBrowse = relPath;
@@ -172,9 +188,9 @@ function listDir(dirPath) {
 }
 function renderTree() {
   const only = changesOnly();
-  changesOnlyButton.setAttribute('aria-pressed', String(only));
-  changesOnlyButton.title = only ? 'Changes only: showing changed files. Click to browse every file in the worktree.' : 'All files: showing the whole worktree. Click to show only changed files.';
-  changesOnlyButton.setAttribute('aria-label', only ? 'Changes only' : 'All files');
+  // AC-264: the list follows the view: Changed in Diffs only, All files in Follow.
+  listTitle.textContent = only ? 'Changed' : 'All files';
+  listTitle.title = only ? 'The files the agent changed; each jumps to its diff.' : 'Every file in the agent\'s worktree; each shows here, in place of the agent\'s file.';
   document.body.dataset.nav = only ? 'changes' : 'all';
   const fragment = document.createDocumentFragment();
   if (only) populateChanges(fragment); else populateAll('', fragment);
@@ -239,7 +255,6 @@ function populateAll(dirPath, parent) {
   }
   if (!listing.entries.length && !dirPath) parent.append(node('div', 'tree-note', 'The worktree is empty.'));
 }
-changesOnlyButton.addEventListener('click', () => { navMode = changesOnly() ? 'all' : 'changes'; renderTree(); persist(); });
 filter.addEventListener('input', () => { renderTree(); persist(); });
 for (const type of ['wheel', 'pointermove', 'pointerdown', 'keydown']) document.getElementById('navigator').addEventListener(type, () => { navigatorTouched = Date.now(); }, { passive: true });
 function fold(row) {
@@ -302,7 +317,7 @@ function release(row) {
   row.editor = undefined; row.body = undefined; row.renderedRevision = undefined; row.save.disabled = true;
   loading(row, true);
 }
-function relevant(row) { return !stopped && rows.get(row.entry.id) === row && row.nearby && !closedFiles.has(row.entry.id); }
+function relevant(row) { return !stopped && view === 'diffs' && rows.get(row.entry.id) === row && row.nearby && !closedFiles.has(row.entry.id); }
 function reviewKey(value) { return JSON.stringify([value.repository, value.mode, value.target, value.description?.headName,
   value.description?.base, value.description?.mergeBase]); }
 function valid(job) {
@@ -398,6 +413,7 @@ function showCard(row, body, stats) {
   showCounts(row, stats); loading(row, false); restoreAnchor(position); trackScroll();
 }
 function updateViewport() {
+  if (view !== 'diffs') return; // Follow hides the diffs: nothing is near, nothing loads
   pursueRestore();
   const top = diffs.scrollTop - 750, bottom = diffs.scrollTop + diffs.clientHeight + 750;
   for (const row of rows.values()) {
@@ -600,6 +616,7 @@ function updateSettings(value) {
   if (thresholdChanged) for (const row of rows.values()) { if (row.classification && !manual.has(row.entry.id)) row.renderedRevision = undefined; }
 
   for (const row of rows.values()) if (row.editor) { row.editor.updateOptions(options(row)); editing.update(row); resize(row); }
+  followEditor?.updateOptions(followOptions());
 }
 // Keep shell assets independent: even delayed Monaco startup cannot block the file list.
 async function loadMonaco() {
@@ -750,6 +767,8 @@ function applyOverseer(o) {
   document.getElementById('base').title += `\n${o.workspaceKind === 'current' ? 'Checkout' : 'Worktree'}: ${short}`;
   document.body.dataset.workspace = o.workspacePath || '';
   renderLand(o.land);
+  // A switch made here wins over a message the host sent before it heard of it (older viewAt).
+  if (o.view && o.view !== view && (Number(o.viewAt) || 0) >= viewChosenAt) setView(o.view);
   followState = o.follow || 'off';
   followNote = o.followNote || '';
   followStatus.textContent = followState === 'paused' ? (/paused/.test(o.followNote || '') ? o.followNote : 'Follow paused by your navigation') : followState === 'following' ? (o.followNote || 'Following agent edits') : '';
@@ -781,8 +800,12 @@ function userNavigated(reason) {
   followState = 'paused'; followStatus.textContent = 'Follow paused by your navigation'; renderFollow();
   vscode.postMessage({ type: 'followPause', reason });
 }
-// AC-233: Diffs only → Follow, the agent's worktree in its real files.
-document.getElementById('head-follow')?.addEventListener('click', () => vscode.postMessage({ type: 'showHead' }));
+// AC-233, AC-264: Follow or Diffs only, both this review. The switch changes the view at once and
+// tells the host, which remembers it for the agent.
+for (const seg of document.querySelectorAll('#view-mode .seg')) seg.addEventListener('click', () => {
+  if (seg.dataset.view === view) return;
+  viewChosenAt = Date.now(); setView(seg.dataset.view); vscode.postMessage({ type: 'setView', view: seg.dataset.view, at: viewChosenAt });
+});
 followButton.addEventListener('click', () => {
   if (followState === 'paused') vscode.postMessage({ type: 'followResume' });
   else vscode.postMessage({ type: 'follow', enabled: followState !== 'following' });
@@ -793,7 +816,7 @@ diffs.addEventListener('wheel', () => userNavigated('scroll'), { passive: true }
 diffs.addEventListener('touchstart', () => userNavigated('scroll'), { passive: true });
 diffs.addEventListener('mousedown', event => { if (!event.target.closest('button')) userNavigated('pointer'); });
 diffs.addEventListener('keydown', event => { if (!['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) userNavigated('keyboard'); });
-tree.addEventListener('click', () => userNavigated('file selection'), true);
+tree.addEventListener('click', () => { if (view === 'diffs') userNavigated('file selection'); }, true);
 filter.addEventListener('input', () => userNavigated('filter'));
 function revealLine(row, line) {
   if (!row.editor || !line) return false;
@@ -806,7 +829,7 @@ function revealLine(row, line) {
 }
 function applyReveal(value) {
   // Overseer: `user` reveals (a file edit clicked in the conversation) work without Follow and pause it.
-  if (followState !== 'following' && !value.user) return;
+  if (view !== 'diffs' || (followState !== 'following' && !value.user)) return;
   const id = value.id || snapshot?.entries.find(e => e.path === value.path)?.id;
   if (!id || !rows.has(id)) { pendingReveal = value; return; }
   pendingReveal = undefined;
@@ -817,6 +840,133 @@ function applyReveal(value) {
   followNote = followStatus.textContent; renderFollow();
   if (!revealLine(row, value.line)) row.pendingLine = value.line;
 }
+// ---- Overseer (AC-264): Follow, in the review. The middle shows the file the agent is in right now,
+// live and read-only, its changes marked (added and changed lines with a bar, a changed line saying
+// what it was, a marker where lines were removed), scrolled to the line the agent is at. A file
+// picked in All files shows in the same place; Follow goes back to the agent when the agent moves to
+// another file, or at once with "Follow the agent".
+const followView = document.getElementById('follow-view');
+const followEditorHost = document.getElementById('follow-editor');
+const followProblem = document.getElementById('follow-problem');
+const followAgainButton = document.getElementById('follow-again');
+const followNotes = document.head.appendChild(document.createElement('style'));
+followAgainButton.addEventListener('click', () => vscode.postMessage({ type: 'followAgain' }));
+function renderViewSwitch() {
+  document.body.dataset.view = view;
+  for (const seg of document.querySelectorAll('#view-mode .seg')) {
+    const on = seg.dataset.view === view;
+    seg.classList.toggle('on', on); seg.setAttribute('aria-pressed', String(on));
+  }
+}
+function setView(next) {
+  if (next !== 'follow' && next !== 'diffs') return;
+  const was = view; view = next; renderViewSwitch();
+  if (was === view) return;
+  renderTree();
+  if (view === 'diffs') requestAnimationFrame(() => { for (const row of rows.values()) resize(row); updateViewport(); trackScroll(); });
+  else followEditor?.layout();
+}
+renderViewSwitch();
+/** Marks the file Follow shows in the list, opening the folders above it (All files lists one folder at a time). */
+function markFollowed(relPath) {
+  followPath = relPath || '';
+  if (view !== 'follow') return;
+  const parts = followPath.split('/'); parts.pop();
+  let opened = false;
+  for (let i = 1; i <= parts.length; i++) { const dir = parts.slice(0, i).join('/'); if (!openDirs.has(dir)) { openDirs.add(dir); opened = true; } }
+  if (opened) { renderTree(); persist(); }
+  for (const button of tree.querySelectorAll('.file')) {
+    const on = button.dataset.path === followPath;
+    button.classList.toggle('active', on); button.setAttribute('aria-selected', String(on));
+    if (on && !navigatorBusy()) button.scrollIntoView({ block: 'nearest' });
+  }
+}
+function showFollowProblem(text) {
+  followProblem.textContent = text; followProblem.hidden = !text;
+  followEditorHost.hidden = !!text;
+  document.body.dataset.followState = text ? 'problem' : 'shown';
+}
+function followOptions() {
+  return { readOnly: true, domReadOnly: true, automaticLayout: true, minimap: { enabled: false }, scrollBeyondLastLine: false,
+    lineNumbersMinChars: 4, lineDecorationsWidth: 12, glyphMargin: false, folding: false, links: false, hover: { enabled: false }, contextmenu: false,
+    renderLineHighlight: 'none', renderValidationDecorations: 'off', occurrencesHighlight: 'off', selectionHighlight: false, matchBrackets: 'never',
+    fontFamily: settings.fontFamily, fontSize: settings.fontSize || 14, fontLigatures: settings.fontLigatures || false,
+    wordWrap: settings.wordWrap || 'off', scrollbar: { alwaysConsumeMouseWheel: true }, tabSize: Number(settings.tabSize) || 4 };
+}
+function followMarks(marks) {
+  const out = [];
+  if (!marks || !followModel) return out;
+  const lines = followModel.getLineCount();
+  const at = line => { const l = Math.max(1, Math.min(lines, line)); const c = followModel.getLineMaxColumn(l); return { startLineNumber: l, startColumn: c, endLineNumber: l, endColumn: c }; };
+  // A note after a line: a generated class whose ::after holds the words (Monaco's afterContentClassName).
+  const note = (line, content, className) => {
+    const l = Math.max(1, Math.min(lines, line)), id = `${className}-${notes.length}`;
+    notes.push(`.${id}::after { content: ${JSON.stringify(content)}; }`);
+    out.push({ range: { startLineNumber: l, startColumn: 1, endLineNumber: l, endColumn: followModel.getLineMaxColumn(l) }, options: { afterContentClassName: `${className} ${id}`, showIfCollapsed: true } });
+  };
+  const notes = [];
+  for (const r of marks.added || []) out.push({ range: { startLineNumber: r.start, startColumn: 1, endLineNumber: Math.min(lines, r.end), endColumn: 1 }, options: { isWholeLine: true, className: 'follow-added', linesDecorationsClassName: 'follow-bar-added' } });
+  for (const r of marks.changed || []) {
+    out.push({ range: { startLineNumber: r.start, startColumn: 1, endLineNumber: Math.min(lines, r.end), endColumn: 1 }, options: { isWholeLine: true, className: 'follow-changed', linesDecorationsClassName: 'follow-bar-changed' } });
+    if (r.was) r.was.forEach((text, i) => { if (r.start + i <= lines) note(r.start + i, `was: ${text || '(empty line)'}`, 'follow-was'); });
+    else if (r.replaced) note(r.start, `replaced ${r.replaced} line${r.replaced === 1 ? '' : 's'}`, 'follow-was');
+  }
+  for (const r of marks.removed || []) {
+    const line = r.line > 0 ? r.line : 1;
+    out.push({ range: at(line), options: { linesDecorationsClassName: 'follow-bar-removed' } });
+    note(line, `− ${r.count} line${r.count === 1 ? '' : 's'} removed ${r.line > 0 ? 'below' : 'above'}`, 'follow-removed');
+  }
+  followNotes.textContent = notes.join('\n');
+  return out;
+}
+async function applyFollowFile(value) {
+  if (!Number.isSafeInteger(value.seq) || value.seq < followSeq) return;
+  followSeq = value.seq;
+  followSource = value.source === 'user' ? 'user' : 'agent';
+  const path = String(value.path || '');
+  document.getElementById('follow-path').textContent = path || 'No file yet';
+  document.getElementById('follow-path').title = path;
+  const why = followSource === 'user' ? 'You picked this file. Follow goes back to the agent when it moves to another file.' : `The agent is here${value.attribution ? ' · ' + value.attribution : ''}`;
+  document.getElementById('follow-why').textContent = why;
+  document.getElementById('follow-icon').className = 'codicon codicon-' + (followSource === 'user' ? 'file' : 'eye');
+  followAgainButton.hidden = followSource !== 'user';
+  followView.dataset.source = followSource;
+  document.body.dataset.followPath = path; document.body.dataset.followSource = followSource;
+  markFollowed(path);
+  if (value.problem || typeof value.text !== 'string') { showFollowProblem(value.problem || 'This file cannot be shown.'); return; }
+  await loadMonaco();
+  if (stopped || value.seq !== followSeq) return;
+  showFollowProblem('');
+  if (!followEditor) {
+    followEditor = monaco.editor.create(followEditorHost, followOptions());
+    followDecorations = followEditor.createDecorationsCollection();
+  }
+  const uri = monaco.Uri.from({ scheme: 'overseer-follow', path: '/' + path });
+  const same = followModel && followModel.uri.toString() === uri.toString();
+  if (same) {
+    const state = value.reveal ? undefined : followEditor.saveViewState();
+    replaceText(followModel, value.text);
+    if (state) followEditor.restoreViewState(state);
+  } else {
+    const old = followModel;
+    followModel = monaco.editor.createModel(value.text, language(path), uri);
+    followEditor.setModel(followModel);
+    old?.dispose();
+  }
+  followDecorations.set(followMarks(value.marks));
+  const line = Math.max(1, Math.min(followModel.getLineCount(), Number(value.line) || 1));
+  if (value.reveal || !same) {
+    followEditor.revealLineInCenterIfOutsideViewport(line);
+    if (!value.line) followEditor.setScrollTop(0);
+    if (value.line && followSource === 'agent') {
+      clearTimeout(followFlash);
+      const flash = followEditor.createDecorationsCollection([{ range: { startLineNumber: line, startColumn: 1, endLineNumber: line, endColumn: 1 }, options: { isWholeLine: true, className: 'follow-line' } }]);
+      followFlash = setTimeout(() => flash.clear(), 2500);
+    }
+  }
+  document.body.dataset.followShown = `${path}:${line}:${followModel.getLineCount()}`;
+  document.body.dataset.followMarks = JSON.stringify({ added: (value.marks?.added || []).length, changed: (value.marks?.changed || []).length, removed: (value.marks?.removed || []).length });
+}
 window.addEventListener('message', event => {
   const value = event.data;
   if (!value || typeof value !== 'object') return;
@@ -824,6 +974,7 @@ window.addEventListener('message', event => {
   if (value.type === 'snapshot') { applyOverseer(value.overseer); applySnapshot(value); }
   else if (value.type === 'overseer') applyOverseer(value.overseer);
   else if (value.type === 'reveal') applyReveal(value);
+  else if (value.type === 'followFile') applyFollowFile(value).catch(error => showFollowProblem('This file could not be shown: ' + (error.message || error)));
   else if (value.type === 'body' && snapshot) {
     const job = requests.get(value.request);
     if (!job) return;
@@ -874,6 +1025,7 @@ window.addEventListener('pagehide', () => {
   flushState(); stopped = true; statistics.dispose(); queued.clear(); requests.clear();
   sizeObserver.disconnect(); themeObserver.disconnect();
   for (const row of rows.values()) release(row);
+  followEditor?.dispose(); followModel?.dispose();
   disposeMonaco?.();
   clearTimeout(persistTimer); clearTimeout(progressTimer); cancelAnimationFrame(frame); cancelAnimationFrame(resizeFrame); cancelAnimationFrame(renderFrame);
 });

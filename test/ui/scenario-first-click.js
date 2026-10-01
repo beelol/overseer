@@ -1,9 +1,9 @@
 // Packaged-UI scenario for AC-150 (fixture runs only): the first click always lands. In each
-// arrangement (composer alone, review beside the chat, the grid, the dashboard) keyboard focus is
+// arrangement (composer alone, review beside the chat, the grid) keyboard focus is
 // first put somewhere else (the side bar, or another editor group), then ONE click goes to a view's
 // first control, and the scenario checks that the click did its job: the composer's agent menu opens,
 // the chat's More menu opens, the review's Changes only toggle flips, a grid tile's pin toggles, and
-// the search field takes the typing that follows.
+// the Agents view's search button opens the search box, which takes the typing that follows.
 const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay } = require('./harness');
@@ -56,20 +56,32 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     check('chat: after focus in the review (another editor group), one click on More opens its menu', await once('chat more', chat, '#more', `document.querySelector('.menu')?.remove()`, `!!document.querySelector('.menu')`), result.clicks.at(-1));
     await cdp.key('Escape'); await delay(300);
     await focusSideBar();
-    const pressed = await review.eval(`document.getElementById('changes-only').getAttribute('aria-pressed')`);
-    check('review: after focus in the side bar, one click on Changes only flips it', await once('review toggle', review, '#changes-only', '', `document.getElementById('changes-only').getAttribute('aria-pressed') !== ${JSON.stringify(pressed)}`), result.clicks.at(-1));
+    // The review's Follow | Diffs only switch (AC-264): one click on the other side switches it.
+    const shown = await review.eval(`document.body.dataset.view`);
+    const other = v => v === 'follow' ? 'diffs' : 'follow';
+    check('review: after focus in the side bar, one click on the Follow | Diffs only switch flips it', await once('review switch', review, `#view-mode .seg[data-view="${other(shown)}"]`, '', `document.body.dataset.view === ${JSON.stringify(other(shown))}`), result.clicks.at(-1));
     await focusOther(chat);
-    const pressed2 = await review.eval(`document.getElementById('changes-only').getAttribute('aria-pressed')`);
-    check('review: after focus in the chat (another editor group), one click flips it back', await once('review toggle back', review, '#changes-only', '', `document.getElementById('changes-only').getAttribute('aria-pressed') !== ${JSON.stringify(pressed2)}`), result.clicks.at(-1));
+    check('review: after focus in the chat (another editor group), one click flips it back', await once('review switch back', review, `#view-mode .seg[data-view="${shown}"]`, '', `document.body.dataset.view === ${JSON.stringify(shown)}`), result.clicks.at(-1));
 
-    // The search field.
-    const search = await cdp.webview(`!!document.getElementById('q') && !!document.getElementById('filter')`, 10000);
+    // Searching agents (AC-264: no Search section): after focus in the chat, ONE click on the Agents
+    // view's search button opens VS Code's input box with the cursor in it, and typing filters.
     await focusOther(chat);
-    const focused = await once('search field', search, '#q', `document.getElementById('q').blur()`, `document.activeElement?.id === 'q'`);
+    // The title bar's buttons show while the pointer is over the Agents header.
+    const agentsPane = sel => cdp.evalWorkbench(`(() => { const p = [...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || '')); const a = p?.querySelector(${JSON.stringify(sel)}); if (!a) return null; const r = a.getBoundingClientRect(); return r.width ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null; })()`);
+    const header = await agentsPane('.pane-header .title');
+    if (header) { await cdp.move(header.x, header.y); await delay(400); }
+    const searchButton = await agentsPane('.pane-header .action-label[aria-label^="Search Agents"]');
+    let focused = false;
+    if (searchButton) {
+      await cdp.move(searchButton.x, searchButton.y); await delay(200);
+      await cdp.click(searchButton.x, searchButton.y);
+      focused = await s.searchFocused(2500).then(() => true, () => false);
+    }
+    result.clicks.push({ label: 'search button', ok: focused });
     await cdp.type('Busy'); await delay(600);
-    const typed = await search.eval(`document.getElementById('q').value`);
-    check('search field: after focus in the chat, one click puts the cursor there and typing filters', focused && typed === 'Busy', { focused, typed });
-    await search.eval(`(() => { const q = document.getElementById('q'); q.value = ''; q.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+    const typed = await cdp.evalWorkbench(`document.querySelector('.quick-input-widget input')?.value || ''`);
+    check('search: after focus in the chat, one click on the Agents view\'s search button puts the cursor in the search box and typing filters', focused && typed === 'Busy', { searchButton, focused, typed });
+    await cdp.key('Escape'); await delay(400);
 
     // The grid: a tile's pin.
     await cdp.command('Overseer: Toggle Agent Grid'); await delay(2500);
@@ -79,14 +91,6 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     check('grid: after focus in the side bar, one click on a tile\'s pin toggles it', await once('grid pin', grid, '.grid .tile .tile-pin', '', `document.querySelector('.grid .tile .tile-pin')?.getAttribute('aria-pressed') !== ${JSON.stringify(pin)}`), result.clicks.at(-1));
     await cdp.command('Overseer: Toggle Agent Grid'); await delay(1500);
 
-    // The dashboard (immersive): the chat's More after focus in the side bar.
-    await cdp.command('Overseer: Enter Focus Mode'); await delay(3000);
-    await s.selectAgent('Click target', { settle: 2500 });
-    const dchat = await s.editorView(`!!document.querySelector('.view-chat') && !document.querySelector('.view-chat').hidden`);
-    await focusSideBar();
-    check('dashboard: after focus in the side bar, one click on the chat\'s More opens its menu', await once('dashboard chat more', dchat, '#more', `document.querySelector('.menu')?.remove()`, `!!document.querySelector('.menu')`), result.clicks.at(-1));
-    await cdp.key('Escape');
-    await cdp.command('Overseer: Exit Focus Mode'); await delay(1500);
     await s.screenshot('after');
     s.ctl('run.interrupt', { run_id: s.ctl('state').runs.find(r => r.title === 'Busy agent').id });
   } catch (error) {

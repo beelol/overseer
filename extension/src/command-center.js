@@ -166,8 +166,6 @@ class CommandCenter {
       case 'search': post({ type: 'searchHits', q: m.q, taskIds: await this.handlers.search(String(m.q || '')) }); return;
       case 'command': await vscode.commands.executeCommand(String(m.command), ...(m.args !== undefined ? [m.args] : [])); return;
       case 'openExternal': { const url = String(m.url || ''); if (/^https?:\/\//i.test(url)) await vscode.env.openExternal(vscode.Uri.parse(url)); return; }
-      case 'exitDashboard': await vscode.commands.executeCommand('overseer.exitDashboard'); return;
-      case 'dashboardWindow': await vscode.commands.executeCommand('overseer.openDashboardWindow'); return;
       case 'cleanupArchived': await vscode.commands.executeCommand('overseer.cleanupArchived'); return;
       default: {
         const runId = typeof m.runId === 'string' ? m.runId : this.chatRun;

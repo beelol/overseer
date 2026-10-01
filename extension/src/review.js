@@ -5,6 +5,11 @@ const path = require('path');
 const fs = require('fs').promises;
 const { execFile } = require('child_process');
 const { ReviewManager } = require('../branch-diff/review/panel');
+const { diffLines, splitLines } = require('./line-diff');
+
+// Follow shows a file of up to this size in the review (larger ones say so); changes are marked up to 2 MB.
+const FOLLOW_MAX_BYTES = 5 * 1024 * 1024;
+const MARK_MAX_CHARS = 2 * 1024 * 1024;
 
 // vscode.git Status values used by the vendored comparison code.
 const STATUS = { A: 1, D: 6, R: 3, M: 5, T: 5, C: 1, U: 5 };
@@ -39,6 +44,9 @@ class Review {
     this.observed = new Map(); // abs path -> last observed text (bounded)
     this.userSaves = new Map(); // abs path -> ms of last user save
     this.lastReveal = new Map(); // runId -> last reveal message
+    this.viewAt = new Map(); // runId -> when its review's switch was last used (ms)
+    this.lastFile = new Map(); // runId -> the file the agent was last in (edit or read), for Follow
+    this.followSeq = 0; this.followLatest = new Map(); // runId -> the newest Follow message's number
     this.manager = new ReviewManager(context, {
       helpers: holder => this.helpers(holder),
       statusLetter,
@@ -54,8 +62,16 @@ class Review {
       reviewHunk: (session, message) => this.reviewHunk(session, message),
       // Switching an agent to Follow (AC-233) closes its review without closing the agent.
       closed: runId => { if (!this.switching) this.onClosed?.(runId); },
-      // Diffs only → Follow, from the review's own header (AC-233).
-      showHead: runId => this.head?.setMode(runId, 'follow'),
+      // Follow or Diffs only (AC-233), switched in the review's own header; both are this review (AC-264).
+      view: runId => this.head?.modeFor(runId) || 'diffs',
+      // `at` is when the review's own switch was used: messages sent before the host heard of it carry an older one.
+      setView: (runId, view, at) => { if (at) this.viewAt.set(runId, at); return this.head?.setMode(runId, view); },
+      viewAt: runId => this.viewAt.get(runId) || 0,
+      // Follow in the review (AC-264): the agent's file, a file picked in All files, and back to the agent.
+      followInit: runId => this.followInit(runId),
+      followPick: (runId, rel) => this.showFollow(runId, { path: rel, source: 'user' }),
+      followAgain: runId => this.followAgain(runId),
+      followPoll: runId => this.followPoll(runId),
       setScope: (runId, scope) => this.setScope(runId, scope),
       // AC-243: the review's Merge / Open PR / Cancel merge buttons, the same as the chat's.
       land: runId => (runId ? this.model.landing?.summary(runId) : undefined),
@@ -274,25 +290,15 @@ class Review {
   }
 
   /**
-   * Opens the agent's head (AC-233): Follow (its worktree's files, annotated, following it) or Diffs
-   * only (this review), as the agent was last toggled; `mode: 'diffs'` asks for the review itself.
+   * Opens the agent's review (AC-233, AC-264): in Follow (the file the agent is in, live, with All
+   * files) or Diffs only (what changed, with Changed), as the agent was last switched.
    */
-  async open(runId, { preserveFocus = false, follow, viewColumn, mode } = {}) {
+  async open(runId, { preserveFocus = false, follow, viewColumn } = {}) {
     const run = this.model.run(runId);
     if (!run) throw new Error('Unknown run.');
     const ws = this.model.workspace(run.workspace_id);
     const why = this.unavailable(run, ws);
     if (why) throw new Error(why);
-    if (this.head && (mode || this.head.modeFor(runId)) === 'follow') {
-      if (follow !== undefined) { this.follow.set(runId, follow ? 'following' : 'off'); this.persistFollow(); }
-      const found = this.manager.panelFor(runId);
-      if (await this.head.open(runId, { viewColumn: viewColumn || found?.panel.viewColumn, preserveFocus })) {
-        // Its review, if open, gives way to its files (after they are open, so the group stays).
-        if (found) { this.switching = (this.switching || 0) + 1; try { found.panel.dispose(); } finally { this.switching--; } }
-        return undefined;
-      }
-      // No file to show (an empty worktree): the review says so.
-    }
     const ready = this.prepared?.runId === runId && this.prepared.path === ws.path && Date.now() - this.prepared.at < 60000 ? this.prepared.lookup.catch(() => null) : null;
     this.prepared = undefined;
     const [repo, comparison] = (ready && await ready) || [await this.repoFor(ws.path), await this.currentComparison(runId)];
@@ -303,8 +309,8 @@ class Review {
 
   /** Opens the run's review at the first changed hunk of `rel` (a file edit clicked in the conversation). */
   async revealEdit(runId, rel) {
-    const inHead = this.head && this.head.modeFor(runId) === 'follow';
-    if (!inHead) await this.open(runId);
+    const inFollow = this.head && this.head.modeFor(runId) === 'follow';
+    await this.open(runId);
     const run = this.model.run(runId);
     const ws = this.model.workspace(run.workspace_id);
     const base = (await this.currentComparison(runId).catch(() => undefined))?.base;
@@ -318,8 +324,8 @@ class Review {
       }
     }
     const message = { path: rel, line, attribution: 'opened from the conversation', user: true };
-    // Follow (AC-233): the file itself, at the change.
-    if (inHead) { await this.open(runId); await this.head.openFile(runId, rel, { line, preserveFocus: false }); return message; }
+    // Follow (AC-264): the file itself, at the change, in the review.
+    if (inFollow) { await this.showFollow(runId, { path: rel, line, source: 'user', attribution: message.attribution }); return message; }
     // A freshly opened review may not have its file list yet; the webview keeps it pending.
     this.manager.reveal(runId, message);
     return message;
@@ -435,6 +441,7 @@ class Review {
       return;
     }
     if (event.kind === 'review_reject' && event.run_id) { this.manager.panelFor(event.run_id)?.session.invalidate(true); this.showMarks(event.run_id); return; }
+    if (event.kind === 'tool' && event.run_id) { this.onRead(event); return; }
     if (event.kind !== 'file_activity' || !event.run_id) return;
     const run = this.model.run(event.run_id) || (await this.model.refresh(), this.model.run(event.run_id));
     if (!run) return;
@@ -468,9 +475,117 @@ class Review {
         this.followNotes.set(target, `Following agent edits (${attribution})`);
         if (this.follow.get(target) === 'following') this.manager.reveal(target, message);
       }
-      // Follow in the agent's files (AC-233).
-      this.head?.follow(root.id, message).catch(error => this.log('head follow: ' + error.message));
+      // Follow (AC-264): the review shows the file the agent is in.
+      this.followAgent(root.id, { path: rel, line, attribution: message.attribution });
     }
+  }
+
+  // ---------------------------------------------------------------- Follow, in the review (AC-264)
+
+  /** A file the agent read (Claude's Read, OpenCode's read): Follow goes there too. */
+  onRead(event) {
+    const p = event.payload || {};
+    if (!/^(read|view|notebookread)$/i.test(String(p.name || ''))) return;
+    let input;
+    try { input = JSON.parse(p.summary || ''); } catch { return; }
+    const file = input?.file_path || input?.filePath || input?.path;
+    const run = this.model.run(event.run_id);
+    const root = run && this.model.rootRun(run);
+    const ws = run && this.model.workspace(run.workspace_id);
+    if (typeof file !== 'string' || !root || !ws) return;
+    const rel = path.isAbsolute(file) ? path.relative(ws.path, file) : file;
+    if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return;
+    const line = Math.max(1, Number(input.offset) || 1);
+    this.followAgent(root.id, { path: rel.split(path.sep).join('/'), line, attribution: 'the agent is reading it' });
+  }
+
+  /** The agent is in `target.path`: remembered, and shown when its review is in Follow. */
+  followAgent(runId, target) {
+    const value = { ...target, source: 'agent' };
+    this.lastFile.set(runId, value);
+    if (this.head?.modeFor(runId) === 'follow') this.showFollow(runId, value).catch(error => this.log('follow: ' + error.message));
+  }
+
+  /** The review came up (or switched) in Follow: what it showed, else where the agent is. */
+  async followInit(runId) {
+    if (this.head?.modeFor(runId) !== 'follow') return;
+    const found = this.manager.panelFor(runId);
+    if (!found) return;
+    const shown = found.session.followShown;
+    if (shown?.runId === runId) return this.showFollow(runId, { ...shown, refresh: true });
+    return this.followAgain(runId);
+  }
+
+  /** "Follow the agent": back to the file the agent is in (or, before it has been in one, its first change). */
+  async followAgain(runId) {
+    const target = this.lastFile.get(runId) || { ...(await this.head?.defaultTarget(runId).catch(() => undefined)), source: 'agent' };
+    if (target.path) return this.showFollow(runId, { ...target, source: 'agent' });
+    this.manager.postFollow(runId, { seq: ++this.followSeq, path: '', source: 'agent', problem: 'The agent has not opened a file yet. Follow shows its file as soon as it reads or edits one.' });
+  }
+
+  /** The file shown changed on disk, or joined or left the agent's changes: shown again, where it was. */
+  async followPoll(runId) {
+    const found = this.manager.panelFor(runId);
+    const shown = found?.session.followShown;
+    if (!shown || shown.runId !== runId || this.head?.modeFor(runId) !== 'follow') return;
+    const abs = path.join(found.session.repo.rootUri.fsPath, shown.path);
+    const mtimeMs = await fs.stat(abs).then(st => st.mtimeMs, () => -1);
+    if (mtimeMs !== shown.mtimeMs || this.isChanged(found.session, shown.path) !== shown.changed) await this.showFollow(runId, { ...shown, refresh: true });
+  }
+
+  isChanged(session, rel) { return !!session.display?.entries.some(e => !e.browsed && e.relPath === rel); }
+
+  /**
+   * Shows a file of the agent's worktree in its review's Follow view: its current text, the agent's
+   * changes marked (against the comparison base), at `line`. `source` is 'agent' (where the agent is)
+   * or 'user' (picked in All files, or opened from the conversation).
+   */
+  async showFollow(runId, { path: rel, line, source = 'agent', attribution, refresh = false }) {
+    const found = this.manager.panelFor(runId);
+    if (!found || typeof rel !== 'string') return;
+    const root = found.session.repo.rootUri.fsPath;
+    rel = rel.split(path.sep).join('/');
+    const abs = path.join(root, rel);
+    const inside = path.relative(root, abs);
+    if (!inside || inside.startsWith('..') || path.isAbsolute(inside)) return;
+    const seq = ++this.followSeq;
+    this.followLatest.set(runId, seq);
+    let text, problem, mtimeMs = -1;
+    try {
+      const st = await fs.stat(abs);
+      mtimeMs = st.mtimeMs;
+      if (!st.isFile()) problem = `${rel} is a folder.`;
+      else if (st.size > FOLLOW_MAX_BYTES) problem = `${rel} is too large to show here (${(st.size / 1048576).toFixed(1)} MB).`;
+      else {
+        const buf = await fs.readFile(abs);
+        if (buf.subarray(0, 8000).includes(0)) problem = `${rel} is a binary file.`;
+        else text = buf.toString('utf8');
+      }
+    } catch (error) { problem = error.code === 'ENOENT' ? `${rel} is no longer in the agent's worktree (it was removed).` : error.message; }
+    const changed = this.isChanged(found.session, rel);
+    const base = found.session.overseer?.comparison?.base;
+    let marks;
+    if (text !== undefined && changed && base && text.length <= MARK_MAX_CHARS) {
+      const before = await this.baseText(root, base, rel).catch(() => undefined);
+      if (before !== undefined) marks = this.followMarks(before, text);
+    }
+    if (this.followLatest.get(runId) !== seq) return; // a newer one is on its way
+    found.session.followShown = { runId, path: rel, line, source, attribution, mtimeMs, changed };
+    this.manager.postFollow(runId, { seq, path: rel, line, source, attribution, text, problem, marks, reveal: !refresh });
+  }
+
+  /** The agent's changes to a file as line marks: added and changed ranges (1-based), and removals. */
+  followMarks(before, after) {
+    const old = splitLines(before);
+    const added = [], changed = [], removed = [];
+    for (const h of diffLines(old, after)) {
+      const gone = old.slice(h.origStart, h.origStart + h.origLen);
+      if (!h.modLen) { removed.push({ line: h.modStart, count: h.origLen }); continue; }
+      const range = { start: h.modStart + 1, end: h.modStart + h.modLen };
+      if (!h.origLen) { added.push(range); continue; }
+      changed.push(h.origLen === h.modLen ? { ...range, was: gone.map(l => l.trim().slice(0, 90)) } : { ...range, replaced: h.origLen });
+    }
+    return { added, changed, removed };
   }
 }
 
