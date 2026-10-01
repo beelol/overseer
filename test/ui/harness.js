@@ -142,7 +142,7 @@ class Session {
       'telemetry.telemetryLevel': 'off', 'extensions.autoUpdate': false, 'extensions.autoCheckUpdates': false,
       'git.autofetch': false, 'git.openRepositoryInParentFolders': 'always', 'workbench.startupEditor': 'none',
       'security.workspace.trust.enabled': false, 'files.autoSave': 'off', 'update.mode': 'none',
-      'workbench.tips.enabled': false, 'overseer.sideBar.openOnStartup': false, 'chat.disableAIFeatures': true, 'window.restoreWindows': 'none',
+      'workbench.tips.enabled': false, 'overseer.sideBar.openOnStartup': false, 'overseer.layout.offerOnStartup': false, 'chat.disableAIFeatures': true, 'window.restoreWindows': 'none',
       'editor.minimap.enabled': false, 'workbench.secondarySideBar.defaultVisibility': 'hidden', 'window.dialogStyle': 'custom',
       // Opening an agent defaults to Follow (AC-233); the scenarios written for the review (Diffs
       // only) keep opening it. scenario-agent-head drops this to test the default.
@@ -312,10 +312,14 @@ class Session {
     await delay(settle);
   }
 
-  /** The side bar's search field (a webview view above the Agents list). */
-  searchFrame(ms = 15000) { return this.cdp.webview(`!!window.__overseerSearch`, ms); }
-  /** Waits until the search field has keyboard focus (after Search Agents or ⌥⌘F); returns its frame. */
-  async searchFocused(ms = 8000) { const f = await this.searchFrame(ms); await f.waitFor(`document.activeElement?.id === 'q'`, ms); return f; }
+  /** Search Agents opens VS Code's input box (AC-264: no Search section in the side bar): waits until its field has the keyboard. */
+  async searchFocused(ms = 8000) {
+    await this.cdp.waitFor(`(() => { const w = document.querySelector('.quick-input-widget'); const i = w?.querySelector('input'); return !!w && w.style.display !== 'none' && /Search agents/.test(w.querySelector('.quick-input-title')?.textContent || '') && i === document.activeElement; })()`, ms, 'the search box');
+  }
+  /** What the Agents view's title says beside it while a search or filter narrows the list ("“beta” · 1 match"). */
+  agentsDescription() {
+    return this.cdp.evalWorkbench(`(() => { const p = [...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header .title')?.textContent.trim() || '')); return p?.querySelector('.pane-header .description')?.textContent.trim() || ''; })()`);
+  }
 
   /** Selects an agent by run id (its task's title) in the side bar. */
   async selectRun(runId, opts) {

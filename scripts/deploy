@@ -14,7 +14,7 @@ const CODE = process.env.OVERSEER_CODE || '/Applications/Visual Studio Code.app/
 const FLAGS = {
   '--yes': 'bool', '--ref': 'value', '--repo': 'value', '--no-fetch': 'bool', '--vsix': 'value', '--wait': 'value', '--no-wait': 'bool',
   '--poll': 'value', '--status': 'bool', '--rollback': 'bool', '--json': 'bool', '--user-data-dir': 'value', '--extensions-dir': 'value',
-  '--skip-notifier-registration': 'bool', '--help': 'bool', '-h': 'bool',
+  '--skip-notifier-registration': 'bool', '--skip-menubar': 'bool', '--help': 'bool', '-h': 'bool',
 };
 
 const HELP = `scripts/deploy: install a build of main as the owner's Overseer (production). Gate T, AC-214.
@@ -42,6 +42,9 @@ WHAT IT DOES
   3. Installs: the extension into your VS Code (code --install-extension --force), the
      notifier registered with macOS, then the daemon stopped (daemon.shutdown) and the new one
      started once. Open VS Code windows reconnect; reload them to use the new extension.
+     On macOS, Overseer's menu-bar item (AC-262) is copied to a fixed place in the data folder
+     (${path.join('~', path.relative(HOME, path.join(dataDir(), 'menubar')))}), registered as a login item and started;
+     the old one is quit first. It is only a display: it never starts or stops agents on its own.
   4. Records: each deploy (commit, time, the VSIX kept) in the data folder's deploys/:
      ${path.join('~', path.relative(HOME, dataDir()), 'deploys/history.json')}
   Your data (agents, history, settings) and logins are never touched.
@@ -52,6 +55,8 @@ WHAT IT DOES
 FOR TESTS ONLY (a temporary production)
   --user-data-dir DIR --extensions-dir DIR   install into that VS Code profile, not yours
   --skip-notifier-registration               do not register the notifier with macOS
+  --skip-menubar                             copy the menu-bar item, but neither register it as
+                                             a login item nor start it
   HOME decides the production data folder and socket.
 `;
 
@@ -230,7 +235,35 @@ async function install(o, vsix, expect) {
   for (let k = 0; k < 150 && !hello; k++) { try { hello = await call(socket, 'hello', {}, 1000); } catch { await sleep(100); } }
   if (!hello) die(`the new daemon did not answer at ${socket}`);
   if (expect && hello.build !== expect) die(`the running daemon reports build ${hello.build}, expected ${expect}`);
-  return { info, hello, restarted: !!old, previousPid: old?.pid || null };
+  const menubar = installMenubar(o, dir, bin, socket);
+  return { info, hello, restarted: !!old, previousPid: old?.pid || null, menubar };
+}
+
+/**
+ * Overseer's item in the menu bar (AC-262): the installed extension's Overseer Menu.app copied to
+ * <data folder>/menubar (a path that stays the same across versions, for the login item), with its
+ * menubar.json naming the installed daemon; then registered as a login item and started. Tests
+ * pass --skip-menubar: the copy only, nothing registered or started.
+ */
+function installMenubar(o, dir, bin, socket) {
+  const src = path.join(dir, 'bin/Overseer Menu.app');
+  if (process.platform !== 'darwin' || !exists(src)) return null;
+  const home = path.join(dataDir(), 'menubar');
+  const app = path.join(home, 'Overseer Menu.app');
+  const exe = path.join(app, 'Contents/MacOS/overseer-menu');
+  const running = cp.spawnSync('pgrep', ['-f', exe], { encoding: 'utf8' }).stdout.split('\n').map(Number).filter(Boolean);
+  for (const pid of running) { try { process.kill(pid, 'SIGTERM'); } catch {} }
+  fs.mkdirSync(home, { recursive: true });
+  fs.rmSync(app, { recursive: true, force: true });
+  fs.cpSync(src, app, { recursive: true });
+  fs.writeFileSync(path.join(home, 'menubar.json'), JSON.stringify({ daemon: bin, socket }, null, 2) + '\n');
+  if (o['--skip-menubar']) return { app, registered: false, started: false };
+  let registered = false;
+  const reg = cp.spawnSync(exe, ['--login-item', 'on'], { encoding: 'utf8' });
+  if (reg.status === 0) registered = reg.stdout.trim();
+  else say(`the menu-bar item was not registered as a login item: ${(reg.stderr || reg.stdout).trim()} (System Settings › General › Login Items)`);
+  const started = cp.spawnSync('open', ['-g', app], { encoding: 'utf8' }).status === 0;
+  return { app, registered, started };
 }
 
 // ------------------------------------------------------------------ commands
@@ -265,7 +298,8 @@ async function rollback(o) {
 }
 
 function report(o, entry, done) {
-  const text = `Deployed build ${entry.build}${entry.rollback_of ? ` (rolled back from ${entry.rollback_of})` : ''}: extension ${done.info.id} ${done.info.version} installed; daemon ${done.restarted ? `restarted (pid ${done.previousPid} → ${done.hello.pid})` : `started (pid ${done.hello.pid})`}. Reload VS Code windows to use the new extension. Recorded in ${historyFile()}.`;
+  const menu = done.menubar ? ` Menu-bar item ${done.menubar.started ? 'started' : 'copied'}${done.menubar.registered ? ` (login item: ${done.menubar.registered})` : ''}.` : '';
+  const text = `Deployed build ${entry.build}${entry.rollback_of ? ` (rolled back from ${entry.rollback_of})` : ''}: extension ${done.info.id} ${done.info.version} installed; daemon ${done.restarted ? `restarted (pid ${done.previousPid} → ${done.hello.pid})` : `started (pid ${done.hello.pid})`}.${menu} Reload VS Code windows to use the new extension. Recorded in ${historyFile()}.`;
   console.log(o['--json'] ? JSON.stringify({ ...entry, restarted: done.restarted, previous_pid: done.previousPid }, null, 2) : text);
 }
 

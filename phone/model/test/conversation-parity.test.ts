@@ -104,6 +104,33 @@ describe('conversation parity with VS Code', () => {
     });
   }
 
+  // What the phone does not draw, on purpose. VS Code draws a card for Overseer's proposals and its
+  // message cards (Overseer's own conversation: on the phone that is AC-128, not built yet) and for
+  // Auto's routing decisions (unfinished and off by default, AC-204), and a card while an agent waits
+  // for a connection or is back online (it needs the daemon's Continuity status, which the phone
+  // does not ask for yet). The phone draws nothing for them rather than a stray line; when one of
+  // these reaches the phone, this is where it starts.
+  it('draws nothing for what only VS Code has a card for yet, and VS Code still draws it', () => {
+    const at = (seq: number, kind: string, payload: unknown, source = 'overseer'): DaemonEvent => ({ seq, ts: seq, task_id: 't-1', run_id: 'r-root', kind, source, confidence: 'exact', payload } as DaemonEvent);
+    const run = { id: 'r-root', task_id: 't-1', parent_run_id: null, harness: 'claude', status: 'running', title: 'root', created_ms: 1 } as unknown as Run;
+    const cards: Array<[DaemonEvent, string]> = [
+      [at(3, 'proposal', { id: 'p-1', what: 'Stop the agent', state: 'open', actions: [{ kind: 'stop' }] }), '.proposal'],
+      [at(4, 'overseer_message', { message: { source: 'agent', text: 'Done with the tests', card: { kind: 'done', left_out: 'docs' } } }), '.card'],
+      [at(5, 'auto_decision', { chosen: { harness: 'codex' }, reasons: ['cheaper'] }), '.auto-decision, .auto'],
+      [at(6, 'status', { status: 'waiting_for_connection', reason: 'offline' }, 'daemon'), '.cont-card'],
+    ];
+    for (const [event, drawn] of cards) {
+      const theirs = chat(HOME);
+      theirs.setRun(run, []);
+      theirs.add(at(2, 'turn_started', { turn: { id: 'u-1', run_id: 'r-root', n: 1, prompt: 'go' } }, 'daemon'));
+      theirs.add(event);
+      expect(theirs.root.querySelector(drawn), `VS Code draws ${event.kind}`).not.toBeNull();
+      let mine = setRun(create({ rootId: 'r-root', home: HOME }), run, []).conversation;
+      mine = append(mine, at(2, 'turn_started', { turn: { id: 'u-1', run_id: 'r-root', n: 1, prompt: 'go' } }, 'daemon')).conversation;
+      expect(append(mine, event).changed, `the phone draws nothing for ${event.kind}`).toEqual([]);
+    }
+  });
+
   it('prints what was compared', () => {
     console.log(['Conversation parity (the phone\'s rows against the page of the real conversation.js):', ...summary].join('\n  '));
   });

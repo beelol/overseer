@@ -25,7 +25,9 @@ pub enum Norm {
     /// A native provider quota frame. The daemon validates and stores only
     /// normalized scoped fields, never this raw event payload.
     Quota(Value),
-    Permission { request_id: String, tool: String, input: Value },
+    /// `always`: what the harness offers to allow for the rest of the session, when it offers
+    /// anything (AC-262's Always allow): `{"label", "suggestions"?}`.
+    Permission { request_id: String, tool: String, input: Value, always: Option<Value> },
     Error { class: String, message: String },
     /// Only an explicit, bounded numeric native field can extend the
     /// transient health cooldown; prose is never parsed as Retry-After.
@@ -490,16 +492,47 @@ pub fn follow_up_via_stdin(harness: &str, prompt: &str) -> Option<String> {
     }
 }
 
+/// Claude Code's permission suggestions (`permission_suggestions` on `can_use_tool`) as an
+/// Always allow offer: the rules it would add, named the way Claude Code writes them
+/// ("Bash(npm test:*)"), and where they would be kept ("this session").
+pub fn claude_always(suggestions: &Value) -> Option<Value> {
+    let list = suggestions.as_array().filter(|l| !l.is_empty())?;
+    let mut rules = Vec::new();
+    let mut places = Vec::new();
+    for s in list {
+        for r in s["rules"].as_array().into_iter().flatten() {
+            let tool = r["toolName"].as_str().unwrap_or_default();
+            if tool.is_empty() { continue; }
+            rules.push(match r["ruleContent"].as_str().filter(|c| !c.is_empty()) { Some(c) => format!("{tool}({c})"), None => tool.to_string() });
+        }
+        if s["type"] == "setMode" { if let Some(m) = s["mode"].as_str() { rules.push(format!("mode {m}")); } }
+        if let Some(d) = s["destination"].as_str() { let d = match d { "session" => "this session", "localSettings" => "this project (local settings)", "projectSettings" => "this project", "userSettings" => "every project", other => other }; if !places.contains(&d) { places.push(d); } }
+    }
+    let what = if rules.is_empty() { "what Claude Code suggests".to_string() } else { rules.join(", ") };
+    let label = if places.is_empty() { what } else { format!("{what} · {}", places.join(", ")) };
+    Some(json!({"label": label, "suggestions": suggestions}))
+}
+
+/// The harness's answer line. `always` is the request's Always allow offer, when the owner chose it.
 pub fn permission_reply(harness: &str, request_id: &str, allow: bool, input: &Value, message: &str) -> Option<String> {
+    permission_reply_always(harness, request_id, allow, input, message, None)
+}
+
+pub fn permission_reply_always(harness: &str, request_id: &str, allow: bool, input: &Value, message: &str, always: Option<&Value>) -> Option<String> {
+    let always = always.filter(|_| allow);
     match harness {
         "codex-app" => {
             let id: Value = serde_json::from_str(request_id).unwrap_or(Value::String(request_id.to_string()));
-            let decision = if allow { "accept" } else { "decline" };
+            let decision = if always.is_some() { "acceptForSession" } else if allow { "accept" } else { "decline" };
             Some(format!("{}\n", json!({"id": id, "result": {"decision": decision}})))
         }
         "opencode-serve" => Some(crate::opencode_bridge::permission_line(request_id, allow, message)),
         "claude" => {
-            let response = if allow { json!({"behavior": "allow", "updatedInput": input}) } else { json!({"behavior": "deny", "message": message}) };
+            let response = match always {
+                Some(offer) => json!({"behavior": "allow", "updatedInput": input, "updatedPermissions": offer["suggestions"]}),
+                None if allow => json!({"behavior": "allow", "updatedInput": input}),
+                None => json!({"behavior": "deny", "message": message}),
+            };
             Some(format!("{}\n", json!({"type": "control_response", "response": {"subtype": "success", "request_id": request_id, "response": response}})))
         }
         _ => None,
@@ -716,13 +749,15 @@ pub fn parse_codex_app(v: &Value) -> Vec<Norm> {
     if has_id {
         let id = v["id"].to_string();
         return match method.unwrap_or_default() {
-            "item/commandExecution/requestApproval" | "execCommandApproval" => vec![Norm::Permission {
+            m @ ("item/commandExecution/requestApproval" | "execCommandApproval") => vec![Norm::Permission {
                 request_id: id,
                 tool: format!("command: {}", params["command"].as_str().map(str::to_string).unwrap_or_else(|| params["command"].to_string())),
                 input: params.clone(),
+                // The app server's v2 decision "acceptForSession" (docs/verification/AC-01.md).
+                always: (m == "item/commandExecution/requestApproval").then(|| json!({"label": "this command for the rest of the session"})),
             }],
-            "item/fileChange/requestApproval" | "applyPatchApproval" => vec![Norm::Permission { request_id: id, tool: "file change".into(), input: params.clone() }],
-            "item/permissions/requestApproval" => vec![Norm::Permission { request_id: id, tool: "permissions".into(), input: params.clone() }],
+            "item/fileChange/requestApproval" | "applyPatchApproval" => vec![Norm::Permission { request_id: id, tool: "file change".into(), input: params.clone(), always: None }],
+            "item/permissions/requestApproval" => vec![Norm::Permission { request_id: id, tool: "permissions".into(), input: params.clone(), always: None }],
             other => vec![
                 Norm::Text { role: "system".into(), text: format!("harness request {other} is not supported by Overseer; declined") },
                 Norm::Send(format!("{}\n", json!({"id": v["id"], "error": {"code": -32601, "message": format!("{other} not supported by Overseer")}}))),
@@ -929,7 +964,7 @@ pub fn parse_claude(v: &Value) -> Vec<Norm> {
         "control_request" => {
             let req = &v["request"];
             if req["subtype"] == "can_use_tool" {
-                vec![Norm::Permission { request_id: s(&v["request_id"]), tool: s(&req["tool_name"]), input: req["input"].clone() }]
+                vec![Norm::Permission { request_id: s(&v["request_id"]), tool: s(&req["tool_name"]), input: req["input"].clone(), always: claude_always(&req["permission_suggestions"]) }]
             } else {
                 vec![Norm::Unparsed(truncate(&v.to_string(), 2000))]
             }
@@ -1297,5 +1332,33 @@ mod turn_option_tests {
         assert!(check_turn_options("claude", None, Some("bypassPermissions"), 0).is_err(), "never bypass permissions");
         assert!(check_turn_options("opencode", Some("high"), None, 0).is_err());
         assert!(check_turn_options("generic", None, None, 1).is_err());
+    }
+}
+
+#[cfg(test)]
+mod always_allow_tests {
+    use super::*;
+
+    #[test]
+    fn claude_suggestions_become_a_named_session_rule() {
+        let offer = claude_always(&json!([{"type": "addRules", "rules": [{"toolName": "Bash", "ruleContent": "npm test:*"}], "behavior": "allow", "destination": "session"}])).unwrap();
+        assert_eq!(offer["label"], "Bash(npm test:*) · this session");
+        assert!(claude_always(&json!([])).is_none() && claude_always(&Value::Null).is_none());
+        let line = permission_reply_always("claude", "req", true, &json!({"command": "npm test"}), "", Some(&offer)).unwrap();
+        let v: Value = serde_json::from_str(line.trim()).unwrap();
+        assert_eq!(v["response"]["response"]["updatedPermissions"][0]["rules"][0]["ruleContent"], "npm test:*");
+        // Allow once and Deny are unchanged; a deny never carries the rule.
+        let deny: Value = serde_json::from_str(permission_reply_always("claude", "req", false, &json!({}), "no", Some(&offer)).unwrap().trim()).unwrap();
+        assert_eq!(deny["response"]["response"]["behavior"], "deny");
+        assert!(deny["response"]["response"].get("updatedPermissions").is_none());
+    }
+
+    #[test]
+    fn codex_command_approvals_offer_accept_for_session() {
+        let norms = parse_codex_app(&json!({"id": 7, "method": "item/commandExecution/requestApproval", "params": {"command": "npm test"}}));
+        let Some(Norm::Permission { always: Some(offer), .. }) = norms.first() else { panic!("{norms:?}") };
+        let line = permission_reply_always("codex-app", "7", true, &json!({}), "", Some(offer)).unwrap();
+        assert!(line.contains("\"acceptForSession\""), "{line}");
+        assert!(permission_reply("codex-app", "7", true, &json!({}), "").unwrap().contains("\"accept\""));
     }
 }

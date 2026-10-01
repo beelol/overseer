@@ -51,4 +51,24 @@ function agentFromUri(uri) {
   return run && /^[A-Za-z0-9_-]{1,80}$/.test(run) ? run : undefined;
 }
 
-module.exports = { Notices, kindsFrom, agentFromUri };
+/**
+ * What a vscode://beelol.overseer/... link asks for: a notification's click (AC-52, AC-240) or the
+ * Mac's menu-bar item (AC-262). open-center[?filter=needs|review&repo=<name>], open-agent?run=<id>,
+ * open-workspace (the AC-250 layout), talk (Talk to Overseer). Anything else: undefined.
+ */
+function uriAction(uri) {
+  const q = new URLSearchParams(uri.query || '');
+  switch (uri.path) {
+    case '/open-agent': { const run = agentFromUri(uri); return run ? { kind: 'agent', run } : undefined; }
+    case '/open-center': {
+      const filter = ['needs', 'review', 'working'].includes(q.get('filter')) ? q.get('filter') : undefined;
+      const repo = (q.get('repo') || '').slice(0, 200) || undefined;
+      return { kind: 'center', filter, repo };
+    }
+    case '/open-workspace': return { kind: 'workspace' };
+    case '/talk': return { kind: 'talk' };
+    default: return undefined;
+  }
+}
+
+module.exports = { Notices, kindsFrom, agentFromUri, uriAction };

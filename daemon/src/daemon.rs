@@ -2470,7 +2470,20 @@ impl Daemon {
     }
 
     pub fn answer_permission(&self, run_id: &str, request_id: &str, allow: bool, message: &str) -> Result<Value> {
+        self.answer_permission_with(run_id, request_id, allow, message, false)
+    }
+
+    /// `always`: allow, and take the request's Always allow offer (the harness's session rule,
+    /// AC-262). Refused when the request offers none.
+    pub fn answer_permission_with(&self, run_id: &str, request_id: &str, allow: bool, message: &str, always: bool) -> Result<Value> {
         let run = self.run(run_id)?;
+        if always {
+            let offered = run.attention.as_ref().filter(|a| a["request_id"].as_str() == Some(request_id)).map(|a| !a["always"].is_null());
+            if offered == Some(false) {
+                return Err(crate::server::ProtoError::new("no_always_allow", format!("{} offers no Always allow for this request", run.harness)).into());
+            }
+        }
+        let allow = allow || always;
         // Several surfaces can answer the same request (VS Code, the terminal, a phone). The
         // request is claimed under the store's lock, so exactly one answer reaches the harness;
         // a later one is told what the first one was.
@@ -2487,7 +2500,8 @@ impl Daemon {
             }
             bail!("permission request {request_id} is not pending");
         };
-        let sent = adapters::permission_reply(&run.harness, request_id, allow, &attention["input"], if message.is_empty() { "Denied by user in Overseer" } else { message })
+        let offer = attention.get("always").filter(|o| always && !o.is_null());
+        let sent = adapters::permission_reply_always(&run.harness, request_id, allow, &attention["input"], if message.is_empty() { "Denied by user in Overseer" } else { message }, offer)
             .ok_or_else(|| anyhow!("{} does not support permission replies", run.harness))
             .and_then(|reply| self.send_stdin(&run, &reply));
         if let Err(e) = sent {
@@ -2496,7 +2510,9 @@ impl Daemon {
             return Err(e);
         }
         self.store.lock().unwrap().update_run_status(run_id, "running", None, None)?;
-        self.emit(Some(&run.task_id), Some(run_id), "permission_answered", "user", "exact", json!({"request_id": request_id, "allow": allow, "by": by}))?;
+        let mut answered = json!({"request_id": request_id, "allow": allow, "by": by});
+        if let Some(o) = offer { answered["always"] = o["label"].clone(); }
+        self.emit(Some(&run.task_id), Some(run_id), "permission_answered", "user", "exact", answered)?;
         self.emit(Some(&run.task_id), Some(run_id), "status", "daemon", "exact", json!({"status": "running"}))?;
         if !allow {
             // What the owner refused is remembered, so Overseer never has another agent do it (AC-196).
@@ -2915,7 +2931,7 @@ impl Daemon {
                     }
                 }
             }
-            Norm::Permission { request_id, tool, input } => {
+            Norm::Permission { request_id, tool, input, always } => {
                 // The daemon's own tools (Overseer's reads, an agent's channel) are always allowed:
                 // the daemon decides what each token may do.
                 if tool.starts_with("mcp__overseer__") {
@@ -2925,7 +2941,8 @@ impl Daemon {
                     ev("permission", "daemon", "exact", json!({"kind": "permission", "request_id": request_id, "tool": tool, "auto_allowed": "Overseer's own tool"}), None)?;
                     return Ok(());
                 }
-                let attention = json!({"kind": "permission", "request_id": request_id, "tool": tool, "input": input});
+                let mut attention = json!({"kind": "permission", "request_id": request_id, "tool": tool, "input": input});
+                if let Some(offer) = always { attention["always"] = offer; }
                 store.set_run_attention(&run.id, Some(&attention))?;
                 store.update_run_status(&run.id, "waiting_for_user", None, None)?;
                 ev("permission", "harness", "exact", attention, None)?;
@@ -3519,12 +3536,12 @@ impl Daemon {
         let mut options = Vec::new();
         let snap_info = |id: &str| -> Option<Snapshot> { self.store.lock().unwrap().snapshot(id).ok().flatten() };
         // AC-232: while the agent works, the review opens on its latest run (the owner's default);
-        // once an agent in its own worktree has finished, on everything it did since the task
-        // started, so work committed in an earlier turn is never hidden behind a later turn that
-        // changed nothing ("0 files"). In the owner's own checkout the latest run stays the
-        // default: since the task started would also hold the owner's own work between turns.
+        // once it has finished, on everything it did since the task started, so work committed in
+        // an earlier turn is never hidden behind a later turn that changed nothing ("0 files").
+        // AC-263 (the owner, 2026-09-29): the same in the owner's own checkout, where the review
+        // says that it also holds any edits made in that folder (`folder_edits`).
         let working = self.store.lock().unwrap().runs()?.iter().any(|r| r.workspace_id == ws.id && ACTIVE.contains(&r.status.as_str()));
-        let start_default = ws.kind == "worktree" && !working && task.start_snapshot.as_deref().and_then(snap_info).is_some();
+        let start_default = !working && task.start_snapshot.as_deref().and_then(snap_info).is_some();
         match turns.last().and_then(|t| t.snapshot_id.as_deref().and_then(snap_info).map(|s| (t.clone(), s))) {
             Some((turn, snap)) => options.push(json!({
                 "mode": "latest_run", "label": "Latest run", "base": snap.commit_sha, "available": true, "default": !start_default,
@@ -3544,6 +3561,22 @@ impl Daemon {
             Some(snap) => options.push(json!({"mode": "task_start", "label": "Since task start", "base": snap.commit_sha, "available": true, "default": start_default,
                 "detail": format!("task-start snapshot {} (HEAD {} plus dirty contents at creation)", snap.id, snap.head.clone().unwrap_or_else(|| "none".into())), "provenance": "recorded"})),
             None => options.push(json!({"mode": "task_start", "label": "Since task start", "available": false, "detail": "task-start snapshot missing"})),
+        }
+        // AC-263: Entire worktree, the agent's branch against the commit it started from, with its
+        // uncommitted and untracked files. In its own worktree that is the recorded start of its
+        // branch; in the owner's checkout, where its branch left the integration branch (recorded
+        // when the task started), else the commit HEAD was on when the task started.
+        let start_head = task.start_snapshot.as_deref().and_then(snap_info).and_then(|s| s.head);
+        let entire = match (&task.fork_commit, &start_head) {
+            (Some(fork), _) if git::rev_parse(path, fork).is_some() => Some((fork.clone(), task.fork_provenance.clone().unwrap_or_default())),
+            (_, Some(h)) if git::rev_parse(path, h).is_some() => Some((h.clone(), format!("HEAD {h} when the task started (no fork point was recorded)"))),
+            _ => None,
+        };
+        match entire {
+            Some((base, prov)) => options.push(json!({"mode": "entire_worktree", "label": "Entire worktree", "base": base, "available": true,
+                "detail": format!("everything in {} against {} ({prov}), including uncommitted and untracked files", if ws.kind == "worktree" { "the agent's worktree" } else { "this checkout" }, &base[..base.len().min(10)]),
+                "provenance": if prov.starts_with("recorded") { "recorded" } else { "detected" }})),
+            None => options.push(json!({"mode": "entire_worktree", "label": "Entire worktree", "available": false, "detail": "unknown: no commit was recorded for where the agent's branch started"})),
         }
         if let Some(snap) = self.redirect_snapshot(&root.workspace_id) {
             options.push(json!({"mode": "redirect", "label": "Since the change of direction", "base": snap.commit_sha, "available": true, "detail": format!("snapshot {} taken when Overseer redirected this agent", snap.id), "provenance": "recorded", "snapshot": snap}));
@@ -3572,7 +3605,10 @@ impl Daemon {
             (None, _) => options.push(json!({"mode": "branch_merge_base", "label": "Target branch", "available": false, "detail": "no target branch: none configured and no default branch detected"})),
             (_, None) => options.push(json!({"mode": "branch_merge_base", "label": "Target branch", "available": false, "detail": "workspace has no HEAD commit"})),
         }
-        Ok(json!({"run_id": run_id, "workspace": ws, "head": head, "branch": git::head_branch(path), "options": options, "branches": git::branches(path)}))
+        // AC-263: in the owner's own checkout every comparison also holds whatever else was edited
+        // in that folder (the owner's own work between turns); the review says so.
+        let folder_edits = ws.kind != "worktree";
+        Ok(json!({"run_id": run_id, "workspace": ws, "head": head, "branch": git::head_branch(path), "options": options, "branches": git::branches(path), "folder_edits": folder_edits}))
     }
 
     /// Archives or restores a task (AC-63): hidden from the default list, never deleted.
@@ -3753,7 +3789,9 @@ impl Daemon {
         };
         // What each agent's work became (AC-243): merged, stopped on conflicts, or a pull request.
         let landings = crate::merge::landings_for_state(&store.conn, &runs, &turns)?;
-        Ok(json!({"cursor": store.max_seq()?, "tasks": tasks, "runs": run_values, "workspaces": workspaces, "profiles": store.profiles()?, "turns": turns, "oversight": oversight, "overseer": overseer, "landings": landings,
+        // Whose review the owner has opened (or merged) since it ended, shared by every surface (T-26).
+        let reviewed = crate::menubar::reviewed_marks(&store.conn)?;
+        Ok(json!({"cursor": store.max_seq()?, "tasks": tasks, "runs": run_values, "workspaces": workspaces, "profiles": store.profiles()?, "turns": turns, "oversight": oversight, "overseer": overseer, "landings": landings, "reviewed": reviewed,
             "daemon": {"pid": std::process::id(), "started_ms": self.started_ms, "version": env!("CARGO_PKG_VERSION"), "parser_version": adapters::PARSER_VERSION,
                 "swarm_storage": if self.swarm_storage_blocked.load(std::sync::atomic::Ordering::SeqCst) { "blocked" } else { "ready" }}}))
     }

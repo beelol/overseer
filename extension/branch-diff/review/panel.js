@@ -3,7 +3,8 @@
 // Changes: sessions are opened for an Overseer-selected worktree and comparison base
 // (not the active editor's repository), the toolbar shows the comparison/base icon,
 // and one Follow icon (following / paused / manual) is wired to the host FollowController; panels can
-// open in a given editor column (the Overseer view's review column).
+// open in a given editor column (the Overseer view's review column). Overseer (AC-264): the review has
+// two views, Follow (the file the agent is in, live, with All files) and Diffs only (with Changed).
 const vscode = require('vscode');
 const { randomBytes } = require('crypto');
 const { Comparison, contains } = require('./comparison');
@@ -35,6 +36,7 @@ class ReviewManager {
     this.poll = setInterval(() => {
       for (const session of this.sessions.values()) {
         if (!session.running && this.panels.get(session)?.visible) session.invalidate(true, undefined, { quiet: true });
+        if (session.followShown && this.panels.get(session)?.visible) this.host.followPoll?.(session.overseer?.runId)?.catch?.(() => {});
       }
     }, 2500);
     this.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
@@ -80,14 +82,22 @@ class ReviewManager {
       const o = session.overseer || {};
       panel.title = `Review: ${o.runTitle || 'run'} (${snapshot.entries.filter(e => !e.browsed).length})`;
       panel.webview.postMessage(this.message(session, snapshot));
+      // A file shown in Follow that joined or left the agent's changes gets its marks.
+      if (session.followShown) this.host.followPoll?.(o.runId)?.catch?.(() => {});
     }
+  }
+
+  /** Follow (AC-264): a file of the agent's worktree for the review's middle. */
+  postFollow(runId, value) {
+    const found = this.panelFor(runId);
+    if (found) found.panel.webview.postMessage({ type: 'followFile', ...value }).then(undefined, () => {});
   }
 
   overseerInfo(session) {
     const o = session.overseer || {};
     return { runId: o.runId, runTitle: o.runTitle, harness: o.harness, workspacePath: session.repo.rootUri.fsPath, workspaceKind: o.workspaceKind,
-      comparison: o.comparison, scope: o.scope || 'all', follow: this.host.followState(o.runId), followNote: this.host.followNote(o.runId), reviewed: this.host.reviewedKeys(o.runId),
-      land: this.host.land?.(o.runId) };
+      comparison: o.comparison, scope: o.scope || 'all', view: this.host.view?.(o.runId) || 'diffs', viewAt: this.host.viewAt?.(o.runId) || 0, follow: this.host.followState(o.runId), followNote: this.host.followNote(o.runId), reviewed: this.host.reviewedKeys(o.runId),
+      land: this.host.land?.(o.runId), choices: this.host.choices?.(o.runId) };
   }
 
   message(session, snapshot) {
@@ -109,6 +119,7 @@ class ReviewManager {
       if (reveal) panel.reveal(viewColumn, preserveFocus);
       this.postOverseer(session);
       if (session.display) this.publish(session, session.display);
+      this.host.followInit?.(session.overseer?.runId)?.catch?.(() => {});
       return panel;
     }
     panel = vscode.window.createWebviewPanel('overseer.review', 'Review', { viewColumn: viewColumn || vscode.ViewColumn.One, preserveFocus }, { retainContextWhenHidden: false });
@@ -137,13 +148,18 @@ class ReviewManager {
           if (!message || typeof message !== 'object') return;
           const send = value => { if (this.panels.get(session) === panel) panel.webview.postMessage(value).then(undefined, () => {}); };
           if (this.editing.receive(session, message, send)) return;
-          if (message.type === 'ready') { this.editing.recoverStored(session).then(async drafts => send({ type: 'editRecovery', drafts, handedOff: await this.editing.handoffDrafts(session, message.drafts) })).catch(() => {}); await panel.webview.postMessage({ type: 'progress', stage: session.stage || 'Finding changed files…' }); await sendSnapshot(); this.host.followReady(session.overseer?.runId); return; }
+          if (message.type === 'ready') { this.editing.recoverStored(session).then(async drafts => send({ type: 'editRecovery', drafts, handedOff: await this.editing.handoffDrafts(session, message.drafts) })).catch(() => {}); await panel.webview.postMessage({ type: 'progress', stage: session.stage || 'Finding changed files…' }); await sendSnapshot(); this.host.followReady(session.overseer?.runId); await this.host.followInit?.(session.overseer?.runId); return; }
           if (message.type === 'whereAmI') { await vscode.commands.executeCommand('overseer.whereAmI'); return; }
           // Overseer (AC-243): Merge, Open PR, Cancel merge and Clean up for the review's agent.
           if (message.type === 'land') { await this.host.land_action?.(session.overseer?.runId, String(message.action || '')); this.postOverseer(session); return; }
-          if (message.type === 'showHead') { await this.host.showHead?.(session.overseer?.runId); return; }
+          // Follow or Diffs only (AC-233), from the review's own switch; both are this review (AC-264).
+          if (message.type === 'setView') { await this.host.setView?.(session.overseer?.runId, String(message.view), Number(message.at) || 0); return; }
+          // Follow (AC-264): a file picked in All files shows in the middle; "Follow the agent" goes back.
+          if (message.type === 'showFile') { await this.host.followPick?.(session.overseer?.runId, String(message.path || '')); return; }
+          if (message.type === 'followAgain') { await this.host.followAgain?.(session.overseer?.runId); return; }
           if (message.type === 'refresh') { session.invalidate(true); await sendSnapshot(); return; }
           if (message.type === 'pickComparison') { await this.host.pickComparison(session.overseer?.runId); return; }
+          if (message.type === 'chooseComparison') { await this.host.chooseComparison?.(session.overseer?.runId, String(message.mode || '')); return; }
           if (message.type === 'scope') { this.host.setScope?.(session.overseer?.runId, String(message.scope)); await sendSnapshot(); return; }
           if (message.type === 'follow') { this.host.setFollow(session.overseer?.runId, message.enabled ? 'following' : 'off'); this.postOverseer(session); return; }
           if (message.type === 'followPause') { this.host.pauseFollow(session.overseer?.runId, String(message.reason || 'navigation')); this.postOverseer(session); return; }
@@ -152,8 +168,7 @@ class ReviewManager {
             send({ type: 'hunkReviewed', key: message.key, reviewed: !!message.reviewed });
             return;
           }
-          // AC-99: the navigator's All files view lists the worktree one folder at a time, and any
-          // file opens in the review (an unchanged one joins the comparison as a browsed file).
+          // AC-99: the navigator's All files list (Follow's, AC-264) lists the worktree one folder at a time.
           if (message.type === 'listDir') { send({ type: 'dir', path: String(message.path || ''), ...await listDir(session.repo.rootUri, String(message.path || '')) }); return; }
           if (message.type === 'browse') { if (!session.browse(String(message.path || ''))) send({ type: 'notice', message: 'That file cannot be opened in the review.' }); return; }
           if (message.type === 'unbrowse') { session.unbrowse(String(message.path || '')); return; }
@@ -204,8 +219,9 @@ class ReviewManager {
     panel.webview.html = `<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src ${panel.webview.cspSource} 'unsafe-inline'; font-src ${panel.webview.cspSource}; img-src ${panel.webview.cspSource} data:; worker-src blob:; connect-src 'none';">
 <link rel="stylesheet" href="${escapeAttribute(panel.webview.asWebviewUri(vscode.Uri.joinPath(codicons, 'codicon.css')))}"><link rel="stylesheet" href="${escapeAttribute(panel.webview.asWebviewUri(tokens))}"><link rel="stylesheet" href="${asset('review.css')}"><title>Overseer Review</title></head>
-<body data-home="${escapeAttribute(require('os').homedir())}" data-run-id="${escapeAttribute(session.overseer?.runId || '')}" data-monaco="${asset('monaco.js')}" data-monaco-css="${asset('monaco.css')}" data-repository="${escapeAttribute(session.repo.rootUri.toString())}" data-mode="${escapeAttribute(session.mode)}" data-target="${escapeAttribute(session.target || '')}"><header id="toolbar"><button id="toggle-navigator" class="icon" aria-label="Toggle file navigator" title="Toggle file list" aria-expanded="true"><span class="codicon codicon-list-tree" aria-hidden="true"></span></button><button id="base" class="base" title="Comparison base">${baseIcon}<span id="base-label">Comparison</span></button><select id="scope" aria-label="Changes to show" title="Changes to show"><option value="all">All changes</option><option value="staged">Staged</option><option value="unstaged">Unstaged</option><option value="untracked">Untracked</option></select><strong id="comparison">Review</strong><span id="total"></span><span id="loading-stage" role="status"></span><span class="spacer"></span><span id="land" role="group" aria-label="The agent's work" hidden><span id="land-text"></span><button id="land-merge" class="land primary" hidden><span class="codicon codicon-git-merge" aria-hidden="true"></span><span class="land-word">Merge</span></button><button id="land-pr" class="land" hidden><span class="codicon codicon-git-pull-request" aria-hidden="true"></span><span class="land-word">Open PR</span></button><button id="land-cancel" class="land" hidden><span class="codicon codicon-discard" aria-hidden="true"></span><span class="land-word">Cancel merge</span></button><button id="land-cleanup" class="land" hidden><span class="codicon codicon-trash" aria-hidden="true"></span><span class="land-word">Clean up</span></button></span><button id="follow" class="icon" aria-pressed="false" aria-label="Follow the agent" title="Follow the agent's edits"><span class="codicon codicon-eye-closed" aria-hidden="true"></span></button><span id="follow-state" class="visually-hidden" role="status"></span><select id="layout" aria-label="Diff layout" title="Diff layout"><option value="unified">Unified</option><option value="split">Split</option></select><button id="refresh" class="icon" aria-label="Refresh" title="Refresh"><span class="codicon codicon-refresh" aria-hidden="true"></span></button><button id="head-follow" class="icon" aria-label="Follow in its files" title="Follow: the agent's worktree in its real files, its changes shown inline (Diffs only now)"><span class="codicon codicon-eye" aria-hidden="true"></span></button><button id="where" class="icon" aria-label="Where am I" title="Where am I (⌥⌘M): every Overseer view open in this window"><span class="codicon codicon-location" aria-hidden="true"></span></button></header>
-<div id="notice" role="status" hidden></div><div id="workspace-note" role="note"></div><main id="review"><nav id="navigator" aria-label="Files"><div id="nav-head"><input id="filter" placeholder="Filter files…" aria-label="Filter files"><button id="changes-only" aria-pressed="true" title="Changes only: show only changed files. Click to browse every file in the worktree." aria-label="Changes only"><span class="codicon codicon-diff" aria-hidden="true"></span></button></div><div id="tree" role="tree" aria-label="File tree"></div></nav><div id="resize" role="separator" tabindex="0" aria-label="Resize file navigator" aria-orientation="vertical"></div><section id="diffs" aria-label="All file diffs" tabindex="0"><p class="empty" role="status">Finding changed files…</p></section></main>
+<body data-view="${escapeAttribute(this.host.view?.(session.overseer?.runId) || 'diffs')}" data-home="${escapeAttribute(require('os').homedir())}" data-run-id="${escapeAttribute(session.overseer?.runId || '')}" data-monaco="${asset('monaco.js')}" data-monaco-css="${asset('monaco.css')}" data-repository="${escapeAttribute(session.repo.rootUri.toString())}" data-mode="${escapeAttribute(session.mode)}" data-target="${escapeAttribute(session.target || '')}"><header id="toolbar"><button id="toggle-navigator" class="icon" aria-label="Toggle file navigator" title="Toggle file list" aria-expanded="true"><span class="codicon codicon-list-tree" aria-hidden="true"></span></button><span id="view-mode" role="group" aria-label="What the review shows"><button class="seg" data-view="follow" aria-pressed="false" aria-label="Follow" title="Follow: the file the agent is in, live, with all its files beside it"><span class="codicon codicon-eye" aria-hidden="true"></span><span class="seg-word">Follow</span></button><button class="seg" data-view="diffs" aria-pressed="false" aria-label="Diffs only" title="Diffs only: what the agent changed, with the changed files beside it"><span class="codicon codicon-diff-multiple" aria-hidden="true"></span><span class="seg-word">Diffs only</span></button></span><select id="scope" aria-label="Changes to show" title="Changes to show"><option value="all">All changes</option><option value="staged">Staged</option><option value="unstaged">Unstaged</option><option value="untracked">Untracked</option></select><strong id="comparison">Review</strong><span id="total"></span><span id="loading-stage" role="status"></span><span class="spacer"></span><span id="land" role="group" aria-label="The agent's work" hidden><span id="land-text"></span><button id="land-merge" class="land primary" hidden><span class="codicon codicon-git-merge" aria-hidden="true"></span><span class="land-word">Merge</span></button><button id="land-pr" class="land" hidden><span class="codicon codicon-git-pull-request" aria-hidden="true"></span><span class="land-word">Open PR</span></button><button id="land-cancel" class="land" hidden><span class="codicon codicon-discard" aria-hidden="true"></span><span class="land-word">Cancel merge</span></button><button id="land-cleanup" class="land" hidden><span class="codicon codicon-trash" aria-hidden="true"></span><span class="land-word">Clean up</span></button></span><button id="follow" class="icon" aria-pressed="false" aria-label="Follow the agent" title="Follow the agent's edits"><span class="codicon codicon-eye-closed" aria-hidden="true"></span></button><span id="follow-state" class="visually-hidden" role="status"></span><select id="layout" aria-label="Diff layout" title="Diff layout"><option value="unified">Unified</option><option value="split">Split</option></select><button id="refresh" class="icon" aria-label="Refresh" title="Refresh"><span class="codicon codicon-refresh" aria-hidden="true"></span></button><button id="where" class="icon" aria-label="Where am I" title="Where am I (⌥⌘M): every Overseer view open in this window"><span class="codicon codicon-location" aria-hidden="true"></span></button></header>
+<div id="compare" role="group" aria-label="Changes to compare" hidden><button class="cmp" data-mode="task_start" aria-pressed="false"><span class="codicon codicon-history" aria-hidden="true"></span><span class="cmp-word">Since task start</span></button><button class="cmp" data-mode="latest_run" aria-pressed="false"><span class="codicon codicon-play-circle" aria-hidden="true"></span><span class="cmp-word">Latest run</span></button><button class="cmp" data-mode="entire_worktree" aria-pressed="false"><span class="codicon codicon-repo" aria-hidden="true"></span><span class="cmp-word">Entire worktree</span></button><button id="base" class="base cmp-more" aria-pressed="false" title="Comparison base">${baseIcon}<span id="base-label">More…</span></button><span id="compare-note"></span></div>
+<div id="notice" role="status" hidden></div><div id="workspace-note" role="note"></div><main id="review"><nav id="navigator" aria-label="Files"><div id="nav-head"><div id="list-title" role="heading" aria-level="2">Changed</div><input id="filter" placeholder="Filter files…" aria-label="Filter files"></div><div id="tree" role="tree" aria-label="File tree"></div></nav><div id="resize" role="separator" tabindex="0" aria-label="Resize file navigator" aria-orientation="vertical"></div><section id="diffs" aria-label="All file diffs" tabindex="0"><p class="empty" role="status">Finding changed files…</p></section><section id="follow-view" aria-label="The file the agent is in"><header id="follow-head"><span id="follow-icon" class="codicon codicon-eye" aria-hidden="true"></span><span id="follow-path"></span><span id="follow-why" role="status"></span><span class="spacer"></span><button id="follow-again" hidden title="Show the file the agent is in again (Follow also goes there by itself when the agent moves to another file)"><span class="codicon codicon-eye" aria-hidden="true"></span>Follow the agent</button></header><div id="follow-editor"></div><p id="follow-problem" class="file-problem" hidden></p></section></main>
 <script type="module" nonce="${nonce}" src="${asset('review.js')}"></script></body></html>`;
     if (waitForComparison) await session.ready(); else session.ready().catch(() => {});
     return panel;

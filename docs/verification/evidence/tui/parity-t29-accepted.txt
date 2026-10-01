@@ -1,0 +1,44 @@
+ ◆ Overseer  page 1/1 · 1 agent · ● 1 active                                                                                     phone access off · ● connected 
+┏ review · Reviewed in the terminal · Latest run · 2 files +3 −2 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 1 Since task start   2 [Latest run]   3 Entire worktree (not available)   t [Changed] | All files                                                            ┃
+┃                                                                                                                                                              ┃
+┃› M a.txt +2 −2                                 │ a.txt  change 2 of 2 · 1 accepted                                                                           ┃
+┃  M b.txt +1 −0                                 │    line 3                                                                                                   ┃
+┃                                                │    line 4                                                                                                   ┃
+┃                                                │ › @@ -8,1 +8,1 @@  ✓ Accepted                                                                               ┃
+┃                                                │    line 6                                                                                                   ┃
+┃                                                │    line 7                                                                                                   ┃
+┃                                                │   -line 8                                                                                                   ┃
+┃                                                │   +line EIGHT                                                                                               ┃
+┃                                                │    line 9                                                                                                   ┃
+┃                                                │    line 10                                                                                                  ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+ Accepted in a.txt                                                                                                                                              

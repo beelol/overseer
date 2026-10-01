@@ -14,7 +14,11 @@ use std::time::{Duration, Instant};
 mod phone;
 pub use phone::{ago, code_groups, fingerprint, platform_name, Device, PairRequest, Pairing, PairingState, Phone};
 
-pub const PAGE: usize = 9;
+/// Agents on one screen at most (T-37); from the 17th the grid pages.
+pub const PAGE: usize = 16;
+/// The smallest tile the grid narrows to before it takes fewer columns (T-37).
+pub const MIN_TILE_W: u16 = 22;
+pub const MIN_TILE_H: u16 = 5;
 /// Pages of history fetched per run (5,000 events each), newest kept by the feed cap.
 const HISTORY_PAGES: usize = 10;
 const MAX_AUDIO_IMPORT_PATH: usize = 4096;
@@ -90,6 +94,8 @@ pub struct Exec {
     pub program: String,
     pub args: Vec<String>,
     pub env: Vec<(String, String)>,
+    /// The owner's editor from the review (T-39), not a sign-in.
+    pub edit: bool,
 }
 
 /// One row of the Accounts panel.
@@ -112,6 +118,8 @@ pub enum Confirm {
     MergePrepare { run: String, text: String },
     /// Merge back, step 2: merge the agent's branch into the target in the source checkout.
     MergeComplete { run: String, text: String },
+    /// Reject changes in the review: the comparison's lines go back into the worktree (T-29).
+    Reject { path: String, keys: Vec<String>, text: String },
     /// Remove a finished agent's worktree (its branch is kept).
     Cleanup { run: String, text: String, discard: bool },
     /// Interrupt every agent and stop the daemon.
@@ -142,6 +150,11 @@ enum Pending {
     Create,
     Comparisons { run: String },
     Diff { run: String },
+    Hunks { run: String, path: String },
+    FileText { run: String, path: String },
+    Tree { run: String },
+    Accept { run: String, path: String, rest: Vec<Hunk> },
+    Reject { run: String, path: String, rest: Vec<String> },
     AccountList,
     AccountStatus(String),
     Login(String),
@@ -151,6 +164,8 @@ enum Pending {
     MergeLanding { run: String, branch: String, target: String, repo: String },
     MergeFiles { run: String, text: String },
     MergeComplete,
+    /// `review.seen`: a reviewed mark shared with VS Code and the menu bar (T-26).
+    Seen,
     CleanupPlan { run: String },
     Cleanup,
     StopAll,
@@ -219,24 +234,99 @@ impl NewAgentForm {
     }
 }
 
-/// The Changes view (`v`): what an agent changed, like the review in VS Code.
+/// A comparison the review can show (`comparison.options`): available or not, and why.
+#[derive(Debug, Clone, Default)]
+pub struct Comparison {
+    pub mode: String,
+    pub label: String,
+    pub base: Option<String>,
+    pub available: bool,
+    pub detail: String,
+}
+
+/// One change of a file, as the daemon names it (`workspace.hunks`): its key, the comparison's
+/// lines it replaces and the working copy's lines, and whether it is accepted.
+#[derive(Debug, Clone, Default)]
+pub struct Hunk {
+    pub key: String,
+    pub base_start: usize,
+    pub base_lines: Vec<String>,
+    pub modified_start: usize,
+    pub modified_lines: Vec<String>,
+    pub reviewed: bool,
+}
+
+/// The comparisons that `1`, `2` and `3` switch to (T-27).
+pub const REVIEW_KEYS: [(&str, &str); 3] = [("task_start", "Since task start"), ("latest_run", "Latest run"), ("entire_worktree", "Entire worktree")];
+
+/// The review (`v`): what an agent changed, like the review in VS Code, all through the daemon:
+/// the comparisons, the files, each change with its Accept and Reject.
 #[derive(Debug, Clone, Default)]
 pub struct ChangesView {
     pub run: String,
-    /// Available comparisons: (label, base commit).
-    pub options: Vec<(String, String)>,
+    pub workspace: String,
+    /// Every comparison the daemon offers, available or not.
+    pub options: Vec<Comparison>,
     pub option: usize,
     /// Changed files: (status letter, path, added lines, removed lines).
     pub files: Vec<(String, String, u64, u64)>,
+    /// `t`: All files (the whole worktree, from the daemon) instead of the changed ones (T-28).
+    pub all_files: bool,
+    /// Every file of the worktree, once listed.
+    pub all: Vec<String>,
+    pub all_loading: usize,
     pub file: usize,
-    /// Diff of the selected file (unified, without color codes).
+    /// The selected file's changes and the lines drawn for them.
+    pub hunks: Vec<Hunk>,
+    pub change: usize,
     pub diff: Vec<String>,
+    /// Where each change starts in `diff`.
+    pub hunk_at: Vec<usize>,
+    /// The selected file is unchanged: its contents, read-only.
+    pub unchanged: bool,
     pub scroll: usize,
     /// Tree object of the worktree as captured by the daemon (includes untracked files).
     pub tree: Option<String>,
     pub root: String,
     pub error: Option<String>,
     pub loading: bool,
+    /// The file whose changes are shown.
+    pub path: String,
+    /// The selected file's working copy, by line.
+    pub now: Vec<String>,
+    /// Lines the owner wrote in their own editor (`e`, T-39), per file: shown as theirs.
+    pub mine: HashMap<String, HashSet<String>>,
+    /// The file as it was when the editor opened, to tell the owner's lines from the agent's.
+    pub editing: Option<(String, String)>,
+}
+
+impl ChangesView {
+    /// The file list shown: the changed files, or every file with the changed ones' counts.
+    pub fn shown(&self) -> Vec<(String, String, u64, u64)> {
+        if !self.all_files {
+            return self.files.clone();
+        }
+        let mut out: Vec<(String, String, u64, u64)> = self.all.iter().map(|p| self.files.iter().find(|f| &f.1 == p).cloned().unwrap_or_else(|| (String::new(), p.clone(), 0, 0))).collect();
+        for f in &self.files {
+            if !self.all.contains(&f.1) {
+                out.push(f.clone());
+            }
+        }
+        out.sort_by(|a, b| a.1.cmp(&b.1));
+        out
+    }
+
+    pub fn selected(&self) -> Option<(String, String, u64, u64)> {
+        self.shown().get(self.file).cloned()
+    }
+
+    pub fn comparison(&self) -> Option<&Comparison> {
+        self.options.get(self.option)
+    }
+
+    pub fn accepted(&self) -> usize {
+        self.hunks.iter().filter(|h| h.reviewed).count()
+    }
 }
 
 /// What the daemon last said about Audio Mode. The TUI keeps no audio setting of its own: the
@@ -292,6 +382,10 @@ impl AudioSettings {
 
 /// Lines of diff shown for one file at most.
 const DIFF_LINES: usize = 4000;
+/// Lines of the working copy shown around each change.
+const CONTEXT: usize = 2;
+/// Files listed in All files at most (T-28).
+const ALL_FILES_MAX: usize = 5000;
 
 fn git_out(dir: &str, args: &[&str]) -> Result<String, String> {
     let out = std::process::Command::new("git").arg("-C").arg(dir).args(args).output().map_err(|e| e.to_string())?;
@@ -321,6 +415,14 @@ pub struct App {
     pub size: (u16, u16),
     /// Tile rectangles from the last draw: (run id, x, y, w, h), for mouse clicks.
     pub hit: Vec<(String, u16, u16, u16, u16)>,
+    /// Agent list rows from the last draw (T-25): a click picks the agent.
+    pub list_hit: Vec<(String, u16, u16, u16, u16)>,
+    /// The focused agent's conversation shows in a column beside the grid (T-25, way 2).
+    pub picked: bool,
+    /// Lines up from the bottom in that conversation (0 = following).
+    pub conv_scroll: usize,
+    /// `L` hides the agent list.
+    pub list_hidden: bool,
     /// Working directory's Git root (the default repository for new agents).
     pub cwd_repo: Option<String>,
     pending: HashMap<u64, Pending>,
@@ -413,6 +515,10 @@ impl App {
             dirty: true,
             size: (120, 40),
             hit: Vec::new(),
+            list_hit: Vec::new(),
+            picked: false,
+            conv_scroll: 0,
+            list_hidden: false,
             cwd_repo: None,
             pending: HashMap::new(),
             history_requested: HashSet::new(),
@@ -526,13 +632,108 @@ impl App {
         self.ensure_history();
     }
 
+    /// The agent list (T-25): the visible agents grouped by repository, the most recently active
+    /// repository and agent first. An agent that is working counts as active now.
+    pub fn groups(&self) -> Vec<(String, Vec<&Run>)> {
+        let recent = |r: &Run| if r.active() { i64::MAX } else { r.ended_ms.unwrap_or(r.created_ms) };
+        let mut groups: Vec<(String, Vec<&Run>)> = Vec::new();
+        for r in self.visible() {
+            let repo = self.state.task(&r.task_id).map(|t| t.repo_root.clone()).unwrap_or_default();
+            match groups.iter_mut().find(|g| g.0 == repo) {
+                Some(g) => g.1.push(r),
+                None => groups.push((repo, vec![r])),
+            }
+        }
+        for g in groups.iter_mut() {
+            g.1.sort_by(|a, b| recent(b).cmp(&recent(a)).then(b.created_ms.cmp(&a.created_ms)).then(b.id.cmp(&a.id)));
+        }
+        groups.sort_by(|a, b| recent(b.1[0]).cmp(&recent(a.1[0])).then(b.1[0].created_ms.cmp(&a.1[0].created_ms)).then(a.0.cmp(&b.0)));
+        groups
+    }
+
+    /// Agent ids in the list's order (`J`/`K` walk it).
+    pub fn list_ids(&self) -> Vec<String> {
+        self.groups().into_iter().flat_map(|g| g.1.into_iter().map(|r| r.id.clone())).collect()
+    }
+
+    /// The list shows beside the grid from 100 columns (and 30 rows, below which the compact
+    /// layout keeps the room), unless `L` hid it.
+    pub fn list_shown(&self) -> bool {
+        !self.list_hidden && !self.compact()
+    }
+
+    /// Below 100×30 one focused tile and a compact list take the screen (T-09).
+    pub fn compact(&self) -> bool {
+        self.size.0 < 100 || self.size.1 < 30
+    }
+
+    /// Picks an agent: it takes focus and its conversation opens beside the grid.
+    pub fn pick(&mut self, id: &str) {
+        if let Some(i) = self.index_of(id) {
+            if self.focus.as_deref() != Some(id) {
+                self.conv_scroll = 0;
+            }
+            self.focus_index(i);
+            self.picked = true;
+            self.dirty = true;
+        }
+    }
+
+    /// `J`/`K`: the next or previous agent in the list; the first press picks the first (or last).
+    fn pick_step(&mut self, delta: i32) {
+        let ids = self.list_ids();
+        if ids.is_empty() {
+            return;
+        }
+        let n = ids.len() as i32;
+        let at = self.focus.as_deref().and_then(|f| ids.iter().position(|i| i == f)).filter(|_| self.picked);
+        let next = match at {
+            Some(i) => (i as i32 + delta).rem_euclid(n),
+            None if delta > 0 => 0,
+            None => n - 1,
+        };
+        let id = ids[next as usize].clone();
+        self.pick(&id);
+    }
+
+    fn scroll_conv(&mut self, delta: i64) {
+        self.conv_scroll = (self.conv_scroll as i64 + delta).max(0) as usize;
+        self.dirty = true;
+    }
+
+    /// The grid's room in cells: the body beside the list and the picked agent's conversation.
+    pub fn grid_room(&self) -> (u16, u16) {
+        let (w, h) = self.size;
+        if self.compact() {
+            return (w, h.saturating_sub(2));
+        }
+        let (list_w, conv_w) = side_widths(w, self.list_shown(), self.picked && self.focus.is_some());
+        (w.saturating_sub(list_w + conv_w), h.saturating_sub(2))
+    }
+
+    /// Agents per page (T-37): up to 16, fewer when the grid has no room for that many tiles.
+    pub fn page_size(&self) -> usize {
+        let (w, h) = self.grid_room();
+        let cols = (w / MIN_TILE_W).max(1) as usize;
+        let rows = (h / MIN_TILE_H).max(1) as usize;
+        (cols * rows).clamp(1, PAGE)
+    }
+
+    /// The grid's shape for `n` tiles in the room it has (T-37).
+    pub fn grid_shape(&self, n: usize) -> (usize, usize) {
+        let max_cols = (self.grid_room().0 / MIN_TILE_W).max(1) as usize;
+        let (r, c) = shape(n);
+        if c <= max_cols { (r, c) } else { (n.div_ceil(max_cols).max(1), max_cols) }
+    }
+
     pub fn pages(&self) -> usize {
-        self.visible().len().div_ceil(PAGE).max(1)
+        self.visible().len().div_ceil(self.page_size()).max(1)
     }
 
     /// The agents on the current page (at most nine).
     pub fn page_agents(&self) -> Vec<&Run> {
-        self.visible().into_iter().skip(self.page * PAGE).take(PAGE).collect()
+        let ps = self.page_size();
+        self.visible().into_iter().skip(self.page * ps).take(ps).collect()
     }
 
     pub fn focused(&self) -> Option<&Run> {
@@ -552,23 +753,24 @@ impl App {
         }
         let i = i.min(ids.len() - 1);
         self.focus = Some(ids[i].clone());
-        self.page = i / PAGE;
+        self.page = i / self.page_size();
         self.dirty = true;
         self.ensure_history();
     }
 
     /// Keeps focus on the same agent after the list changed (new agents, filter changes).
-    fn settle_focus(&mut self) {
+    pub fn settle_focus(&mut self) {
         let n = self.visible().len();
+        let ps = self.page_size();
         if n == 0 {
             self.focus = None;
             self.page = 0;
             return;
         }
         match self.focus.clone().and_then(|f| self.index_of(&f)) {
-            Some(i) => self.page = i / PAGE,
+            Some(i) => self.page = i / ps,
             None => {
-                let i = (self.page * PAGE).min(n - 1);
+                let i = (self.page * ps).min(n - 1);
                 self.focus_index(i);
             }
         }
@@ -576,13 +778,15 @@ impl App {
     }
 
     fn move_focus(&mut self, dx: i32, dy: i32) {
+        let ps = self.page_size();
+        let shape = |n: usize| self.grid_shape(n);
         let Some(i) = self.focus.clone().and_then(|f| self.index_of(&f)) else {
-            self.focus_index(self.page * PAGE);
+            self.focus_index(self.page * ps);
             return;
         };
         let n = self.visible().len();
-        let (page, slot) = (i / PAGE, i % PAGE);
-        let on_page = |p: usize| n.saturating_sub(p * PAGE).min(PAGE);
+        let (page, slot) = (i / ps, i % ps);
+        let on_page = |p: usize| n.saturating_sub(p * ps).min(ps);
         let (_, cols) = shape(on_page(page));
         let (row, col) = ((slot / cols) as i32, (slot % cols) as i32);
         let target = if dx != 0 {
@@ -593,7 +797,7 @@ impl App {
                     None
                 } else {
                     let (_, pc) = shape(on_page(page - 1));
-                    Some((page - 1) * PAGE + (row as usize) * pc + pc - 1)
+                    Some((page - 1) * ps + (row as usize) * pc + pc - 1)
                 }
             } else if c >= cols as i32 {
                 // Past the right edge: the next page's same row (or its last agent).
@@ -601,15 +805,15 @@ impl App {
                     None
                 } else {
                     let (nr, nc) = shape(on_page(page + 1));
-                    Some(((page + 1) * PAGE + (row as usize).min(nr - 1) * nc).min(n - 1))
+                    Some(((page + 1) * ps + (row as usize).min(nr - 1) * nc).min(n - 1))
                 }
             } else {
-                Some(page * PAGE + (row * cols as i32 + c) as usize)
+                Some(page * ps + (row * cols as i32 + c) as usize)
             }
         } else {
             let r = row + dy;
-            let t = page * PAGE + (r.max(0) as usize) * cols + col as usize;
-            if r >= 0 && t < page * PAGE + on_page(page) { Some(t) } else { None }
+            let t = page * ps + (r.max(0) as usize) * cols + col as usize;
+            if r >= 0 && t < page * ps + on_page(page) { Some(t) } else { None }
         };
         if let Some(t) = target {
             if t < n {
@@ -619,14 +823,15 @@ impl App {
     }
 
     fn change_page(&mut self, delta: i32) {
+        let ps = self.page_size();
         let pages = self.pages() as i32;
         let next = (self.page as i32 + delta).clamp(0, pages - 1) as usize;
         if next == self.page {
             return;
         }
-        let slot = self.focus.clone().and_then(|f| self.index_of(&f)).map(|i| i % PAGE).unwrap_or(0);
+        let slot = self.focus.clone().and_then(|f| self.index_of(&f)).map(|i| i % ps).unwrap_or(0);
         let n = self.visible().len();
-        self.focus_index((next * PAGE + slot).min(n.saturating_sub(1)));
+        self.focus_index((next * ps + slot).min(n.saturating_sub(1)));
     }
 
     /// Loads history for the agents on screen (and the zoomed one) that have none yet.
@@ -785,12 +990,16 @@ impl App {
             feed.add(&ev, child.as_deref());
             self.last_event.insert(root, Instant::now());
         }
+        // The review follows marks and rejections made elsewhere (VS Code, the phone).
+        if self.mode == Mode::Changes && matches!(kind.as_str(), "review_mark" | "review_reject") && self.state.root_of(&run_id) == self.changes.run && !self.changes.loading {
+            if kind == "review_reject" { self.load_diff() } else { self.load_file_diff() }
+        }
         // The conversation with Overseer follows its own events while it is open.
         if matches!(self.mode, Mode::Overseer) && matches!(kind.as_str(), "overseer_message" | "proposal" | "proposal_answered" | "overseer_level" | "overseer_session") {
             self.request("overseer.session", json!({}), Pending::OverseerSession);
         }
         // Statuses, turns and new runs come from `state`, reloaded like VS Code does.
-        if (matches!(kind.as_str(), "status" | "turn_started" | "turn_done" | "permission" | "permission_answered" | "child" | "child_reparented" | "task_created" | "workspace_removed" | "reattached" | "profile")
+        if (matches!(kind.as_str(), "status" | "turn_started" | "turn_done" | "permission" | "permission_answered" | "child" | "child_reparented" | "task_created" | "workspace_removed" | "reattached" | "profile" | "review_seen" | "merge_back")
             || (!run_id.is_empty() && self.state.run(&run_id).is_none()))
             && self.state_due.is_none()
         {
@@ -979,18 +1188,28 @@ impl App {
                 if self.changes.run != run {
                     return;
                 }
-                let opts: Vec<(String, String)> = v["options"].as_array().cloned().unwrap_or_default().iter()
-                    .filter(|o| o["available"].as_bool().unwrap_or(false) && o["base"].is_string())
-                    .map(|o| (o["label"].as_str().unwrap_or("comparison").to_string(), o["base"].as_str().unwrap_or_default().to_string()))
-                    .collect();
-                if opts.is_empty() {
-                    self.changes.loading = false;
-                    self.changes.error = Some("No comparison is available for this agent yet.".into());
-                    return;
+                let keep = self.changes.comparison().map(|c| c.mode.clone());
+                let opts: Vec<Value> = v["options"].as_array().cloned().unwrap_or_default();
+                self.changes.options = opts.iter().map(|o| Comparison {
+                    mode: o["mode"].as_str().unwrap_or_default().to_string(),
+                    label: o["label"].as_str().unwrap_or("comparison").to_string(),
+                    base: o["base"].as_str().map(str::to_string),
+                    available: o["available"].as_bool().unwrap_or(false) && o["base"].is_string(),
+                    detail: o["detail"].as_str().unwrap_or_default().to_string(),
+                }).collect();
+                // T-27: the comparison the daemon marks as the default ("Since task start"), else the first available.
+                let default = opts.iter().position(|o| o["default"] == true && o["available"] == true && o["base"].is_string());
+                let kept = keep.and_then(|m| self.changes.options.iter().position(|c| c.mode == m && c.available));
+                match kept.or(default).or_else(|| self.changes.options.iter().position(|c| c.available)) {
+                    Some(i) => {
+                        self.changes.option = i;
+                        self.load_diff();
+                    }
+                    None => {
+                        self.changes.loading = false;
+                        self.changes.error = Some("No comparison is available for this agent yet.".into());
+                    }
                 }
-                self.changes.options = opts;
-                self.changes.option = 0;
-                self.load_diff();
             }
             (Pending::Diff { run }, Ok(v)) => {
                 if self.changes.run != run {
@@ -1010,15 +1229,112 @@ impl App {
                         }
                     }
                 }
-                let keep = self.changes.files.get(self.changes.file).map(|f| f.1.clone());
+                let keep = self.changes.selected().map(|f| f.1);
                 self.changes.files = v["changes"].as_array().cloned().unwrap_or_default().iter().map(|c| {
                     let path = c["path"].as_str().unwrap_or_default().to_string();
                     let (a, d) = counts.get(&path).copied().unwrap_or((0, 0));
                     (c["status"].as_str().unwrap_or("M").to_string(), path, a, d)
                 }).collect();
-                self.changes.file = keep.and_then(|k| self.changes.files.iter().position(|f| f.1 == k)).unwrap_or(0);
+                self.changes.file = keep.and_then(|k| self.changes.shown().iter().position(|f| f.1 == k)).unwrap_or(0);
                 self.changes.error = None;
                 self.load_file_diff();
+            }
+            (Pending::Hunks { run, path }, Ok(v)) => {
+                if self.changes.run != run || self.changes.selected().map(|f| f.1) != Some(path.clone()) {
+                    return;
+                }
+                let strings = |x: &Value| -> Vec<String> { x.as_array().map(|a| a.iter().filter_map(|l| l.as_str().map(str::to_string)).collect()).unwrap_or_default() };
+                self.changes.hunks = v["hunks"].as_array().cloned().unwrap_or_default().iter().map(|h| Hunk {
+                    key: h["key"].as_str().unwrap_or_default().to_string(),
+                    base_start: h["base_start"].as_u64().unwrap_or(0) as usize,
+                    base_lines: strings(&h["base_lines"]),
+                    modified_start: h["modified_start"].as_u64().unwrap_or(0) as usize,
+                    modified_lines: strings(&h["modified_lines"]),
+                    reviewed: h["reviewed"] == true,
+                }).collect();
+                self.changes.change = self.changes.change.min(self.changes.hunks.len().saturating_sub(1));
+                if v["shown"] == false {
+                    self.changes.diff = vec![format!("({})", v["why"].as_str().filter(|w| !w.is_empty()).unwrap_or("not shown as text"))];
+                    self.changes.hunk_at.clear();
+                    self.changes.loading = false;
+                    return;
+                }
+                let ws = self.changes.workspace.clone();
+                self.request("workspace.file", json!({ "workspace_id": ws, "path": path }), Pending::FileText { run, path });
+            }
+            (Pending::FileText { run, path }, Ok(v)) => {
+                if self.changes.run != run || self.changes.selected().map(|f| f.1) != Some(path.clone()) {
+                    return;
+                }
+                self.changes.loading = false;
+                let text = v["now"]["text"].as_str().map(str::to_string);
+                // T-39: lines the owner wrote in the editor just now are theirs.
+                if let Some((p, before)) = self.changes.editing.take() {
+                    if p == path {
+                        let mine = owner_lines(&before, text.as_deref().unwrap_or_default());
+                        self.changes.mine.entry(p).or_default().extend(mine);
+                    }
+                }
+                if self.changes.unchanged {
+                    self.changes.diff = match (&text, v["now"]["note"].as_str()) {
+                        (Some(t), _) => t.lines().take(DIFF_LINES).map(|l| format!(" {l}")).collect(),
+                        (None, Some(note)) => vec![format!("({note})")],
+                        (None, None) => vec!["(this file is not on disk)".into()],
+                    };
+                    self.changes.hunk_at.clear();
+                } else {
+                    self.render_hunks(text.as_deref().unwrap_or_default());
+                }
+            }
+            (Pending::Tree { run }, Ok(v)) => {
+                if self.changes.run != run {
+                    return;
+                }
+                self.changes.all_loading = self.changes.all_loading.saturating_sub(1);
+                for e in v["entries"].as_array().cloned().unwrap_or_default() {
+                    let path = e["path"].as_str().unwrap_or_default().to_string();
+                    if e["dir"] == true && e["symlink"] != true {
+                        // Folders are listed in turn, up to a bound (a very large worktree is cut short).
+                        if self.changes.all.len() < ALL_FILES_MAX {
+                            self.changes.all_loading += 1;
+                            let ws = self.changes.workspace.clone();
+                            self.request("workspace.tree", json!({ "workspace_id": ws, "dir": path }), Pending::Tree { run: run.clone() });
+                        }
+                    } else if self.changes.all.len() < ALL_FILES_MAX && !self.changes.all.contains(&path) {
+                        self.changes.all.push(path);
+                    }
+                }
+                if self.changes.all_loading == 0 {
+                    self.changes.all.sort();
+                    self.changes.file = 0;
+                    self.load_file_diff();
+                }
+            }
+            (Pending::Accept { run, path, rest }, Ok(_)) => {
+                if let Some(next) = rest.first().cloned() {
+                    self.send_accept(&run, &path, next, rest[1..].to_vec());
+                } else {
+                    self.say(format!("Accepted in {path}"), false);
+                    self.load_file_diff();
+                }
+            }
+            (Pending::Reject { run, path, rest }, Ok(_)) => {
+                if let Some(next) = rest.first().cloned() {
+                    self.send_reject(&run, &path, next, rest[1..].to_vec());
+                } else {
+                    self.say(format!("Rejected in {path}: the lines from before are back"), false);
+                    self.load_diff();
+                }
+            }
+            (Pending::Accept { .. } | Pending::Reject { .. }, Err(e)) => {
+                // The daemon's conflict check: the agent changed it meanwhile.
+                self.say(e, true);
+                self.load_diff();
+            }
+            (Pending::Hunks { .. } | Pending::FileText { .. } | Pending::Tree { .. }, Err(e)) => {
+                self.changes.loading = false;
+                self.changes.all_loading = 0;
+                self.changes.error = Some(e);
             }
             (Pending::AccountList, Ok(v)) => {
                 let keep = self.accounts.get(self.account_sel).map(|a| a.id.clone());
@@ -1051,6 +1367,7 @@ impl App {
                     program: v["program"].as_str().unwrap_or_default().to_string(),
                     args: v["args"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default(),
                     env,
+                    edit: false,
                 });
             }
             (Pending::MergePlan { run }, Ok(plan)) => self.on_merge_plan(run, plan),
@@ -1106,6 +1423,7 @@ impl App {
                 self.say(format!("Pull request #{number} is open: {url} (nothing was merged)"), false);
             }
             (Pending::PrOpened, Ok(_)) => {}
+            (Pending::Seen, Ok(_)) => {}
             (Pending::StopAll, Ok(v)) => {
                 let n = v["stopped"].as_array().map(|a| a.len()).unwrap_or(0);
                 let left = v["remaining"].as_array().map(|a| a.len()).unwrap_or(0);
@@ -1299,39 +1617,174 @@ impl App {
         self.request("task.create", params, Pending::Create);
     }
 
+    /// Opening a finished agent's review clears its "to review" mark here, in VS Code and in the
+    /// menu bar: the mark is the daemon's (T-26, as VS Code's markReviewed).
+    fn mark_reviewed(&mut self, run_id: &str) {
+        let root = self.state.root_of(run_id);
+        let Some(run) = self.state.run(&root) else { return };
+        if run.active() || !self.state.unreviewed(run, crate::model::now_ms()) {
+            return;
+        }
+        let at = crate::model::now_ms();
+        self.state.reviewed.insert(root.clone(), at);
+        self.request("review.seen", json!({ "marks": { root: at } }), Pending::Seen);
+    }
+
     fn open_changes(&mut self) {
         let Some(run) = self.focused().cloned() else { return };
-        self.changes = ChangesView { run: run.id.clone(), loading: true, ..Default::default() };
+        self.mark_reviewed(&run.id);
+        let keep = std::mem::take(&mut self.changes.mine);
+        self.changes = ChangesView { run: run.id.clone(), workspace: run.workspace_id.clone(), loading: true, mine: if self.changes.run == run.id { keep } else { HashMap::new() }, ..Default::default() };
         self.mode = Mode::Changes;
         self.request("comparison.options", json!({ "run_id": run.id }), Pending::Comparisons { run: run.id.clone() });
     }
 
+    /// Reloads the comparisons (their bases move as turns start), then the files and the diff.
+    fn reload_review(&mut self) {
+        let run = self.changes.run.clone();
+        self.changes.loading = true;
+        self.request("comparison.options", json!({ "run_id": run }), Pending::Comparisons { run });
+    }
+
     fn load_diff(&mut self) {
         let run = self.changes.run.clone();
-        let Some(ws) = self.state.run(&run).map(|r| r.workspace_id.clone()) else { return };
-        let Some((_, base)) = self.changes.options.get(self.changes.option).cloned() else { return };
+        let ws = self.changes.workspace.clone();
+        let Some(base) = self.changes.comparison().and_then(|c| c.base.clone()) else { return };
         self.changes.loading = true;
         self.request("workspace.diff", json!({ "workspace_id": ws, "base": base, "status": false }), Pending::Diff { run });
     }
 
-    /// The selected file's unified diff (read-only `git diff` between the base and the captured tree).
+    /// The selected file's changes from the daemon (`workspace.hunks`), or an unchanged file's
+    /// contents (`workspace.file`).
     fn load_file_diff(&mut self) {
         let c = &mut self.changes;
-        c.scroll = 0;
+        let Some((status, path, ..)) = c.selected() else {
+            c.diff.clear();
+            c.hunks.clear();
+            c.hunk_at.clear();
+            return;
+        };
+        // Another file starts at its first change; the same file (a refresh) keeps its place and
+        // its lines until the new ones arrive.
+        if c.path != path {
+            c.path = path.clone();
+            c.scroll = 0;
+            c.diff.clear();
+            c.hunks.clear();
+            c.hunk_at.clear();
+            c.change = 0;
+        }
+        let (run, ws) = (c.run.clone(), c.workspace.clone());
+        c.unchanged = status.is_empty();
+        c.loading = true;
+        if c.unchanged {
+            self.request("workspace.file", json!({ "workspace_id": ws, "path": path }), Pending::FileText { run, path });
+            return;
+        }
+        let Some(base) = c.comparison().and_then(|x| x.base.clone()) else { return };
+        self.request("workspace.hunks", json!({ "workspace_id": ws, "path": path, "base": base, "run_id": run }), Pending::Hunks { run, path });
+    }
+
+    /// Draws the changes as a diff: each change's header, two lines around it from the working
+    /// copy, the comparison's lines (−) and the working copy's (+).
+    fn render_hunks(&mut self, now: &str) {
+        let lines: Vec<&str> = now.split('\n').collect();
+        let c = &mut self.changes;
+        c.now = crate::app::split_lines(now);
         c.diff.clear();
-        let (Some((_, base)), Some(tree), Some(file)) = (c.options.get(c.option), c.tree.as_ref(), c.files.get(c.file)) else { return };
-        let mut args = vec!["diff", "--no-color", "-M", base.as_str(), tree.as_str(), "--"];
-        let old = file.1.clone();
-        args.push(&old);
-        match git_out(&c.root, &args) {
-            Ok(text) => {
-                c.diff = text.lines().skip_while(|l| !l.starts_with("@@") && !l.starts_with("Binary")).take(DIFF_LINES).map(str::to_string).collect();
-                if c.diff.is_empty() {
-                    c.diff.push("(no textual change)".into());
+        c.hunk_at.clear();
+        for h in &c.hunks {
+            c.hunk_at.push(c.diff.len());
+            c.diff.push(format!("@@ -{},{} +{},{} @@", h.base_start, h.base_lines.len(), h.modified_start, h.modified_lines.len()));
+            // The working copy's lines before and after the change (1-based; a removal sits after its line).
+            let (first, after) = if h.modified_lines.is_empty() { (h.modified_start + 1, h.modified_start + 1) } else { (h.modified_start, h.modified_start + h.modified_lines.len()) };
+            for n in first.saturating_sub(CONTEXT).max(1)..first {
+                if let Some(l) = lines.get(n - 1) {
+                    c.diff.push(format!(" {l}"));
                 }
             }
-            Err(e) => c.error = Some(e),
+            c.diff.extend(h.base_lines.iter().map(|l| format!("-{l}")));
+            c.diff.extend(h.modified_lines.iter().map(|l| format!("+{l}")));
+            for n in after..after + CONTEXT {
+                if let Some(l) = lines.get(n - 1).filter(|_| n <= lines.len()) {
+                    c.diff.push(format!(" {l}"));
+                }
+            }
         }
+        if c.hunks.is_empty() {
+            c.diff.push("(no textual change)".into());
+        }
+        c.change = c.change.min(c.hunks.len().saturating_sub(1));
+    }
+
+    fn send_accept(&mut self, run: &str, path: &str, h: Hunk, rest: Vec<Hunk>) {
+        let mut p = json!({ "run_id": run, "path": path, "key": h.key, "modified_start": h.modified_start, "modified_lines": h.modified_lines, "base_lines": h.base_lines });
+        if h.modified_lines.is_empty() {
+            // A change that only removes lines is checked at the line it sits after.
+            if let Some(anchor) = h.modified_start.checked_sub(1).and_then(|i| self.changes.now.get(i)) {
+                p["anchor"] = json!(anchor);
+            }
+        }
+        self.request("review.accept", p, Pending::Accept { run: run.to_string(), path: path.to_string(), rest });
+    }
+
+    fn send_reject(&mut self, run: &str, path: &str, key: String, rest: Vec<String>) {
+        let ws = self.changes.workspace.clone();
+        let Some(base) = self.changes.comparison().and_then(|c| c.base.clone()) else { return };
+        self.request("review.reject", json!({ "workspace_id": ws, "path": path, "base": base, "key": key }), Pending::Reject { run: run.to_string(), path: path.to_string(), rest });
+    }
+
+    /// `1`, `2`, `3` and `c`: another comparison; one that is not available says why (T-27).
+    fn choose_comparison(&mut self, i: usize) {
+        let Some(c) = self.changes.options.get(i).cloned() else { return };
+        if !c.available {
+            self.say(format!("{} is not available: {}", c.label, if c.detail.is_empty() { "the daemon has no base for it" } else { &c.detail }), true);
+            return;
+        }
+        self.changes.option = i;
+        self.changes.files.clear();
+        self.changes.hunks.clear();
+        self.changes.diff.clear();
+        self.changes.path.clear();
+        self.load_diff();
+    }
+
+    fn review_key_comparison(&mut self, n: usize) {
+        let (mode, label) = REVIEW_KEYS[n];
+        match self.changes.options.iter().position(|c| c.mode == mode) {
+            Some(i) => self.choose_comparison(i),
+            None => self.say(format!("{label} is not available: this daemon does not offer it yet"), true),
+        }
+    }
+
+    /// Moves to change `i` of the file and scrolls it into view.
+    fn go_to_change(&mut self, i: usize) {
+        let c = &mut self.changes;
+        if c.hunks.is_empty() {
+            return;
+        }
+        c.change = i.min(c.hunks.len() - 1);
+        c.scroll = c.hunk_at.get(c.change).copied().unwrap_or(0).saturating_sub(2);
+    }
+
+    /// `e` (T-39): the file at the current change in the owner's `$EDITOR` (else `vi`), with the
+    /// TUI suspended; the review refreshes when the editor exits.
+    fn edit_in_editor(&mut self) {
+        let Some((_, path, ..)) = self.changes.selected() else { return };
+        let root = self.state.workspace(&self.changes.workspace).map(|w| w.path.clone()).unwrap_or_else(|| self.changes.root.clone());
+        if root.is_empty() {
+            return;
+        }
+        let line = self.changes.hunks.get(self.changes.change).map(|h| h.modified_start.max(1)).unwrap_or(1);
+        let before = std::fs::read_to_string(std::path::Path::new(&root).join(&path)).unwrap_or_default();
+        self.changes.editing = Some((path.clone(), before));
+        let editor = std::env::var("EDITOR").ok().filter(|e| !e.trim().is_empty()).unwrap_or_else(|| "vi".into());
+        let mut words = editor.split_whitespace().map(str::to_string);
+        let program = words.next().unwrap_or_else(|| "vi".into());
+        let mut args: Vec<String> = words.collect();
+        args.push(format!("+{line}"));
+        args.push(std::path::Path::new(&root).join(&path).display().to_string());
+        self.exec = Some(Exec { title: format!("Editing {path}"), program, args, env: Vec::new(), edit: true });
     }
 
     fn merge_plan(&mut self, run: &str) {
@@ -1483,6 +1936,19 @@ impl App {
 
     /// Called by the event loop after a suspended program (a sign-in) finished.
     pub fn after_exec(&mut self, result: Result<i32, String>) {
+        if self.mode == Mode::Changes && self.changes.editing.is_some() {
+            // T-39: back from the owner's editor; the review shows the file as it is now.
+            match result {
+                Ok(_) => self.say("Back from your editor; the review shows your edits", false),
+                Err(e) => {
+                    self.changes.editing = None;
+                    self.say(format!("Could not open your editor: {e}"), true);
+                }
+            }
+            self.load_diff();
+            self.dirty = true;
+            return;
+        }
         match result {
             Ok(0) => self.say("Sign-in finished", false),
             Ok(code) => self.say(format!("Sign-in exited with code {code}"), true),
@@ -1516,8 +1982,11 @@ impl App {
     }
 
     fn changes_key(&mut self, k: KeyEvent) {
-        let n = self.changes.files.len();
+        let n = self.changes.shown().len();
+        let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
+        let page = (self.size.1 as usize).saturating_sub(8);
         match k.code {
+            KeyCode::Char('r') if ctrl => self.reload_review(),
             KeyCode::Esc | KeyCode::Char('v') | KeyCode::Char('q') => self.mode = Mode::Grid,
             KeyCode::Down | KeyCode::Char('j') if n > 0 => {
                 self.changes.file = (self.changes.file + 1) % n;
@@ -1527,14 +1996,59 @@ impl App {
                 self.changes.file = (self.changes.file + n - 1) % n;
                 self.load_file_diff();
             }
-            KeyCode::Char('J') | KeyCode::PageDown => self.changes.scroll = (self.changes.scroll + (self.size.1 as usize).saturating_sub(6)).min(self.changes.diff.len().saturating_sub(1)),
-            KeyCode::Char('K') | KeyCode::PageUp => self.changes.scroll = self.changes.scroll.saturating_sub((self.size.1 as usize).saturating_sub(6)),
+            KeyCode::Char('J') | KeyCode::PageDown => self.changes.scroll = (self.changes.scroll + page).min(self.changes.diff.len().saturating_sub(1)),
+            KeyCode::Char('K') | KeyCode::PageUp => self.changes.scroll = self.changes.scroll.saturating_sub(page),
+            KeyCode::Char('n') => self.go_to_change(self.changes.change + 1),
+            KeyCode::Char('p') => self.go_to_change(self.changes.change.saturating_sub(1)),
             KeyCode::Char('c') if !self.changes.options.is_empty() => {
-                self.changes.option = (self.changes.option + 1) % self.changes.options.len();
-                self.changes.files.clear();
-                self.load_diff();
+                let len = self.changes.options.len();
+                if let Some(i) = (1..=len).map(|d| (self.changes.option + d) % len).find(|&i| self.changes.options[i].available) {
+                    self.choose_comparison(i);
+                }
             }
-            KeyCode::Char('r') => self.load_diff(),
+            KeyCode::Char(c @ '1'..='3') => self.review_key_comparison(c as usize - '1' as usize),
+            KeyCode::Char('t') => {
+                self.changes.all_files = !self.changes.all_files;
+                self.changes.file = 0;
+                if self.changes.all_files && self.changes.all.is_empty() && self.changes.all_loading == 0 {
+                    let (run, ws) = (self.changes.run.clone(), self.changes.workspace.clone());
+                    self.changes.all_loading = 1;
+                    self.request("workspace.tree", json!({ "workspace_id": ws, "dir": "" }), Pending::Tree { run });
+                } else {
+                    self.load_file_diff();
+                }
+            }
+            KeyCode::Char(c @ ('a' | 'A')) => {
+                let Some((_, path, ..)) = self.changes.selected() else { return };
+                let todo: Vec<Hunk> = if c == 'a' {
+                    self.changes.hunks.get(self.changes.change).filter(|h| !h.reviewed).cloned().into_iter().collect()
+                } else {
+                    self.changes.hunks.iter().filter(|h| !h.reviewed).cloned().collect()
+                };
+                match todo.first().cloned() {
+                    Some(first) => {
+                        let run = self.changes.run.clone();
+                        self.send_accept(&run, &path, first, todo[1..].to_vec());
+                    }
+                    None if self.changes.hunks.is_empty() => self.say("No change to accept here", false),
+                    None => self.say("Already accepted", false),
+                }
+            }
+            KeyCode::Char(c @ ('r' | 'R')) => {
+                let Some((_, path, ..)) = self.changes.selected() else { return };
+                let todo: Vec<Hunk> = if c == 'r' { self.changes.hunks.get(self.changes.change).cloned().into_iter().collect() } else { self.changes.hunks.clone() };
+                if todo.is_empty() {
+                    self.say("No change to reject here", false);
+                    return;
+                }
+                let back: usize = todo.iter().map(|h| h.base_lines.len()).sum();
+                let gone: usize = todo.iter().map(|h| h.modified_lines.len()).sum();
+                let lines = |n: usize| format!("{n} line{}", if n == 1 { "" } else { "s" });
+                let what = if c == 'r' { format!("this change in {path}") } else { format!("all {} change{} in {path}", todo.len(), if todo.len() == 1 { "" } else { "s" }) };
+                let text = format!("Reject {what}? {} go{} back to what was there before; {} the agent wrote {} removed.", lines(back), if back == 1 { "es" } else { "" }, lines(gone), if gone == 1 { "is" } else { "are" });
+                self.mode = Mode::Confirm(Confirm::Reject { path, keys: todo.into_iter().map(|h| h.key).collect(), text });
+            }
+            KeyCode::Char('e') => self.edit_in_editor(),
             _ => {}
         }
     }
@@ -1542,7 +2056,12 @@ impl App {
     // ---------------------------------------------------------------- input
 
     pub fn handle_mouse(&mut self, m: MouseEvent) {
+        let inside = |(_, x, y, w, h): &(String, u16, u16, u16, u16)| m.column >= *x && m.column < x + w && m.row >= *y && m.row < y + h;
         if let MouseEventKind::Down(MouseButton::Left) = m.kind {
+            if let Some((id, ..)) = self.list_hit.iter().find(|r| inside(r)).cloned() {
+                self.pick(&id);
+                return;
+            }
             if let Some((id, ..)) = self.hit.iter().find(|(_, x, y, w, h)| m.column >= *x && m.column < x + w && m.row >= *y && m.row < y + h).cloned() {
                 if let Some(i) = self.index_of(&id) {
                     self.focus_index(i);
@@ -1552,6 +2071,12 @@ impl App {
             match m.kind {
                 MouseEventKind::ScrollUp => self.scroll(3),
                 MouseEventKind::ScrollDown => self.scroll(-3),
+                _ => {}
+            }
+        } else if self.picked && self.mode == Mode::Grid {
+            match m.kind {
+                MouseEventKind::ScrollUp => self.scroll_conv(3),
+                MouseEventKind::ScrollDown => self.scroll_conv(-3),
                 _ => {}
             }
         }
@@ -1574,6 +2099,15 @@ impl App {
             Mode::Help => self.mode = Mode::Grid,
             Mode::Confirm(c @ (Confirm::PhoneOff { .. } | Confirm::PhoneOnAndPair | Confirm::Revoke { .. } | Confirm::Pair { .. })) => {
                 self.phone_confirm(&c, k);
+            }
+            Mode::Confirm(Confirm::Reject { path, keys, .. }) => {
+                self.mode = Mode::Changes;
+                if matches!(k.code, KeyCode::Char('y') | KeyCode::Char('Y')) {
+                    if let Some(first) = keys.first().cloned() {
+                        let run = self.changes.run.clone();
+                        self.send_reject(&run, &path, first, keys[1..].to_vec());
+                    }
+                }
             }
             Mode::Confirm(c) => match k.code {
                 KeyCode::Char('y') | KeyCode::Char('Y') => {
@@ -1608,7 +2142,8 @@ impl App {
                                 self.request("workspace.merge_complete", json!({ "workspace_id": ws }), Pending::MergeComplete);
                             }
                         }
-                        // The phone questions are answered in `phone_confirm`.
+                        // The phone questions are answered in `phone_confirm`; Reject above.
+                        Confirm::Reject { .. } => {}
                         Confirm::PhoneOff { .. } | Confirm::PhoneOnAndPair | Confirm::Revoke { .. } | Confirm::Pair { .. } => {}
                     }
                 }
@@ -1648,7 +2183,13 @@ impl App {
             KeyCode::Char('q') => self.try_quit(),
             KeyCode::Char('?') => self.mode = Mode::Help,
             KeyCode::Esc if zoom => self.mode = Mode::Grid,
-            KeyCode::Char('z') => self.mode = if zoom { Mode::Grid } else { Mode::Zoom { scroll: 0 } },
+            // The agent list (T-25): J/K pick the next or previous agent; Esc closes its conversation.
+            KeyCode::Char('J') => self.pick_step(1),
+            KeyCode::Char('K') => self.pick_step(-1),
+            KeyCode::Char('L') => self.list_hidden = !self.list_hidden,
+            KeyCode::Esc if self.picked => self.picked = false,
+            // z, and g (T-38): the grid and the focused agent's full view, back on the same agent.
+            KeyCode::Char('z') | KeyCode::Char('g') => self.mode = if zoom { Mode::Grid } else { Mode::Zoom { scroll: 0 } },
             KeyCode::Char('i') | KeyCode::Enter => {
                 if let Some(run) = self.focused().cloned() {
                     self.mode = Mode::Compose;
@@ -1741,8 +2282,14 @@ impl App {
             KeyCode::PageUp if zoom => self.scroll(self.size.1 as i64 - 4),
             KeyCode::PageDown if zoom => self.scroll(-(self.size.1 as i64 - 4)),
             KeyCode::Char('e') if zoom => self.expand_tools = !self.expand_tools,
-            KeyCode::Char('g') if zoom => self.mode = Mode::Zoom { scroll: usize::MAX / 2 },
-            KeyCode::Char('G') if zoom => self.mode = Mode::Zoom { scroll: 0 },
+            KeyCode::Home if zoom => self.mode = Mode::Zoom { scroll: usize::MAX / 2 },
+            KeyCode::Char('G') | KeyCode::End if zoom => self.mode = Mode::Zoom { scroll: 0 },
+            // The picked agent's conversation beside the grid: the same scrollback and tool details as zoom.
+            KeyCode::PageUp if self.picked => self.scroll_conv(self.size.1 as i64 - 6),
+            KeyCode::PageDown if self.picked => self.scroll_conv(-(self.size.1 as i64 - 6)),
+            KeyCode::Home if self.picked => self.conv_scroll = usize::MAX / 2,
+            KeyCode::End if self.picked => self.conv_scroll = 0,
+            KeyCode::Char('e') if self.picked => self.expand_tools = !self.expand_tools,
             // Grid navigation.
             KeyCode::Left | KeyCode::Char('h') => self.move_focus(-1, 0),
             KeyCode::Right | KeyCode::Char('l') => self.move_focus(1, 0),
@@ -1754,8 +2301,9 @@ impl App {
             KeyCode::Char('[') | KeyCode::PageUp => self.change_page(-1),
             KeyCode::Char(c @ '1'..='9') => {
                 let slot = c as usize - '1' as usize;
-                if self.page * PAGE + slot < self.visible().len() {
-                    self.focus_index(self.page * PAGE + slot);
+                let ps = self.page_size();
+                if slot < ps && self.page * ps + slot < self.visible().len() {
+                    self.focus_index(self.page * ps + slot);
                 }
             }
             _ => self.dirty = false,
@@ -1968,7 +2516,8 @@ fn publish_pr(ws: &str, plan: &Value, body: &str) -> Result<Value, String> {
     Ok(json!({ "url": url, "number": number }))
 }
 
-/// Grid shape (rows, columns) for `n` agents on a page: 1, 1×2, 1×3, 2×2, 2×3, 3×3.
+/// Grid shape (rows, columns) for `n` agents on a page (T-37): 1, 1×2, 1×3, 2×2, 2×3, 3×3,
+/// 3×4, 4×4.
 pub fn shape(n: usize) -> (usize, usize) {
     match n {
         0 | 1 => (1, 1),
@@ -1976,7 +2525,9 @@ pub fn shape(n: usize) -> (usize, usize) {
         3 => (1, 3),
         4 => (2, 2),
         5 | 6 => (2, 3),
-        _ => (3, 3),
+        7..=9 => (3, 3),
+        10..=12 => (3, 4),
+        _ => (4, 4),
     }
 }
 
@@ -1994,4 +2545,26 @@ pub fn short(s: &str, max: usize) -> String {
     let mut out: String = s.chars().take(max.saturating_sub(1)).collect();
     out.push('…');
     out
+}
+
+/// The widths of the agent list and of the picked agent's conversation beside the grid
+/// (T-25), for a terminal `width` columns wide; the grid takes the rest.
+pub fn side_widths(width: u16, list: bool, conversation: bool) -> (u16, u16) {
+    let list_w = if list { (width / 5).clamp(30, 42) } else { 0 };
+    let conv_w = if conversation { (width.saturating_sub(list_w) * 2 / 5).clamp(40, 90) } else { 0 };
+    (list_w, conv_w)
+}
+
+/// Lines in `after` that the owner wrote (T-39): what differs from `before` between their common
+/// first and last lines.
+pub fn owner_lines(before: &str, after: &str) -> HashSet<String> {
+    let (b, a): (Vec<&str>, Vec<&str>) = (before.lines().collect(), after.lines().collect());
+    let head = b.iter().zip(a.iter()).take_while(|(x, y)| x == y).count();
+    let tail = b[head..].iter().rev().zip(a[head..].iter().rev()).take_while(|(x, y)| x == y).count();
+    a[head..a.len() - tail].iter().filter(|l| !l.trim().is_empty()).map(|l| l.to_string()).collect()
+}
+
+/// Lines as the daemon counts them (`\n`, `\r\n` or `\r`), for the checks it makes.
+pub fn split_lines(text: &str) -> Vec<String> {
+    text.replace("\r\n", "\n").replace('\r', "\n").split('\n').map(str::to_string).collect()
 }

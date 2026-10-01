@@ -197,7 +197,7 @@ body[data-aside="1"] .view-composer .composer-view { display: none; }
 body[data-aside="1"] .home { padding: 0 var(--ov-space-3); }
 body[data-aside="1"] .home-list { max-height: none; }
 body[data-aside="1"] .voice-mark { width: min(200px, 60%); }
-body[data-aside="1"] .home-voice-heard, body[data-aside="1"] #home-fresh, body[data-aside="1"] .home-level { display: none; }
+body[data-aside="1"] .home-voice-heard, body[data-aside="1"] .home-foot-tools { display: none; }
 @keyframes aside-in { from { transform: translateX(40%); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { body[data-voice="on"] .home-stage, body[data-aside="1"] .main > .view-composer { animation: none; } }
 .home-list[hidden] { display: none; }
@@ -212,7 +212,8 @@ body[data-conversation="1"] .view-composer > .composer-view, body[data-voice="on
 body[data-conversation="1"] .view-composer .hero-mark, body[data-conversation="1"] .view-composer .hero-title { display: none; }
 /* With cards to read, the mark gives them room. */
 body[data-conversation="1"] .home-stage .voice-mark { width: min(220px, 50vw, 22vh); }
-.home[data-empty="1"] .home-level, .home[data-empty="1"] #home-fresh { display: none; }
+body:not([data-conversation="1"]) .home-foot-tools { display: none; }
+.home-foot-tools { display: flex; align-items: center; gap: var(--ov-space-2); flex: none; }
 
 /* AC-247: home's input is always on screen. A one-time notice (Continuity) above the box is one
    compact line while folded, so it never pushes the input off. */

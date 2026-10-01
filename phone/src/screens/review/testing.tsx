@@ -32,6 +32,8 @@ export function comparisons(branch = 'main'): Result<'comparison.options'> {
     head: 'eeeeeeeeee5555555555',
     branch: 'overseer/fix-cart',
     branches: ['main', 'release', 'overseer/fix-cart'],
+    // An agent's own worktree: its changes are the agent's alone.
+    folder_edits: false,
     options: [
       { mode: 'latest_run', label: 'Latest run', base: LATEST, available: true, default: true, detail: 'run-start snapshot s-2' },
       { mode: 'task_start', label: 'Since task start', base: TASK_START, available: true, detail: 'task-start snapshot s-1' },

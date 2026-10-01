@@ -7,12 +7,12 @@ import { here } from './helpers/fixtures.ts';
 
 const COMMITTED: Record<string, string[]> = {
   store: ['EMPTY', 'load', 'apply', 'applyAll', 'snapshot', 'loadMarks', 'markStopping', 'rows', 'run', 'task', 'workspace', 'profile', 'turnsOf', 'marksOf', 'childrenOf', 'descendantsOf', 'rootOf'],
-  agents: ['agentRows', 'needsYou', 'counts', 'searchLocally', 'emptyText', 'logoForHarness', 'logoForProvider', 'runHeader', 'DEFAULT_LOGIN', 'accountName', 'accountLabel', 'accountShort', 'accountBrief'],
+  agents: ['agentRows', 'needsYou', 'counts', 'rollup', 'rollupText', 'searchLocally', 'emptyText', 'logoForHarness', 'logoForProvider', 'runHeader', 'DEFAULT_LOGIN', 'accountName', 'accountLabel', 'accountShort', 'accountBrief'],
   conversation: ['create', 'setRun', 'append', 'appendAll', 'build', 'belongs', 'rowsOf', 'rowAt', 'rowCount', 'visibleRows', 'toolDetail', 'requestText', 'permissionActions', 'markdownOf', 'describe'],
   markdown: ['parse', 'plainText', 'safeHref', 'opensExternally', 'knownEntities'],
   review: ['statusLetter', 'changedFiles', 'changesSummary', 'comparisonChoices', 'branchChoices', 'fileDiff', 'hunkKey', 'splitLine', 'editTarget', 'acceptParams'],
   pending: ['pendingRows', 'withPending', 'isWaiting', 'sentLabel', 'keyOf'],
-  text: ['TEXT', 'PHONE_ONLY', 'COPIED', 'statusText', 'listStatusText', 'ago', 'agoInWords', 'duration', 'compact', 'grouped', 'basename', 'firstLine', 'shortPath'],
+  text: ['TEXT', 'PHONE_ONLY', 'COPIED', 'statusText', 'listStatusText', 'continuityState', 'plain', 'plainTool', 'ago', 'agoInWords', 'duration', 'compact', 'grouped', 'basename', 'firstLine', 'shortPath'],
 };
 const TOP = ['ACTIVE_STATUSES', 'isActive', 'isRun', 'isTurn', 'isAttention', 'isMark', 'record', 'textOf', 'numberOf', 'number'];
 

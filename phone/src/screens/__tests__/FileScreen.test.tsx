@@ -62,7 +62,7 @@ describe("a file's changes", () => {
     expect(heading(ONE.key).getByTestId(`file.hunk.${ONE.key}.where`)).toHaveTextContent('Lines 12 to 14');
     expect(heading(TWO.key).getByTestId(`file.hunk.${TWO.key}.where`)).toHaveTextContent('Line 30');
     expect(screen.getAllByLabelText(`Hunk 1 of ${PATH}, lines 12–14`).length).toBeGreaterThan(0);
-    expect(screen.getByTestId('file.about')).toHaveTextContent('Latest run+4−20 of 2 reviewed');
+    expect(screen.getByTestId('file.about')).toHaveTextContent('Latest run+4−20 of 2 accepted');
 
     const removed = screen.getByTestId(`file.line.${ONE.key}:-0`);
     const added = screen.getByTestId(`file.line.${ONE.key}:+2`);
@@ -102,22 +102,22 @@ describe("a file's changes", () => {
     await fireEvent.press(heading(ONE.key).getByTestId('file.hunk.accept'));
 
     // The Mac has not answered yet.
-    expect(heading(ONE.key).getByTestId('file.hunk.accept')).toHaveTextContent(/Reviewed$/);
-    expect(heading(ONE.key).getByLabelText('Unmark reviewed hunk 1')).toBeTruthy();
+    expect(heading(ONE.key).getByTestId('file.hunk.accept')).toHaveTextContent(/Accepted$/);
+    expect(heading(ONE.key).getByLabelText('Hunk 1 accepted; tap to take the accept back')).toBeTruthy();
     expect(heading(TWO.key).getByTestId('file.hunk.accept')).toHaveTextContent('Accept');
-    expect(screen.getByTestId('file.reviewed')).toHaveTextContent('1 of 2 reviewed');
+    expect(screen.getByTestId('file.reviewed')).toHaveTextContent('1 of 2 accepted');
     expect(app.connection.calls('review.accept')).toEqual([{ run_id: RUN, path: PATH, key: ONE.key, modified_start: 12, modified_lines: ONE.modified_lines, base_lines: ONE.base_lines }]);
 
     await act(async () => answer({ key: ONE.key, reviewed: true }));
     await app.settle();
-    expect(heading(ONE.key).getByTestId('file.hunk.accept')).toHaveTextContent(/Reviewed$/);
+    expect(heading(ONE.key).getByTestId('file.hunk.accept')).toHaveTextContent(/Accepted$/);
 
     await fireEvent.press(heading(ONE.key).getByTestId('file.hunk.accept'));
     expect(heading(ONE.key).getByTestId('file.hunk.accept')).toHaveTextContent('Accept');
     await app.settle();
     expect(app.connection.calls('review.unaccept')).toEqual([{ run_id: RUN, key: ONE.key }]);
     expect(app.connection.calls('review.accept')).toHaveLength(1);
-    expect(screen.getByTestId('file.reviewed')).toHaveTextContent('0 of 2 reviewed');
+    expect(screen.getByTestId('file.reviewed')).toHaveTextContent('0 of 2 accepted');
   });
 
   test('a hunk the Mac already holds as reviewed shows so', async () => {
@@ -125,7 +125,7 @@ describe("a file's changes", () => {
     app.connection.answers['review.marks'] = () => ({ run_id: RUN, keys: [TWO.key], marks: [] });
     await draw(app, <FileScreen />);
     await app.settle();
-    expect(heading(TWO.key).getByTestId('file.hunk.accept')).toHaveTextContent(/Reviewed$/);
+    expect(heading(TWO.key).getByTestId('file.hunk.accept')).toHaveTextContent(/Accepted$/);
     expect(heading(ONE.key).getByTestId('file.hunk.accept')).toHaveTextContent('Accept');
   });
 
@@ -138,7 +138,7 @@ describe("a file's changes", () => {
     app.connection.answers['review.marks'] = () => ({ run_id: RUN, keys: [TWO.key], marks: [] });
     await app.events(makeEvent('review_mark', { key: TWO.key, path: PATH, reviewed: true }, { run_id: RUN, source: 'user' }));
     await afterNews(app);
-    expect(heading(TWO.key).getByTestId('file.hunk.accept')).toHaveTextContent(/Reviewed$/);
+    expect(heading(TWO.key).getByTestId('file.hunk.accept')).toHaveTextContent(/Accepted$/);
     expect(app.connection.calls('review.accept')).toHaveLength(0);
   });
 
@@ -152,7 +152,7 @@ describe("a file's changes", () => {
     await fireEvent.press(heading(ONE.key).getByTestId('file.hunk.accept'));
     await app.settle();
     expect(heading(ONE.key).getByTestId('file.hunk.accept')).toHaveTextContent('Accept');
-    expect(screen.getByTestId('file.notice')).toHaveTextContent('Not marked as reviewed, because the file changed since.');
+    expect(screen.getByTestId('file.notice')).toHaveTextContent('Not accepted, because the file changed since.');
     expect(app.connection.calls('workspace.hunks')).toHaveLength(2);
   });
 
@@ -264,7 +264,7 @@ describe("a file's changes", () => {
     await app.settle();
     expect(screen.getAllByTestId(`file.hunk.${ONE.key}`).length).toBeGreaterThan(0);
     expect(screen.getByTestId(`file.line.${ONE.key}:+0`)).toBeTruthy();
-    expect(heading(ONE.key).getByTestId(`file.hunk.${ONE.key}.reviewed`)).toHaveTextContent(/Reviewed$/);
+    expect(heading(ONE.key).getByTestId(`file.hunk.${ONE.key}.reviewed`)).toHaveTextContent(/Accepted$/);
     expect(screen.queryByTestId('file.hunk.accept')).toBeNull();
     expect(screen.queryByTestId('file.hunk.reject')).toBeNull();
     expect(screen.getByTestId('watch.line')).toHaveTextContent('This phone may watch. Change it on the Mac.');

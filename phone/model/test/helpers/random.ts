@@ -23,7 +23,39 @@ const TEXTS = [
   '| a | b |\n| --- | :-: |\n| 1 | 2 |', '```ts\nconst x = 1;\n```', 'A path: /Users/fixture/projects/overseer/extension/media/some/very/long/path/that/does/not/break.ts here', '', 'line one\nline two',
   '<script>alert(1)</script> after', '> quoted\n\ntext', 'a_b_c and *emphasis* and ~~gone~~',
 ];
-const STATUSES = ['queued', 'starting', 'running', 'waiting_for_user', 'completed', 'failed', 'interrupted', 'disconnected', 'unknown'];
+// Continuity's waiting states (waiting_for_connection, waiting_for_memory) and its back_online
+// event are left out: VS Code draws a card for them (Use a local model now, Retry now, Stay on the
+// local model) from the daemon's Continuity status and actions, which the phone does not have yet.
+const STATUSES = ['queued', 'starting', 'running', 'waiting_for_user', 'completed', 'failed', 'interrupted', 'disconnected', 'unknown', 'handed_off'];
+/**
+ * What Overseer's oversight (Gate S) says in an agent's chat, and the kinds it keeps quiet. Overseer's
+ * own conversation (`proposal`, `overseer_message` cards) and Auto's `auto_decision` are left out:
+ * VS Code draws cards for them that the phone does not have (Overseer's chat on the phone is AC-128's;
+ * Auto is unfinished, AC-204); test/conversation-parity.test.ts checks the phone draws nothing for them.
+ */
+const OVERSIGHT = [
+  { kind: 'hold', payload: { reason: 'two agents write the same file' } }, { kind: 'hold', payload: {} }, { kind: 'release', payload: { why: 'the other one finished' } }, { kind: 'release', payload: {} },
+  { kind: 'guardrail', payload: { words: 'Never touch the migrations\nsecond line', enforcement: 'hold' } }, { kind: 'guardrail', payload: {} }, { kind: 'guardrail_crossed', payload: { paths: ['db/migrate/1.sql', 'db/x.sql'] } },
+  { kind: 'redirect', payload: { text: 'go the other way' }, source: 'overseer' }, { kind: 'redirect', payload: { text: 'from you' }, source: 'user' },
+  { kind: 'check_in', payload: { result: 'on_track', reason: 'tests pass', left_out: 'the docs' } }, { kind: 'check_in', payload: {} }, { kind: 'report', payload: { doing: 'Writing the tests\nthen the docs' } },
+  { kind: 'ask', payload: { question: 'Which branch?' } }, { kind: 'claim', payload: { paths: ['src/a.ts'] } }, { kind: 'share', payload: { source: 'the schema' } }, { kind: 'share', payload: {} }, { kind: 'share_withdrawn', payload: {} },
+  { kind: 'finding', payload: { watcher_title: 'Reviewer', result: 'concern', text: 'The test is flaky' } }, { kind: 'finding', payload: {} }, { kind: 'watch_started', payload: { mode: 'check', brief: 'Watch the migration' } },
+  { kind: 'watch_started', payload: { brief: 'Just watch' } }, { kind: 'watch_ended', payload: { reason: 'done' } }, { kind: 'queued', payload: { text: 'Then run the linter\nplease' } }, { kind: 'queued', payload: { text: 'From Overseer', detail: { by: 'overseer' } } },
+  { kind: 'briefing', payload: { text: 'The owner wants small commits.' } },
+  { kind: 'merge_back', payload: { state: 'merged', target: 'develop', commit: '1a2b3c4d5e6f' } }, { kind: 'merge_back', payload: { state: 'merged' } }, { kind: 'merge_back', payload: { state: 'conflicts', files: ['a.ts', 'b.ts'] } },
+  { kind: 'merge_back', payload: { state: 'cancelled' } }, { kind: 'merge_back', payload: { state: 'ready' } }, { kind: 'pull_request', payload: { number: 42 } }, { kind: 'pull_request', payload: {} }, { kind: 'overseer_tool_call', payload: {} }, { kind: 'going_in_circles', payload: {} }, { kind: 'conflict', payload: {} }, { kind: 'dispatch', payload: {} },
+];
+
+/** What Continuity (Gate L) says in a chat: its own event kinds, and system lines marked as its own. */
+const CONTINUITY = [
+  { kind: 'handoff', payload: { predecessor: ROOT, successor: 'r-next', reason: 'offline' } }, { kind: 'handoff', payload: { predecessor: 'r-before', successor: ROOT, reason: 'back_online' } },
+  { kind: 'stall', payload: {} }, { kind: 'memory_valve', payload: {} }, { kind: 'retry', payload: { sending: true } }, { kind: 'retry', payload: { attempt: 2, next_in_ms: 5000, reason: 'offline' } }, { kind: 'retry', payload: { retry_now: true } },
+  { kind: 'local_model', payload: { model: 'ollama/qwen3-coder:30b', base: 'ollama/qwen3-coder:30b', context: 32768, bytes: 19_327_352_832 } }, { kind: 'local_model', payload: { model: 'ollama/qwen3-coder:30b', base: 'ollama/qwen3-coder:30b', context: 32768, bytes: 19_327_352_832 } },
+  { kind: 'local_model', payload: { model: 'gemma3:4b', context: 8192, already_loaded: true } }, { kind: 'attention', payload: { kind: 'connection', reason: 'the connection was lost.' } }, { kind: 'attention', payload: { kind: 'memory' } },
+  { kind: 'output', payload: { role: 'system', continuity: true, text: 'Back online. The agent **continues** here.' } }, { kind: 'output', payload: { role: 'system', continuity: true, text: 'Queued until a connection is back.' } },
+  { kind: 'output', payload: { role: 'system', continuity: true, text: 'Memory is short: waiting.' } }, { kind: 'output', payload: { role: 'system', continuity: true, text: 'Handed off to a local model.' } },
+  { kind: 'local_load', payload: {} }, { kind: 'connection', payload: { state: 'offline' } }, { kind: 'continuity_settings', payload: {} },
+];
 
 export interface Step {
   /** An event, or the state read again (what VS Code does after a change). */
@@ -101,7 +133,7 @@ export function stream(seed: number, count: number): Step[] {
       push('permission_answered', ROOT, { request_id: id, allow: chance(0.5), by: pick(['the Mac', "phone:Bilal's iPhone"]) }, 'exact', 'user');
       if (attention && (attention as { request_id: string }).request_id === id) { attention = null; statuses.set(ROOT, 'running'); push('status', ROOT, { status: 'running' }, 'exact', 'daemon'); }
     } else if (roll < 0.74) {
-      push('error', anyRun(), { class: pick(['auth', 'rate_limit', 'quota', 'network', 'other', null]), message: pick(['Failed to authenticate', 'API Error: 429', '', '   ', 'boom\nsecond line']) });
+      push('error', anyRun(), { class: pick(['auth', 'rate_limit', 'quota', 'network', 'network', 'other', null]), message: pick(['Failed to authenticate', 'API Error: 429', '', '   ', 'boom\nsecond line', 'error sending request for url (https://api.openai.com/v1/responses)', 'Connection refused (os error 61)']) });
     } else if (roll < 0.80) {
       const unborn = CHILDREN.filter(c => !born.includes(c));
       if (unborn.length) {
@@ -135,6 +167,12 @@ export function stream(seed: number, count: number): Step[] {
       statuses.set(ROOT, statuses.get(ROOT) === 'waiting_for_user' ? 'waiting_for_user' : statuses.get(ROOT) ?? 'running');
     } else if (roll < 0.95) {
       push('interrupt_requested', ROOT, {}, 'exact', 'user');
+    } else if (roll < 0.965) {
+      const said = pick(CONTINUITY);
+      push(said.kind, anyRun(), said.payload, 'exact', 'daemon');
+    } else if (roll < 0.975) {
+      const said = pick(OVERSIGHT);
+      push(said.kind, anyRun(), said.payload, 'exact', said.source ?? 'overseer');
     } else if (roll < 0.985) {
       push(pick(['retention', 'raw_unparsed', 'session', 'remote_command', 'review_mark', 'push', 'reattached', 'merge_back', 'pull_request', 'daemon_error', 'task_created', 'a_new_kind']), anyRun(), pick<unknown>([{}, { text: 'x' }, { method: 'run.follow_up', device: 'd-1', request_id: `request-${seq}` }, null]));
     } else {

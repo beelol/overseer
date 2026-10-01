@@ -230,7 +230,7 @@ export function fileDiff(result: HunksResult, marks?: Iterable<string>): FileDif
     return {
       key: hunk.key, index: at + 1, reviewed, label: t.hunkOf(at + 1, result.path, where), where, baseStart: hunk.base_start, modifiedStart: hunk.modified_start,
       removed: hunk.base_lines.length, added: hunk.modified_lines.length, rows,
-      accept: { label: reviewed ? t.unmark(at + 1) : t.accept(at + 1), reviewed: !reviewed }, reject: { label: t.reject(at + 1) }, hunk,
+      accept: { label: reviewed ? t.unaccept(at + 1) : t.accept(at + 1), reviewed: !reviewed }, reject: { label: t.reject(at + 1) }, hunk,
     };
   });
   let note: string | null = null;

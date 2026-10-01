@@ -1,12 +1,11 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { agents, text, type store } from '@/model';
+import { agents, store, text } from '@/model';
 import { useSessionValue, type SessionSnapshot } from '@/session';
 import { useMinute } from '@/ui';
 
 import { toggled, useAgentsStore, withSeen } from './store';
 import { useStored } from './stored';
-import { useChanged } from './useChanged';
 import { useSearch } from './useSearch';
 
 type Row = agents.AgentRow;
@@ -55,7 +54,10 @@ export interface AgentsList {
   /** How many agents the search shows; `null` while nothing is searched. */
   readonly matches: number | null;
   readonly pinned: readonly string[];
-  /** The owner opened an agent: it is remembered, and what it showed no longer needs them. */
+  /**
+   * The owner opened an agent: it is remembered, and an agent at its end is reviewed (AC-254). A
+   * sub-agent's opening reviews the agent it belongs to, as in VS Code.
+   */
   opened(runId: string): void;
   pin(runId: string, on: boolean): void;
   /** Folds or unfolds a heading. */
@@ -78,17 +80,21 @@ export function useAgentsList(hidden: ReadonlySet<string>): AgentsList {
   const [filter, setFilter] = useState<agents.AgentFilter>('all');
   const [query, setQuery] = useState('');
   const found = useSearch(query);
-  const changed = useChanged(seen);
 
   const collapsed = useMemo(() => new Set(folded), [folded]);
-  const options = useMemo<agents.AgentsOptions>(() => ({ now, filter, query, matches: found, collapsed, seen, changed, pinned }), [now, filter, query, found, collapsed, seen, changed, pinned]);
+  const options = useMemo<agents.AgentsOptions>(() => ({ now, filter, query, matches: found, collapsed, seen, pinned }), [now, filter, query, found, collapsed, seen, pinned]);
   const all = useMemo(() => agents.agentRows(state, options), [state, options]);
   const rows = useMemo(() => withoutTasks(all, hidden), [all, hidden]);
-  const counts = useMemo(() => agents.counts(state, { now, seen, changed }), [state, now, seen, changed]);
+  const counts = useMemo(() => agents.counts(state, { now, seen }), [state, now, seen]);
   const empty = useMemo(() => (rows.length > 0 || !known ? null : (agents.emptyText(state, options) ?? text.TEXT.agents.empty)), [rows, known, state, options]);
   const matches = useMemo(() => (query.trim() ? rows.filter((row) => row.kind === 'agent').length : null), [rows, query]);
 
-  const opened = useCallback((runId: string) => setSeen((was) => withSeen(was, runId, Date.now())), [setSeen]);
+  // The state as it is when the owner taps, without making a new callback for every change of it.
+  const latest = useRef(state);
+  useEffect(() => {
+    latest.current = state;
+  }, [state]);
+  const opened = useCallback((runId: string) => setSeen((was) => withSeen(was, store.rootOf(latest.current, runId)?.id ?? runId, Date.now())), [setSeen]);
   const pin = useCallback((runId: string, on: boolean) => setPinned((was) => toggled(was, runId, on)), [setPinned]);
   const fold = useCallback((rowId: string, on: boolean) => setFolded((was) => toggled(was, rowId, on)), [setFolded]);
 

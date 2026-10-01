@@ -612,9 +612,10 @@ fn ac26_snapshots_and_selectable_bases() {
     d.wait_done(&run, 10);
     assert_eq!(fingerprint(&repo).replace("pre-existing untracked\nrun1", "pre-existing untracked"), before, "snapshots did not mutate, stage or stash anything");
     let latest1 = option(&d, &run, "latest_run", None);
-    // In the owner's own checkout the latest run stays the default (AC-232 changes it only for a
-    // finished agent in its own worktree: ac232_a_finished_agents_committed_new_file_is_in_its_default_review).
-    assert_eq!(latest1["default"], true);
+    // A finished agent's review opens on Since task start, in the owner's checkout too (AC-232,
+    // AC-263: ac263_the_review_opens_on_since_task_start_with_latest_run_and_entire_worktree_one_click_away).
+    assert_eq!(latest1["default"], false);
+    assert_eq!(option(&d, &run, "task_start", None)["default"], true);
     assert_eq!(diff_paths(&d, &created, latest1["base"].as_str().unwrap()), vec![("M".into(), "pre.txt".into())], "baseline included dirty+untracked contents");
     // A user edit between runs, then turn 2 (follow-up) gets its own baseline.
     std::fs::write(repo.join("between.txt"), "user edit between runs\n").unwrap();

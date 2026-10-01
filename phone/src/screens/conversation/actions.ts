@@ -23,6 +23,8 @@ export interface RowActions {
   /** Takes back a message that waits on the phone for the turn to end. */
   cancel(requestId: string): void;
   signIn(): void;
+  /** Opens another agent's conversation: the one that took over the work, or the one it came from. */
+  openAgent(runId: string): void;
   markdownOf(row: conversation.MessageRow | conversation.ThinkingRow): readonly markdown.Block[];
   /** True once for a row that came live: it arrives, and a request for permission is felt. */
   arriving(key: string): boolean;
@@ -40,6 +42,7 @@ const ActionsContext = createContext<RowActions>({
   remove: nothing,
   cancel: nothing,
   signIn: nothing,
+  openAgent: nothing,
   markdownOf: () => [],
   arriving: () => false,
 });

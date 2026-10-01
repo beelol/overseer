@@ -1,9 +1,8 @@
-// (In the immersive dashboard, AC-102, the tab strips are hidden: the groups are compared by their shares.)
-// Packaged-UI scenario for AC-79 (grid and dashboard mode in the new layout), fixture runs only.
+// Packaged-UI scenario for AC-79 (the grid in the new layout), fixture runs only. (Dashboard mode,
+// Focus Mode, is retired by AC-264: the Overseer layout is scenario-overseer-window.js.)
 // From the chat-only arrangement (an agent without changes) and the review-and-chat arrangement
 // (an agent with changes): the grid opens in the editor area and closing it returns to the same
-// arrangement; dashboard mode hides the panel and secondary side bar, keeps the side bar on the
-// Overseer agents list, and Exit returns to the same arrangement and parts.
+// arrangement.
 const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay, until } = require('./harness');
@@ -22,7 +21,7 @@ const { Session, makeRepo, latestVsix, delay, until } = require('./harness');
     const edits = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', "sed -i '' 's/^L9: original$/L9: agent edit/' a.txt"], prompt: '', title: 'With changes' });
     const quiet = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/echo', args: ['nothing to change'], prompt: '', title: 'No changes' });
     await until(() => !s.ctl('state').runs.some(r => ['queued', 'starting', 'running'].includes(r.status)), Boolean, 60000, 300);
-    // Agents at work, so the grid and dashboard mode have something to show (the grid never opens empty, AC-113).
+    // Agents at work, so the grid has something to show (the grid never opens empty, AC-113).
     const workers = ['Split payments', 'Refresh sessions', 'Migrate users', 'Fix flaky test'].map(title => s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'i=0; while [ $i -lt 600 ]; do echo "step $i"; i=$((i+1)); sleep 0.5; done'], prompt: '', title }));
     await until(() => s.ctl('state').runs.filter(r => r.status === 'running').length >= 4, Boolean, 60000, 300);
     await cdp.command('View: Show Explorer'); await delay(500);
@@ -49,16 +48,6 @@ const { Session, makeRepo, latestVsix, delay, until } = require('./harness');
       check(`${label}: the grid takes the editor area and closing it returns to the same arrangement`, during.groups.length === 1 && /^Overseer/.test(during.groups[0].active) && same(before, after), { before, during, after });
       return dash;
     };
-    const dashboardRoundTrip = async label => {
-      const before = await arrangement();
-      await cdp.command('Overseer: Enter Focus Mode');
-      const during = await until(arrangement, a => !a.panel && !a.auxiliary && a.sidebar && /Overseer/i.test(a.sidebarTitle), 30000, 200);
-      await s.screenshot(`dashboard-from-${label}`);
-      await cdp.command('Overseer: Exit Focus Mode');
-      const after = await until(arrangement, a => same(before, a), 30000, 200);
-      check(`${label}: dashboard mode hides the panel and secondary side bar, keeps the side bar on Overseer, and Exit returns to the same arrangement`,
-        !during.panel && !during.auxiliary && during.sidebar && /Overseer/i.test(during.sidebarTitle) && (during.groups.every(g => g.active === '') ? JSON.stringify(during.groups.map(g => g.share)) === JSON.stringify(before.groups.map(g => g.share)) : JSON.stringify(during.groups.map(g => g.active)) === JSON.stringify(before.groups.map(g => g.active))) && same(before, after), { before, during, after });
-    };
 
     // Chat only.
     await select('No changes', a => a.groups.length === 1);
@@ -68,7 +57,6 @@ const { Session, makeRepo, latestVsix, delay, until } = require('./harness');
     const chatOnly = await until(arrangement, a => a.groups.length === 1 && a.sidebar && a.panel && !/Overseer/i.test(a.sidebarTitle), 30000, 200);
     check('starting point 1: the chat alone (one group), Explorer and terminal open', chatOnly.groups.length === 1 && chatOnly.sidebar && chatOnly.panel, chatOnly);
     await gridRoundTrip('chat only');
-    await dashboardRoundTrip('chat only');
 
     // Review and chat.
     await select('With changes', a => a.groups.length === 2 && /^Review/.test(a.groups[0].active) && /^Overseer/.test(a.groups[1].active));
@@ -76,7 +64,6 @@ const { Session, makeRepo, latestVsix, delay, until } = require('./harness');
     const split = await until(arrangement, a => a.groups.length === 2 && /^Review/.test(a.groups[0].active) && /^Overseer/.test(a.groups[1].active) && !/Overseer/i.test(a.sidebarTitle), 30000, 200);
     check('starting point 2: review on the left, chat on the right', split.groups.length === 2 && /^Review/.test(split.groups[0].active) && /^Overseer/.test(split.groups[1].active), split);
     await gridRoundTrip('review and chat');
-    await dashboardRoundTrip('review and chat');
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}

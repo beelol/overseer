@@ -2,6 +2,7 @@
 // as `describe` in extension/media/conversation.js, line for line, so "Read README.md" on the
 // Mac is "Read README.md" on the phone.
 
+import { plainTool } from './plain.ts';
 import { basename, firstLine, TEXT } from './text.ts';
 
 export interface ToolDescription {
@@ -115,7 +116,8 @@ export function describe(name: unknown, input: unknown, summary?: unknown): Tool
     default:
       if (/^collab:spawn_agent|^spawn_agent/.test(n)) return { icon: 'hubot', verb: t.delegated, target: firstLine(summary, 80), full: summary };
       if (/^collab:/.test(n)) return { icon: 'watch', verb: n.replace('collab:', '').replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase()), target: '' };
-      if (/mcp/i.test(n)) return { icon: 'plug', verb: t.used, target: n, full: summary };
+      // A tool's internal name (mcp__server__tool) in words (AC-245).
+      if (/mcp/i.test(n)) return { icon: 'plug', verb: t.used, target: plainTool(n), full: summary };
       return { icon: 'tools', verb: n, target: firstLine(Object.values(i).find(v => typeof v === 'string') || '', 60), full: summary };
   }
 }

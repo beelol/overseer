@@ -4,6 +4,9 @@
 //   Unit      node test/unit/run.js (extension unit tests)
 //   Check     npm run check --prefix extension (syntax of the extension's sources)
 //   Links     scripts/check-links (every relative link in the README and the ledger, AC-153)
+//   Phone     phone/model's tests (types, and vitest: the parity of the phone's view models with the
+//             extension's real code) and the phone app's check (generated files, lint, types, jest);
+//             each package's node_modules are installed from its lockfile the first time (npm ci)
 //   Dev       test/dev/run.js (dev daemons through scripts/dev beside a temporary production, Gate T)
 //   Deploy    test/deploy/run.js (scripts/deploy onto a temporary production, AC-214)
 //   UI        the packaged-VSIX fixture scenarios in test/ui (built VSIX, isolated VS Code profiles)
@@ -12,6 +15,8 @@
 // spend paid turns within the budget in AGENTS.md), --perf (also the ten-minute AC-35 load test),
 // --jobs=N (run N UI scenarios at once; each has its own VS Code profile, ports and evidence folder,
 // so 3 or 4 cut the UI part from about 50 minutes to about 15 on one machine).
+// ON SCREEN scenarios (the menu-bar item, AC-262: its menus open on this Mac's screen for a moment)
+// run only when named: --only=menubar.
 // Exit code 1 when anything fails.
 const fs = require('fs');
 const path = require('path');
@@ -98,8 +103,28 @@ function run(name, cmd, cmdArgs, opts = {}) {
   const detail = opts.summary ? opts.summary(out) : '';
   const s = Math.round((Date.now() - t0) / 1000);
   console.log(`${ok ? 'ok' : 'FAILED'} (${s}s)${detail ? ' ' + detail : ''}`);
-  if (!ok) console.log(out.split('\n').filter(l => /FAIL|error|panicked|ERROR|✗/.test(l)).slice(0, 12).map(l => '    ' + l.slice(0, 200)).join('\n'));
+  if (!ok) console.log(out.split('\n').filter(l => /FAIL|error|panicked|ERROR|✗|×|✕/.test(l)).slice(0, 12).map(l => '    ' + l.slice(0, 200)).join('\n'));
   results.push({ name, ok, s, detail });
+  return ok;
+}
+
+/**
+ * A package's node_modules, installed from its lockfile the first time in a checkout (as scripts/dev
+ * installs the packaging tools): `npm ci --ignore-scripts`, so nothing of a dependency runs. False,
+ * with the command to run by hand, when it cannot be installed (no network, a lockfile out of date).
+ */
+function installed(dir, name) {
+  if (fs.existsSync(path.join(root, dir, 'node_modules'))) return true;
+  const t0 = Date.now();
+  process.stdout.write(`▶ ${name}: install ${dir}/node_modules (npm ci, first time in this checkout) … `);
+  const r = cp.spawnSync('npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund', '--prefix', dir], { cwd: root, env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const ok = r.status === 0;
+  console.log(`${ok ? 'ok' : 'FAILED'} (${Math.round((Date.now() - t0) / 1000)}s)`);
+  if (!ok) {
+    console.log(((r.stdout || '') + (r.stderr || '')).split('\n').filter(l => /ERR|error/i.test(l)).slice(0, 6).map(l => '    ' + l.slice(0, 200)).join('\n'));
+    console.log(`    ${dir} has no node_modules and npm ci could not install them: run \`npm ci --ignore-scripts --prefix ${dir}\` in this checkout, then run test-all again`);
+    results.push({ name, ok: false, s: 0, detail: 'node_modules missing' });
+  }
   return ok;
 }
 
@@ -132,6 +157,11 @@ run('Rust (cargo test --workspace)', 'cargo', ['test', '--workspace'], {
 run('Unit (test/unit)', 'node', ['test/unit/run.js'], { summary: out => (out.match(/(\d+) of (\d+) passed/) || [''])[0] });
 run('Check (extension sources)', 'npm', ['run', '--silent', 'check', '--prefix', 'extension']);
 run('Links (README and ledger)', 'node', ['scripts/check-links'], { summary: out => (out.match(/(\d+) links checked.*?(\d+) broken/) || [''])[0] });
+// The phone (Gate N): its view models, checked against the extension's real views, chat and review
+// (the parity tests), and the app itself.
+const tests = out => { const m = out.match(/Tests:?\s+(?:(\d+) failed[ ,|]+)?(\d+) passed/); return m ? `${m[2]} passed${m[1] ? `, ${m[1]} failed` : ''}` : ''; };
+if (installed('phone/model', 'Phone model (phone/model)')) run('Phone model (phone/model: types, vitest)', 'npm', ['test', '--prefix', 'phone/model'], { summary: tests });
+if (installed('phone', 'Phone app (phone)')) run('Phone app (phone: generated files, lint, types, jest)', 'npm', ['run', 'check', '--prefix', 'phone'], { summary: tests });
 // Dev daemons beside a temporary "production" (Gate T): scripts/dev with a temporary HOME and dev root.
 run('Dev daemons (test/dev)', 'node', ['test/dev/run.js'], { summary: out => (out.match(/(\d+) of (\d+) passed/) || [''])[0] });
 // Guided owner tests (AC-215): every owner-check file, and a fixture check run step by step.
@@ -144,13 +174,15 @@ if (!flag('--no-ui')) {
   const dir = path.join(root, 'test/ui');
   const all = fs.readdirSync(dir).filter(f => /^scenario-.+\.js$/.test(f)).map(f => f.slice(9, -3)).sort();
   const isLive = n => /LIVE/.test(fs.readFileSync(path.join(dir, `scenario-${n}.js`), 'utf8').split('\n')[0]);
-  const chosen = all.filter(n => (!only.length || only.includes(n)) && (flag('--live') || !isLive(n)) && (flag('--perf') || n !== 'perf'));
+  // ON SCREEN scenarios open things on this Mac's screen (the menu-bar item's menus, AC-262): only when named with --only.
+  const onScreen = n => /ON SCREEN/.test(fs.readFileSync(path.join(dir, `scenario-${n}.js`), 'utf8').split('\n')[0]);
+  const chosen = all.filter(n => (!only.length || only.includes(n)) && (flag('--live') || !isLive(n)) && (flag('--perf') || n !== 'perf') && (only.includes(n) || !onScreen(n)));
   if (run('Build the VSIX', 'node', ['extension/scripts/package.js'])) {
     if (jobs === 1) for (const n of chosen) run(`UI ${n}`, 'node', [`test/ui/scenario-${n}.js`], { okText: /SCENARIO PASSED/ });
     else await parallel(chosen);
   }
   const skipped = all.filter(n => !chosen.includes(n) && (!only.length || only.includes(n)));
-  if (skipped.length) console.log(`(not run: ${skipped.join(', ')}; ${flag('--live') ? '' : 'LIVE ones need --live, '}perf needs --perf)`);
+  if (skipped.length) console.log(`(not run: ${skipped.join(', ')}; ${flag('--live') ? '' : 'LIVE ones need --live, '}perf needs --perf, ON SCREEN ones need --only=NAME)`);
 }
 
 // Nothing the run started is left running. What finishing tests still stop gets a moment; what

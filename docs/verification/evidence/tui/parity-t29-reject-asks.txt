@@ -1,0 +1,44 @@
+ ◆ Overseer  page 1/1 · 1 agent · ● 1 active                                                                                     phone access off · ● connected 
+┏ review · Reviewed in the terminal · Latest run · 2 files +3 −2 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 1 Since task start   2 [Latest run]   3 Entire worktree (not available)   t [Changed] | All files                                                            ┃
+┃                                                                                                                                                              ┃
+┃› M a.txt +2 −2                                 │ a.txt  change 1 of 2 · 1 accepted                                                                           ┃
+┃  M b.txt +1 −0                                 │ › @@ -2,1 +2,1 @@  a Accept · r Reject                                                                      ┃
+┃                                                │    line 1                                                                                                   ┃
+┃                                                │   -line 2                                                                                                   ┃
+┃                                                │   +line TWO                                                                                                 ┃
+┃                                                │    line 3                                                                                                   ┃
+┃                                                │    line 4                                                                                                   ┃
+┃                                                │   @@ -8,1 +8,1 @@  ✓ Accepted                                                                               ┃
+┃                                                │    line 6                                                                                                   ┃
+┃                                                │    line 7                                                                                                   ┃
+┃                                                │   -line 8                                                                                                   ┃
+┃                                                │   +line EIGHT                                                                                               ┃
+┃                                                │    line 9                                                                                                   ┃
+┃                                                │    line 10                                                                                                  ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+ Reject this change in a.txt? 1 line goes back to what was there before; 1 line the agent wrote is removed. y / n                                               
+                                                                                                                                                                
+ Accepted in a.txt                                                                                                                                              

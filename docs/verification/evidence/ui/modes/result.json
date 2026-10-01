@@ -59,48 +59,6 @@
       }
     },
     {
-      "name": "chat only: dashboard mode hides the panel and secondary side bar, keeps the side bar on Overseer, and Exit returns to the same arrangement",
-      "ok": true,
-      "detail": {
-        "before": {
-          "groups": [
-            {
-              "share": 1,
-              "active": "Overseer"
-            }
-          ],
-          "sidebar": true,
-          "sidebarTitle": "Explorer",
-          "panel": true,
-          "auxiliary": false
-        },
-        "during": {
-          "groups": [
-            {
-              "share": 1,
-              "active": ""
-            }
-          ],
-          "sidebar": true,
-          "sidebarTitle": "Overseer",
-          "panel": false,
-          "auxiliary": false
-        },
-        "after": {
-          "groups": [
-            {
-              "share": 1,
-              "active": "Overseer"
-            }
-          ],
-          "sidebar": true,
-          "sidebarTitle": "Explorer",
-          "panel": true,
-          "auxiliary": false
-        }
-      }
-    },
-    {
       "name": "starting point 2: review on the left, chat on the right",
       "ok": true,
       "detail": {
@@ -150,60 +108,6 @@
           "sidebar": true,
           "sidebarTitle": "Explorer",
           "panel": true,
-          "auxiliary": false
-        },
-        "after": {
-          "groups": [
-            {
-              "share": 0.66,
-              "active": "Review"
-            },
-            {
-              "share": 0.34,
-              "active": "Overseer"
-            }
-          ],
-          "sidebar": true,
-          "sidebarTitle": "Explorer",
-          "panel": true,
-          "auxiliary": false
-        }
-      }
-    },
-    {
-      "name": "review and chat: dashboard mode hides the panel and secondary side bar, keeps the side bar on Overseer, and Exit returns to the same arrangement",
-      "ok": true,
-      "detail": {
-        "before": {
-          "groups": [
-            {
-              "share": 0.66,
-              "active": "Review"
-            },
-            {
-              "share": 0.34,
-              "active": "Overseer"
-            }
-          ],
-          "sidebar": true,
-          "sidebarTitle": "Explorer",
-          "panel": true,
-          "auxiliary": false
-        },
-        "during": {
-          "groups": [
-            {
-              "share": 0.66,
-              "active": ""
-            },
-            {
-              "share": 0.34,
-              "active": ""
-            }
-          ],
-          "sidebar": true,
-          "sidebarTitle": "Overseer",
-          "panel": false,
           "auxiliary": false
         },
         "after": {

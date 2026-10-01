@@ -67,16 +67,48 @@ export function Thinking({ id, row }: { readonly id: string; readonly row: conve
   );
 }
 
-/** A quiet line: how a run ended outside a turn, what was done from a phone. */
+/** A quiet line that opens: what Overseer added to the agent's prompt, shown on a tap. */
+function OpeningNote({ id, row, detail }: { readonly id: string; readonly row: conversation.NoteRow; readonly detail: string }) {
+  const styles = useStyles();
+  const [open, toggle] = useOpen(row.key);
+  return (
+    <View>
+      <Tap testID={id} accessibilityLabel={row.text} accessibilityState={{ expanded: open }} haptic="selection" scales={false} onPress={toggle} style={styles.mark}>
+        {row.icon ? <Icon name={iconOf(row.icon)} size="sm" tone="muted" /> : null}
+        <Txt kind="small" tone="muted" style={styles.words}>
+          {row.text}
+        </Txt>
+      </Tap>
+      {open ? (
+        <Txt testID={`${id}.detail`} kind="small" tone="muted" style={styles.thought}>
+          {detail}
+        </Txt>
+      ) : null}
+    </View>
+  );
+}
+
+/** A quiet line: how a run ended outside a turn, what was done from a phone, what Overseer or Continuity did. */
 export function Note({ id, row }: { readonly id: string; readonly row: conversation.NoteRow }) {
   const styles = useStyles();
+  const actions = useRowActions();
   const tone: TxtTone = row.status === 'failed' || row.status === 'disconnected' ? 'red' : 'muted';
-  return (
+  const link = row.link;
+  if (row.detail !== undefined) return <OpeningNote id={id} row={row} detail={row.detail} />;
+  const line = (
     <View testID={id} accessible accessibilityLabel={[row.text, row.tooltip].filter(Boolean).join(', ')} style={styles.mark}>
       {row.icon ? <Icon name={iconOf(row.icon)} size="sm" tone={tone} /> : null}
       <Txt kind="small" tone={tone} style={styles.words}>
         {row.text}
       </Txt>
+    </View>
+  );
+  if (!link) return line;
+  // A handoff names the other agent: one tap opens it.
+  return (
+    <View style={styles.quiet}>
+      {line}
+      <Button testID={`${id}.link`} label={link.label} kind="quiet" haptic="selection" onPress={() => actions.openAgent(link.runId)} />
     </View>
   );
 }

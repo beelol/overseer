@@ -2,7 +2,7 @@
 //! form. Terminal default colors for text (works on dark and light terminals) plus a purple
 //! accent and status colors; truecolor when the terminal says so, 256 colors otherwise.
 
-use crate::app::{code_groups, shape, short, App, Confirm, Mode, NewAgentForm, PairingState, PAGE};
+use crate::app::{code_groups, short, App, Confirm, Mode, NewAgentForm, PairingState};
 use crate::qr;
 use crate::feed::{compact, Feed, Item, Kind, ToolStatus};
 use crate::model::Run;
@@ -84,18 +84,22 @@ fn now_ms() -> i64 {
 pub fn draw(f: &mut Frame, app: &mut App) {
     app.stats.draws += 1;
     app.hit.clear();
+    app.list_hit.clear();
     let area = f.area();
-    app.size = (area.width, area.height);
+    if app.size != (area.width, area.height) {
+        app.size = (area.width, area.height);
+    }
+    // The page follows the focused agent when the room changes (a resize, the list, a conversation).
+    app.settle_focus();
     let composing = matches!(app.mode, Mode::Compose) || matches!(app.mode, Mode::Confirm(_));
     let composer_h = if matches!(app.mode, Mode::Compose) { composer_height(app, area.width) } else if composing { 2 } else { 0 };
     let [head, body, comp, foot] = Layout::vertical([Constraint::Length(1), Constraint::Min(3), Constraint::Length(composer_h), Constraint::Length(1)]).areas(area);
     header(f, app, head);
     match app.mode {
         Mode::Zoom { .. } => zoom(f, app, body),
-        Mode::Changes => changes(f, app, body),
-        _ if app.state.runs.is_empty() || app.visible().is_empty() => empty(f, app, body),
-        _ if area.width < 100 || area.height < 30 => compact_layout(f, app, body),
-        _ => grid(f, app, body),
+        Mode::Changes | Mode::Confirm(Confirm::Reject { .. }) => changes(f, app, body),
+        _ if app.compact() && !(app.state.runs.is_empty() || app.visible().is_empty()) => compact_layout(f, app, body),
+        _ => main_screen(f, app, body),
     }
     if matches!(app.mode, Mode::Compose) {
         composer(f, app, comp);
@@ -103,7 +107,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         let text = match c {
             Confirm::Interrupt(id) => format!(" Interrupt {}? y / n", short(&app.state.run(id).map(|r| r.title.clone()).unwrap_or_default(), 50)),
             Confirm::Quit => " Unsent drafts will be lost. Quit? y / n".to_string(),
-            Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::OpenPr { text, .. } => format!(" {text} y / n"),
+            Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::OpenPr { text, .. } | Confirm::Reject { text, .. } => format!(" {text} y / n"),
             Confirm::PhoneOff { text } | Confirm::Revoke { text, .. } | Confirm::Pair { text, .. } => format!(" {text} y / n"),
             Confirm::PhoneOnAndPair => " Phone access is off. Turn it on and pair a phone? y / n".to_string(),
         };
@@ -210,9 +214,6 @@ fn overseer_view(f: &mut Frame, app: &App, area: Rect) {
 
 fn header(f: &mut Frame, app: &App, area: Rect) {
     let visible = app.visible();
-    let all = app.state.agents();
-    let active = all.iter().filter(|r| r.active()).count();
-    let needs = app.state.needs_you_count();
     let dot = Style::new().fg(MUTED);
     let mut spans = vec![
         Span::styled(" ◆ Overseer ", Style::new().fg(accent()).add_modifier(Modifier::BOLD)),
@@ -220,13 +221,21 @@ fn header(f: &mut Frame, app: &App, area: Rect) {
         Span::styled("· ", dot),
         Span::raw(format!("{} agent{}", visible.len(), if visible.len() == 1 { "" } else { "s" })),
     ];
-    if active > 0 {
+    // The rollup (T-26): VS Code's five counts, zero counts left out; on a narrow terminal the
+    // later ones give way to the connection on the right.
+    let room = (area.width as usize).saturating_sub(24);
+    for (key, n, words) in app.state.counts(crate::model::now_ms()).parts() {
+        if Line::from(spans.clone()).width() + 3 + words.width() + 2 > room {
+            break;
+        }
         spans.push(Span::styled(" · ", dot));
-        spans.push(Span::styled(format!("● {active} active"), Style::new().fg(Color::Cyan)));
-    }
-    if needs > 0 {
-        spans.push(Span::styled(" · ", dot));
-        spans.push(Span::styled(format!("◆ {needs} need{} you", if needs == 1 { "s" } else { "" }), Style::new().fg(waiting()).add_modifier(Modifier::BOLD)));
+        spans.push(match key {
+            "working" => Span::styled(format!("● {words}"), Style::new().fg(Color::Cyan)),
+            "needs" => Span::styled(format!("◆ {n} need{} you", if n == 1 { "s" } else { "" }), Style::new().fg(waiting()).add_modifier(Modifier::BOLD)),
+            "to_review" => Span::styled(format!("✦ {words}"), Style::new().fg(Color::Green)),
+            "failed" => Span::styled(format!("✗ {words}"), Style::new().fg(Color::Red)),
+            _ => Span::styled(words, dot),
+        });
     }
     if !app.search.is_empty() || app.mode == Mode::Search {
         spans.push(Span::styled(" · ", dot));
@@ -269,7 +278,7 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
     }
     let keys: &[(&str, &str)] = match app.mode {
         Mode::Compose => &[("enter", "send"), ("alt+enter", "new line"), ("esc", "close (keeps draft)"), ("ctrl+u", "clear")],
-        Mode::Zoom { .. } => &[("e", if app.expand_tools { "fold tools" } else { "expand tools" }), ("j/k", "scroll"), ("g/G", "top/bottom"), ("i", "message"), ("a/d", "allow/deny"), ("x", "interrupt"), ("z", "grid"), ("?", "help")],
+        Mode::Zoom { .. } => &[("e", if app.expand_tools { "fold tools" } else { "expand tools" }), ("j/k", "scroll"), ("home/G", "top/bottom"), ("i", "message"), ("a/d", "allow/deny"), ("x", "interrupt"), ("g/z", "grid"), ("?", "help")],
         Mode::NewAgent => &[("tab", "next field"), ("←/→", "choose"), ("enter", "start"), ("esc", "cancel")],
         Mode::Accounts => &[("j/k", "select"), ("s", "sign in"), ("S", "device code (ChatGPT)"), ("r", "refresh"), ("esc", "close")],
         Mode::Devices => &[("p", "pair a phone"), ("j/k", "select"), ("s", "scope"), ("x", "revoke"), ("N", "notifications"), ("O", "on/off"), ("esc", "close")],
@@ -279,9 +288,10 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         Mode::AudioImport => &[("type", "private folder path"), ("enter", "import"), ("esc", "back")],
         Mode::Overseer => &[("type", "to Overseer"), ("enter", "send"), ("ctrl+y/n", "yes/no to a proposal"), ("j/k", "scroll"), ("esc", "close")],
         Mode::Search => &[("type", "to search title, repo, harness, model, prompt"), ("enter", "keep"), ("esc", "clear")],
-        Mode::Changes => &[("j/k", "file"), ("J/K", "scroll diff"), ("c", "comparison"), ("r", "refresh"), ("v/esc", "back")],
-        _ if area.width < 110 => &[("i", "message"), ("z", "zoom"), ("a/d", "answer"), ("n", "new"), ("o", "Overseer"), ("?", "keys"), ("q", "quit")],
-        _ => &[("←↑↓→", "move"), ("i", "message"), ("z", "zoom"), ("v", "changes"), ("a/d", "allow/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
+        Mode::Changes => &[("n/p", "change"), ("a/A", "Accept change/file"), ("r/R", "Reject change/file"), ("j/k", "file"), ("t", "Changed | All files"), ("1/2/3 c", "comparison"), ("e", "your editor"), ("J/K", "scroll"), ("ctrl+r", "reload"), ("esc", "back")],
+        Mode::Grid if app.picked && app.focused().is_some() => &[("J/K", "next / previous agent"), ("esc", "close the conversation"), ("pgup/pgdn", "scroll"), ("e", if app.expand_tools { "fold tools" } else { "tool details" }), ("i", "message"), ("v", "changes"), ("?", "help")],
+        _ if area.width < 110 => &[("i", "message"), ("g", "full view"), ("a/d", "answer"), ("n", "new"), ("o", "Overseer"), ("?", "keys"), ("q", "quit")],
+        _ => &[("←↑↓→", "move"), ("J/K", "pick in the list"), ("i", "message"), ("g", "full view"), ("v", "changes"), ("a/d", "allow/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
     };
     let mut spans = vec![Span::raw(" ")];
     for (k, v) in keys {
@@ -301,11 +311,135 @@ fn empty(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(Paragraph::new(Line::from(Span::styled(msg, Style::new().fg(MUTED)))).alignment(Alignment::Center), Rect { y, height: 1, ..area });
 }
 
+/// The main screen (T-25): the agent list on the left, the grid, and the picked agent's
+/// conversation in a column beside the grid (way 2, the owner's pick).
+fn main_screen(f: &mut Frame, app: &mut App, area: Rect) {
+    let (list_w, conv_w) = crate::app::side_widths(app.size.0, app.list_shown(), app.picked && app.focused().is_some());
+    let [list, rest, conv] = Layout::horizontal([Constraint::Length(list_w), Constraint::Min(10), Constraint::Length(conv_w)]).areas(area);
+    if list_w > 0 {
+        agent_list(f, app, list);
+    }
+    if app.state.runs.is_empty() || app.visible().is_empty() {
+        empty(f, app, rest);
+    } else {
+        grid(f, app, rest);
+    }
+    if conv_w > 0 {
+        if let Some(run) = app.focused().cloned() {
+            let slot = app.page_agents().iter().position(|r| r.id == run.id).map(|i| i + 1).unwrap_or(0);
+            tile(f, app, &run, slot, conv, true);
+        }
+    }
+}
+
+/// The account in a few words for a list row: a named account's name, else the plan
+/// ("Claude Max") of the Mac's default login.
+fn account_word(app: &App, run: &Run) -> String {
+    let Some(p) = run.profile_id.as_deref().and_then(|p| app.state.profile(p)) else { return String::new() };
+    if p.is_system {
+        p.short().split(" · ").next().unwrap_or_default().to_string()
+    } else {
+        crate::words::account(&p.name)
+    }
+}
+
+/// A list row's mark: needs you, to review (T-26), or what the work became (merged, a pull
+/// request, stopped on conflicts).
+fn row_mark(app: &App, run: &Run, now: i64) -> (&'static str, Color) {
+    if run.needs_you() {
+        return ("◆", waiting());
+    }
+    if app.state.unreviewed(run, now) {
+        return ("✦", if crate::model::FAILED.contains(&run.status.as_str()) { Color::Red } else { Color::Green });
+    }
+    match app.state.landings[run.workspace_id.as_str()]["state"].as_str() {
+        Some("merged") if !run.active() => ("✓", Color::Green),
+        Some("pr") if !run.active() => ("↗", accent()),
+        Some("conflicts") => ("⚠", waiting()),
+        _ => (" ", MUTED),
+    }
+}
+
+/// The agent list (T-25): grouped by repository with each repository's counts; each row the
+/// status, the title, the account and a mark.
+fn agent_list(f: &mut Frame, app: &mut App, area: Rect) {
+    // The marks' legend, in short words when the list is narrow.
+    let legend = [" ◆ needs you ✦ to review ✓ merged ", " ◆ you ✦ review ✓ merged ", " ◆ ✦ ✓ "].into_iter().find(|l| l.width() + 2 <= area.width as usize).unwrap_or("");
+    let block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(MUTED)).title(Span::styled(" agents ", Style::new().fg(MUTED)))
+        .title_bottom(Line::from(Span::styled(legend, Style::new().fg(MUTED))).right_aligned());
+    let now = crate::model::now_ms();
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+    let w = inner.width as usize;
+    let mut lines: Vec<Line> = Vec::new();
+    let mut rows: Vec<(usize, String)> = Vec::new();
+    let mut focused_line = 0;
+    for (repo, runs) in app.groups() {
+        if !lines.is_empty() {
+            lines.push(Line::raw(""));
+        }
+        let name = repo.rsplit('/').next().filter(|n| !n.is_empty()).unwrap_or("(no repository)").to_string();
+        let count = |pred: &dyn Fn(&Run) -> bool| runs.iter().filter(|r| pred(r)).count();
+        let mut counts = Vec::new();
+        for (n, word) in [
+            (count(&|r: &Run| r.active() && !r.needs_you()), "working"),
+            (count(&|r: &Run| r.needs_you()), "needs you"),
+            (count(&|r: &Run| app.state.unreviewed(r, now) && !crate::model::FAILED.contains(&r.status.as_str())), "to review"),
+            (count(&|r: &Run| app.state.unreviewed(r, now) && crate::model::FAILED.contains(&r.status.as_str())), "failed"),
+            (count(&|r: &Run| app.state.landings[r.workspace_id.as_str()]["state"] == "merged"), "merged"),
+        ] {
+            if n > 0 {
+                counts.push(format!("{n} {word}"));
+            }
+        }
+        let head = fit(&name, w.saturating_sub(2).min(24));
+        let counts = counts.join(" · ");
+        let bold = Style::new().add_modifier(Modifier::BOLD);
+        if head.width() + counts.width() + 3 <= w {
+            lines.push(Line::from(vec![Span::styled(format!(" {head}"), bold), Span::styled(format!("  {counts}"), Style::new().fg(MUTED))]));
+        } else {
+            // A narrow list: the counts go under the repository's name.
+            lines.push(Line::from(Span::styled(format!(" {head}"), bold)));
+            lines.push(Line::from(Span::styled(format!("   {}", fit(&counts, w.saturating_sub(3))), Style::new().fg(MUTED))));
+        }
+        for r in runs {
+            let (g, c) = status_mark(&r.status);
+            let focused = app.focus.as_deref() == Some(r.id.as_str());
+            let (mark, mc) = row_mark(app, r, now);
+            let account = fit(&account_word(app, r), 12);
+            let title_w = w.saturating_sub(7 + account.width()).max(4);
+            let title = fit(&r.title, title_w);
+            let pad = w.saturating_sub(3 + title.width() + account.width() + 3);
+            let style = if focused && app.picked { Style::new().fg(accent()).add_modifier(Modifier::BOLD | Modifier::REVERSED) } else if focused { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else { Style::new() };
+            if focused {
+                focused_line = lines.len();
+            }
+            rows.push((lines.len(), r.id.clone()));
+            lines.push(Line::from(vec![
+                Span::styled(if focused { "›" } else { " " }, Style::new().fg(accent())),
+                Span::styled(format!("{g} "), Style::new().fg(c)),
+                Span::styled(title, style),
+                Span::raw(" ".repeat(pad)),
+                Span::styled(account, Style::new().fg(MUTED)),
+                Span::styled(format!(" {mark} "), Style::new().fg(mc)),
+            ]));
+        }
+    }
+    let h = inner.height as usize;
+    let skip = if lines.len() <= h { 0 } else { focused_line.saturating_sub(h / 2).min(lines.len() - h) };
+    for (line, id) in rows {
+        if line >= skip && line < skip + h {
+            app.list_hit.push((id, inner.x, inner.y + (line - skip) as u16, inner.width, 1));
+        }
+    }
+    f.render_widget(Paragraph::new(lines.into_iter().skip(skip).take(h).collect::<Vec<_>>()), inner);
+}
+
 fn grid(f: &mut Frame, app: &mut App, area: Rect) {
     let agents: Vec<Run> = app.page_agents().into_iter().cloned().collect();
-    let (nr, nc) = shape(agents.len());
+    let (nr, nc) = app.grid_shape(agents.len());
     let rows = Layout::vertical(vec![Constraint::Ratio(1, nr as u32); nr]).split(area);
-    for (slot, run) in agents.iter().enumerate().take(PAGE) {
+    for (slot, run) in agents.iter().enumerate() {
         let cols = Layout::horizontal(vec![Constraint::Ratio(1, nc as u32); nc]).split(rows[slot / nc]);
         tile(f, app, run, slot + 1, cols[slot % nc], false);
     }
@@ -357,7 +491,11 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     // Oversight (AC-199): held, watched, watching, in conflict, from the daemon's state.
     meta.extend(app.state.marks(&run.id));
     let age = elapsed(run.ended_ms.unwrap_or_else(now_ms) - run.created_ms);
-    let right = format!(" {} · {} ", meta.join(" · "), age);
+    let mut right = format!(" {} · {} ", meta.join(" · "), age);
+    // A narrow tile keeps its title and drops the harness and model (the conversation and zoom show them).
+    if run.title.width() + right.width() + 8 > area.width as usize && !zoomed {
+        right.clear();
+    }
     let room = (area.width as usize).saturating_sub(right.width() + 8);
     let title_style = if focused { Style::new().add_modifier(Modifier::BOLD).fg(accent()) } else { Style::new().add_modifier(Modifier::BOLD) };
     let title = Line::from(vec![
@@ -367,7 +505,7 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
         Span::raw(" "),
     ]);
     let mut block = Block::default().borders(Borders::ALL).border_type(if focused { BorderType::Thick } else { BorderType::Rounded }).border_style(border).title(title);
-    if area.width as usize > right.width() + 20 {
+    if !right.is_empty() && area.width as usize > right.width() + 20 {
         block = block.title_top(Line::from(Span::styled(right, Style::new().fg(MUTED))).right_aligned());
     }
     // Bottom: what needs attention, a draft, or the status.
@@ -417,10 +555,11 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
             let max_scroll = all.len().saturating_sub(h);
             let scroll = match app.mode {
                 Mode::Zoom { scroll } => scroll.min(max_scroll),
-                _ => 0,
+                _ => app.conv_scroll.min(max_scroll),
             };
-            if let Mode::Zoom { scroll: s } = &mut app.mode {
-                *s = scroll;
+            match &mut app.mode {
+                Mode::Zoom { scroll: s } => *s = scroll,
+                _ => app.conv_scroll = scroll,
             }
             let end = all.len() - scroll;
             all[end.saturating_sub(h)..end].to_vec()
@@ -442,19 +581,21 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     f.render_widget(Paragraph::new(lines), Rect { x: inner.x + 1, width: inner.width.saturating_sub(1), ..inner });
 }
 
-/// Changes view: the focused agent's changed files and the selected file's diff.
+/// The review (`v`, T-27 to T-29): the comparison in its header with the keys for the others,
+/// Changed or All files, and the selected file's changes, each with Accept and Reject.
 fn changes(f: &mut Frame, app: &mut App, area: Rect) {
     let c = app.changes.clone();
     let run = app.state.run(&c.run).cloned().unwrap_or_default();
-    let label = c.options.get(c.option).map(|o| o.0.as_str()).unwrap_or("…");
+    let label = c.comparison().map(|o| o.label.as_str()).unwrap_or("…");
     let total: (u64, u64) = c.files.iter().fold((0, 0), |a, f| (a.0 + f.2, a.1 + f.3));
+    let muted = Style::new().fg(MUTED);
     let title = Line::from(vec![
-        Span::styled(" changes ", Style::new().fg(accent()).add_modifier(Modifier::BOLD)),
-        Span::styled("· ", Style::new().fg(MUTED)),
+        Span::styled(" review ", Style::new().fg(accent()).add_modifier(Modifier::BOLD)),
+        Span::styled("· ", muted),
         Span::styled(fit(&run.title, 50), Style::new().add_modifier(Modifier::BOLD)),
-        Span::styled(" · ", Style::new().fg(MUTED)),
-        Span::styled(label.to_string(), Style::new().fg(accent())),
-        Span::styled(format!(" · {} file{} ", c.files.len(), if c.files.len() == 1 { "" } else { "s" }), Style::new().fg(MUTED)),
+        Span::styled(" · ", muted),
+        Span::styled(label.to_string(), Style::new().fg(accent()).add_modifier(Modifier::BOLD)),
+        Span::styled(format!(" · {} file{} ", c.files.len(), if c.files.len() == 1 { "" } else { "s" }), muted),
         Span::styled(format!("+{} ", total.0), Style::new().fg(Color::Green)),
         Span::styled(format!("−{} ", total.1), Style::new().fg(Color::Red)),
     ]);
@@ -462,45 +603,103 @@ fn changes(f: &mut Frame, app: &mut App, area: Rect) {
     let inner = block.inner(area);
     f.render_widget(Clear, area);
     f.render_widget(block, area);
-    if c.loading && c.files.is_empty() {
-        f.render_widget(Paragraph::new(Span::styled(" loading…", Style::new().fg(MUTED))), inner);
+    // The comparisons one key away, and which file list is shown.
+    let mut bar = vec![Span::raw(" ")];
+    for (i, (mode, name)) in crate::app::REVIEW_KEYS.iter().enumerate() {
+        let opt = c.options.iter().position(|o| &o.mode == mode);
+        let current = opt == Some(c.option);
+        let available = opt.is_some_and(|i| c.options[i].available);
+        let style = if current { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else if available { Style::new() } else { muted };
+        bar.push(Span::styled(format!("{}", i + 1), Style::new().fg(accent()).add_modifier(Modifier::BOLD)));
+        bar.push(Span::styled(if current { format!(" [{name}]") } else if available || c.options.is_empty() { format!(" {name}") } else { format!(" {name} (not available)") }, style));
+        bar.push(Span::raw("   "));
+    }
+    if !REVIEW_MODES.contains(&c.comparison().map(|o| o.mode.as_str()).unwrap_or("")) && !c.options.is_empty() {
+        bar.push(Span::styled(format!("c [{label}]   "), Style::new().fg(accent()).add_modifier(Modifier::BOLD)));
+    }
+    bar.push(Span::styled("t ", Style::new().fg(accent()).add_modifier(Modifier::BOLD)));
+    bar.push(Span::styled(if c.all_files { "Changed | [All files]" } else { "[Changed] | All files" }, Style::new().add_modifier(Modifier::BOLD)));
+    f.render_widget(Paragraph::new(Line::from(bar)), Rect { height: 1, ..inner });
+    let inner = Rect { y: inner.y + 2, height: inner.height.saturating_sub(2), ..inner };
+    if c.loading && c.files.is_empty() && c.diff.is_empty() {
+        f.render_widget(Paragraph::new(Span::styled(" loading…", muted)), inner);
         return;
     }
     if let Some(e) = &c.error {
         f.render_widget(Paragraph::new(Span::styled(format!(" {e}"), Style::new().fg(Color::Red))), inner);
         return;
     }
-    if c.files.is_empty() {
-        f.render_widget(Paragraph::new(Span::styled(format!(" No changes since {}.", label.to_lowercase()), Style::new().fg(MUTED))), inner);
+    let shown = c.shown();
+    if shown.is_empty() {
+        let text = if c.all_files && c.all_loading > 0 { " listing the worktree…".to_string() } else { format!(" No changes since {}.", label.to_lowercase()) };
+        f.render_widget(Paragraph::new(Span::styled(text, muted)), inner);
         return;
     }
     let list_w = (inner.width / 3).clamp(24, 48);
     let [list, sep, diff] = Layout::horizontal([Constraint::Length(list_w), Constraint::Length(1), Constraint::Min(10)]).areas(inner);
     let mut lines = Vec::new();
-    for (i, (st, path, a, d)) in c.files.iter().enumerate() {
+    for (i, (st, path, a, d)) in shown.iter().enumerate() {
         let sel = i == c.file;
         let color = match st.as_str() { "A" | "?" => Color::Green, "D" => Color::Red, "R" => Color::Cyan, _ => Color::Yellow };
-        let counts = format!(" +{a} −{d}");
+        let counts = if st.is_empty() { String::new() } else { format!(" +{a} −{d}") };
         let room = (list_w as usize).saturating_sub(counts.width() + 5);
         let name = fit_path(path, room);
-        let style = if sel { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else { Style::new() };
+        let style = if sel { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else if st.is_empty() { muted } else { Style::new() };
         lines.push(Line::from(vec![
             Span::styled(if sel { "› " } else { "  " }, Style::new().fg(accent())),
-            Span::styled(format!("{st} "), Style::new().fg(color).add_modifier(Modifier::BOLD)),
+            Span::styled(if st.is_empty() { "  ".to_string() } else { format!("{st} ") }, Style::new().fg(color).add_modifier(Modifier::BOLD)),
             Span::styled(name, style),
-            Span::styled(counts, Style::new().fg(MUTED)),
+            Span::styled(counts, muted),
         ]));
     }
-    let skip = c.file.saturating_sub(list.height as usize / 2).min(c.files.len().saturating_sub(list.height as usize));
+    let skip = c.file.saturating_sub(list.height as usize / 2).min(shown.len().saturating_sub(list.height as usize));
     f.render_widget(Paragraph::new(lines.into_iter().skip(skip).collect::<Vec<_>>()), list);
-    f.render_widget(Paragraph::new(vec![Line::from(Span::styled("│", Style::new().fg(MUTED))); sep.height as usize]), sep);
+    f.render_widget(Paragraph::new(vec![Line::from(Span::styled("│", muted)); sep.height as usize]), sep);
     let w = diff.width.saturating_sub(1) as usize;
-    let body: Vec<Line> = c.diff.iter().skip(c.scroll).take(diff.height as usize).map(|l| {
-        let style = if l.starts_with('+') { Style::new().fg(Color::Green) } else if l.starts_with('-') { Style::new().fg(Color::Red) } else if l.starts_with("@@") { Style::new().fg(accent()) } else { Style::new() };
-        Line::from(Span::styled(fit(&l.replace('\t', "    "), w), style))
-    }).collect();
+    let path = shown.get(c.file).map(|f| f.1.clone()).unwrap_or_default();
+    // The file's header: which change is current and how many are accepted.
+    let head = if c.unchanged {
+        Line::from(vec![Span::styled(fit(&path, w.saturating_sub(24)), Style::new().add_modifier(Modifier::BOLD)), Span::styled("  unchanged · read-only", muted)])
+    } else if c.hunks.is_empty() {
+        Line::from(Span::styled(fit(&path, w), Style::new().add_modifier(Modifier::BOLD)))
+    } else {
+        Line::from(vec![
+            Span::styled(fit(&path, w.saturating_sub(40)), Style::new().add_modifier(Modifier::BOLD)),
+            Span::styled(format!("  change {} of {} · {} accepted", c.change + 1, c.hunks.len(), c.accepted()), muted),
+        ])
+    };
+    let mine = c.mine.get(&path);
+    let current_at = c.hunk_at.get(c.change).copied();
+    let mut body: Vec<Line> = vec![head];
+    for (i, l) in c.diff.iter().enumerate().skip(c.scroll).take((diff.height as usize).saturating_sub(1)) {
+        let raw = l.replace('\t', "    ");
+        if l.starts_with("@@") {
+            let text = fit(&raw, w.saturating_sub(24));
+            let n = c.hunk_at.iter().position(|&at| at == i).unwrap_or(0);
+            let current = current_at == Some(i);
+            let mut spans = vec![Span::styled(if current { "› " } else { "  " }, Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(text, Style::new().fg(accent()))];
+            if c.hunks.get(n).is_some_and(|h| h.reviewed) {
+                spans.push(Span::styled("  ✓ Accepted", Style::new().fg(Color::Green)));
+            } else if current {
+                spans.push(Span::styled("  a Accept · r Reject", Style::new().fg(MUTED)));
+            }
+            body.push(Line::from(spans));
+            continue;
+        }
+        let yours = l.starts_with('+') && mine.is_some_and(|m| m.contains(&l[1..]));
+        let text = fit(&raw, w.saturating_sub(if yours { 16 } else { 3 }));
+        let style = if yours { Style::new().fg(waiting()) } else if l.starts_with('+') { Style::new().fg(Color::Green) } else if l.starts_with('-') { Style::new().fg(Color::Red) } else { Style::new() };
+        let mut spans = vec![Span::raw("  "), Span::styled(text, style)];
+        if yours {
+            spans.push(Span::styled("  ✎ your edit", Style::new().fg(waiting())));
+        }
+        body.push(Line::from(spans));
+    }
     f.render_widget(Paragraph::new(body), Rect { x: diff.x + 1, width: diff.width.saturating_sub(1), ..diff });
 }
+
+/// The comparisons with a key of their own.
+const REVIEW_MODES: [&str; 3] = ["task_start", "latest_run", "entire_worktree"];
 
 /// Fits a path by dropping leading directories: `…/providers/stripe/refund.ts`.
 fn fit_path(path: &str, max: usize) -> String {
@@ -545,10 +744,14 @@ fn help(f: &mut Frame, area: Rect) {
         ("←↓↑→  h j k l", "move between agents"),
         ("1 – 9", "focus agent n on this page"),
         ("tab / shift+tab", "next / previous agent"),
+        ("J / K", "pick the next / previous agent in the list"),
+        ("esc", "close the picked agent's conversation"),
+        ("L", "hide or show the agent list"),
         ("] [   pgdn pgup", "next / previous page"),
         ("i  enter", "message the focused agent"),
-        ("z", "zoom: full screen with scrollback"),
-        ("v", "changes: files and diffs"),
+        ("g  z", "zoom: one agent's full view ⇄ grid"),
+        ("home / G", "in the full view: top / bottom"),
+        ("v", "review: Accept / Reject changes"),
         ("e  (in zoom)", "expand tool inputs and results"),
         ("a / d", "allow / deny its permission request"),
         ("w", "next agent waiting for you"),

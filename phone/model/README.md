@@ -117,9 +117,13 @@ differ 0 times; in an earlier recording of `nine-agents` the archive time differ
 ### The conversation, against VS Code's chat
 
 `test/helpers/vscode.ts` makes a page with jsdom and runs the extension's real files in it, in the
-order the webview loads them (`extension/src/webview-html.js`): `ui.js`, `logos.js`,
-`vendor/marked.umd.js`, `vendor/purify.min.js`, `vendor/highlight.min.js`, `markdown.js`,
-`conversation.js`. Nothing of the extension is copied or rewritten. The same events go to
+order the webview loads them. The list is read from `extension/src/webview-html.js` itself
+(`SHARED_JS`, then `CHAT_JS` up to `conversation.js`: today `ui.js`, `logos.js`, marked,
+DOMPurify, highlight.js, `markdown.js`, `plain-words.js`, `continuity-text.js`, `continuity.js`,
+`conversation.js`), so a script the chat's page gains is loaded here too; a list kept by hand here
+once missed `plain-words.js` and Continuity's scripts while the phone drifted. What follows
+`conversation.js` is the chat page's own shell (the composer, `chat.js`). Nothing of the extension
+is copied or rewritten. The same events go to
 `window.OverseerConversation` and to the phone's model. Then both are turned into the same plain
 description, a line for each row, and compared with deep equality.
 
@@ -136,7 +140,8 @@ How the page is read:
 | A tool call | icon, verb, target, whether the target is code, the tooltip, the result (running, ok, "failed", "exit 2", "+8 −0"); then the row is opened as a click opens it and its two sections are read (label and text of the input, label and text of the result, or the note) |
 | A permission card | its state (pending, allowed, denied, asked), icon, sentence, tooltip, the preview, the buttons with what they answer, the request as text |
 | An error | icon, title, message, class, the "Sign in again" button and its label |
-| A child | icon, title, status, tooltip, the run; its rows one deeper |
+| A quiet line | its words, a link after them (Continuity's "Open it"), status, icon, tooltip |
+| A child | icon, title, the usage it reported, status, tooltip, the run; its rows one deeper |
 | A footer | state, icon, sentence, tooltip, duration, tokens and cost, the detail in the tooltip |
 | A reply | its Markdown as rendered (see "Markdown") |
 | Above and below | the banner when shown, the working line when shown |
@@ -182,9 +187,16 @@ kind of event the chat reads, in any order, with the state read again at random 
 of other agents, and events repeated. They are shaped like the daemon's events; they are not
 recordings. Both sides are compared after every step.
 
-Result: 24 streams, 2,911 conversations compared, 97,257 rows compared, 0 differences. What the
-streams end with: 102 folds, 359 tool calls in a fold or a child, 63 children under a tool call or
-a child, 23 edit chips under a fold, permission cards in all four states, footers in all four.
+The streams carry Continuity's events too (a lost connection again and again, handoffs, stalls,
+the memory valve, local models, its system lines) and Overseer's oversight (holds, guardrails,
+check-ins, watches, briefings, queued messages, the kinds it keeps quiet), but not Continuity's
+waiting states or `back_online`, Overseer's proposals and message cards, or Auto's decisions:
+VS Code draws a card for those that the phone does not have yet, and a test checks the phone draws
+nothing for them (see "Known differences").
+
+Result: 24 streams, 2,916 conversations compared, 97,021 rows compared, 0 differences. What the
+streams end with: folds, tool calls in a fold or a child, children under a tool call or a child,
+edit chips under a fold, permission cards in all four states, footers in all four.
 
 This test found one real change while it was written: `conversation.js` had just been given a
 line for `remote_command` ("Message from Bilal's iPhone") and `push` had been made quiet. The
@@ -193,28 +205,32 @@ phone's model follows both.
 ### The agents list, against VS Code's side bar
 
 `views.js` asks for the `vscode` module, which exists only inside VS Code. It is given a stand-in
-with the few things the file uses (tree items, icons, colours, addresses, an event emitter):
-plain objects that keep what they are given, so none of the list's logic is in the stand-in. The
-list of agents that need the owner is a function inside `extension.js` (`attention`, within
-`activate`); its source is taken from the file as it stands and run with the same state. The tree
-is walked the way VS Code walks it (`getChildren`, then the children of every open row) and each
-row is read from its tree item: id, label, description, tooltip, the label for screen readers,
-context value, logo or icon, and from its decoration the badge, the word for the status and
-whether the row takes the badge's colour. The clock is set, so "7m" is the same on both sides.
+with the few things the file uses (tree items, icons, colours, addresses, an event emitter, a
+settings reader with every setting at its default): plain objects that keep what they are given,
+so none of the list's logic is in the stand-in. The state reaches the list through the model's own
+`refresh`, as in VS Code. What `extension.js` hands the list is taken from `extension.js`: the
+list of agents that need the owner (`attention`, within `activate`) is its source as it stands,
+run with the same state and the same `media/rollup.js`, and the reviewed marks are given as
+`extension.js` gives them. A name `attention` uses that is not given fails the test, so the next
+thing `extension.js` passes the list is noticed. The tree is walked the way VS Code walks it
+(`getChildren`, then the children of every open row) and each row is read from its tree item: id,
+label, description, tooltip, the label for screen readers, context value, logo or icon, and from
+its decoration the badge, the word for the status and whether the row takes the badge's colour.
+The clock is set, so "7m" and "to review" are the same on both sides.
 
 | What is listed | Rows | Differences |
 | --- | --- | --- |
-| Nine agents as the list opens (Needs you, two repositories, a child with a child) | 18 | 0 |
-| Some agents seen, two pinned, two rows closed | 11 | 0 |
-| Needs you closed | 13 | 0 |
+| Nine agents as the list opens (the rollup, Needs you, two repositories with what is to review, a child with a child) | 15 | 0 |
+| Some agents reviewed, two pinned, two rows closed | 10 | 0 |
+| Needs you closed | 14 | 0 |
 | Archived agents | 2 | 0 |
 | 11 searches, each in the list and in the archive, with what the daemon's `search` found | 43 | 0 |
 | The daemon cannot be reached | 1 | 0 |
-| Every moment of every recording, the list and the archive (186 lists) | 342 | 0 |
+| Every moment of every recording, the list and the archive (186 lists) | 402 | 0 |
+| Every status (VS Code's, Continuity's, one never heard of), just ended, reviewed, and ended over a week ago | 39 | 0 |
 
 The agents that need the owner, their order and their reasons are compared too (3 cases, 0
-differences), and the mark, the word and the colour of every status with the tables in `views.js`.
-For every search the phone's own search finds nothing the daemon's does not.
+differences). For every search the phone's own search finds nothing the daemon's does not.
 
 ### Markdown, against VS Code's renderer
 
@@ -241,9 +257,12 @@ addresses, and the 307 entities the phone knows with what the page's parser read
 ### Review
 
 VS Code's review cannot be loaded whole outside VS Code (it needs Monaco and the Git extension).
-The functions compared are taken from its files as they stand and run as they are: `renderTree`,
-`node` and `hunkHash` of `extension/branch-diff/review/browser.js` in a page; `STATUS`,
-`statusLetter` and the items of the comparison picker of `extension/src/review.js`.
+The functions compared are taken from its files as they stand and run as they are: the
+navigator's tree (`renderTree` and what it calls in Changes only) and `hunkHash` of
+`extension/branch-diff/review/browser.js` in a page; `STATUS`, `statusLetter` and the items of the
+comparison picker of `extension/src/review.js`. VS Code's navigator can also browse every file of
+the worktree (All files, AC-99); the phone's review is the changed files (AC-126), so the tree is
+compared in Changes only.
 
 | What | Compared | Differences |
 | --- | --- | --- |
@@ -339,9 +358,9 @@ are from a machine that was busy with other work.
     `agoInWords` gives "2m ago", the form `extension/src/phone-text.js` uses.
 18. **The agents list keeps VS Code's ids and context values** (`agent:<task>`, `run:<run>`,
     `agent-done-archived`), so what is open or closed and what a row can do mean the same.
-19. **Needs you depends on what only the phone knows**: when the owner last opened a run (`seen`)
-    and how many files a finished run changed (`changed`). Both are given to `agentRows`; the
-    rule is `extension.js`'s.
+19. **Needs you is what waits for an answer, counted as `media/rollup.js` counts it** (AC-246).
+    An agent at its end is "to review" (AC-254) until it is opened after it ended: `seen`, when
+    the owner last opened each agent on the phone, is the phone's reviewed marks.
 20. **The filters All, Active and Needs you are the terminal UI's** (`tui/src/app.rs`). VS Code's
     side bar has none.
 21. **A hunk is its removed lines, then its added lines.** The daemon sends hunks without context.
@@ -376,6 +395,14 @@ Every place where the phone's model does not do what VS Code does, or does more.
 | Agents list: tooltip | Markdown, the title bold | the same lines, plain | No Markdown in a native label. |
 | Agents list: colour | only failed, disconnected and waiting rows take the badge's colour | `badgeTone` is there for every status; `emphasized` says when VS Code colours the row | The app decides. |
 | Agents list: the daemon cannot be reached | a row without an id | the same row, id `notice:daemon` | A list needs a key. |
+| Agents list: the rollup row | its tooltip adds "Click to show only one of them."; a click opens a filter picker | the counts only | The phone's filters are the chips above the list. The rest of the row is compared. |
+| Agents list: reviewed marks | kept in VS Code's storage, set when an agent at its end or its review is opened, or it is merged | kept on the phone, set when an agent is opened on the phone | The phone cannot read VS Code's storage. Sharing them needs a daemon method. The rule (reviewed once opened after it ended, within a week) is the same and is compared. |
+| Agents list: Needs you | also counts Overseer's own proposals and conflicts, and Continuity's agents waiting for a connection | the agents waiting for an answer | The phone does not keep the state's `overseer` summary or ask for Continuity's status yet. |
+| Agents list: what the work became | "Merged into main (1a2b3c4)" first on a finished agent's row and in its status (AC-243, the state's `landings`) | not there | The phone's store does not keep the state's `landings` yet; the recordings have none. The chat's merge and pull request lines are there. |
+| Agents list: oversight marks | "held", "watched", conflicts beside an agent (AC-199) | not there | The phone's store does not keep the state's `oversight` yet. |
+| Conversation: Continuity's cards | a card while an agent waits for a connection or memory (Use a local model now, Retry now, Stop) and one when it is back online | not there; its quiet lines are | They need the daemon's Continuity status and actions, which the phone does not have yet (AC-127: "the connection state from Gate L when it exists"). |
+| Conversation: Auto's decisions | a card for `auto_decision` (Auto routing, off by default) | not there | Unfinished in the extension too (AC-204). |
+| Conversation: Overseer's own conversation | proposal cards with Yes and No, message cards (asks, reports, findings) | not there | Talk to Overseer on the phone is AC-128, not built yet; Overseer's run is not in the phone's list. |
 | Review: context lines | Monaco shows the whole file | removed and added lines only | The daemon sends no context. |
 | Review: unsaved, read-only, staged and unstaged | markers and scopes | not there | Editing on the phone is not in this gate. |
 | Review: words for a status | the letter | the letter, and "New file", "Deleted file", "Renamed from …" | A letter is little on a phone. The letter is what is compared. |

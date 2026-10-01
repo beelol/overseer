@@ -35,6 +35,17 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const panel = runId => cdp.webview(`(document.body.dataset.runId === ${JSON.stringify(runId)} || window.__overseer?.selected?.() === ${JSON.stringify(runId)}) && !!document.querySelector('#conv .turn')`, 30000);
     const clickIn = async (frame, selector) => { const p = await s.webviewPoint(frame, selector); await cdp.click(p.x, p.y); await delay(400); };
     const tag = (frame, expr, id) => frame.eval(`(() => { const e = ${expr}; if (!e) return false; e.id = ${JSON.stringify(id)}; e.scrollIntoView({ block: 'center' }); return true; })()`);
+    // A live conversation can re-render between tagging an element and clicking it (a state update
+    // redraws the card), which drops the id: tag again and retry (AC-149).
+    const tagClick = async (frame, expr, id) => {
+      for (let i = 0; i < 10; i++) {
+        if (await tag(frame, expr, id)) {
+          try { return await clickIn(frame, '#' + id); } catch (e) { if (!/element not found/.test(e.message)) throw e; }
+        }
+        await delay(300);
+      }
+      throw new Error('element not found #' + id);
+    };
 
     // --- codex-app fixture: turns, nested children, inline permission, file edit.
     await selectRun('app tree', 'codex-app');
@@ -48,8 +59,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const pending = await a.eval(`(() => { const c = document.querySelector('#conv .perm-card.pending'); return c && { head: c.querySelector('.perm-head').textContent, buttons: [...c.querySelectorAll('button')].map(b => b.textContent) }; })()`);
     check('permission request inline in the conversation with Allow/Deny', pending && /^Allow .+\?$/.test(pending.head) && pending.buttons.includes('Allow once'), pending);
     await s.screenshot('codex-app-pending');
-    await tag(a, `[...document.querySelectorAll('#conv .perm-card.pending button')].find(b => b.textContent === 'Allow once')`, 'inline-allow');
-    await clickIn(a, '#inline-allow');
+    await tagClick(a, `[...document.querySelectorAll('#conv .perm-card.pending button')].find(b => b.textContent === 'Allow once')`, 'inline-allow');
     await a.waitFor(`[...document.querySelectorAll('#conv .perm-card')].some(c => /Allowed/.test(c.querySelector('.perm-head').textContent))`, 20000);
     await a.waitFor(`!!document.querySelector('#conv .turn-foot .done.ok') && !!document.querySelector('#conv .edit-path')`, 20000);
     const after = await a.eval(`({ decision: [...document.querySelectorAll('#conv .perm-card .perm-head')].map(h => h.textContent), done: document.querySelector('#conv .turn-foot .done').textContent, usage: document.querySelector('#conv .turn-foot .usage').title, edits: [...document.querySelectorAll('#conv .edit-path')].map(b => b.textContent) })`);
@@ -68,8 +78,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const closed = await a.eval(`!document.getElementById('shell-summary').parentElement.open`);
     check('tool call expands to its input and status, and collapses again', open.open && /touch approved.txt/.test(open.input || '') && open.status === 'completed' && closed, { open, closed });
     // File edit -> review of the right worktree at the hunk.
-    await tag(a, `[...document.querySelectorAll('#conv .edit-path')].find(b => b.textContent === 'approved.txt')`, 'edit-approved');
-    await clickIn(a, '#edit-approved');
+    await tagClick(a, `[...document.querySelectorAll('#conv .edit-path')].find(b => b.textContent === 'approved.txt')`, 'edit-approved');
     const reviewA = await cdp.webview(`document.body.dataset.revealed === 'approved.txt:1' && document.getElementById('workspace-note').textContent.includes(${JSON.stringify(app.workspace.path)})`, 30000).catch(() => null);
     check('clicking a file edit opens that hunk in the run\'s worktree review', !!reviewA, app.workspace.path);
     await s.screenshot('edit-opened-in-review');
@@ -80,15 +89,13 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await c.waitFor(`!!document.querySelector('#conv .perm-card.pending')`, 20000);
     const write = await c.eval(`(() => { const t = [...document.querySelectorAll('#conv details.tool')].find(t => t.dataset.name === 'Write'); return t && { summary: t.querySelector('.tool-summary').textContent }; })()`);
     check('Claude Write tool call shown before its permission request', write && /perm.txt/.test(write.summary), write);
-    await tag(c, `[...document.querySelectorAll('#conv .perm-card.pending button')].find(b => b.textContent === 'Allow once')`, 'inline-allow');
-    await clickIn(c, '#inline-allow');
+    await tagClick(c, `[...document.querySelectorAll('#conv .perm-card.pending button')].find(b => b.textContent === 'Allow once')`, 'inline-allow');
     await c.waitFor(`!!document.querySelector('#conv .turn-foot .done.ok')`, 20000);
     await tag(c, `[...document.querySelectorAll('#conv details.tool')].find(t => t.dataset.name === 'Write')?.querySelector('summary')`, 'write-summary');
     for (let i = 0; i < 3 && !(await c.eval(`document.getElementById('write-summary').parentElement.open`)); i++) { await c.eval(`document.getElementById('write-summary').scrollIntoView({ block: 'center' })`); await delay(300); await clickIn(c, '#write-summary'); }
     const writeOpen = await c.eval(`(() => { const d = document.getElementById('write-summary').parentElement; const r = d.querySelector('.tool-result'); return { pres: [...d.querySelectorAll('pre')].map(p => p.textContent), labels: [...d.querySelectorAll('.tool-section .label')].map(l => l.textContent), title: d.title, status: r.classList.contains('bad') ? 'failed' : r.textContent.includes('+') ? 'completed' : r.querySelector('.codicon-check') ? 'completed' : r.textContent }; })()`);
     check('Claude tool call shows input (the written content, full path in the tooltip) and result', writeOpen.pres.some(p => /allowed/.test(p)) && /perm\.txt/.test(writeOpen.title) && writeOpen.pres.some(p => /File created successfully/.test(p)) && writeOpen.status === 'completed', writeOpen);
-    await tag(c, `[...document.querySelectorAll('#conv .edit-path')].find(b => b.textContent === 'perm.txt')`, 'edit-perm');
-    await clickIn(c, '#edit-perm');
+    await tagClick(c, `[...document.querySelectorAll('#conv .edit-path')].find(b => b.textContent === 'perm.txt')`, 'edit-perm');
     const reviewC = await cdp.webview(`document.body.dataset.revealed === 'perm.txt:1' && document.getElementById('workspace-note').textContent.includes(${JSON.stringify(claude.workspace.path)})`, 30000).catch(() => null);
     check('Claude file edit opens the Claude worktree review (not the codex-app one)', !!reviewC, claude.workspace.path);
     // Event log tab keeps the raw event stream.

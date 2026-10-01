@@ -4,6 +4,8 @@
 //
 // Sentences the phone has and VS Code does not are in PHONE_ONLY, at the end.
 
+export { plain, plainTool } from './plain.ts';
+
 const UI = 'extension/media/ui.js';
 const CONVERSATION = 'extension/media/conversation.js';
 const CHAT = 'extension/media/chat.js';
@@ -15,6 +17,9 @@ const BROWSER = 'extension/branch-diff/review/browser.js';
 const PHONE_TEXT = 'extension/src/phone-text.js';
 const DAEMON = 'daemon/src/daemon.rs';
 const ROLLUP = 'extension/media/rollup.js';
+const AGENT_SEARCH = 'extension/src/agent-search.js';
+const CONTINUITY_TEXT = 'extension/media/continuity-text.js';
+const CONTINUITY = 'extension/media/continuity.js';
 
 export interface Copied {
   /** The words, as they stand in the file. */
@@ -68,15 +73,87 @@ export const TEXT = {
     failed: from(VIEWS, '✕'), interrupted: from(VIEWS, '■'), disconnected: from(VIEWS, '✕'), unknown: from(VIEWS, '?'),
   } as Readonly<Record<string, string>>,
 
+  /** The marks views.js adds: an agent at its end not reviewed yet (AC-254), and Continuity's states. */
+  badgeToReview: from(VIEWS, '✦'),
+  badgeWaiting: from(VIEWS, '☁'),
+  badgeHandedOff: from(VIEWS, '→'),
+
+  /** What Continuity (Gate L) says in a chat (continuity.js). */
+  continuity: {
+    sendingAgain: from(CONTINUITY, 'The connection is back. Sending your message again.'),
+    continuesElsewhere: from(CONTINUITY, 'The work continues in another agent.'),
+    continuesHere: from(CONTINUITY, 'This agent continues the work of another.'),
+    openIt: from(CONTINUITY, 'Open it'),
+    openFirst: from(CONTINUITY, 'Open the first agent'),
+    lost: from(CONTINUITY, 'The connection was lost; the agent keeps trying to reconnect.'),
+    lostAttempts: shaped(CONTINUITY, '` · ${c.netCount} attempts`', (n: number) => `The connection was lost; the agent keeps trying to reconnect. · ${n} attempts`),
+    stall: from(CONTINUITY, 'No answer while offline. Overseer interrupted the turn; your message is kept.'),
+    memoryValve: from(CONTINUITY, 'The system ran short of memory. Overseer paused this agent and unloaded the model; your message is kept.'),
+    localModel: shaped(CONTINUITY, "k context${bytes}${p.already_loaded ? ', already loaded' : ''}.`", (name: string, k: number, gib: string | null, loaded: boolean) => `Local model **${name}** at a ${k}k context${gib !== null ? ` · ${gib} GiB` : ''}${loaded ? ', already loaded' : ''}.`),
+    kept: shaped(CONTINUITY, '. Your message is kept.`', (why: string) => `${why}. Your message is kept.`),
+  },
+
+  /** What Overseer's oversight says in an agent's chat (Gate S, conversation.js `oversightLine`). */
+  oversight: {
+    held: shaped(CONVERSATION, "`Held by Overseer${p && p.reason ? ': ' + p.reason : ''}`", (reason: string) => `Held by Overseer${reason ? ': ' + reason : ''}`),
+    released: shaped(CONVERSATION, "`Released${p && p.why ? ': ' + p.why : ''}`", (why: string) => `Released${why ? ': ' + why : ''}`),
+    guardrail: shaped(CONVERSATION, "`Guardrail${p && p.words ? ': ' + ui.firstLine(p.words, 120) : ''}${p && p.enforcement ? ' (' + p.enforcement + ')' : ''}`", (words: string, enforcement: string) => `Guardrail${words ? ': ' + words : ''}${enforcement ? ' (' + enforcement + ')' : ''}`),
+    crossed: shaped(CONVERSATION, '`Wrote across a guardrail: ${', (paths: string) => `Wrote across a guardrail: ${paths}`),
+    redirected: from(CONVERSATION, 'Redirected by Overseer'),
+    checkIn: shaped(CONVERSATION, "`Check-in: ${p && p.result ? p.result.replace('_', ' ') : ''}${p && p.reason ? ' — ' + p.reason : ''}${p && p.left_out ? ' · left out: ' + p.left_out : ''}`", (result: string, reason: string, leftOut: string) => `Check-in: ${result}${reason ? ' — ' + reason : ''}${leftOut ? ' · left out: ' + leftOut : ''}`),
+    reported: shaped(CONVERSATION, '`Reported to Overseer: ${', (doing: string) => `Reported to Overseer: ${doing}`),
+    asked: shaped(CONVERSATION, '`Asked Overseer: ${', (question: string) => `Asked Overseer: ${question}`),
+    claimed: shaped(CONVERSATION, '`Claimed ${', (paths: string) => `Claimed ${paths}`),
+    shared: shaped(CONVERSATION, "`Overseer shared ${(p && p.source) || 'a piece'}`", (source: string) => `Overseer shared ${source || 'a piece'}`),
+    shareWithdrawn: from(CONVERSATION, 'A share was withdrawn'),
+    finding: shaped(CONVERSATION, "`${(p && p.watcher_title) || 'A watcher'}: ${(p && p.result) || ''}${p && p.text ? ' — ' + ui.firstLine(p.text, 140) : ''}`", (watcher: string, result: string, said: string) => `${watcher || 'A watcher'}: ${result}${said ? ' — ' + said : ''}`),
+    watched: shaped(CONVERSATION, "`Watched${p && p.mode === 'check' ? ' and checked' : ''}: ${", (checked: boolean, brief: string) => `Watched${checked ? ' and checked' : ''}: ${brief}`),
+    watchEnded: shaped(CONVERSATION, "`The watch ended: ${(p && p.reason) || ''}`", (reason: string) => `The watch ended: ${reason}`),
+    handedOff: from(CONVERSATION, 'Handed off'),
+    queued: shaped(CONVERSATION, "`Queued by ${p.detail && p.detail.by ? 'Overseer' : ev.source === 'overseer' ? 'Overseer' : 'you'}: ${", (byOverseer: unknown, text: string) => `Queued by ${byOverseer ? 'Overseer' : 'you'}: ${text}`),
+    briefing: from(CONVERSATION, 'Overseer added a briefing'),
+    merged: shaped(CONVERSATION, "`Merged into ${p.target || 'main'}${p.commit ? ` (${String(p.commit).slice(0, 7)})` : ''}`", (target: string, commit: string) => `Merged into ${target}${commit ? ` (${commit})` : ''}`),
+    mergeConflicts: shaped(CONVERSATION, "`Merge stopped: conflicts in ${", (files: string) => `Merge stopped: conflicts in ${files}`),
+    mergeCancelled: from(CONVERSATION, 'Merge cancelled: the worktree is as it was before it'),
+    pullRequest: shaped(CONVERSATION, "`Pull request${p && p.number ? ' #' + p.number : ''} opened`", (n: string) => `Pull request${n ? ' #' + n : ''} opened`),
+  },
+
   /** A harness by name (ui.js HARNESS). */
   harness: {
     claude: from(UI, 'Claude Code'), codex: from(UI, 'Codex'), 'codex-app': from(UI, 'Codex app-server'), opencode: from(UI, 'OpenCode'), generic: from(UI, 'Program'),
+    // Continuity's local models (Gate L): continuity.js adds the name to ui.js's.
+    'opencode-serve': from(CONTINUITY_TEXT, 'Local model'),
   } as Readonly<Record<string, string>>,
+
+  /**
+   * The states Continuity adds (Gate L, continuity-text.js STATES): waiting for a connection or for
+   * memory (the agent still holds its work, so it counts as active), and handed off.
+   */
+  continuityStates: {
+    waiting_for_connection: { text: from(CONTINUITY_TEXT, 'Waiting for a connection'), icon: 'cloud', active: true },
+    waiting_for_memory: { text: from(CONTINUITY_TEXT, 'Waiting for memory'), icon: 'cloud', active: true },
+    handed_off: { text: from(CONTINUITY_TEXT, 'Handed off'), icon: 'arrow-right', active: false },
+  } as Readonly<Record<string, { readonly text: string; readonly icon: string; readonly active: boolean }>>,
 
   agents: {
     title: from(PACKAGE, 'Agents'),
     needsYou: from(VIEWS, 'Needs you'),
     needsYouCount: shaped(VIEWS, '`Needs you, ${list.length}`', (n: number) => `Needs you, ${n}`),
+    /** The rollup by state (AC-255, rollup.js `parts`): "2 working · 1 needs you · 6 to review · 3 reviewed · 1 failed". */
+    rollup: {
+      working: shaped(ROLLUP, "'working'", 'working'), needs: shaped(ROLLUP, "'needs you'", 'needs you'), unreviewed: shaped(ROLLUP, "'to review'", 'to review'),
+      reviewed: shaped(ROLLUP, "'reviewed'", 'reviewed'), failed: shaped(ROLLUP, "'failed'", 'failed'),
+    },
+    rollupLabel: shaped(VIEWS, '`Agents: ${text}`', (text: string) => `Agents: ${text}`),
+    /** The status's words after an agent's end (AC-254): ", to review" until its review is opened, then ", reviewed". */
+    toReview: shaped(VIEWS, "', to review'", ', to review'),
+    reviewed: shaped(VIEWS, "', reviewed'", ', reviewed'),
+    doneToReview: from(VIEWS, 'Done, to review'),
+    repoToReview: shaped(VIEWS, '`${toReview} to review`', (n: number) => `${n} to review`),
+    repoFailed: shaped(VIEWS, '`${failed} failed`', (n: number) => `${n} failed`),
+    repoWorking: shaped(VIEWS, '`${active} working`', (n: number) => `${n} working`),
+    repoDoneToReview: shaped(VIEWS, '`${toReview} done, to review`', (n: number) => `${n} done, to review`),
+    repoFailedToReview: shaped(VIEWS, '`${failed} failed, to review`', (n: number) => `${n} failed, to review`),
     empty: from(PACKAGE, 'No agents yet.'),
     emptyMore: from(PACKAGE, 'Overseer runs agents through a local daemon; closing VS Code does not stop them.'),
     newTask: from(PACKAGE, 'New Agent'),
@@ -84,16 +161,18 @@ export const TEXT = {
     nativeChild: from(VIEWS, 'native child'),
     inferred: from(VIEWS, ' (inferred)'),
     currentCheckout: from(VIEWS, 'current checkout'),
-    repoLabel: shaped(VIEWS, "agent${tasks.length === 1 ? '' : 's'}${active ? `, ${active} active` : ''}", (name: string, agents: number, active: number) => `${name}, ${agents} agent${plural(agents)}${active ? `, ${active} active` : ''}`),
+    repoLabel: shaped(VIEWS, "agent${tasks.length === 1 ? '' : 's'}${active ? `, ${active} active` : ''}${toReview ? `, ${toReview} to review` : ''}${failed ? `, ${failed} failed` : ''}",
+      (name: string, agents: number, active: number, toReview = 0, failed = 0) => `${name}, ${agents} agent${plural(agents)}${active ? `, ${active} active` : ''}${toReview ? `, ${toReview} to review` : ''}${failed ? `, ${failed} failed` : ''}`),
     approve: from(ROLLUP, 'Approve'),
     reply: from(ROLLUP, 'Reply'),
     wantsToUse: shaped(ROLLUP, "`Wants to use ${r.attention.tool || 'a tool'}`", (tool: string) => `Wants to use ${tool}`),
     waitingForReply: from(ROLLUP, 'Waiting for your reply'),
     needYou: shaped(EXTENSION, "`${n} need${n === 1 ? 's' : ''} you`", (n: number) => `${n} need${n === 1 ? 's' : ''} you`),
     search: from(PACKAGE, 'Search Agents'),
-    searchHint: from(EXTENSION, 'Title, message, file, repository, account or status'),
+    /** What the search looks in, as the search box's placeholder says it (agent-search.js). */
+    searchHint: from(AGENT_SEARCH, 'Title, message, file, repository, account or status'),
     clearSearch: from(PACKAGE, 'Clear Search'),
-    matches: shaped(EXTENSION, "`${shown} match${shown === 1 ? '' : 'es'} for “${filter.query}”`", (shown: number, query: string) => `${shown} match${shown === 1 ? '' : 'es'} for “${query}”`),
+    matches: shaped(EXTENSION, "match${shown === 1 ? '' : 'es'}", (shown: number) => `${shown} match${shown === 1 ? '' : 'es'}`),
     showArchived: from(PACKAGE, 'Show Archived Agents'),
     showActive: from(PACKAGE, 'Show Active Agents'),
     archive: from(PACKAGE, 'Archive'),
@@ -143,6 +222,12 @@ export const TEXT = {
     tokensIn: shaped(CONVERSATION, '} in`', (n: number) => `${grouped(n)} in`),
     tokensOut: shaped(CONVERSATION, '} out`', (n: number) => `${grouped(n)} out`),
     tokensCached: shaped(CONVERSATION, '} cached`', (n: number) => `${grouped(n)} cached`),
+    /** A sub-agent's usage beside its title (both counts, or the one reported). */
+    childTokens: shaped(CONVERSATION, '`${ui.compact(total)} reported tokens`', (count: string) => `${count} reported tokens`),
+    childTokensOf: shaped(CONVERSATION, "`${ui.compact(total)} reported ${input !== undefined ? 'input' : 'output'} tokens`", (count: string, input: boolean) => `${count} reported ${input ? 'input' : 'output'} tokens`),
+    childInput: shaped(CONVERSATION, '`${input.toLocaleString()} input`', (n: number) => `${grouped(n)} input`),
+    childOutput: shaped(CONVERSATION, '`${output.toLocaleString()} output`', (n: number) => `${grouped(n)} output`),
+    notAllowance: from(CONVERSATION, 'activity, not subscription allowance'),
     /** What was done from a phone, in the owner's words. */
     fromPhone: {
       'run.follow_up': from(CONVERSATION, 'Message'), 'run.permission': from(CONVERSATION, 'Answered'), 'run.interrupt': from(CONVERSATION, 'Stopped'), 'task.create': from(CONVERSATION, 'Started'),
@@ -187,7 +272,7 @@ export const TEXT = {
     queueMessage: from(CHAT, 'Queue message'),
     stop: from(CHAT, 'Stop'),
     reviewChanges: from(CHAT, 'Review changes'),
-    files: shaped(CHAT, "`${n} file${n === 1 ? '' : 's'}`", (n: number) => `${n} file${plural(n)}`),
+    files: shaped(CHAT, "${n} file${n === 1 ? '' : 's'}", (n: number) => `${n} file${plural(n)}`),
     currentCheckout: from(CHAT, 'current checkout'),
     currentCheckoutTitle: from(CHAT, 'Current checkout'),
     whenItFinishes: from(CHAT, 'Message for when it finishes'),
@@ -216,9 +301,11 @@ export const TEXT = {
     comparisonUnavailable: shaped(BROWSER, "'Comparison unavailable: ' + next.error", (why: string) => `Comparison unavailable: ${why}`),
     checking: from(BROWSER, 'Checking files…'),
     loading: from(BROWSER, 'Loading diff…'),
-    reviewed: from(BROWSER, 'Reviewed'),
+    /** A hunk's Accept button, and what it reads once the hunk is accepted (AC-263: Accept and Reject, never Keep or Undo). */
+    acceptWord: from(BROWSER, 'Accept'),
+    accepted: from(BROWSER, 'Accepted'),
     accept: shaped(BROWSER, '`Accept hunk ${index + 1}`', (n: number) => `Accept hunk ${n}`),
-    unmark: shaped(BROWSER, '`Unmark reviewed hunk ${index + 1}`', (n: number) => `Unmark reviewed hunk ${n}`),
+    unaccept: shaped(BROWSER, '`Hunk ${index + 1} accepted; click to take the accept back`', (n: number) => `Hunk ${n} accepted; tap to take the accept back`),
     reject: shaped(BROWSER, '`Reject hunk ${index + 1}`', (n: number) => `Reject hunk ${n}`),
     hunkOf: shaped(BROWSER, '`Hunk ${index + 1} of ${row.entry.path}, ${where}`', (n: number, path: string, where: string) => `Hunk ${n} of ${path}, ${where}`),
     lines: shaped(BROWSER, '`lines ${change.modifiedStartLineNumber}–${change.modifiedEndLineNumber}`', (first: number, last: number) => `lines ${first}–${last}`),
@@ -267,13 +354,19 @@ export const PHONE_ONLY = {
 
 /** "Needs you" for waiting_for_user; an unknown status with its underscores as spaces (ui.js statusText). */
 export function statusText(status: string | null | undefined): string {
-  const known = status ? TEXT.status[status] : undefined;
+  const known = status ? (TEXT.status[status] ?? continuityState(status)?.text) : undefined;
   return known ?? String(status || 'unknown').replace(/_/g, ' ');
+}
+
+/** One of Continuity's states, or undefined for any other. */
+export function continuityState(status: string | null | undefined): { readonly text: string; readonly icon: string; readonly active: boolean } | undefined {
+  return status && Object.hasOwn(TEXT.continuityStates, status) ? TEXT.continuityStates[status] : undefined;
 }
 
 /** The agents list's word for a status: "working", "needs you" (views.js). */
 export function listStatusText(status: string): string {
-  return TEXT.listStatus[status] ?? status;
+  // views.js adds Continuity's states to its STATUS_TEXT, in lower case.
+  return TEXT.listStatus[status] ?? continuityState(status)?.text.toLowerCase() ?? status;
 }
 
 /** "now", "5m", "2h", "3d": how long ago in the agents list (views.js `ago`). */

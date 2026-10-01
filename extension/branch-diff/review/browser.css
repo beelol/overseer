@@ -91,7 +91,7 @@ button.icon:hover { background: var(--vscode-toolbar-hoverBackground, var(--vsco
 #toolbar #comparison { flex: 0 1 auto; min-width: 3em; }
 #toolbar .spacer { flex: 1 1 0; min-width: 0; }
 /* Narrow reviews (beside the chat on a small window): icons first, words go to tooltips. */
-@media (max-width: 700px) { #base-label, #total { display: none; } #scope { max-width: 7.5em; } }
+@media (max-width: 700px) { #total { display: none; } #scope { max-width: 7.5em; } }
 /* The agent's name stays at every width: with no tab strip (AC-102) it is what names the review. */
 @media (max-width: 520px) { #layout { display: none; } }
 @media (max-width: 760px) { #review { grid-template-columns: min(var(--nav-width), 32%) 5px minmax(0, 1fr); } }
@@ -126,10 +126,34 @@ button.open-native { min-width: 26px; }
 .file-header .file-path { flex: 0 1 auto; }
 /* Overseer (AC-99): the navigator covers the whole worktree. Changes only / All files toggle,
    counts beside changed files, folders holding changes marked, unchanged files opened as plain text. */
-#nav-head { display: flex; align-items: center; gap: 4px; margin: 0 4px 10px; }
-#nav-head #filter { flex: 1; min-width: 0; width: auto; margin: 0; }
-#changes-only { flex: none; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border-radius: 3px; background: transparent; border: 1px solid transparent; color: var(--vscode-icon-foreground); }
-#changes-only[aria-pressed="true"] { background: var(--vscode-inputOption-activeBackground, var(--vscode-list-inactiveSelectionBackground)); border-color: var(--vscode-inputOption-activeBorder, transparent); color: var(--vscode-inputOption-activeForeground, var(--vscode-foreground)); }
+#nav-head { display: flex; flex-direction: column; align-items: stretch; gap: 6px; margin: 0 4px 10px; }
+#nav-head #filter { min-width: 0; width: auto; margin: 0; }
+/* AC-264: the list follows the view: "All files" in Follow, "Changed" in Diffs only. */
+#list-title { padding: 2px 3px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--vscode-descriptionForeground); }
+/* AC-233, AC-264: Follow | Diffs only, a two-way switch in the review's header. */
+#view-mode { display: inline-flex; align-items: stretch; flex: none; height: 28px; padding: 2px; gap: 2px; border-radius: 3px; background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); }
+#view-mode .seg { display: inline-flex; align-items: center; gap: 5px; padding: 0 9px; border: 0; border-radius: 2px; font-size: 12px; white-space: nowrap; color: var(--vscode-descriptionForeground); background: transparent; }
+#view-mode .seg.on { background: var(--vscode-inputOption-activeBackground, var(--vscode-list-inactiveSelectionBackground)); color: var(--vscode-inputOption-activeForeground, var(--vscode-foreground)); cursor: default; }
+#view-mode .seg .codicon { font-size: 13px; }
+/* Follow shows the agent's file where the diffs were; the diff-only controls step aside. */
+#diffs, #follow-view { grid-column: 3; grid-row: 1; }
+body[data-view="follow"] #diffs, body:not([data-view="follow"]) #follow-view { display: none; }
+body[data-view="follow"] #scope, body[data-view="follow"] #layout, body[data-view="follow"] #follow { display: none; }
+#follow-view { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+#follow-head { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 10px; border-bottom: 1px solid var(--vscode-panel-border); }
+#follow-head > * { flex: none; }
+#follow-path { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--vscode-editor-font-family); }
+#follow-why { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--vscode-descriptionForeground); }
+#follow-again { display: inline-flex; align-items: center; gap: 5px; }
+#follow-again[hidden] { display: none; }
+#follow-editor { flex: 1; min-height: 0; }
+#follow-editor[hidden] { display: none; }
+.follow-added, .follow-changed { background: var(--vscode-diffEditor-insertedLineBackground); }
+.follow-bar-added { border-left: 3px solid var(--vscode-editorGutter-addedBackground); margin-left: 4px; }
+.follow-bar-changed { border-left: 3px solid var(--vscode-editorGutter-modifiedBackground); margin-left: 4px; }
+.follow-bar-removed { border-bottom: 2px solid var(--vscode-editorGutter-deletedBackground); margin-left: 4px; }
+.follow-was { font-style: italic; color: var(--vscode-editorCodeLens-foreground); margin-left: 2em; }
+.follow-removed { font-style: italic; color: var(--vscode-editorGutter-deletedBackground); margin-left: 2em; }
 .file .counts { display: flex; gap: 4px; margin-left: auto; font-size: 11px; font-variant-numeric: tabular-nums; }
 .file .counts:empty { display: none; }
 .file .counts + .status { margin-left: 0; }
@@ -170,8 +194,23 @@ button.base { height: 28px; padding: 0 var(--ov-space-2); color: var(--ov-text);
 #resize:hover, #resize:focus { background: var(--ov-accent-soft); }
 #filter { height: 28px; padding: 0 var(--ov-space-2); background: var(--ov-input-bg); color: var(--ov-input-fg); border: 1px solid var(--ov-border); border-radius: var(--ov-radius-control); font-size: var(--ov-font-sm); }
 #filter:focus { outline: 0; border-color: var(--ov-focus); }
-#changes-only { width: 28px; height: 28px; border-radius: var(--ov-radius-control); color: var(--ov-icon); }
-#changes-only[aria-pressed="true"] { background: var(--ov-accent-soft); color: var(--ov-accent); border-color: transparent; }
+#list-title { font-size: var(--ov-font-xs); color: var(--ov-muted); }
+#view-mode { border-radius: var(--ov-radius-control); background: var(--ov-input-bg); border-color: var(--ov-border); }
+#view-mode .seg { border-radius: calc(var(--ov-radius-control) - 2px); font-size: var(--ov-font-sm); color: var(--ov-muted); }
+#view-mode .seg:hover:not(.on) { background: var(--ov-hover); color: var(--ov-text); }
+#view-mode .seg.on { background: var(--ov-accent-soft); color: var(--ov-accent); font-weight: var(--ov-weight-semibold); }
+#follow-head { background: var(--ov-raised); border-bottom-color: var(--ov-border); }
+#follow-path { font-family: var(--ov-mono); font-size: var(--ov-font-sm); color: var(--ov-text); }
+#follow-why { color: var(--ov-muted); font-size: var(--ov-font-sm); }
+#follow-icon { color: var(--ov-accent); }
+#follow-view[data-source="user"] #follow-icon { color: var(--ov-icon); }
+#follow-again { height: 24px; padding: 0 var(--ov-space-3); border-radius: var(--ov-radius-pill); background: var(--ov-accent-gradient); color: var(--ov-accent-fg); font-size: var(--ov-font-sm); }
+#follow-again:hover { background: var(--ov-accent-bg-hover); }
+#follow-problem { margin: var(--ov-space-10) auto; max-width: 460px; text-align: center; }
+.follow-bar-added { border-left-color: var(--ov-added); }
+.follow-bar-changed { border-left-color: var(--ov-modified); }
+.follow-bar-removed, .follow-removed { border-bottom-color: var(--ov-removed); }
+.follow-removed { color: var(--ov-removed); }
 .folder summary, .file { min-height: 26px; padding: 3px var(--ov-space-2); border-radius: var(--ov-radius-control); font-size: var(--ov-font-md); color: var(--ov-text); transition: background-color var(--ov-motion-fast) var(--ov-ease); }
 .folder summary:hover, .file:hover { background: var(--ov-hover); }
 .file.active { background: var(--ov-selected-strong); color: var(--ov-selected-fg); }
@@ -220,12 +259,16 @@ button.open-native, button.close-file { height: 24px; min-width: 24px; padding: 
    and Refresh (the review refreshes itself) give their room to the agent's name (AC-76). */
 @media (max-width: 440px) { #where, #refresh { display: none; } #toolbar { gap: 4px; padding: 0 var(--ov-space-2); } }
 
-/* Overseer (AC-232): Keep / Undo in words; (AC-243) the agent's work in the toolbar: Merge, Open PR, Merged. */
+/* Overseer (AC-232, AC-263): Accept / Reject in words; (AC-243) the agent's work in the toolbar: Merge, Open PR, Merged. */
 .hunk-actions .hunk-word { margin-left: 3px; font-size: 11px; }
 #land { display: inline-flex; align-items: center; gap: 6px; margin-right: 6px; min-width: 0; flex: 0 1 auto; overflow: hidden; }
 #land[hidden], #land button[hidden] { display: none; }
 #land-text { font-size: var(--ov-font-sm, 12px); color: var(--ov-muted, var(--vscode-descriptionForeground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 30ch; min-width: 0; flex: 0 1 auto; }
 button.land .codicon { font-size: 14px; }
+/* AC-76, AC-264: a narrow review (beside the chat) keeps the Follow | Diffs only switch as two icons,
+   their words in tooltips, and a shorter scope list, so the agent's name and Merge keep their room. */
+@media (max-width: 700px) { #view-mode .seg-word { display: none; } #view-mode .seg { padding: 0 6px; } }
+@media (max-width: 440px) { #scope { max-width: 5em; } #view-mode .seg { padding: 0 5px; } #land { margin-right: 0; } #land-text:empty { display: none; } #loading-stage:empty { position: absolute; } }
 @media (max-width: 640px) { button.land .land-word { display: none; } button.land { padding: 0 6px; } #land-text { max-width: 12ch; } }
 #land[data-state="merged"] #land-text { color: var(--ov-done, var(--vscode-testing-iconPassed)); }
 #land[data-state="conflicts"] #land-text { color: var(--ov-waiting, var(--vscode-editorWarning-foreground)); }
@@ -234,3 +277,58 @@ button.land.primary { background: var(--ov-accent-gradient, var(--vscode-button-
 button.land:hover { background: var(--ov-hover, var(--vscode-toolbar-hoverBackground)); }
 button.land.primary:hover { background: var(--ov-accent-bg-hover, var(--vscode-button-hoverBackground)); }
 .save-file[hidden] { display: none; }
+
+/* Overseer (AC-263): the comparison row under the toolbar: Since task start, Latest run and Entire
+   worktree one click each, the shown one pressed; More… for the rest; the checkout's note. */
+#compare { display: flex; align-items: center; gap: var(--ov-space-1, 4px); min-height: 34px; padding: 0 var(--ov-space-3, 12px); border-bottom: 1px solid var(--ov-border, var(--vscode-panel-border)); overflow: hidden; white-space: nowrap; }
+#compare[hidden], #compare button[hidden] { display: none; }
+#compare button { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 var(--ov-space-2, 8px); border-radius: var(--ov-radius-pill, 12px); border: 1px solid var(--ov-border, transparent); background: transparent; color: var(--ov-muted, var(--vscode-descriptionForeground)); font-size: var(--ov-font-sm, 12px); }
+#compare button:hover:not(:disabled) { background: var(--ov-hover, var(--vscode-toolbar-hoverBackground)); color: var(--ov-text, var(--vscode-foreground)); }
+#compare button[aria-pressed="true"] { background: var(--ov-accent-soft, var(--vscode-inputOption-activeBackground)); color: var(--ov-text, var(--vscode-foreground)); border-color: var(--ov-accent, var(--vscode-focusBorder)); font-weight: var(--ov-weight-medium, 500); }
+#compare button:disabled { opacity: .5; cursor: default; }
+#compare .cmp-more { margin-left: var(--ov-space-1, 4px); height: 24px; background: transparent; }
+#compare-note { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; margin-left: var(--ov-space-1, 4px); color: var(--ov-muted, var(--vscode-descriptionForeground)); font-size: var(--ov-font-sm, 12px); }
+/* A narrow review: the buttons not shown shorten first, the shown one keeps its name, More… is its icon. */
+#compare button { min-width: 0; flex: 0 1 auto; }
+#compare button[aria-pressed="true"] { flex: none; }
+#compare .cmp-word, #base-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The shown comparison is named in words; the others are icons one click away, their names in the
+   tooltip and label, so the review keeps AC-54's text budget. */
+#compare button.cmp[aria-pressed="false"] .cmp-word { display: none; }
+#compare button.cmp[aria-pressed="false"] { padding: 0 6px; }
+@media (max-width: 700px) { #compare .cmp-more[aria-pressed="false"] #base-label { display: none; } }
+@media (max-width: 440px) { #compare { padding: 0 var(--ov-space-2, 8px); gap: 2px; } #compare button { padding: 0 6px; } }
+
+/* Overseer (AC-263): Accept file and Reject file in each file's header; Accepted reads pressed. */
+button.file-accept, button.file-reject { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 var(--ov-space-2, 8px); border-radius: var(--ov-radius-pill, 12px); border: 1px solid var(--ov-border, transparent); background: transparent; color: var(--ov-text, inherit); font-size: var(--ov-font-sm, 12px); white-space: nowrap; cursor: pointer; }
+button.file-accept[hidden], button.file-reject[hidden] { display: none; }
+button.file-accept:hover:not(:disabled), button.file-reject:hover:not(:disabled) { background: var(--ov-hover, var(--vscode-toolbar-hoverBackground)); }
+button.file-accept[aria-pressed="true"] { color: var(--ov-done, var(--vscode-testing-iconPassed)); border-color: transparent; }
+button.file-reject:hover:not(:disabled) { color: var(--ov-removed, var(--vscode-gitDecoration-deletedResourceForeground)); }
+button.file-accept:disabled, button.file-reject:disabled { opacity: .5; cursor: default; }
+/* The file buttons' check and X (the owner, 2026-09-30): solid strokes in the accept and reject
+   colours at every width, so an icon-only button on a narrow card is still plain to read. */
+button.file-accept .file-glyph, button.file-reject .file-glyph { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+button.file-accept .file-glyph { color: var(--ov-done, var(--vscode-testing-iconPassed)); }
+button.file-reject .file-glyph { color: var(--ov-removed, var(--vscode-gitDecoration-deletedResourceForeground)); }
+.hunk-actions .hunk-accept[aria-pressed="true"] { font-weight: 600; }
+@media (max-width: 560px) { button.file-accept, button.file-reject { padding: 0 var(--ov-space-1, 4px); } }
+/* Narrow cards keep every header button on the card: below 440 px Accept file and Reject file are
+   icons (their words stay in the tooltip and label); while "Save your edits" shows on a card below
+   600 px, the file buttons and line counts step aside (each change keeps Accept and Reject); Unsaved
+   stays, the review's one mark of the owner's unsaved typing. */
+.diff-file { container-type: inline-size; }
+@container (max-width: 440px) {
+  .file-header button.file-accept .file-word, .file-header button.file-reject .file-word { display: none; }
+  /* Icon only: a square button framed in its own colour, the glyph a little larger. */
+  .file-header { gap: var(--ov-space-1, 4px); }
+  .file-header button.file-accept, .file-header button.file-reject { justify-content: center; width: 26px; padding: 0; border-radius: var(--ov-radius-control, 4px); }
+  .file-header button.file-accept { border-color: var(--ov-done, var(--vscode-testing-iconPassed)); }
+  .file-header button.file-reject { border-color: var(--ov-removed, var(--vscode-gitDecoration-deletedResourceForeground)); }
+  .file-header button.file-accept[aria-pressed="true"] { background: color-mix(in srgb, var(--ov-done, var(--vscode-testing-iconPassed)) 18%, transparent); }
+  .file-header .file-glyph { width: 18px; height: 18px; }
+}
+@container (max-width: 600px) {
+  .file-header:has(.save-file:not([hidden])) button.file-accept, .file-header:has(.save-file:not([hidden])) button.file-reject,
+  .file-header:has(.save-file:not([hidden])) .stats { display: none; }
+}

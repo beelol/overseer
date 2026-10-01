@@ -49,7 +49,7 @@ export function SearchField({ query, onChange, onClose, matches }: SearchFieldPr
       </View>
       {matches !== null ? (
         <Txt testID="agents.search.matches" kind="small" tone="muted" accessibilityLiveRegion="polite">
-          {words.matches(matches, query.trim())}
+          {words.matches(matches)}
         </Txt>
       ) : null}
     </Arrive>

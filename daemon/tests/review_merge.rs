@@ -58,10 +58,64 @@ fn ac232_a_finished_agents_committed_new_file_is_in_its_default_review() {
     d.wait_status(&run_id(&busy), |s| s == "running", 20);
     assert_eq!(default_option(&d, &run_id(&busy))["mode"], "latest_run");
     d.call("run.interrupt", json!({"run_id": run_id(&busy)}));
-    // In the owner's own checkout the latest run stays the default.
+    // In the owner's own checkout too (AC-263, the owner's decision of 2026-09-29).
     let current = d.generic(&repo, "current", "/bin/sh", &["-c", "true"]);
     d.wait_done(&run_id(&current), 20);
-    assert_eq!(default_option(&d, &run_id(&current))["mode"], "latest_run");
+    assert_eq!(default_option(&d, &run_id(&current))["mode"], "task_start");
+}
+
+/// AC-263: the review opens on Since task start whether the agent works in its own worktree or in
+/// the owner's checkout; Latest run and Entire worktree (the branch against where it started,
+/// with its uncommitted and untracked files) are there beside it, each with its own files.
+#[test]
+fn ac263_the_review_opens_on_since_task_start_with_latest_run_and_entire_worktree_one_click_away() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[]);
+    // Its own worktree: turn 1 commits a file, turn 2 leaves an untracked one.
+    let created = sh(&d, &repo, "if [ -f one.txt ]; then printf 'two\\n' > two.txt; else printf 'one\\n' > one.txt && git add one.txt && git -c user.name=A -c user.email=a@x.invalid commit -qm one; fi");
+    let run = run_id(&created);
+    d.wait_done(&run, 20);
+    d.call("run.follow_up", json!({"run_id": run, "prompt": ""}));
+    d.wait_done(&run, 20);
+    let opts = d.call("comparison.options", json!({"run_id": run}));
+    assert_eq!(opts["folder_edits"], false, "its own worktree holds only the agent's work: {opts}");
+    assert_eq!(default_option(&d, &run)["mode"], "task_start");
+    let base = |mode: &str| option(&d, &run, mode, None)["base"].as_str().unwrap().to_string();
+    assert_eq!(diff_paths(&d, &created, &base("task_start")), vec![("A".into(), "one.txt".into()), ("A".into(), "two.txt".into())]);
+    assert_eq!(diff_paths(&d, &created, &base("latest_run")), vec![("A".into(), "two.txt".into())], "the latest run is turn 2 alone");
+    let entire = option(&d, &run, "entire_worktree", None);
+    assert_eq!((entire["label"].as_str(), entire["available"].as_bool(), entire["provenance"].as_str()), (Some("Entire worktree"), Some(true), Some("recorded")), "{entire}");
+    assert_eq!(entire["base"].as_str().unwrap(), git(&repo, &["rev-parse", "main"]), "the branch against the commit it started from");
+    // Main moves on: the worktree's comparison still starts where its branch did.
+    std::fs::write(repo.join("main-later.txt"), "later\n").unwrap();
+    git(&repo, &["add", "main-later.txt"]);
+    git(&repo, &["commit", "-qm", "main later"]);
+    assert_eq!(diff_paths(&d, &created, &base("entire_worktree")), vec![("A".into(), "one.txt".into()), ("A".into(), "two.txt".into())]);
+
+    // The owner's checkout, on a feature branch with a commit of its own and an edit left before the task.
+    git(&repo, &["switch", "-q", "-c", "feature"]);
+    std::fs::write(repo.join("feature.txt"), "feature\n").unwrap();
+    git(&repo, &["add", "feature.txt"]);
+    git(&repo, &["commit", "-qm", "feature"]);
+    std::fs::write(repo.join("a.txt"), "owner edit before the task\n").unwrap();
+    let current = d.generic(&repo, "current", "/bin/sh", &["-c", "if [ -f c2.txt ]; then :; elif [ -f c1.txt ]; then printf 'c2\\n' > c2.txt; else printf 'c1\\n' > c1.txt; fi"]);
+    let crun = run_id(&current);
+    d.wait_done(&crun, 20);
+    // The owner edits the folder between turns.
+    std::fs::write(repo.join("owner.txt"), "the owner's own edit\n").unwrap();
+    d.call("run.follow_up", json!({"run_id": crun, "prompt": ""}));
+    d.wait_done(&crun, 20);
+    let copts = d.call("comparison.options", json!({"run_id": crun}));
+    assert_eq!(copts["folder_edits"], true, "the review says the owner's checkout holds any edits made there: {copts}");
+    assert_eq!(default_option(&d, &crun)["mode"], "task_start");
+    let cbase = |mode: &str| option(&d, &crun, mode, None)["base"].as_str().unwrap().to_string();
+    assert_eq!(diff_paths(&d, &current, &cbase("task_start")), vec![("A".into(), "c1.txt".into()), ("A".into(), "c2.txt".into()), ("A".into(), "owner.txt".into())], "since the task started, with the owner's edit between turns; not the edit made before it");
+    assert_eq!(diff_paths(&d, &current, &cbase("latest_run")), vec![("A".into(), "c2.txt".into())]);
+    let centire = option(&d, &crun, "entire_worktree", None);
+    assert_eq!(centire["base"].as_str().unwrap(), git(&repo, &["rev-parse", "main"]), "the feature branch against where it left main: {centire}");
+    assert_eq!(centire["label"], "Entire worktree");
+    assert_eq!(diff_paths(&d, &current, &cbase("entire_worktree")), vec![("A".into(), "c1.txt".into()), ("A".into(), "c2.txt".into()), ("A".into(), "feature.txt".into()), ("A".into(), "owner.txt".into()), ("M".into(), "a.txt".into())]);
 }
 
 /// AC-232: Open PR needs a GitHub remote; the plan says which remote there is, so a repository

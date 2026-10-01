@@ -1,17 +1,11 @@
 // Packaged-UI scenario for AC-244 (opening an agent leaves your layout alone), fixture agents only.
 // The owner has two editor groups of their own files and the secondary side bar open. Selecting an
 // agent with no changes, then one with changes (review and chat), then home (New Agent) keeps both
-// groups with their tabs and the secondary side bar: Overseer opens beside them. Then, with a second
-// VS Code window open, the dashboard hides the tab strips in its own window only: this window is
-// opened on a workspace file (as the dashboard's own window, Open Dashboard in New Window, is), so
-// the settings go to that file; the second window keeps its tab strip and user settings never
-// change; leaving the dashboard takes the settings out of the file again.
-// (A window opened from inside a test window does not load the test's extensions, so the second
-// window has no Overseer and Open Dashboard in New Window itself is not driven here.)
+// groups with their tabs and the secondary side bar: Overseer opens beside them. No user setting
+// changes. (The Overseer layout, which takes the whole window, is scenario-overseer-window.js.)
 const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
-const { Cdp } = require('./cdp');
 
 (async () => {
   const s = new Session('own-layout');
@@ -19,7 +13,6 @@ const { Cdp } = require('./cdp');
   const check = (name, ok, detail) => { result.checks.push({ name, ok: !!ok, detail }); s.note(`${ok ? 'PASS' : 'FAIL'} ${name}`, detail); };
   const fx = name => path.join(repoRoot, 'fixtures/fake-harness', name);
   const modeFile = path.join(s.root, 'claude-mode');
-  let cdp2;
   try {
     const repo = makeRepo(path.join(s.root, 'own-repo'), { dirty: false });
     const wsFile = path.join(s.root, 'own.code-workspace');
@@ -82,54 +75,11 @@ const { Cdp } = require('./cdp');
     check('opening home keeps them too (the review closes; the owner\'s groups stay)', kept(l3) && l3.groups.length === 3, l3);
     await s.screenshot('home-beside');
 
-    // A second VS Code window of the same profile, with an editor open (so it has a tab strip).
-    const { targetInfos: before } = await cdp.call('Target.getTargets');
-    const known = new Set(before.filter(t => t.type === 'page').map(t => t.targetId));
-    await cdp.focusWorkbench();
-    await cdp.key('n', { meta: true, shift: true }); // File: New Window
-    let page;
-    for (let i = 0; i < 80 && !page; i++) {
-      const { targetInfos } = await cdp.call('Target.getTargets');
-      page = targetInfos.find(t => t.type === 'page' && t.url.includes('workbench') && !known.has(t.targetId));
-      if (!page) await delay(250);
-    }
-    if (!page) throw new Error('the second window did not open');
-    cdp2 = await Cdp.connect(s.profile);
-    const { sessionId } = await cdp2.call('Target.attachToTarget', { targetId: page.targetId, flatten: true });
-    cdp2.workbench = sessionId;
-    await cdp2.call('Runtime.enable', {}, sessionId); await cdp2.call('Page.enable', {}, sessionId);
-    await cdp2.call('Emulation.setFocusEmulationEnabled', { enabled: true }, sessionId).catch(() => {});
-    await cdp2.waitFor(`!!document.querySelector('.monaco-workbench .part.activitybar')`, 60000, 'second window');
-    await delay(1500);
-    await cdp2.focusWorkbench();
-    await cdp2.key('n', { meta: true });
-    await cdp2.waitFor(`[...document.querySelectorAll('.part.editor .tab')].length > 0`, 10000, 'an editor in the second window');
-    const wsSettings = () => { try { return JSON.parse(fs.readFileSync(wsFile, 'utf8')).settings || {}; } catch { return null; } };
-    const second0 = await layout(cdp2);
-    check('the second window shows its tab strip', second0.tabStrips === 1, second0);
-
-    // ⌥⌘O toggles the dashboard (its palette title is being renamed on another branch).
-    await cdp.focusWorkbench(); await cdp.key('o', { meta: true, alt: true });
-    await s.editorView();
-    await delay(2500);
-    const inDash = { first: await layout(), second: await layout(cdp2), user: norm(fs.readFileSync(settingsFile, 'utf8')) === settingsBefore, workspace: wsSettings() };
-    await s.screenshot('dashboard-window');
-    await cdp2.screenshot(path.join(s.evidence, `${String(++s.shot).padStart(2, '0')}-second-window-while-dashboard-open.png`));
-    check('the dashboard hides the tab strips in its own window only (its workspace settings); the second window keeps its tab strip and user settings do not change',
-      inDash.first.tabStrips === 0 && inDash.second.tabStrips === 1 && inDash.user && inDash.workspace && inDash.workspace['workbench.editor.showTabs'] === 'none',
-      { dashboardWindowTabStrips: inDash.first.tabStrips, secondWindowTabStrips: inDash.second.tabStrips, userSettingsUnchanged: inDash.user, workspaceSettings: inDash.workspace });
-    await cdp.focusWorkbench(); await cdp.key('o', { meta: true, alt: true }); await delay(3000);
-    const left = { first: await layout(), second: await layout(cdp2), workspace: wsSettings(), user: norm(fs.readFileSync(settingsFile, 'utf8')) === settingsBefore };
-    check('leaving it takes the settings out of the workspace file; the second window and user settings are unchanged throughout',
-      left.workspace && Object.keys(left.workspace).length === 0 && left.first.tabStrips === left.first.groups.length && left.second.tabStrips === 1 && left.user, left);
-    await s.quiet.main(`(() => { const ws = require('electron').BrowserWindow.getAllWindows(); const w = ws.filter(w => !/own/.test(w.getTitle())); w.forEach(x => x.close()); return w.map(x => x.getTitle()); })()`).then(t => s.note('closed the second window', t));
-    await delay(1500);
     check('no user setting changed at any point', norm(fs.readFileSync(settingsFile, 'utf8')) === settingsBefore);
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}
   } finally {
-    try { cdp2?.close(); } catch {}
     s.writeLog();
     fs.writeFileSync(path.join(s.evidence, 'result.json'), JSON.stringify(result, null, 2));
     if (!process.env.KEEP_OPEN) { await s.quit(); s.stopDaemon(); }

@@ -331,6 +331,11 @@ impl Daemon {
             let _ = std::fs::remove_file(f);
         }
         self.emit(task_id.as_deref(), plan["run_id"].as_str(), "merge_back", "user", "exact", json!({"state": "merged", "target": target, "branch": branch, "commit": after}))?;
+        // Merged work has been looked at: it leaves "to review" on every surface (T-26).
+        let at = crate::daemon::now();
+        let seen: serde_json::Map<String, Value> = self.store.lock().unwrap().runs()?.into_iter()
+            .filter(|r| r.workspace_id == ws.id && r.parent_run_id.is_none()).map(|r| (r.id, json!(at))).collect();
+        crate::menubar::mark_seen(self, &seen)?;
         Ok(result)
     }
 

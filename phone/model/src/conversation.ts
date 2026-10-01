@@ -20,8 +20,9 @@ import type { ToolDescription } from './describe.ts';
 import { mapGet, mapSet, pmap, pvec, vecArray, vecGet, vecPush, vecSet, vecSplice } from './persistent.ts';
 import type { PMap, PVec } from './persistent.ts';
 import { parse } from './markdown.ts';
+import { plain } from './plain.ts';
 import type { Block } from './markdown.ts';
-import { basename, compact, duration, statusText, TEXT } from './text.ts';
+import { basename, compact, continuityState, duration, firstLine, statusText, TEXT } from './text.ts';
 import { record } from './types.ts';
 import type { DaemonEvent, Run } from './types.ts';
 
@@ -172,6 +173,8 @@ export interface ChildRow extends RowBase {
   readonly title: string;
   readonly status: string;
   readonly statusText: string;
+  /** What it reported using, beside its title: "20k reported tokens"; empty until it reports. */
+  readonly usage: string;
   readonly tooltip: string;
 }
 
@@ -182,6 +185,10 @@ export interface NoteRow extends RowBase {
   readonly status: string | null;
   readonly icon: string | null;
   readonly tooltip: string | null;
+  /** A link after the words that opens another agent: Continuity's "Open it" after a handoff. */
+  readonly link?: { readonly label: string; readonly runId: string };
+  /** What the line opens to: the briefing Overseer added. */
+  readonly detail?: string;
 }
 
 /** The end of a turn: how it ended, how long it took, tokens and cost. */
@@ -297,10 +304,14 @@ export interface Conversation {
   readonly blocks: PMap<BlockState>;
   readonly blockOrder: ReadonlyArray<string>;
   readonly childInfo: PMap<ChildInfo>;
+  /** What each native child reported using: its label and the tooltip's line. */
+  readonly childUsage: PMap<{ readonly label: string; readonly detail: string }>;
   readonly cards: PMap<CardState>;
   readonly cardRequests: PMap<unknown>;
   /** A request from a phone that was just accepted: the next turn is its message. */
   readonly arriving: string | null;
+  /** Continuity's (Gate L): the turn's one line for a lost connection, and the local model last said. */
+  readonly continuity: { readonly net: { readonly key: string; readonly count: number; readonly last: string; readonly at: number } | null; readonly model: string | null };
 }
 
 export interface Appended {
@@ -320,7 +331,7 @@ export function create(options: ConversationOptions): Conversation {
   return {
     rootId: options.rootId, home: options.home ?? '', rows: pvec(), working: { shown: false, label: TEXT.conversation.working }, banner: null, status: undefined, attention: undefined,
     landed: pmap(), active: false, stopping: false, seen: pmap(), family: mapSet(pmap<true>(), options.rootId, true), turns: [], tools: pmap(), toolsOf: pmap(), open: [], groups: pmap(),
-    blocks: pmap(), blockOrder: [], childInfo: pmap(), cards: pmap(), cardRequests: pmap(), arriving: null,
+    blocks: pmap(), blockOrder: [], childInfo: pmap(), childUsage: pmap(), cards: pmap(), cardRequests: pmap(), arriving: null, continuity: { net: null, model: null },
   };
 }
 
@@ -587,7 +598,8 @@ function toolRow(b: RowBase, t: ToolState, c: Conversation): ToolRow {
   const d = describe(t.name, t.input, t.summary);
   const done = !!t.status && !/running|started|inProgress|in_progress/.test(t.status);
   const verb = !done && d.pending && t.status !== undefined ? d.pending : d.verb;
-  const full = [d.full, t.name !== d.verb ? `(${t.name})` : ''].filter(Boolean).join(' ');
+  // The tool's own name follows in brackets, unless it is an internal one (mcp__server__tool, AC-245).
+  const full = [d.full, t.name !== d.verb && !/^mcp__/.test(t.name) ? `(${t.name})` : ''].filter(Boolean).join(' ');
   return {
     ...b, kind: 'tool', id: t.id ?? '', name: t.name, icon: d.icon, verb, target: d.target || '', code: !!d.code, full,
     result: resultOf(t, d, c), group: t.group ?? null,
@@ -714,9 +726,11 @@ function summarize(w: Work, gkey: string): void {
 function childRow(b: RowBase, run: string, c: Conversation): ChildRow {
   const info = mapGet(c.childInfo, run) || {};
   const st = info.status || 'unknown';
+  const used = mapGet(c.childUsage, run);
+  // Its title, state and usage; how it was linked to its parent is the daemon's business (AC-245).
   return {
-    ...b, kind: 'child', icon: 'type-hierarchy-sub', childRun: run, title: info.title || TEXT.conversation.subAgent, status: st, statusText: statusText(st),
-    tooltip: [info.title, statusText(st)].filter(Boolean).join('\n'),
+    ...b, kind: 'child', icon: 'type-hierarchy-sub', childRun: run, title: info.title || TEXT.conversation.subAgent, status: st, statusText: statusText(st), usage: used?.label ?? '',
+    tooltip: [info.title, statusText(st), used?.detail].filter(Boolean).join('\n'),
   };
 }
 
@@ -879,9 +893,51 @@ function seenBefore(w: Work, seq: number): boolean {
   return false;
 }
 
-/** Kinds that say nothing in a chat, and kinds the chat has a picture for; any other is a quiet line. */
-const QUIET = new Set(['session', 'task_created', 'reattached', 'interrupt_requested', 'workspace_removed', 'background_notice', 'daemon_stopping', 'status', 'usage', 'push']);
-const KNOWN = new Set(['turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed', 'remote_command']);
+/** Kinds that say nothing in a chat, and kinds the chat has a picture for; any other is a quiet line (conversation.js QUIET and KNOWN). */
+const QUIET = new Set([
+  'session', 'task_created', 'reattached', 'interrupt_requested', 'workspace_removed', 'background_notice', 'daemon_stopping', 'status', 'usage', 'overseer_tool_call', 'overseer_action', 'outside_area',
+  'going_in_circles', 'check_in_started', 'watch_wake', 'watcher_started', 'watch_capped', 'watch_copy_removed', 'oversight_moved', 'dispatch', 'area', 'conflict', 'conflict_closed', 'push',
+]);
+const KNOWN = new Set([
+  'auto_decision', 'turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed',
+  'proposal', 'proposal_answered', 'queued', 'briefing', 'overseer_message', 'redirect', 'hold', 'release', 'guardrail', 'guardrail_crossed', 'check_in', 'report', 'ask', 'claim', 'share', 'share_withdrawn',
+  'finding', 'watch_started', 'watch_ended', 'handoff', 'remote_command', 'merge_back', 'pull_request',
+]);
+
+/**
+ * What Overseer's oversight (Gate S, AC-199) says in an agent's chat: a quiet line with an icon
+ * (conversation.js `oversightLine`), or nothing.
+ */
+function oversightLine(kind: string, p: Readonly<Record<string, unknown>>, source: string): readonly [string, string] | undefined {
+  const o = TEXT.oversight;
+  const s = (key: string): string => String(p[key] ?? '');
+  const paths = (): string => (Array.isArray(p['paths']) ? p['paths'].map(String).join(', ') : '');
+  switch (kind) {
+    case 'hold': return ['debug-pause', o.held(p['reason'] ? s('reason') : '')];
+    case 'release': return ['debug-continue', o.released(p['why'] ? s('why') : '')];
+    case 'guardrail': return ['shield', o.guardrail(p['words'] ? firstLine(p['words'], 120) : '', p['enforcement'] ? s('enforcement') : '')];
+    case 'guardrail_crossed': return ['warning', o.crossed(paths())];
+    case 'redirect': return source === 'overseer' ? ['arrow-swap', o.redirected] : undefined;
+    case 'check_in': return ['checklist', o.checkIn(p['result'] ? s('result').replace('_', ' ') : '', p['reason'] ? s('reason') : '', p['left_out'] ? s('left_out') : '')];
+    case 'report': return ['note', o.reported(firstLine(p['doing'] || '', 120))];
+    case 'ask': return ['question', o.asked(firstLine(p['question'] || '', 120))];
+    case 'claim': return ['symbol-folder', o.claimed(paths())];
+    case 'share': return ['export', o.shared(p['source'] ? s('source') : '')];
+    case 'share_withdrawn': return ['discard', o.shareWithdrawn];
+    case 'finding': return ['eye', o.finding(p['watcher_title'] ? s('watcher_title') : '', p['result'] ? s('result') : '', p['text'] ? firstLine(p['text'], 140) : '')];
+    case 'watch_started': return ['eye', o.watched(p['mode'] === 'check', firstLine(p['brief'] || '', 120))];
+    case 'watch_ended': return ['eye-closed', o.watchEnded(p['reason'] ? s('reason') : '')];
+    case 'handoff': return ['arrow-right', o.handedOff];
+    // AC-243: what a merge did, once, in words; its steps ("ready") are not news.
+    case 'merge_back':
+      if (p['state'] === 'merged') return ['git-merge', o.merged(p['target'] ? s('target') : 'main', p['commit'] ? s('commit').slice(0, 7) : '')];
+      if (p['state'] === 'conflicts') return ['warning', o.mergeConflicts(Array.isArray(p['files']) ? p['files'].map(String).join(', ') : '')];
+      if (p['state'] === 'cancelled') return ['discard', o.mergeCancelled];
+      return undefined;
+    case 'pull_request': return ['git-pull-request', o.pullRequest(p['number'] ? s('number') : '')];
+    default: return undefined;
+  }
+}
 
 /** True when the event is this agent's or one of its native children's: what VS Code's feed passes on. */
 export function belongs(conversation: Conversation, event: DaemonEvent): boolean {
@@ -944,6 +1000,8 @@ function add(w: Work, ev: DaemonEvent): void {
   const child = !!ev.run_id && ev.run_id !== w.c.rootId;
   const run = ev.run_id || w.c.rootId;
   const t = TEXT.conversation;
+  // Continuity (Gate L) draws its own events: transitions, notes, the lost connection.
+  if (continuity(w, ev, p, !child)) return;
   switch (ev.kind) {
     case 'turn_started': {
       if (child) break;
@@ -1039,7 +1097,7 @@ function add(w: Work, ev: DaemonEvent): void {
       if (!child) turnChange(w, ensureTurn(w, ev), { hadError: true });
       const place = placeFor(w, ev);
       const cls = typeof p['class'] === 'string' ? p['class'] : '';
-      const row: ErrorRow = { ...base(place, `err:${ev.seq}`, run, ev.seq), kind: 'error', icon: 'error', class: cls || 'error', title: t.errorTitle[cls] || t.errorTitleOther, message: String(p['message'] || ''), signIn: cls === 'auth' };
+      const row: ErrorRow = { ...base(place, `err:${ev.seq}`, run, ev.seq), kind: 'error', icon: 'error', class: cls || 'error', title: t.errorTitle[cls] || t.errorTitleOther, message: plain(p['message'] || '', 600), signIn: cls === 'auth' };
       put(w, place.end, [row]);
       break;
     }
@@ -1076,9 +1134,10 @@ function add(w: Work, ev: DaemonEvent): void {
       const ok = !!p['ok'];
       const stopped = !ok && w.c.stopping;
       const word = ok ? t.done : stopped ? t.stopped : t.failed;
-      const reason = !ok && !stopped && !turn.hadError && p['summary'] ? (String(p['summary']).split('\n')[0] as string).slice(0, 160) : '';
+      // The harness's words in plain words (AC-245).
+      const reason = !ok && !stopped && !turn.hadError && p['summary'] ? plain(String(p['summary']).split('\n')[0], 400).slice(0, 160) : '';
       const change: Writable<Partial<FooterRow>> = { state: ok ? 'ok' : stopped ? 'stopped' : 'fail', icon: ok ? 'check' : stopped ? 'circle-slash' : 'error', text: reason ? `${word}: ${reason}` : word };
-      if (p['summary'] && !ok) change.tooltip = String(p['summary']);
+      if (p['summary'] && !ok) change.tooltip = plain(p['summary'], 400);
       w.c.stopping = false;
       const end = eventTime(ev);
       if (turn.started && end && end > turn.started) change.duration = duration(end - turn.started);
@@ -1092,12 +1151,31 @@ function add(w: Work, ev: DaemonEvent): void {
     case 'retention':
       w.c.banner = t.trimmed;
       break;
+    case 'queued': {
+      // A message queued for the agent, by the owner or by Overseer.
+      const detail = record(p['detail']);
+      const place = placeFor(w, ev);
+      put(w, place.end, [{ ...base(place, `note:${ev.seq}`, run, ev.seq), kind: 'note', text: TEXT.oversight.queued(detail['by'] || ev.source === 'overseer', firstLine(p['text'] || '', 80)), status: null, icon: 'history', tooltip: null }]);
+      break;
+    }
+    case 'briefing': {
+      // What Overseer added to the agent's prompt: one line, the briefing when it is opened.
+      const place = placeFor(w, ev);
+      put(w, place.end, [{ ...base(place, `note:${ev.seq}`, run, ev.seq), kind: 'note', text: TEXT.oversight.briefing, status: null, icon: 'info', tooltip: null, detail: String(p['text'] || '') }]);
+      break;
+    }
+    // Overseer's own conversation (its proposals and message cards) and Auto's decisions are not
+    // drawn on the phone: Overseer's chat on the phone is AC-128's, and Auto is unfinished (AC-204).
     default:
       break;
   }
   if (ev.kind === 'status') status(w, ev, p, child);
   if (ev.kind === 'usage') usage(w, ev, p, child);
-  if (!QUIET.has(ev.kind) && !KNOWN.has(ev.kind)) {
+  const line = oversightLine(ev.kind, p, String(ev.source || ''));
+  if (line) {
+    const place = placeFor(w, ev);
+    put(w, place.end, [{ ...base(place, `note:${ev.seq}`, run, ev.seq), kind: 'note', text: line[1].trim(), status: null, icon: line[0], tooltip: null }]);
+  } else if (!QUIET.has(ev.kind) && !KNOWN.has(ev.kind)) {
     const place = placeFor(w, ev);
     put(w, place.end, [{ ...base(place, `note:${ev.seq}`, run, ev.seq), kind: 'note', text: ev.kind.replace(/_/g, ' '), status: null, icon: null, tooltip: null }]);
   }
@@ -1128,16 +1206,142 @@ function status(w: Work, ev: DaemonEvent, p: Readonly<Record<string, unknown>>, 
   const place = placeFor(w, ev);
   put(w, place.end, [{
     ...base(place, `status:${ev.seq}`, ev.run_id || w.c.rootId, ev.seq), kind: 'note', text: statusText(st), status: st, icon: st === 'interrupted' ? 'circle-slash' : 'error',
-    tooltip: p['reason'] ? String(p['reason']) : null,
+    tooltip: p['reason'] ? plain(p['reason'], 400) : null,
   }]);
 }
 
+// ------------------------------------------------------------------ Continuity (Gate L)
+
+const GIB = 1024 ** 3;
+const CONTINUITY_QUIET = new Set(['local_load', 'local_queue', 'local_download', 'ollama_install', 'ollama_server', 'connection', 'continuity_settings']);
+
+/** A quiet line of Continuity's at the end of the agent's current turn. `**bold**` is said as plain words. */
+function continuityNote(w: Work, ev: DaemonEvent, icon: string, words: string, link?: NoteRow['link']): NoteRow {
+  const place = rootPlace(w, ev);
+  const row: NoteRow = { ...base(place, `cont:${ev.seq}`, w.c.rootId, ev.seq), kind: 'note', text: words.split('**').join(''), status: null, icon, tooltip: null, ...(link ? { link } : {}) };
+  put(w, place.end, [row]);
+  return row;
+}
+
+/**
+ * What continuity.js draws in the chat from the events alone (its `event`), and true when it took
+ * the event. The cards that need the daemon's Continuity status (“Use a local model now”, “Retry
+ * now”, the way back online) are not drawn on the phone: the phone does not ask for that status
+ * yet (AC-127's connection state, Gate L's phone part).
+ */
+function continuity(w: Work, ev: DaemonEvent, p: Readonly<Record<string, unknown>>, mine: boolean): boolean {
+  const words = TEXT.continuity;
+  switch (ev.kind) {
+    case 'output':
+      if (!(p['role'] === 'system' && p['continuity'])) return false;
+      if (mine) {
+        const said = String(p['text'] ?? '');
+        continuityNote(w, ev, /^Back online/.test(said) ? 'cloud' : /^Queued/.test(said) ? 'clock' : /^Memory/.test(said) ? 'chip' : 'arrow-right', said);
+      }
+      return true;
+    case 'status': {
+      if (!mine) return false;
+      const st = String(p['status']);
+      const state = continuityState(st);
+      if (state === undefined) return false;
+      if (st !== 'handed_off') {
+        // The turn is not over: its message is kept and will be sent again.
+        const ordinal = w.c.turns.length - 1;
+        const turn = w.c.turns[ordinal];
+        if (turn !== undefined) {
+          if (turn.foot) {
+            const at = locate(w.c.rows, `${turnKey(ordinal)}:foot`, w.c.rows.length - 1);
+            if (at >= 0) take(w, at, 1);
+          }
+          turnChange(w, ordinal, { foot: false, ended: false });
+        }
+      }
+      w.c.active = false;
+      working(w);
+      return true;
+    }
+    case 'retry':
+      if (mine && p['sending']) continuityNote(w, ev, 'cloud', words.sendingAgain);
+      return true;
+    case 'handoff': {
+      if (!mine) return true;
+      const away = p['predecessor'] === w.c.rootId;
+      const other = String((away ? p['successor'] : p['predecessor']) ?? '');
+      continuityNote(w, ev, 'arrow-right', away ? words.continuesElsewhere : words.continuesHere, { label: away ? words.openIt : words.openFirst, runId: other });
+      return true;
+    }
+    case 'error': {
+      // A lost connection is one quiet line per turn, updated in place, not a stack of red alerts.
+      if (!mine || p['class'] !== 'network') return false;
+      const said = plain(String(p['message'] ?? ''), 400);
+      if (!said) return true;
+      const net = w.c.continuity.net;
+      if (net !== null) {
+        const at = locate(w.c.rows, net.key, net.at);
+        if (at >= 0) {
+          const count = net.last !== said ? net.count + 1 : net.count;
+          w.c.continuity = { ...w.c.continuity, net: { ...net, count, last: said, at } };
+          // As VS Code says it: from the second error on, the line counts the attempts.
+          set(w, at, { ...(vecGet(w.c.rows, at) as NoteRow), text: words.lostAttempts(count), tooltip: said });
+          return true;
+        }
+      }
+      const row = continuityNote(w, ev, 'cloud', words.lost);
+      const at = locate(w.c.rows, row.key, w.c.rows.length - 1);
+      set(w, at, { ...row, tooltip: said });
+      w.c.continuity = { ...w.c.continuity, net: { key: row.key, count: 1, last: said, at } };
+      return true;
+    }
+    case 'stall':
+      if (mine) continuityNote(w, ev, 'debug-pause', words.stall);
+      return true;
+    case 'memory_valve':
+      if (mine) continuityNote(w, ev, 'chip', words.memoryValve);
+      return true;
+    case 'local_model': {
+      if (!mine) return true;
+      const key = `${String(p['model'])}@${String(p['context'])}`;
+      if (w.c.continuity.model !== key) {
+        w.c.continuity = { ...w.c.continuity, model: key };
+        const bytes = typeof p['bytes'] === 'number' ? String(Math.round((p['bytes'] / GIB) * 10) / 10) : null;
+        continuityNote(w, ev, 'server', words.localModel(String(p['base'] || p['model']).replace(/^ollama\//, ''), Math.round((Number(p['context']) || 0) / 1024), bytes, !!p['already_loaded']));
+      }
+      return true;
+    }
+    case 'back_online':
+      return true;
+    case 'attention':
+      if (mine && p['kind'] && p['reason']) continuityNote(w, ev, 'cloud', words.kept(plain(String(p['reason']), 400).replace(/^./, m => m.toUpperCase()).replace(/\.$/, '')));
+      return true;
+    case 'turn_started':
+      // A new turn has its own line for a lost connection.
+      if (mine) w.c.continuity = { ...w.c.continuity, net: null };
+      return false;
+    default:
+      return CONTINUITY_QUIET.has(ev.kind);
+  }
+}
+
 function usage(w: Work, ev: DaemonEvent, p: Readonly<Record<string, unknown>>, child: boolean): void {
-  if (child) return;
-  const ordinal = ensureTurn(w, ev);
   const u = record(p['usage'] || p['total'] || p['tokens'] || p);
   const pick = (...keys: string[]): number | undefined => keys.map(k => u[k]).find(v => typeof v === 'number') as number | undefined;
   const input = pick('input_tokens', 'inputTokens', 'input'), output = pick('output_tokens', 'outputTokens', 'output');
+  if (child) {
+    // A sub-agent's usage stands beside its title: what it reported, never counted as allowance.
+    const counts = [input, output];
+    if (counts.every(v => v === undefined) || counts.some(v => v !== undefined && (!Number.isSafeInteger(v) || v < 0))) return;
+    const total = (input || 0) + (output || 0);
+    if (!Number.isSafeInteger(total)) return;
+    const t = TEXT.conversation;
+    const label = input !== undefined && output !== undefined ? t.childTokens(compact(total)) : t.childTokensOf(compact(total), input !== undefined);
+    const detail = [input !== undefined && t.childInput(input), output !== undefined && t.childOutput(output), t.notAllowance].filter(Boolean).join(' · ');
+    const run = ev.run_id as string;
+    w.c.childUsage = mapSet(w.c.childUsage, run, { label, detail });
+    childBlock(w, run, undefined, ev);
+    childHeader(w, run);
+    return;
+  }
+  const ordinal = ensureTurn(w, ev);
   const cached = pick('cache_read_input_tokens', 'cached_input_tokens', 'cachedInputTokens');
   const cost = typeof p['total_cost_usd'] === 'number' ? p['total_cost_usd'] : typeof p['cost'] === 'number' ? p['cost'] : undefined;
   if (input === undefined && output === undefined && cost === undefined) return;

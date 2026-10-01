@@ -177,6 +177,9 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, until, 
     await selectRun('C current');
     const reviewC = await reviewFor(repoA);
     check('current checkout review is the repository itself', true, await reviewC.eval(`document.getElementById('workspace-note').textContent`));
+    // AC-263: a finished agent in the owner's checkout opens on Since task start, and says so.
+    const opened = await reviewC.waitFor(`document.getElementById('compare')?.dataset.mode && ({ mode: document.getElementById('compare').dataset.mode, note: document.getElementById('compare-note').textContent })`, 20000).catch(() => null);
+    check("current checkout review opens on Since task start and says it includes the folder's other edits", opened && opened.mode === 'task_start' && /includes any edits made in this folder/.test(opened.note), opened);
     await reviewC.waitFor(`[...document.querySelectorAll('.diff-file')].some(e => e.querySelector('.file-path')?.textContent === 'a.txt' && e.dataset.loadState === 'rendered')`, 20000);
     const fbox = await s.webviewPoint(reviewC, '#follow');
     await cdp.click(fbox.x, fbox.y);
@@ -216,7 +219,14 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, until, 
     const diskHasAgent = fs.readFileSync(path.join(repoA, 'a.txt'), 'utf8').includes('AGENT-EXTERNAL-WRITE');
     check('same-line external write does not overwrite the unsaved draft; both versions exist', draftKept && diskHasAgent, { draftKept, diskHasAgent });
     // Bring the review back to the front of its group (the native diff editor was on top of it).
-    const reviewTab = await cdp.waitFor(`(() => { const t = [...document.querySelectorAll('.tab')].find(t => /Review.*C current/.test(t.getAttribute('aria-label') || '')); if (!t) return null; const b = t.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`, 10000, 'review tab').catch(() => null);
+    // The native diff's tab ("a.txt (Since task start)") can push the review's tab partly out of the
+    // tab bar's view: click the part of it that is on screen, after scrolling it into view (AC-263).
+    const tabPoint = pattern => `(() => { const t = [...document.querySelectorAll('.tab')].find(t => ${pattern}.test(t.getAttribute('aria-label') || t.textContent)); if (!t) return null;
+      t.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      const b = t.getBoundingClientRect(), bar = (t.closest('.tabs-container') || t.parentElement).getBoundingClientRect();
+      const left = Math.max(b.left, bar.left), right = Math.min(b.right, bar.right); if (right - left < 8) return null;
+      return { x: (left + right) / 2, y: b.top + b.height / 2 }; })()`;
+    const reviewTab = await cdp.waitFor(tabPoint('/Review.*C current/'), 10000, 'review tab').catch(() => null);
     if (reviewTab) { await cdp.click(reviewTab.x, reviewTab.y); await delay(1200); }
     const reviewC2 = await cdp.webview(`!!document.getElementById('diffs') && document.getElementById('workspace-note')?.textContent.includes(${JSON.stringify(repoA)})`, 15000).catch(() => reviewC);
     const draftListed = await reviewC2.waitFor(`[...document.querySelectorAll('#tree .file')].some(b => /^a\\.txt, .*unsaved/.test(b.getAttribute('aria-label') || '') && !!b.querySelector('.marker.codicon-circle-filled'))`, 8000).then(() => true, () => false);
@@ -231,7 +241,7 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, until, 
     const recovered = await cdp2.waitFor(`[...document.querySelectorAll('.tab')].some(t => /a\\.txt/.test(t.getAttribute('aria-label') || '') && t.classList.contains('dirty'))`, 20000).catch(() => false);
     check('pending draft recovered after reload', recovered);
     await s.screenshot('after-reload');
-    const tab = await cdp2.waitFor(`(() => { const t = [...document.querySelectorAll('.tab')].find(t => /Review.*C current/.test(t.getAttribute('aria-label') || t.textContent)); if (!t) return null; const b = t.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`, 20000).catch(() => undefined);
+    const tab = await cdp2.waitFor(tabPoint('/Review.*C current/'), 20000).catch(() => undefined);
     if (tab) await cdp2.click(tab.x, tab.y);
     const reviewAfter = tab && await cdp2.webview(`document.getElementById('workspace-note')?.textContent.includes(${JSON.stringify(repoA)}) && document.querySelectorAll('.diff-file').length > 0`, 30000).catch(() => undefined);
     check('review restored after reload', !!reviewAfter, tab ? 'tab restored' : 'no tab');

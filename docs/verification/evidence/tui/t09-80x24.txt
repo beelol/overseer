@@ -1,5 +1,5 @@
- ◆ Overseer  page 1/1 · 9 agents · ● 3 active · ◆ 1 needs you       ● connected 
-╭ agents ──────────────────────╮┏ 1 ✓ Write API docs ━━━━━━━━━━━━ generic · 0s ┓
+ ◆ Overseer  page 1/1 · 9 agents · ● 2 working   phone access off · ● connected 
+╭ agents ──────────────────────╮┏ 1 ✓ Write API docs ━━━━━━━━━━━━ Program · 0s ┓
 │ 1 ✓ Write API docs           │┃ step 2 done                                  ┃
 │ 2 ✓ Bump dependencies        │┃                                              ┃
 │ 3 ✓ Tidy lint warnings       │┃                                              ┃
@@ -21,4 +21,4 @@
 │                              │┃                                              ┃
 │                              │┃                                              ┃
 ╰──────────────────────────────╯┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
- i message   z zoom   a/d answer   n new   o Overseer   ? keys   q quit         
+ i message   g full view   a/d answer   n new   o Overseer   ? keys   q quit    
