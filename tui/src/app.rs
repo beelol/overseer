@@ -1589,6 +1589,11 @@ impl App {
         if fu.starts_with("unsupported") {
             return Some(format!("{} does not take follow-ups", run.harness));
         }
+        // A waiting agent always takes a reply (AC-241): with a permission waiting it denies it
+        // with the reply as the reason.
+        if run.permission_request().is_some() {
+            return None;
+        }
         if run.active() && run.harness != "generic" {
             return Some("a turn is running; wait for it or press x to interrupt".into());
         }
@@ -1606,18 +1611,38 @@ impl App {
             return;
         }
         self.drafts.remove(&run.id);
+        if let Some(request_id) = run.permission_request() {
+            // Deny with a note (AC-241): the agent reads the reply as the reason.
+            self.request("run.permission", json!({ "run_id": run.id, "request_id": request_id, "allow": false, "message": text }), Pending::Permission { allow: false });
+            self.mode = if matches!(self.mode, Mode::Compose) { Mode::Grid } else { self.mode.clone() };
+            return;
+        }
         self.request("run.follow_up", json!({ "run_id": run.id, "prompt": text }), Pending::FollowUp { run: run.id.clone(), text: text.clone() });
         self.mode = if matches!(self.mode, Mode::Compose) { Mode::Grid } else { self.mode.clone() };
     }
 
     fn answer(&mut self, allow: bool) {
+        self.answer_with(allow, false);
+    }
+
+    /// Allow once, Allow for this session (`always`: the harness's rule, when it offers one) or
+    /// Deny (AC-241).
+    fn answer_with(&mut self, allow: bool, always: bool) {
         let Some(run) = self.focused().cloned() else { return };
         let request_id = run.permission_request().or_else(|| self.feeds.get(&run.id).and_then(|f| f.pending_permission().map(|p| p.0.to_string())));
         let Some(request_id) = request_id else {
             self.say("Nothing to answer for this agent", false);
             return;
         };
-        self.request("run.permission", json!({ "run_id": run.id, "request_id": request_id, "allow": allow }), Pending::Permission { allow });
+        if always && run.attention.as_ref().is_none_or(|a| a["always"].is_null()) {
+            self.say(format!("{} offers no Allow for this session here; a allows once", crate::words::harness(&run.harness)), false);
+            return;
+        }
+        let mut params = json!({ "run_id": run.id, "request_id": request_id, "allow": allow });
+        if always {
+            params["always"] = json!(true);
+        }
+        self.request("run.permission", params, Pending::Permission { allow });
     }
 
     fn next_waiting(&mut self) {
@@ -2345,6 +2370,7 @@ impl App {
                 }
             }
             KeyCode::Char('a') => self.answer(true),
+            KeyCode::Char('s') => self.answer_with(true, true),
             KeyCode::Char('d') => self.answer(false),
             KeyCode::Char('w') => self.next_waiting(),
             KeyCode::Char('x') => {

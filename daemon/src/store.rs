@@ -1722,6 +1722,16 @@ impl Store {
     }
 
     /// The first answer given to a permission request: `{"allow", "by", "ts"}`.
+    /// Whether the owner already chose "Allow for this session" for this offer (its label, such
+    /// as "Write · this session") on this agent (AC-241).
+    pub fn allowed_for_session(&self, run: &str, label: &str) -> Result<bool> {
+        Ok(self.conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM events WHERE run_id=?1 AND kind='permission_answered' AND json_extract(payload, '$.allow')=1 AND json_extract(payload, '$.always')=?2)",
+            params![run, label],
+            |r| r.get::<_, bool>(0),
+        )?)
+    }
+
     pub fn permission_answer(&self, run: &str, request_id: &str) -> Result<Option<Value>> {
         Ok(self
             .conn

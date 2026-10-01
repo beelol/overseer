@@ -139,7 +139,13 @@
       t.addEventListener('click', e => { if (!e.target.closest('button, input, a, form, summary, .tile-perm')) post({ type: 'track', runId: run.id }); });
       openBtn.addEventListener('click', () => open(run.id));
       pin.addEventListener('click', () => post({ type: 'pin', runId: run.id, on: pin.getAttribute('aria-pressed') !== 'true' }));
-      foot.addEventListener('submit', e => { e.preventDefault(); const text = input.value.trim(); if (!text || input.disabled) return; post({ type: 'followUp', runId: run.id, text, scope: 'tile' }); input.value = ''; });
+      foot.addEventListener('submit', e => {
+        e.preventDefault(); const text = input.value.trim(); if (!text || input.disabled) return;
+        if (tile.asking) post({ type: 'permission', runId: run.id, request_id: tile.asking.request_id, allow: false, message: text, scope: 'tile' });
+        else if (ACTIVE.has(tile.run.status) && tile.run.harness !== 'generic') post({ type: 'steer', runId: run.id, text, how: 'queue', scope: 'tile' });
+        else post({ type: 'followUp', runId: run.id, text, scope: 'tile' });
+        input.value = '';
+      });
       t.addEventListener('keydown', e => {
         if (e.target !== t) return;
         if (e.key === 'Enter') { open(run.id); e.preventDefault(); }
@@ -202,15 +208,16 @@
       if (att) {
         const d = window.OverseerConversation.describe(att.tool, att.input);
         const text = el('span', 'tile-perm-text', `Allow ${d.pending || d.verb} ${d.target || ''}?`); text.title = d.full || att.tool;
-        const allow = el('button', 'btn primary sm', 'Allow'); allow.type = 'button'; allow.dataset.permission = 'allow';
-        allow.addEventListener('click', () => post({ type: 'permission', runId: run.id, request_id: att.request_id, allow: true, scope: 'tile' }));
-        const deny = el('button', 'btn sm', 'Deny'); deny.type = 'button'; deny.dataset.permission = 'deny';
-        deny.addEventListener('click', () => post({ type: 'permission', runId: run.id, request_id: att.request_id, allow: false, scope: 'tile' }));
-        tile.perm.replaceChildren(ui.icon('shield', 'sm'), text, allow, deny);
+        tile.perm.replaceChildren(ui.icon('shield', 'sm'), text, ...window.OverseerConversation.permissionButtons(att.always, m => post({ type: 'permission', runId: run.id, request_id: att.request_id, ...m, scope: 'tile' }), { short: true }));
       }
-      const busy = ACTIVE.has(run.status) && run.harness !== 'generic';
-      tile.input.disabled = busy || String(run.capabilities?.follow_up || '').startsWith('unsupported');
-      tile.input.placeholder = busy ? (window.OverseerContinuityText && window.OverseerContinuityText.isWaiting(run.status) ? 'Message for when it continues' : 'Working…') : 'Reply';
+      // A waiting agent always takes a reply (AC-241): with a permission waiting the reply denies it
+      // with the reply as the reason; waiting on another question, it is queued for the agent.
+      tile.asking = att;
+      const waiting = run.status === 'waiting_for_user' || !!att;
+      const busy = ACTIVE.has(run.status) && run.harness !== 'generic' && !waiting;
+      tile.input.disabled = busy || (!att && String(run.capabilities?.follow_up || '').startsWith('unsupported'));
+      tile.input.placeholder = att ? 'Deny with a note' : waiting ? 'Reply' : busy ? (window.OverseerContinuityText && window.OverseerContinuityText.isWaiting(run.status) ? 'Message for when it continues' : 'Working…') : 'Reply';
+      tile.input.title = att ? 'Denies the request; the agent reads your note as the reason' : '';
     }
 
     let ready = false; // no layout (and no pruning of a restored one) before the first state arrives

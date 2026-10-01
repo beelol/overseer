@@ -156,7 +156,7 @@
       const head = el('div', 'proposal-head'); head.append(ui.mark('sm'), el('span', null, 'Overseer will'));
       if (p.cause === 'voice') { const mic = ui.icon('mic', 'xs'); mic.removeAttribute('aria-hidden'); mic.setAttribute('role', 'img'); mic.setAttribute('aria-label', 'From a spoken request'); mic.title = 'From a spoken request'; head.append(mic); card.classList.add('spoken'); }
       const list = el('ul', 'proposal-list');
-      for (const line of p.lines || (p.actions || []).map(a => a.action + (a.title ? ' ' + a.title : ''))) list.append(el('li', null, line));
+      for (const line of p.lines || (p.actions || []).map(a => a.action + (a.title ? ' ' + a.title : '') + (a.blocked_on ? `. ${a.blocked_on}: answer the permission first?` : ''))) list.append(el('li', null, line));
       const status = el('div', 'proposal-status'); status.setAttribute('role', 'status');
       const yes = el('button', 'btn primary sm', 'Yes'); yes.type = 'button'; yes.dataset.proposal = 'yes';
       const no = el('button', 'btn sm', 'No'); no.type = 'button'; no.dataset.proposal = 'no';
@@ -255,7 +255,8 @@
           if (quiet > STUCK_MS) return { stage: 'stuck', text: `${title} has shown no activity for ${elapsed(quiet)}`, run: run.id, since };
           return { stage: 'working', text: `${title} is working`, detail: act && act.text ? act.text : '', run: run.id, since };
         }
-        case 'waiting_for_user': return { stage: 'stuck', text: `${title} needs you${run.attention && run.attention.tool ? `: it wants to use ${run.attention.tool}` : ''}`, run: run.id };
+        // Blocked on the owner (AC-241): said as such, never "done"; the stage opens its chat to answer.
+        case 'waiting_for_user': return { stage: 'stuck', text: run.attention && run.attention.kind === 'permission' ? `${title} is blocked on your permission${run.attention.tool ? ` to use ${window.OverseerPlain ? window.OverseerPlain.tool(run.attention.tool) : run.attention.tool}` : ''}: answer it?` : `${title} needs you`, run: run.id };
         case 'waiting_for_connection': return { stage: 'stuck', text: `${title} waits for a connection`, run: run.id };
         case 'waiting_for_memory': return { stage: 'stuck', text: `${title} waits for memory`, run: run.id };
         case 'completed': return { stage: 'done', text: row.action === 'start' ? `${title} finished` : row.state === 'answered' || row.state === 'picked_up' ? `${title} is done with it` : `${title} finished`, run: run.id };

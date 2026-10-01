@@ -288,6 +288,7 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         return;
     }
     let keys: &[(&str, &str)] = match app.mode {
+        Mode::Compose if app.focused().is_some_and(|r| r.permission_request().is_some()) => &[("enter", "deny with this note"), ("alt+enter", "new line"), ("esc", "close (keeps draft)"), ("ctrl+u", "clear")],
         Mode::Compose => &[("enter", "send"), ("alt+enter", "new line"), ("esc", "close (keeps draft)"), ("ctrl+u", "clear")],
         Mode::Zoom { .. } => &[("e", if app.expand_tools { "fold tools" } else { "expand tools" }), ("j/k", "scroll"), ("home/G", "top/bottom"), ("i", "message"), ("a/d", "allow/deny"), ("x", "interrupt"), ("g/z", "grid"), ("?", "help")],
         Mode::NewAgent => &[("tab", "next field"), ("←/→", "choose"), ("enter", "start"), ("esc", "cancel")],
@@ -569,7 +570,10 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     let pending = run.permission_request().is_some() || feed.and_then(|f| f.pending_permission()).is_some();
     let bottom = if pending {
         let what = feed.and_then(|f| f.pending_permission().map(|p| p.1.to_string())).or_else(|| run.attention.as_ref().and_then(|a| a["tool"].as_str().map(str::to_string))).unwrap_or_default();
-        Some(Line::from(vec![Span::styled(" ◆ ", Style::new().fg(waiting())), Span::styled(fit(&what, (area.width as usize).saturating_sub(24)), Style::new().fg(waiting()).add_modifier(Modifier::BOLD)), Span::styled("  a", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(" allow ", Style::new().fg(MUTED)), Span::styled("d", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(" deny ", Style::new().fg(MUTED))]))
+        Some(Line::from(vec![Span::styled(" ◆ ", Style::new().fg(waiting())), Span::styled(fit(&what, (area.width as usize).saturating_sub(24)), Style::new().fg(waiting()).add_modifier(Modifier::BOLD)), Span::styled("  a", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(" allow ", Style::new().fg(MUTED))].into_iter()
+            .chain(run.attention.as_ref().filter(|a| !a["always"].is_null()).map(|_| vec![Span::styled("s", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(" this session ", Style::new().fg(MUTED))]).unwrap_or_default())
+            .chain([Span::styled("d", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(" deny ", Style::new().fg(MUTED)), Span::styled("i", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(" reply ", Style::new().fg(MUTED))])
+            .collect::<Vec<_>>()))
     } else if app.drafts.get(&run.id).is_some_and(|d| !d.trim().is_empty()) && !matches!(app.mode, Mode::Compose) {
         Some(Line::from(Span::styled(" ✎ draft ", Style::new().fg(accent()))))
     } else if let Some(landed) = app.state.landing_text(&run.workspace_id).filter(|_| !run.active()) {
@@ -783,7 +787,9 @@ fn composer(f: &mut Frame, app: &App, area: Rect) {
     let Some(run) = app.focused() else { return };
     let draft = app.drafts.get(&run.id).cloned().unwrap_or_default();
     let blocker = app.message_blocker(run);
-    let title = Line::from(vec![Span::styled(" message → ", Style::new().fg(MUTED)), Span::styled(short(&run.title, 50), Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::raw(" ")]);
+    // A permission waits (AC-241): the reply denies it, and the agent reads it as the reason.
+    let lead = if run.permission_request().is_some() { " deny with a note → " } else { " message → " };
+    let title = Line::from(vec![Span::styled(lead, Style::new().fg(MUTED)), Span::styled(short(&run.title, 50), Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::raw(" ")]);
     let mut block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(accent())).title(title);
     if let Some(why) = &blocker {
         block = block.title_bottom(Line::from(Span::styled(format!(" can't send now: {why} "), Style::new().fg(waiting()))));
@@ -811,7 +817,8 @@ fn help(f: &mut Frame, area: Rect) {
         ("home / G", "in the full view: top / bottom"),
         ("v", "review: Accept / Reject changes"),
         ("e  (in zoom)", "expand tool inputs and results"),
-        ("a / d", "allow / deny its permission request"),
+        ("a / s / d", "allow once / allow for this session / deny its permission request"),
+        ("i  (waiting)", "deny it with a note: the agent reads it as the reason"),
         ("w", "next agent waiting for you"),
         ("x", "interrupt the focused agent"),
         ("n", "start a new agent"),

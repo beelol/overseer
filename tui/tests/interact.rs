@@ -204,17 +204,22 @@ fn t05_messages_go_to_the_focused_agent_only_and_drafts_are_kept() {
     assert!(heard(&b, "B heard: draft for B") && heard(&b, "B heard: second line"));
     assert!(!heard(&a, "A heard: draft for B"));
 
-    // A running Claude turn cannot take a message: the composer says why instead of failing.
+    // AC-241: a Claude agent waiting on a permission takes a reply: it denies the request, and the
+    // agent reads the reply as the reason.
     focus(&mut tui, &busy);
-    tui.key(KeyCode::Char('i'));
-    tui.type_text("are you there?");
     let s = tui.screen();
-    assert!(s.contains("can't send now: a turn is running"), "{s}");
+    assert!(s.contains("a allow") && s.contains("d deny") && s.contains("i reply"), "the tile offers the answers: {s}");
+    tui.key(KeyCode::Char('i'));
+    tui.type_text("not perm.txt; write notes.md instead");
+    let s = tui.screen();
+    assert!(s.contains("deny with a note → Busy Claude") && !s.contains("can't send now"), "{s}");
+    tui.snapshot("t05-deny-with-a-note");
     tui.key(KeyCode::Enter);
-    assert!(tui.screen().contains("Not sent: a turn is running"));
-    assert_eq!(tui.app.drafts.get(&busy).map(String::as_str), Some("are you there?"), "the draft is kept");
-    tui.key(KeyCode::Esc);
-    d.ctl("run.interrupt", json!({ "run_id": busy }));
+    d.wait_status(&busy, |s| !matches!(s, "waiting_for_user" | "running" | "queued" | "starting"), 20);
+    let answered = d.events(&busy).into_iter().find(|e| e["kind"] == "permission_answered").expect("answered");
+    assert_eq!(answered["payload"]["allow"], false);
+    assert!(d.events(&busy).iter().any(|e| e["kind"] == "tool_result" && e["payload"].to_string().contains("write notes.md instead")), "the note reached the agent as the reason");
+    assert!(tui.app.drafts.get(&busy).is_none(), "the note was sent");
 }
 
 #[test]
