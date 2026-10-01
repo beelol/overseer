@@ -410,7 +410,7 @@ Each command in `extension/package.json` has a row: the TUI's key (every key her
 
 ### Criteria
 
-Status (pull request #43, merged 2026-10-01 as e5836534; tests in `tui/tests/parity.rs`, evidence `docs/verification/evidence/tui/parity-*`): T-25 to T-28, T-37, T-38 and T-39 verified (T-26 with pull request #44, merged as its own commit: VS Code reads the daemon's reviewed marks; `scenario-review-marks` sees a terminal's `review.seen` clear VS Code's mark in 259 ms). T-29 partial: accepting and rejecting in the terminal is checked through the daemon, not yet in a VS Code window. T-40 and T-41 verified with pull request #45 (`t40_dashboard_mode_for_big_screens`, `t41_a_grid_only_terminal_beside_it`, `t41_two_real_terminals_on_one_daemon`; evidence `parity-t40-*`, `parity-t41-*`); with it the phone Devices panel moved from `D` to Ctrl-O. T-30 to T-36 not started.
+Status (pull request #43, merged 2026-10-01 as e5836534; tests in `tui/tests/parity.rs`, evidence `docs/verification/evidence/tui/parity-*`): T-25 to T-28, T-37, T-38 and T-39 verified (T-26 with pull request #44, merged as its own commit: VS Code reads the daemon's reviewed marks; `scenario-review-marks` sees a terminal's `review.seen` clear VS Code's mark in 259 ms). T-29 partial: accepting and rejecting in the terminal is checked through the daemon, not yet in a VS Code window. T-40 and T-41 verified with pull request #45 (`t40_dashboard_mode_for_big_screens`, `t41_a_grid_only_terminal_beside_it`, `t41_two_real_terminals_on_one_daemon`; evidence `parity-t40-*`, `parity-t41-*`); with it the phone Devices panel moved from `D` to Ctrl-O. T-30 to T-34 and T-36 verified with pull request #46 (`t30`..`t36` in `tui/tests/parity.rs`, evidence `parity-t30-*`..`parity-t36-*`; the `d` key now asks for a note before denying, and archived agents leave every filter but Archived, as in VS Code); T-35 (Voice Mode in the terminal) partial: the simulated voice drives every state and a second client sees the same sequence, but it is not checked in a VS Code window.
 
 - [x] **T-25 — An agent list beside the grid.** The main screen keeps the pages of nine and adds an
   agent list on the left: agents grouped by repository, the most recently active repository and
@@ -456,28 +456,28 @@ Status (pull request #43, merged 2026-10-01 as e5836534; tests in `tui/tests/par
   VS Code's review; a change rejected in the TUI restores the base lines in the worktree; a whole
   file accepted and rejected; a change the fixture agent edits again before Reject is refused with
   the reason; a text audit finds no Keep, Undo or Save in the review.
-- [ ] **T-30 — Follow in the review.** `F` turns Follow on: the review moves to the file the agent
+- [x] **T-30 — Follow in the review.** `F` turns Follow on: the review moves to the file the agent
   is editing and to the change being made, as edits arrive. Moving by hand pauses Follow and the
   header says "Paused"; `F` resumes it. **Verify:** a fixture agent editing three files in turn:
   the review moves to each within 250 ms of its edit; `j` pauses it; `F` resumes it.
-- [ ] **T-31 — A waiting agent can always be answered from the terminal.** A pending permission
+- [x] **T-31 — A waiting agent can always be answered from the terminal.** A pending permission
   offers Allow once (`a`), Allow for this session (`s`, the harness's own rule) and Deny with a
   note (`d` opens a one-line note; Enter sends, empty is fine). The note reaches the agent as the
   reason. This is the terminal side of the main RFC's "a waiting agent can always be answered".
   **Verify:** on the Claude fixture: Allow for this session is not asked again for the same tool;
   a denial's note is in the fixture's input log; the prompt's snapshot.
-- [ ] **T-32 — New agent with every choice VS Code has.** The `n` form adds effort and permission
+- [x] **T-32 — New agent with every choice VS Code has.** The `n` form adds effort and permission
   mode (Ask first, Accept edits, Auto) to repository, harness, account, model and prompt, offering
   only what the chosen harness and model support, remembered like VS Code's composer. **Verify:** a
   fixture agent started with a chosen effort and mode has both in its task record; a harness
   without efforts hides the field.
-- [ ] **T-33 — Cancel a conflicted merge.** When merge back stops on conflicts, `M` on that agent
+- [x] **T-33 — Cancel a conflicted merge.** When merge back stops on conflicts, `M` on that agent
   offers to cancel the merge (y/n), which puts the worktree back as it was before the merge, as
   VS Code's Cancel merge does. The merge confirmation lists every file that will be committed,
   untracked ones included. **Verify:** a fixture merge that conflicts; cancelling restores the
   worktree's pre-merge HEAD and files; the confirmation of a worktree with an untracked `.env`
   names it.
-- [ ] **T-34 — Archive and restore.** `E` archives a finished agent (y/n): it leaves the list and
+- [x] **T-34 — Archive and restore.** `E` archives a finished agent (y/n): it leaves the list and
   the grid, as in VS Code. The filter gains Archived, where `E` restores one. **Verify:** archiving
   a fixture agent in the TUI hides it in both the TUI and VS Code; restoring brings it back in both.
 - [ ] **T-35 — Voice Mode in the terminal.** Overseer's conversation (`o`) shows a Voice Mode line:
@@ -487,7 +487,7 @@ Status (pull request #43, merged 2026-10-01 as e5836534; tests in `tui/tests/par
   the TUI only shows and sends. **Verify:** with a fixture voice session each state shows in turn,
   a card fills in as it advances, and mute, cancel and yes work by key; the same state shows in
   VS Code at the same time.
-- [ ] **T-36 — Nothing left out without a reason.** This RFC keeps a table of every command VS Code
+- [x] **T-36 — Nothing left out without a reason.** This RFC keeps a table of every command VS Code
   Overseer offers, each with its TUI key or the reason it stays in VS Code. **Verify:** a unit test
   reads the commands in `extension/package.json` and fails when one has no row; `?` lists every key
   the table names.
