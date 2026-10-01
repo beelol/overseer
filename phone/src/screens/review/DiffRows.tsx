@@ -68,7 +68,7 @@ export const HunkHeading = memo(function HunkHeading({ hunk, controls, onAccept,
             <>
               <Icon name="check" size="sm" tone="green" />
               <Txt testID={`file.hunk.${hunk.key}.reviewed`} kind="small" tone="green">
-                {text.TEXT.review.reviewed}
+                {text.TEXT.review.accepted}
               </Txt>
             </>
           ) : null}
@@ -78,7 +78,7 @@ export const HunkHeading = memo(function HunkHeading({ hunk, controls, onAccept,
         <Actions>
           <Button
             testID="file.hunk.accept"
-            label={hunk.reviewed ? text.TEXT.review.reviewed : WORDS.file.accept}
+            label={hunk.reviewed ? text.TEXT.review.accepted : text.TEXT.review.acceptWord}
             accessibilityLabel={hunk.accept.label}
             accessibilityState={{ selected: hunk.reviewed }}
             kind={hunk.reviewed ? 'secondary' : 'primary'}

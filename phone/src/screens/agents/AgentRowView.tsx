@@ -41,6 +41,7 @@ const useStyles = makeStyles((theme) => ({
   texts: { flex: 1, justifyContent: 'center', paddingVertical: theme.space[3], gap: theme.space[1] },
   end: { flexDirection: 'row', alignItems: 'center', gap: theme.space[2] },
   mark: { width: theme.space[2], height: theme.space[2], borderRadius: theme.radius.pill },
+  review: { color: theme.colors.green },
   orange: { backgroundColor: theme.colors.amber },
   red: { backgroundColor: theme.colors.red },
   green: { backgroundColor: theme.colors.green },
@@ -51,10 +52,19 @@ const ICON: Readonly<Record<string, IconName>> = { terminal: 'terminal', hubot: 
 const ARCHIVE = 'archive';
 const MORE = 'longpress';
 
+/** The status in words on the row's line: an agent at its end says whether it was reviewed (AC-254). */
+function wordsOf(row: Row): string | null {
+  if (row.kind === 'needs') return row.description;
+  // Done work not reviewed yet: the side bar's words, in the line's own lower case.
+  if (row.toReview && row.status !== null && row.badge === text.TEXT.badgeToReview) return `${text.listStatusText(row.status)}${text.TEXT.agents.toReview}`;
+  return row.statusText;
+}
+
 /**
  * One agent of the list: the provider's logo, the title on one line and under it the
- * repository, the status in words and the time. A child stands indented under its parent with
- * a line. Tap opens it, a long press offers Pin, Archive and Stop, a swipe archives.
+ * repository, the status in words and the time. Done work not reviewed yet carries the side
+ * bar's ✦. A child stands indented under its parent with a line. Tap opens it, a long press
+ * offers Pin, Archive and Stop, a swipe archives.
  */
 export const AgentRowView = memo(function AgentRowView({ row, stopping, canChange, onOpen, onMore, onArchive }: AgentRowViewProps) {
   const styles = useStyles();
@@ -78,7 +88,7 @@ export const AgentRowView = memo(function AgentRowView({ row, stopping, canChang
   );
 
   const mark = row.badgeTone === 'red' ? styles.red : row.badgeTone === 'green' ? styles.green : styles.orange;
-  const words = going ? WORDS.stopping : row.kind === 'needs' ? row.description : row.statusText;
+  const words = going ? WORDS.stopping : wordsOf(row);
   const detail = row.kind === 'needs' ? (row.tooltip.split('\n')[1] ?? '') : going ? '' : row.description;
 
   return (
@@ -108,6 +118,11 @@ export const AgentRowView = memo(function AgentRowView({ row, stopping, canChang
         </View>
         <View style={styles.end}>
           {row.pinned ? <Icon name="pinned" size="sm" tone="faint" /> : null}
+          {row.kind !== 'needs' && row.toReview && row.badge === text.TEXT.badgeToReview ? (
+            <Txt testID={`${testID}.review`} kind="small" style={styles.review} accessibilityElementsHidden importantForAccessibility="no">
+              {row.badge}
+            </Txt>
+          ) : null}
           {needsOwner(row) ? (
             <Pulse>
               <View testID={`${testID}.mark`} style={[styles.mark, mark]} />

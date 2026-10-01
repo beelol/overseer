@@ -295,6 +295,44 @@ describe('the rows', () => {
     expect(words(rowId(`note:${stopped.seq}`))).toBe('Stopped from Phone');
   });
 
+  test('what Overseer does to the agent is a quiet line; its briefing opens on a tap', async () => {
+    const { app, run } = await open('echo-follow-up');
+    const held = makeEvent('hold', { reason: 'two agents write the same file' }, { run_id: run, source: 'overseer' });
+    const briefing = makeEvent('briefing', { text: 'The owner wants small commits.' }, { run_id: run, source: 'overseer' });
+    const quiet = makeEvent('overseer_tool_call', { name: 'hold' }, { run_id: run, source: 'overseer' });
+    await arrive(app, held, briefing, quiet);
+    expect(words(rowId(`note:${held.seq}`))).toBe('Held by Overseer: two agents write the same file');
+    expect(words(rowId(`note:${briefing.seq}`))).toBe('Overseer added a briefing');
+    expect(screen.queryByTestId(`${rowId(`note:${briefing.seq}`)}.detail`)).toBeNull();
+    await fireEvent.press(screen.getByTestId(rowId(`note:${briefing.seq}`)));
+    expect(words(`${rowId(`note:${briefing.seq}`)}.detail`)).toBe('The owner wants small commits.');
+    expect(screen.queryByTestId(rowId(`note:${quiet.seq}`))).toBeNull();
+  });
+
+  test('a sub-agent says beside its title what it reported using', async () => {
+    const { app } = await open('nested');
+    const child = rowId('child:r-222956848452');
+    expect(screen.queryByTestId(`${child}.usage`)).toBeNull();
+    await arrive(app, makeEvent('usage', { usage: { input_tokens: 18423, output_tokens: 1204 } }, { run_id: 'r-222956848452' }));
+    expect(words(`${child}.usage`)).toBe('20k reported tokens');
+    expect(screen.getByLabelText('child task, 20k reported tokens, Done')).toBeTruthy();
+  });
+
+  test('Continuity: a lost connection is one quiet line that counts the attempts; a handoff opens the other agent', async () => {
+    const { app, run } = await open('echo-follow-up');
+    const lost = makeEvent('error', { class: 'network', message: 'error sending request for url (https://api.openai.com/v1/responses)' }, { run_id: run });
+    await arrive(app, lost, makeEvent('error', { class: 'network', message: 'Connection refused (os error 61)' }, { run_id: run }));
+    const line = rowId(`cont:${lost.seq}`);
+    expect(words(line)).toBe('The connection was lost; the agent keeps trying to reconnect. · 2 attempts');
+    expect(screen.getByTestId(line).props.accessibilityLabel).toBe('The connection was lost; the agent keeps trying to reconnect. · 2 attempts, Could not connect');
+    expect(idsOf(screen.toJSON()).filter((id) => id.startsWith(rowId('err:')))).toEqual([]);
+    const handoff = makeEvent('handoff', { predecessor: run, successor: 'r-successor', reason: 'offline' }, { run_id: run });
+    await arrive(app, handoff);
+    expect(words(rowId(`cont:${handoff.seq}`))).toBe('The work continues in another agent.');
+    await fireEvent.press(screen.getByTestId(`${rowId(`cont:${handoff.seq}`)}.link`));
+    expect(router.pushed).toEqual([routes.agent('r-successor')]);
+  });
+
   test('while the agent works the line under the rows says what it does', async () => {
     const r = recording('showcase');
     const { app } = await open('showcase', { state: stateOf(r, 10), through: 10 });
