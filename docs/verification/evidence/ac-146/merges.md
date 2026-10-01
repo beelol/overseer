@@ -1,5 +1,12 @@
 # AC-146: merges
 
+## Pull request #40 (one Overseer layout, Follow inside the review), 2026-09-30
+
+- **Finished:** phase 2 by its agent on 2026-09-29; the owner then rejected Follow opening files in a plain editor, and the rework put Follow inside the review (`26fabb77`..`d67dab5c`, "follow looks fantastic"); "Ask first" and "Start fresh" moved to the composer's foot (`861b905e`).
+- **Throwaway copy:** a first full run on the branch's own head (Rust 1,385, UI 76 of 79: theme and conversation fixed on the branch, chat passed alone); then main with #42 merged in and pushed (`df4e814d`, clean).
+- **Tests:** `scripts/test-all --jobs=1` at `nice -n 20` on `df4e814d`: Rust 1,414 passed, 0 failed; UI 78 of 80. review-width (the header past the edge at 900 px, from the new switch) fixed in the product (`b6bd0fb9`); chat (a classic scroll bar on this Mac takes 15 px; main fails it the same way) fixed in the scenario (`91e107ee`). review-width, chat, review, review-files, agent-head, overseer-window, home and gallery passed alone on the final head. Main gained no code between the copy and the merge.
+- **Merged:** squash, `4da1640e`. AC-264 verified at the merge; AC-99's record notes that an unchanged file now shows in Follow's view.
+
 ## Pull request #42 (Overseer in the Mac's menu bar), 2026-09-30
 
 - **Finished:** built by its agent on 2026-09-29; the on-screen check passed 10 of 10 on 2026-09-30 with nobody at the Mac (the owner's yes to run it then).
