@@ -18,7 +18,7 @@ export const WORDS = {
     /** extension/src/review.js */
     branchToCompare: 'Branch to compare with',
     noBranches: 'No other branches.',
-    reviewed: (done: number, all: number): string => `${done} of ${all} reviewed`,
+    reviewed: (done: number, all: number): string => `${done} of ${all} accepted`,
     asOf: (age: string): string => `As of ${age}`,
     noMatch: 'No files match.',
     fold: (name: string): string => `Fold ${name}`,
@@ -27,7 +27,6 @@ export const WORDS = {
   file: {
     lines: (first: number, last: number): string => (first === last ? `Line ${first}` : `Lines ${first} to ${last}`),
     deletionAfter: (line: number): string => (line > 0 ? `After line ${line}` : 'At the start'),
-    accept: 'Accept',
     reject: 'Reject',
     wrap: 'Wrap long lines',
     unwrap: 'Scroll long lines sideways',
@@ -37,7 +36,7 @@ export const WORDS = {
     takeOutDetail: 'The file goes back to how it was here.',
     putBackConfirm: 'Put back',
     changedSince: 'Nothing was put back, because the file changed since.',
-    changedSinceAccept: 'Not marked as reviewed, because the file changed since.',
+    changedSinceAccept: 'Not accepted, because the file changed since.',
     noChanges: 'No changes in this file for this comparison.',
     more: (n: number): string => `… ${text.grouped(n)} more characters`,
     removedLine: (line: number | null, words: string): string => `Removed, line ${line ?? ''}: ${words}`,

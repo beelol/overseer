@@ -8,10 +8,10 @@
 // extension/branch-diff/review/browser.js in a page, and `statusLetter`, `STATUS` and the picker's
 // items of extension/src/review.js.
 //
-// VS Code's navigator has two modes (AC-99): Changes only, the default while an agent has changes,
-// and All files, which browses the whole worktree a folder at a time. The phone's review is the
+// VS Code's navigator lists what its view shows (AC-264): Changed in Diffs, the files the agent
+// changed, and All files in Follow, the whole worktree a folder at a time. The phone's review is the
 // changed files (AC-126: "the changed files with status and counts"); browsing every file of the
-// worktree is not part of the phone's gate, so the tree is compared in Changes only.
+// worktree is not part of the phone's gate, so the tree is compared as Diffs lists it (Changed).
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import { acceptParams, branchChoices, changedFiles, changesSummary, comparisonChoices, editTarget, fileDiff, hunkKey, splitLine, statusLetter } from '../src/review.ts';
@@ -38,15 +38,15 @@ interface TreeRow { kind: 'folder' | 'file'; depth: number; name: string; key: s
 
 /** The tree VS Code's review draws for these entries, read from the page. */
 function theirTree(entries: Array<{ id: string; path: string; status: string; conflicted?: boolean }>, query = '', closed: string[] = []): TreeRow[] {
-  const dom = new JSDOM('<!doctype html><body><button id="changes-only"></button><div id="navigator"><div id="tree"></div></div></body>');
+  const dom = new JSDOM('<!doctype html><body><span id="list-title"></span><div id="navigator"><div id="tree"></div></div></body>');
   const document = dom.window.document;
   const TREE = ['node', 'changedEntries', 'changesOnly', 'countsText', 'fileButton', 'openPath', 'populateChanges', 'renderTree'];
-  const draw = new Function('document', 'snapshot', 'filter', 'closedFolders', 'selected', 'jump', 'persist', 'tree', 'navMode', 'rows', 'changesOnlyButton', 'vscode',
+  const draw = new Function('document', 'snapshot', 'filter', 'closedFolders', 'selected', 'jump', 'persist', 'tree', 'view', 'rows', 'listTitle', 'vscode',
     `${TREE.map(name => functionSource(BROWSER, name)).join('\n')}\nrenderTree();`);
   const tree = document.getElementById('tree') as HTMLElement;
   // No diff is drawn yet, so no row has its counts: the tree lists what changed, with its letter.
-  draw(document, { entries }, { value: query }, new Set(closed), undefined, () => {}, () => {}, tree, 'changes', new Map(), document.getElementById('changes-only'), { postMessage: () => {} });
-  if (document.body.dataset['nav'] !== 'changes') throw new Error('the review is not in Changes only');
+  draw(document, { entries }, { value: query }, new Set(closed), undefined, () => {}, () => {}, tree, 'diffs', new Map(), document.getElementById('list-title'), { postMessage: () => {} });
+  if (document.body.dataset['nav'] !== 'changes') throw new Error('the review is not listing Changed');
   const out: TreeRow[] = [];
   const walk = (parent: Element, depth: number): void => {
     for (const el of parent.children) {
@@ -210,7 +210,7 @@ describe('review: hunks', () => {
     expect(readme).toHaveLength(2);
     const before = fileDiff(readme[0]!), after = fileDiff(readme[1]!);
     expect(before.hunks[0]?.reviewed).toBe(false);
-    expect(after.hunks[0]).toMatchObject({ reviewed: true, accept: { label: 'Unmark reviewed hunk 1', reviewed: false } });
+    expect(after.hunks[0]).toMatchObject({ reviewed: true, accept: { label: 'Hunk 1 accepted; tap to take the accept back', reviewed: false } });
     expect(after.reviewed).toBe(1);
     const key = readme[0]!.hunks[0]!.key;
     expect(fileDiff(readme[0]!, [key]).hunks[0]?.reviewed).toBe(true);

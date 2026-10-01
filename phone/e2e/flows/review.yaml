@@ -44,7 +44,7 @@ appId: ${APP}
 - extendedWaitUntil:
     visible:
       id: "file\\.hunk\\.accept"
-      text: "Unmark reviewed hunk 1"
+      text: "Hunk 1 accepted; tap to take the accept back"
     timeout: 20000
 - tapOn:
     id: "file.back"

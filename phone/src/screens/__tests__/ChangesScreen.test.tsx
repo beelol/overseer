@@ -63,9 +63,9 @@ describe('the changed files of an agent', () => {
 
     expect(screen.getByTestId('changes.row.src/cart.ts.added')).toHaveTextContent('+3');
     expect(screen.getByTestId('changes.row.src/cart.ts.removed')).toHaveTextContent('−2');
-    expect(screen.getByTestId('changes.row.src/cart.ts.reviewed')).toHaveTextContent('1 of 2 reviewed');
+    expect(screen.getByTestId('changes.row.src/cart.ts.reviewed')).toHaveTextContent('1 of 2 accepted');
     expect(screen.getByTestId('changes.row.src/tax.ts.added')).toHaveTextContent('+3');
-    expect(screen.getByTestId('changes.row.src/tax.ts.reviewed')).toHaveTextContent('0 of 1 reviewed');
+    expect(screen.getByTestId('changes.row.src/tax.ts.reviewed')).toHaveTextContent('0 of 1 accepted');
     expect(screen.getByLabelText(/logo\.png, D, Deleted file, Not shown: a binary file\./)).toBeTruthy();
 
     // The summary counts every file once its hunks are known.
@@ -166,12 +166,12 @@ describe('the changed files of an agent', () => {
     const app = await open();
     await draw(app, <ChangesScreen />);
     await app.settle();
-    expect(screen.getByTestId('changes.row.src/cart.ts.reviewed')).toHaveTextContent('1 of 2 reviewed');
+    expect(screen.getByTestId('changes.row.src/cart.ts.reviewed')).toHaveTextContent('1 of 2 accepted');
 
     app.connection.answers['review.marks'] = () => ({ run_id: RUN, keys: [FIRST, SECOND], marks: [] });
     await app.events(makeEvent('review_mark', { key: SECOND, path: 'src/cart.ts', reviewed: true }, { run_id: RUN, source: 'user' }));
     await afterNews(app);
-    expect(screen.getByTestId('changes.row.src/cart.ts.reviewed')).toHaveTextContent('2 of 2 reviewed');
+    expect(screen.getByTestId('changes.row.src/cart.ts.reviewed')).toHaveTextContent('2 of 2 accepted');
   });
 
   test('the filter keeps the files whose path holds what was typed', async () => {
@@ -228,7 +228,7 @@ describe('the changed files of an agent', () => {
     const app = await open({ scope: 'watch' });
     await draw(app, <ChangesScreen />);
     await app.settle();
-    expect(screen.getByTestId('changes.row.src/cart.ts.reviewed')).toHaveTextContent('1 of 2 reviewed');
+    expect(screen.getByTestId('changes.row.src/cart.ts.reviewed')).toHaveTextContent('1 of 2 accepted');
     expect(screen.getByTestId('changes.comparison')).toBeTruthy();
   });
 

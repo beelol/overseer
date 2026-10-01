@@ -329,7 +329,7 @@ export const scenarios = [
       else c.lab.call('review.unaccept', { run_id: runId, key: hunks[0].key });
       // The hunk's button says what it would do: take the mark away from a reviewed hunk, or accept it.
       const expectations = second
-        ? [[hunks[0].key, 'Unmark reviewed hunk 1'], [second.key, 'Unmark reviewed hunk 2']]
+        ? [[hunks[0].key, 'Hunk 1 accepted; tap to take the accept back'], [second.key, 'Hunk 2 accepted; tap to take the accept back']]
         : [[hunks[0].key, 'Accept hunk 1']];
       // Every line on the screen, as the phone says it: its number and its text.
       const shown = (line) => line.replace(/\t/g, '  ').slice(0, 2000);

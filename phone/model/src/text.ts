@@ -17,7 +17,7 @@ const BROWSER = 'extension/branch-diff/review/browser.js';
 const PHONE_TEXT = 'extension/src/phone-text.js';
 const DAEMON = 'daemon/src/daemon.rs';
 const ROLLUP = 'extension/media/rollup.js';
-const SEARCH_VIEW = 'extension/src/search-view.js';
+const AGENT_SEARCH = 'extension/src/agent-search.js';
 const CONTINUITY_TEXT = 'extension/media/continuity-text.js';
 const CONTINUITY = 'extension/media/continuity.js';
 
@@ -169,8 +169,8 @@ export const TEXT = {
     waitingForReply: from(ROLLUP, 'Waiting for your reply'),
     needYou: shaped(EXTENSION, "`${n} need${n === 1 ? 's' : ''} you`", (n: number) => `${n} need${n === 1 ? 's' : ''} you`),
     search: from(PACKAGE, 'Search Agents'),
-    /** What the search looks in, as the search field's tooltip says it; the phone's field shows it as its placeholder. */
-    searchHint: shaped(SEARCH_VIEW, 'title, message, file, repository, account or status', 'Title, message, file, repository, account or status'),
+    /** What the search looks in, as the search box's placeholder says it (agent-search.js). */
+    searchHint: from(AGENT_SEARCH, 'Title, message, file, repository, account or status'),
     clearSearch: from(PACKAGE, 'Clear Search'),
     matches: shaped(EXTENSION, "match${shown === 1 ? '' : 'es'}", (shown: number) => `${shown} match${shown === 1 ? '' : 'es'}`),
     showArchived: from(PACKAGE, 'Show Archived Agents'),
@@ -301,9 +301,11 @@ export const TEXT = {
     comparisonUnavailable: shaped(BROWSER, "'Comparison unavailable: ' + next.error", (why: string) => `Comparison unavailable: ${why}`),
     checking: from(BROWSER, 'Checking files…'),
     loading: from(BROWSER, 'Loading diff…'),
-    reviewed: from(BROWSER, 'Reviewed'),
+    /** A hunk's Accept button, and what it reads once the hunk is accepted (AC-263: Accept and Reject, never Keep or Undo). */
+    acceptWord: from(BROWSER, 'Accept'),
+    accepted: from(BROWSER, 'Accepted'),
     accept: shaped(BROWSER, '`Accept hunk ${index + 1}`', (n: number) => `Accept hunk ${n}`),
-    unmark: shaped(BROWSER, '`Unmark reviewed hunk ${index + 1}`', (n: number) => `Unmark reviewed hunk ${n}`),
+    unaccept: shaped(BROWSER, '`Hunk ${index + 1} accepted; click to take the accept back`', (n: number) => `Hunk ${n} accepted; tap to take the accept back`),
     reject: shaped(BROWSER, '`Reject hunk ${index + 1}`', (n: number) => `Reject hunk ${n}`),
     hunkOf: shaped(BROWSER, '`Hunk ${index + 1} of ${row.entry.path}, ${where}`', (n: number, path: string, where: string) => `Hunk ${n} of ${path}, ${where}`),
     lines: shaped(BROWSER, '`lines ${change.modifiedStartLineNumber}–${change.modifiedEndLineNumber}`', (first: number, last: number) => `lines ${first}–${last}`),
