@@ -25,6 +25,9 @@ function gitShow(root, spec) {
   return new Promise((resolve, reject) => execFile('git', ['show', spec], { cwd: root, maxBuffer: 64 * 1024 * 1024, encoding: 'buffer' }, (err, out) => err ? reject(err) : resolve(out)));
 }
 
+// The comparisons the review's header offers in one click (AC-263), in the header's order.
+const QUICK_COMPARISONS = ['task_start', 'latest_run', 'entire_worktree'];
+
 class Review {
   constructor(context, client, model, log) {
     this.context = context; this.client = client; this.model = model; this.log = log;
@@ -44,6 +47,8 @@ class Review {
     this.observed = new Map(); // abs path -> last observed text (bounded)
     this.userSaves = new Map(); // abs path -> ms of last user save
     this.lastReveal = new Map(); // runId -> last reveal message
+    // AC-263: the comparisons the review's header offers in one click, as the daemon last listed them.
+    this.choices = new Map(); // runId -> { options: [{ mode, label, available, detail }], folderEdits }
     this.viewAt = new Map(); // runId -> when its review's switch was last used (ms)
     this.lastFile = new Map(); // runId -> the file the agent was last in (edit or read), for Follow
     this.followSeq = 0; this.followLatest = new Map(); // runId -> the newest Follow message's number
@@ -52,6 +57,9 @@ class Review {
       statusLetter,
       openFileDiff: (entry, session) => this.openFileDiff(entry, session),
       pickComparison: runId => this.pickComparison(runId),
+      // AC-263: Since task start, Latest run and Entire worktree, one click each in the review's header.
+      chooseComparison: (runId, mode) => this.chooseComparison(runId, mode),
+      choices: runId => this.choices.get(runId),
       followState: runId => this.follow.get(runId) || 'off',
       followNote: runId => this.followNotes.get(runId),
       setFollow: (runId, state) => this.setFollow(runId, state),
@@ -216,7 +224,7 @@ class Review {
     if (open?.isDirty) {
       const lines = open.getText().split(/\r?\n/);
       const same = end ? lines.slice(start - 1, end).join('\n') === modified.join('\n') : (start === 0 || lines[start - 1] === msg.anchor);
-      if (!same) throw new Error(`Not marked reviewed: ${msg.path} changed while you were accepting this hunk (conflict). Review the current content.`);
+      if (!same) throw new Error(`Not accepted: ${msg.path} changed while you were accepting this change (conflict). Review the current content.`);
       // The unsaved text is what was reviewed; the file on disk may differ until it is saved.
       await this.client.request('review.accept', { run_id: runId, path: msg.path, key: msg.key, modified_start: 0, modified_lines: [] });
     } else {
@@ -269,6 +277,7 @@ class Review {
   async currentComparison(runId) {
     let selected = this.comparisons.get(runId);
     const opts = await this.options(runId, selected?.branch);
+    this.rememberChoices(runId, opts);
     if (selected) {
       const fresh = opts.options.find(o => o.mode === selected.mode && (o.branch || '') === (selected.branch || ''));
       if (fresh) return fresh;
@@ -329,6 +338,25 @@ class Review {
     // A freshly opened review may not have its file list yet; the webview keeps it pending.
     this.manager.reveal(runId, message);
     return message;
+  }
+
+  /** AC-263: what the header's one-click comparisons show, and whether this folder holds the owner's edits too. */
+  rememberChoices(runId, opts) {
+    const options = QUICK_COMPARISONS.map(mode => opts.options.find(o => o.mode === mode)).filter(Boolean)
+      .map(o => ({ mode: o.mode, label: o.label, available: !!o.available, detail: o.detail || '' }));
+    this.choices.set(runId, { options, folderEdits: opts.folder_edits ?? opts.workspace?.kind === 'current' });
+  }
+
+  /** One click in the review's header: Since task start, Latest run or Entire worktree (AC-263). */
+  async chooseComparison(runId, mode) {
+    if (!runId || !QUICK_COMPARISONS.includes(mode)) return;
+    const opts = await this.options(runId);
+    this.rememberChoices(runId, opts);
+    const option = opts.options.find(o => o.mode === mode);
+    if (!option) return;
+    if (!option.available) { vscode.window.showWarningMessage(`${option.label} is unavailable: ${option.detail}`); return; }
+    this.setComparison(runId, option);
+    await this.open(runId, { preserveFocus: true });
   }
 
   async pickComparison(runId) {
@@ -400,8 +428,11 @@ class Review {
     this.persistFollow();
     if (/paused/.test(this.followNotes.get(runId) || '')) this.followNotes.delete(runId);
     if (state === 'following') {
+      // After the caller's Follow state reaches the review (panel.js posts it right after this
+      // returns): a reveal that arrived first found Follow still paused and was dropped, and Resume
+      // stayed where it was.
       const last = this.lastReveal.get(runId);
-      if (last) this.manager.reveal(runId, last);
+      if (last) queueMicrotask(() => this.manager.reveal(runId, last));
     }
   }
 

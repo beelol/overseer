@@ -527,7 +527,8 @@
         "head": "string?",
         "branch": "string?",
         "branches": "string[]",
-        "options": "Comparison[]"
+        "options": "Comparison[]",
+        "folder_edits": "boolean"
       }
     },
     "workspace.diff": {
