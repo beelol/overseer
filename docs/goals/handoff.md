@@ -105,7 +105,7 @@ Five builders plus merge checks at once pushed the load past 100 and crashed the
 
 Mergeability against main, checked 2026-09-30 00:00 with `git merge-tree --write-tree`: #32, #40, #42, #39, #38 merge cleanly; **#41 (`claude/steady-tests`) and #37 (`claude/phone-parity`) now conflict** and need main merged into them before their turn.
 
-Merged on 2026-09-30: #40 (`4da1640e`, one layout with Follow inside the review), #42 (`86e993fd`, the menu bar; two class-table gaps fixed in the merge check), #39 (`ac7a4143`), #32 (`3ab9c1f7`; talk, conversation and review missed in the full run and passed alone). Merged on 2026-09-29: #31, #33, #34, #35, #36. Deployed to the owner: b3b7133d (#31, #33, #34). **Deployed to the owner: `9a4a2c0b`** (#42 the menu bar, plus everything before) on 2026-09-30 at 16:45: daemon restarted, the menu-bar item started and registered as a login item; VS Code windows need a reload. Before it, `ed747bc7` (#32 and earlier) at 01:03. A deploy of `c42ad18c` (#40) started 17:05.
+Merged on 2026-09-30: #40 (`4da1640e`, one layout with Follow inside the review), #42 (`86e993fd`, the menu bar; two class-table gaps fixed in the merge check), #39 (`ac7a4143`), #32 (`3ab9c1f7`; talk, conversation and review missed in the full run and passed alone). Merged on 2026-09-29: #31, #33, #34, #35, #36. Deployed to the owner: b3b7133d (#31, #33, #34). **Deployed to the owner: `c42ad18c`** (#40 one layout with Follow inside the review, #42 the menu bar, and everything before) on 2026-09-30 at 17:07: daemon restarted, the menu-bar item running as a login item; VS Code windows need a reload. Earlier today: `9a4a2c0b` (16:45), `ed747bc7` (01:03).
 
 ## New from the owner (2026-09-30)
 
