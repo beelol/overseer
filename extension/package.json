@@ -46,9 +46,7 @@
     },
     "views": {
       "overseer": [
-        { "type": "webview", "id": "overseer.search", "name": "Search", "initialSize": 1 },
         { "id": "overseer.agents", "name": "Agents", "initialSize": 14 },
-        { "id": "overseer.worktree", "name": "Worktree", "initialSize": 10, "when": "overseer.headOpen" },
         { "id": "overseer.accounts", "name": "Accounts", "initialSize": 5 },
         { "id": "overseer.devices", "name": "Devices", "visibility": "collapsed", "initialSize": 3 }
       ]
@@ -62,12 +60,8 @@
     ],
     "commands": [
       { "command": "overseer.openCenter", "title": "Open Overseer View", "category": "Overseer", "icon": "$(layout)" },
-      { "command": "overseer.openDashboard", "title": "Enter Focus Mode", "category": "Overseer", "icon": "$(screen-full)" },
-      { "command": "overseer.exitDashboard", "title": "Exit Focus Mode", "category": "Overseer", "icon": "$(screen-normal)", "enablement": "overseer.inDashboard" },
-      { "command": "overseer.toggleDashboard", "title": "Toggle Focus Mode", "category": "Overseer" },
-      { "command": "overseer.openDashboardWindow", "title": "Open Focus Mode in a New Window", "category": "Overseer", "icon": "$(empty-window)" },
-      { "command": "overseer.openWorkspace", "title": "Open Workspace", "category": "Overseer", "icon": "$(layout)" },
-      { "command": "overseer.closeWorkspace", "title": "Close Workspace", "category": "Overseer", "icon": "$(layout-sidebar-left-off)", "enablement": "overseer.inWorkspace" },
+      { "command": "overseer.openWorkspace", "title": "Workspace: Open or Close the Overseer Layout", "category": "Overseer", "icon": "$(layout)" },
+      { "command": "overseer.closeWorkspace", "title": "Close the Overseer Layout", "category": "Overseer", "icon": "$(layout-sidebar-left-off)", "enablement": "overseer.inWorkspace" },
       { "command": "overseer.popOutReview", "title": "Pop Out Follow into Its Own Window", "category": "Overseer", "icon": "$(multiple-windows)" },
       { "command": "overseer.returnReview", "title": "Return Follow to the Main Window", "category": "Overseer", "icon": "$(screen-normal)" },
       { "command": "overseer.newAgent", "title": "New Agent", "category": "Overseer", "icon": "$(add)", "enablement": "isWorkspaceTrusted" },
@@ -148,11 +142,8 @@
       { "command": "overseer.turnOffPhoneNotifications", "title": "Turn Off Notifications to Phones", "category": "Overseer", "icon": "$(bell-slash)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.turnOnPhoneNotifications", "title": "Turn On Notifications to Phones", "category": "Overseer", "icon": "$(bell)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.head.toggleMode", "title": "Switch Between Follow and Diffs Only", "category": "Overseer", "icon": "$(eye)" },
-      { "command": "overseer.head.follow", "title": "Follow the Agent in Its Files", "category": "Overseer", "icon": "$(eye)" },
+      { "command": "overseer.head.follow", "title": "Follow the Agent", "category": "Overseer", "icon": "$(eye)" },
       { "command": "overseer.head.diffsOnly", "title": "Diffs Only", "category": "Overseer", "icon": "$(diff-multiple)" },
-      { "command": "overseer.head.openFile", "title": "Open in the Agent's Worktree", "category": "Overseer" },
-      { "command": "overseer.head.refresh", "title": "Refresh the Worktree", "category": "Overseer", "icon": "$(refresh)" },
-      { "command": "overseer.head.catchUp", "title": "Go to the Agent's Latest Edit", "category": "Overseer" },
       { "command": "overseer.backToOverseer", "title": "Back to Overseer's Conversation", "category": "Overseer", "icon": "$(comment-discussion)" },
       { "command": "overseer.backToAgent", "title": "Back to the Agent", "category": "Overseer", "icon": "$(eye)" },
       { "command": "overseer.switchAgentOverseer", "title": "Switch Between the Agent and Overseer", "category": "Overseer" }
@@ -161,7 +152,6 @@
       { "command": "overseer.archiveAgent", "key": "delete", "mac": "cmd+backspace", "when": "focusedView == overseer.agents" },
       { "command": "overseer.searchAgents", "key": "ctrl+alt+f", "mac": "cmd+alt+f", "when": "!editorTextFocus" },
       { "command": "overseer.clearAgentSearch", "key": "escape", "when": "focusedView == overseer.agents && overseer.agentsFiltered" },
-      { "command": "overseer.toggleDashboard", "key": "ctrl+alt+o", "mac": "cmd+alt+o" },
       { "command": "overseer.openWorkspace", "key": "ctrl+alt+shift+o", "mac": "cmd+alt+shift+o" },
       { "command": "overseer.voice.open", "key": "ctrl+alt+v", "mac": "cmd+alt+v" },
       { "command": "overseer.voice.toggle", "key": "ctrl+alt+shift+v", "mac": "cmd+alt+shift+v" },
@@ -188,10 +178,10 @@
         { "command": "overseer.newAgent", "when": "view == overseer.agents", "group": "navigation@1" },
         { "command": "overseer.searchAgents", "when": "view == overseer.agents && !overseer.agentsFiltered", "group": "navigation@2" },
         { "command": "overseer.clearAgentSearch", "when": "view == overseer.agents && overseer.agentsFiltered", "group": "navigation@2" },
+        { "command": "overseer.filterAgents", "when": "view == overseer.agents", "group": "1_view@0" },
         { "command": "overseer.toggleGrid", "when": "view == overseer.agents", "group": "navigation@3" },
         { "command": "overseer.showArchived", "when": "view == overseer.agents && !overseer.showArchived", "group": "1_view@1" },
         { "command": "overseer.hideArchived", "when": "view == overseer.agents && overseer.showArchived", "group": "1_view@1" },
-        { "command": "overseer.openDashboard", "when": "view == overseer.agents", "group": "1_view@2" },
         { "command": "overseer.openWorkspace", "when": "view == overseer.agents && !overseer.inWorkspace", "group": "1_view@2" },
         { "command": "overseer.closeWorkspace", "when": "view == overseer.agents && overseer.inWorkspace", "group": "1_view@2" },
         { "command": "overseer.switchAgent", "when": "view == overseer.agents", "group": "1_view@3" },
@@ -202,10 +192,6 @@
         { "command": "overseer.showCapabilities", "when": "view == overseer.agents", "group": "4_info@1" },
         { "command": "overseer.audioMode", "when": "view == overseer.agents", "group": "5_audio@1" },
         { "command": "overseer.stopAll", "when": "view == overseer.agents", "group": "9_stop@1" },
-        { "command": "overseer.head.diffsOnly", "when": "view == overseer.worktree && overseer.headMode == follow", "group": "navigation@1" },
-        { "command": "overseer.head.follow", "when": "view == overseer.worktree && overseer.headMode == diffs", "group": "navigation@1" },
-        { "command": "overseer.backToOverseer", "when": "view == overseer.worktree", "group": "navigation@2" },
-        { "command": "overseer.head.refresh", "when": "view == overseer.worktree", "group": "navigation@3" },
         { "command": "overseer.addProfile", "when": "view == overseer.accounts", "group": "navigation@1" },
         { "command": "overseer.refreshAccounts", "when": "view == overseer.accounts", "group": "navigation@2" },
         { "command": "overseer.pairPhone", "when": "view == overseer.devices", "group": "navigation@1" },
@@ -255,12 +241,11 @@
       "editor/title": [
         { "command": "overseer.head.diffsOnly", "when": "overseer.headEditor", "group": "navigation@90" },
         { "command": "overseer.backToOverseer", "when": "overseer.headEditor", "group": "navigation@91" },
-        { "command": "overseer.head.follow", "when": "activeWebviewPanelId == 'overseer.review'", "group": "navigation@90" }
+        { "command": "overseer.head.follow", "when": "activeWebviewPanelId == 'overseer.review' && overseer.headMode == 'diffs'", "group": "navigation@90" },
+        { "command": "overseer.head.diffsOnly", "when": "activeWebviewPanelId == 'overseer.review' && overseer.headMode == 'follow'", "group": "navigation@90" }
       ],
       "commandPalette": [
         { "command": "overseer.openEdit", "when": "false" },
-        { "command": "overseer.head.openFile", "when": "false" },
-        { "command": "overseer.head.catchUp", "when": "false" },
         { "command": "overseer.startSwarm", "when": "config.overseer.experimental.swarm" },
         { "command": "overseer.filterSwarmJobs", "when": "config.overseer.experimental.swarm" },
         { "command": "overseer.pauseSwarm", "when": "config.overseer.experimental.swarm" },
@@ -284,11 +269,10 @@
       "title": "Overseer",
       "properties": {
         "overseer.grid.maxTiles": { "type": "integer", "minimum": 1, "maximum": 16, "default": 6, "markdownDescription": "How many running or pinned agents fill the agent grid on their own (1–16). Agents you drag in can fill it up to 16." },
-        "overseer.dashboard.openOnStartup": { "type": "boolean", "default": false, "markdownDescription": "Open Overseer in Focus Mode (the agent full screen, the Agents list beside it) when VS Code starts." },
         "overseer.chat.model": { "type": "string", "default": "", "markdownDescription": "The model Talk to Overseer asks for (for example `haiku`); empty uses the harness's default." },
         "overseer.chat.harness": { "type": "string", "enum": ["claude", "codex", "opencode"], "default": "claude", "markdownDescription": "The harness Talk to Overseer runs on (its default account)." },
         "overseer.sideBar.openOnStartup": { "type": ["boolean", "null"], "default": null, "markdownDescription": "Show Overseer in the side bar instead of Explorer when VS Code opens (Explorer stays one click away in the activity bar). Overseer asks once while this is not set." },
-        "overseer.dashboard.immersive": { "type": "boolean", "default": true, "markdownDescription": "In Focus Mode, hide VS Code's chrome above Overseer's views. While Focus Mode is on Overseer sets these settings, and puts back exactly what was there when you leave it: `workbench.editor.showTabs` = `none`, `breadcrumbs.enabled` = `false`, `workbench.editor.editorActionsLocation` = `hidden`. In Focus Mode's own window (**Open Focus Mode in a New Window**) or a window opened on a `.code-workspace` file they are that window's workspace settings and no other window changes; in a window opened on a folder or on nothing they are user settings, which every VS Code window of this profile reads." },
+        "overseer.layout.offerOnStartup": { "type": "boolean", "default": true, "scope": "application", "markdownDescription": "Offer the Overseer layout once, the first time Overseer starts (**Workspace**, ⌥⌘⇧O, opens it any time)." },
         "overseer.hideVsCodeChat": { "type": "boolean", "default": true, "markdownDescription": "Close VS Code's own chat view the first time Overseer's view opens in a window (once per window; reopening it yourself is left alone)." },
         "overseer.history.autoArchiveDays": { "type": "number", "minimum": 0, "default": 14, "markdownDescription": "Archive finished agents automatically after this many days (0 turns it off). Archived agents stay searchable and can be restored." },
         "overseer.experimental.autoRouting": { "type": "boolean", "default": false, "markdownDescription": "**Unfinished.** Offer Auto routing in the composer and the full form. Auto routing picks the account, agent, model and effort for each task; several of its checks are not yet verified. Off by default." },
@@ -319,7 +303,7 @@
         "overseer.devInstance": { "type": "string", "default": "", "markdownDescription": "Dev profiles only (written by `scripts/dev code`): the dev instance (`dev-<name>`) this window is pinned to; a daemon reporting another instance is refused. The installed extension ignores it.", "scope": "machine" },
         "overseer.review.enableEditing": { "type": "boolean", "default": true, "markdownDescription": "Edit working-tree text directly in the review. Undo/redo is available through Open in Native Diff." },
         "overseer.review.largeDiffThreshold": { "type": "integer", "minimum": 1, "default": 500, "markdownDescription": "Show a Load Diff card when additions + deletions exceed this count." },
-        "overseer.agent.openIn": { "type": "string", "enum": ["follow", "diffs"], "enumDescriptions": ["Follow: the agent's worktree in its real files, following the file it is editing, its changes shown inline. You can edit and save any file.", "Diffs only: the review of what the agent changed."], "default": "follow", "markdownDescription": "What opening an agent shows beside its chat. Each agent remembers the last choice you toggled (**Overseer: Switch Between Follow and Diffs Only**)." },
+        "overseer.agent.openIn": { "type": "string", "enum": ["follow", "diffs"], "enumDescriptions": ["Follow: the review shows the file the agent is in, live, its changes marked, with all its worktree's files beside it.", "Diffs only: the review of what the agent changed, with the changed files beside it."], "default": "follow", "markdownDescription": "What opening an agent shows beside its chat. Each agent remembers the last choice you toggled (**Overseer: Switch Between Follow and Diffs Only**)." },
         "overseer.followNewRuns": { "type": "boolean", "default": true, "markdownDescription": "Turn Follow on for agents you start from this window. Opening an agent that already exists never turns Follow on." },
         "overseer.home.sendTo": { "type": "string", "enum": ["overseer", "agent"], "enumDescriptions": ["Overseer reads it and starts, steers or answers.", "Start an agent directly with the task (repository, agent, model and workspace choices)."], "default": "overseer", "scope": "application", "markdownDescription": "Where home's box sends what you type. Home's **Send to** choice changes it and remembers it." },
         "overseer.showStartedAgent": { "type": "boolean", "default": true, "markdownDescription": "**Show the agent I start.** When something you ask Overseer (typed or spoken) starts a single agent, the conversation slides aside, with the mark on the right, and shows that agent working beside it. Off: the conversation stays as it is." },
@@ -330,7 +314,7 @@
     }
   },
   "scripts": {
-    "check": "node --check src/extension.js && node --check src/daemon-client.js && node --check src/views.js && node --check src/swarm-controls.js && node --check src/review.js && node --check src/agent-head.js && node --check src/line-diff.js && node --check src/output-panel.js && node --check src/phone-access.js && node --check src/phone-text.js && node --check media/pairing.js && node --check branch-diff/review/panel.js && node --check src/arrangement.js && node --check src/dashboard-mode.js && node --check src/layout.js && node --check src/vscode-chat.js && node --check src/immersive.js",
+    "check": "node --check src/extension.js && node --check src/daemon-client.js && node --check src/views.js && node --check src/swarm-controls.js && node --check src/review.js && node --check src/agent-head.js && node --check src/line-diff.js && node --check src/output-panel.js && node --check src/phone-access.js && node --check src/phone-text.js && node --check media/pairing.js && node --check branch-diff/review/panel.js && node --check src/arrangement.js && node --check src/layout.js && node --check src/vscode-chat.js && node --check src/overseer-window.js",
     "build:review": "node branch-diff/scripts/build-review.js",
     "package": "node scripts/package.js",
     "test": "node ../test/unit/run.js"

@@ -37,14 +37,17 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await setWidth(1600);
 
     const layout = await dash.eval(`(() => {
-      const col = document.querySelector('.chat-column').getBoundingClientRect(); const main = document.querySelector('.view-chat').getBoundingClientRect();
+      // The column's room is the scroller's client area: with classic (non-overlay) scroll bars, as
+      // macOS shows when a mouse is connected, the vertical scroll bar takes about 15 px of the panel.
+      const col = document.querySelector('.chat-column').getBoundingClientRect(); const scroller = document.querySelector('.chat-column').closest('.chat-scroll'), sr = scroller.getBoundingClientRect();
+      const main = { left: sr.left, width: scroller.clientWidth, right: sr.left + scroller.clientWidth }, scrollBar = Math.round(sr.width - scroller.clientWidth);
       const user = document.querySelector('#conv .msg.user'), agent = document.querySelector('#conv .msg.agent');
       const ur = user.getBoundingClientRect(), cs = getComputedStyle(user), as = getComputedStyle(agent);
       const md = agent.closest('.turn').querySelectorAll('.msg.agent .md');
       const last = md[md.length - 1];
       const code = last.querySelector('.codeblock');
       return {
-        columnWidth: Math.round(col.width), available: Math.round(main.width), centered: Math.abs((col.left - main.left) - (main.right - col.right)) <= 2, userRight: Math.round(col.right - ur.right), userBubble: cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && parseFloat(cs.borderTopLeftRadius) >= 10,
+        columnWidth: Math.round(col.width), available: Math.round(main.width), scrollBar, centered: Math.abs((col.left - main.left) - (main.right - col.right)) <= 2, userRight: Math.round(col.right - ur.right), userBubble: cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && parseFloat(cs.borderTopLeftRadius) >= 10,
         agentPlain: as.backgroundColor === 'rgba(0, 0, 0, 0)', h2: last.querySelector('h2')?.textContent, listItems: last.querySelectorAll('li').length, tableRows: last.querySelectorAll('tr').length,
         codeLang: code?.querySelector('.codeblock-lang')?.textContent, highlighted: !!code?.querySelector('[class^="hljs-"]'), link: last.querySelector('a')?.title,
         longPath: last.querySelector('.md-long')?.textContent, longPathTitle: last.querySelector('.md-long')?.title?.split('\\n')[0],

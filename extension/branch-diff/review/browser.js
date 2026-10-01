@@ -2,8 +2,9 @@
 // comparison/base control, Follow (off/following/paused), agent-edit reveal, restores
 // the saved scroll anchor once the rows above it have rendered (after reload/restart), and
 // per-hunk Accept (mark reviewed) / Reject (restore the base text through the native edit path),
-// and (AC-99) a file navigator over the whole worktree: Changes only or All files, where any file
-// opens inside the review (an unchanged one as plain editable text).
+// and (AC-99) a file navigator over the whole worktree. Overseer (AC-264) has two views: Follow shows
+// the file the agent is in, live, read-only with its changes marked, and its list is All files (a
+// file picked there shows in the same place); Diffs only shows the diffs, and its list is Changed.
 import './browser.css';
 import { StatisticsWorker } from './statistics-client';
 import { EditingClient, replaceText } from './editing-client';
@@ -31,12 +32,15 @@ let requestId = 0, clicked, classifying = false, renderFrame, stopped = false;
 let snapshot, settings = {}, selected = saved.selected, initialized = false, restoring = true;
 let rendering = false, nextSnapshot, pendingJump, hierarchy = saved.hierarchy;
 let frame, resizeFrame, persistTimer, progressTimer, pendingState;
-// AC-99: 'changes' or 'all' once the user picks; until then Changes only while the agent has changes.
-let navMode = saved.navMode === 'all' || saved.navMode === 'changes' ? saved.navMode : undefined;
+// AC-264: 'follow' (the agent's file, All files) or 'diffs' (the diffs, Changed); the host decides.
+let view = document.body.dataset.view === 'follow' ? 'follow' : 'diffs';
+// Follow's file (AC-264): its path, who put it there ('agent' or 'user') and the newest message's number.
+let viewChosenAt = 0;
+let followPath = '', followSource = 'agent', followSeq = 0, followEditor, followModel, followDecorations, followFlash;
 const openDirs = new Set(saved.openDirs || []);
 const dirCache = new Map(); // folder path -> { loading } | { entries } | { error }
 let pendingBrowse;
-const changesOnlyButton = document.getElementById('changes-only');
+const listTitle = document.getElementById('list-title');
 const editing = new EditingClient({ vscode, saved, repository: identity.repository, snapshot: () => snapshot, settings: () => settings, notice: stickyMessage, changed: row => { if (!rows.has(row.entry.id)) release(row); else { if (row.largeWhileEditing && !row.editor?.getModifiedEditor().hasTextFocus()) { row.largeWhileEditing = false; row.renderedRevision = undefined; } ensure(row); updateViewport(); } } });
 filter.value = saved.filter || '';
 layout.value = saved.layout === 'split' ? 'split' : 'unified';
@@ -57,12 +61,19 @@ toggleNavigator.addEventListener('click', () => { collapseNavigator(!document.bo
 function persist() {
   clearTimeout(persistTimer);
   if (!snapshot) return;
+  if (document.visibilityState === 'hidden') return;
+  // Overseer (AC-264): Follow hides the diffs; the list's state is kept and the diffs' position left as it was.
+  if (view === 'follow') {
+    pendingState = { ...(pendingState || saved), ...identity, navWidth, navCollapsed: document.body.classList.contains('nav-collapsed'), filter: filter.value, openDirs: [...openDirs] };
+    persistTimer = setTimeout(flushState, 100);
+    return;
+  }
   // Overseer: a hidden or zero-height view clamps scrollTop to 0; keep the last real position.
-  if (document.visibilityState === 'hidden' || !diffs.clientHeight) return;
+  if (!diffs.clientHeight) return;
   pendingState = { ...identity, layout: layout.value, closedFiles: [...closedFiles], closedFolders: [...closedFolders],
     navWidth, navCollapsed: document.body.classList.contains('nav-collapsed'), filter: filter.value,
     selected, scrollTop: diffs.scrollTop, anchor: restoreGoal ? { id: restoreGoal.id, offset: restoreGoal.offset } : anchor(), hierarchy,
-    navMode, openDirs: [...openDirs] };
+    openDirs: [...openDirs] };
   persistTimer = setTimeout(flushState, 100);
 }
 function flushState() {
@@ -133,18 +144,19 @@ function jump(id) {
   select(id); if (document.hasFocus()) row.header.focus({ preventScroll: true }); updateViewport(); persist();
 }
 function changedEntries() { return (snapshot?.entries || []).filter(e => !e.browsed); }
-function changesOnly() { return navMode ? navMode === 'changes' : changedEntries().length > 0; }
+function changesOnly() { return view !== 'follow'; }
 function countsText(id) {
   const data = id && rows.get(id)?.element.dataset;
   return data && data.additions !== undefined ? [data.additions, data.deletions] : undefined;
 }
 function fileButton(relPath, entry) {
   const changed = !!entry && !entry.browsed;
-  const button = node('button', 'file' + (entry && entry.id === selected ? ' active' : '') + (changed ? ' changed' : ''));
+  const shown = view === 'follow' ? relPath === followPath : !!entry && entry.id === selected;
+  const button = node('button', 'file' + (shown ? ' active' : '') + (changed ? ' changed' : ''));
   if (entry) button.dataset.id = entry.id;
   button.dataset.path = relPath;
   button.title = relPath + (entry?.unsaved ? ' (unsaved)' : '') + (entry?.conflicted ? ' (conflicted)' : '') + (entry?.readOnly ? ' (staged: read-only)' : '');
-  button.setAttribute('role', 'treeitem'); button.setAttribute('aria-selected', String(!!entry && entry.id === selected));
+  button.setAttribute('role', 'treeitem'); button.setAttribute('aria-selected', String(shown));
   button.setAttribute('aria-label', [relPath, changed && entry.status, entry?.unsaved && 'unsaved', entry?.conflicted && 'conflicted'].filter(Boolean).join(', '));
   // Codicon per file, plus markers: conflicted (warning) and unsaved (filled dot).
   const icon = node('span', 'codicon codicon-' + (entry?.conflicted ? 'warning' : 'file')); icon.setAttribute('aria-hidden', 'true');
@@ -159,8 +171,12 @@ function fileButton(relPath, entry) {
   button.addEventListener('click', () => openPath(relPath));
   return button;
 }
-/** Opens any worktree file in the review: jump to its row, or ask for it as a browsed file. */
+/**
+ * Changed (Diffs only): a file jumps to its diff. All files is Follow's list (AC-264, the owner
+ * 2026-09-30): every file of the worktree, each shown in the review's middle, in place of the agent's.
+ */
 function openPath(relPath) {
+  if (view === 'follow') { markFollowed(relPath); vscode.postMessage({ type: 'showFile', path: relPath }); return; }
   const entry = snapshot?.entries.find(e => e.path === relPath);
   if (entry) { jump(entry.id); return; }
   pendingBrowse = relPath;
@@ -172,9 +188,9 @@ function listDir(dirPath) {
 }
 function renderTree() {
   const only = changesOnly();
-  changesOnlyButton.setAttribute('aria-pressed', String(only));
-  changesOnlyButton.title = only ? 'Changes only: showing changed files. Click to browse every file in the worktree.' : 'All files: showing the whole worktree. Click to show only changed files.';
-  changesOnlyButton.setAttribute('aria-label', only ? 'Changes only' : 'All files');
+  // AC-264: the list follows the view: Changed in Diffs only, All files in Follow.
+  listTitle.textContent = only ? 'Changed' : 'All files';
+  listTitle.title = only ? 'The files the agent changed; each jumps to its diff.' : 'Every file in the agent\'s worktree; each shows here, in place of the agent\'s file.';
   document.body.dataset.nav = only ? 'changes' : 'all';
   const fragment = document.createDocumentFragment();
   if (only) populateChanges(fragment); else populateAll('', fragment);
@@ -239,7 +255,6 @@ function populateAll(dirPath, parent) {
   }
   if (!listing.entries.length && !dirPath) parent.append(node('div', 'tree-note', 'The worktree is empty.'));
 }
-changesOnlyButton.addEventListener('click', () => { navMode = changesOnly() ? 'all' : 'changes'; renderTree(); persist(); });
 filter.addEventListener('input', () => { renderTree(); persist(); });
 for (const type of ['wheel', 'pointermove', 'pointerdown', 'keydown']) document.getElementById('navigator').addEventListener(type, () => { navigatorTouched = Date.now(); }, { passive: true });
 function fold(row) {
@@ -260,20 +275,33 @@ function makeRow(entry) {
   const status = node('span', 'status'); const unsaved = node('span', 'unsaved');
   const stats = node('span', 'stats', '…');
   const open = node('button', 'open-native', '↗'); open.title = 'Open in native diff (undo, redo, Git gutters)'; open.setAttribute('aria-label', 'Open ' + entry.path + ' in native diff');
-  // Overseer (AC-232): Save says what it does; it writes your edits, it does not keep or undo the agent's change.
-  const save = node('button', 'save-file', "Save your changes to the agent's copy"); save.disabled = true; save.hidden = true;
-  save.title = "Save your changes to the agent's copy (Cmd+S): writes your edits to this file in the agent's worktree. It does not keep or undo the agent's change.";
+  // Overseer (AC-263): the agent's changes are Accepted or Rejected, per change and per file; saving
+  // what the owner typed is a separate "Save your edits", shown only once they have typed.
+  // A narrow card shows them as icons only (the owner, 2026-09-30): a solid check in the accept
+  // colour and an X in the reject colour, drawn as strokes so they read at a glance; the words stay
+  // in the tooltip and label.
+  const fileButton = (cls, d) => {
+    const b = node('button', cls), svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 16 16'); svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('class', 'file-glyph');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', d); svg.append(path);
+    b.append(svg, node('span', 'file-word')); b.hidden = true; return b;
+  };
+  const acceptFile = fileButton('file-accept', 'M3 8.5l3.2 3.2L13 4.8'), rejectFile = fileButton('file-reject', 'M4 4l8 8M12 4l-8 8');
+  const save = node('button', 'save-file', 'Save your edits'); save.disabled = true; save.hidden = true;
+  save.title = "Save your edits (Cmd+S): writes what you typed to this file. It does not accept or reject the agent's changes.";
   // An unchanged file opened from the navigator can be closed again (AC-99).
   const close = node('button', 'close-file'); close.title = 'Close this file (it has no changes)'; close.setAttribute('aria-label', 'Close ' + entry.path);
   const closeIcon = node('span', 'codicon codicon-close'); closeIcon.setAttribute('aria-hidden', 'true'); close.append(closeIcon);
   close.addEventListener('click', () => vscode.postMessage({ type: 'unbrowse', path: row.entry.path }));
   const editStatus = node('span', 'edit-status'); editStatus.setAttribute('role', 'status');
   const host = node('div', 'diff-body'); host.style.height = '220px';
-  header.append(toggle, status, title, unsaved, editStatus, stats, save, open, close); element.append(header, host);
+  header.append(toggle, status, title, unsaved, editStatus, stats, save, acceptFile, rejectFile, open, close); element.append(header, host);
   const progress = node('span', 'file-loading'); progress.setAttribute('role', 'status'); progress.hidden = true; header.insertBefore(progress, stats);
-  const row = { entry, element, header, toggle, title, status, unsaved, stats, host, progress, open, save, close, editStatus, nearby: false };
+  const row = { entry, element, header, toggle, title, status, unsaved, stats, host, progress, open, save, close, editStatus, acceptFile, rejectFile, nearby: false };
   loading(row, true);
   save.addEventListener('click', () => editing.save(row));
+  acceptFile.addEventListener('click', () => acceptWholeFile(row));
+  rejectFile.addEventListener('click', () => rejectWholeFile(row));
   title.addEventListener('click', event => {
     event.preventDefault();
     if (!row.entry.pending && !snapshot.cached) vscode.postMessage({ type: 'openFile', id: row.entry.id, version: snapshot.version });
@@ -300,9 +328,10 @@ function release(row) {
   row.listeners.forEach(l => l.dispose());
   row.editor.dispose(); row.original.dispose(); row.modified.dispose();
   row.editor = undefined; row.body = undefined; row.renderedRevision = undefined; row.save.disabled = true;
+  row.acceptFile.hidden = true; row.rejectFile.hidden = true;
   loading(row, true);
 }
-function relevant(row) { return !stopped && rows.get(row.entry.id) === row && row.nearby && !closedFiles.has(row.entry.id); }
+function relevant(row) { return !stopped && view === 'diffs' && rows.get(row.entry.id) === row && row.nearby && !closedFiles.has(row.entry.id); }
 function reviewKey(value) { return JSON.stringify([value.repository, value.mode, value.target, value.description?.headName,
   value.description?.base, value.description?.mergeBase]); }
 function valid(job) {
@@ -398,6 +427,7 @@ function showCard(row, body, stats) {
   showCounts(row, stats); loading(row, false); restoreAnchor(position); trackScroll();
 }
 function updateViewport() {
+  if (view !== 'diffs') return; // Follow hides the diffs: nothing is near, nothing loads
   pursueRestore();
   const top = diffs.scrollTop - 750, bottom = diffs.scrollTop + diffs.clientHeight + 750;
   for (const row of rows.values()) {
@@ -526,16 +556,17 @@ function renderHunks(row) {
     const where = change.modifiedEndLineNumber ? `lines ${change.modifiedStartLineNumber}–${change.modifiedEndLineNumber}` : `deletion after line ${change.modifiedStartLineNumber}`;
     dom.setAttribute('role', 'group'); dom.setAttribute('aria-label', `Hunk ${index + 1} of ${row.entry.path}, ${where}`);
     const glyph = name => { const g = node('span', 'codicon codicon-' + name); g.setAttribute('aria-hidden', 'true'); return g; };
-    if (reviewed) { const badge = node('span', 'hunk-badge'); badge.append(glyph('pass-filled')); badge.title = 'Reviewed'; dom.append(badge); }
-    // Overseer (AC-232): keeping or undoing the agent's change is a choice in words, Keep or Undo.
-    const accept = node('button', 'hunk-accept'); accept.append(glyph(reviewed ? 'close' : 'check'), node('span', 'hunk-word', reviewed ? 'Unmark' : 'Keep'));
-    accept.title = reviewed ? "Kept and marked reviewed. Click to mark it not reviewed (the change stays either way)" : "Keep: the agent's change stays, and this hunk is marked reviewed (nothing is committed or staged)";
-    accept.setAttribute('aria-label', reviewed ? `Unmark reviewed hunk ${index + 1}` : `Accept hunk ${index + 1}`);
+    // Overseer (AC-263): the agent's change is Accepted or Rejected, never Keep or Undo. An accepted
+    // change reads Accepted (pressed); clicking it again takes the accept back.
+    const accept = node('button', 'hunk-accept'); accept.append(glyph('check'), node('span', 'hunk-word', reviewed ? 'Accepted' : 'Accept'));
+    accept.setAttribute('aria-pressed', String(reviewed));
+    accept.title = reviewed ? "Accepted. Click to take the accept back (the change stays in the file either way)" : "Accept: the agent's change stays and is marked accepted (nothing is committed or staged)";
+    accept.setAttribute('aria-label', reviewed ? `Hunk ${index + 1} accepted; click to take the accept back` : `Accept hunk ${index + 1}`);
     accept.addEventListener('click', () => vscode.postMessage({ type: 'hunkReview', reviewed: !reviewed, key, path: row.entry.path, version: snapshot?.version,
       modifiedStart: change.modifiedStartLineNumber, modifiedEnd: change.modifiedEndLineNumber, modified: mod, anchor: row.modified.getLineContent(Math.max(1, Math.min(change.modifiedStartLineNumber || 1, row.modified.getLineCount()))) }));
-    const reject = node('button', 'hunk-reject'); reject.append(glyph('discard'), node('span', 'hunk-word', 'Undo'));
+    const reject = node('button', 'hunk-reject'); reject.append(glyph('discard'), node('span', 'hunk-word', 'Reject'));
     reject.disabled = !canEdit;
-    reject.title = canEdit ? "Undo: put back what was there before the agent's change, in the agent's copy (Cmd+Z in the native editor brings it back)" : 'Undo is unavailable: this file cannot be edited in the review (see Open in Native Diff)';
+    reject.title = canEdit ? "Reject: take the agent's change out and put back what was there before (Cmd+Z in the native editor brings it back)" : 'Reject is unavailable: this file cannot be edited in the review (see Open in Native Diff)';
     reject.setAttribute('aria-label', `Reject hunk ${index + 1}`);
     reject.addEventListener('click', () => rejectHunk(row, change, key));
     dom.append(accept, reject);
@@ -548,7 +579,41 @@ function renderHunks(row) {
   row.hunkDecorations.set(reviewedRanges);
   row.element.dataset.hunks = String(changes.length);
   row.element.dataset.reviewed = String(row.hunks.filter(h => reviewedHunks.has(h.key)).length);
+  fileActions(row, canEdit);
   placeHunks(row);
+}
+// Overseer (AC-263): Accept file and Reject file act on every change of the file at once.
+function fileActions(row, canEdit) {
+  const hunks = row.hunks || [], all = hunks.length > 0 && hunks.every(h => reviewedHunks.has(h.key));
+  const { acceptFile, rejectFile } = row, name = row.entry.path;
+  acceptFile.hidden = rejectFile.hidden = !hunks.length;
+  acceptFile.querySelector('.file-word').textContent = all ? 'Accepted' : 'Accept file';
+  acceptFile.setAttribute('aria-pressed', String(all));
+  acceptFile.title = all ? `All of the agent's changes to ${name} are accepted. Click to take the accepts back (the changes stay either way)` : `Accept file: every change the agent made to ${name} stays and is marked accepted (nothing is committed or staged)`;
+  acceptFile.setAttribute('aria-label', all ? `${name} accepted; click to take the accepts back` : `Accept every change to ${name}`);
+  // A new or deleted file has nothing to put back line by line; Reject file needs an editable file with lines on both sides.
+  const whole = canEdit && !['A', 'D', '?'].includes(String(row.entry.status || '').charAt(0));
+  rejectFile.querySelector('.file-word').textContent = 'Reject file';
+  rejectFile.disabled = !whole;
+  rejectFile.title = whole ? `Reject file: take out every change the agent made to ${name} and put back what was there before` : 'Reject file is unavailable here: a new or deleted file, or one the review cannot edit (use Open in Native Diff)';
+  rejectFile.setAttribute('aria-label', `Reject every change to ${name}`);
+}
+function acceptWholeFile(row) {
+  const hunks = row.hunks || []; if (!hunks.length) return;
+  const all = hunks.every(h => reviewedHunks.has(h.key));
+  for (const h of hunks) {
+    if (reviewedHunks.has(h.key) !== all) continue;
+    const { mod } = hunkTexts(row, h.change);
+    vscode.postMessage({ type: 'hunkReview', reviewed: !all, key: h.key, path: row.entry.path, version: snapshot?.version,
+      modifiedStart: h.change.modifiedStartLineNumber, modifiedEnd: h.change.modifiedEndLineNumber, modified: mod,
+      anchor: row.modified.getLineContent(Math.max(1, Math.min(h.change.modifiedStartLineNumber || 1, row.modified.getLineCount()))) });
+  }
+}
+function rejectWholeFile(row) {
+  if (row.rejectFile.disabled || !row.hunks?.length) return;
+  if (!editing.enabled(row) || editing.held(row)) { message('This file cannot be rejected in the review right now. Use Open in Native Diff.'); return; }
+  editing.reject(row, row.original.getValue(), row.hunks[0].key);
+  stickyMessage(`Rejected: the agent's changes to ${row.entry.path} were taken out.`);
 }
 function placeHunks(row) {
   const editor = row.editor?.getModifiedEditor();
@@ -567,9 +632,8 @@ function rejectHunk(row, change, key) {
   const b = change.modifiedEndLineNumber ? change.modifiedEndLineNumber : change.modifiedStartLineNumber;
   const seg = change.originalEndLineNumber ? o.slice(change.originalStartLineNumber - 1, change.originalEndLineNumber) : [];
   const next = [...m.slice(0, a), ...seg, ...m.slice(b)].join(row.modified.getEOL());
-  editing.hunkOperation(row, key);
-  replaceText(row.modified, next);
-  editing.save(row);
+  editing.reject(row, next, key);
+  stickyMessage(`Rejected: the agent's change at ${change.modifiedEndLineNumber ? `lines ${change.modifiedStartLineNumber}–${change.modifiedEndLineNumber}` : `line ${change.modifiedStartLineNumber}`} of ${row.entry.path} was taken out.`);
 }
 // Theme variables arrive as hex or rgb()/rgba(); Monaco themes take hex. Without this an rgba value
 // was dropped and Monaco's own olive inserted-text color showed through (Overseer, AC-101).
@@ -600,6 +664,7 @@ function updateSettings(value) {
   if (thresholdChanged) for (const row of rows.values()) { if (row.classification && !manual.has(row.entry.id)) row.renderedRevision = undefined; }
 
   for (const row of rows.values()) if (row.editor) { row.editor.updateOptions(options(row)); editing.update(row); resize(row); }
+  followEditor?.updateOptions(followOptions());
 }
 // Keep shell assets independent: even delayed Monaco startup cannot block the file list.
 async function loadMonaco() {
@@ -728,9 +793,8 @@ function applyOverseer(o) {
     reviewedHunks = next;
     if (changed) for (const row of rows.values()) if (row.editor) renderHunks(row);
   }
-  const label = document.getElementById('base-label');
   const c = o.comparison || {};
-  label.textContent = c.label || 'Comparison';
+  renderCompare(o, c);
   document.getElementById('base').title = [c.label, c.base ? 'Base: ' + c.base : 'Base unavailable', c.detail, c.provenance ? 'Provenance: ' + c.provenance : ''].filter(Boolean).join('\n') + '\nClick to choose another comparison.';
   document.getElementById('comparison').textContent = o.runTitle || 'Run';
   const scope = document.getElementById('scope');
@@ -750,11 +814,54 @@ function applyOverseer(o) {
   document.getElementById('base').title += `\n${o.workspaceKind === 'current' ? 'Checkout' : 'Worktree'}: ${short}`;
   document.body.dataset.workspace = o.workspacePath || '';
   renderLand(o.land);
+  // A switch made here wins over a message the host sent before it heard of it (older viewAt).
+  if (o.view && o.view !== view && (Number(o.viewAt) || 0) >= viewChosenAt) setView(o.view);
+  // Still following: the file and line the last reveal named stay (an update of the review, such as
+  // its comparison choices, does not turn them back into the general note).
+  const keep = followState === 'following' && o.follow === 'following' && followStatus.textContent.startsWith('Following: ');
   followState = o.follow || 'off';
-  followNote = o.followNote || '';
-  followStatus.textContent = followState === 'paused' ? (/paused/.test(o.followNote || '') ? o.followNote : 'Follow paused by your navigation') : followState === 'following' ? (o.followNote || 'Following agent edits') : '';
+  if (!keep) {
+    followNote = o.followNote || '';
+    followStatus.textContent = followState === 'paused' ? (/paused/.test(o.followNote || '') ? o.followNote : 'Follow paused by your navigation') : followState === 'following' ? (o.followNote || 'Following agent edits') : '';
+  }
   renderFollow();
 }
+// Overseer (AC-263): the header names the comparison shown, and Since task start, Latest run and
+// Entire worktree are one click each; More… lists the rest (earlier turns, the fork, a branch).
+// In the owner's own checkout it says that the changes also hold any edits made in that folder.
+const compareBar = document.getElementById('compare');
+function renderCompare(o, c) {
+  if (!compareBar) return;
+  const choices = o.choices?.options || [];
+  const note = (o.choices ? o.choices.folderEdits : o.workspaceKind === 'current') ? 'includes any edits made in this folder' : '';
+  let quick = false;
+  for (const b of compareBar.querySelectorAll('button.cmp')) {
+    const choice = choices.find(x => x.mode === b.dataset.mode);
+    const on = b.dataset.mode === c.mode;
+    quick ||= on;
+    const word = choice?.label || b.querySelector('.cmp-word').textContent;
+    b.querySelector('.cmp-word').textContent = word;
+    // A daemon that does not list a comparison (an older one) does not show its button.
+    b.hidden = !choice && !on && !!o.choices;
+    b.disabled = !!choice && !choice.available;
+    b.setAttribute('aria-pressed', String(on));
+    b.setAttribute('aria-label', on && note ? `${word} (${note})` : word);
+    b.title = [on ? `Showing ${word}` : choice && !choice.available ? `${word} is unavailable` : `Show ${word}`, choice?.detail, on && note ? `This folder is your own checkout: the changes ${note}, not only the agent's.` : ''].filter(Boolean).join('\n');
+  }
+  const more = document.getElementById('base');
+  document.getElementById('base-label').textContent = quick ? 'More…' : (c.label || 'Comparison');
+  more.setAttribute('aria-pressed', String(!quick && !!c.label));
+  more.setAttribute('aria-label', quick ? 'More comparisons' : `${c.label || 'Comparison'}${note ? ` (${note})` : ''}: choose another comparison`);
+  document.getElementById('compare-note').textContent = note ? `(${note})` : '';
+  compareBar.dataset.mode = c.mode || '';
+  compareBar.dataset.label = c.label || '';
+  compareBar.hidden = false;
+}
+compareBar?.addEventListener('click', event => {
+  const b = event.target.closest('button.cmp');
+  if (!b || b.disabled || b.getAttribute('aria-pressed') === 'true') return;
+  vscode.postMessage({ type: 'chooseComparison', mode: b.dataset.mode });
+});
 // Overseer (AC-243): the chat's Merge buttons in the review's toolbar, for this agent.
 const landBox = document.getElementById('land');
 // Publish to GitHub (no remote) is in the chat only; the review keeps its toolbar short (AC-54, AC-76).
@@ -781,8 +888,12 @@ function userNavigated(reason) {
   followState = 'paused'; followStatus.textContent = 'Follow paused by your navigation'; renderFollow();
   vscode.postMessage({ type: 'followPause', reason });
 }
-// AC-233: Diffs only → Follow, the agent's worktree in its real files.
-document.getElementById('head-follow')?.addEventListener('click', () => vscode.postMessage({ type: 'showHead' }));
+// AC-233, AC-264: Follow or Diffs only, both this review. The switch changes the view at once and
+// tells the host, which remembers it for the agent.
+for (const seg of document.querySelectorAll('#view-mode .seg')) seg.addEventListener('click', () => {
+  if (seg.dataset.view === view) return;
+  viewChosenAt = Date.now(); setView(seg.dataset.view); vscode.postMessage({ type: 'setView', view: seg.dataset.view, at: viewChosenAt });
+});
 followButton.addEventListener('click', () => {
   if (followState === 'paused') vscode.postMessage({ type: 'followResume' });
   else vscode.postMessage({ type: 'follow', enabled: followState !== 'following' });
@@ -793,7 +904,7 @@ diffs.addEventListener('wheel', () => userNavigated('scroll'), { passive: true }
 diffs.addEventListener('touchstart', () => userNavigated('scroll'), { passive: true });
 diffs.addEventListener('mousedown', event => { if (!event.target.closest('button')) userNavigated('pointer'); });
 diffs.addEventListener('keydown', event => { if (!['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) userNavigated('keyboard'); });
-tree.addEventListener('click', () => userNavigated('file selection'), true);
+tree.addEventListener('click', () => { if (view === 'diffs') userNavigated('file selection'); }, true);
 filter.addEventListener('input', () => userNavigated('filter'));
 function revealLine(row, line) {
   if (!row.editor || !line) return false;
@@ -806,7 +917,7 @@ function revealLine(row, line) {
 }
 function applyReveal(value) {
   // Overseer: `user` reveals (a file edit clicked in the conversation) work without Follow and pause it.
-  if (followState !== 'following' && !value.user) return;
+  if (view !== 'diffs' || (followState !== 'following' && !value.user)) return;
   const id = value.id || snapshot?.entries.find(e => e.path === value.path)?.id;
   if (!id || !rows.has(id)) { pendingReveal = value; return; }
   pendingReveal = undefined;
@@ -817,6 +928,133 @@ function applyReveal(value) {
   followNote = followStatus.textContent; renderFollow();
   if (!revealLine(row, value.line)) row.pendingLine = value.line;
 }
+// ---- Overseer (AC-264): Follow, in the review. The middle shows the file the agent is in right now,
+// live and read-only, its changes marked (added and changed lines with a bar, a changed line saying
+// what it was, a marker where lines were removed), scrolled to the line the agent is at. A file
+// picked in All files shows in the same place; Follow goes back to the agent when the agent moves to
+// another file, or at once with "Follow the agent".
+const followView = document.getElementById('follow-view');
+const followEditorHost = document.getElementById('follow-editor');
+const followProblem = document.getElementById('follow-problem');
+const followAgainButton = document.getElementById('follow-again');
+const followNotes = document.head.appendChild(document.createElement('style'));
+followAgainButton.addEventListener('click', () => vscode.postMessage({ type: 'followAgain' }));
+function renderViewSwitch() {
+  document.body.dataset.view = view;
+  for (const seg of document.querySelectorAll('#view-mode .seg')) {
+    const on = seg.dataset.view === view;
+    seg.classList.toggle('on', on); seg.setAttribute('aria-pressed', String(on));
+  }
+}
+function setView(next) {
+  if (next !== 'follow' && next !== 'diffs') return;
+  const was = view; view = next; renderViewSwitch();
+  if (was === view) return;
+  renderTree();
+  if (view === 'diffs') requestAnimationFrame(() => { for (const row of rows.values()) resize(row); updateViewport(); trackScroll(); });
+  else followEditor?.layout();
+}
+renderViewSwitch();
+/** Marks the file Follow shows in the list, opening the folders above it (All files lists one folder at a time). */
+function markFollowed(relPath) {
+  followPath = relPath || '';
+  if (view !== 'follow') return;
+  const parts = followPath.split('/'); parts.pop();
+  let opened = false;
+  for (let i = 1; i <= parts.length; i++) { const dir = parts.slice(0, i).join('/'); if (!openDirs.has(dir)) { openDirs.add(dir); opened = true; } }
+  if (opened) { renderTree(); persist(); }
+  for (const button of tree.querySelectorAll('.file')) {
+    const on = button.dataset.path === followPath;
+    button.classList.toggle('active', on); button.setAttribute('aria-selected', String(on));
+    if (on && !navigatorBusy()) button.scrollIntoView({ block: 'nearest' });
+  }
+}
+function showFollowProblem(text) {
+  followProblem.textContent = text; followProblem.hidden = !text;
+  followEditorHost.hidden = !!text;
+  document.body.dataset.followState = text ? 'problem' : 'shown';
+}
+function followOptions() {
+  return { readOnly: true, domReadOnly: true, automaticLayout: true, minimap: { enabled: false }, scrollBeyondLastLine: false,
+    lineNumbersMinChars: 4, lineDecorationsWidth: 12, glyphMargin: false, folding: false, links: false, hover: { enabled: false }, contextmenu: false,
+    renderLineHighlight: 'none', renderValidationDecorations: 'off', occurrencesHighlight: 'off', selectionHighlight: false, matchBrackets: 'never',
+    fontFamily: settings.fontFamily, fontSize: settings.fontSize || 14, fontLigatures: settings.fontLigatures || false,
+    wordWrap: settings.wordWrap || 'off', scrollbar: { alwaysConsumeMouseWheel: true }, tabSize: Number(settings.tabSize) || 4 };
+}
+function followMarks(marks) {
+  const out = [];
+  if (!marks || !followModel) return out;
+  const lines = followModel.getLineCount();
+  const at = line => { const l = Math.max(1, Math.min(lines, line)); const c = followModel.getLineMaxColumn(l); return { startLineNumber: l, startColumn: c, endLineNumber: l, endColumn: c }; };
+  // A note after a line: a generated class whose ::after holds the words (Monaco's afterContentClassName).
+  const note = (line, content, className) => {
+    const l = Math.max(1, Math.min(lines, line)), id = `${className}-${notes.length}`;
+    notes.push(`.${id}::after { content: ${JSON.stringify(content)}; }`);
+    out.push({ range: { startLineNumber: l, startColumn: 1, endLineNumber: l, endColumn: followModel.getLineMaxColumn(l) }, options: { afterContentClassName: `${className} ${id}`, showIfCollapsed: true } });
+  };
+  const notes = [];
+  for (const r of marks.added || []) out.push({ range: { startLineNumber: r.start, startColumn: 1, endLineNumber: Math.min(lines, r.end), endColumn: 1 }, options: { isWholeLine: true, className: 'follow-added', linesDecorationsClassName: 'follow-bar-added' } });
+  for (const r of marks.changed || []) {
+    out.push({ range: { startLineNumber: r.start, startColumn: 1, endLineNumber: Math.min(lines, r.end), endColumn: 1 }, options: { isWholeLine: true, className: 'follow-changed', linesDecorationsClassName: 'follow-bar-changed' } });
+    if (r.was) r.was.forEach((text, i) => { if (r.start + i <= lines) note(r.start + i, `was: ${text || '(empty line)'}`, 'follow-was'); });
+    else if (r.replaced) note(r.start, `replaced ${r.replaced} line${r.replaced === 1 ? '' : 's'}`, 'follow-was');
+  }
+  for (const r of marks.removed || []) {
+    const line = r.line > 0 ? r.line : 1;
+    out.push({ range: at(line), options: { linesDecorationsClassName: 'follow-bar-removed' } });
+    note(line, `− ${r.count} line${r.count === 1 ? '' : 's'} removed ${r.line > 0 ? 'below' : 'above'}`, 'follow-removed');
+  }
+  followNotes.textContent = notes.join('\n');
+  return out;
+}
+async function applyFollowFile(value) {
+  if (!Number.isSafeInteger(value.seq) || value.seq < followSeq) return;
+  followSeq = value.seq;
+  followSource = value.source === 'user' ? 'user' : 'agent';
+  const path = String(value.path || '');
+  document.getElementById('follow-path').textContent = path || 'No file yet';
+  document.getElementById('follow-path').title = path;
+  const why = followSource === 'user' ? 'You picked this file. Follow goes back to the agent when it moves to another file.' : `The agent is here${value.attribution ? ' · ' + value.attribution : ''}`;
+  document.getElementById('follow-why').textContent = why;
+  document.getElementById('follow-icon').className = 'codicon codicon-' + (followSource === 'user' ? 'file' : 'eye');
+  followAgainButton.hidden = followSource !== 'user';
+  followView.dataset.source = followSource;
+  document.body.dataset.followPath = path; document.body.dataset.followSource = followSource;
+  markFollowed(path);
+  if (value.problem || typeof value.text !== 'string') { showFollowProblem(value.problem || 'This file cannot be shown.'); return; }
+  await loadMonaco();
+  if (stopped || value.seq !== followSeq) return;
+  showFollowProblem('');
+  if (!followEditor) {
+    followEditor = monaco.editor.create(followEditorHost, followOptions());
+    followDecorations = followEditor.createDecorationsCollection();
+  }
+  const uri = monaco.Uri.from({ scheme: 'overseer-follow', path: '/' + path });
+  const same = followModel && followModel.uri.toString() === uri.toString();
+  if (same) {
+    const state = value.reveal ? undefined : followEditor.saveViewState();
+    replaceText(followModel, value.text);
+    if (state) followEditor.restoreViewState(state);
+  } else {
+    const old = followModel;
+    followModel = monaco.editor.createModel(value.text, language(path), uri);
+    followEditor.setModel(followModel);
+    old?.dispose();
+  }
+  followDecorations.set(followMarks(value.marks));
+  const line = Math.max(1, Math.min(followModel.getLineCount(), Number(value.line) || 1));
+  if (value.reveal || !same) {
+    followEditor.revealLineInCenterIfOutsideViewport(line);
+    if (!value.line) followEditor.setScrollTop(0);
+    if (value.line && followSource === 'agent') {
+      clearTimeout(followFlash);
+      const flash = followEditor.createDecorationsCollection([{ range: { startLineNumber: line, startColumn: 1, endLineNumber: line, endColumn: 1 }, options: { isWholeLine: true, className: 'follow-line' } }]);
+      followFlash = setTimeout(() => flash.clear(), 2500);
+    }
+  }
+  document.body.dataset.followShown = `${path}:${line}:${followModel.getLineCount()}`;
+  document.body.dataset.followMarks = JSON.stringify({ added: (value.marks?.added || []).length, changed: (value.marks?.changed || []).length, removed: (value.marks?.removed || []).length });
+}
 window.addEventListener('message', event => {
   const value = event.data;
   if (!value || typeof value !== 'object') return;
@@ -824,6 +1062,7 @@ window.addEventListener('message', event => {
   if (value.type === 'snapshot') { applyOverseer(value.overseer); applySnapshot(value); }
   else if (value.type === 'overseer') applyOverseer(value.overseer);
   else if (value.type === 'reveal') applyReveal(value);
+  else if (value.type === 'followFile') applyFollowFile(value).catch(error => showFollowProblem('This file could not be shown: ' + (error.message || error)));
   else if (value.type === 'body' && snapshot) {
     const job = requests.get(value.request);
     if (!job) return;
@@ -874,6 +1113,7 @@ window.addEventListener('pagehide', () => {
   flushState(); stopped = true; statistics.dispose(); queued.clear(); requests.clear();
   sizeObserver.disconnect(); themeObserver.disconnect();
   for (const row of rows.values()) release(row);
+  followEditor?.dispose(); followModel?.dispose();
   disposeMonaco?.();
   clearTimeout(persistTimer); clearTimeout(progressTimer); cancelAnimationFrame(frame); cancelAnimationFrame(resizeFrame); cancelAnimationFrame(renderFrame);
 });

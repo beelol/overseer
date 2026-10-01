@@ -1,0 +1,431 @@
+{
+  "checks": [
+    {
+      "name": "fixture: turn 1 committed one.txt, turn 2 left two.txt untracked, main moved on",
+      "ok": true,
+      "detail": "?? two.txt"
+    },
+    {
+      "name": "a finished agent in its own worktree: the review opens on Since task start (one.txt and two.txt, 2 files)",
+      "ok": true,
+      "detail": {
+        "files": [
+          "one.txt",
+          "two.txt"
+        ],
+        "count": "2",
+        "total": "2 files",
+        "label": "Since task start",
+        "pressed": [
+          "Since task start"
+        ],
+        "pressedName": [
+          "Since task start"
+        ],
+        "note": "",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "the header names it: Since task start pressed, Latest run and Entire worktree one click away, no folder note",
+      "ok": true,
+      "detail": {
+        "files": [
+          "one.txt",
+          "two.txt"
+        ],
+        "count": "2",
+        "total": "2 files",
+        "label": "Since task start",
+        "pressed": [
+          "Since task start"
+        ],
+        "pressedName": [
+          "Since task start"
+        ],
+        "note": "",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "one click: Latest run (two.txt, 1 file), named in the header",
+      "ok": true,
+      "detail": {
+        "files": [
+          "two.txt"
+        ],
+        "count": "1",
+        "total": "1 file",
+        "label": "Latest run",
+        "pressed": [
+          "Latest run"
+        ],
+        "pressedName": [
+          "Latest run"
+        ],
+        "note": "",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "one click: Entire worktree (the branch against where it started: one.txt and two.txt, not main's later commit), named in the header",
+      "ok": true,
+      "detail": {
+        "files": [
+          "one.txt",
+          "two.txt"
+        ],
+        "count": "2",
+        "total": "2 files",
+        "label": "Entire worktree",
+        "pressed": [
+          "Entire worktree"
+        ],
+        "pressedName": [
+          "Entire worktree"
+        ],
+        "note": "",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "one click back to Since task start",
+      "ok": true,
+      "detail": {
+        "files": [
+          "one.txt",
+          "two.txt"
+        ],
+        "count": "2",
+        "total": "2 files",
+        "label": "Since task start",
+        "pressed": [
+          "Since task start"
+        ],
+        "pressedName": [
+          "Since task start"
+        ],
+        "note": "",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "a finished agent in the owner's checkout: the review opens on Since task start (c1, c2 and the owner's edit between turns; not the edit before the task)",
+      "ok": true,
+      "detail": {
+        "files": [
+          "c1.txt",
+          "c2.txt",
+          "owner.txt"
+        ],
+        "count": "3",
+        "total": "3 files",
+        "label": "Since task start",
+        "pressed": [
+          "Since task start"
+        ],
+        "pressedName": [
+          "Since task start (includes any edits made in this folder)"
+        ],
+        "note": "(includes any edits made in this folder)",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "the header says it includes any edits made in this folder",
+      "ok": true,
+      "detail": {
+        "files": [
+          "c1.txt",
+          "c2.txt",
+          "owner.txt"
+        ],
+        "count": "3",
+        "total": "3 files",
+        "label": "Since task start",
+        "pressed": [
+          "Since task start"
+        ],
+        "pressedName": [
+          "Since task start (includes any edits made in this folder)"
+        ],
+        "note": "(includes any edits made in this folder)",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "one click: Latest run (c2.txt, 1 file), named in the header",
+      "ok": true,
+      "detail": {
+        "files": [
+          "c2.txt"
+        ],
+        "count": "1",
+        "total": "1 file",
+        "label": "Latest run",
+        "pressed": [
+          "Latest run"
+        ],
+        "pressedName": [
+          "Latest run (includes any edits made in this folder)"
+        ],
+        "note": "(includes any edits made in this folder)",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "one click: Entire worktree (the feature branch against main: a.txt, c1, c2, feature.txt, owner.txt, 5 files), named in the header",
+      "ok": true,
+      "detail": {
+        "files": [
+          "a.txt",
+          "c1.txt",
+          "c2.txt",
+          "feature.txt",
+          "owner.txt"
+        ],
+        "count": "5",
+        "total": "5 files",
+        "label": "Entire worktree",
+        "pressed": [
+          "Entire worktree"
+        ],
+        "pressedName": [
+          "Entire worktree (includes any edits made in this folder)"
+        ],
+        "note": "(includes any edits made in this folder)",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "each agent keeps its own choice (the worktree agent is still on Since task start)",
+      "ok": true,
+      "detail": {
+        "files": [
+          "one.txt",
+          "two.txt"
+        ],
+        "count": "2",
+        "total": "2 files",
+        "label": "Since task start",
+        "pressed": [
+          "Since task start"
+        ],
+        "pressedName": [
+          "Since task start"
+        ],
+        "note": "",
+        "buttons": [
+          "Since task start",
+          "Latest run",
+          "Entire worktree"
+        ],
+        "more": "More…"
+      }
+    },
+    {
+      "name": "each file offers Accept file and Reject file, each change Accept and Reject; no Keep, Undo or Save before typing",
+      "ok": true,
+      "detail": {
+        "load": "rendered",
+        "hunks": 2,
+        "accepted": 0,
+        "accept": "Accept file",
+        "acceptPressed": "false",
+        "reject": "Reject file",
+        "rejectDisabled": false,
+        "save": null,
+        "hunkWords": [
+          [
+            "Accept",
+            "Reject"
+          ],
+          [
+            "Accept",
+            "Reject"
+          ]
+        ],
+        "notice": ""
+      }
+    },
+    {
+      "name": "a narrow card: Accept file and Reject file are a solid check in the accept colour and an X in the reject colour, words in tooltip and label; each change keeps its words",
+      "ok": true,
+      "detail": {
+        "card": 269,
+        "accept": {
+          "word": "",
+          "label": "Accept every change to a.txt",
+          "title": "Accept file: every change the agent made to a.txt stays and is marked accepted (nothing is committed or staged)",
+          "stroke": "rgb(76, 195, 138)",
+          "opacity": 1,
+          "size": 16,
+          "visible": true
+        },
+        "reject": {
+          "word": "",
+          "label": "Reject every change to a.txt",
+          "title": "Reject file: take out every change the agent made to a.txt and put back what was there before",
+          "stroke": "rgb(240, 112, 123)",
+          "opacity": 1,
+          "size": 16,
+          "visible": true
+        },
+        "done": "rgb(76, 195, 138)",
+        "removed": "rgb(240, 112, 123)",
+        "hunkWords": [
+          [
+            "Accept",
+            "Reject"
+          ],
+          [
+            "Accept",
+            "Reject"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "a change accepted reads Accepted; the file on disk keeps the agent's line",
+      "ok": true,
+      "detail": {
+        "load": "rendered",
+        "hunks": 2,
+        "accepted": 1,
+        "accept": "Accept file",
+        "acceptPressed": "false",
+        "reject": "Reject file",
+        "rejectDisabled": false,
+        "save": null,
+        "hunkWords": [
+          [
+            "Accepted",
+            "Reject"
+          ],
+          [
+            "Accept",
+            "Reject"
+          ]
+        ],
+        "notice": ""
+      }
+    },
+    {
+      "name": "a change rejected: the line is back on disk, the review says Rejected, and \"Save your edits\" does not appear",
+      "ok": true,
+      "detail": {
+        "afterReject": {
+          "load": "rendered",
+          "hunks": 1,
+          "accepted": 1,
+          "accept": "Accepted",
+          "acceptPressed": "true",
+          "reject": "Reject file",
+          "rejectDisabled": false,
+          "save": null,
+          "hunkWords": [
+            [
+              "Accepted",
+              "Reject"
+            ]
+          ],
+          "notice": "Rejected: the agent's change at lines 100–100 of a.txt was taken out."
+        },
+        "l100": "L100: original"
+      }
+    },
+    {
+      "name": "a whole file accepted: every change reads Accepted and the file's button reads Accepted",
+      "ok": true,
+      "detail": {
+        "load": "rendered",
+        "hunks": 2,
+        "accepted": 2,
+        "accept": "Accepted",
+        "acceptPressed": "true",
+        "reject": "Reject file",
+        "rejectDisabled": false,
+        "save": null,
+        "hunkWords": [
+          [
+            "Accepted",
+            "Reject"
+          ],
+          [
+            "Accepted",
+            "Reject"
+          ]
+        ],
+        "notice": "Rejected: the agent's change at lines 100–100 of a.txt was taken out."
+      }
+    },
+    {
+      "name": "a whole file rejected: b.txt is as it was before the agent, leaves the review, and the review says Rejected",
+      "ok": true,
+      "detail": {
+        "notice": "Rejected: the agent's changes to b.txt were taken out.",
+        "count": "1",
+        "saves": 0,
+        "same": true
+      }
+    },
+    {
+      "name": "\"Save your edits\" appears once the owner types",
+      "ok": true,
+      "detail": "Save your edits"
+    },
+    {
+      "name": "Save your edits writes what was typed, then goes away",
+      "ok": true,
+      "detail": {
+        "l10": "L10: agent edit OWNER-TYPED",
+        "hiddenAgain": true
+      }
+    }
+  ]
+}

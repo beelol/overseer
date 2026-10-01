@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **199 / 264** · **35** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-128, AC-129, AC-133, AC-135, AC-136, AC-137, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-183, AC-185, AC-186, AC-188, AC-189, AC-190, AC-192, AC-195, AC-196, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-210, AC-213, AC-216, AC-218, AC-219, AC-220, AC-221, AC-222, AC-223, AC-224, AC-225, AC-229, AC-230, AC-231, AC-234, AC-239, AC-240, AC-241, AC-244, AC-246, AC-252, AC-263, AC-264. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+criteria: **201 / 264** · **34** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-128, AC-129, AC-133, AC-135, AC-136, AC-137, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-183, AC-185, AC-186, AC-188, AC-189, AC-190, AC-192, AC-195, AC-196, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-210, AC-213, AC-216, AC-218, AC-219, AC-220, AC-221, AC-222, AC-223, AC-224, AC-225, AC-229, AC-230, AC-231, AC-234, AC-239, AC-240, AC-241, AC-244, AC-246, AC-252. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), Voice Mode (Gate R, AC-162 to AC-177, added by the owner on 2026-09-27: a voice to talk to constantly that redirects every agent from context, answers quickly and shows every word it sent, with audio collected on the Rust side and the animated mark in the middle moving with the voice; [design](docs/rfcs/voice-mode.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -219,7 +219,7 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-176** Voice Mode by voice (owner-confirmed) — not started: waits for the owner's session (in a dev daemon, Gate T's guided test) — [evidence](docs/verification/AC-176.md)
 - [ ] **AC-177** The mark shows it is hearing you — ◐ partial: the Star motion ported unchanged, its poses equal the reference's within 1% for every state (`test/unit/voice-mark.js`); in the packaged UI the mark is centred (measured), the star follows the level curve with a 40 ms lag (best-aligned, r 0.88), noise leaves it at rest, each state in screenshots in the three themes and in grayscale, frame work p95 0.2 ms beside a streaming chat at the display's rate, no frame while hidden, reduced motion shows the still mark and a meter; two windows get the same levels from one listener; the listener's output carries levels and no audio, and nothing of them is stored / deferred: the owner speaks with Voice Mode on and sees the star follow their real voice and stay at rest for taps and typing (the owner's checks (docs/rfcs/voice-mode.md#the-owners-checks), step 4) — [evidence](docs/verification/AC-177.md)
 - [ ] **AC-178** The phone app uses the owner's mark — not started (Brand, added by the owner on 2026-09-27): the phone app's agent uses the owner's files — [evidence](docs/verification/AC-178.md)
-- [ ] **AC-179** The Mac surfaces use the owner's mark — ◐ partial: the notification helper's `.icns` is built from `docs/design/brand/exports/overseer-app-icon-macos-1024.png` by `extension/notifier/build.js` (sips for every macOS size, iconutil); the brand scenario unpacks the installed helper's icon and finds every size, the owner's violet tile (`node test/ui/scenario-brand.js`); Overseer has no menu-bar item and no other Mac app, so those parts do not apply yet / deferred: a screenshot of a real notification banner and of the helper in Finder: macOS asks the owner to allow the helper's notifications, and screenshots of the desktop need the owner's screen-recording permission; the menu-bar image when a menu-bar item exists — [evidence](docs/verification/AC-179.md)
+- [ ] **AC-179** The Mac surfaces use the owner's mark — ◐ partial: the notification helper's `.icns` is built from `docs/design/brand/exports/overseer-app-icon-macos-1024.png` by `extension/notifier/build.js` (sips for every macOS size, iconutil); the brand scenario unpacks the installed helper's icon and finds every size, the owner's violet tile (`node test/ui/scenario-brand.js`); Overseer has no menu-bar item and no other Mac app, so those parts do not apply yet / deferred: a screenshot of a real notification banner and of the helper in Finder: macOS asks the owner to allow the helper's notifications, and screenshots of the desktop need the owner's screen-recording permission — [evidence](docs/verification/AC-179.md)
 - [x] **AC-180** Spikes before lock-in — [evidence](docs/verification/AC-180.md)
 - [x] **AC-181** Overseer lives in the daemon — [evidence](docs/verification/AC-181.md)
 - [x] **AC-182** One conversation, from home — [evidence](docs/verification/AC-182.md)
@@ -303,8 +303,8 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-260** Starting an agent in another repository never needs a native dialog — [evidence](docs/verification/AC-260.md)
 - [x] **AC-261** One Sign In, clearly Overseer's or clearly not — [evidence](docs/verification/AC-261.md)
 - [x] **AC-262** Overseer in the Mac's menu bar — [evidence](docs/verification/AC-262.md)
-- [ ] **AC-263** The review opens on "Since task start", with the other comparisons one click away — not started (the owner, 2026-09-29) — [evidence](docs/verification/AC-263.md)
-- [ ] **AC-264** One Overseer layout, and it looks like Focus Mode without its side effects — ◐ partial: — / deferred: — — [evidence](docs/verification/AC-264.md)
+- [x] **AC-263** The review opens on "Since task start", with the other comparisons one click away — [evidence](docs/verification/AC-263.md)
+- [x] **AC-264** One Overseer layout, and it looks like Focus Mode without its side effects — [evidence](docs/verification/AC-264.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -325,9 +325,12 @@ and Verify clauses. Both lists are generated from the records by
   staged/unstaged/untracked/unsaved work recorded and preserved. Single writer per checkout;
   cleanup reports dirty files and active runs and never removes the current checkout.
 - **Review** — Branch Diff's editable Monaco review opened on the selected run's worktree.
-  Default comparison is **Latest run** (a snapshot taken at the start of every turn,
-  including dirty and untracked files, without touching your index/stash); also since
-  earlier turns, **Since task start**, **Original fork**, and any branch (merge-base or tip).
+  A finished agent's review opens on **Since task start**; **Latest run** (a snapshot taken
+  at the start of every turn, including dirty and untracked files, without touching your
+  index/stash; the default while the agent works) and **Entire worktree** (its branch against
+  the commit it started from) are one click each in the review's header, which names the one
+  shown; **More…** has earlier turns, **Original fork** and any branch (merge-base or tip).
+  In your own checkout the header says the changes include any edits made in that folder.
   A separate **Workspace Dirty** view always shows staged, unstaged, untracked, conflicted
   and unsaved work. **Follow** jumps to agent-reported edits across and within files and
   pauses when you scroll or select a file until you press **Resume**. Each hunk has
@@ -376,7 +379,7 @@ phone cannot reach the Mac; that needs the relay, which is later work.
 What a phone can do, method by method:
 
 <!-- phone-capabilities:start -->
-267 methods: 71 available on a phone, 154 on the Mac only, 42 not yet. A *watch only* phone reads and cannot change anything. Generated by `python3 protocol/capabilities.py` from `protocol/protocol.json`.
+269 methods: 71 available on a phone, 156 on the Mac only, 42 not yet. A *watch only* phone reads and cannot change anything. Generated by `python3 protocol/capabilities.py` from `protocol/protocol.json`.
 
 | Method | What it does | On a phone | Who |
 | --- | --- | --- | --- |
@@ -547,6 +550,7 @@ What a phone can do, method by method:
 | `local.pull` | Download a local model | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
 | `local.pull_cancel` | Cancel a local model download | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
 | `local.unload` | Unload a local model | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
+| `menubar.snapshot` | Everything the Mac menu-bar item shows, in one read | The Mac only: the menu-bar item is the Mac's own surface (AC-262); the phone reads state and events | — |
 | `notices.get` | Which agent moments become Mac notifications | The Mac only: it belongs to the Mac's own notifications | — |
 | `notices.set` | Choose which agent moments become Mac notifications | The Mac only: it belongs to the Mac's own notifications | — |
 | `ollama.install` | Install Ollama | The Mac only: it changes what runs on the Mac and how much of its memory is used | — |
@@ -556,6 +560,7 @@ What a phone can do, method by method:
 | `overseer.tool` | Run one of Overseer's tools for an agent | The Mac only: it is for the agents' own Overseer tools, never a phone | — |
 | `overseer.tools` | The Overseer tools an agent may use | The Mac only: it is for the agents' own Overseer tools, never a phone | — |
 | `profile.login_command` | The sign-in command for a terminal | The Mac only: it needs a terminal on the Mac; a phone uses profile.device_login | — |
+| `review.seen` | Share the reviewed marks VS Code keeps, so every surface counts "to review" the same | The Mac only: written by VS Code on the Mac (AC-262); the phone reads the counts through state | — |
 | `run.delegate` | Delegate a work unit from a run (managed child) | The Mac only: auto routing and Swarm come to the phone later (the partial merge, AC-204) | — |
 | `run.result` | A managed child's result | The Mac only: auto routing and Swarm come to the phone later (the partial merge, AC-204) | — |
 | `settings.get` | Continuity settings | The Mac only: continuity is set on the Mac | — |
@@ -849,8 +854,6 @@ the owner action or decision each one needs.
 - [ ] [AC-244](docs/verification/AC-244.md) (Opening an agent leaves your layout alone): The owner chooses what the dashboard does with its settings in a window opened on a folder (see deferred).
 - [ ] [AC-246](docs/verification/AC-246.md) (One name for each thing): not blocked
 - [ ] [AC-252](docs/verification/AC-252.md) (Zero-friction loop, measured): Overnight goal.
-- [ ] [AC-263](docs/verification/AC-263.md) (The review opens on "Since task start", with the other comparisons one click away): Its own agent.
-- [ ] [AC-264](docs/verification/AC-264.md) (One Overseer layout, and it looks like Focus Mode without its side effects): The owner, 2026-09-30: Follow happens inside the review window (the file the agent is in, live, with All files on the left), not in a plain VS Code editor; #40 opens the real file in VS Code instead. Being rebuilt on #40.
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.

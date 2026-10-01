@@ -15,6 +15,8 @@
 // spend paid turns within the budget in AGENTS.md), --perf (also the ten-minute AC-35 load test),
 // --jobs=N (run N UI scenarios at once; each has its own VS Code profile, ports and evidence folder,
 // so 3 or 4 cut the UI part from about 50 minutes to about 15 on one machine).
+// ON SCREEN scenarios (the menu-bar item, AC-262: its menus open on this Mac's screen for a moment)
+// run only when named: --only=menubar.
 // Exit code 1 when anything fails.
 const fs = require('fs');
 const path = require('path');
@@ -172,13 +174,15 @@ if (!flag('--no-ui')) {
   const dir = path.join(root, 'test/ui');
   const all = fs.readdirSync(dir).filter(f => /^scenario-.+\.js$/.test(f)).map(f => f.slice(9, -3)).sort();
   const isLive = n => /LIVE/.test(fs.readFileSync(path.join(dir, `scenario-${n}.js`), 'utf8').split('\n')[0]);
-  const chosen = all.filter(n => (!only.length || only.includes(n)) && (flag('--live') || !isLive(n)) && (flag('--perf') || n !== 'perf'));
+  // ON SCREEN scenarios open things on this Mac's screen (the menu-bar item's menus, AC-262): only when named with --only.
+  const onScreen = n => /ON SCREEN/.test(fs.readFileSync(path.join(dir, `scenario-${n}.js`), 'utf8').split('\n')[0]);
+  const chosen = all.filter(n => (!only.length || only.includes(n)) && (flag('--live') || !isLive(n)) && (flag('--perf') || n !== 'perf') && (only.includes(n) || !onScreen(n)));
   if (run('Build the VSIX', 'node', ['extension/scripts/package.js'])) {
     if (jobs === 1) for (const n of chosen) run(`UI ${n}`, 'node', [`test/ui/scenario-${n}.js`], { okText: /SCENARIO PASSED/ });
     else await parallel(chosen);
   }
   const skipped = all.filter(n => !chosen.includes(n) && (!only.length || only.includes(n)));
-  if (skipped.length) console.log(`(not run: ${skipped.join(', ')}; ${flag('--live') ? '' : 'LIVE ones need --live, '}perf needs --perf)`);
+  if (skipped.length) console.log(`(not run: ${skipped.join(', ')}; ${flag('--live') ? '' : 'LIVE ones need --live, '}perf needs --perf, ON SCREEN ones need --only=NAME)`);
 }
 
 // Nothing the run started is left running. What finishing tests still stop gets a moment; what

@@ -3,7 +3,7 @@
     {
       "name": "selecting run A opens A worktree review (outside the open folder)",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-V08gK7/overseer-home/worktrees/repoA-c3c13f34/a-seq"
+      "detail": "/private/tmp/ovs-ui-tAYpxc/overseer-home/worktrees/repoA-5688a9ba/a-seq"
     },
     {
       "name": "selecting an existing run does not turn Follow on",
@@ -14,11 +14,13 @@
       "name": "follow ignores unattributed user file",
       "ok": true,
       "detail": [
-        "Following agent edits (agent tool input (tool-input))",
-        "Following: a.txt:60 (agent tool input (tool-input))",
-        "Following agent edits (agent tool input (tool-input))",
-        "Following: b.txt:240 (agent tool input (tool-input))",
-        "Following agent edits (agent tool input (tool-input))"
+        "Following agent edits (from what the agent asked to change)",
+        "Following: a.txt:60 (from what the agent asked to change)",
+        "Following agent edits (from what the agent asked to change)",
+        "Following: b.txt:240 (from what the agent asked to change)",
+        "Following agent edits (from what the agent asked to change)",
+        "Following: a.txt:150 (from what the agent asked to change)",
+        "Following agent edits (from what the agent asked to change)"
       ]
     },
     {
@@ -29,7 +31,7 @@
     {
       "name": "selecting run B shows B worktree",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-V08gK7/overseer-home/worktrees/repoB-a1279858/b-seq"
+      "detail": "/private/tmp/ovs-ui-tAYpxc/overseer-home/worktrees/repoB-fe8ae8dd/b-seq"
     },
     {
       "name": "agent switch does not inherit Follow",
@@ -52,19 +54,19 @@
       "name": "ordinary changes refresh within 2 s",
       "ok": true,
       "detail": {
-        "write new file": 415,
-        "atomic replace": 572,
-        "staging (review Staged scope)": 277,
-        "rename": 708,
-        "delete": 772,
-        "branch change": 799,
-        "missed watcher event (excluded folder)": 626
+        "write new file": 521,
+        "atomic replace": 575,
+        "staging (review Staged scope)": 227,
+        "rename": 278,
+        "delete": 419,
+        "branch change": 592,
+        "missed watcher event (excluded folder)": 366
       }
     },
     {
       "name": "missed watcher event reconciled within 5 s",
       "ok": true,
-      "detail": 626
+      "detail": 366
     },
     {
       "name": "navigator selection preserved across live refreshes",
@@ -135,7 +137,15 @@
     {
       "name": "current checkout review is the repository itself",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-V08gK7/repoA"
+      "detail": "/private/tmp/ovs-ui-tAYpxc/repoA"
+    },
+    {
+      "name": "current checkout review opens on Since task start and says it includes the folder's other edits",
+      "ok": true,
+      "detail": {
+        "mode": "task_start",
+        "note": "(includes any edits made in this folder)"
+      }
     },
     {
       "name": "filesystem-only harness shows the Follow limitation",
@@ -186,12 +196,12 @@
     }
   ],
   "timings": {
-    "write new file": 415,
-    "atomic replace": 572,
-    "staging (review Staged scope)": 277,
-    "rename": 708,
-    "delete": 772,
-    "branch change": 799,
-    "missed watcher event (excluded folder)": 626
+    "write new file": 521,
+    "atomic replace": 575,
+    "staging (review Staged scope)": 227,
+    "rename": 278,
+    "delete": 419,
+    "branch change": 592,
+    "missed watcher event (excluded folder)": 366
   }
 }

@@ -174,6 +174,10 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     // Start fresh, by keyboard.
     await focusTask();
     await tabTo(home, focused('#home-fresh'), { back: true, max: 200 });
+    // The level and Start fresh sit at the bottom right, under the message box (the owner, 2026-09-30).
+    const foot = await home.eval(`(() => { const f = document.getElementById('home-fresh'), l = document.getElementById('home-level'), box = document.querySelector('.composer-foot'); const r = f.getBoundingClientRect(), b = box && box.getBoundingClientRect(); return { inFoot: !!box && box.contains(f) && box.contains(l), level: l.textContent, right: b ? Math.round(b.right - r.right) : null, belowBox: b ? r.top >= b.top : false }; })()`);
+    check('Ask first and Start fresh sit at the bottom right, under the message box', foot.inFoot && foot.level === 'Ask first' && foot.right !== null && foot.right < 24 && foot.belowBox, foot);
+    await s.screenshot('home-level-and-fresh');
     await cdp.key('Enter');
     await home.waitFor(`document.querySelectorAll('#home-conv .home-msg, #home-conv .card').length === 0`, 20000);
     const holds = s.ctl('agent.holds').holds;

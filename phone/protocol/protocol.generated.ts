@@ -473,6 +473,7 @@ export interface Methods {
     branch?: string | null;
     branches: Array<string>;
     options: Array<Comparison>;
+    folder_edits: boolean;
   } };
   /** The diff of a workspace against a comparison. */
   "workspace.diff": { class: 'read'; params: {
@@ -1225,6 +1226,15 @@ export interface Methods {
   "swarm.worker.liveness.sample": { class: 'mac_only'; params: unknown; result: unknown };
   /** Reconcile a Swarm worker's exit. The Mac only: Auto routing and Swarm come to the phone later (the partial merge, AC-204). */
   "swarm.worker.reconcile": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Everything the Mac menu-bar item shows, in one read. The Mac only: The menu-bar item is the Mac's own surface (AC-262); the phone reads state and events. */
+  "menubar.snapshot": { class: 'mac_only'; params: Record<string, never>; result: unknown };
+  /** Share the reviewed marks VS Code keeps, so every surface counts "to review" the same. The Mac only: Written by VS Code on the Mac (AC-262); the phone reads the counts through state. */
+  "review.seen": { class: 'mac_only'; params: {
+    marks: unknown;
+  }; result: {
+    ok: boolean;
+    kept: number;
+  } };
 }
 
 export type MethodName = keyof Methods;
@@ -1498,6 +1508,8 @@ export const METHOD_CLASS = {
   "swarm.worker.liveness.poll": 'mac_only',
   "swarm.worker.liveness.sample": 'mac_only',
   "swarm.worker.reconcile": 'mac_only',
+  "menubar.snapshot": 'mac_only',
+  "review.seen": 'mac_only',
 } as const satisfies Record<MethodName, MethodClass>;
 
 export type PhoneMethod = { [K in MethodName]: Methods[K]['class'] extends 'mac_only' ? never : K }[MethodName];
