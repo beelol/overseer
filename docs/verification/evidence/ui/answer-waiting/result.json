@@ -46,7 +46,7 @@
             "behavior": "allow",
             "updatedInput": {
               "content": "one.txt\n",
-              "file_path": "/private/tmp/ovs-ui-Mlxt7M/overseer-home/worktrees/answer-repo-23ada726/writer/one.txt"
+              "file_path": "/private/tmp/ovs-ui-rrOYAx/overseer-home/worktrees/answer-repo-0e9c0b71/writer/one.txt"
             },
             "updatedPermissions": [
               {
@@ -65,7 +65,7 @@
             "behavior": "allow",
             "updatedInput": {
               "content": "two.txt\n",
-              "file_path": "/private/tmp/ovs-ui-Mlxt7M/overseer-home/worktrees/answer-repo-23ada726/writer/two.txt"
+              "file_path": "/private/tmp/ovs-ui-rrOYAx/overseer-home/worktrees/answer-repo-0e9c0b71/writer/two.txt"
             },
             "updatedPermissions": [
               {
