@@ -1,5 +1,11 @@
 # AC-146: merges
 
+## Pull request #43 (the terminal UI's parity slice), 2026-10-01
+
+- **Finished:** built by its agent (T-25, T-27 to T-29, T-37 to T-39), main merged in after #38, #40 and #42 (clean), the to-review marks and counts added (T-26 partial), marked ready.
+- **Throwaway copy:** #43 with main. `test-all --no-ui`: dev, guided, deploy, links, unit ok; Rust's one failure (the README's phone table not regenerated after the merge) fixed on the branch (`6c9447a5`); `cargo test --workspace --no-fail-fast` 1,424 passed, 0 failed. The UI scenarios one at a time, LIVE, ON SCREEN and perf skipped as test-all does: 71 of 72; inventory passed alone (#43 changes nothing in the extension).
+- **Merged:** squash, `e5836534`. T-25, T-27, T-28, T-37, T-38, T-39 verified (ticked in `docs/rfcs/tui.md`); T-26 and T-29 partial.
+
 ## Pull request #37 (the phone model brought up to the extension; test-all runs the phone's tests), 2026-10-01
 
 - **Finished:** its first builder stopped mid-way on 2026-09-29; a builder merged main in (clean) and brought the phone model up to #32, #38, #40 and #42 (Accept / Accepted on hunks, "N of M accepted", the review tree drawn in Diffs, the search hint copied from `agent-search.js`), then marked it ready.

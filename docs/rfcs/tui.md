@@ -307,7 +307,9 @@ agent list, the review screen, and the two numbered ways of showing a picked age
 
 ### Criteria
 
-- [ ] **T-25 — An agent list beside the grid.** The main screen keeps the pages of nine and adds an
+Status (pull request #43, merged 2026-10-01 as e5836534; tests in `tui/tests/parity.rs`, evidence `docs/verification/evidence/tui/parity-*`): T-25, T-27, T-28, T-37, T-38 and T-39 verified. T-26 partial: the daemon shares the reviewed marks (`state.reviewed`, the `review_seen` event, a merge marks its runs reviewed) and the TUI and the menu bar read them, but VS Code's side bar does not yet, so a review opened in the terminal does not clear VS Code's mark. T-29 partial: accepting and rejecting in the terminal is checked through the daemon, not yet in a VS Code window. T-30 to T-36, T-40 and T-41 not started.
+
+- [x] **T-25 — An agent list beside the grid.** The main screen keeps the pages of nine and adds an
   agent list on the left: agents grouped by repository, the most recently active repository and
   agent first. Each row shows the status mark, the title (shortened with `…`), the account, and a
   mark for needs you, to review or merged. Each repository's heading shows its counts. `J`/`K` (or
@@ -327,14 +329,14 @@ agent list, the review screen, and the two numbered ways of showing a picked age
   repositories. The TUI header and VS Code's side bar give the same counts. Opening one agent's
   review in the TUI clears only that mark, in both. A mark cleared in VS Code clears in the TUI
   within 2 s.
-- [ ] **T-27 — The review opens on "Since task start".** `v` opens the review on the comparison
+- [x] **T-27 — The review opens on "Since task start".** `v` opens the review on the comparison
   the daemon marks as the default: "Since task start". `1`, `2` and `3` switch to Since task start,
   Latest run and Entire worktree, and `c` still cycles through every comparison. The review's
   header always names what is shown and how many files and lines changed. A comparison that is not
   available says why instead of disappearing. **Verify:** a finished fixture agent in its own
   worktree and one in the current checkout both open on Since task start. Each key shows the right
   files and counts. The header names each one. Snapshots of the three.
-- [ ] **T-28 — Changed or All files.** `t` switches the file list between Changed (what the
+- [x] **T-28 — Changed or All files.** `t` switches the file list between Changed (what the
   comparison shows) and All files (the agent's whole worktree, from the daemon), as in VS Code.
   In All files, changed files carry their `+/−` counts, and picking an unchanged file shows its
   contents read-only. The switch says which list is shown. **Verify:** an agent that edited 2 of 5
@@ -387,19 +389,19 @@ agent list, the review screen, and the two numbered ways of showing a picked age
   reads the commands in `extension/package.json` and fails when one has no row; `?` lists every key
   the table names.
 
-- [ ] **T-37 — The grid fits the count.** The grid shows top-level agents only (runs without a
+- [x] **T-37 — The grid fits the count.** The grid shows top-level agents only (runs without a
   parent) and sizes itself to how many there are, up to 16 on one screen (1, 1×2, 2×2, 2×3, 3×3,
   3×4, 4×4 and the shapes between), narrowing to fit beside the list and a picked agent's
   conversation; from the 17th agent it pages, 16 per page. Arrow keys follow the shape.
   **Verify:** snapshots at 200×60 with 1, 4, 7, 12, 16 and 17 fixture agents show the expected
   shape (the 17th on page 2), with and without the conversation column; sub-agents never get a
   tile.
-- [ ] **T-38 — One key between the grid and one agent.** A key (`g`, shown in `?`) switches between
+- [x] **T-38 — One key between the grid and one agent.** A key (`g`, shown in `?`) switches between
   the grid and the focused agent's full view (its conversation with scrollback and tool details),
   and back to the grid on the same agent. **Verify:** with 9 fixture agents, focusing the fourth
   and pressing the key shows its full conversation; pressing it again shows the grid with the
   fourth focused; the key works from the list and from a tile.
-- [ ] **T-39 — Edit in your own editor.** In the review, `e` suspends the TUI and opens the file at
+- [x] **T-39 — Edit in your own editor.** In the review, `e` suspends the TUI and opens the file at
   the current change in `$EDITOR` (falling back to `vi`); when the editor exits, the TUI comes back
   and the review refreshes from the daemon, showing the owner's edits as theirs (not the agent's).
   **Verify:** with `EDITOR` set to a script that appends a line and exits, `e` on a change returns
