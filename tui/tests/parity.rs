@@ -1386,3 +1386,60 @@ fn t34_archive_and_restore() {
     tui.snapshot("parity-t34-restored");
     d.ctl("run.interrupt", json!({ "run_id": busy }));
 }
+
+/// A client for screens that need no daemon (the `?` overlay).
+struct NoDaemon;
+impl overseer_tui::client::Requests for NoDaemon {
+    fn request(&self, _method: &str, _params: serde_json::Value) -> u64 {
+        0
+    }
+    fn connected(&self) -> bool {
+        false
+    }
+    fn set_cursor_if_unset(&self, _cursor: i64) {}
+    fn subscribe(&self) {}
+}
+
+/// T-36: every command VS Code Overseer offers (extension/package.json) has a row in the RFC's
+/// table with its TUI key or the reason it stays in VS Code; every key the table names is in `?`.
+#[test]
+fn t36_nothing_left_out_without_a_reason() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    let pkg: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(root.join("extension/package.json")).unwrap()).unwrap();
+    let commands: Vec<String> = pkg["contributes"]["commands"].as_array().unwrap().iter().map(|c| c["command"].as_str().unwrap().to_string()).collect();
+    assert!(commands.len() > 50, "VS Code's commands: {}", commands.len());
+    let rfc = std::fs::read_to_string(root.join("docs/rfcs/tui.md")).unwrap();
+    // The table's rows: | `command` | title | keys | reason |
+    let mut rows: std::collections::HashMap<String, (Vec<String>, String)> = std::collections::HashMap::new();
+    for line in rfc.lines().filter(|l| l.starts_with("| `overseer.")) {
+        let cells: Vec<&str> = line.trim().trim_matches('|').split('|').map(str::trim).collect();
+        assert_eq!(cells.len(), 4, "a row of four cells: {line}");
+        let id = cells[0].trim_matches('`').to_string();
+        let keys: Vec<String> = cells[2].split(',').map(|k| k.trim().trim_matches('`').to_string()).filter(|k| !k.is_empty()).collect();
+        assert!(rows.insert(id.clone(), (keys, cells[3].to_string())).is_none(), "{id} has one row");
+    }
+    let missing: Vec<&String> = commands.iter().filter(|c| rows.get(*c).is_none_or(|(keys, why)| keys.is_empty() && why.len() < 12)).collect();
+    assert!(missing.is_empty(), "VS Code commands with no TUI key and no reason in docs/rfcs/tui.md: {missing:?}");
+    let stale: Vec<&String> = rows.keys().filter(|id| !commands.contains(id)).collect();
+    assert!(stale.is_empty(), "rows for commands VS Code no longer has: {stale:?}");
+
+    // `?` lists every key the table names.
+    let mut app = overseer_tui::app::App::new(std::sync::Arc::new(NoDaemon));
+    app.mode = Mode::Help;
+    let mut term = ratatui::Terminal::new(ratatui::backend::TestBackend::new(200, 60)).unwrap();
+    term.draw(|f| overseer_tui::ui::draw(f, &mut app)).unwrap();
+    let screen = buffer_text(term.backend().buffer());
+    let help = overseer_tui::ui::HELP;
+    for (id, (keys, _)) in &rows {
+        for key in keys {
+            let wanted: Vec<&str> = key.split_whitespace().collect();
+            let found = help.iter().find(|(cell, _)| {
+                let tokens: Vec<&str> = cell.split_whitespace().collect();
+                wanted.iter().all(|w| tokens.contains(w))
+            });
+            let Some((cell, what)) = found else { panic!("{id}'s key {key:?} is not in ?") };
+            assert!(screen.contains(&format!("{cell:<20}{what}")), "{id}'s key {key:?} ({cell}) is not drawn in ?:\n{screen}");
+        }
+    }
+    snapshot(term.backend().buffer(), "parity-t36-help");
+}

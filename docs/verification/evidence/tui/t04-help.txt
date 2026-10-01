@@ -4,51 +4,51 @@
 │›✓ agent 20                     ✦ │┃                                  ┃│                                  ││                                  ││                                  │
 │ ✓ agent 19                     ✦ │┃                                  ┃│                                  ││                                  ││                                  │
 │ ✓ agent 18                     ✦ │┃                                  ┃│                                  ││                                  ││                                  │
-│ ✓ agent 17                     ✦ │┃                                  ┃│                                  ││                                  ││                                  │
-│ ✓ agent 16                     ✦ │┃                                  ┃│                                  ││                                  ││                                  │
-│ ✓ agent 15                     ✦ │┃                                  ┃│                                  ││                                  ││                                  │
-│ ✓ agent 14                     ✦ │┃                                  ┃│                                  ││                                  ││                                  │
-│ ✓ agent 13                     ✦ │┃                        ╭ keys ──────────────────────────────────────────────────╮                        ││                                  │
-│ ✓ agent 12                     ✦ │┃                        │                                                        │                        ││                                  │
-│ ✓ agent 11                     ✦ │┃                        │  ←↓↑→  h j k l     move between agents                 │                        ││                                  │
-│ ✓ agent 10                     ✦ │┗ completed ━━━━━━━━━━━━━│  1 – 9             focus agent n on this page          │ ───────────────────────╯╰ completed ───────────────────────╯
-│ ✓ agent 09                     ✦ │╭ 5 ✓ agent 16 ────── Pro│  tab / shift+tab   next / previous agent               │ 14 ────── Program · 0s ╮╭ 8 ✓ agent 13 ────── Program · 0s ╮
-│ ✓ agent 08                     ✦ ││ hi                     │  J / K             pick the next / previous agent in th│                        ││ hi                               │
-│ ✓ agent 07                     ✦ ││                        │  esc               close the picked agent's conversatio│                        ││                                  │
-│ ✓ agent 06                     ✦ ││                        │  L                 hide or show the agent list         │                        ││                                  │
-│ ✓ agent 05                     ✦ ││                        │  D                 dashboard mode ⇄ grid, same agent   │                        ││                                  │
-│ ✓ agent 04                     ✦ ││                        │  tab  (dashboard)  list → review → conversation        │                        ││                                  │
-│ ✓ agent 03                     ✦ ││                        │  ] [   pgdn pgup   next / previous page                │                        ││                                  │
-│ ✓ agent 02                     ✦ ││                        │  i  enter          message the focused agent           │                        ││                                  │
-│ ✓ agent 01                     ✦ ││                        │  g  z              zoom: one agent's full view ⇄ grid  │                        ││                                  │
-│                                  ││                        │  home / G          in the full view: top / bottom      │                        ││                                  │
-│                                  ││                        │  v                 review: Accept / Reject changes     │                        ││                                  │
-│                                  ││                        │  e  (in zoom)      expand tool inputs and results      │                        ││                                  │
-│                                  │╰ completed ─────────────│  a / d             allow / deny its permission request │ ───────────────────────╯╰ completed ───────────────────────╯
-│                                  │╭ 9 ✓ agent 12 ────── Pro│  w                 next agent waiting for you          │t 10 ───── Program · 0s ╮╭ 12 ✓ agent 09 ───── Program · 0s ╮
-│                                  ││ hi                     │  x                 interrupt the focused agent         │                        ││ hi                               │
-│                                  ││                        │  n                 start a new agent                   │                        ││                                  │
-│                                  ││                        │  M                 merge back (asks before each step)  │                        ││                                  │
-│                                  ││                        │  P                 open a GitHub pull request (gh)     │                        ││                                  │
-│                                  ││                        │  C                 remove a finished agent's worktree  │                        ││                                  │
-│                                  ││                        │  f                 filter: all → active → needs you    │                        ││                                  │
-│                                  ││                        │  /                 search agents (esc clears)          │                        ││                                  │
-│                                  ││                        │  A                 accounts and sign-in                │                        ││                                  │
-│                                  ││                        │  O                 phone access on / off               │                        ││                                  │
-│                                  ││                        │  ctrl+o            devices: pair a phone, revoke, scope│                        ││                                  │
-│                                  ││                        │  S                 Audio Mode: settings and preview    │                        ││                                  │
-│                                  │╰ completed ─────────────│  r                 reload (after X: start the daemon)  │ ───────────────────────╯╰ completed ───────────────────────╯
-│                                  │╭ 13 ✓ agent 08 ───── Pro│  X                 stop all agents and the daemon      │t 06 ───── Program · 0s ╮╭ 16 ✓ agent 05 ───── Program · 0s ╮
-│                                  ││ hi                     │  q                 quit (agents keep running)          │                        ││ hi                               │
-│                                  ││                        │                                                        │                        ││                                  │
-│                                  ││                        ╰──────────────────────────────────────── any key closes ╯                        ││                                  │
-│                                  ││                                  ││                                  ││                                  ││                                  │
-│                                  ││                                  ││                                  ││                                  ││                                  │
-│                                  ││                                  ││                                  ││                                  ││                                  │
+│ ✓ agent 17                     ✦ │┃                 ╭ keys ────────────────────────────────────────────────────────────────╮                 ││                                  │
+│ ✓ agent 16                     ✦ │┃                 │                                                                      │                 ││                                  │
+│ ✓ agent 15                     ✦ │┃                 │  ←↓↑→  h j k l       move between agents                             │                 ││                                  │
+│ ✓ agent 14                     ✦ │┃                 │  1 – 9               focus agent n on this page                      │                 ││                                  │
+│ ✓ agent 13                     ✦ │┃                 │  tab / shift+tab     next / previous agent                           │                 ││                                  │
+│ ✓ agent 12                     ✦ │┃                 │  J / K               pick the next / previous agent in the list      │                 ││                                  │
+│ ✓ agent 11                     ✦ │┃                 │  esc                 close the picked agent's conversation           │                 ││                                  │
+│ ✓ agent 10                     ✦ │┗ completed ━━━━━━│  L                   hide or show the agent list                     │─────────────────╯╰ completed ───────────────────────╯
+│ ✓ agent 09                     ✦ │╭ 5 ✓ agent 16 ───│  D                   dashboard mode ⇄ grid, same agent               │─── Program · 0s ╮╭ 8 ✓ agent 13 ────── Program · 0s ╮
+│ ✓ agent 08                     ✦ ││ hi              │  tab  (dashboard)    list → review → conversation                    │                 ││ hi                               │
+│ ✓ agent 07                     ✦ ││                 │  ] [   pgdn pgup     next / previous page                            │                 ││                                  │
+│ ✓ agent 06                     ✦ ││                 │  i  enter            message the focused agent                       │                 ││                                  │
+│ ✓ agent 05                     ✦ ││                 │  g  z                zoom: one agent's full view ⇄ grid              │                 ││                                  │
+│ ✓ agent 04                     ✦ ││                 │  home / G            in the full view: top / bottom                  │                 ││                                  │
+│ ✓ agent 03                     ✦ ││                 │  v                   review: Accept / Reject changes                 │                 ││                                  │
+│ ✓ agent 02                     ✦ ││                 │  1 2 3  c  (review)  comparison: task start, latest run, worktree    │                 ││                                  │
+│ ✓ agent 01                     ✦ ││                 │  t  (review)         Changed | All files                             │                 ││                                  │
+│                                  ││                 │  a A  r R  (review)  Accept / Reject a change, a whole file          │                 ││                                  │
+│                                  ││                 │  e  (review)         open the file in your $EDITOR                   │                 ││                                  │
+│                                  ││                 │  F  (review)         Follow the agent's edits (a move pauses)        │                 ││                                  │
+│                                  │╰ completed ──────│  e  (in zoom)        expand tool inputs and results                  │─────────────────╯╰ completed ───────────────────────╯
+│                                  │╭ 9 ✓ agent 12 ───│  a  s  d             allow / deny: once, this session, with a note   │─── Program · 0s ╮╭ 12 ✓ agent 09 ───── Program · 0s ╮
+│                                  ││ hi              │  w                   next agent waiting for you                      │                 ││ hi                               │
+│                                  ││                 │  x                   interrupt the focused agent                     │                 ││                                  │
+│                                  ││                 │  n                   start a new agent                               │                 ││                                  │
+│                                  ││                 │  o                   Overseer: its conversation and Voice Mode       │                 ││                                  │
+│                                  ││                 │  M                   merge back (asks before each step)              │                 ││                                  │
+│                                  ││                 │  P                   open a GitHub pull request (gh)                 │                 ││                                  │
+│                                  ││                 │  C                   remove a finished agent's worktree              │                 ││                                  │
+│                                  ││                 │  f                   filter: all → active → needs you → archived     │                 ││                                  │
+│                                  ││                 │  E                   archive a finished agent (Archived: restore)    │                 ││                                  │
+│                                  ││                 │  /                   search agents (esc clears)                      │                 ││                                  │
+│                                  ││                 │  A                   accounts and sign-in                            │                 ││                                  │
+│                                  │╰ completed ──────│  O                   phone access on / off                           │─────────────────╯╰ completed ───────────────────────╯
+│                                  │╭ 13 ✓ agent 08 ──│  ctrl+o              devices: pair a phone, revoke, scope            │─── Program · 0s ╮╭ 16 ✓ agent 05 ───── Program · 0s ╮
+│                                  ││ hi              │  S                   Audio Mode: settings and preview                │                 ││ hi                               │
+│                                  ││                 │  r                   reload (after X: start the daemon)              │                 ││                                  │
+│                                  ││                 │  X                   stop all agents and the daemon                  │                 ││                                  │
+│                                  ││                 │  q                   quit (agents keep running)                      │                 ││                                  │
+│                                  ││                 │                                                                      │                 ││                                  │
+│                                  ││                 ╰────────────────────────────────────────────────────── any key closes ╯                 ││                                  │
 │                                  ││                                  ││                                  ││                                  ││                                  │
 │                                  ││                                  ││                                  ││                                  ││                                  │
 │                                  ││                                  ││                                  ││                                  ││                                  │
 │                                  ││                                  ││                                  ││                                  ││                                  │
 │                                  ││                                  ││                                  ││                                  ││                                  │
 ╰ ◆ needs you ✦ to review ✓ merged ╯╰ completed ───────────────────────╯╰ completed ───────────────────────╯╰ completed ───────────────────────╯╰ completed ───────────────────────╯
- ←↑↓→ move   J/K pick in the list   i message   g full view   v changes   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                           
+ ←↑↓→ move   J/K pick in the list   i message   g full view   v changes   a/s/d allow once/session/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit            

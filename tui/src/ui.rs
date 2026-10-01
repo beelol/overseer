@@ -838,51 +838,67 @@ fn composer(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }).block(block.padding(ratatui::widgets::Padding::horizontal(1))), area);
 }
 
+/// Every key `?` lists (T-36: the parity table's keys are all here).
+pub const HELP: &[(&str, &str)] = &[
+    ("←↓↑→  h j k l", "move between agents"),
+    ("1 – 9", "focus agent n on this page"),
+    ("tab / shift+tab", "next / previous agent"),
+    ("J / K", "pick the next / previous agent in the list"),
+    ("esc", "close the picked agent's conversation"),
+    ("L", "hide or show the agent list"),
+    ("D", "dashboard mode ⇄ grid, same agent"),
+    ("tab  (dashboard)", "list → review → conversation"),
+    ("] [   pgdn pgup", "next / previous page"),
+    ("i  enter", "message the focused agent"),
+    ("g  z", "zoom: one agent's full view ⇄ grid"),
+    ("home / G", "in the full view: top / bottom"),
+    ("v", "review: Accept / Reject changes"),
+    ("1 2 3  c  (review)", "comparison: task start, latest run, worktree"),
+    ("t  (review)", "Changed | All files"),
+    ("a A  r R  (review)", "Accept / Reject a change, a whole file"),
+    ("e  (review)", "open the file in your $EDITOR"),
+    ("F  (review)", "Follow the agent's edits (a move pauses)"),
+    ("e  (in zoom)", "expand tool inputs and results"),
+    ("a  s  d", "allow / deny: once, this session, with a note"),
+    ("w", "next agent waiting for you"),
+    ("x", "interrupt the focused agent"),
+    ("n", "start a new agent"),
+    ("o", "Overseer: its conversation and Voice Mode"),
+    ("M", "merge back (asks before each step)"),
+    ("P", "open a GitHub pull request (gh)"),
+    ("C", "remove a finished agent's worktree"),
+    ("f", "filter: all → active → needs you → archived"),
+    ("E", "archive a finished agent (Archived: restore)"),
+    ("/", "search agents (esc clears)"),
+    ("A", "accounts and sign-in"),
+    ("O", "phone access on / off"),
+    ("ctrl+o", "devices: pair a phone, revoke, scope"),
+    ("S", "Audio Mode: settings and preview"),
+    ("r", "reload (after X: start the daemon)"),
+    ("X", "stop all agents and the daemon"),
+    ("q", "quit (agents keep running)"),
+];
+
 fn help(f: &mut Frame, area: Rect) {
-    let rows: &[(&str, &str)] = &[
-        ("←↓↑→  h j k l", "move between agents"),
-        ("1 – 9", "focus agent n on this page"),
-        ("tab / shift+tab", "next / previous agent"),
-        ("J / K", "pick the next / previous agent in the list"),
-        ("esc", "close the picked agent's conversation"),
-        ("L", "hide or show the agent list"),
-        ("D", "dashboard mode ⇄ grid, same agent"),
-        ("tab  (dashboard)", "list → review → conversation"),
-        ("] [   pgdn pgup", "next / previous page"),
-        ("i  enter", "message the focused agent"),
-        ("g  z", "zoom: one agent's full view ⇄ grid"),
-        ("home / G", "in the full view: top / bottom"),
-        ("v", "review: Accept / Reject changes"),
-        ("F  (review)", "Follow the agent's edits (a move pauses)"),
-        ("e  (in zoom)", "expand tool inputs and results"),
-        ("a  s  d", "allow / deny: once, this session, with a note"),
-        ("w", "next agent waiting for you"),
-        ("x", "interrupt the focused agent"),
-        ("n", "start a new agent"),
-        ("M", "merge back (asks before each step)"),
-        ("P", "open a GitHub pull request (gh)"),
-        ("C", "remove a finished agent's worktree"),
-        ("f", "filter: all → active → needs you → archived"),
-        ("E", "archive a finished agent (in Archived: restore)"),
-        ("/", "search agents (esc clears)"),
-        ("A", "accounts and sign-in"),
-        ("O", "phone access on / off"),
-        ("ctrl+o", "devices: pair a phone, revoke, scope"),
-        ("S", "Audio Mode: settings and preview"),
-        ("r", "reload (after X: start the daemon)"),
-        ("X", "stop all agents and the daemon"),
-        ("q", "quit (agents keep running)"),
-    ];
-    let w = 72.min(area.width.saturating_sub(4));
-    let h = (rows.len() as u16 + 4).min(area.height.saturating_sub(2));
+    let rows = HELP;
+    // Two columns when one would not fit the terminal's height and two fit its width.
+    let cols: usize = if rows.len() as u16 + 4 > area.height.saturating_sub(2) && area.width >= 2 * 72 + 4 { 2 } else { 1 };
+    let per = rows.len().div_ceil(cols);
+    let w = (72 * cols as u16).min(area.width.saturating_sub(4));
+    let h = (per as u16 + 4).min(area.height.saturating_sub(2));
     let r = Rect { x: area.x + (area.width.saturating_sub(w)) / 2, y: area.y + (area.height.saturating_sub(h)) / 2, width: w, height: h };
-    let mut lines = vec![Line::raw("")];
-    for (k, v) in rows {
-        lines.push(Line::from(vec![Span::styled(format!("  {k:<18}"), Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::raw(*v)]));
-    }
     let block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(accent())).title(Span::styled(" keys ", Style::new().add_modifier(Modifier::BOLD))).title_bottom(Line::from(Span::styled(" any key closes ", Style::new().fg(MUTED))).right_aligned());
+    let inner = block.inner(r);
     f.render_widget(Clear, r);
-    f.render_widget(Paragraph::new(lines).block(block), r);
+    f.render_widget(block, r);
+    for (c, chunk) in rows.chunks(per).enumerate() {
+        let mut lines = vec![Line::raw("")];
+        for (k, v) in chunk {
+            lines.push(Line::from(vec![Span::styled(format!("  {k:<20}"), Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::raw(*v)]));
+        }
+        let col_w = inner.width / cols as u16;
+        f.render_widget(Paragraph::new(lines), Rect { x: inner.x + col_w * c as u16, width: col_w, ..inner });
+    }
 }
 
 /// Accounts panel: each account's provider, kind and sign-in status; `s` signs in.
