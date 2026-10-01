@@ -39,7 +39,14 @@ const { Session, makeRepo, latestVsix, delay, until } = require('./harness');
     const pt = await rowPoint('Open me beside');
     await cdp.click(pt.x, pt.y, { button: 'right' });
     const item = await cdp.waitFor(`(() => { const a = [...document.querySelectorAll('.monaco-menu .action-item .action-label')].find(a => /^Open to the Side/.test(a.getAttribute('aria-label') || a.textContent.trim())); if (!a) return null; const r = a.getBoundingClientRect(); return { x: r.left + 20, y: r.top + r.height / 2 }; })()`, 15000, 'menu item');
-    await cdp.click(item.x, item.y);
+    // VS Code's menu ignores a click that comes too soon after it opened: click until the menu has
+    // taken it (it closes), noting each extra click.
+    const menuOpen = () => cdp.evalWorkbench(`!!document.querySelector('.monaco-menu .action-item')`);
+    for (let i = 0; i < 5; i++) {
+      await cdp.click(item.x, item.y);
+      if (!(await until(menuOpen, open => !open, 3000, 100))) break;
+      s.note('the menu did not take the click; clicking Open to the Side again');
+    }
     const beside = await cdp.webview(`document.body.dataset.runId === ${JSON.stringify(b.run.id)} && /says hello/.test(document.body.innerText)`, 30000).then(() => true, () => false);
     check('Open to the Side (context menu) opens the agent\'s chat beside', beside);
 

@@ -26,6 +26,11 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, until, 
     fs.mkdirSync(path.join(profile.home, 'config/opencode'), { recursive: true });
     fs.writeFileSync(path.join(profile.home, 'config/opencode/opencode.json'), openCodeConfig(await mock.port()));
     const taskA = s.ctl('task.create', { repo: repoA, harness: 'opencode', profile_id: profile.id, model: 'mock/mock-coder', prompt: 'sequence 10', title: 'A seq' });
+    // A fresh OpenCode profile migrates its database on first start; two runs starting at once on
+    // it race that migration (one fails "Failed to run the query 'CREATE TABLE project'"). B starts
+    // once A's OpenCode is past it: its first request has reached the mock model.
+    const mockLog = path.join(s.root, 'mock.log');
+    await until(() => fs.existsSync(mockLog) && fs.readFileSync(mockLog, 'utf8').includes('/chat/completions'), Boolean, 60000, 200);
     const taskB = s.ctl('task.create', { repo: repoB, harness: 'opencode', profile_id: profile.id, model: 'mock/mock-coder', prompt: 'sequence 3', title: 'B seq' });
     const wsA = taskA.workspace.path, wsB = taskB.workspace.path;
     s.note('workspaces', { wsA, wsB });
@@ -101,8 +106,10 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, until, 
       while (Date.now() - t0 < limit) { if (await pred()) { result.timings[label] = Date.now() - t0; s.note('timing', { label, ms: result.timings[label] }); return result.timings[label]; } await delay(50); }
       result.timings[label] = null; s.note('timing', { label, ms: null }); return null;
     };
-    await reviewB.eval(`[...document.querySelectorAll('#tree .file')].find(b => b.textContent.includes('a.txt')).id = 'sel-a'`);
-    const selA = await s.webviewPoint(reviewB, '#sel-a');
+    // The file list redraws as the review refreshes (replacing its rows): tag the row and find it
+    // again until the tag is still there when it is measured.
+    const tagged = (frame, tag, selector) => until(async () => { await frame.eval(tag); return s.webviewPoint(frame, selector); }, Boolean, 15000, 200);
+    const selA = await tagged(reviewB, `[...document.querySelectorAll('#tree .file')].find(b => b.textContent.includes('a.txt')).id = 'sel-a'`, '#sel-a');
     await cdp.click(selA.x, selA.y);
     await until(() => reviewB.eval(`document.querySelector('#tree .file.active')?.textContent || ''`), t => t.includes('a.txt'), 10000);
     const selectedBefore = await reviewB.eval(`document.querySelector('#tree .file.active')?.textContent`);
@@ -195,8 +202,7 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, until, 
     await until(() => fs.readFileSync(path.join(repoA, 'a.txt'), 'utf8').includes('SAVED-FROM-REVIEW'), Boolean, 20000);
     check('current-checkout review edit saved to the checkout path', fs.readFileSync(path.join(repoA, 'a.txt'), 'utf8').includes('SAVED-FROM-REVIEW'));
     // Native diff editor: type, undo, redo.
-    await reviewC.eval(`[...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === 'a.txt').querySelector('.open-native').id = 'native-a'`);
-    const nat = await s.webviewPoint(reviewC, '#native-a');
+    const nat = await tagged(reviewC, `[...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === 'a.txt').querySelector('.open-native').id = 'native-a'`, '#native-a');
     await cdp.click(nat.x, nat.y);
     await cdp.waitFor(`[...document.querySelectorAll('.monaco-diff-editor .editor.modified .view-lines .view-line')].some(l => /SAVED-FROM-REVIEW/.test(l.textContent))`, 30000, 'native diff');
     const modLine = await cdp.evalWorkbench(`(() => { const l = [...document.querySelectorAll('.monaco-diff-editor .editor.modified .view-lines .view-line')].find(l => /SAVED-FROM-REVIEW/.test(l.textContent)); const b = l.getBoundingClientRect(); return { x: b.left + 20, y: b.top + b.height / 2 }; })()`);

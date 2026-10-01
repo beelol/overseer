@@ -1,6 +1,8 @@
-[2026-09-28T16:23:57.563Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-28T16:24:08.574Z] screenshot docs/verification/evidence/ui/dragout/01-dragged-into-editor.png
-[2026-09-28T16:24:08.575Z] PASS dragging an agent from the side bar into the editor area opens its chat there {"dragTypes":["codeeditors","application/vnd.code.uri-list","resourceurls","text/uri-list","application/vnd.code.tree.overseer.agents"],"opened":true,"tabs":["Drag me"]}
-[2026-09-28T16:24:11.563Z] PASS Open to the Side (context menu) opens the agent's chat beside
-[2026-09-28T16:24:16.788Z] screenshot docs/verification/evidence/ui/dragout/02-pinned-in-grid.png
-[2026-09-28T16:24:16.788Z] PASS Pin to Grid (row action) puts the agent on the grid
+[2026-10-01T12:35:15.456Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-10-01T12:35:15.641Z] background launch: VS Code window constructor not found; the first window may come to the front
+[2026-10-01T12:35:21.361Z] screenshot docs/verification/evidence/ui/dragout/01-dragged-into-editor.png
+[2026-10-01T12:35:21.386Z] PASS dragging an agent from the side bar into the editor area opens its chat there {"dragTypes":["codeeditors","application/vnd.code.uri-list","resourceurls","text/uri-list","application/vnd.code.tree.overseer.agents"],"opened":true,"tabs":["Drag me"]}
+[2026-10-01T12:35:24.652Z] the menu did not take the click; clicking Open to the Side again
+[2026-10-01T12:35:25.056Z] PASS Open to the Side (context menu) opens the agent's chat beside
+[2026-10-01T12:35:25.897Z] screenshot docs/verification/evidence/ui/dragout/02-pinned-in-grid.png
+[2026-10-01T12:35:25.925Z] PASS Pin to Grid (row action) puts the agent on the grid
