@@ -1139,7 +1139,8 @@ fn audio_import(f: &mut Frame, app: &App, area: Rect) {
 fn new_agent(f: &mut Frame, form: &NewAgentForm, state: &crate::model::State, area: Rect) {
     let w = 84.min(area.width.saturating_sub(4));
     let prompt_lines = form.prompt.split('\n').count().clamp(1, 6) as u16;
-    let h = (11 + prompt_lines).min(area.height.saturating_sub(2));
+    let extra = [NewAgentForm::EFFORT, NewAgentForm::MODE].iter().filter(|&&f| form.has_field(f)).count() as u16;
+    let h = (11 + extra + prompt_lines).min(area.height.saturating_sub(2));
     let r = Rect { x: area.x + (area.width.saturating_sub(w)) / 2, y: area.y + (area.height.saturating_sub(h)) / 2, width: w, height: h };
     let inner_w = w.saturating_sub(18) as usize;
     let generic = form.is_generic();
@@ -1158,15 +1159,24 @@ fn new_agent(f: &mut Frame, form: &NewAgentForm, state: &crate::model::State, ar
         let email = state.profile(&a.0).and_then(|p| p.account.as_ref()).and_then(|x| x.email.clone()).map(|e| format!(" · {e}")).unwrap_or_default();
         format!("{}{email}{}", crate::words::account(&a.1), match a.3 { Some(true) => "  ✓ signed in", Some(false) => "  ✗ not signed in", None => "" })
     }).collect();
-    let values: Vec<(String, String)> = vec![
-        ("Repository".into(), choice(repos, form.repo)),
-        ("Harness".into(), choice(harnesses, form.harness)),
-        if generic { ("Arguments".into(), form.args.clone()) } else { ("Account".into(), choice(accounts, form.account)) },
-        if generic { ("Program".into(), form.program.clone()) } else { ("Model".into(), if form.model.is_empty() { "harness default".into() } else { form.model.clone() }) },
-        ("Prompt".into(), form.prompt.clone()),
+    // T-32: effort and permission mode, only where the chosen harness takes them.
+    let efforts: Vec<String> = std::iter::once("harness default".to_string()).chain(form.efforts().iter().map(|e| e.to_string())).collect();
+    let modes: Vec<String> = std::iter::once("harness default".to_string()).chain(form.modes().iter().map(|m| m.1.to_string())).collect();
+    let mut values: Vec<(usize, String, String)> = vec![
+        (0, "Repository".into(), choice(repos, form.repo)),
+        (1, "Harness".into(), choice(harnesses, form.harness)),
+        if generic { (2, "Arguments".into(), form.args.clone()) } else { (2, "Account".into(), choice(accounts, form.account)) },
+        if generic { (3, "Program".into(), form.program.clone()) } else { (3, "Model".into(), if form.model.is_empty() { "harness default".into() } else { form.model.clone() }) },
     ];
+    if form.has_field(NewAgentForm::EFFORT) {
+        values.push((NewAgentForm::EFFORT, "Effort".into(), choice(efforts, form.effort)));
+    }
+    if form.has_field(NewAgentForm::MODE) {
+        values.push((NewAgentForm::MODE, "Permissions".into(), choice(modes, form.mode)));
+    }
+    values.push((NewAgentForm::PROMPT, "Prompt".into(), form.prompt.clone()));
     let mut lines = vec![Line::raw("")];
-    for (i, (label, value)) in values.iter().enumerate() {
+    for (i, label, value) in values.iter().map(|(i, l, v)| (*i, l, v)) {
         let active = form.field == i;
         let ls = if active { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else { Style::new().fg(MUTED) };
         let vs = if active { Style::new().add_modifier(Modifier::BOLD) } else { Style::new() };
@@ -1174,13 +1184,13 @@ fn new_agent(f: &mut Frame, form: &NewAgentForm, state: &crate::model::State, ar
         for part in value.split('\n') {
             let label = if first { format!("  {}{:<12}", if active { "›" } else { " " }, label) } else { " ".repeat(15) };
             let mut spans = vec![Span::styled(label, ls), Span::styled(fit(part, inner_w), if value == "harness default" { Style::new().fg(MUTED) } else { vs })];
-            if active && i >= 3 || active && i == 2 && generic {
+            if active && (i == 3 || i == NewAgentForm::PROMPT) || active && i == 2 && generic {
                 spans.push(Span::styled("▌", Style::new().fg(accent())));
             }
             lines.push(Line::from(spans));
             first = false;
         }
-        if i == 1 || i == 3 {
+        if i == 1 || i == 3 && !form.has_field(NewAgentForm::EFFORT) && !form.has_field(NewAgentForm::MODE) || i == NewAgentForm::MODE || i == NewAgentForm::EFFORT && !form.has_field(NewAgentForm::MODE) {
             lines.push(Line::raw(""));
         }
     }

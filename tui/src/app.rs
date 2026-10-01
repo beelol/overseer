@@ -212,10 +212,63 @@ pub struct NewAgentForm {
     pub args: String,
     pub error: Option<String>,
     pub busy: bool,
+    /// Reasoning effort and permission mode (T-32): an index into the harness's choices, 0 being
+    /// the harness's default.
+    pub effort: usize,
+    pub mode: usize,
+    /// The last effort and permission mode chosen for each harness, kept like VS Code's composer.
+    pub remembered: HashMap<String, (String, String)>,
+}
+
+/// What each harness takes at start (T-32), as VS Code's composer offers them
+/// (extension/media/prompt-tools.js): reasoning efforts, and permission modes with their names.
+pub fn harness_options(harness: &str) -> (&'static [&'static str], &'static [(&'static str, &'static str)]) {
+    match harness {
+        "claude" => (&["low", "medium", "high", "xhigh", "max"], &[("manual", "Ask first"), ("acceptEdits", "Accept edits"), ("plan", "Plan only"), ("auto", "Auto")]),
+        "codex" => (&["minimal", "low", "medium", "high", "xhigh"], &[("workspace-write", "Can edit"), ("read-only", "Read only")]),
+        _ => (&[], &[]),
+    }
 }
 
 impl NewAgentForm {
-    pub const FIELDS: [&'static str; 5] = ["Repository", "Harness", "Account", "Model", "Prompt"];
+    pub const FIELDS: [&'static str; 7] = ["Repository", "Harness", "Account", "Model", "Effort", "Permissions", "Prompt"];
+    pub const EFFORT: usize = 4;
+    pub const MODE: usize = 5;
+    pub const PROMPT: usize = 6;
+
+    pub fn efforts(&self) -> &'static [&'static str] {
+        harness_options(self.harness_id().unwrap_or_default()).0
+    }
+
+    pub fn modes(&self) -> &'static [(&'static str, &'static str)] {
+        harness_options(self.harness_id().unwrap_or_default()).1
+    }
+
+    /// A field the chosen harness has: Effort and Permissions only where it takes them.
+    pub fn has_field(&self, field: usize) -> bool {
+        match field {
+            Self::EFFORT => !self.efforts().is_empty(),
+            Self::MODE => !self.modes().is_empty(),
+            _ => field < Self::FIELDS.len(),
+        }
+    }
+
+    /// The chosen effort (None: the harness's default).
+    pub fn effort_value(&self) -> Option<&'static str> {
+        self.effort.checked_sub(1).and_then(|i| self.efforts().get(i).copied())
+    }
+
+    /// The chosen permission mode (id, name); None: the harness's default.
+    pub fn mode_value(&self) -> Option<(&'static str, &'static str)> {
+        self.mode.checked_sub(1).and_then(|i| self.modes().get(i).copied())
+    }
+
+    /// The effort and mode last chosen for this harness, if they still apply.
+    fn recall(&mut self) {
+        let (e, m) = self.harness_id().and_then(|h| self.remembered.get(h)).cloned().unwrap_or_default();
+        self.effort = self.efforts().iter().position(|x| *x == e).map(|i| i + 1).unwrap_or(0);
+        self.mode = self.modes().iter().position(|x| x.0 == m).map(|i| i + 1).unwrap_or(0);
+    }
 
     pub fn harness_id(&self) -> Option<&str> {
         self.harnesses.get(self.harness).map(|h| h.0.as_str())
@@ -1286,7 +1339,10 @@ impl App {
                 self.form.harnesses = list.iter().map(|h| (h["harness"].as_str().unwrap_or_default().to_string(), h["installed"].as_bool().unwrap_or(false), h["version"].as_str().unwrap_or_default().to_string())).filter(|h| h.1).collect();
                 // Claude Code first, then Codex, then the rest.
                 let rank = |h: &str| match h { "claude" => 0, "codex" => 1, "codex-app" => 2, "opencode" => 3, _ => 4 };
+                let keep = self.form.harness_id().map(str::to_string);
                 self.form.harnesses.sort_by_key(|h| rank(&h.0));
+                self.form.harness = keep.and_then(|k| self.form.harnesses.iter().position(|h| h.0 == k)).unwrap_or(0);
+                self.form.recall();
             }
             (Pending::Accounts, Ok(v)) => {
                 let list = v["accounts"].as_array().cloned().unwrap_or_default();
@@ -1763,7 +1819,8 @@ impl App {
             }
         }
         let keep = std::mem::take(&mut self.form);
-        self.form = NewAgentForm { repos, model: keep.model, program: keep.program, args: if keep.args.is_empty() { "[]".into() } else { keep.args }, harnesses: keep.harnesses, accounts: keep.accounts, field: 4, ..Default::default() };
+        self.form = NewAgentForm { repos, model: keep.model, program: keep.program, args: if keep.args.is_empty() { "[]".into() } else { keep.args }, harness: keep.harness, harnesses: keep.harnesses, accounts: keep.accounts, remembered: keep.remembered, field: NewAgentForm::PROMPT, ..Default::default() };
+        self.form.recall();
         self.request("harness.list", json!({}), Pending::Harnesses);
         self.request("account.list", json!({}), Pending::Accounts);
         self.mode = Mode::NewAgent;
@@ -1811,6 +1868,15 @@ impl App {
             if !f.model.trim().is_empty() {
                 params["model"] = json!(f.model.trim());
             }
+            // T-32: the effort and permission mode, only where the harness takes them.
+            if let Some(e) = f.effort_value() {
+                params["effort"] = json!(e);
+            }
+            if let Some((m, _)) = f.mode_value() {
+                params["permission_mode"] = json!(m);
+            }
+            let chosen = (f.effort_value().unwrap_or_default().to_string(), f.mode_value().map(|m| m.0).unwrap_or_default().to_string());
+            self.form.remembered.insert(harness.clone(), chosen);
         }
         self.last_repo = Some(repo);
         self.form.error = None;
@@ -2718,7 +2784,7 @@ impl App {
             (3, false) => Some(&mut self.form.model),
             (3, true) => Some(&mut self.form.program),
             (2, true) => Some(&mut self.form.args),
-            (4, _) => Some(&mut self.form.prompt),
+            (NewAgentForm::PROMPT, _) => Some(&mut self.form.prompt),
             _ => None,
         }
     }
@@ -2728,12 +2794,23 @@ impl App {
             return;
         }
         let fields = NewAgentForm::FIELDS.len();
+        // Tab skips the fields the chosen harness does not have (T-32).
+        let step = |form: &NewAgentForm, d: usize| {
+            let mut f = form.field;
+            for _ in 0..fields {
+                f = (f + d) % fields;
+                if form.has_field(f) {
+                    break;
+                }
+            }
+            f
+        };
         match k.code {
             KeyCode::Esc => self.mode = Mode::Grid,
-            KeyCode::Tab | KeyCode::Down => self.form.field = (self.form.field + 1) % fields,
-            KeyCode::BackTab | KeyCode::Up => self.form.field = (self.form.field + fields - 1) % fields,
+            KeyCode::Tab | KeyCode::Down => self.form.field = step(&self.form, 1),
+            KeyCode::BackTab | KeyCode::Up => self.form.field = step(&self.form, fields - 1),
             KeyCode::Enter if k.modifiers.contains(KeyModifiers::ALT) || k.modifiers.contains(KeyModifiers::SHIFT) => {
-                if self.form.field == 4 {
+                if self.form.field == NewAgentForm::PROMPT {
                     self.form.prompt.push('\n');
                 }
             }
@@ -2747,8 +2824,11 @@ impl App {
                     (1, _) => {
                         self.form.harness = cycle(self.form.harness, self.form.harnesses.len());
                         self.form.account = 0;
+                        self.form.recall();
                     }
                     (2, false) => self.form.account = cycle(self.form.account, self.form.compatible().len()),
+                    (NewAgentForm::EFFORT, false) => self.form.effort = cycle(self.form.effort, self.form.efforts().len() + 1),
+                    (NewAgentForm::MODE, false) => self.form.mode = cycle(self.form.mode, self.form.modes().len() + 1),
                     _ => {}
                 }
             }

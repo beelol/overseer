@@ -1151,3 +1151,97 @@ fn t31_a_waiting_agent_can_always_be_answered() {
     tui.key(KeyCode::Char('?'));
     assert!(tui.screen().contains("allow / deny: once, this session, with a note"));
 }
+
+/// T-32: the `n` form offers effort and permission mode for a harness that takes them (the Claude
+/// fixture, echoing what it was started with): both reach the daemon's records of the run and the
+/// harness; they are remembered for the next agent; a harness without them hides both fields.
+#[test]
+fn t32_new_agent_with_every_choice_vs_code_has() {
+    use overseer_tui::app::NewAgentForm;
+    let t = tempfile::tempdir().unwrap();
+    let d = claude_daemon("echo");
+    let r = repo(&t.path().join("choices"));
+    let mut tui = Tui::attach(&d, 160, 44);
+    tui.app.cwd_repo = Some(r.display().to_string());
+    tui.key(KeyCode::Char('n'));
+    assert_eq!(tui.app.mode, Mode::NewAgent);
+    tui.until(10, |a| a.form.harnesses.iter().any(|h| h.0 == "claude") && a.form.harnesses.iter().any(|h| h.0 == "generic") && !a.form.accounts.is_empty());
+    // To the harness field, then the Claude fixture.
+    while tui.app.form.field != 1 {
+        tui.key(KeyCode::Tab);
+    }
+    for _ in 0..8 {
+        if tui.app.form.harness_id() == Some("claude") {
+            break;
+        }
+        tui.key(KeyCode::Right);
+    }
+    assert_eq!(tui.app.form.harness_id(), Some("claude"));
+    let s = tui.screen();
+    assert!(s.contains("Effort") && s.contains("Permissions"), "{s}");
+    // Effort: high (default, low, medium, high); permission mode: Accept edits.
+    tui.key(KeyCode::Tab);
+    tui.key(KeyCode::Tab);
+    tui.key(KeyCode::Tab);
+    assert_eq!(tui.app.form.field, NewAgentForm::EFFORT);
+    for _ in 0..3 {
+        tui.key(KeyCode::Right);
+    }
+    assert_eq!(tui.app.form.effort_value(), Some("high"));
+    tui.key(KeyCode::Tab);
+    assert_eq!(tui.app.form.field, NewAgentForm::MODE);
+    tui.key(KeyCode::Right);
+    tui.key(KeyCode::Right);
+    assert_eq!(tui.app.form.mode_value(), Some(("acceptEdits", "Accept edits")));
+    // The modes offered are VS Code's for Claude Code: Ask first, Accept edits, Plan only, Auto.
+    let names: Vec<&str> = tui.app.form.modes().iter().map(|m| m.1).collect();
+    assert_eq!(names, ["Ask first", "Accept edits", "Plan only", "Auto"]);
+    tui.key(KeyCode::Tab);
+    assert_eq!(tui.app.form.field, NewAgentForm::PROMPT);
+    tui.type_text("Report what you were started with");
+    let s = tui.screen();
+    assert!(s.contains("Effort") && s.contains("‹ high ›") && s.contains("Permissions") && s.contains("‹ Accept edits ›"), "{s}");
+    tui.snapshot("parity-t32-form");
+    tui.key(KeyCode::Enter);
+    tui.until(10, |a| a.mode == Mode::Grid && a.focused().is_some_and(|r| r.harness == "claude"));
+    let run = tui.app.focus.clone().unwrap();
+    d.wait_status(&run, |s| s == "completed", 20);
+    // The daemon's records: the run's effort, and the permission mode its turns start with.
+    assert_eq!(d.run(&run)["effort"], "high");
+    let db = d.home.path().join("overseer.sqlite");
+    let out = std::process::Command::new("sqlite3").arg(&db).arg(format!("SELECT launch FROM runs WHERE id='{run}'")).output().unwrap();
+    let launch: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap_or_default();
+    let opts = launch.get("generic").unwrap_or(&launch)["opts"].clone();
+    assert_eq!(opts, json!({ "effort": "high", "mode": "acceptEdits" }), "the run's launch record: {launch}");
+    // And the harness was started with both.
+    let echo = d.events(&run).iter().filter_map(|e| e["payload"]["text"].as_str().map(str::to_string)).find(|t| t.starts_with("ECHO ")).expect("the fixture's echo");
+    let argv: serde_json::Value = serde_json::from_str(&echo[5..]).unwrap();
+    let args: Vec<&str> = argv["argv"].as_array().unwrap().iter().filter_map(|a| a.as_str()).collect();
+    assert!(args.windows(2).any(|w| w == ["--effort", "high"]) && args.windows(2).any(|w| w == ["--permission-mode", "acceptEdits"]), "{args:?}");
+
+    // Remembered: the next form opens on Claude Code with the same effort and mode.
+    tui.key(KeyCode::Char('n'));
+    tui.until(10, |a| a.form.harness_id() == Some("claude"));
+    assert_eq!((tui.app.form.effort_value(), tui.app.form.mode_value().map(|m| m.0)), (Some("high"), Some("acceptEdits")));
+    // A harness without efforts or modes (the generic one): both fields are hidden, and Tab skips them.
+    while tui.app.form.field != 1 {
+        tui.key(KeyCode::Tab);
+    }
+    for _ in 0..8 {
+        if tui.app.form.is_generic() {
+            break;
+        }
+        tui.key(KeyCode::Right);
+    }
+    assert!(tui.app.form.is_generic());
+    let s = tui.screen();
+    assert!(!s.contains("Effort") && !s.contains("Permissions"), "{s}");
+    tui.snapshot("parity-t32-generic-hides-them");
+    let mut seen = Vec::new();
+    for _ in 0..7 {
+        tui.key(KeyCode::Tab);
+        seen.push(tui.app.form.field);
+    }
+    assert!(!seen.contains(&NewAgentForm::EFFORT) && !seen.contains(&NewAgentForm::MODE), "{seen:?}");
+    tui.key(KeyCode::Esc);
+}

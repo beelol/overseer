@@ -187,7 +187,7 @@ fn t08_start_agents_from_the_new_agent_form() {
     assert!(s.contains("Mac's default login") && !s.contains("Your login"), "compatible account offered (the Mac's own login, as VS Code names it):\n{s}");
     tui.key(KeyCode::BackTab); // → Repository
     tui.key(KeyCode::BackTab); // → Prompt (wraps)
-    assert_eq!(tui.app.form.field, 4);
+    assert_eq!(tui.app.form.field, overseer_tui::app::NewAgentForm::PROMPT);
     tui.type_text("write perm.txt from the form");
     tui.key(KeyCode::Enter);
     tui.until(10, |a| a.mode == Mode::Grid && a.focused().is_some_and(|r| r.harness == "claude"));

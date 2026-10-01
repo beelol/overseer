@@ -68,7 +68,7 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | P | Open a GitHub pull request (y/n): commit, push with your Git credentials, create it with `gh` |
 | C | Remove a finished agent's worktree (its branch is kept; lists uncommitted files first) |
 | X | Stop all agents and the daemon (y/n); the TUI does not restart it until `r` |
-| n | New agent (repository, harness, account, model, prompt) |
+| n | New agent (repository, harness, account, model, effort, permission mode, prompt; effort and permission mode only where the harness takes them, remembered per harness) (T-32) |
 | f | Filter: All → Active → Needs you |
 | / | Search agents by title, repository, harness, model, account or prompt (Esc clears) |
 | O / Ctrl-O | Phone access on or off / Devices: pair a phone, revoke, scope (Devices moved from `D` to Ctrl-O when `D` became dashboard mode, T-40) |

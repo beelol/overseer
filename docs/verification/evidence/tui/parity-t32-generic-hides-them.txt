@@ -1,0 +1,44 @@
+ ◆ Overseer  page 1/1 · 1 agent · ✦ 1 to review                                                                                  phone access off · ● connected 
+╭ agents ──────────────────────╮┏ 1 ✓ Report what you were started with ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Claude Code · 0s ┓
+│ choices  1 to review         │┃ › Report what you were started with                                                                                          ┃
+│›✓ Report wha… Claude Fixt… ✦ │┃ ECHO                                                                                                                         ┃
+│                              │┃ {"argv":["-p","--output-format","stream-json","--input-format","stream-json","--verbose","--permission-prompt-tool","stdio","┃
+│                              │┃ --effort","high","--effort","high","--permission-mode","acceptEdits"],"kinds":["text"],"text":"Report what you were started  ┃
+│                              │┃ with"}                                                                                                                       ┃
+│                              │┃ ■ done · 1 in / 1 out                                                                                                        ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃     ╭ new agent ───────────────────────────────────────────────────────────────────────╮                                     ┃
+│                              │┃     │                                                                                  │                                     ┃
+│                              │┃     │   Repository  /private/var/folders/mk/vz_j1tqn0rz6w6f4ztwfv0gr0000gn/T/.tmpNrfA… │                                     ┃
+│                              │┃     │  ›Harness     ‹ Program ›  (6/6)                                                 │                                     ┃
+│                              │┃     │                                                                                  │                                     ┃
+│                              │┃     │   Arguments   []                                                                 │                                     ┃
+│                              │┃     │   Program                                                                        │                                     ┃
+│                              │┃     │                                                                                  │                                     ┃
+│                              │┃     │   Prompt                                                                         │                                     ┃
+│                              │┃     │                                                                                  │                                     ┃
+│                              │┃     │                                                                                  │                                     ┃
+│                              │┃     ╰────────────────────────────────────────────────────── enter starts · esc cancels ╯                                     ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+╰───── ◆ you ✦ review ✓ merged ╯┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Claude Fixture · fix…@example.test ┛
+ Started                                                                                                                                                        
