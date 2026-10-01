@@ -1303,3 +1303,86 @@ fn t33_cancel_a_conflicted_merge() {
     assert_eq!(git_in(&wt, &["status", "--porcelain", "-uall"]), status_before, "the files as they were");
     tui.snapshot("parity-t33-cancelled");
 }
+
+/// The agents VS Code's side bar lists (extension/media/rollup.js `agents`: archived tasks left
+/// out), over the daemon's state: their run ids.
+fn vscode_agents(d: &Daemon) -> Vec<String> {
+    let state = d.ctl("state", json!({}));
+    let rollup = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().join("extension/media/rollup.js");
+    let script = format!("const R = require({:?}); const s = JSON.parse(require('fs').readFileSync(0, 'utf8')); process.stdout.write(JSON.stringify(R.agents(s).map(r => r.id)));", rollup.display().to_string());
+    let mut child = std::process::Command::new("node").args(["-e", &script]).stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped()).spawn().expect("node");
+    use std::io::Write;
+    child.stdin.take().unwrap().write_all(state.to_string().as_bytes()).unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(out.status.success());
+    serde_json::from_slice(&out.stdout).unwrap()
+}
+
+/// T-34: `E` archives a finished agent after y/n: it leaves the TUI's list and grid and VS Code's
+/// side bar (rollup.js over the daemon's state); the filter's Archived shows it, where `E` restores
+/// it, back in both. A working agent is not archived.
+#[test]
+fn t34_archive_and_restore() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let r = repo(&t.path().join("archive"));
+    let keep = d.sh(&r, "Stays in the list", "echo output of stays");
+    let old = d.sh(&r, "Old finished work", "echo output of old work");
+    for id in [&keep, &old] {
+        d.wait_status(id, |s| s == "completed", 20);
+    }
+    let busy = d.sh(&r, "Still working", "echo working; sleep 30");
+    let mut tui = Tui::attach(&d, 160, 44);
+    tui.until(10, |a| a.visible().len() == 3);
+    let focus = |tui: &mut Tui, id: &str| {
+        for _ in 0..10 {
+            if tui.app.focus.as_deref() == Some(id) {
+                return;
+            }
+            tui.key(KeyCode::Tab);
+        }
+        panic!("could not focus {id}");
+    };
+    assert!(vscode_agents(&d).contains(&old));
+    // Not while it works.
+    focus(&mut tui, &busy);
+    tui.key(KeyCode::Char('E'));
+    assert!(tui.screen().contains("Archiving waits until the agent is done"));
+    // E, y/n: n keeps it; y archives it.
+    focus(&mut tui, &old);
+    tui.key(KeyCode::Char('E'));
+    let s = tui.screen();
+    assert!(s.contains("Archive Old finished work? It leaves the list and the grid, here and in VS Code; nothing is deleted"), "{s}");
+    tui.snapshot("parity-t34-archive-asks");
+    tui.key(KeyCode::Char('n'));
+    assert!(tui.app.visible().iter().any(|r| r.id == old));
+    tui.key(KeyCode::Char('E'));
+    tui.key(KeyCode::Char('y'));
+    tui.until(10, |a| a.visible().len() == 2);
+    assert!(!tui.app.visible().iter().any(|r| r.id == old), "gone from the TUI's list and grid");
+    let s = tui.screen();
+    assert!(!s.contains("Old finished work") || s.lines().last().unwrap().contains("Archived Old finished work"), "{s}");
+    assert!(!vscode_agents(&d).contains(&old), "gone from VS Code's side bar");
+    assert!(vscode_agents(&d).contains(&keep));
+    tui.snapshot("parity-t34-archived");
+
+    // The filter: all → active → needs you → archived, where E restores it.
+    for _ in 0..3 {
+        tui.key(KeyCode::Char('f'));
+    }
+    assert_eq!(tui.app.filter, overseer_tui::app::Filter::Archived);
+    let ids: Vec<String> = tui.app.visible().iter().map(|r| r.id.clone()).collect();
+    assert_eq!(ids, [old.clone()], "only the archived agent");
+    let s = tui.screen();
+    assert!(s.contains("filter: archived") && s.contains("Old finished work"), "{s}");
+    tui.snapshot("parity-t34-archived-filter");
+    tui.key(KeyCode::Char('E'));
+    tui.until(10, |a| a.visible().is_empty());
+    tui.key(KeyCode::Char('f'));
+    assert_eq!(tui.app.filter, overseer_tui::app::Filter::All);
+    tui.until(10, |a| a.visible().len() == 3);
+    assert!(vscode_agents(&d).contains(&old), "back in VS Code's side bar");
+    assert!(tui.screen().contains("Old finished work"));
+    tui.snapshot("parity-t34-restored");
+    d.ctl("run.interrupt", json!({ "run_id": busy }));
+}

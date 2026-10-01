@@ -110,7 +110,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         let text = match c {
             Confirm::Interrupt(id) => format!(" Interrupt {}? y / n", short(&app.state.run(id).map(|r| r.title.clone()).unwrap_or_default(), 50)),
             Confirm::Quit => " Unsent drafts will be lost. Quit? y / n".to_string(),
-            Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::MergeCancel { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::OpenPr { text, .. } | Confirm::Reject { text, .. } => format!(" {text} y / n"),
+            Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::MergeCancel { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::Archive { text, .. } | Confirm::OpenPr { text, .. } | Confirm::Reject { text, .. } => format!(" {text} y / n"),
             Confirm::PhoneOff { text } | Confirm::Revoke { text, .. } | Confirm::Pair { text, .. } => format!(" {text} y / n"),
             Confirm::PhoneOnAndPair => " Phone access is off. Turn it on and pair a phone? y / n".to_string(),
         };
@@ -805,7 +805,7 @@ fn composer_height(app: &App, width: u16) -> u16 {
 /// A question's lines: a long one (every file a merge commits, T-33) wraps instead of being cut.
 fn confirm_height(app: &App, width: u16) -> u16 {
     let text = match &app.mode {
-        Mode::Confirm(Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::MergeCancel { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::OpenPr { text, .. } | Confirm::Reject { text, .. }) => text.as_str(),
+        Mode::Confirm(Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::MergeCancel { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::Archive { text, .. } | Confirm::OpenPr { text, .. } | Confirm::Reject { text, .. }) => text.as_str(),
         _ => "",
     };
     ((text.width() + 8).div_ceil(width.max(20) as usize) as u16).clamp(2, 8)
@@ -862,7 +862,8 @@ fn help(f: &mut Frame, area: Rect) {
         ("M", "merge back (asks before each step)"),
         ("P", "open a GitHub pull request (gh)"),
         ("C", "remove a finished agent's worktree"),
-        ("f", "filter: all → active → needs you"),
+        ("f", "filter: all → active → needs you → archived"),
+        ("E", "archive a finished agent (in Archived: restore)"),
         ("/", "search agents (esc clears)"),
         ("A", "accounts and sign-in"),
         ("O", "phone access on / off"),

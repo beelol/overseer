@@ -35,6 +35,8 @@ pub enum Filter {
     All,
     Active,
     NeedsYou,
+    /// Archived agents only (T-34), as VS Code's Archived filter: `E` restores one.
+    Archived,
 }
 
 impl Filter {
@@ -43,17 +45,22 @@ impl Filter {
             Filter::All => "all",
             Filter::Active => "active",
             Filter::NeedsYou => "needs you",
+            Filter::Archived => "archived",
         }
     }
     fn next(self) -> Filter {
         match self {
             Filter::All => Filter::Active,
             Filter::Active => Filter::NeedsYou,
-            Filter::NeedsYou => Filter::All,
+            Filter::NeedsYou => Filter::Archived,
+            Filter::Archived => Filter::All,
         }
     }
-    fn keeps(self, r: &Run) -> bool {
+    /// Archived agents show only in Archived; every other filter leaves them out, as VS Code does.
+    fn keeps(self, r: &Run, archived: bool) -> bool {
         match self {
+            Filter::Archived => archived,
+            _ if archived => false,
             Filter::All => true,
             Filter::Active => r.active(),
             Filter::NeedsYou => r.needs_you(),
@@ -130,6 +137,8 @@ pub enum Confirm {
     Cleanup { run: String, text: String, discard: bool },
     /// Interrupt every agent and stop the daemon.
     StopAll { text: String },
+    /// Archive a finished agent (T-34): it leaves the list and the grid, here and in VS Code.
+    Archive { task: String, text: String },
     /// Commit, push the agent's branch and open a GitHub pull request with `gh`.
     OpenPr { run: String, text: String },
     /// Turn phone access off while phones are connected.
@@ -171,6 +180,7 @@ enum Pending {
     MergeFiles { run: String, text: String },
     MergeComplete,
     MergeAbort,
+    Archive { archived: bool, title: String },
     /// `review.seen`: a reviewed mark shared with VS Code and the menu bar (T-26).
     Seen,
     CleanupPlan { run: String },
@@ -702,7 +712,12 @@ impl App {
     /// Agents shown with the current filter, newest first.
     pub fn visible(&self) -> Vec<&Run> {
         let q = self.search.trim().to_lowercase();
-        self.state.agents().into_iter().filter(|r| self.filter.keeps(r) && (q.is_empty() || self.matches(r, &q))).collect()
+        self.state.agents().into_iter().filter(|r| self.filter.keeps(r, self.archived(r)) && (q.is_empty() || self.matches(r, &q))).collect()
+    }
+
+    /// The agent's task is archived (T-34).
+    pub fn archived(&self, r: &Run) -> bool {
+        self.state.task(&r.task_id).is_some_and(|t| t.archived_ms.is_some())
     }
 
     fn matches(&self, r: &Run, q: &str) -> bool {
@@ -1187,7 +1202,7 @@ impl App {
             self.request("overseer.session", json!({}), Pending::OverseerSession);
         }
         // Statuses, turns and new runs come from `state`, reloaded like VS Code does.
-        if (matches!(kind.as_str(), "status" | "turn_started" | "turn_done" | "permission" | "permission_answered" | "child" | "child_reparented" | "task_created" | "workspace_removed" | "reattached" | "profile" | "review_seen" | "merge_back")
+        if (matches!(kind.as_str(), "status" | "turn_started" | "turn_done" | "permission" | "permission_answered" | "child" | "child_reparented" | "task_created" | "workspace_removed" | "reattached" | "profile" | "review_seen" | "merge_back" | "task_archived")
             || (!run_id.is_empty() && self.state.run(&run_id).is_none()))
             && self.state_due.is_none()
         {
@@ -1680,6 +1695,10 @@ impl App {
             (Pending::MergeFiles { run, text }, Ok(v)) => {
                 let n = v["changes"].as_array().map(|a| a.len()).unwrap_or(0);
                 self.mode = Mode::Confirm(Confirm::MergeComplete { run, text: format!("{text} {n} file{} land{}. The worktree and branch are kept.", if n == 1 { "" } else { "s" }, if n == 1 { "s" } else { "" }) });
+            }
+            (Pending::Archive { archived, title }, Ok(_)) => {
+                self.say(if archived { format!("Archived {} (f shows Archived, where E restores it)", short(&title, 40)) } else { format!("Restored {}", short(&title, 40)) }, false);
+                self.request_state();
             }
             (Pending::MergeAbort, Ok(v)) => {
                 self.say(if v["uncommitted"] == true { "Merge cancelled: the worktree is as it was before, its work uncommitted again" } else { "Merge cancelled: the worktree is as it was before" }, false);
@@ -2519,6 +2538,10 @@ impl App {
                                 self.request("workspace.merge_complete", json!({ "workspace_id": ws }), Pending::MergeComplete);
                             }
                         }
+                        Confirm::Archive { task, .. } => {
+                            let title = self.state.task(&task).map(|t| t.title.clone()).unwrap_or_default();
+                            self.request("task.archive", json!({ "task_id": task, "archived": true }), Pending::Archive { archived: true, title });
+                        }
                         Confirm::MergeCancel { run, .. } => {
                             if let Some(ws) = self.state.run(&run).map(|r| r.workspace_id.clone()) {
                                 self.request("workspace.merge_abort", json!({ "workspace_id": ws }), Pending::MergeAbort);
@@ -2682,6 +2705,7 @@ impl App {
                     }
                 }
             }
+            KeyCode::Char('E') => self.archive_key(),
             KeyCode::Char('/') => {
                 self.mode = Mode::Search;
                 self.page = 0;
@@ -2742,6 +2766,20 @@ impl App {
                 }
             }
             _ => self.dirty = false,
+        }
+    }
+
+    /// `E` (T-34): archive the focused finished agent (y/n), or in Archived restore it.
+    fn archive_key(&mut self) {
+        let Some(run) = self.focused().cloned() else { return };
+        if self.archived(&run) {
+            let title = run.title.clone();
+            self.request("task.archive", json!({ "task_id": run.task_id, "archived": false }), Pending::Archive { archived: false, title });
+        } else if run.active() {
+            self.say("Archiving waits until the agent is done (x interrupts it)", false);
+        } else {
+            let text = format!("Archive {}? It leaves the list and the grid, here and in VS Code; nothing is deleted (f → Archived restores it).", short(&run.title, 50));
+            self.mode = Mode::Confirm(Confirm::Archive { task: run.task_id.clone(), text });
         }
     }
 

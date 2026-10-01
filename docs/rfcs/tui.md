@@ -69,7 +69,8 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | C | Remove a finished agent's worktree (its branch is kept; lists uncommitted files first) |
 | X | Stop all agents and the daemon (y/n); the TUI does not restart it until `r` |
 | n | New agent (repository, harness, account, model, effort, permission mode, prompt; effort and permission mode only where the harness takes them, remembered per harness) (T-32) |
-| f | Filter: All → Active → Needs you |
+| f | Filter: All → Active → Needs you → Archived (archived agents show only there, as in VS Code) (T-34) |
+| E | Archive a finished agent (y/n): it leaves the list and the grid, here and in VS Code; in Archived, restore it (T-34) |
 | / | Search agents by title, repository, harness, model, account or prompt (Esc clears) |
 | O / Ctrl-O | Phone access on or off / Devices: pair a phone, revoke, scope (Devices moved from `D` to Ctrl-O when `D` became dashboard mode, T-40) |
 | A | Accounts: sign-in status; `s` signs in (the provider's own login, in this terminal), `S` device code for ChatGPT |

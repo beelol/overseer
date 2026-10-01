@@ -1,0 +1,44 @@
+ ◆ Overseer  page 1/1 · 1 agent · ● 1 working · ✦ 1 to review · filter: archived                                                 phone access off · ● connected 
+╭ agents ──────────────────────╮┏ 1 ✓ Old finished work ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Program · 0s ┓
+│ archive  1 to review         │┃ output of old work                                                                                                           ┃
+│›✓ Old finished work        ✦ │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+│                              │┃                                                                                                                              ┃
+╰───── ◆ you ✦ review ✓ merged ╯┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+ Archived Old finished work (f shows Archived, where E restores it)                                                                                             

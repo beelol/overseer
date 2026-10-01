@@ -36,7 +36,8 @@ KEYS:
     /               search agents              A     accounts and sign-in
     O               phone access on / off      ctrl+o devices: pair a phone, revoke, scope
     S               Audio Mode, track, preview  e     in zoom: expand tool calls
-    f               filter all/active/needs you ?     all keys
+    f               filter all/active/needs you/archived   ?  all keys
+    E               archive a finished agent (in the Archived filter: restore it)
     q               quit (agents keep running)
 
 Top-level agents, newest first; the grid fits the count, up to sixteen: page 1 is the newest sixteen.
