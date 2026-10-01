@@ -132,6 +132,7 @@ export interface State {
   oversight: Record<string, unknown>;
   overseer: unknown;
   landings: Record<string, unknown>;
+  reviewed?: Record<string, number> | null;
   daemon: {
     pid: number;
     started_ms: number;
@@ -282,6 +283,9 @@ export interface EventPayloads {
     request?: unknown | null;
   };
   retention: unknown;
+  review_seen: {
+    marks: Record<string, number>;
+  };
   review_mark: {
     key: string;
     path: string;
@@ -1228,7 +1232,7 @@ export interface Methods {
   "swarm.worker.reconcile": { class: 'mac_only'; params: unknown; result: unknown };
   /** Everything the Mac menu-bar item shows, in one read. The Mac only: The menu-bar item is the Mac's own surface (AC-262); the phone reads state and events. */
   "menubar.snapshot": { class: 'mac_only'; params: Record<string, never>; result: unknown };
-  /** Share the reviewed marks VS Code keeps, so every surface counts "to review" the same. The Mac only: Written by VS Code on the Mac (AC-262); the phone reads the counts through state. */
+  /** Share the reviewed marks VS Code keeps, so every surface counts "to review" the same. The Mac only: Written by VS Code and the TUI on the Mac (AC-262, T-26); the phone reads the marks through state. */
   "review.seen": { class: 'mac_only'; params: {
     marks: unknown;
   }; result: {

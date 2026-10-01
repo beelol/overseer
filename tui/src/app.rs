@@ -164,6 +164,8 @@ enum Pending {
     MergeLanding { run: String, branch: String, target: String, repo: String },
     MergeFiles { run: String, text: String },
     MergeComplete,
+    /// `review.seen`: a reviewed mark shared with VS Code and the menu bar (T-26).
+    Seen,
     CleanupPlan { run: String },
     Cleanup,
     StopAll,
@@ -997,7 +999,7 @@ impl App {
             self.request("overseer.session", json!({}), Pending::OverseerSession);
         }
         // Statuses, turns and new runs come from `state`, reloaded like VS Code does.
-        if (matches!(kind.as_str(), "status" | "turn_started" | "turn_done" | "permission" | "permission_answered" | "child" | "child_reparented" | "task_created" | "workspace_removed" | "reattached" | "profile")
+        if (matches!(kind.as_str(), "status" | "turn_started" | "turn_done" | "permission" | "permission_answered" | "child" | "child_reparented" | "task_created" | "workspace_removed" | "reattached" | "profile" | "review_seen" | "merge_back")
             || (!run_id.is_empty() && self.state.run(&run_id).is_none()))
             && self.state_due.is_none()
         {
@@ -1421,6 +1423,7 @@ impl App {
                 self.say(format!("Pull request #{number} is open: {url} (nothing was merged)"), false);
             }
             (Pending::PrOpened, Ok(_)) => {}
+            (Pending::Seen, Ok(_)) => {}
             (Pending::StopAll, Ok(v)) => {
                 let n = v["stopped"].as_array().map(|a| a.len()).unwrap_or(0);
                 let left = v["remaining"].as_array().map(|a| a.len()).unwrap_or(0);
@@ -1614,8 +1617,22 @@ impl App {
         self.request("task.create", params, Pending::Create);
     }
 
+    /// Opening a finished agent's review clears its "to review" mark here, in VS Code and in the
+    /// menu bar: the mark is the daemon's (T-26, as VS Code's markReviewed).
+    fn mark_reviewed(&mut self, run_id: &str) {
+        let root = self.state.root_of(run_id);
+        let Some(run) = self.state.run(&root) else { return };
+        if run.active() || !self.state.unreviewed(run, crate::model::now_ms()) {
+            return;
+        }
+        let at = crate::model::now_ms();
+        self.state.reviewed.insert(root.clone(), at);
+        self.request("review.seen", json!({ "marks": { root: at } }), Pending::Seen);
+    }
+
     fn open_changes(&mut self) {
         let Some(run) = self.focused().cloned() else { return };
+        self.mark_reviewed(&run.id);
         let keep = std::mem::take(&mut self.changes.mine);
         self.changes = ChangesView { run: run.id.clone(), workspace: run.workspace_id.clone(), loading: true, mine: if self.changes.run == run.id { keep } else { HashMap::new() }, ..Default::default() };
         self.mode = Mode::Changes;

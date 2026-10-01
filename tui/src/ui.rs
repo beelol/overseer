@@ -214,9 +214,6 @@ fn overseer_view(f: &mut Frame, app: &App, area: Rect) {
 
 fn header(f: &mut Frame, app: &App, area: Rect) {
     let visible = app.visible();
-    let all = app.state.agents();
-    let active = all.iter().filter(|r| r.active()).count();
-    let needs = app.state.needs_you_count();
     let dot = Style::new().fg(MUTED);
     let mut spans = vec![
         Span::styled(" ◆ Overseer ", Style::new().fg(accent()).add_modifier(Modifier::BOLD)),
@@ -224,13 +221,21 @@ fn header(f: &mut Frame, app: &App, area: Rect) {
         Span::styled("· ", dot),
         Span::raw(format!("{} agent{}", visible.len(), if visible.len() == 1 { "" } else { "s" })),
     ];
-    if active > 0 {
+    // The rollup (T-26): VS Code's five counts, zero counts left out; on a narrow terminal the
+    // later ones give way to the connection on the right.
+    let room = (area.width as usize).saturating_sub(24);
+    for (key, n, words) in app.state.counts(crate::model::now_ms()).parts() {
+        if Line::from(spans.clone()).width() + 3 + words.width() + 2 > room {
+            break;
+        }
         spans.push(Span::styled(" · ", dot));
-        spans.push(Span::styled(format!("● {active} active"), Style::new().fg(Color::Cyan)));
-    }
-    if needs > 0 {
-        spans.push(Span::styled(" · ", dot));
-        spans.push(Span::styled(format!("◆ {needs} need{} you", if needs == 1 { "s" } else { "" }), Style::new().fg(waiting()).add_modifier(Modifier::BOLD)));
+        spans.push(match key {
+            "working" => Span::styled(format!("● {words}"), Style::new().fg(Color::Cyan)),
+            "needs" => Span::styled(format!("◆ {n} need{} you", if n == 1 { "s" } else { "" }), Style::new().fg(waiting()).add_modifier(Modifier::BOLD)),
+            "to_review" => Span::styled(format!("✦ {words}"), Style::new().fg(Color::Green)),
+            "failed" => Span::styled(format!("✗ {words}"), Style::new().fg(Color::Red)),
+            _ => Span::styled(words, dot),
+        });
     }
     if !app.search.is_empty() || app.mode == Mode::Search {
         spans.push(Span::styled(" · ", dot));
@@ -338,10 +343,14 @@ fn account_word(app: &App, run: &Run) -> String {
     }
 }
 
-/// A list row's mark: needs you, or what the work became (merged, a pull request, stopped on conflicts).
-fn row_mark(app: &App, run: &Run) -> (&'static str, Color) {
+/// A list row's mark: needs you, to review (T-26), or what the work became (merged, a pull
+/// request, stopped on conflicts).
+fn row_mark(app: &App, run: &Run, now: i64) -> (&'static str, Color) {
     if run.needs_you() {
         return ("◆", waiting());
+    }
+    if app.state.unreviewed(run, now) {
+        return ("✦", if crate::model::FAILED.contains(&run.status.as_str()) { Color::Red } else { Color::Green });
     }
     match app.state.landings[run.workspace_id.as_str()]["state"].as_str() {
         Some("merged") if !run.active() => ("✓", Color::Green),
@@ -354,8 +363,11 @@ fn row_mark(app: &App, run: &Run) -> (&'static str, Color) {
 /// The agent list (T-25): grouped by repository with each repository's counts; each row the
 /// status, the title, the account and a mark.
 fn agent_list(f: &mut Frame, app: &mut App, area: Rect) {
+    // The marks' legend, in short words when the list is narrow.
+    let legend = [" ◆ needs you ✦ to review ✓ merged ", " ◆ you ✦ review ✓ merged ", " ◆ ✦ ✓ "].into_iter().find(|l| l.width() + 2 <= area.width as usize).unwrap_or("");
     let block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(MUTED)).title(Span::styled(" agents ", Style::new().fg(MUTED)))
-        .title_bottom(Line::from(Span::styled(" ◆ needs you ✓ merged ", Style::new().fg(MUTED))).right_aligned());
+        .title_bottom(Line::from(Span::styled(legend, Style::new().fg(MUTED))).right_aligned());
+    let now = crate::model::now_ms();
     let inner = block.inner(area);
     f.render_widget(block, area);
     let w = inner.width as usize;
@@ -372,7 +384,8 @@ fn agent_list(f: &mut Frame, app: &mut App, area: Rect) {
         for (n, word) in [
             (count(&|r: &Run| r.active() && !r.needs_you()), "working"),
             (count(&|r: &Run| r.needs_you()), "needs you"),
-            (count(&|r: &Run| r.status == "failed"), "failed"),
+            (count(&|r: &Run| app.state.unreviewed(r, now) && !crate::model::FAILED.contains(&r.status.as_str())), "to review"),
+            (count(&|r: &Run| app.state.unreviewed(r, now) && crate::model::FAILED.contains(&r.status.as_str())), "failed"),
             (count(&|r: &Run| app.state.landings[r.workspace_id.as_str()]["state"] == "merged"), "merged"),
         ] {
             if n > 0 {
@@ -392,7 +405,7 @@ fn agent_list(f: &mut Frame, app: &mut App, area: Rect) {
         for r in runs {
             let (g, c) = status_mark(&r.status);
             let focused = app.focus.as_deref() == Some(r.id.as_str());
-            let (mark, mc) = row_mark(app, r);
+            let (mark, mc) = row_mark(app, r, now);
             let account = fit(&account_word(app, r), 12);
             let title_w = w.saturating_sub(7 + account.width()).max(4);
             let title = fit(&r.title, title_w);

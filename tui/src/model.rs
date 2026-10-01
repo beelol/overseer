@@ -5,6 +5,38 @@ use serde_json::Value;
 
 // Continuity (Gate L): an agent that waits for its connection or for memory still holds its work.
 pub const ACTIVE: [&str; 6] = ["queued", "starting", "running", "waiting_for_user", "waiting_for_connection", "waiting_for_memory"];
+/// The rollup's states (extension/media/rollup.js): at work, done, failed.
+const WORKING: [&str; 5] = ["queued", "starting", "running", "waiting_for_connection", "waiting_for_memory"];
+pub const DONE: [&str; 2] = ["completed", "interrupted"];
+pub const FAILED: [&str; 2] = ["failed", "disconnected"];
+/// A finished agent stays "to review" for a week at most, as in VS Code and the menu bar.
+pub const WEEK_MS: i64 = 7 * 86_400_000;
+
+/// The rollup by state (T-26): the same five counts as VS Code's side bar and grid.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Counts {
+    pub working: usize,
+    pub needs: usize,
+    pub to_review: usize,
+    pub reviewed: usize,
+    pub failed: usize,
+}
+
+impl Counts {
+    /// Only the states that have agents: "2 working · 1 needs you · 6 to review · 3 reviewed · 1 failed".
+    pub fn parts(&self) -> Vec<(&'static str, usize, String)> {
+        [("working", self.working, "working"), ("needs", self.needs, "needs you"), ("to_review", self.to_review, "to review"), ("reviewed", self.reviewed, "reviewed"), ("failed", self.failed, "failed")]
+            .into_iter()
+            .filter(|(_, n, _)| *n > 0)
+            .map(|(k, n, w)| (k, n, format!("{n} {w}")))
+            .collect()
+    }
+}
+
+/// Milliseconds since the epoch, for the week the "to review" mark lasts.
+pub fn now_ms() -> i64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
+}
 
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct Run {
@@ -24,6 +56,9 @@ pub struct Run {
     pub capabilities: Value,
     #[serde(default)]
     pub attention: Option<Value>,
+    /// A swarm worker or director: not one of the agents the rollup counts.
+    #[serde(default)]
+    pub swarm_membership: Option<Value>,
 }
 
 impl Run {
@@ -133,6 +168,10 @@ pub struct State {
     /// What each workspace's work became (AC-243): merged, stopped on conflicts, or a pull request.
     #[serde(default)]
     pub landings: Value,
+    /// When each agent's review was last opened (or its work merged), kept by the daemon for
+    /// every surface (`review.seen`, T-26).
+    #[serde(default)]
+    pub reviewed: std::collections::HashMap<String, i64>,
 }
 
 impl State {
@@ -222,13 +261,12 @@ impl State {
         out
     }
 
-    /// Needs you, counted as the extension and the phone count it (AC-246, extension/media/rollup.js):
-    /// each non-archived task's newest top-level run that waits on a permission or a question, and
-    /// one more while Overseer has proposals or conflicts waiting for a decision.
-    pub fn needs_you_count(&self) -> usize {
+    /// The agents the rollup counts (extension/media/rollup.js `agents`): each non-archived task's
+    /// newest top-level run, without Overseer's own run or swarm members.
+    fn rollup_agents(&self) -> Vec<&Run> {
         let mut newest: std::collections::HashMap<&str, &Run> = std::collections::HashMap::new();
-        for r in self.runs.iter().filter(|r| r.parent_run_id.is_none()) {
-            if self.task(&r.task_id).is_some_and(|t| t.archived_ms.is_some()) {
+        for r in self.runs.iter().filter(|r| r.parent_run_id.is_none() && r.swarm_membership.is_none()) {
+            if self.task(&r.task_id).is_some_and(|t| t.archived_ms.is_some()) || self.oversight[r.id.as_str()]["role"] == "overseer" {
                 continue;
             }
             let keep = newest.get(r.task_id.as_str()).is_none_or(|cur| r.created_ms > cur.created_ms);
@@ -236,10 +274,49 @@ impl State {
                 newest.insert(r.task_id.as_str(), r);
             }
         }
-        let waiting = newest.values().filter(|r| r.status == "waiting_for_user").count();
+        newest.into_values().collect()
+    }
+
+    /// Needs you, counted as the extension and the phone count it (AC-246, extension/media/rollup.js):
+    /// each non-archived task's newest top-level run that waits on a permission or a question, and
+    /// one more while Overseer has proposals or conflicts waiting for a decision.
+    pub fn needs_you_count(&self) -> usize {
+        let waiting = self.rollup_agents().iter().filter(|r| r.status == "waiting_for_user").count();
         let o = &self.overseer;
         let decide = !o["run_id"].is_null() && (o["open_proposals"].as_i64().unwrap_or(0) > 0 || o["conflicts_needing_decision"].as_i64().unwrap_or(0) > 0);
         waiting + usize::from(decide)
+    }
+
+    /// Whether an agent at its end still waits to be reviewed (T-26, rollup.js `unreviewed`): done,
+    /// stopped or failed in the last week, with no review opened (nor merge) since it ended.
+    pub fn unreviewed(&self, run: &Run, now: i64) -> bool {
+        if run.parent_run_id.is_some() || !(DONE.contains(&run.status.as_str()) || FAILED.contains(&run.status.as_str())) {
+            return false;
+        }
+        let ended = run.ended_ms.unwrap_or(run.created_ms);
+        if now - ended > WEEK_MS {
+            return false;
+        }
+        self.reviewed.get(&run.id).copied().unwrap_or(0) < ended
+    }
+
+    /// The rollup by state (T-26, rollup.js `counts`): a failed agent counts as failed until its
+    /// review is opened, then as reviewed.
+    pub fn counts(&self, now: i64) -> Counts {
+        let mut c = Counts { needs: self.needs_you_count(), ..Default::default() };
+        for r in self.rollup_agents() {
+            if r.status == "waiting_for_user" {
+                continue;
+            }
+            if WORKING.contains(&r.status.as_str()) {
+                c.working += 1;
+            } else if self.unreviewed(r, now) {
+                if FAILED.contains(&r.status.as_str()) { c.failed += 1 } else { c.to_review += 1 }
+            } else if DONE.contains(&r.status.as_str()) || FAILED.contains(&r.status.as_str()) {
+                c.reviewed += 1;
+            }
+        }
+        c
     }
 
     /// Top-level agents, newest first (a stable order: tiles do not jump when statuses change).
@@ -307,5 +384,42 @@ mod needs_you {
         assert_eq!(state.needs_you_count(), 1);
         state.overseer = json!({ "run_id": "ov", "open_proposals": 2 });
         assert_eq!(state.needs_you_count(), 2);
+    }
+}
+
+#[cfg(test)]
+mod rollup {
+    use super::*;
+    use serde_json::json;
+
+    /// T-26: the five counts are the extension's (extension/media/rollup.js `counts`): working,
+    /// needs you, to review, reviewed, failed; a reviewed mark older than the run's end does not count,
+    /// a failed agent once reviewed is reviewed, and an agent older than a week is not to review.
+    #[test]
+    fn the_five_counts_are_the_extensions() {
+        let now = 30 * 86_400_000;
+        let run = |id: &str, task: &str, status: &str, ended: i64| json!({ "id": id, "task_id": task, "harness": "claude", "workspace_id": "w", "status": status, "created_ms": 1, "ended_ms": ended, "title": id });
+        let state: State = serde_json::from_value(json!({
+            "tasks": (1..=9).map(|n| json!({ "id": format!("t{n}"), "repo_root": "/r", "workspace_id": "w", "title": "x" })).collect::<Vec<_>>(),
+            "runs": [
+                run("work", "t1", "running", 0),
+                run("wait", "t2", "waiting_for_user", 0),
+                run("done", "t3", "completed", now - 1000),
+                run("seen", "t4", "completed", now - 1000),
+                run("stale-mark", "t5", "interrupted", now - 1000),
+                run("broke", "t6", "failed", now - 1000),
+                run("broke-seen", "t7", "disconnected", now - 1000),
+                run("old", "t8", "completed", now - 8 * 86_400_000),
+                { "id": "sub", "task_id": "t9", "parent_run_id": "done", "harness": "claude", "workspace_id": "w", "status": "completed", "created_ms": 1, "ended_ms": now - 5, "title": "sub" }
+            ],
+            "reviewed": { "seen": now - 500, "stale-mark": now - 5000, "broke-seen": now - 1 }
+        }))
+        .unwrap();
+        let c = state.counts(now);
+        assert_eq!(c, Counts { working: 1, needs: 1, to_review: 2, reviewed: 3, failed: 1 });
+        let words: Vec<String> = c.parts().into_iter().map(|p| p.2).collect();
+        assert_eq!(words.join(" · "), "1 working · 1 needs you · 2 to review · 3 reviewed · 1 failed");
+        assert!(state.unreviewed(state.run("done").unwrap(), now) && !state.unreviewed(state.run("seen").unwrap(), now));
+        assert_eq!(Counts { working: 2, ..Default::default() }.parts().len(), 1, "zero counts are left out");
     }
 }

@@ -1,0 +1,50 @@
+ ◆ Overseer  page 1/1 · 6 agents · ✦ 3 to review · 3 reviewed                                                                                                            phone access off · ● connected 
+╭ agents ──────────────────────────────╮╭ 1 ✓ Site notes ───────────────────── Program · 0s ╮╭ 2 ✓ Site page ─────────────────────── Program · 0s ╮╭ 3 ✗ App check ────────────────────── Program · 0s ╮
+│ site  1 to review · 1 merged         ││ output of site notes                              ││ wrote the page                                     ││ error: check failed                               │
+│ ✓ Site notes                       ✦ ││                                                   ││                                                    ││ · failed: exit code 1                             │
+│ ✓ Site page                        ✓ ││                                                   ││                                                    ││                                                   │
+│                                      ││                                                   ││                                                    ││                                                   │
+│ app  2 to review                     ││                                                   ││                                                    ││                                                   │
+│ ✗ App check                          ││                                                   ││                                                    ││                                                   │
+│ ✓ App task 3                       ✦ ││                                                   ││                                                    ││                                                   │
+│ ✓ App task 2                       ✦ ││                                                   ││                                                    ││                                                   │
+│›✓ App task 1                         ││                                                   ││                                                    ││                                                   │
+│                                      ││                                                   ││                                                    ││                                                   │
+│                                      ││                                                   ││                                                    ││                                                   │
+│                                      ││                                                   ││                                                    ││                                                   │
+│                                      ││                                                   ││                                                    ││                                                   │
+│                                      ││                                                   ││                                                    ││                                                   │
+│                                      ││                                                   ││                                                    ││                                                   │
+│                                      ││                                                   ││                                                    ││                                                   │
+│                                      ││                                                   ││                                                    ││                                                   │
+│                                      ││                                                   ││                                                    ││                                                   │
+│                                      ││                                                   ││                                                    ││                                                   │
+│                                      ││                                                   ││                                                    ││                                                   │
+│                                      ││                                                   ││                                                    ││                                                   │
+│                                      ││                                                   ││                                                    ││                                                   │
+│                                      │╰ completed ────────────────────────────────────────╯╰ ✓ Merged into main (fdbd841) C clean up ───────────╯╰ failed · exit code 1 ─────────────────────────────╯
+│                                      │╭ 4 ✓ App task 3 ───────────────────── Program · 0s ╮╭ 5 ✓ App task 2 ────────────────────── Program · 0s ╮┏ 6 ✓ App task 1 ━━━━━━━━━━━━━━━━━━━━━ Program · 0s ┓
+│                                      ││ output of app task 3                              ││ output of app task 2                               │┃ output of app task 1                              ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+│                                      ││                                                   ││                                                    │┃                                                   ┃
+╰──── ◆ needs you ✦ to review ✓ merged ╯╰ completed ────────────────────────────────────────╯╰ completed ─────────────────────────────────────────╯┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+ ←↑↓→ move   J/K pick in the list   i message   g full view   v changes   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                                               

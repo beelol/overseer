@@ -42,7 +42,7 @@ fn t09_readable_at_a_glance_at_three_sizes() {
     for glyph in ["✓ Refresh sessions once", "✗ Migration dry-run", "■ Long soak test", "● Watch the build", "◆ Add a changelog entry"] {
         assert!(s.contains(glyph), "missing {glyph}:\n{s}");
     }
-    assert!(s.contains("page 1/1") && s.contains("● 3 active") && s.contains("◆ 1 needs you"), "{s}");
+    assert!(s.contains("page 1/1") && s.contains("● 2 working · ◆ 1 needs you · ✦ 5 to review"), "VS Code's counts (T-26):\n{s}");
     assert!(s.contains("error: relation users_v2 missing"), "stderr shown:\n{s}");
     assert!(s.contains("Refactor the payment service so every provider adapter shares one retry and idempotency …") || s.contains("…"), "long titles shortened:\n{s}");
     tui.snapshot("t09-200x60");

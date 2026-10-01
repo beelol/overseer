@@ -68,6 +68,9 @@ fn t25_an_agent_list_beside_the_grid() {
     tui.until(15, |a| a.state.profiles.iter().filter(|p| p.account.as_ref().is_some_and(|x| x.email.is_some())).count() >= 2);
     tui.until(10, |a| a.state.landing_text(&ws).is_some());
     tui.pump(300);
+    // The header: VS Code's five counts (T-26), zero counts left out.
+    let s = tui.screen();
+    assert!(s.contains("● 2 working · ◆ 2 need you · ✦ 14 to review · 1 reviewed · ✗ 1 failed"), "{s}");
 
     // Grouped by repository, the most recently active first, each heading with its counts.
     let groups: Vec<String> = tui.app.groups().iter().map(|g| g.0.rsplit('/').next().unwrap().to_string()).collect();
@@ -77,12 +80,16 @@ fn t25_an_agent_list_beside_the_grid() {
         let s = tui.screen();
         assert!(s.contains(" agents "), "the list at {w}×{h}:\n{s}");
         assert!(s.contains("web-app  2 working · 2 needs you") || (s.contains(" web-app ") && s.contains("   2 working · 2 needs you")), "web-app's counts at {w}×{h}:\n{s}");
-        assert!(s.contains("api-server  1 failed"), "api-server's counts at {w}×{h}:\n{s}");
-        assert!(s.contains("docs-site  1 merged"), "docs-site's counts at {w}×{h}:\n{s}");
+        assert!(s.contains("api-server  6 to review · 1 failed") || s.contains("   6 to review · 1 failed"), "api-server's counts at {w}×{h}:\n{s}");
+        assert!(s.contains("docs-site  4 to review · 1 merged") || s.contains("   4 to review · 1 merged"), "docs-site's counts at {w}×{h}:\n{s}");
         // Each row: status, title, account, mark.
         assert!(s.lines().any(|l| l.contains("◆ Tidy the") && l.contains("Claude Max ◆")), "the Mac's login and the needs-you mark at {w}×{h}:\n{s}");
         assert!(s.lines().any(|l| l.contains("◆ Write the") && l.contains("Personal ◆")), "the named account at {w}×{h}:\n{s}");
-        assert!(s.lines().any(|l| l.contains("✓ Add the") && l.contains(" ✓ │")), "the merged mark at {w}×{h}:\n{s}");
+        // (At 100×30 the list is longer than the screen and ends before docs-site's last row.)
+        assert!(w == 100 || s.lines().any(|l| l.contains("✓ Add the") && l.contains(" ✓ │")), "the merged mark (merging marks it reviewed) at {w}×{h}:\n{s}");
+        assert!(s.lines().any(|l| l.contains("✓ Endpoint") && l.contains(" ✦ │")), "the to-review mark at {w}×{h}:\n{s}");
+        assert!(s.lines().any(|l| l.contains("✗ Migration") && l.contains(" ✦ │")), "a failed agent is to review too at {w}×{h}:\n{s}");
+        assert!(s.contains("◆ needs you ✦ to review ✓ merged") || s.contains("◆ you ✦ review ✓ merged"), "the legend at {w}×{h}:\n{s}");
         no_line_wider(&s, w as usize);
         tui.snapshot(name);
     }
@@ -116,7 +123,7 @@ fn t25_an_agent_list_beside_the_grid() {
     tui.key(KeyCode::Enter);
     assert_eq!(tui.app.groups().len(), 1);
     let s = tui.screen();
-    assert!(s.contains("docs-site  1 merged") && !s.contains("web-app") && !s.contains("api-server"), "{s}");
+    assert!(s.contains("docs-site  4 to review · 1 merged") && !s.contains("web-app") && !s.contains("api-server"), "{s}");
     assert_eq!(tui.app.visible().len(), 5);
     tui.snapshot("parity-t25-search");
     tui.key(KeyCode::Esc);
@@ -132,6 +139,113 @@ fn t25_an_agent_list_beside_the_grid() {
     for id in busy.iter().chain([&mac, &own]) {
         d.ctl("run.interrupt", json!({ "run_id": id }));
     }
+}
+
+/// VS Code's rollup (extension/media/rollup.js, the side bar's and the grid's counts) over the
+/// daemon's state and the daemon's reviewed marks, as "working needs to-review reviewed failed".
+fn vscode_counts(d: &Daemon) -> String {
+    let state = d.ctl("state", json!({}));
+    let rollup = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().join("extension/media/rollup.js");
+    let script = format!(
+        "const R = require({:?}); const s = JSON.parse(require('fs').readFileSync(0, 'utf8')); const c = R.counts(s, s.reviewed || {{}}); process.stdout.write([c.working, c.needs, c.unreviewed, c.reviewed, c.failed].join(' '));",
+        rollup.display().to_string()
+    );
+    let mut child = std::process::Command::new("node").args(["-e", &script]).stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped()).spawn().expect("node");
+    use std::io::Write;
+    child.stdin.take().unwrap().write_all(state.to_string().as_bytes()).unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(out.status.success());
+    String::from_utf8(out.stdout).unwrap()
+}
+
+fn tui_counts(tui: &Tui) -> String {
+    let c = tui.app.state.counts(overseer_tui::model::now_ms());
+    format!("{} {} {} {} {}", c.working, c.needs, c.to_review, c.reviewed, c.failed)
+}
+
+/// T-26: six finished agents in two repositories. The TUI's header gives VS Code's five counts
+/// (rollup.js over the same state and the daemon's reviewed marks); opening one agent's review in
+/// the TUI clears only that mark, in the daemon (where VS Code and the menu bar read it); a mark
+/// sent the way VS Code sends it (`review.seen`) clears in the TUI within 2 s; merging clears one.
+#[test]
+fn t26_the_same_counts_and_the_same_unreviewed_marks() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let app = repo(&t.path().join("app"));
+    let site = repo(&t.path().join("site"));
+    let mut done = Vec::new();
+    for i in 1..=3 {
+        done.push(d.sh(&app, &format!("App task {i}"), &format!("echo output of app task {i}")));
+    }
+    let failed = d.sh(&app, "App check", "echo 'error: check failed' 1>&2; exit 1");
+    let edits = d.sh(&site, "Site page", "printf 'page\\n' > page.txt; echo wrote the page");
+    let other = d.sh(&site, "Site notes", "echo output of site notes");
+    for r in done.iter().chain([&edits, &other]) {
+        d.wait_status(r, |s| s == "completed", 20);
+    }
+    d.wait_status(&failed, |s| s == "failed", 20);
+
+    let mut tui = Tui::attach(&d, 200, 50);
+    tui.until(10, |a| a.visible().len() == 6 && a.state.counts(overseer_tui::model::now_ms()).to_review == 5);
+    assert_eq!(tui_counts(&tui), "0 0 5 0 1");
+    assert_eq!(vscode_counts(&d), tui_counts(&tui), "the TUI counts as VS Code does");
+    let s = tui.screen();
+    assert!(s.lines().next().unwrap().contains("✦ 5 to review · ✗ 1 failed"), "{s}");
+    assert!(s.contains("app  4 to review · 1 failed") || s.contains("app  3 to review · 1 failed"), "{s}");
+    assert!(s.contains("site  2 to review"), "{s}");
+    assert_eq!(d.ctl("menubar.snapshot", json!({}))["counts"]["review"], 6, "the menu bar's to review (failed included)");
+    tui.snapshot("parity-t26-counts");
+
+    // Opening one agent's review in the TUI clears only its mark, in the daemon too.
+    let first = done[0].clone();
+    for _ in 0..20 {
+        if tui.app.focus.as_deref() == Some(first.as_str()) {
+            break;
+        }
+        tui.key(KeyCode::Tab);
+    }
+    assert_eq!(tui.app.focus.as_deref(), Some(first.as_str()));
+    tui.key(KeyCode::Char('v'));
+    assert_eq!(tui.app.mode, Mode::Changes);
+    tui.pump(300);
+    tui.key(KeyCode::Esc);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while d.ctl("state", json!({}))["reviewed"].get(&first).is_none() {
+        assert!(std::time::Instant::now() < deadline, "the daemon has the TUI's mark");
+        tui.pump(50);
+    }
+    let marks = d.ctl("state", json!({}))["reviewed"].clone();
+    assert_eq!(marks.as_object().unwrap().len(), 1, "only that mark: {marks}");
+    tui.until(5, |a| a.state.counts(overseer_tui::model::now_ms()).to_review == 4);
+    assert_eq!(tui_counts(&tui), "0 0 4 1 1");
+    assert_eq!(vscode_counts(&d), tui_counts(&tui), "VS Code's rollup over the daemon's marks agrees");
+    assert_eq!(d.ctl("menubar.snapshot", json!({}))["counts"]["review"], 5);
+    let s = tui.screen();
+    assert!(s.lines().next().unwrap().contains("✦ 4 to review · 1 reviewed · ✗ 1 failed"), "{s}");
+    assert!(s.lines().any(|l| l.contains("✓ App task 1") && !l.contains("✦")), "its row lost the mark:\n{s}");
+    assert!(s.lines().any(|l| l.contains("✓ App task 2") && l.contains(" ✦ │")), "the others keep it:\n{s}");
+    tui.snapshot("parity-t26-one-reviewed");
+
+    // A mark sent as VS Code sends it (extension.js markReviewed) clears in the TUI within 2 s.
+    let at = d.run(&failed)["ended_ms"].as_i64().unwrap() + 1;
+    let sent = std::time::Instant::now();
+    d.ctl("review.seen", json!({ "marks": { failed.clone(): at } }));
+    tui.until(2, |a| a.state.counts(overseer_tui::model::now_ms()).failed == 0);
+    assert!(sent.elapsed() < std::time::Duration::from_secs(2), "cleared in {:?}", sent.elapsed());
+    assert_eq!(tui_counts(&tui), "0 0 4 2 0");
+    assert_eq!(vscode_counts(&d), tui_counts(&tui));
+
+    // Merging an agent's work back clears its mark, whoever merges it.
+    let ws = d.run(&edits)["workspace_id"].as_str().unwrap().to_string();
+    assert_eq!(d.ctl("workspace.merge_prepare", json!({ "workspace_id": ws }))["state"], "ready");
+    d.ctl("workspace.merge_complete", json!({ "workspace_id": ws }));
+    tui.until(2, |a| a.state.counts(overseer_tui::model::now_ms()).to_review == 3);
+    assert_eq!(tui_counts(&tui), "0 0 3 3 0");
+    assert_eq!(vscode_counts(&d), tui_counts(&tui));
+    assert_eq!(d.ctl("menubar.snapshot", json!({}))["counts"]["review"], 3);
+    let s = tui.screen();
+    assert!(s.lines().next().unwrap().contains("✦ 3 to review · 3 reviewed") && !s.lines().next().unwrap().contains("failed"), "zero counts left out:\n{s}");
+    tui.snapshot("parity-t26-merged");
 }
 
 /// The grid's rows and columns as drawn: the tiles left of the conversation column, by row.
@@ -294,7 +408,8 @@ fn open_review(tui: &mut Tui, run: &str) {
 }
 
 /// T-27: the review opens on the daemon's default comparison; 1, 2, 3 switch to Since task start,
-/// Latest run and Entire worktree, and the header names what is shown with its counts.
+/// Latest run and Entire worktree, and the header names what is shown with its counts, both for an
+/// agent in its own worktree and for one in the owner's checkout.
 #[test]
 fn t27_the_review_opens_on_since_task_start() {
     let t = tempfile::tempdir().unwrap();
@@ -321,17 +436,12 @@ fn t27_the_review_opens_on_since_task_start() {
     tui.key(KeyCode::Char('1'));
     tui.until(10, |a| !a.changes.loading && a.changes.comparison().is_some_and(|c| c.mode == "task_start") && !a.changes.files.is_empty());
     assert!(tui.screen().contains("· Since task start · 2 files +3 −2"));
-    // Entire worktree: shown, or it says why it is not (a daemon before AC-263 does not offer it).
+    // Entire worktree is offered and shows the worktree's changes.
+    assert!(tui.app.changes.options.iter().any(|c| c.mode == "entire_worktree" && c.available), "Entire worktree offered: {:?}", tui.app.changes.options.iter().map(|c| (&c.mode, c.available)).collect::<Vec<_>>());
     tui.key(KeyCode::Char('3'));
-    tui.until(10, |a| !a.changes.loading);
+    tui.until(10, |a| !a.changes.loading && a.changes.comparison().is_some_and(|c| c.mode == "entire_worktree") && !a.changes.files.is_empty());
     let s = tui.screen();
-    let offered = tui.app.changes.options.iter().any(|c| c.mode == "entire_worktree" && c.available);
-    if offered {
-        tui.until(10, |a| !a.changes.loading && a.changes.comparison().is_some_and(|c| c.mode == "entire_worktree") && !a.changes.files.is_empty());
-        assert!(tui.screen().contains("· Entire worktree · 2 files"), "{}", tui.screen());
-    } else {
-        assert!(s.contains("Entire worktree is not available") && s.contains("· Since task start ·"), "says why and keeps what was shown:\n{s}");
-    }
+    assert!(s.contains("review · Edits in its worktree · Entire worktree · 2 files +3 −2") && s.contains("3 [Entire worktree]"), "{s}");
     tui.snapshot("parity-t27-entire-worktree");
     // c still cycles through every available comparison.
     let before = tui.app.changes.option;
@@ -340,12 +450,19 @@ fn t27_the_review_opens_on_since_task_start() {
     assert_ne!(tui.app.changes.option, before);
     tui.key(KeyCode::Esc);
 
-    // In the owner's checkout: the daemon's default (Since task start once AC-263 is on main).
+    // In the owner's checkout: also Since task start, with Entire worktree offered.
     open_review(&mut tui, &here);
-    let default = d.ctl("comparison.options", json!({ "run_id": here }))["options"].as_array().unwrap().iter().find(|o| o["default"] == true).map(|o| o["label"].as_str().unwrap().to_string()).unwrap();
+    let opts = d.ctl("comparison.options", json!({ "run_id": here }))["options"].as_array().unwrap().clone();
+    assert_eq!(opts.iter().find(|o| o["default"] == true).map(|o| o["mode"].as_str().unwrap()), Some("task_start"), "the daemon's default in the checkout: {opts:?}");
     let s = tui.screen();
-    assert!(s.contains(&format!("review · Edits in the checkout · {default} · 2 files")), "opens on the daemon's default {default}:\n{s}");
+    assert!(s.contains("review · Edits in the checkout · Since task start · 2 files +3 −2") && s.contains("1 [Since task start]"), "{s}");
     tui.snapshot("parity-t27-checkout");
+    assert!(tui.app.changes.options.iter().any(|c| c.mode == "entire_worktree" && c.available), "Entire worktree offered in the checkout");
+    tui.key(KeyCode::Char('3'));
+    tui.until(10, |a| !a.changes.loading && a.changes.comparison().is_some_and(|c| c.mode == "entire_worktree") && !a.changes.files.is_empty());
+    let s = tui.screen();
+    assert!(s.contains("review · Edits in the checkout · Entire worktree · 2 files +3 −2"), "{s}");
+    tui.snapshot("parity-t27-checkout-entire-worktree");
 }
 
 /// T-28: `t` switches between the changed files and every file of the worktree; changed files

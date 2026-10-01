@@ -141,11 +141,17 @@ pub fn build(agents: &[Agent], profiles: &[Profile], reviewed: &HashMap<String, 
     })
 }
 
-fn reviewed(d: &Daemon) -> Result<HashMap<String, i64>> {
+/// The reviewed marks (run id -> when its review was last opened, or it was merged), as `state`
+/// gives them to every client (the TUI counts "to review" from them, T-26).
+pub fn reviewed_marks(conn: &rusqlite::Connection) -> Result<HashMap<String, i64>> {
     use rusqlite::OptionalExtension;
-    let store = d.store.lock().unwrap();
-    let raw: Option<String> = store.conn.query_row("SELECT value FROM meta WHERE key=?1", [REVIEWED_KEY], |r| r.get(0)).optional()?;
+    let raw: Option<String> = conn.query_row("SELECT value FROM meta WHERE key=?1", [REVIEWED_KEY], |r| r.get(0)).optional()?;
     Ok(raw.and_then(|j| serde_json::from_str::<HashMap<String, i64>>(&j).ok()).unwrap_or_default())
+}
+
+fn reviewed(d: &Daemon) -> Result<HashMap<String, i64>> {
+    let store = d.store.lock().unwrap();
+    reviewed_marks(&store.conn)
 }
 
 /// `menubar.snapshot`: what the item and its menu show now.
@@ -180,20 +186,39 @@ pub fn snapshot(d: &Arc<Daemon>) -> Result<Value> {
     Ok(out)
 }
 
-/// `review.seen {marks: {run_id: ms}}`: the finished agents VS Code has shown the owner, merged
-/// with what the daemon knew (the later time wins).
-pub fn review_seen(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
+/// `review.seen {marks: {run_id: ms}}`: the finished agents VS Code or the TUI has shown the
+/// owner, merged with what the daemon knew (the later time wins). Marks that moved are announced
+/// as a `review_seen` event, so every open surface clears them at once (T-26).
+pub fn review_seen(d: &Daemon, p: &Value) -> Result<Value> {
     let incoming: &Map<String, Value> = p["marks"].as_object().ok_or_else(|| anyhow::anyhow!("marks must be an object of run id to time"))?;
-    let mut marks = reviewed(d)?;
-    for (run, ms) in incoming {
-        if let Some(ms) = ms.as_i64() { let e = marks.entry(run.clone()).or_insert(0); *e = (*e).max(ms); }
-    }
+    Ok(json!({"ok": true, "kept": mark_seen(d, incoming)?}))
+}
+
+/// Merges reviewed marks into the daemon's, announces the ones that moved, and returns how many
+/// are kept. Merging an agent's work back marks it too, whoever merged it.
+pub fn mark_seen(d: &Daemon, incoming: &Map<String, Value>) -> Result<usize> {
     // Keep a month: older agents are idle whatever their mark says.
     let horizon = now() - 4 * WEEK_MS;
-    marks.retain(|_, ms| *ms >= horizon);
-    let store = d.store.lock().unwrap();
-    store.conn.execute("INSERT INTO meta(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value", rusqlite::params![REVIEWED_KEY, serde_json::to_string(&marks)?])?;
-    Ok(json!({"ok": true, "kept": marks.len()}))
+    let (kept, changed) = {
+        let store = d.store.lock().unwrap();
+        let mut marks = reviewed_marks(&store.conn)?;
+        let mut changed = Map::new();
+        for (run, ms) in incoming {
+            let Some(ms) = ms.as_i64() else { continue };
+            let e = marks.entry(run.clone()).or_insert(0);
+            if ms > *e {
+                *e = ms;
+                if ms >= horizon { changed.insert(run.clone(), json!(ms)); }
+            }
+        }
+        marks.retain(|_, ms| *ms >= horizon);
+        store.conn.execute("INSERT INTO meta(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value", rusqlite::params![REVIEWED_KEY, serde_json::to_string(&marks)?])?;
+        (marks.len(), changed)
+    };
+    if !changed.is_empty() {
+        d.emit(None, None, "review_seen", "user", "exact", json!({"marks": changed}))?;
+    }
+    Ok(kept)
 }
 
 #[cfg(test)]
