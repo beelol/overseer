@@ -1,5 +1,11 @@
 # AC-146: merges
 
+## Pull request #45 (the TUI's dashboard mode and a grid-only terminal; T-40, T-41), 2026-10-01
+
+- **Finished:** built by a builder on the coordinator's brief; changes only `tui/` and its evidence (and the phone Devices key in the TUI, `D` to Ctrl-O, said in the PR: Gate N's area).
+- **Throwaway copy:** #45 with main (clean). `cargo test -p overseer-tui --no-fail-fast` 81 passed, 0 failed (`live_harness` on its skip path, no paid turns); links 875, 0 broken. No daemon or extension change, so no UI scenarios.
+- **Merged:** squash. T-40 and T-41 verified (ticked in `docs/rfcs/tui.md`).
+
 ## Pull request #44 (VS Code reads the daemon's reviewed marks; T-26), 2026-10-01
 
 - **Finished:** built by a builder on the coordinator's brief; 11 lines in `extension/src/extension.js` and two checks in `scenario-review-marks`.

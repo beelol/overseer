@@ -312,7 +312,7 @@ agent list, the review screen, and the two numbered ways of showing a picked age
 
 ### Criteria
 
-Status (pull request #43, merged 2026-10-01 as e5836534; tests in `tui/tests/parity.rs`, evidence `docs/verification/evidence/tui/parity-*`): T-25 to T-28, T-37, T-38 and T-39 verified (T-26 with pull request #44, merged as its own commit: VS Code reads the daemon's reviewed marks; `scenario-review-marks` sees a terminal's `review.seen` clear VS Code's mark in 259 ms). T-29 partial: accepting and rejecting in the terminal is checked through the daemon, not yet in a VS Code window. T-30 to T-36, T-40 and T-41 not started.
+Status (pull request #43, merged 2026-10-01 as e5836534; tests in `tui/tests/parity.rs`, evidence `docs/verification/evidence/tui/parity-*`): T-25 to T-28, T-37, T-38 and T-39 verified (T-26 with pull request #44, merged as its own commit: VS Code reads the daemon's reviewed marks; `scenario-review-marks` sees a terminal's `review.seen` clear VS Code's mark in 259 ms). T-29 partial: accepting and rejecting in the terminal is checked through the daemon, not yet in a VS Code window. T-40 and T-41 verified with pull request #45 (`t40_dashboard_mode_for_big_screens`, `t41_a_grid_only_terminal_beside_it`, `t41_two_real_terminals_on_one_daemon`; evidence `parity-t40-*`, `parity-t41-*`); with it the phone Devices panel moved from `D` to Ctrl-O. T-30 to T-36 not started.
 
 - [x] **T-25 — An agent list beside the grid.** The main screen keeps the pages of nine and adds an
   agent list on the left: agents grouped by repository, the most recently active repository and
@@ -413,7 +413,7 @@ Status (pull request #43, merged 2026-10-01 as e5836534; tests in `tui/tests/par
   to the review with that line shown as the owner's edit and the terminal restored (no leftover
   raw mode or alternate screen).
 
-- [ ] **T-40 — Dashboard mode for big screens.** An option beside the grid (the owner, 2026-09-30:
+- [x] **T-40 — Dashboard mode for big screens.** An option beside the grid (the owner, 2026-09-30:
   "screens are pretty big now … agents on the left for now are good, and then review in the middle,
   and then the chat on the right as a dashboard mode, as just an option"): the agent list on the
   left, the picked agent's review in the middle (the T-27 to T-29 review) and its conversation on
@@ -424,7 +424,7 @@ Status (pull request #43, merged 2026-10-01 as e5836534; tests in `tui/tests/par
   columns; `J` changes both the review and the conversation to the next agent; `D` returns to the
   grid on that agent; below 160 columns dashboard mode says it needs a wider terminal and stays on
   the grid.
-- [ ] **T-41 — A grid-only terminal beside it.** `overseer-tui --grid` shows only the grid of agents
+- [x] **T-41 — A grid-only terminal beside it.** `overseer-tui --grid` shows only the grid of agents
   (no list, no conversation column), so the owner can keep the grid in a second terminal and
   dashboard mode in the first (the owner: "maybe you can open a second TUI, and then I can view the
   agent grid only on the second TUI, like two terminals. Maybe that's the best use case"). Both
