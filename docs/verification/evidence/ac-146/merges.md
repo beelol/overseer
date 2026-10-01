@@ -1,5 +1,11 @@
 # AC-146: merges
 
+## Pull request #46 (the TUI's T-30 to T-36), 2026-10-01
+
+- **Finished:** built by a builder on the coordinator's brief, one commit per criterion; it adds a `session-rule` mode to the shared Claude fixture.
+- **Throwaway copy:** #46 with main (clean). `cargo test -p overseer-tui` 88 passed, 0 failed; unit 25/25; links. Because the shared fixture changed, every UI scenario one at a time (LIVE, ON SCREEN, perf skipped): 71 of 72; popout fails whenever the owner is at the Mac (on main too).
+- **Merged:** squash. T-30 to T-34 and T-36 verified; T-35 partial.
+
 ## Pull request #41 (tests wait for what they check; AC-149), 2026-10-01
 
 - **Finished:** its first builder converted the daemon tests; a builder finished it (main merged in, ac185 against a measured baseline, the harness's screenshot and port-file waits, 13 scenarios waiting on what they check) and marked it ready. Real fixes found: the review now marks a conflict that arrives after the file's own change (`comparison.js`), two OpenCode runs no longer race its first-start migration in scenario-review, a context-menu click is retried.

@@ -1,0 +1,44 @@
+ ◆ Overseer  page 1/1 · 3 agents · ● 1 working · ✦ 2 to review                                                                   phone access off · ● connected 
+╭ agents ──────────────────────╮╭ 1 ● Still working ──────── Program · 0s ╮┏ 2 ✓ Old finished work ━━━ Program · 0s ┓╭ 3 ✓ Stays in the list ──── Program · 0s ╮
+│ archive                      ││ working                                 │┃ output of old work                     ┃│ output of stays                         │
+│   1 working · 2 to review    ││                                         │┃                                        ┃│                                         │
+│ ● Still working              ││                                         │┃                                        ┃│                                         │
+│›✓ Old finished work        ✦ ││                                         │┃                                        ┃│                                         │
+│ ✓ Stays in the list        ✦ ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+│                              ││                                         │┃                                        ┃│                                         │
+╰───── ◆ you ✦ review ✓ merged ╯╰─────────────────────────────────────────╯┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰ completed ──────────────────────────────╯
+ Archive Old finished work? It leaves the list and the grid, here and in VS Code; nothing is deleted (f → Archived restores it). y / n                          
+                                                                                                                                                                
+ Archiving waits until the agent is done (x interrupts it)                                                                                                      

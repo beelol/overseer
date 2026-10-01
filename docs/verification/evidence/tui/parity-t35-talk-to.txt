@@ -1,0 +1,48 @@
+ ◆ Overseer  page 1/1 · 2 agents · ● 1 working · ◆ 1 needs you                                                                   phone access off · ● connected 
+╭ agents ────────────────╭ ◆ Overseer · Ask first ────────────────────────────────────────────────────────────────────────────────────╮━━━━━━━━━ Program · 11s ┓
+│ voice                  │ ◉ Speaking · talking to Phone  ctrl+v off ctrl+t mute ctrl+a talk to ctrl+x cancel                         │01) The owner said:     ┃
+│   1 working · 1 needs y│   heard: “What does Sessions want?”                                                                        │mat.”                   ┃
+│ ◆ Sessions    Claude Fi│                                                                                                            │rmat.                   ┃
+│›● Phone                │ ▶ Started Phone (generic) in voice                                                                         │                        ┃
+│                        │ you (spoken) › Tell Phone to use the new wire format.                                                      │                        ┃
+│                        │   ◇ Done: sent "(voice, request V-0001) The owner said: “Tell Phone to use the new wire format.” For yo…   │                        ┃
+│                        │ ◆ Telling Phone to use the new wire format.                                                                │                        ┃
+│                        │ you (spoken) › Tell Phone to stop pushing to main.                                                         │                        ┃
+│                        │   ◇ Cancelled: nothing was sent                                                                            │                        ┃
+│                        │ ◆ Telling Phone to stop pushing to main.                                                                   │                        ┃
+│                        │ ▶ Started Sessions (Claude Code) in voice                                                                  │                        ┃
+│                        │ you (spoken) › yes, allow it                                                                               │                        ┃
+│                        │   ◇ Sent: allowed Sessions                                                                                 │                        ┃
+│                        │──────────────────────────────────────────────────────────────────────────────────────────────────────────  │                        ┃
+│                        │ › type a message for Overseer                                                                              │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+╰───── ◆ you ✦ review ✓ m╰──────────────────────────────────────── enter sends · ctrl+y / ctrl+n yes / no · ctrl+v voice · esc closes ╯━━━━━━━━━━━━━━━━━━━━━━━━┛
+ Sent: allowed Sessions                                                                                                                                         
