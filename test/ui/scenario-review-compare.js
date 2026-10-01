@@ -131,6 +131,32 @@ const { Session, makeRepo, latestVsix, delay, git } = require('./harness');
     await waitWords(er, 'a.txt', "Number(e.dataset.hunks) === 2");
     const start = await fileWords(er, 'a.txt');
     check('each file offers Accept file and Reject file, each change Accept and Reject; no Keep, Undo or Save before typing', start && start.accept === 'Accept file' && start.reject === 'Reject file' && !start.rejectDisabled && start.save === null && start.hunks === 2 && start.hunkWords.every(w => JSON.stringify(w) === '["Accept","Reject"]'), start);
+    // A narrow card (the owner, 2026-09-30): Accept file and Reject file are icons only, a check in
+    // the accept colour and an X in the reject colour, solid; the words stay in tooltip and label;
+    // each change keeps its words.
+    const narrowAt = async w => { await cdp.call('Emulation.setDeviceMetricsOverride', { width: w, height: 900, deviceScaleFactor: 0, mobile: false }, cdp.workbench); await delay(1600); };
+    const icons = () => er.eval(`(() => { const e = ${fileOf('a.txt')}; e.scrollIntoView({ block: 'start' }); const card = e.getBoundingClientRect().width;
+      const one = sel => { const b = e.querySelector(sel), g = b.querySelector('.file-glyph'), w = b.querySelector('.file-word'), cs = getComputedStyle(g), r = g.getBoundingClientRect();
+        return { word: getComputedStyle(w).display === 'none' ? '' : w.textContent, label: b.getAttribute('aria-label'), title: b.title, stroke: cs.stroke, opacity: Number(cs.opacity) * Number(getComputedStyle(b).opacity), size: Math.round(r.width), visible: r.width > 0 && b.getBoundingClientRect().right <= e.getBoundingClientRect().right }; };
+      const probe = (v) => { const d = document.createElement('i'); d.style.color = 'var(' + v + ')'; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c; };
+      return { card: Math.round(card), accept: one('.file-accept'), reject: one('.file-reject'), done: probe('--ov-done'), removed: probe('--ov-removed'),
+        hunkWords: [...e.querySelectorAll('.hunk-actions')].map(h => [...h.querySelectorAll('button')].map(x => getComputedStyle(x.querySelector('.hunk-word')).display === 'none' ? '' : x.textContent.trim())) }; })()`);
+    await narrowAt(1280);
+    const narrow = await icons();
+    const solid = c => /^rgb\(/.test(c) || (/^rgba\(/.test(c) && parseFloat(c.split(',')[3]) >= 0.9);
+    await s.screenshot('narrow-card-icons');
+    const cardBox = await er.eval(`(() => { const r = ${fileOf('a.txt')}.querySelector('.file-header').getBoundingClientRect(); return { w: r.width, h: r.height }; })()`);
+    await er.eval(`${fileOf('a.txt')}.querySelector('.file-header').id = 'narrow-head'`);
+    const head = await s.webviewPoint(er, '#narrow-head');
+    await er.eval(`document.getElementById('narrow-head')?.removeAttribute('id')`);
+    // webviewPoint is the header's left edge + up to 40 px and its middle; the clip is the header and the change below it.
+    await s.screenshot('narrow-card-icons-closeup', { x: Math.max(0, head.x - Math.min(cardBox.w / 2, 40) - 8), y: Math.max(0, head.y - Math.min(cardBox.h / 2, 12) - 8), width: cardBox.w + 16, height: 220 });
+    check('a narrow card: Accept file and Reject file are a solid check in the accept colour and an X in the reject colour, words in tooltip and label; each change keeps its words',
+      narrow && narrow.card <= 440 && narrow.accept.word === '' && narrow.reject.word === '' && narrow.accept.visible && narrow.reject.visible && narrow.accept.size >= 16 && narrow.reject.size >= 16
+        && narrow.accept.stroke === narrow.done && narrow.reject.stroke === narrow.removed && solid(narrow.done) && solid(narrow.removed) && narrow.accept.opacity === 1 && narrow.reject.opacity === 1
+        && /Accept every change to a\.txt/.test(narrow.accept.label) && /^Accept file/.test(narrow.accept.title) && /Reject every change to a\.txt/.test(narrow.reject.label) && /^Reject file/.test(narrow.reject.title)
+        && narrow.hunkWords.length === 2 && narrow.hunkWords.every(w => JSON.stringify(w) === '["Accept","Reject"]'), narrow);
+    await cdp.call('Emulation.clearDeviceMetricsOverride', {}, cdp.workbench); await delay(1600);
     await hunkClick(er, 'a.txt', 'L10: agent edit', 'accept');
     const oneAccepted = await waitWords(er, 'a.txt', "Number(e.dataset.reviewed) === 1 && [...e.querySelectorAll('.hunk-accept')].some(b => b.getAttribute('aria-pressed') === 'true' && b.textContent.trim() === 'Accepted')");
     const afterAccept = await fileWords(er, 'a.txt');

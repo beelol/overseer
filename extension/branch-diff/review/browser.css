@@ -302,6 +302,11 @@ button.file-accept:hover:not(:disabled), button.file-reject:hover:not(:disabled)
 button.file-accept[aria-pressed="true"] { color: var(--ov-done, var(--vscode-testing-iconPassed)); border-color: transparent; }
 button.file-reject:hover:not(:disabled) { color: var(--ov-removed, var(--vscode-gitDecoration-deletedResourceForeground)); }
 button.file-accept:disabled, button.file-reject:disabled { opacity: .5; cursor: default; }
+/* The file buttons' check and X (the owner, 2026-09-30): solid strokes in the accept and reject
+   colours at every width, so an icon-only button on a narrow card is still plain to read. */
+button.file-accept .file-glyph, button.file-reject .file-glyph { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+button.file-accept .file-glyph { color: var(--ov-done, var(--vscode-testing-iconPassed)); }
+button.file-reject .file-glyph { color: var(--ov-removed, var(--vscode-gitDecoration-deletedResourceForeground)); }
 .hunk-actions .hunk-accept[aria-pressed="true"] { font-weight: 600; }
 @media (max-width: 560px) { button.file-accept, button.file-reject { padding: 0 var(--ov-space-1, 4px); } }
 /* Narrow cards keep every header button on the card: below 440 px Accept file and Reject file are
@@ -310,6 +315,13 @@ button.file-accept:disabled, button.file-reject:disabled { opacity: .5; cursor: 
 .diff-file { container-type: inline-size; }
 @container (max-width: 440px) {
   .file-header button.file-accept .file-word, .file-header button.file-reject .file-word { display: none; }
+  /* Icon only: a square button framed in its own colour, the glyph a little larger. */
+  .file-header { gap: var(--ov-space-1, 4px); }
+  .file-header button.file-accept, .file-header button.file-reject { justify-content: center; width: 26px; padding: 0; border-radius: var(--ov-radius-control, 4px); }
+  .file-header button.file-accept { border-color: var(--ov-done, var(--vscode-testing-iconPassed)); }
+  .file-header button.file-reject { border-color: var(--ov-removed, var(--vscode-gitDecoration-deletedResourceForeground)); }
+  .file-header button.file-accept[aria-pressed="true"] { background: color-mix(in srgb, var(--ov-done, var(--vscode-testing-iconPassed)) 18%, transparent); }
+  .file-header .file-glyph { width: 18px; height: 18px; }
 }
 @container (max-width: 600px) {
   .file-header:has(.save-file:not([hidden])) button.file-accept, .file-header:has(.save-file:not([hidden])) button.file-reject,

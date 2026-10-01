@@ -277,8 +277,16 @@ function makeRow(entry) {
   const open = node('button', 'open-native', '↗'); open.title = 'Open in native diff (undo, redo, Git gutters)'; open.setAttribute('aria-label', 'Open ' + entry.path + ' in native diff');
   // Overseer (AC-263): the agent's changes are Accepted or Rejected, per change and per file; saving
   // what the owner typed is a separate "Save your edits", shown only once they have typed.
-  const fileButton = (cls, icon) => { const b = node('button', cls); const g = node('span', 'codicon codicon-' + icon); g.setAttribute('aria-hidden', 'true'); b.append(g, node('span', 'file-word')); b.hidden = true; return b; };
-  const acceptFile = fileButton('file-accept', 'check-all'), rejectFile = fileButton('file-reject', 'discard');
+  // A narrow card shows them as icons only (the owner, 2026-09-30): a solid check in the accept
+  // colour and an X in the reject colour, drawn as strokes so they read at a glance; the words stay
+  // in the tooltip and label.
+  const fileButton = (cls, d) => {
+    const b = node('button', cls), svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 16 16'); svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('class', 'file-glyph');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', d); svg.append(path);
+    b.append(svg, node('span', 'file-word')); b.hidden = true; return b;
+  };
+  const acceptFile = fileButton('file-accept', 'M3 8.5l3.2 3.2L13 4.8'), rejectFile = fileButton('file-reject', 'M4 4l8 8M12 4l-8 8');
   const save = node('button', 'save-file', 'Save your edits'); save.disabled = true; save.hidden = true;
   save.title = "Save your edits (Cmd+S): writes what you typed to this file. It does not accept or reject the agent's changes.";
   // An unchanged file opened from the navigator can be closed again (AC-99).

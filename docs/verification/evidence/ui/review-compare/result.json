@@ -294,6 +294,43 @@
       }
     },
     {
+      "name": "a narrow card: Accept file and Reject file are a solid check in the accept colour and an X in the reject colour, words in tooltip and label; each change keeps its words",
+      "ok": true,
+      "detail": {
+        "card": 269,
+        "accept": {
+          "word": "",
+          "label": "Accept every change to a.txt",
+          "title": "Accept file: every change the agent made to a.txt stays and is marked accepted (nothing is committed or staged)",
+          "stroke": "rgb(76, 195, 138)",
+          "opacity": 1,
+          "size": 16,
+          "visible": true
+        },
+        "reject": {
+          "word": "",
+          "label": "Reject every change to a.txt",
+          "title": "Reject file: take out every change the agent made to a.txt and put back what was there before",
+          "stroke": "rgb(240, 112, 123)",
+          "opacity": 1,
+          "size": 16,
+          "visible": true
+        },
+        "done": "rgb(76, 195, 138)",
+        "removed": "rgb(240, 112, 123)",
+        "hunkWords": [
+          [
+            "Accept",
+            "Reject"
+          ],
+          [
+            "Accept",
+            "Reject"
+          ]
+        ]
+      }
+    },
+    {
       "name": "a change accepted reads Accepted; the file on disk keeps the agent's line",
       "ok": true,
       "detail": {
