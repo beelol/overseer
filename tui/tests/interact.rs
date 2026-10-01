@@ -66,12 +66,15 @@ fn t02_pages_newest_first() {
     assert!(s.contains("1 ● agent 21"), "the new agent is tile 1 on page 1:\n{s}");
     assert!(s.contains("7 ✓ agent 15"), "agent 15 moved to slot 7:\n{s}");
 
-    // Filter: all → active → needs you → all.
+    // Filter: all → active → needs you → archived (T-34) → all.
     tui.key(KeyCode::Char('f'));
     assert_eq!(tui.app.filter, Filter::Active);
     let s = tui.screen();
     assert!(s.contains("filter: active") && s.contains("agent 21") && !s.contains("agent 20"), "{s}");
     tui.key(KeyCode::Char('f'));
+    assert!(tui.screen().contains("No agents match"));
+    tui.key(KeyCode::Char('f'));
+    assert_eq!(tui.app.filter, Filter::Archived);
     assert!(tui.screen().contains("No agents match"));
     tui.key(KeyCode::Char('f'));
     assert_eq!(tui.app.filter, Filter::All);

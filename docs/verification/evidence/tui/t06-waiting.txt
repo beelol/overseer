@@ -1,50 +1,50 @@
- ◆ Overseer  page 1/1 · 4 agents · ● 4 active · ◆ 2 need you                                                                                         phone access off · ● connected 
-┏ 1 ◆ Claude two ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ claude · 0s ┓╭ 2 ● Echo two ──────────────────────────────────────────────────────────── generic · 2s ╮
-┃ › write perm.txt                                                                       ┃│ up                                                                                     │
-┃ ✎ perm.txt                                                                             ┃│                                                                                        │
-┃ ⚙ Write perm.txt …                                                                     ┃│                                                                                        │
-┃ ◆ wants Write perm.txt                                                                 ┃│                                                                                        │
-┃                                                                                        ┃│                                                                                        │
-┃                                                                                        ┃│                                                                                        │
-┃                                                                                        ┃│                                                                                        │
-┃                                                                                        ┃│                                                                                        │
-┃                                                                                        ┃│                                                                                        │
-┃                                                                                        ┃│                                                                                        │
-┃                                                                                        ┃│                                                                                        │
-┃                                                                                        ┃│                                                                                        │
-┃                                                                                        ┃│                                                                                        │
-┃                                                                                        ┃│                                                                                        │
-┃                                                                                        ┃│                                                                                        │
-┃                                                                                        ┃│                                                                                        │
-┃                                                                                        ┃│                                                                                        │
-┃                                                                                        ┃│                                                                                        │
-┃                                                                                        ┃│                                                                                        │
-┃                                                                                        ┃│                                                                                        │
-┃                                                                                        ┃│                                                                                        │
-┃                                                                                        ┃│                                                                                        │
-┗ ◆ Write perm.txt  a allow d deny ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰────────────────────────────────────────────────────────────────────────────────────────╯
-╭ 3 ◆ Claude one ─────────────────────────────────────────────────────────── claude · 3s ╮╭ 4 ● Echo one ──────────────────────────────────────────────────────────── generic · 4s ╮
-│ › write perm.txt                                                                       ││ up                                                                                     │
-│ ✎ perm.txt                                                                             ││                                                                                        │
-│ ⚙ Write perm.txt …                                                                     ││                                                                                        │
-│ ◆ wants Write perm.txt                                                                 ││                                                                                        │
-│                                                                                        ││                                                                                        │
-│                                                                                        ││                                                                                        │
-│                                                                                        ││                                                                                        │
-│                                                                                        ││                                                                                        │
-│                                                                                        ││                                                                                        │
-│                                                                                        ││                                                                                        │
-│                                                                                        ││                                                                                        │
-│                                                                                        ││                                                                                        │
-│                                                                                        ││                                                                                        │
-│                                                                                        ││                                                                                        │
-│                                                                                        ││                                                                                        │
-│                                                                                        ││                                                                                        │
-│                                                                                        ││                                                                                        │
-│                                                                                        ││                                                                                        │
-│                                                                                        ││                                                                                        │
-│                                                                                        ││                                                                                        │
-│                                                                                        ││                                                                                        │
-│                                                                                        ││                                                                                        │
-╰ ◆ Write perm.txt  a allow d deny ──────────────────────────────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────────╯
- ←↑↓→ move   i message   z zoom   v changes   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                                                       
+ ◆ Overseer  page 1/1 · 4 agents · ● 2 working · ◆ 2 need you                                                                                        phone access off · ● connected 
+╭ agents ──────────────────────────╮┏ 1 ◆ Claude two ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Claude Code · 0s ┓╭ 2 ● Echo two ────────────────────────────────────────── Program · 1s ╮
+│ perm  2 working · 2 needs you    │┃ › write perm.txt                                                     ┃│ up                                                                   │
+│›◆ Claude two      Claude Fixt… ◆ │┃ ✎ perm.txt                                                           ┃│                                                                      │
+│ ● Echo two                       │┃ ⚙ Write perm.txt …                                                   ┃│                                                                      │
+│ ◆ Claude one      Claude Fixt… ◆ │┃ ◆ wants Write perm.txt                                               ┃│                                                                      │
+│ ● Echo one                       │┃                                                                      ┃│                                                                      │
+│                                  │┃                                                                      ┃│                                                                      │
+│                                  │┃                                                                      ┃│                                                                      │
+│                                  │┃                                                                      ┃│                                                                      │
+│                                  │┃                                                                      ┃│                                                                      │
+│                                  │┃                                                                      ┃│                                                                      │
+│                                  │┃                                                                      ┃│                                                                      │
+│                                  │┃                                                                      ┃│                                                                      │
+│                                  │┃                                                                      ┃│                                                                      │
+│                                  │┃                                                                      ┃│                                                                      │
+│                                  │┃                                                                      ┃│                                                                      │
+│                                  │┃                                                                      ┃│                                                                      │
+│                                  │┃                                                                      ┃│                                                                      │
+│                                  │┃                                                                      ┃│                                                                      │
+│                                  │┃                                                                      ┃│                                                                      │
+│                                  │┃                                                                      ┃│                                                                      │
+│                                  │┃                                                                      ┃│                                                                      │
+│                                  │┃                                                                      ┃│                                                                      │
+│                                  │┗ ◆ Write perm.txt  a allow once d deny… ━━━━━━━━━━━ fix…@example.test ┛╰──────────────────────────────────────────────────────────────────────╯
+│                                  │╭ 3 ◆ Claude one ──────────────────────────────────── Claude Code · 2s ╮╭ 4 ● Echo one ────────────────────────────────────────── Program · 2s ╮
+│                                  ││ › write perm.txt                                                     ││ up                                                                   │
+│                                  ││ ✎ perm.txt                                                           ││                                                                      │
+│                                  ││ ⚙ Write perm.txt …                                                   ││                                                                      │
+│                                  ││ ◆ wants Write perm.txt                                               ││                                                                      │
+│                                  ││                                                                      ││                                                                      │
+│                                  ││                                                                      ││                                                                      │
+│                                  ││                                                                      ││                                                                      │
+│                                  ││                                                                      ││                                                                      │
+│                                  ││                                                                      ││                                                                      │
+│                                  ││                                                                      ││                                                                      │
+│                                  ││                                                                      ││                                                                      │
+│                                  ││                                                                      ││                                                                      │
+│                                  ││                                                                      ││                                                                      │
+│                                  ││                                                                      ││                                                                      │
+│                                  ││                                                                      ││                                                                      │
+│                                  ││                                                                      ││                                                                      │
+│                                  ││                                                                      ││                                                                      │
+│                                  ││                                                                      ││                                                                      │
+│                                  ││                                                                      ││                                                                      │
+│                                  ││                                                                      ││                                                                      │
+│                                  ││                                                                      ││                                                                      │
+│                                  ││                                                                      ││                                                                      │
+╰ ◆ needs you ✦ to review ✓ merged ╯╰ ◆ Write perm.txt  a allow once d deny… ─────────── fix…@example.test ╯╰──────────────────────────────────────────────────────────────────────╯
+ ←↑↓→ move   J/K pick in the list   i message   g full view   v changes   a/s/d allow once/session/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit            

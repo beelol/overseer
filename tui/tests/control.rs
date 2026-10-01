@@ -40,7 +40,7 @@ fn t06_answer_permissions_jump_to_waiting_agents_and_interrupt() {
     tui.until(10, |a| a.visible().iter().filter(|r| r.needs_you()).count() == 2);
     let s = tui.screen();
     assert!(s.contains("◆ 2 need you"), "{s}");
-    assert!(s.contains("wants Write perm.txt") && s.contains("a allow d deny"), "readable summary, not JSON:\n{s}");
+    assert!(s.contains("wants Write perm.txt") && (s.contains("a allow once d deny…") || s.contains("a once d deny…")), "readable summary, not JSON:\n{s}");
     tui.snapshot("t06-waiting");
 
     // w: next agent waiting for you (newest first: Claude two, then Claude one).
@@ -54,6 +54,8 @@ fn t06_answer_permissions_jump_to_waiting_agents_and_interrupt() {
     tui.key(KeyCode::Char('w'));
     assert_eq!(focused(&tui), p1);
     tui.key(KeyCode::Char('d'));
+    // T-31: d asks for a note first; Enter with none denies.
+    tui.key(KeyCode::Enter);
     tui.until(10, |a| a.state.run(&p1).is_some_and(|r| !r.needs_you()));
     let answered = |run: &str| d.events(run).iter().find(|e| e["kind"] == "permission_answered").map(|e| e["payload"]["allow"].as_bool().unwrap());
     assert_eq!(answered(&p2), Some(true));
@@ -185,7 +187,7 @@ fn t08_start_agents_from_the_new_agent_form() {
     assert!(s.contains("Mac's default login") && !s.contains("Your login"), "compatible account offered (the Mac's own login, as VS Code names it):\n{s}");
     tui.key(KeyCode::BackTab); // → Repository
     tui.key(KeyCode::BackTab); // → Prompt (wraps)
-    assert_eq!(tui.app.form.field, 4);
+    assert_eq!(tui.app.form.field, overseer_tui::app::NewAgentForm::PROMPT);
     tui.type_text("write perm.txt from the form");
     tui.key(KeyCode::Enter);
     tui.until(10, |a| a.mode == Mode::Grid && a.focused().is_some_and(|r| r.harness == "claude"));
@@ -270,7 +272,7 @@ fn t18_merge_back_from_the_terminal_asks_before_each_step() {
     tui.key(KeyCode::Char('M'));
     tui.until(10, |a| matches!(a.mode, Mode::Confirm(Confirm::MergePrepare { .. })));
     let s = tui.screen();
-    assert!(s.contains("Merge back overseer/document-sessions → main: commit 1 worktree file and merge main into overseer/document-sessions"), "{s}");
+    assert!(s.contains("Merge back overseer/document-sessions → main: commit 1 worktree file (README.md) and merge main into overseer/document-sessions"), "{s}");
     tui.snapshot("t18-merge-step-1");
     tui.key(KeyCode::Char('y'));
     // Step 2: exactly what lands, then merge into main in the source checkout.

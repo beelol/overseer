@@ -92,7 +92,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     // The page follows the focused agent when the room changes (a resize, the list, a conversation).
     app.settle_focus();
     let composing = matches!(app.mode, Mode::Compose) || matches!(app.mode, Mode::Confirm(_));
-    let composer_h = if matches!(app.mode, Mode::Compose) { composer_height(app, area.width) } else if composing { 2 } else { 0 };
+    let composer_h = if matches!(app.mode, Mode::Compose) { composer_height(app, area.width) } else if matches!(app.mode, Mode::DenyNote { .. }) { 3 } else if composing { confirm_height(app, area.width) } else { 0 };
     let [head, body, comp, foot] = Layout::vertical([Constraint::Length(1), Constraint::Min(3), Constraint::Length(composer_h), Constraint::Length(1)]).areas(area);
     header(f, app, head);
     match app.mode {
@@ -104,11 +104,13 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     }
     if matches!(app.mode, Mode::Compose) {
         composer(f, app, comp);
+    } else if let Mode::DenyNote { run, .. } = &app.mode {
+        deny_note(f, app, run, comp);
     } else if let Mode::Confirm(c) = &app.mode {
         let text = match c {
             Confirm::Interrupt(id) => format!(" Interrupt {}? y / n", short(&app.state.run(id).map(|r| r.title.clone()).unwrap_or_default(), 50)),
             Confirm::Quit => " Unsent drafts will be lost. Quit? y / n".to_string(),
-            Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::OpenPr { text, .. } | Confirm::Reject { text, .. } => format!(" {text} y / n"),
+            Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::MergeCancel { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::Archive { text, .. } | Confirm::OpenPr { text, .. } | Confirm::Reject { text, .. } => format!(" {text} y / n"),
             Confirm::PhoneOff { text } | Confirm::Revoke { text, .. } | Confirm::Pair { text, .. } => format!(" {text} y / n"),
             Confirm::PhoneOnAndPair => " Phone access is off. Turn it on and pair a phone? y / n".to_string(),
         };
@@ -161,9 +163,38 @@ fn overseer_view(f: &mut Frame, app: &App, area: Rect) {
             first = false;
         }
     };
-    for m in s["messages"].as_array().cloned().unwrap_or_default() {
+    // Spoken requests (T-35) are the same cards as typed ones: the words, then how far they got.
+    let spoken_of = |m: &serde_json::Value| -> Option<(String, String)> {
+        if m["source"] != "owner" || m["surface"] != "voice" {
+            return None;
+        }
+        let text = m["text"].as_str()?;
+        let at = text.rfind("Request V-")?;
+        let rest = &text[at + "Request ".len()..];
+        let (id, words) = rest.split_once(": ")?;
+        Some((id.to_string(), words.to_string()))
+    };
+    let messages = s["messages"].as_array().cloned().unwrap_or_default();
+    let in_conversation: Vec<String> = messages.iter().filter_map(|m| spoken_of(m).map(|x| x.0)).collect();
+    let mut timeline: Vec<serde_json::Value> = messages.clone();
+    for r in &app.voice_requests {
+        if !in_conversation.iter().any(|id| r["id"].as_str() == Some(id.as_str())) {
+            timeline.push(serde_json::json!({ "source": "owner", "surface": "voice", "ts": r["ts"], "voice": r }));
+        }
+    }
+    timeline.sort_by_key(|m| m["ts"].as_i64().unwrap_or(0));
+    let request_of = |id: &str| app.voice_requests.iter().find(|r| r["id"].as_str() == Some(id)).cloned();
+    for m in timeline {
         let source = m["source"].as_str().unwrap_or("system");
         let text = m["text"].as_str().unwrap_or("");
+        let spoken = if m["voice"].is_object() { Some((m["voice"]["words"].as_str().unwrap_or("").to_string(), Some(m["voice"].clone()))) } else { spoken_of(&m).map(|(id, words)| (words, request_of(&id))) };
+        if let Some((words, request)) = spoken {
+            wrap(&words, " you (spoken) › ", Style::new().add_modifier(Modifier::BOLD), &mut lines);
+            if let Some((stage, color)) = request.as_ref().and_then(voice_stage) {
+                lines.push(Line::from(Span::styled(format!("   ◇ {stage}"), Style::new().fg(color))));
+            }
+            continue;
+        }
         match source {
             "owner" => wrap(text, " you › ", Style::new().add_modifier(Modifier::BOLD), &mut lines),
             // Overseer's replies are Markdown (AC-245): bullets, bold and headings as a terminal draws them.
@@ -198,19 +229,97 @@ fn overseer_view(f: &mut Frame, app: &App, area: Rect) {
         lines.push(Line::from(Span::styled(" Nothing yet. Type to Overseer: what your agents are doing, or what one of them should do next.", Style::new().fg(MUTED))));
     }
     let draft_h = (app.overseer_draft.lines().count().max(1) as u16).min(4) + 1;
-    let body_h = (h as usize).saturating_sub(2 + draft_h as usize);
+    let voice = voice_line(app, inner_w);
+    let body_h = (h as usize).saturating_sub(2 + draft_h as usize + voice.len());
     let end = lines.len().saturating_sub(app.overseer_scroll.min(lines.len()));
     let start = end.saturating_sub(body_h);
     let shown: Vec<Line> = lines[start..end].to_vec();
-    let mut all = shown;
+    let mut all = voice;
+    all.extend(shown);
     all.push(Line::from(Span::styled(" ".repeat(inner_w.min(120)).replace(' ', "─"), Style::new().fg(MUTED))));
     let draft = if app.overseer_draft.is_empty() { " › type a message for Overseer".to_string() } else { format!(" › {}", app.overseer_draft) };
     all.push(Line::from(Span::styled(draft, if app.overseer_draft.is_empty() { Style::new().fg(MUTED) } else { Style::new().fg(accent()) })));
     let block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(accent()))
         .title(Span::styled(format!(" ◆ Overseer · {level} "), Style::new().add_modifier(Modifier::BOLD)))
-        .title_bottom(Line::from(Span::styled(" enter sends · ctrl+y / ctrl+n answer a proposal · esc closes ", Style::new().fg(MUTED))).right_aligned());
+        .title_bottom(Line::from(Span::styled(" enter sends · ctrl+y / ctrl+n yes / no · ctrl+v voice · esc closes ", Style::new().fg(MUTED))).right_aligned());
     f.render_widget(Clear, r);
     f.render_widget(Paragraph::new(all).block(block).wrap(Wrap { trim: false }), r);
+}
+
+/// Voice Mode's words for its states, as VS Code's (extension/src/voice.js `LABEL`).
+pub fn voice_label(state: &str) -> &'static str {
+    match state {
+        "off" => "Voice off",
+        "starting" => "Starting",
+        "listening" => "Listening",
+        "hearing" => "Hearing you",
+        "thinking" => "Thinking",
+        "speaking" => "Speaking",
+        "muted" => "Muted",
+        "paused" => "Paused for a call",
+        "failed" => "Voice stopped",
+        _ => "Voice Mode",
+    }
+}
+
+/// A spoken request's stage, in VS Code's words (extension/media/home.js `VOICE_STAGE`).
+fn voice_stage(r: &serde_json::Value) -> Option<(String, Color)> {
+    let (stage, text) = match r["state"].as_str()? {
+        "taken" | "thinking" => ("thinking", "Overseer is thinking"),
+        "settling" => ("sending", "Going out in a moment (ctrl+x cancels)"),
+        "waiting" => ("waiting", "Waits for your yes (ctrl+y / ctrl+n)"),
+        "waiting_turn" => ("thinking", "Waits for the requests before it"),
+        "sent" => ("done", "Sent"),
+        "partly_sent" => ("failed", "Partly sent: the card says what"),
+        "cancelled" => ("done", "Cancelled: nothing was sent"),
+        "corrected" => ("done", "Corrected by what you said next"),
+        "superseded" => ("done", "Replaced by your correction"),
+        "joined" => ("done", "Joined with what you said next"),
+        "not_sent" => ("failed", "Not sent"),
+        "answered" => ("done", "Answered"),
+        "done" => ("done", "Done"),
+        "not_for_overseer" => ("aside", "Not meant for Overseer: kept as context"),
+        _ => return None,
+    };
+    let text = match r["done"].as_str() {
+        Some(d) if !d.is_empty() && matches!(r["state"].as_str(), Some("sent" | "not_sent" | "done" | "partly_sent")) => fit(&crate::words::plain(d).replace('\n', " "), 100),
+        _ => text.to_string(),
+    };
+    let color = match stage { "failed" => Color::Red, "waiting" => waiting(), "done" => Color::Green, _ => accent() };
+    Some((text, color))
+}
+
+/// The voice line on top of Overseer's conversation (T-35): the state, who it talks to, the words
+/// as they are heard, and the keys. The daemon listens and speaks; the terminal only shows.
+fn voice_line(app: &App, width: usize) -> Vec<Line<'static>> {
+    let Some(state) = app.voice_state() else {
+        return vec![Line::from(Span::styled(" ◎ Voice Mode is unavailable with this daemon", Style::new().fg(MUTED)))];
+    };
+    let key = |k: &'static str| Span::styled(k, Style::new().fg(accent()).add_modifier(Modifier::BOLD));
+    let word = |w: &'static str| Span::styled(w, Style::new().fg(MUTED));
+    if state == "off" {
+        let why = app.voice["reason"].as_str().filter(|r| !r.is_empty()).map(|r| format!(" ({})", crate::words::plain(r))).unwrap_or_default();
+        return vec![Line::from(vec![Span::styled(format!(" ◎ Voice off{why}  "), Style::new().fg(MUTED)), key("ctrl+v"), word(" turns it on")]), Line::raw("")];
+    }
+    let color = match state { "hearing" => Color::Green, "speaking" | "thinking" => accent(), "muted" | "paused" => waiting(), "failed" => Color::Red, _ => Color::Cyan };
+    let target = match app.voice["target"].as_str() {
+        None | Some("overseer") | Some("") => "Overseer".to_string(),
+        Some(id) => app.state.run(id).map(|r| r.title.clone()).unwrap_or_else(|| id.to_string()),
+    };
+    let reason = app.voice["reason"].as_str().filter(|r| !r.is_empty()).map(|r| format!(" ({})", crate::words::plain(r))).unwrap_or_default();
+    let mut out = vec![Line::from(vec![
+        Span::styled(format!(" ◉ {}", voice_label(state)), Style::new().fg(color).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{reason} · talking to {} ", fit(&target, 30)), Style::new().fg(MUTED)),
+        key(" ctrl+v"), word(" off "), key("ctrl+t"), word(if state == "muted" { " unmute " } else { " mute " }), key("ctrl+a"), word(" talk to "), key("ctrl+x"), word(" cancel"),
+    ])];
+    if !app.voice_heard.is_empty() {
+        out.push(Line::from(vec![Span::styled("   heard: ", Style::new().fg(MUTED)), Span::styled(format!("“{}”", fit(&app.voice_heard, width.saturating_sub(14))), Style::new().add_modifier(Modifier::ITALIC))]));
+    }
+    if app.voice_asking {
+        out.push(Line::from(vec![Span::styled("   waits for your yes  ", Style::new().fg(waiting()).add_modifier(Modifier::BOLD)), key("ctrl+y"), word(" yes "), key("ctrl+n"), word(" no")]));
+    }
+    out.push(Line::raw(""));
+    out
 }
 
 fn header(f: &mut Frame, app: &App, area: Rect) {
@@ -284,8 +393,9 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         return;
     }
     let keys: &[(&str, &str)] = match app.mode {
+        Mode::DenyNote { .. } => &[("type", "a note for the agent"), ("enter", "deny"), ("esc", "cancel")],
         Mode::Compose => &[("enter", "send"), ("alt+enter", "new line"), ("esc", "close (keeps draft)"), ("ctrl+u", "clear")],
-        Mode::Zoom { .. } => &[("e", if app.expand_tools { "fold tools" } else { "expand tools" }), ("j/k", "scroll"), ("home/G", "top/bottom"), ("i", "message"), ("a/d", "allow/deny"), ("x", "interrupt"), ("g/z", "grid"), ("?", "help")],
+        Mode::Zoom { .. } => &[("e", if app.expand_tools { "fold tools" } else { "expand tools" }), ("j/k", "scroll"), ("home/G", "top/bottom"), ("i", "message"), ("a/s/d", "allow once/session/deny"), ("x", "interrupt"), ("g/z", "grid"), ("?", "help")],
         Mode::NewAgent => &[("tab", "next field"), ("←/→", "choose"), ("enter", "start"), ("esc", "cancel")],
         Mode::Accounts => &[("j/k", "select"), ("s", "sign in"), ("S", "device code (ChatGPT)"), ("r", "refresh"), ("esc", "close")],
         Mode::Devices => &[("p", "pair a phone"), ("j/k", "select"), ("s", "scope"), ("x", "revoke"), ("N", "notifications"), ("O", "on/off"), ("esc", "close")],
@@ -293,16 +403,16 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         Mode::Pairing => &[("p", "new code"), ("esc", "close")],
         Mode::Audio => &[("space", "on/off"), ("1/2/3", "track"), ("tab", "cue"), ("p", "preview"), ("v", "voice"), ("i", "import"), ("esc", "close")],
         Mode::AudioImport => &[("type", "private folder path"), ("enter", "import"), ("esc", "back")],
-        Mode::Overseer => &[("type", "to Overseer"), ("enter", "send"), ("ctrl+y/n", "yes/no to a proposal"), ("j/k", "scroll"), ("esc", "close")],
+        Mode::Overseer => &[("type", "to Overseer"), ("enter", "send"), ("ctrl+y/n", "yes/no"), ("ctrl+v", "voice on/off"), ("ctrl+t", "mute"), ("ctrl+a", "talk to"), ("ctrl+x", "cancel"), ("esc", "close")],
         Mode::Search => &[("type", "to search title, repo, harness, model, prompt"), ("enter", "keep"), ("esc", "clear")],
-        Mode::Changes => &[("n/p", "change"), ("a/A", "Accept change/file"), ("r/R", "Reject change/file"), ("j/k", "file"), ("t", "Changed | All files"), ("1/2/3 c", "comparison"), ("e", "your editor"), ("J/K", "scroll"), ("ctrl+r", "reload"), ("esc", "back")],
-        Mode::Grid if app.dashboard_shown() && app.dash_col == 0 => &[("J/K j/k", "next / previous agent"), ("tab", "review, conversation"), ("i", "message"), ("a/d", "allow/deny"), ("g", "full view"), ("w", "next waiting"), ("n", "new"), ("D", "grid"), ("?", "help"), ("q", "quit")],
-        Mode::Grid if app.dashboard_shown() && app.dash_col == 1 => &[("J/K", "agent"), ("n/p", "change"), ("a/A", "Accept change/file"), ("r/R", "Reject change/file"), ("j/k", "file"), ("t", "Changed | All files"), ("1/2/3 c", "comparison"), ("e", "your editor"), ("pgup/pgdn", "scroll"), ("tab", "conversation"), ("D", "grid")],
-        Mode::Grid if app.dashboard_shown() => &[("J/K", "agent"), ("j/k pgup/pgdn", "scroll"), ("e", if app.expand_tools { "fold tools" } else { "tool details" }), ("i", "message"), ("a/d", "allow/deny"), ("tab", "list"), ("D", "grid"), ("?", "help")],
+        Mode::Changes => &[("F", "Follow"), ("n/p", "change"), ("a/A", "Accept change/file"), ("r/R", "Reject change/file"), ("j/k", "file"), ("t", "Changed | All files"), ("1/2/3 c", "comparison"), ("e", "your editor"), ("J/K", "scroll"), ("ctrl+r", "reload"), ("esc", "back")],
+        Mode::Grid if app.dashboard_shown() && app.dash_col == 0 => &[("J/K j/k", "next / previous agent"), ("tab", "review, conversation"), ("i", "message"), ("a/s/d", "allow once/session/deny"), ("g", "full view"), ("w", "next waiting"), ("n", "new"), ("D", "grid"), ("?", "help"), ("q", "quit")],
+        Mode::Grid if app.dashboard_shown() && app.dash_col == 1 => &[("J/K", "agent"), ("F", "Follow"), ("n/p", "change"), ("a/A", "Accept change/file"), ("r/R", "Reject change/file"), ("j/k", "file"), ("t", "Changed | All files"), ("1/2/3 c", "comparison"), ("e", "your editor"), ("pgup/pgdn", "scroll"), ("tab", "conversation"), ("D", "grid")],
+        Mode::Grid if app.dashboard_shown() => &[("J/K", "agent"), ("j/k pgup/pgdn", "scroll"), ("e", if app.expand_tools { "fold tools" } else { "tool details" }), ("i", "message"), ("a/s/d", "allow once/session/deny"), ("tab", "list"), ("D", "grid"), ("?", "help")],
         Mode::Grid if app.picked && app.focused().is_some() => &[("J/K", "next / previous agent"), ("esc", "close the conversation"), ("pgup/pgdn", "scroll"), ("e", if app.expand_tools { "fold tools" } else { "tool details" }), ("i", "message"), ("v", "changes"), ("?", "help")],
         _ if area.width < 110 => &[("i", "message"), ("g", "full view"), ("a/d", "answer"), ("n", "new"), ("o", "Overseer"), ("?", "keys"), ("q", "quit")],
-        _ if app.grid_only => &[("←↑↓→", "move"), ("tab", "next agent"), ("i", "message"), ("g", "full view"), ("v", "changes"), ("a/d", "allow/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
-        _ => &[("←↑↓→", "move"), ("J/K", "pick in the list"), ("i", "message"), ("g", "full view"), ("v", "changes"), ("a/d", "allow/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
+        _ if app.grid_only => &[("←↑↓→", "move"), ("tab", "next agent"), ("i", "message"), ("g", "full view"), ("v", "changes"), ("a/s/d", "allow once/session/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
+        _ => &[("←↑↓→", "move"), ("J/K", "pick in the list"), ("i", "message"), ("g", "full view"), ("v", "changes"), ("a/s/d", "allow once/session/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
     };
     // Dashboard mode asked for (`--dashboard`) in a terminal too narrow for it: say so, on the grid.
     if app.dashboard && !app.dashboard_shown() && matches!(app.mode, Mode::Grid) {
@@ -565,7 +675,24 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     let pending = run.permission_request().is_some() || feed.and_then(|f| f.pending_permission()).is_some();
     let bottom = if pending {
         let what = feed.and_then(|f| f.pending_permission().map(|p| p.1.to_string())).or_else(|| run.attention.as_ref().and_then(|a| a["tool"].as_str().map(str::to_string))).unwrap_or_default();
-        Some(Line::from(vec![Span::styled(" ◆ ", Style::new().fg(waiting())), Span::styled(fit(&what, (area.width as usize).saturating_sub(24)), Style::new().fg(waiting()).add_modifier(Modifier::BOLD)), Span::styled("  a", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(" allow ", Style::new().fg(MUTED)), Span::styled("d", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(" deny ", Style::new().fg(MUTED))]))
+        // T-31: Allow once, Allow for this session (when the harness offers its rule), Deny with a note.
+        let session = run.attention.as_ref().is_some_and(|a| a["kind"] == "permission" && !a["always"].is_null());
+        let key = |k: &'static str| Span::styled(k, Style::new().fg(accent()).add_modifier(Modifier::BOLD));
+        let word = |w: &'static str| Span::styled(w, Style::new().fg(MUTED));
+        let words = |long: bool| {
+            let mut answers = vec![key("  a"), word(if long { " allow once " } else { " once " }), key("d"), word(" deny… ")];
+            if session {
+                answers.splice(2..2, [key("s"), word(if long { " this session " } else { " session " })]);
+            }
+            answers
+        };
+        // The short words when the long ones leave the request no room (a small tile).
+        let long = (area.width as usize) >= Line::from(words(true)).width() + 4 + 14;
+        let answers = words(long);
+        let room = (area.width as usize).saturating_sub(Line::from(answers.clone()).width() + 4);
+        let mut spans = vec![Span::styled(" ◆ ", Style::new().fg(waiting())), Span::styled(fit(&what, room.max(8)), Style::new().fg(waiting()).add_modifier(Modifier::BOLD))];
+        spans.extend(answers);
+        Some(Line::from(spans))
     } else if app.drafts.get(&run.id).is_some_and(|d| !d.trim().is_empty()) && !matches!(app.mode, Mode::Compose) {
         Some(Line::from(Span::styled(" ✎ draft ", Style::new().fg(accent()))))
     } else if let Some(landed) = app.state.landing_text(&run.workspace_id).filter(|_| !run.active()) {
@@ -651,6 +778,13 @@ fn changes(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
         Span::styled(format!("+{} ", total.0), Style::new().fg(Color::Green)),
         Span::styled(format!("−{} ", total.1), Style::new().fg(Color::Red)),
     ]);
+    // Follow (T-30): on, or paused by a move made by hand.
+    let mut title = title;
+    match c.follow {
+        crate::app::Follow::On => title.spans.push(Span::styled("· ◉ Following the agent ", Style::new().fg(accent()).add_modifier(Modifier::BOLD))),
+        crate::app::Follow::Paused => title.spans.push(Span::styled("· Follow Paused (F resumes) ", Style::new().fg(waiting()).add_modifier(Modifier::BOLD))),
+        crate::app::Follow::Off => {}
+    }
     let block = if active { Block::bordered().border_type(BorderType::Thick).border_style(Style::new().fg(accent())) } else { Block::bordered().border_type(BorderType::Rounded).border_style(muted) }.title(title);
     let inner = block.inner(area);
     f.render_widget(Clear, area);
@@ -775,6 +909,26 @@ fn composer_height(app: &App, width: u16) -> u16 {
     (lines as u16 + 2).min(8)
 }
 
+/// A question's lines: a long one (every file a merge commits, T-33) wraps instead of being cut.
+fn confirm_height(app: &App, width: u16) -> u16 {
+    let text = match &app.mode {
+        Mode::Confirm(Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::MergeCancel { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::Archive { text, .. } | Confirm::OpenPr { text, .. } | Confirm::Reject { text, .. }) => text.as_str(),
+        _ => "",
+    };
+    ((text.width() + 8).div_ceil(width.max(20) as usize) as u16).clamp(2, 8)
+}
+
+/// Denying a permission (T-31): the note the agent gets as the reason; empty is fine.
+fn deny_note(f: &mut Frame, app: &App, run: &str, area: Rect) {
+    let title = short(&app.state.run(run).map(|r| r.title.clone()).unwrap_or_default(), 50);
+    let what = app.feeds.get(run).and_then(|f| f.pending_permission().map(|p| p.1.to_string())).unwrap_or_default();
+    let block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(waiting()))
+        .title(Line::from(vec![Span::styled(" deny → ", Style::new().fg(MUTED)), Span::styled(title, Style::new().fg(waiting()).add_modifier(Modifier::BOLD)), Span::styled(format!(" · {} ", fit(&what, 60)), Style::new().fg(MUTED))]))
+        .title_bottom(Line::from(Span::styled(" a note for the agent (optional) · enter denies · esc cancels ", Style::new().fg(MUTED))).right_aligned());
+    let text = if app.deny_note.is_empty() { Line::from(vec![Span::styled("▌", Style::new().fg(accent())), Span::styled(" why, or what to do instead", Style::new().fg(MUTED))]) } else { Line::from(vec![Span::raw(app.deny_note.clone()), Span::styled("▌", Style::new().fg(accent()))]) };
+    f.render_widget(Paragraph::new(text).block(block.padding(ratatui::widgets::Padding::horizontal(1))), area);
+}
+
 fn composer(f: &mut Frame, app: &App, area: Rect) {
     let Some(run) = app.focused() else { return };
     let draft = app.drafts.get(&run.id).cloned().unwrap_or_default();
@@ -791,49 +945,72 @@ fn composer(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }).block(block.padding(ratatui::widgets::Padding::horizontal(1))), area);
 }
 
+/// Every key `?` lists (T-36: the parity table's keys are all here).
+pub const HELP: &[(&str, &str)] = &[
+    ("←↓↑→  h j k l", "move between agents"),
+    ("1 – 9", "focus agent n on this page"),
+    ("tab / shift+tab", "next / previous agent"),
+    ("J / K", "pick the next / previous agent in the list"),
+    ("esc", "close the picked agent's conversation"),
+    ("L", "hide or show the agent list"),
+    ("D", "dashboard mode ⇄ grid, same agent"),
+    ("tab  (dashboard)", "list → review → conversation"),
+    ("] [   pgdn pgup", "next / previous page"),
+    ("i  enter", "message the focused agent"),
+    ("g  z", "zoom: one agent's full view ⇄ grid"),
+    ("home / G", "in the full view: top / bottom"),
+    ("v", "review: Accept / Reject changes"),
+    ("1 2 3  c  (review)", "comparison: task start, latest run, worktree"),
+    ("t  (review)", "Changed | All files"),
+    ("a A  r R  (review)", "Accept / Reject a change, a whole file"),
+    ("e  (review)", "open the file in your $EDITOR"),
+    ("F  (review)", "Follow the agent's edits (a move pauses)"),
+    ("e  (in zoom)", "expand tool inputs and results"),
+    ("a  s  d", "allow / deny: once, this session, with a note"),
+    ("w", "next agent waiting for you"),
+    ("x", "interrupt the focused agent"),
+    ("n", "start a new agent"),
+    ("o", "Overseer: its conversation and Voice Mode"),
+    ("ctrl+v  (in o)", "Voice Mode on / off"),
+    ("ctrl+t  (in o)", "Voice Mode: mute / unmute"),
+    ("ctrl+a  (in o)", "Voice Mode: talk to Overseer or an agent"),
+    ("ctrl+x  (in o)", "Voice Mode: cancel the open request"),
+    ("ctrl+y / ctrl+n", "yes / no: a read-back, a plan, a proposal"),
+    ("M", "merge back (asks before each step)"),
+    ("P", "open a GitHub pull request (gh)"),
+    ("C", "remove a finished agent's worktree"),
+    ("f", "filter: all → active → needs you → archived"),
+    ("E", "archive a finished agent (Archived: restore)"),
+    ("/", "search agents (esc clears)"),
+    ("A", "accounts and sign-in"),
+    ("O", "phone access on / off"),
+    ("ctrl+o", "devices: pair a phone, revoke, scope"),
+    ("S", "Audio Mode: settings and preview"),
+    ("r", "reload (after X: start the daemon)"),
+    ("X", "stop all agents and the daemon"),
+    ("q", "quit (agents keep running)"),
+];
+
 fn help(f: &mut Frame, area: Rect) {
-    let rows: &[(&str, &str)] = &[
-        ("←↓↑→  h j k l", "move between agents"),
-        ("1 – 9", "focus agent n on this page"),
-        ("tab / shift+tab", "next / previous agent"),
-        ("J / K", "pick the next / previous agent in the list"),
-        ("esc", "close the picked agent's conversation"),
-        ("L", "hide or show the agent list"),
-        ("D", "dashboard mode ⇄ grid, same agent"),
-        ("tab  (dashboard)", "list → review → conversation"),
-        ("] [   pgdn pgup", "next / previous page"),
-        ("i  enter", "message the focused agent"),
-        ("g  z", "zoom: one agent's full view ⇄ grid"),
-        ("home / G", "in the full view: top / bottom"),
-        ("v", "review: Accept / Reject changes"),
-        ("e  (in zoom)", "expand tool inputs and results"),
-        ("a / d", "allow / deny its permission request"),
-        ("w", "next agent waiting for you"),
-        ("x", "interrupt the focused agent"),
-        ("n", "start a new agent"),
-        ("M", "merge back (asks before each step)"),
-        ("P", "open a GitHub pull request (gh)"),
-        ("C", "remove a finished agent's worktree"),
-        ("f", "filter: all → active → needs you"),
-        ("/", "search agents (esc clears)"),
-        ("A", "accounts and sign-in"),
-        ("O", "phone access on / off"),
-        ("ctrl+o", "devices: pair a phone, revoke, scope"),
-        ("S", "Audio Mode: settings and preview"),
-        ("r", "reload (after X: start the daemon)"),
-        ("X", "stop all agents and the daemon"),
-        ("q", "quit (agents keep running)"),
-    ];
-    let w = 58.min(area.width.saturating_sub(4));
-    let h = (rows.len() as u16 + 4).min(area.height.saturating_sub(2));
+    let rows = HELP;
+    // Two columns when one would not fit the terminal's height and two fit its width.
+    let cols: usize = if rows.len() as u16 + 4 > area.height.saturating_sub(2) && area.width >= 120 { 2 } else { 1 };
+    let per = rows.len().div_ceil(cols);
+    let w = (72 * cols as u16).min(area.width.saturating_sub(4));
+    let h = (per as u16 + 4).min(area.height.saturating_sub(2));
     let r = Rect { x: area.x + (area.width.saturating_sub(w)) / 2, y: area.y + (area.height.saturating_sub(h)) / 2, width: w, height: h };
-    let mut lines = vec![Line::raw("")];
-    for (k, v) in rows {
-        lines.push(Line::from(vec![Span::styled(format!("  {k:<18}"), Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::raw(*v)]));
-    }
     let block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(accent())).title(Span::styled(" keys ", Style::new().add_modifier(Modifier::BOLD))).title_bottom(Line::from(Span::styled(" any key closes ", Style::new().fg(MUTED))).right_aligned());
+    let inner = block.inner(r);
     f.render_widget(Clear, r);
-    f.render_widget(Paragraph::new(lines).block(block), r);
+    f.render_widget(block, r);
+    for (c, chunk) in rows.chunks(per).enumerate() {
+        let mut lines = vec![Line::raw("")];
+        for (k, v) in chunk {
+            lines.push(Line::from(vec![Span::styled(format!("  {k:<20}"), Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::raw(*v)]));
+        }
+        let col_w = inner.width / cols as u16;
+        f.render_widget(Paragraph::new(lines), Rect { x: inner.x + col_w * c as u16, width: col_w, ..inner });
+    }
 }
 
 /// Accounts panel: each account's provider, kind and sign-in status; `s` signs in.
@@ -1100,7 +1277,8 @@ fn audio_import(f: &mut Frame, app: &App, area: Rect) {
 fn new_agent(f: &mut Frame, form: &NewAgentForm, state: &crate::model::State, area: Rect) {
     let w = 84.min(area.width.saturating_sub(4));
     let prompt_lines = form.prompt.split('\n').count().clamp(1, 6) as u16;
-    let h = (11 + prompt_lines).min(area.height.saturating_sub(2));
+    let extra = [NewAgentForm::EFFORT, NewAgentForm::MODE].iter().filter(|&&f| form.has_field(f)).count() as u16;
+    let h = (11 + extra + prompt_lines).min(area.height.saturating_sub(2));
     let r = Rect { x: area.x + (area.width.saturating_sub(w)) / 2, y: area.y + (area.height.saturating_sub(h)) / 2, width: w, height: h };
     let inner_w = w.saturating_sub(18) as usize;
     let generic = form.is_generic();
@@ -1119,15 +1297,24 @@ fn new_agent(f: &mut Frame, form: &NewAgentForm, state: &crate::model::State, ar
         let email = state.profile(&a.0).and_then(|p| p.account.as_ref()).and_then(|x| x.email.clone()).map(|e| format!(" · {e}")).unwrap_or_default();
         format!("{}{email}{}", crate::words::account(&a.1), match a.3 { Some(true) => "  ✓ signed in", Some(false) => "  ✗ not signed in", None => "" })
     }).collect();
-    let values: Vec<(String, String)> = vec![
-        ("Repository".into(), choice(repos, form.repo)),
-        ("Harness".into(), choice(harnesses, form.harness)),
-        if generic { ("Arguments".into(), form.args.clone()) } else { ("Account".into(), choice(accounts, form.account)) },
-        if generic { ("Program".into(), form.program.clone()) } else { ("Model".into(), if form.model.is_empty() { "harness default".into() } else { form.model.clone() }) },
-        ("Prompt".into(), form.prompt.clone()),
+    // T-32: effort and permission mode, only where the chosen harness takes them.
+    let efforts: Vec<String> = std::iter::once("harness default".to_string()).chain(form.efforts().iter().map(|e| e.to_string())).collect();
+    let modes: Vec<String> = std::iter::once("harness default".to_string()).chain(form.modes().iter().map(|m| m.1.to_string())).collect();
+    let mut values: Vec<(usize, String, String)> = vec![
+        (0, "Repository".into(), choice(repos, form.repo)),
+        (1, "Harness".into(), choice(harnesses, form.harness)),
+        if generic { (2, "Arguments".into(), form.args.clone()) } else { (2, "Account".into(), choice(accounts, form.account)) },
+        if generic { (3, "Program".into(), form.program.clone()) } else { (3, "Model".into(), if form.model.is_empty() { "harness default".into() } else { form.model.clone() }) },
     ];
+    if form.has_field(NewAgentForm::EFFORT) {
+        values.push((NewAgentForm::EFFORT, "Effort".into(), choice(efforts, form.effort)));
+    }
+    if form.has_field(NewAgentForm::MODE) {
+        values.push((NewAgentForm::MODE, "Permissions".into(), choice(modes, form.mode)));
+    }
+    values.push((NewAgentForm::PROMPT, "Prompt".into(), form.prompt.clone()));
     let mut lines = vec![Line::raw("")];
-    for (i, (label, value)) in values.iter().enumerate() {
+    for (i, label, value) in values.iter().map(|(i, l, v)| (*i, l, v)) {
         let active = form.field == i;
         let ls = if active { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else { Style::new().fg(MUTED) };
         let vs = if active { Style::new().add_modifier(Modifier::BOLD) } else { Style::new() };
@@ -1135,13 +1322,13 @@ fn new_agent(f: &mut Frame, form: &NewAgentForm, state: &crate::model::State, ar
         for part in value.split('\n') {
             let label = if first { format!("  {}{:<12}", if active { "›" } else { " " }, label) } else { " ".repeat(15) };
             let mut spans = vec![Span::styled(label, ls), Span::styled(fit(part, inner_w), if value == "harness default" { Style::new().fg(MUTED) } else { vs })];
-            if active && i >= 3 || active && i == 2 && generic {
+            if active && (i == 3 || i == NewAgentForm::PROMPT) || active && i == 2 && generic {
                 spans.push(Span::styled("▌", Style::new().fg(accent())));
             }
             lines.push(Line::from(spans));
             first = false;
         }
-        if i == 1 || i == 3 {
+        if i == 1 || i == 3 && !form.has_field(NewAgentForm::EFFORT) && !form.has_field(NewAgentForm::MODE) || i == NewAgentForm::MODE || i == NewAgentForm::EFFORT && !form.has_field(NewAgentForm::MODE) {
             lines.push(Line::raw(""));
         }
     }

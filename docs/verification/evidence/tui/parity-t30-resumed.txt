@@ -1,0 +1,44 @@
+ ◆ Overseer  page 1/1 · 1 agent · ● 1 working                                                                                    phone access off · ● connected 
+┏ review · Edits three files in turn · Latest run · 4 files +4 −4 · ◉ Following the agent ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 1 Since task start   2 [Latest run]   3 Entire worktree   t [Changed] | All files                                                                            ┃
+┃                                                                                                                                                              ┃
+┃› M a.txt +1 −1                                 │ a.txt  change 1 of 2 · 0 accepted                                                                           ┃
+┃  M b.txt +1 −1                                 │ › @@ -2,1 +2,1 @@  a Accept · r Reject                                                                      ┃
+┃  M c.txt +1 −1                                 │    line 1                                                                                                   ┃
+┃  M d.txt +1 −1                                 │   -line 2                                                                                                   ┃
+┃                                                │   +line 2 (edited by the agent)                                                                             ┃
+┃                                                │    line 3                                                                                                   ┃
+┃                                                │    line 4                                                                                                   ┃
+┃                                                │   @@ -8,1 +8,1 @@                                                                                           ┃
+┃                                                │    line 6                                                                                                   ┃
+┃                                                │    line 7                                                                                                   ┃
+┃                                                │   -line 8                                                                                                   ┃
+┃                                                │   +line 8 (edited by the agent)                                                                             ┃
+┃                                                │    line 9                                                                                                   ┃
+┃                                                │    line 10                                                                                                  ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+ Follow resumed: the review moves to the file the agent is editing                                                                                              

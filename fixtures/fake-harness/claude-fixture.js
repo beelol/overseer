@@ -987,6 +987,41 @@ async function mcpClient() {
       assistant([{ type: 'text', text: 'done' }]);
       result(false, 'done');
     }
+  } else if (mode === 'session-rule') {
+    // T-31: an agent that runs the same tool twice ("twice: <command>"). Each Bash call asks
+    // can_use_tool with Claude Code's session-rule suggestion, unless an earlier answer added that
+    // rule for this session (updatedPermissions), as the live CLI does. A denial ends the turn with
+    // the owner's note as the reason.
+    const command = (firstText.match(/twice:\s*(.+)/) || [, 'npm test'])[1].trim();
+    const rule = command.split(/\s+/).slice(0, 2).join(' ') + ':*';
+    const rules = [];
+    let asked = 0;
+    for (const [n, cmd] of [[1, command], [2, command + ' --again']]) {
+      const input = { command: cmd, description: 'Run ' + cmd };
+      const id = `toolu_bash_${n}`;
+      assistant([{ type: 'tool_use', id, name: 'Bash', input }]);
+      const covered = rules.some(r => r.toolName === 'Bash' && cmd.startsWith(r.ruleContent.replace(/:\*$/, '')));
+      if (!covered) {
+        asked++;
+        out({ type: 'control_request', request_id: `req-bash-${n}`, request: { subtype: 'can_use_tool', tool_name: 'Bash', input,
+          permission_suggestions: [{ type: 'addRules', rules: [{ toolName: 'Bash', ruleContent: rule }], behavior: 'allow', destination: 'session' }] } });
+        const reply = await next(m => m.type === 'control_response' || (m.type === 'control_request' && m.request?.subtype === 'interrupt'));
+        if (reply.type === 'control_request') { result(true, 'interrupted'); await sleep(50); process.exit(130); }
+        const decision = reply.response.response;
+        if (decision.behavior !== 'allow') {
+          user([{ type: 'tool_result', tool_use_id: id, content: 'Permission denied: ' + decision.message, is_error: true }]);
+          assistant([{ type: 'text', text: 'permission denied: ' + decision.message }]);
+          result(false, 'denied');
+          await sleep(100);
+          process.exit(0);
+        }
+        for (const s of decision.updatedPermissions || []) if (s.type === 'addRules' && s.behavior === 'allow') rules.push(...s.rules);
+      }
+      user([{ type: 'tool_result', tool_use_id: id, content: 'ok' }]);
+      assistant([{ type: 'text', text: `ran ${cmd}${covered ? ' (allowed for this session, not asked again)' : ''}` }]);
+    }
+    assistant([{ type: 'text', text: `asked ${asked} time${asked === 1 ? '' : 's'}` }]);
+    result(false, `asked ${asked}`);
   } else if (mode === 'tested' || mode === 'tested-fail') {
     // AC-238: an agent that writes a function, runs its tests (passing, or one failing) and says so.
     const pass = mode === 'tested';

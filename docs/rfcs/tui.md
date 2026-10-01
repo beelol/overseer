@@ -58,21 +58,24 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | a / A (review) | Accept the change / every change of the file (T-29) |
 | r / R (review) | Reject the change / every change of the file, after y/n (T-29) |
 | e (review) | Open the file at the change in `$EDITOR` (else `vi`); the review refreshes when it exits (T-39) |
+| F (review) | Follow: the review moves to the file the agent is editing and to that change; a move by hand pauses it ("Paused"), `F` resumes it (T-30) |
 | Ctrl-R (review) | Reload the review (T-29) |
 | e (zoom) | Expand or fold every tool call's input and result |
-| a / d | Allow / deny the focused agent's pending permission |
+| a / s / d | Answer the focused agent's pending permission: Allow once, Allow for this session (the harness's own rule, when it offers one), Deny with a note (a one-line note; Enter sends, empty is fine) (T-31) |
 | w | Jump to the next agent waiting for you |
 | x | Interrupt the focused agent (asks y/n) |
-| M | Merge back: commit the worktree and merge the target in (y/n), then merge into the target (y/n) |
+| M | Merge back: commit the worktree (the confirmation names every file it commits, untracked ones included) and merge the target in (y/n), then merge into the target (y/n); on a merge stopped by conflicts, cancel it (y/n), the worktree back as before (T-33) |
 | P | Open a GitHub pull request (y/n): commit, push with your Git credentials, create it with `gh` |
 | C | Remove a finished agent's worktree (its branch is kept; lists uncommitted files first) |
 | X | Stop all agents and the daemon (y/n); the TUI does not restart it until `r` |
-| n | New agent (repository, harness, account, model, prompt) |
-| f | Filter: All → Active → Needs you |
+| n | New agent (repository, harness, account, model, effort, permission mode, prompt; effort and permission mode only where the harness takes them, remembered per harness) (T-32) |
+| f | Filter: All → Active → Needs you → Archived (archived agents show only there, as in VS Code) (T-34) |
+| E | Archive a finished agent (y/n): it leaves the list and the grid, here and in VS Code; in Archived, restore it (T-34) |
 | / | Search agents by title, repository, harness, model, account or prompt (Esc clears) |
 | O / Ctrl-O | Phone access on or off / Devices: pair a phone, revoke, scope (Devices moved from `D` to Ctrl-O when `D` became dashboard mode, T-40) |
 | A | Accounts: sign-in status; `s` signs in (the provider's own login, in this terminal), `S` device code for ChatGPT |
 | S | Audio Mode: on or off, track, system voice, a private Commander folder, preview (the daemon plays) |
+| ctrl+v / ctrl+t / ctrl+a / ctrl+x (in `o`) | Voice Mode (T-35): on or off, mute, talk to Overseer or an agent, cancel the open spoken request; ctrl+y / ctrl+n answer a read-back or a plan that waits for a yes (else a proposal). The voice line on top shows the state and the words as they are heard; spoken requests are cards like typed ones |
 | ? | Help |
 | q | Quit (agents keep running) |
 
@@ -309,6 +312,101 @@ agent list, the review screen, and the two numbered ways of showing a picked age
 | Audio Mode | Has: `S` | Unchanged |
 | Pop the review out to another screen, the Overseer window layout, dragging the grid, themes | Not in a terminal | Stay in VS Code: the terminal is already its own window, and colours come from the terminal |
 | A command that VS Code gains later | — | The parity table fails its test until the command has a key or a reason (T-36) |
+
+### Every VS Code command (T-36)
+
+Each command in `extension/package.json` has a row: the TUI's key (every key here is in `?`), or why it stays in VS Code. `tui/tests/parity.rs` (`t36_nothing_left_out_without_a_reason`) fails when a command has neither.
+
+| VS Code command | In VS Code | TUI key | Why it stays in VS Code |
+| --- | --- | --- | --- |
+| `overseer.openCenter` | Open Overseer View | | The terminal is itself the Overseer view: `overseer-tui` |
+| `overseer.openWorkspace` | Open or Close the Overseer Layout | `D` | |
+| `overseer.closeWorkspace` | Close the Overseer Layout | `D` | |
+| `overseer.popOutReview` | Pop Out Follow into Its Own Window | | Moving a view to another window is VS Code's window management; a second terminal is the terminal's own (T-41) |
+| `overseer.returnReview` | Return Follow to the Main Window | | The same: window management |
+| `overseer.newAgent` | New Agent | `n` | |
+| `overseer.toggleGrid` | Toggle Agent Grid | `g` | |
+| `overseer.resetGridLayout` | Reset Grid Layout | | The terminal's grid has no layout to reset: it sizes itself to the count (T-37) |
+| `overseer.whereAmI` | Where Am I | | The header, the thick border of the focused tile and the picked row always say where you are |
+| `overseer.talk` | Talk to Overseer | `o` | |
+| `overseer.switchAgent` | Switch Agent… | `tab`, `J / K` | |
+| `overseer.nextNeedsYou` | Go to Next Agent That Needs You | `w` | |
+| `overseer.allowPermission` | Allow Pending Request | `a`, `s` | |
+| `overseer.denyPermission` | Deny Pending Request | `d` | |
+| `overseer.stopSelected` | Stop Selected Agent | `x` | |
+| `overseer.cleanupArchived` | Clean Up Archived Worktrees… | `C` | |
+| `overseer.newTask` | Start an Agent with the Full Form… | `n` | |
+| `overseer.newTaskQuick` | Start an Agent with Quick Picks… | `n` | |
+| `overseer.refresh` | Refresh | `r` | |
+| `overseer.startSwarm` | Start Swarm… | | Swarm is started and steered in VS Code (docs/rfcs/swarm-mode.md); its agents show in the terminal like any other |
+| `overseer.filterSwarmJobs` | Filter Swarm Jobs… | | Swarm's job view is VS Code's |
+| `overseer.pauseSwarm` | Pause Swarm | | Swarm is steered in VS Code |
+| `overseer.resumeSwarm` | Resume Swarm | | Swarm is steered in VS Code |
+| `overseer.stopSwarm` | Stop Swarm… | | Swarm is steered in VS Code; `X` still stops every agent |
+| `overseer.turnSwarmOff` | Turn Swarm Off | | Swarm is steered in VS Code |
+| `overseer.extendSwarmDeadline` | Extend Swarm Deadline… | | Swarm is steered in VS Code |
+| `overseer.continuity.show` | Connection and Continuity… | | Continuity (docs/rfcs/offline-mode.md) is set up in VS Code; the daemon applies it to the terminal's agents too |
+| `overseer.continuity.checkNow` | Check the Connection Now | | Continuity is set up in VS Code |
+| `overseer.continuity.toggle` | Turn Continuity On or Off | | Continuity is set up in VS Code |
+| `overseer.continuity.localModels` | Local Models… | | Downloading and choosing local models is VS Code's (memory checks and progress) |
+| `overseer.openReview` | Open Review | `v` | |
+| `overseer.showOutput` | Show Output | | VS Code's Output panel; the terminal's own messages show in its footer |
+| `overseer.followUp` | Send Follow-up… | `i` | |
+| `overseer.interrupt` | Stop | `x` | |
+| `overseer.searchAgents` | Search Agents | `/` | |
+| `overseer.filterAgents` | Filter Agents… | `f` | |
+| `overseer.clearAgentSearch` | Clear Search | `/` | |
+| `overseer.showArchived` | Show Archived Agents | `f` | |
+| `overseer.hideArchived` | Show Active Agents | `f` | |
+| `overseer.archiveAgent` | Archive | `E` | |
+| `overseer.restoreAgent` | Restore | `E` | |
+| `overseer.pinAgent` | Pin to Grid | | The terminal's grid shows every agent, newest first, up to 16 on a screen (T-37): nothing needs pinning |
+| `overseer.unpinAgent` | Unpin from Grid | | The same: nothing is pinned |
+| `overseer.openAgentToSide` | Open to the Side | `J / K` | |
+| `overseer.selectComparison` | Select Comparison… | `c` | |
+| `overseer.cleanupWorkspace` | Clean Up Worktree… | `C` | |
+| `overseer.addProfile` | Add Account… | | Adding an account creates its home and keychain items: VS Code's; the terminal signs it in (`A`) |
+| `overseer.removeAccount` | Remove Account… | | Removing an account deletes its home: VS Code's, with its own confirmation |
+| `overseer.signIn` | Sign In… | `A` | |
+| `overseer.signOut` | Sign Out | | Signing out removes credentials: VS Code's, never the terminal's |
+| `overseer.renameProfile` | Rename Account… | | Renaming an account is VS Code's |
+| `overseer.refreshAccounts` | Refresh Account Status | `A` | |
+| `overseer.autoUsage` | Auto Usage… | | Auto Mode's usage view is VS Code's (docs/rfcs/auto-mode.md) |
+| `overseer.openEdit` | Open Edit in Review | `e` | |
+| `overseer.showCapabilities` | Show Harness Capabilities | | A VS Code document; the terminal offers only what a harness supports where it matters (the `n` form, T-32) |
+| `overseer.openPullRequest` | Open Pull Request… | `P` | |
+| `overseer.mergeBack` | Merge Back… | `M` | |
+| `overseer.stopAll` | Stop Agents and Daemon… | `X` | |
+| `overseer.startDaemon` | Start Daemon | `r` | |
+| `overseer.audioMode` | Audio Mode and Reactor Cues… | `S` | |
+| `overseer.voice.toggle` | Voice Mode: Turn On or Off | `ctrl+v` | |
+| `overseer.voice.open` | Voice Mode: Show | `o` | |
+| `overseer.voice.mute` | Voice Mode: Mute or Unmute | `ctrl+t` | |
+| `overseer.voice.talkTo` | Voice Mode: Talk To… | `ctrl+a` | |
+| `overseer.voice.cancel` | Voice Mode: Cancel the Request | `ctrl+x` | |
+| `overseer.voice.yes` | Voice Mode: Yes | `ctrl+y` | |
+| `overseer.voice.no` | Voice Mode: No | `ctrl+n` | |
+| `overseer.voice.simulate` | Voice Mode: Simulate the Voice (development) | | A development aid of VS Code's for the simulated voice; tests use the daemon's `voice.simulate` |
+| `overseer.testNotification` | Test Notification | | The Mac's notifications are sent by VS Code's notifier; the terminal rings its bell (T-24) |
+| `overseer.showLog` | Show Daemon Log | | A VS Code view of the daemon's log file, which any terminal can read directly |
+| `overseer.restartDaemonConnection` | Reconnect to Daemon | `r` | |
+| `overseer.phoneAccess` | Phone Access… | `O` | |
+| `overseer.turnOnPhoneAccess` | Turn On Phone Access | `O` | |
+| `overseer.turnOffPhoneAccess` | Turn Off Phone Access | `O` | |
+| `overseer.pairPhone` | Pair a Phone… | `ctrl+o` | |
+| `overseer.showDevices` | Show Devices | `ctrl+o` | |
+| `overseer.revokeDevice` | Revoke Device… | `ctrl+o` | |
+| `overseer.makeDeviceWatchOnly` | Make Watch Only | `ctrl+o` | |
+| `overseer.giveDeviceFullControl` | Give Full Control | `ctrl+o` | |
+| `overseer.renameDevice` | Rename… | | A phone keeps the name it paired with in the terminal; renaming it is VS Code's |
+| `overseer.turnOffPhoneNotifications` | Turn Off Notifications to Phones | `ctrl+o` | |
+| `overseer.turnOnPhoneNotifications` | Turn On Notifications to Phones | `ctrl+o` | |
+| `overseer.head.toggleMode` | Switch Between Follow and Diffs Only | `F` | |
+| `overseer.head.follow` | Follow the Agent | `F` | |
+| `overseer.head.diffsOnly` | Diffs Only | `F` | |
+| `overseer.backToOverseer` | Back to Overseer's Conversation | `o` | |
+| `overseer.backToAgent` | Back to the Agent | `esc` | |
+| `overseer.switchAgentOverseer` | Switch Between the Agent and Overseer | `o` | |
 
 ### Criteria
 

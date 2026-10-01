@@ -35,6 +35,8 @@ pub enum Filter {
     All,
     Active,
     NeedsYou,
+    /// Archived agents only (T-34), as VS Code's Archived filter: `E` restores one.
+    Archived,
 }
 
 impl Filter {
@@ -43,17 +45,22 @@ impl Filter {
             Filter::All => "all",
             Filter::Active => "active",
             Filter::NeedsYou => "needs you",
+            Filter::Archived => "archived",
         }
     }
     fn next(self) -> Filter {
         match self {
             Filter::All => Filter::Active,
             Filter::Active => Filter::NeedsYou,
-            Filter::NeedsYou => Filter::All,
+            Filter::NeedsYou => Filter::Archived,
+            Filter::Archived => Filter::All,
         }
     }
-    fn keeps(self, r: &Run) -> bool {
+    /// Archived agents show only in Archived; every other filter leaves them out, as VS Code does.
+    fn keeps(self, r: &Run, archived: bool) -> bool {
         match self {
+            Filter::Archived => archived,
+            _ if archived => false,
             Filter::All => true,
             Filter::Active => r.active(),
             Filter::NeedsYou => r.needs_you(),
@@ -87,6 +94,8 @@ pub enum Mode {
     AudioImport,
     /// The conversation with Overseer (`o`): its messages, the proposals that wait, a composer.
     Overseer,
+    /// Denying a permission (T-31): a one-line note for the agent; Enter sends, empty is fine.
+    DenyNote { run: String, request: String },
 }
 
 /// A program to run in the terminal with the TUI suspended (a provider's own sign-in).
@@ -120,12 +129,16 @@ pub enum Confirm {
     MergePrepare { run: String, text: String },
     /// Merge back, step 2: merge the agent's branch into the target in the source checkout.
     MergeComplete { run: String, text: String },
+    /// A merge back stopped on conflicts: cancel it, the worktree back as before (T-33).
+    MergeCancel { run: String, text: String },
     /// Reject changes in the review: the comparison's lines go back into the worktree (T-29).
     Reject { path: String, keys: Vec<String>, text: String },
     /// Remove a finished agent's worktree (its branch is kept).
     Cleanup { run: String, text: String, discard: bool },
     /// Interrupt every agent and stop the daemon.
     StopAll { text: String },
+    /// Archive a finished agent (T-34): it leaves the list and the grid, here and in VS Code.
+    Archive { task: String, text: String },
     /// Commit, push the agent's branch and open a GitHub pull request with `gh`.
     OpenPr { run: String, text: String },
     /// Turn phone access off while phones are connected.
@@ -144,7 +157,7 @@ enum Pending {
     State,
     History { root: String, run: String, page: usize },
     FollowUp { run: String, text: String },
-    Permission { allow: bool },
+    Permission { allow: bool, session: bool },
     Interrupt,
     Harnesses,
     Accounts,
@@ -166,6 +179,8 @@ enum Pending {
     MergeLanding { run: String, branch: String, target: String, repo: String },
     MergeFiles { run: String, text: String },
     MergeComplete,
+    MergeAbort,
+    Archive { archived: bool, title: String },
     /// `review.seen`: a reviewed mark shared with VS Code and the menu bar (T-26).
     Seen,
     CleanupPlan { run: String },
@@ -187,6 +202,12 @@ enum Pending {
     AudioSet,
     AudioPreview,
     OverseerSession,
+    VoiceSubscribe,
+    VoiceRequests,
+    VoiceSet,
+    VoiceCancel,
+    VoiceAnswer,
+    VoiceRoster,
     OverseerSend,
     OverseerAnswer,
     AudioVoices,
@@ -210,10 +231,63 @@ pub struct NewAgentForm {
     pub args: String,
     pub error: Option<String>,
     pub busy: bool,
+    /// Reasoning effort and permission mode (T-32): an index into the harness's choices, 0 being
+    /// the harness's default.
+    pub effort: usize,
+    pub mode: usize,
+    /// The last effort and permission mode chosen for each harness, kept like VS Code's composer.
+    pub remembered: HashMap<String, (String, String)>,
+}
+
+/// What each harness takes at start (T-32), as VS Code's composer offers them
+/// (extension/media/prompt-tools.js): reasoning efforts, and permission modes with their names.
+pub fn harness_options(harness: &str) -> (&'static [&'static str], &'static [(&'static str, &'static str)]) {
+    match harness {
+        "claude" => (&["low", "medium", "high", "xhigh", "max"], &[("manual", "Ask first"), ("acceptEdits", "Accept edits"), ("plan", "Plan only"), ("auto", "Auto")]),
+        "codex" => (&["minimal", "low", "medium", "high", "xhigh"], &[("workspace-write", "Can edit"), ("read-only", "Read only")]),
+        _ => (&[], &[]),
+    }
 }
 
 impl NewAgentForm {
-    pub const FIELDS: [&'static str; 5] = ["Repository", "Harness", "Account", "Model", "Prompt"];
+    pub const FIELDS: [&'static str; 7] = ["Repository", "Harness", "Account", "Model", "Effort", "Permissions", "Prompt"];
+    pub const EFFORT: usize = 4;
+    pub const MODE: usize = 5;
+    pub const PROMPT: usize = 6;
+
+    pub fn efforts(&self) -> &'static [&'static str] {
+        harness_options(self.harness_id().unwrap_or_default()).0
+    }
+
+    pub fn modes(&self) -> &'static [(&'static str, &'static str)] {
+        harness_options(self.harness_id().unwrap_or_default()).1
+    }
+
+    /// A field the chosen harness has: Effort and Permissions only where it takes them.
+    pub fn has_field(&self, field: usize) -> bool {
+        match field {
+            Self::EFFORT => !self.efforts().is_empty(),
+            Self::MODE => !self.modes().is_empty(),
+            _ => field < Self::FIELDS.len(),
+        }
+    }
+
+    /// The chosen effort (None: the harness's default).
+    pub fn effort_value(&self) -> Option<&'static str> {
+        self.effort.checked_sub(1).and_then(|i| self.efforts().get(i).copied())
+    }
+
+    /// The chosen permission mode (id, name); None: the harness's default.
+    pub fn mode_value(&self) -> Option<(&'static str, &'static str)> {
+        self.mode.checked_sub(1).and_then(|i| self.modes().get(i).copied())
+    }
+
+    /// The effort and mode last chosen for this harness, if they still apply.
+    fn recall(&mut self) {
+        let (e, m) = self.harness_id().and_then(|h| self.remembered.get(h)).cloned().unwrap_or_default();
+        self.effort = self.efforts().iter().position(|x| *x == e).map(|i| i + 1).unwrap_or(0);
+        self.mode = self.modes().iter().position(|x| x.0 == m).map(|i| i + 1).unwrap_or(0);
+    }
 
     pub fn harness_id(&self) -> Option<&str> {
         self.harnesses.get(self.harness).map(|h| h.0.as_str())
@@ -300,6 +374,25 @@ pub struct ChangesView {
     pub mine: HashMap<String, HashSet<String>>,
     /// The file as it was when the editor opened, to tell the owner's lines from the agent's.
     pub editing: Option<(String, String)>,
+    /// Follow (T-30): the review moves to the file the agent is editing and to that change.
+    pub follow: Follow,
+    /// The file Follow is moving to, the changes of it already seen (so the new one is found)
+    /// and how many more times to look when the edit is not on disk yet.
+    pub follow_to: Option<String>,
+    pub follow_known: Vec<String>,
+    pub follow_tries: u8,
+    /// The change to show once the file's lines are drawn.
+    pub follow_change: Option<usize>,
+}
+
+/// Follow in the review (T-30), as in VS Code: off, following the agent, or paused by a move made
+/// by hand (`F` resumes it).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Follow {
+    #[default]
+    Off,
+    On,
+    Paused,
 }
 
 impl ChangesView {
@@ -498,6 +591,24 @@ pub struct App {
     pairing_since: Option<Instant>,
     /// The seconds left last drawn (the clock redraws once a second).
     pairing_shown: u64,
+    /// The file each agent last edited (`file_activity`), for Follow (T-30).
+    pub last_edit: HashMap<String, String>,
+    /// Follow looks again when an edit was reported before it reached the disk.
+    follow_due: Option<Instant>,
+    /// The note typed while denying a permission (T-31).
+    pub deny_note: String,
+    /// Voice Mode as the daemon last said (`voice.get` and its live channel, T-35): Null when the
+    /// daemon has none.
+    pub voice: Value,
+    /// The words as they are heard.
+    pub voice_heard: String,
+    /// Spoken requests by id (`voice.requests` and live `request` messages): the cards' states.
+    pub voice_requests: Vec<Value>,
+    /// A read-back or a plan waits for a yes: ctrl+y / ctrl+n answer it.
+    pub voice_asking: bool,
+    voice_plan: Option<String>,
+    /// Every state shown, in order (for tests and the latency checks).
+    pub voice_seen: Vec<String>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -574,6 +685,15 @@ impl App {
             pair_starting: 0,
             pairing_since: None,
             pairing_shown: 0,
+            last_edit: HashMap::new(),
+            follow_due: None,
+            deny_note: String::new(),
+            voice: Value::Null,
+            voice_heard: String::new(),
+            voice_requests: Vec::new(),
+            voice_asking: false,
+            voice_plan: None,
+            voice_seen: Vec::new(),
         }
     }
 
@@ -616,7 +736,12 @@ impl App {
     /// Agents shown with the current filter, newest first.
     pub fn visible(&self) -> Vec<&Run> {
         let q = self.search.trim().to_lowercase();
-        self.state.agents().into_iter().filter(|r| self.filter.keeps(r) && (q.is_empty() || self.matches(r, &q))).collect()
+        self.state.agents().into_iter().filter(|r| self.filter.keeps(r, self.archived(r)) && (q.is_empty() || self.matches(r, &q))).collect()
+    }
+
+    /// The agent's task is archived (T-34).
+    pub fn archived(&self, r: &Run) -> bool {
+        self.state.task(&r.task_id).is_some_and(|t| t.archived_ms.is_some())
     }
 
     fn matches(&self, r: &Run, q: &str) -> bool {
@@ -948,6 +1073,8 @@ impl App {
                 self.audio.known = false;
                 self.audio_inflight = false;
                 self.request_audio();
+                // Voice Mode's live channel (T-35); a daemon without it answers with an error.
+                self.request("voice.subscribe", json!({}), Pending::VoiceSubscribe);
             }
             Msg::Refused(why) => {
                 self.connected = false;
@@ -973,6 +1100,7 @@ impl App {
                 }
             }
             Msg::Replayed => {}
+            Msg::Voice(m) => self.on_voice(m),
             Msg::Event(ev) => self.on_event(ev),
             Msg::Reply { id, result } => {
                 if let Some(why) = self.pending.remove(&id) {
@@ -1019,6 +1147,13 @@ impl App {
             }
         }
         changed |= self.phone_tick(now);
+        if self.follow_due.is_some_and(|due| now >= due) {
+            self.follow_due = None;
+            if let Some(path) = self.changes.follow_to.clone() {
+                self.follow_load(&path);
+                changed = true;
+            }
+        }
         // Dashboard mode (from `--dashboard`, or a terminal grown wide enough) loads its review.
         if self.dashboard && self.connected && self.dashboard_shown() {
             let unsynced = self.focused().is_some_and(|r| r.id != self.changes.run) || (self.focus.is_none() && !self.visible().is_empty());
@@ -1070,6 +1205,17 @@ impl App {
             feed.add(&ev, child.as_deref());
             self.last_event.insert(root, Instant::now());
         }
+        // Follow (T-30): the file the agent is editing, and the review moves to it when Follow is on.
+        if kind == "file_activity" && !run_id.is_empty() {
+            let root = self.state.root_of(&run_id);
+            let paths: Vec<String> = ev["payload"]["paths"].as_array().map(|a| a.iter().filter_map(|x| x.as_str()).filter(|p| !p.starts_with('/') && !p.starts_with("..")).map(str::to_string).collect()).unwrap_or_default();
+            if let Some(path) = paths.last().cloned() {
+                self.last_edit.insert(root.clone(), path.clone());
+                if self.review_shown() && root == self.changes.run && self.changes.follow == Follow::On {
+                    self.follow_start(&path);
+                }
+            }
+        }
         // The review follows marks and rejections made elsewhere (VS Code, the phone).
         if self.review_shown() && matches!(kind.as_str(), "review_mark" | "review_reject") && self.state.root_of(&run_id) == self.changes.run && !self.changes.loading {
             if kind == "review_reject" { self.load_diff() } else { self.load_file_diff() }
@@ -1083,7 +1229,7 @@ impl App {
             self.request("overseer.session", json!({}), Pending::OverseerSession);
         }
         // Statuses, turns and new runs come from `state`, reloaded like VS Code does.
-        if (matches!(kind.as_str(), "status" | "turn_started" | "turn_done" | "permission" | "permission_answered" | "child" | "child_reparented" | "task_created" | "workspace_removed" | "reattached" | "profile" | "review_seen" | "merge_back")
+        if (matches!(kind.as_str(), "status" | "turn_started" | "turn_done" | "permission" | "permission_answered" | "child" | "child_reparented" | "task_created" | "workspace_removed" | "reattached" | "profile" | "review_seen" | "merge_back" | "task_archived")
             || (!run_id.is_empty() && self.state.run(&run_id).is_none()))
             && self.state_due.is_none()
         {
@@ -1148,6 +1294,40 @@ impl App {
                 self.dirty = true;
             }
             (Pending::OverseerSession, Err(e)) => self.say(format!("Overseer: {e}"), true),
+            (Pending::VoiceSubscribe, Ok(v)) => {
+                self.set_voice(v["voice"].clone());
+                self.request("voice.requests", json!({ "limit": 20 }), Pending::VoiceRequests);
+            }
+            // A daemon without Voice Mode: the conversation says it is unavailable.
+            (Pending::VoiceSubscribe, Err(_)) => self.voice = Value::Null,
+            (Pending::VoiceSet, Ok(v)) => self.set_voice(v),
+            (Pending::VoiceRequests, Ok(v)) => {
+                for r in v["requests"].as_array().cloned().unwrap_or_default() {
+                    self.voice_request(r);
+                }
+            }
+            (Pending::VoiceCancel, Ok(v)) => {
+                let done = v["cancelled"] == true;
+                self.say(if done { "Cancelled: nothing was sent" } else { "No spoken request is open to cancel" }, false);
+                self.request("voice.requests", json!({ "limit": 20 }), Pending::VoiceRequests);
+            }
+            (Pending::VoiceAnswer, Ok(_)) => {
+                self.voice_asking = false;
+                self.voice_plan = None;
+                self.say("Answered", false);
+            }
+            (Pending::VoiceRoster, Ok(v)) => {
+                // Talk to: Overseer, then each agent at work, in turn.
+                let active: Vec<String> = v["roster"].as_array().into_iter().flatten()
+                    .filter(|a| matches!(a["status"].as_str(), Some("queued" | "starting" | "running" | "waiting_for_user")))
+                    .filter_map(|a| a["id"].as_str().map(str::to_string)).collect();
+                let mut targets = vec!["overseer".to_string()];
+                targets.extend(active);
+                let now = self.voice["target"].as_str().unwrap_or("overseer").to_string();
+                let next = targets.iter().position(|t| *t == now).map(|i| (i + 1) % targets.len()).unwrap_or(0);
+                let target = targets[next].clone();
+                self.request("voice.set", json!({ "target": target }), Pending::VoiceSet);
+            }
             (Pending::OverseerSend, Ok(_)) => self.request("overseer.session", json!({}), Pending::OverseerSession),
             (Pending::OverseerSend, Err(e)) => self.say(format!("Overseer: {e}"), true),
             (Pending::OverseerAnswer, Ok(v)) => {
@@ -1228,8 +1408,8 @@ impl App {
                 }
                 self.say(format!("Not sent: {e}"), true);
             }
-            (Pending::Permission { allow }, Ok(_)) => {
-                self.say(if allow { "Allowed" } else { "Denied" }, false);
+            (Pending::Permission { allow, session }, Ok(_)) => {
+                self.say(if session { "Allowed for this session" } else if allow { "Allowed once" } else { "Denied" }, false);
                 self.state_due = Some(Instant::now() + Duration::from_millis(60));
             }
             (Pending::Interrupt, Ok(_)) => self.say("Interrupt sent", false),
@@ -1238,7 +1418,10 @@ impl App {
                 self.form.harnesses = list.iter().map(|h| (h["harness"].as_str().unwrap_or_default().to_string(), h["installed"].as_bool().unwrap_or(false), h["version"].as_str().unwrap_or_default().to_string())).filter(|h| h.1).collect();
                 // Claude Code first, then Codex, then the rest.
                 let rank = |h: &str| match h { "claude" => 0, "codex" => 1, "codex-app" => 2, "opencode" => 3, _ => 4 };
+                let keep = self.form.harness_id().map(str::to_string);
                 self.form.harnesses.sort_by_key(|h| rank(&h.0));
+                self.form.harness = keep.and_then(|k| self.form.harnesses.iter().position(|h| h.0 == k)).unwrap_or(0);
+                self.form.recall();
             }
             (Pending::Accounts, Ok(v)) => {
                 let list = v["accounts"].as_array().cloned().unwrap_or_default();
@@ -1320,6 +1503,13 @@ impl App {
                     (c["status"].as_str().unwrap_or("M").to_string(), path, a, d)
                 }).collect();
                 self.changes.file = keep.and_then(|k| self.changes.shown().iter().position(|f| f.1 == k)).unwrap_or(0);
+                // Follow (T-30): the file the agent is editing, once it shows as changed.
+                if let Some(to) = self.changes.follow_to.clone() {
+                    match self.changes.shown().iter().position(|f| f.1 == to) {
+                        Some(i) => self.changes.file = i,
+                        None => self.follow_again(),
+                    }
+                }
                 self.changes.error = None;
                 self.load_file_diff();
             }
@@ -1337,6 +1527,21 @@ impl App {
                     reviewed: h["reviewed"] == true,
                 }).collect();
                 self.changes.change = self.changes.change.min(self.changes.hunks.len().saturating_sub(1));
+                if self.changes.follow_to.as_deref() == Some(path.as_str()) {
+                    // The change being made: the one not seen before the edit.
+                    let known = &self.changes.follow_known;
+                    match self.changes.hunks.iter().position(|h| !known.contains(&h.key)) {
+                        Some(i) => {
+                            self.changes.follow_change = Some(i);
+                            self.changes.follow_to = None;
+                        }
+                        None if self.changes.follow_tries > 0 => self.follow_again(),
+                        None => {
+                            self.changes.follow_change = self.changes.hunks.len().checked_sub(1);
+                            self.changes.follow_to = None;
+                        }
+                    }
+                }
                 if v["shown"] == false {
                     self.changes.diff = vec![format!("({})", v["why"].as_str().filter(|w| !w.is_empty()).unwrap_or("not shown as text"))];
                     self.changes.hunk_at.clear();
@@ -1368,6 +1573,9 @@ impl App {
                     self.changes.hunk_at.clear();
                 } else {
                     self.render_hunks(text.as_deref().unwrap_or_default());
+                    if let Some(i) = self.changes.follow_change.take() {
+                        self.go_to_change(i);
+                    }
                 }
             }
             (Pending::Tree { run }, Ok(v)) => {
@@ -1549,6 +1757,14 @@ impl App {
                 let n = v["changes"].as_array().map(|a| a.len()).unwrap_or(0);
                 self.mode = Mode::Confirm(Confirm::MergeComplete { run, text: format!("{text} {n} file{} land{}. The worktree and branch are kept.", if n == 1 { "" } else { "s" }, if n == 1 { "s" } else { "" }) });
             }
+            (Pending::Archive { archived, title }, Ok(_)) => {
+                self.say(if archived { format!("Archived {} (f shows Archived, where E restores it)", short(&title, 40)) } else { format!("Restored {}", short(&title, 40)) }, false);
+                self.request_state();
+            }
+            (Pending::MergeAbort, Ok(v)) => {
+                self.say(if v["uncommitted"] == true { "Merge cancelled: the worktree is as it was before, its work uncommitted again" } else { "Merge cancelled: the worktree is as it was before" }, false);
+                self.request_state();
+            }
             (Pending::MergeComplete, Ok(v)) => {
                 self.say(format!("Merged {} into {} ({}). The worktree and branch are kept.", v["branch"].as_str().unwrap_or("the branch"), v["target"].as_str().unwrap_or("the target"), v["commit"].as_str().unwrap_or_default().chars().take(10).collect::<String>()), false);
                 self.request_state();
@@ -1610,14 +1826,58 @@ impl App {
         self.mode = if matches!(self.mode, Mode::Compose) { Mode::Grid } else { self.mode.clone() };
     }
 
-    fn answer(&mut self, allow: bool) {
-        let Some(run) = self.focused().cloned() else { return };
+    /// The focused agent's pending permission request.
+    fn pending_request(&mut self) -> Option<(Run, String)> {
+        let run = self.focused().cloned()?;
         let request_id = run.permission_request().or_else(|| self.feeds.get(&run.id).and_then(|f| f.pending_permission().map(|p| p.0.to_string())));
-        let Some(request_id) = request_id else {
-            self.say("Nothing to answer for this agent", false);
+        match request_id {
+            Some(r) => Some((run, r)),
+            None => {
+                self.say("Nothing to answer for this agent", false);
+                None
+            }
+        }
+    }
+
+    /// `a` Allow once (T-31).
+    fn answer(&mut self, allow: bool) {
+        let Some((run, request_id)) = self.pending_request() else { return };
+        self.request("run.permission", json!({ "run_id": run.id, "request_id": request_id, "allow": allow }), Pending::Permission { allow, session: false });
+    }
+
+    /// `s` Allow for this session (T-31): the harness's own rule, so the same tool is not asked again.
+    fn answer_session(&mut self) {
+        let Some((run, request_id)) = self.pending_request() else { return };
+        let offered = run.attention.as_ref().filter(|a| a["request_id"].as_str() == Some(request_id.as_str())).is_some_and(|a| !a["always"].is_null());
+        if !offered {
+            self.say("This request offers no Allow for this session: a allows once", false);
             return;
-        };
-        self.request("run.permission", json!({ "run_id": run.id, "request_id": request_id, "allow": allow }), Pending::Permission { allow });
+        }
+        self.request("run.permission", json!({ "run_id": run.id, "request_id": request_id, "allow": true, "always": true }), Pending::Permission { allow: true, session: true });
+    }
+
+    /// `d` Deny with a note (T-31): a one-line note, sent to the agent as the reason.
+    fn open_deny(&mut self) {
+        let Some((run, request)) = self.pending_request() else { return };
+        self.deny_note.clear();
+        self.mode = Mode::DenyNote { run: run.id, request };
+    }
+
+    fn deny_key(&mut self, k: KeyEvent, run: String, request: String) {
+        match k.code {
+            KeyCode::Esc => self.mode = Mode::Grid,
+            KeyCode::Enter => {
+                let note = self.deny_note.trim().to_string();
+                self.mode = Mode::Grid;
+                self.request("run.permission", json!({ "run_id": run, "request_id": request, "allow": false, "message": note }), Pending::Permission { allow: false, session: false });
+            }
+            KeyCode::Backspace => {
+                self.deny_note.pop();
+            }
+            KeyCode::Char('u') if k.modifiers.contains(KeyModifiers::CONTROL) => self.deny_note.clear(),
+            KeyCode::Char(c) if !c.is_control() && self.deny_note.chars().count() < 500 => self.deny_note.push(c),
+            _ => {}
+        }
     }
 
     fn next_waiting(&mut self) {
@@ -1646,7 +1906,8 @@ impl App {
             }
         }
         let keep = std::mem::take(&mut self.form);
-        self.form = NewAgentForm { repos, model: keep.model, program: keep.program, args: if keep.args.is_empty() { "[]".into() } else { keep.args }, harnesses: keep.harnesses, accounts: keep.accounts, field: 4, ..Default::default() };
+        self.form = NewAgentForm { repos, model: keep.model, program: keep.program, args: if keep.args.is_empty() { "[]".into() } else { keep.args }, harness: keep.harness, harnesses: keep.harnesses, accounts: keep.accounts, remembered: keep.remembered, field: NewAgentForm::PROMPT, ..Default::default() };
+        self.form.recall();
         self.request("harness.list", json!({}), Pending::Harnesses);
         self.request("account.list", json!({}), Pending::Accounts);
         self.mode = Mode::NewAgent;
@@ -1694,6 +1955,15 @@ impl App {
             if !f.model.trim().is_empty() {
                 params["model"] = json!(f.model.trim());
             }
+            // T-32: the effort and permission mode, only where the harness takes them.
+            if let Some(e) = f.effort_value() {
+                params["effort"] = json!(e);
+            }
+            if let Some((m, _)) = f.mode_value() {
+                params["permission_mode"] = json!(m);
+            }
+            let chosen = (f.effort_value().unwrap_or_default().to_string(), f.mode_value().map(|m| m.0).unwrap_or_default().to_string());
+            self.form.remembered.insert(harness.clone(), chosen);
         }
         self.last_repo = Some(repo);
         self.form.error = None;
@@ -1724,7 +1994,10 @@ impl App {
     fn load_review(&mut self, run: &Run) {
         self.mark_reviewed(&run.id);
         let keep = std::mem::take(&mut self.changes.mine);
-        self.changes = ChangesView { run: run.id.clone(), workspace: run.workspace_id.clone(), loading: true, mine: if self.changes.run == run.id { keep } else { HashMap::new() }, ..Default::default() };
+        let same = self.changes.run == run.id;
+        let follow = if same { self.changes.follow } else { Follow::Off };
+        self.changes = ChangesView { run: run.id.clone(), workspace: run.workspace_id.clone(), loading: true, mine: if same { keep } else { HashMap::new() }, follow, ..Default::default() };
+        self.follow_due = None;
         self.request("comparison.options", json!({ "run_id": run.id }), Pending::Comparisons { run: run.id.clone() });
     }
 
@@ -1823,6 +2096,70 @@ impl App {
         self.request("review.reject", json!({ "workspace_id": ws, "path": path, "base": base, "key": key }), Pending::Reject { run: run.to_string(), path: path.to_string(), rest });
     }
 
+    /// Follow (T-30) moves to `path`, the file the agent just edited: the changed files are
+    /// listed again and the change not seen before is shown.
+    fn follow_start(&mut self, path: &str) {
+        let c = &mut self.changes;
+        c.follow_known = if c.path == path { c.hunks.iter().map(|h| h.key.clone()).collect() } else { Vec::new() };
+        c.follow_to = Some(path.to_string());
+        c.follow_tries = 4;
+        self.follow_due = None;
+        self.follow_load(path);
+    }
+
+    /// Shows the file's changes at once (its counts come with the file list, asked for together).
+    fn follow_load(&mut self, path: &str) {
+        let c = &mut self.changes;
+        if !c.shown().iter().any(|f| f.1 == path) {
+            c.files.push(("M".into(), path.to_string(), 0, 0));
+        }
+        if let Some(i) = c.shown().iter().position(|f| f.1 == path) {
+            c.file = i;
+        }
+        self.load_file_diff();
+        self.load_diff();
+    }
+
+    /// The edit was reported before it reached the disk: look again shortly.
+    fn follow_again(&mut self) {
+        if self.changes.follow_tries == 0 {
+            self.changes.follow_to = None;
+            return;
+        }
+        self.changes.follow_tries -= 1;
+        self.follow_due = Some(Instant::now() + Duration::from_millis(60));
+    }
+
+    /// `F`: Follow on (or resumed, at the file the agent edited last) and off.
+    fn toggle_follow(&mut self) {
+        match self.changes.follow {
+            Follow::On => {
+                self.changes.follow = Follow::Off;
+                self.changes.follow_to = None;
+                self.follow_due = None;
+                self.say("Follow is off", false);
+            }
+            was => {
+                self.changes.follow = Follow::On;
+                let root = self.state.root_of(&self.changes.run);
+                if let Some(path) = self.last_edit.get(&root).cloned() {
+                    self.follow_start(&path);
+                }
+                self.say(if was == Follow::Paused { "Follow resumed: the review moves to the file the agent is editing" } else { "Follow is on: the review moves to the file the agent is editing" }, false);
+            }
+        }
+    }
+
+    /// A move made by hand pauses Follow (T-30).
+    fn pause_follow(&mut self) {
+        if self.changes.follow == Follow::On {
+            self.changes.follow = Follow::Paused;
+            self.changes.follow_to = None;
+            self.changes.follow_change = None;
+            self.follow_due = None;
+        }
+    }
+
     /// `1`, `2`, `3` and `c`: another comparison; one that is not available says why (T-27).
     fn choose_comparison(&mut self, i: usize) {
         let Some(c) = self.changes.options.get(i).cloned() else { return };
@@ -1892,11 +2229,27 @@ impl App {
         let repo = plan["repo"].as_str().unwrap_or_default().to_string();
         match plan["state"].as_str().unwrap_or_default() {
             "idle" => {
-                let n = plan["worktree_uncommitted"].as_array().map(|a| a.len()).unwrap_or(0);
-                let commit = if n > 0 { format!("commit {n} worktree file{} and ", if n == 1 { "" } else { "s" }) } else { String::new() };
+                // T-33: every file that will be committed, the untracked ones named as new.
+                let files: Vec<String> = plan["worktree_uncommitted"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
+                let untracked: Vec<String> = plan["untracked"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
+                let mut named: Vec<String> = Vec::new();
+                for f in &files {
+                    let f = if untracked.contains(f) { format!("{f} [new, untracked]") } else { f.clone() };
+                    if !named.contains(&f) {
+                        named.push(f);
+                    }
+                }
+                let n = named.len();
+                let commit = if n > 0 { format!("commit {n} worktree file{} ({}) and ", if n == 1 { "" } else { "s" }, named.join(", ")) } else { String::new() };
                 self.mode = Mode::Confirm(Confirm::MergePrepare { run, text: format!("Merge back {branch} → {target}: {commit}merge {target} into {branch} in the worktree (conflicts go back to the agent)?") });
             }
-            "resolving" | "resolved" => {
+            "resolving" => {
+                // T-33: stopped on conflicts; offer to cancel, as VS Code's Cancel merge does.
+                let files: Vec<String> = plan["conflicts"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().or(x["path"].as_str()).map(str::to_string)).collect()).unwrap_or_default();
+                let text = format!("Merge back stopped on conflicts in {}. Cancel the merge and put the worktree back as it was before it? (n keeps it to resolve)", if files.is_empty() { "the worktree".to_string() } else { files.join(", ") });
+                self.mode = Mode::Confirm(Confirm::MergeCancel { run, text });
+            }
+            "resolved" => {
                 let ws = self.state.run(&run).map(|r| r.workspace_id.clone()).unwrap_or_default();
                 self.request("workspace.merge_resolved", json!({ "workspace_id": ws }), Pending::MergeResolved { run });
             }
@@ -1919,6 +2272,9 @@ impl App {
         self.mode = Mode::Overseer;
         self.overseer_scroll = 0;
         self.request("overseer.session", json!({}), Pending::OverseerSession);
+        if self.voice.is_object() {
+            self.request("voice.requests", json!({ "limit": 20 }), Pending::VoiceRequests);
+        }
     }
 
     /// Keys in the conversation: type and Enter sends; ctrl+y / ctrl+n answer the first proposal
@@ -1927,6 +2283,21 @@ impl App {
         let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
         match k.code {
             KeyCode::Esc => self.mode = Mode::Grid,
+            // Voice Mode (T-35): on and off, mute, talk to, cancel the open request.
+            KeyCode::Char('v') if ctrl => self.voice_toggle(),
+            KeyCode::Char('t') if ctrl => {
+                let muted = self.voice["muted"] == true;
+                self.request("voice.set", json!({ "muted": !muted }), Pending::VoiceSet);
+            }
+            KeyCode::Char('a') if ctrl => self.request("agents.roster", json!({}), Pending::VoiceRoster),
+            KeyCode::Char('x') if ctrl => {
+                let open = self.voice_requests.iter().find(|r| matches!(r["state"].as_str(), Some("settling" | "thinking" | "taken" | "waiting"))).and_then(|r| r["id"].as_str()).unwrap_or("").to_string();
+                self.request("voice.cancel", json!({ "id": open }), Pending::VoiceCancel);
+            }
+            // A read-back or a plan that waits for a spoken yes takes the keyboard's too.
+            KeyCode::Char('y') | KeyCode::Char('n') if ctrl && self.voice_asking => {
+                self.request("voice.answer", json!({ "yes": k.code == KeyCode::Char('y') }), Pending::VoiceAnswer);
+            }
             KeyCode::Char('y') | KeyCode::Char('n') if ctrl => {
                 let yes = k.code == KeyCode::Char('y');
                 let open = self.overseer["proposals"].as_array().and_then(|p| p.iter().find(|x| x["state"] == "open")).map(|p| p["id"].as_str().unwrap_or("").to_string());
@@ -1955,6 +2326,112 @@ impl App {
             _ => {}
         }
         self.dirty = true;
+    }
+
+    /// Voice Mode's settings and state from the daemon (T-35).
+    fn set_voice(&mut self, v: Value) {
+        if !v.is_object() {
+            return;
+        }
+        self.voice = v;
+        self.note_voice_state();
+    }
+
+    /// The state shown now: off, or the daemon's state.
+    pub fn voice_state(&self) -> Option<&str> {
+        if !self.voice.is_object() {
+            return None;
+        }
+        Some(if self.voice["enabled"] != true { "off" } else { self.voice["state"].as_str().unwrap_or("starting") })
+    }
+
+    fn note_voice_state(&mut self) {
+        if let Some(s) = self.voice_state().map(str::to_string) {
+            if self.voice_seen.last() != Some(&s) {
+                self.voice_seen.push(s);
+            }
+        }
+        self.dirty = true;
+    }
+
+    fn voice_request(&mut self, r: Value) {
+        let Some(id) = r["id"].as_str().map(str::to_string) else { return };
+        match self.voice_requests.iter_mut().find(|x| x["id"].as_str() == Some(id.as_str())) {
+            Some(x) => *x = r,
+            None => self.voice_requests.push(r),
+        }
+        self.voice_requests.sort_by_key(|r| r["ts"].as_i64().unwrap_or(0));
+        let n = self.voice_requests.len();
+        if n > 40 {
+            self.voice_requests.drain(..n - 40);
+        }
+    }
+
+    /// The live channel (as VS Code's voice.js `live`): states, heard words, requests, read-backs.
+    fn on_voice(&mut self, m: Value) {
+        match m["kind"].as_str().unwrap_or_default() {
+            "state" if self.voice.is_object() => {
+                self.voice["state"] = m["state"].clone();
+                self.voice["reason"] = m["reason"].clone();
+                if m["state"] == "off" {
+                    self.voice["enabled"] = json!(false);
+                } else {
+                    self.voice["enabled"] = json!(true);
+                }
+                self.voice["muted"] = json!(m["state"] == "muted");
+                self.note_voice_state();
+            }
+            "target" if self.voice.is_object() => self.voice["target"] = m["target"].clone(),
+            "heard" | "not_meant" => self.voice_heard = m["text"].as_str().unwrap_or_default().to_string(),
+            "read_back" => self.voice_asking = m["lapsed"] != true && !m["agent"].is_null(),
+            "confirm" if m["lapsed"] == true => {
+                self.voice_plan = None;
+                self.voice_asking = false;
+            }
+            "request" => {
+                let r = m["request"].clone();
+                if r["state"] == "waiting" {
+                    self.voice_plan = r["id"].as_str().map(str::to_string);
+                    self.voice_asking = true;
+                } else if self.voice_plan.is_some() && self.voice_plan.as_deref() == r["id"].as_str() {
+                    self.voice_plan = None;
+                    self.voice_asking = false;
+                }
+                self.voice_request(r);
+            }
+            "toast" => {
+                if m["cancel"] == true {
+                    self.voice_asking = false;
+                }
+                let text = m["text"].as_str().unwrap_or_default().to_string();
+                if !text.is_empty() {
+                    self.say(if m["cancel"] == true { format!("{text} (ctrl+x cancels)") } else { text }, false);
+                }
+            }
+            _ => return,
+        }
+        self.dirty = true;
+    }
+
+    /// `ctrl+v`: Voice Mode on or off; the daemon listens and speaks, the terminal only asks.
+    fn voice_toggle(&mut self) {
+        if !self.voice.is_object() {
+            self.say("Voice Mode is unavailable: this daemon has no voice session", true);
+            return;
+        }
+        if self.voice["enabled"] == true {
+            self.request("voice.set", json!({ "enabled": false }), Pending::VoiceSet);
+            return;
+        }
+        if self.voice["available"] != true && self.voice["simulated"] != true {
+            self.say("Voice Mode needs the listener, which ships with Overseer on macOS", true);
+            return;
+        }
+        if self.voice["model"]["downloaded"] != true {
+            self.say("Voice Mode needs its speech model: turn it on once in VS Code, which downloads it after asking", true);
+            return;
+        }
+        self.request("voice.set", json!({ "enabled": true }), Pending::VoiceSet);
     }
 
     fn open_audio(&mut self) {
@@ -2074,7 +2551,11 @@ impl App {
         let n = self.changes.shown().len();
         let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
         let page = (self.size.1 as usize).saturating_sub(8);
+        if matches!(k.code, KeyCode::Down | KeyCode::Up | KeyCode::PageDown | KeyCode::PageUp | KeyCode::Char('j' | 'k' | 'J' | 'K' | 'n' | 'p' | 'c' | 't' | '1' | '2' | '3')) {
+            self.pause_follow();
+        }
         match k.code {
+            KeyCode::Char('F') => self.toggle_follow(),
             KeyCode::Char('r') if ctrl => self.reload_review(),
             KeyCode::Esc | KeyCode::Char('v') | KeyCode::Char('q') => self.mode = Mode::Grid,
             KeyCode::Down | KeyCode::Char('j') if n > 0 => {
@@ -2242,12 +2723,26 @@ impl App {
                                 self.request("workspace.merge_complete", json!({ "workspace_id": ws }), Pending::MergeComplete);
                             }
                         }
+                        Confirm::Archive { task, .. } => {
+                            let title = self.state.task(&task).map(|t| t.title.clone()).unwrap_or_default();
+                            self.request("task.archive", json!({ "task_id": task, "archived": true }), Pending::Archive { archived: true, title });
+                        }
+                        Confirm::MergeCancel { run, .. } => {
+                            if let Some(ws) = self.state.run(&run).map(|r| r.workspace_id.clone()) {
+                                self.request("workspace.merge_abort", json!({ "workspace_id": ws }), Pending::MergeAbort);
+                            }
+                        }
                         // The phone questions are answered in `phone_confirm`; Reject above.
                         Confirm::Reject { .. } => {}
                         Confirm::PhoneOff { .. } | Confirm::PhoneOnAndPair | Confirm::Revoke { .. } | Confirm::Pair { .. } => {}
                     }
                 }
-                _ => self.mode = Mode::Grid,
+                _ => {
+                    self.mode = Mode::Grid;
+                    if matches!(c, Confirm::MergeCancel { .. }) {
+                        self.say("The merge stays: resolve the conflicts in the worktree (or ask the agent), then press M again", false);
+                    }
+                }
             },
             Mode::Compose => self.compose_key(k),
             Mode::NewAgent => self.form_key(k),
@@ -2259,6 +2754,7 @@ impl App {
             Mode::Audio => self.audio_key(k),
             Mode::Overseer => self.overseer_key(k),
             Mode::AudioImport => self.audio_import_key(k),
+            Mode::DenyNote { run, request } => self.deny_key(k, run, request),
             Mode::Grid if self.dashboard_shown() => self.dashboard_key(k),
             Mode::Grid | Mode::Zoom { .. } => self.nav_key(k),
         }
@@ -2289,7 +2785,7 @@ impl App {
             // The review column: the review's own keys (T-27 to T-29, T-39).
             KeyCode::Char('r') if ctrl && self.dash_col == 1 => self.changes_key(k),
             KeyCode::Down | KeyCode::Up | KeyCode::PageDown | KeyCode::PageUp
-            | KeyCode::Char('j' | 'k' | 'n' | 'p' | 'c' | '1' | '2' | '3' | 't' | 'a' | 'A' | 'r' | 'R' | 'e')
+            | KeyCode::Char('j' | 'k' | 'n' | 'p' | 'c' | '1' | '2' | '3' | 't' | 'a' | 'A' | 'r' | 'R' | 'e' | 'F')
                 if self.dash_col == 1 =>
             {
                 self.changes_key(k)
@@ -2345,7 +2841,8 @@ impl App {
                 }
             }
             KeyCode::Char('a') => self.answer(true),
-            KeyCode::Char('d') => self.answer(false),
+            KeyCode::Char('s') => self.answer_session(),
+            KeyCode::Char('d') => self.open_deny(),
             KeyCode::Char('w') => self.next_waiting(),
             KeyCode::Char('x') => {
                 if let Some(run) = self.focused() {
@@ -2393,6 +2890,7 @@ impl App {
                     }
                 }
             }
+            KeyCode::Char('E') => self.archive_key(),
             KeyCode::Char('/') => {
                 self.mode = Mode::Search;
                 self.page = 0;
@@ -2456,6 +2954,20 @@ impl App {
         }
     }
 
+    /// `E` (T-34): archive the focused finished agent (y/n), or in Archived restore it.
+    fn archive_key(&mut self) {
+        let Some(run) = self.focused().cloned() else { return };
+        if self.archived(&run) {
+            let title = run.title.clone();
+            self.request("task.archive", json!({ "task_id": run.task_id, "archived": false }), Pending::Archive { archived: false, title });
+        } else if run.active() {
+            self.say("Archiving waits until the agent is done (x interrupts it)", false);
+        } else {
+            let text = format!("Archive {}? It leaves the list and the grid, here and in VS Code; nothing is deleted (f → Archived restores it).", short(&run.title, 50));
+            self.mode = Mode::Confirm(Confirm::Archive { task: run.task_id.clone(), text });
+        }
+    }
+
     fn step(&mut self, delta: i32) {
         let n = self.visible().len() as i32;
         if n == 0 {
@@ -2512,6 +3024,7 @@ impl App {
                     s.push_str(text);
                 }
             }
+            Mode::DenyNote { .. } => self.deny_note.push_str(&text.replace('\n', " ")),
             Mode::AudioImport => {
                 let remaining = MAX_AUDIO_IMPORT_PATH.saturating_sub(self.audio.import_path.chars().count());
                 self.audio.import_path.extend(text.chars().take(remaining));
@@ -2527,7 +3040,7 @@ impl App {
             (3, false) => Some(&mut self.form.model),
             (3, true) => Some(&mut self.form.program),
             (2, true) => Some(&mut self.form.args),
-            (4, _) => Some(&mut self.form.prompt),
+            (NewAgentForm::PROMPT, _) => Some(&mut self.form.prompt),
             _ => None,
         }
     }
@@ -2537,12 +3050,23 @@ impl App {
             return;
         }
         let fields = NewAgentForm::FIELDS.len();
+        // Tab skips the fields the chosen harness does not have (T-32).
+        let step = |form: &NewAgentForm, d: usize| {
+            let mut f = form.field;
+            for _ in 0..fields {
+                f = (f + d) % fields;
+                if form.has_field(f) {
+                    break;
+                }
+            }
+            f
+        };
         match k.code {
             KeyCode::Esc => self.mode = Mode::Grid,
-            KeyCode::Tab | KeyCode::Down => self.form.field = (self.form.field + 1) % fields,
-            KeyCode::BackTab | KeyCode::Up => self.form.field = (self.form.field + fields - 1) % fields,
+            KeyCode::Tab | KeyCode::Down => self.form.field = step(&self.form, 1),
+            KeyCode::BackTab | KeyCode::Up => self.form.field = step(&self.form, fields - 1),
             KeyCode::Enter if k.modifiers.contains(KeyModifiers::ALT) || k.modifiers.contains(KeyModifiers::SHIFT) => {
-                if self.form.field == 4 {
+                if self.form.field == NewAgentForm::PROMPT {
                     self.form.prompt.push('\n');
                 }
             }
@@ -2556,8 +3080,11 @@ impl App {
                     (1, _) => {
                         self.form.harness = cycle(self.form.harness, self.form.harnesses.len());
                         self.form.account = 0;
+                        self.form.recall();
                     }
                     (2, false) => self.form.account = cycle(self.form.account, self.form.compatible().len()),
+                    (NewAgentForm::EFFORT, false) => self.form.effort = cycle(self.form.effort, self.form.efforts().len() + 1),
+                    (NewAgentForm::MODE, false) => self.form.mode = cycle(self.form.mode, self.form.modes().len() + 1),
                     _ => {}
                 }
             }

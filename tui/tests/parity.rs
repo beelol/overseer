@@ -987,3 +987,679 @@ fn t41_two_real_terminals_on_one_daemon() {
     assert!(g.contains("Pty newcomer") && s.contains("Pty newcomer"), "the new agent in both");
     d.ctl("run.interrupt", json!({ "run_id": newcomer }));
 }
+
+/// T-30: a fixture agent edits three files in turn (the Claude fixture's editor mode, one edit per
+/// barrier file); with Follow on, the review moves to each file and to the change being made
+/// within 250 ms of the edit reaching the disk; `j` pauses it ("Paused"); `F` resumes it.
+#[test]
+fn t30_follow_in_the_review() {
+    let t = tempfile::tempdir().unwrap();
+    let barrier = t.path().join("barrier");
+    std::fs::create_dir_all(&barrier).unwrap();
+    let barrier_s = barrier.display().to_string();
+    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture("claude-fixture.js")), ("CLAUDE_FIXTURE_MODE", "editor"), ("FIXTURE_EDIT_BARRIER", &barrier_s), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE,FIXTURE_EDIT_BARRIER")]);
+    let r = five_files(&t.path().join("follow"));
+    let run = d.ctl("task.create", json!({ "repo": r, "harness": "claude", "prompt": "edit a.txt:8 edit b.txt:1 edit c.txt:1 edit d.txt:1 edit a.txt:2", "title": "Edits three files in turn" }))["run"]["id"].as_str().unwrap().to_string();
+    d.wait_status(&run, |s| s == "running", 20);
+    let wt = worktree(&d, &run);
+    let mut tui = Tui::attach(&d, 160, 44);
+    tui.until(10, |a| a.visible().len() == 1);
+    tui.key(KeyCode::Char('v'));
+    assert_eq!(tui.app.mode, Mode::Changes);
+    tui.until(10, |a| !a.changes.loading && !a.changes.options.is_empty());
+    tui.key(KeyCode::Char('F'));
+    assert_eq!(tui.app.changes.follow, overseer_tui::app::Follow::On);
+    assert!(tui.screen().contains("◉ Following the agent"));
+
+    // Each edit: the review shows that file, at the change the agent made (the line it edited).
+    let edit = |tui: &mut Tui, step: usize, file: &str, line: &str| -> std::time::Duration {
+        let before = std::fs::read_to_string(wt.join(file)).unwrap();
+        std::fs::write(barrier.join(format!("go-{step}")), "").unwrap();
+        let end = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        let mut written = None;
+        loop {
+            assert!(std::time::Instant::now() < end, "step {step}: the review did not move to {file}:\n{}", tui.screen());
+            if written.is_none() && std::fs::read_to_string(wt.join(file)).unwrap() != before {
+                written = Some(std::time::Instant::now());
+            }
+            let c = &tui.app.changes;
+            let there = c.path == file && !c.loading && c.hunks.get(c.change).is_some_and(|h| h.modified_lines.iter().any(|l| l == line)) && c.follow_to.is_none();
+            if there {
+                if let Some(at) = written {
+                    return at.elapsed();
+                }
+            }
+            tui.pump(5);
+        }
+    };
+    let mut took = Vec::new();
+    for (step, file, line) in [(1, "a.txt", "line 8 (edited by the agent)"), (2, "b.txt", "b one (edited by the agent)"), (3, "c.txt", "c one (edited by the agent)")] {
+        let dt = edit(&mut tui, step, file, line);
+        took.push((file, dt));
+        assert!(dt < std::time::Duration::from_millis(250), "{file}: the review moved {dt:?} after the edit");
+        tui.until(5, |a| !a.changes.loading && a.changes.files.iter().any(|f| f.1 == file && f.2 > 0));
+        let s = tui.screen();
+        assert!(s.contains(&format!("{file}  change")) && s.contains(&format!("+{line}")), "{s}");
+        tui.snapshot(&format!("parity-t30-follow-{step}"));
+    }
+    eprintln!("T-30 Follow latencies: {took:?}");
+
+    // j (a move by hand) pauses Follow: the next edit does not move the review.
+    tui.key(KeyCode::Char('j'));
+    assert_eq!(tui.app.changes.follow, overseer_tui::app::Follow::Paused);
+    let at = tui.app.changes.path.clone();
+    std::fs::write(barrier.join("go-4"), "").unwrap();
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    while !std::fs::read_to_string(wt.join("d.txt")).unwrap().contains("edited by the agent") {
+        assert!(std::time::Instant::now() < end);
+        tui.pump(20);
+    }
+    tui.until(10, |a| a.last_edit.values().any(|p| p == "d.txt"));
+    tui.pump(500);
+    assert_eq!(tui.app.changes.path, at, "paused: the review stays where it was moved by hand");
+    let s = tui.screen();
+    assert!(s.contains("Follow Paused (F resumes)"), "{s}");
+    tui.snapshot("parity-t30-paused");
+    // F resumes it: straight to the file the agent edited last, then on to the next edit.
+    tui.key(KeyCode::Char('F'));
+    assert_eq!(tui.app.changes.follow, overseer_tui::app::Follow::On);
+    tui.until(5, |a| a.changes.path == "d.txt" && !a.changes.loading && a.changes.follow_to.is_none() && !a.changes.hunks.is_empty());
+    let dt = edit(&mut tui, 5, "a.txt", "line 2 (edited by the agent)");
+    assert!(dt < std::time::Duration::from_millis(250), "after resuming, {dt:?}");
+    assert!(tui.screen().contains("◉ Following the agent"));
+    tui.snapshot("parity-t30-resumed");
+    // `?` names the key.
+    tui.key(KeyCode::Esc);
+    tui.key(KeyCode::Char('?'));
+    assert!(tui.screen().contains("Follow the agent's edits"));
+}
+
+/// T-31: on the Claude fixture, every waiting agent can be answered from the terminal: `a` Allow
+/// once (asked again for the same tool), `s` Allow for this session (Claude Code's own session
+/// rule: not asked again), `d` Deny with a note (the note reaches the fixture as the reason).
+#[test]
+fn t31_a_waiting_agent_can_always_be_answered() {
+    let t = tempfile::tempdir().unwrap();
+    let log = t.path().join("stdin");
+    std::fs::create_dir_all(&log).unwrap();
+    let log_s = log.display().to_string();
+    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture("claude-fixture.js")), ("CLAUDE_FIXTURE_MODE", "session-rule"), ("FIXTURE_STDIN_LOG_DIR", &log_s), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE,FIXTURE_STDIN_LOG_DIR")]);
+    let r = five_files(&t.path().join("answers"));
+    let start = |title: &str| d.ctl("task.create", json!({ "repo": r, "harness": "claude", "prompt": "twice: npm test", "title": title }))["run"]["id"].as_str().unwrap().to_string();
+    let session = start("Allowed for the session");
+    let once = start("Allowed once");
+    let denied = start("Denied with a note");
+    for id in [&session, &once, &denied] {
+        d.wait_status(id, |s| s == "waiting_for_user", 20);
+    }
+    let mut tui = Tui::attach(&d, 240, 44);
+    tui.until(10, |a| a.visible().iter().filter(|r| r.needs_you()).count() == 3);
+    let focus = |tui: &mut Tui, id: &str| {
+        for _ in 0..10 {
+            if tui.app.focus.as_deref() == Some(id) {
+                return;
+            }
+            tui.key(KeyCode::Tab);
+        }
+        panic!("could not focus {id}");
+    };
+    let asked = |id: &str| d.events(id).iter().filter(|e| e["kind"] == "permission").count();
+
+    // The prompt: the three answers, with Allow for this session because Claude Code offers its rule.
+    focus(&mut tui, &session);
+    let s = tui.until_screen(10, "s this session");
+    assert!(s.lines().any(|l| l.contains("◆ Bash npm test") && l.contains("a allow once s this session d deny…")), "{s}");
+    tui.snapshot("parity-t31-prompt");
+
+    // s: allowed for this session; the second npm test is not asked again.
+    tui.key(KeyCode::Char('s'));
+    d.wait_status(&session, |s| s == "completed", 20);
+    assert_eq!(asked(&session), 1, "Allow for this session is not asked again for the same tool");
+    let said: Vec<String> = d.events(&session).iter().filter_map(|e| e["payload"]["text"].as_str().map(str::to_string)).collect();
+    assert!(said.iter().any(|t| t.contains("npm test --again (allowed for this session, not asked again)")), "{said:?}");
+    let answered = d.events(&session).into_iter().find(|e| e["kind"] == "permission_answered").unwrap();
+    assert_eq!(answered["payload"]["always"], "Bash(npm test:*) · this session", "{answered}");
+
+    // a: allowed once; the same tool is asked again, and a allows it again.
+    focus(&mut tui, &once);
+    tui.key(KeyCode::Char('a'));
+    tui.until(10, |a| a.state.run(&once).is_some_and(|r| r.permission_request().is_some_and(|q| q == "req-bash-2")));
+    assert_eq!(asked(&once), 2, "Allow once asks again");
+    tui.key(KeyCode::Char('a'));
+    d.wait_status(&once, |s| s == "completed", 20);
+
+    // d: a one-line note; Enter sends it as the reason.
+    focus(&mut tui, &denied);
+    tui.key(KeyCode::Char('d'));
+    assert!(matches!(tui.app.mode, Mode::DenyNote { .. }));
+    tui.type_text("use the staging database instead");
+    let s = tui.screen();
+    assert!(s.contains("deny → Denied with a note") && s.contains("use the staging database instead") && s.contains("enter denies"), "{s}");
+    tui.snapshot("parity-t31-deny-note");
+    tui.key(KeyCode::Enter);
+    assert_eq!(tui.app.mode, Mode::Grid);
+    d.wait_status(&denied, |s| s == "completed", 20);
+    let wt = worktree(&d, &denied);
+    let input = std::fs::read_to_string(log.join(format!("{}.log", wt.file_name().unwrap().to_string_lossy()))).unwrap();
+    let reply = input.lines().find(|l| l.contains("control_response")).expect("the denial reached the fixture");
+    assert!(reply.contains("\"behavior\":\"deny\"") && reply.contains("\"message\":\"use the staging database instead\""), "{reply}");
+    tui.until(10, |a| a.state.run(&denied).is_some_and(|r| !r.needs_you() && !r.active()));
+    let s = tui.until_screen(10, "permission denied: use the staging database instead");
+    assert!(!s.lines().next().unwrap().contains("need"), "no one waits:\n{s}");
+    tui.snapshot("parity-t31-answered");
+    // `?` names all three.
+    tui.key(KeyCode::Char('?'));
+    assert!(tui.screen().contains("allow / deny: once, this session, with a note"));
+}
+
+/// T-32: the `n` form offers effort and permission mode for a harness that takes them (the Claude
+/// fixture, echoing what it was started with): both reach the daemon's records of the run and the
+/// harness; they are remembered for the next agent; a harness without them hides both fields.
+#[test]
+fn t32_new_agent_with_every_choice_vs_code_has() {
+    use overseer_tui::app::NewAgentForm;
+    let t = tempfile::tempdir().unwrap();
+    let d = claude_daemon("echo");
+    let r = repo(&t.path().join("choices"));
+    let mut tui = Tui::attach(&d, 160, 44);
+    tui.app.cwd_repo = Some(r.display().to_string());
+    tui.key(KeyCode::Char('n'));
+    assert_eq!(tui.app.mode, Mode::NewAgent);
+    tui.until(10, |a| a.form.harnesses.iter().any(|h| h.0 == "claude") && a.form.harnesses.iter().any(|h| h.0 == "generic") && !a.form.accounts.is_empty());
+    // To the harness field, then the Claude fixture.
+    while tui.app.form.field != 1 {
+        tui.key(KeyCode::Tab);
+    }
+    for _ in 0..8 {
+        if tui.app.form.harness_id() == Some("claude") {
+            break;
+        }
+        tui.key(KeyCode::Right);
+    }
+    assert_eq!(tui.app.form.harness_id(), Some("claude"));
+    let s = tui.screen();
+    assert!(s.contains("Effort") && s.contains("Permissions"), "{s}");
+    // Effort: high (default, low, medium, high); permission mode: Accept edits.
+    tui.key(KeyCode::Tab);
+    tui.key(KeyCode::Tab);
+    tui.key(KeyCode::Tab);
+    assert_eq!(tui.app.form.field, NewAgentForm::EFFORT);
+    for _ in 0..3 {
+        tui.key(KeyCode::Right);
+    }
+    assert_eq!(tui.app.form.effort_value(), Some("high"));
+    tui.key(KeyCode::Tab);
+    assert_eq!(tui.app.form.field, NewAgentForm::MODE);
+    tui.key(KeyCode::Right);
+    tui.key(KeyCode::Right);
+    assert_eq!(tui.app.form.mode_value(), Some(("acceptEdits", "Accept edits")));
+    // The modes offered are VS Code's for Claude Code: Ask first, Accept edits, Plan only, Auto.
+    let names: Vec<&str> = tui.app.form.modes().iter().map(|m| m.1).collect();
+    assert_eq!(names, ["Ask first", "Accept edits", "Plan only", "Auto"]);
+    tui.key(KeyCode::Tab);
+    assert_eq!(tui.app.form.field, NewAgentForm::PROMPT);
+    tui.type_text("Report what you were started with");
+    let s = tui.screen();
+    assert!(s.contains("Effort") && s.contains("‹ high ›") && s.contains("Permissions") && s.contains("‹ Accept edits ›"), "{s}");
+    tui.snapshot("parity-t32-form");
+    tui.key(KeyCode::Enter);
+    tui.until(10, |a| a.mode == Mode::Grid && a.focused().is_some_and(|r| r.harness == "claude"));
+    let run = tui.app.focus.clone().unwrap();
+    d.wait_status(&run, |s| s == "completed", 20);
+    // The daemon's records: the run's effort, and the permission mode its turns start with.
+    assert_eq!(d.run(&run)["effort"], "high");
+    let db = d.home.path().join("overseer.sqlite");
+    let out = std::process::Command::new("sqlite3").arg(&db).arg(format!("SELECT launch FROM runs WHERE id='{run}'")).output().unwrap();
+    let launch: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap_or_default();
+    let opts = launch.get("generic").unwrap_or(&launch)["opts"].clone();
+    assert_eq!(opts, json!({ "effort": "high", "mode": "acceptEdits" }), "the run's launch record: {launch}");
+    // And the harness was started with both.
+    let echo = d.events(&run).iter().filter_map(|e| e["payload"]["text"].as_str().map(str::to_string)).find(|t| t.starts_with("ECHO ")).expect("the fixture's echo");
+    let argv: serde_json::Value = serde_json::from_str(&echo[5..]).unwrap();
+    let args: Vec<&str> = argv["argv"].as_array().unwrap().iter().filter_map(|a| a.as_str()).collect();
+    assert!(args.windows(2).any(|w| w == ["--effort", "high"]) && args.windows(2).any(|w| w == ["--permission-mode", "acceptEdits"]), "{args:?}");
+
+    // Remembered: the next form opens on Claude Code with the same effort and mode.
+    tui.key(KeyCode::Char('n'));
+    tui.until(10, |a| a.form.harness_id() == Some("claude"));
+    assert_eq!((tui.app.form.effort_value(), tui.app.form.mode_value().map(|m| m.0)), (Some("high"), Some("acceptEdits")));
+    // A harness without efforts or modes (the generic one): both fields are hidden, and Tab skips them.
+    while tui.app.form.field != 1 {
+        tui.key(KeyCode::Tab);
+    }
+    for _ in 0..8 {
+        if tui.app.form.is_generic() {
+            break;
+        }
+        tui.key(KeyCode::Right);
+    }
+    assert!(tui.app.form.is_generic());
+    let s = tui.screen();
+    assert!(!s.contains("Effort") && !s.contains("Permissions"), "{s}");
+    tui.snapshot("parity-t32-generic-hides-them");
+    let mut seen = Vec::new();
+    for _ in 0..7 {
+        tui.key(KeyCode::Tab);
+        seen.push(tui.app.form.field);
+    }
+    assert!(!seen.contains(&NewAgentForm::EFFORT) && !seen.contains(&NewAgentForm::MODE), "{seen:?}");
+    tui.key(KeyCode::Esc);
+}
+
+fn git_in(dir: &Path, args: &[&str]) -> String {
+    let out = std::process::Command::new("git").args(args).current_dir(dir).output().unwrap();
+    String::from_utf8_lossy(&out.stdout).trim().to_string()
+}
+
+/// T-33: the merge confirmation names every file it will commit, the untracked `.env` included;
+/// merge back stops on a conflict with main; `M` then offers to cancel the merge, and cancelling
+/// puts the worktree back at its pre-merge HEAD with its files as they were (uncommitted again).
+#[test]
+fn t33_cancel_a_conflicted_merge() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let r = five_files(&t.path().join("conflict"));
+    let run = d.sh(&r, "Conflicts with main", "printf 'line 1\\nline 2 from the agent\\n' > a.txt; printf 'SECRET=1\\n' > .env; echo edited");
+    d.wait_status(&run, |s| s == "completed", 20);
+    // Meanwhile main changes the same line.
+    std::fs::write(r.join("a.txt"), "line 1\nline 2 from main\n").unwrap();
+    git_in(&r, &["commit", "-qam", "main edits line 2"]);
+    let wt = worktree(&d, &run);
+    let head_before = git_in(&wt, &["rev-parse", "HEAD"]);
+    let status_before = git_in(&wt, &["status", "--porcelain", "-uall"]);
+    assert!(status_before.contains("?? .env") && status_before.contains("M a.txt"), "{status_before}");
+
+    let mut tui = Tui::attach(&d, 160, 44);
+    tui.until(10, |a| a.visible().len() == 1 && a.focus.is_some());
+    tui.key(KeyCode::Char('M'));
+    tui.until(10, |a| matches!(a.mode, Mode::Confirm(overseer_tui::app::Confirm::MergePrepare { .. })));
+    let s = tui.screen();
+    let flat: String = s.lines().map(|l| l.trim_end()).collect::<Vec<_>>().join(" ");
+    assert!(flat.contains("commit 2 worktree files (") && flat.contains(".env [new, untracked]") && flat.contains("a.txt"), "the untracked .env is named:\n{s}");
+    tui.snapshot("parity-t33-confirm-names-untracked");
+    tui.key(KeyCode::Char('y'));
+    tui.until_screen(10, "Merge back: conflicts in a.txt");
+    assert!(wt.join(".git").exists() && git_in(&wt, &["rev-parse", "-q", "--verify", "MERGE_HEAD"]).len() == 40, "a merge is in progress in the worktree");
+
+    // M again: the merge stopped on conflicts; n keeps it.
+    tui.app.notice = None;
+    tui.key(KeyCode::Char('M'));
+    tui.until(10, |a| matches!(a.mode, Mode::Confirm(overseer_tui::app::Confirm::MergeCancel { .. })));
+    let s = tui.screen();
+    assert!(s.contains("Merge back stopped on conflicts in a.txt. Cancel the merge and put the worktree back as it was before it?"), "{s}");
+    tui.snapshot("parity-t33-cancel-asks");
+    tui.key(KeyCode::Char('n'));
+    assert!(tui.screen().contains("The merge stays"));
+    assert_eq!(git_in(&wt, &["rev-parse", "-q", "--verify", "MERGE_HEAD"]).len(), 40, "n keeps the merge");
+    // y cancels it: the pre-merge HEAD, the agent's files, uncommitted as before.
+    tui.key(KeyCode::Char('M'));
+    tui.until(10, |a| matches!(a.mode, Mode::Confirm(overseer_tui::app::Confirm::MergeCancel { .. })));
+    tui.key(KeyCode::Char('y'));
+    tui.until_screen(10, "Merge cancelled");
+    assert_eq!(git_in(&wt, &["rev-parse", "HEAD"]), head_before, "the worktree's pre-merge HEAD");
+    assert_eq!(git_in(&wt, &["rev-parse", "-q", "--verify", "MERGE_HEAD"]), "", "no merge in progress");
+    assert_eq!(std::fs::read_to_string(wt.join("a.txt")).unwrap(), "line 1\nline 2 from the agent\n");
+    assert_eq!(std::fs::read_to_string(wt.join(".env")).unwrap(), "SECRET=1\n");
+    assert_eq!(git_in(&wt, &["status", "--porcelain", "-uall"]), status_before, "the files as they were");
+    tui.snapshot("parity-t33-cancelled");
+}
+
+/// The agents VS Code's side bar lists (extension/media/rollup.js `agents`: archived tasks left
+/// out), over the daemon's state: their run ids.
+fn vscode_agents(d: &Daemon) -> Vec<String> {
+    let state = d.ctl("state", json!({}));
+    let rollup = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().join("extension/media/rollup.js");
+    let script = format!("const R = require({:?}); const s = JSON.parse(require('fs').readFileSync(0, 'utf8')); process.stdout.write(JSON.stringify(R.agents(s).map(r => r.id)));", rollup.display().to_string());
+    let mut child = std::process::Command::new("node").args(["-e", &script]).stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped()).spawn().expect("node");
+    use std::io::Write;
+    child.stdin.take().unwrap().write_all(state.to_string().as_bytes()).unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(out.status.success());
+    serde_json::from_slice(&out.stdout).unwrap()
+}
+
+/// T-34: `E` archives a finished agent after y/n: it leaves the TUI's list and grid and VS Code's
+/// side bar (rollup.js over the daemon's state); the filter's Archived shows it, where `E` restores
+/// it, back in both. A working agent is not archived.
+#[test]
+fn t34_archive_and_restore() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let r = repo(&t.path().join("archive"));
+    let keep = d.sh(&r, "Stays in the list", "echo output of stays");
+    let old = d.sh(&r, "Old finished work", "echo output of old work");
+    for id in [&keep, &old] {
+        d.wait_status(id, |s| s == "completed", 20);
+    }
+    let busy = d.sh(&r, "Still working", "echo working; sleep 30");
+    let mut tui = Tui::attach(&d, 160, 44);
+    tui.until(10, |a| a.visible().len() == 3);
+    let focus = |tui: &mut Tui, id: &str| {
+        for _ in 0..10 {
+            if tui.app.focus.as_deref() == Some(id) {
+                return;
+            }
+            tui.key(KeyCode::Tab);
+        }
+        panic!("could not focus {id}");
+    };
+    assert!(vscode_agents(&d).contains(&old));
+    // Not while it works.
+    focus(&mut tui, &busy);
+    tui.key(KeyCode::Char('E'));
+    assert!(tui.screen().contains("Archiving waits until the agent is done"));
+    // E, y/n: n keeps it; y archives it.
+    focus(&mut tui, &old);
+    tui.key(KeyCode::Char('E'));
+    let s = tui.screen();
+    assert!(s.contains("Archive Old finished work? It leaves the list and the grid, here and in VS Code; nothing is deleted"), "{s}");
+    tui.snapshot("parity-t34-archive-asks");
+    tui.key(KeyCode::Char('n'));
+    assert!(tui.app.visible().iter().any(|r| r.id == old));
+    tui.key(KeyCode::Char('E'));
+    tui.key(KeyCode::Char('y'));
+    tui.until(10, |a| a.visible().len() == 2);
+    assert!(!tui.app.visible().iter().any(|r| r.id == old), "gone from the TUI's list and grid");
+    let s = tui.screen();
+    assert!(!s.contains("Old finished work") || s.lines().last().unwrap().contains("Archived Old finished work"), "{s}");
+    assert!(!vscode_agents(&d).contains(&old), "gone from VS Code's side bar");
+    assert!(vscode_agents(&d).contains(&keep));
+    tui.snapshot("parity-t34-archived");
+
+    // The filter: all → active → needs you → archived, where E restores it.
+    for _ in 0..3 {
+        tui.key(KeyCode::Char('f'));
+    }
+    assert_eq!(tui.app.filter, overseer_tui::app::Filter::Archived);
+    let ids: Vec<String> = tui.app.visible().iter().map(|r| r.id.clone()).collect();
+    assert_eq!(ids, [old.clone()], "only the archived agent");
+    let s = tui.screen();
+    assert!(s.contains("filter: archived") && s.contains("Old finished work"), "{s}");
+    tui.snapshot("parity-t34-archived-filter");
+    tui.key(KeyCode::Char('E'));
+    tui.until(10, |a| a.visible().is_empty());
+    tui.key(KeyCode::Char('f'));
+    assert_eq!(tui.app.filter, overseer_tui::app::Filter::All);
+    tui.until(10, |a| a.visible().len() == 3);
+    assert!(vscode_agents(&d).contains(&old), "back in VS Code's side bar");
+    assert!(tui.screen().contains("Old finished work"));
+    tui.snapshot("parity-t34-restored");
+    d.ctl("run.interrupt", json!({ "run_id": busy }));
+}
+
+/// A client for screens that need no daemon (the `?` overlay).
+struct NoDaemon;
+impl overseer_tui::client::Requests for NoDaemon {
+    fn request(&self, _method: &str, _params: serde_json::Value) -> u64 {
+        0
+    }
+    fn connected(&self) -> bool {
+        false
+    }
+    fn set_cursor_if_unset(&self, _cursor: i64) {}
+    fn subscribe(&self) {}
+}
+
+/// T-36: every command VS Code Overseer offers (extension/package.json) has a row in the RFC's
+/// table with its TUI key or the reason it stays in VS Code; every key the table names is in `?`.
+#[test]
+fn t36_nothing_left_out_without_a_reason() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    let pkg: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(root.join("extension/package.json")).unwrap()).unwrap();
+    let commands: Vec<String> = pkg["contributes"]["commands"].as_array().unwrap().iter().map(|c| c["command"].as_str().unwrap().to_string()).collect();
+    assert!(commands.len() > 50, "VS Code's commands: {}", commands.len());
+    let rfc = std::fs::read_to_string(root.join("docs/rfcs/tui.md")).unwrap();
+    // The table's rows: | `command` | title | keys | reason |
+    let mut rows: std::collections::HashMap<String, (Vec<String>, String)> = std::collections::HashMap::new();
+    for line in rfc.lines().filter(|l| l.starts_with("| `overseer.")) {
+        let cells: Vec<&str> = line.trim().trim_matches('|').split('|').map(str::trim).collect();
+        assert_eq!(cells.len(), 4, "a row of four cells: {line}");
+        let id = cells[0].trim_matches('`').to_string();
+        let keys: Vec<String> = cells[2].split(',').map(|k| k.trim().trim_matches('`').to_string()).filter(|k| !k.is_empty()).collect();
+        assert!(rows.insert(id.clone(), (keys, cells[3].to_string())).is_none(), "{id} has one row");
+    }
+    let missing: Vec<&String> = commands.iter().filter(|c| rows.get(*c).is_none_or(|(keys, why)| keys.is_empty() && why.len() < 12)).collect();
+    assert!(missing.is_empty(), "VS Code commands with no TUI key and no reason in docs/rfcs/tui.md: {missing:?}");
+    let stale: Vec<&String> = rows.keys().filter(|id| !commands.contains(id)).collect();
+    assert!(stale.is_empty(), "rows for commands VS Code no longer has: {stale:?}");
+
+    // `?` lists every key the table names.
+    let mut app = overseer_tui::app::App::new(std::sync::Arc::new(NoDaemon));
+    app.mode = Mode::Help;
+    let mut term = ratatui::Terminal::new(ratatui::backend::TestBackend::new(200, 60)).unwrap();
+    term.draw(|f| overseer_tui::ui::draw(f, &mut app)).unwrap();
+    let screen = buffer_text(term.backend().buffer());
+    let help = overseer_tui::ui::HELP;
+    for (id, (keys, _)) in &rows {
+        for key in keys {
+            let wanted: Vec<&str> = key.split_whitespace().collect();
+            let found = help.iter().find(|(cell, _)| {
+                let tokens: Vec<&str> = cell.split_whitespace().collect();
+                wanted.iter().all(|w| tokens.contains(w))
+            });
+            let Some((cell, what)) = found else { panic!("{id}'s key {key:?} is not in ?") };
+            assert!(screen.contains(&format!("{cell:<20}{what}")), "{id}'s key {key:?} ({cell}) is not drawn in ?:\n{screen}");
+        }
+    }
+    snapshot(term.backend().buffer(), "parity-t36-help");
+}
+
+/// The listener, built once (its simulated room: no microphone, a made-up voice for Overseer).
+fn listener_bin() -> std::path::PathBuf {
+    static BIN: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+    BIN.get_or_init(|| {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf();
+        let target = std::env::var_os("CARGO_TARGET_DIR").map(std::path::PathBuf::from).unwrap_or_else(|| root.join("target"));
+        let ok = std::process::Command::new(env!("CARGO")).args(["build", "-q", "-p", "overseer-listener"]).current_dir(&root).status().map(|s| s.success()).unwrap_or(false);
+        let bin = target.join("debug/overseer-listener");
+        assert!(ok || bin.exists(), "could not build overseer-listener");
+        bin
+    })
+    .clone()
+}
+
+/// A second client on Voice Mode's live channel, as VS Code's daemon client subscribes
+/// (extension/src/daemon-client.js): the states it is told, in order.
+struct VoiceWatcher {
+    states: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+}
+
+impl VoiceWatcher {
+    fn open(d: &Daemon) -> VoiceWatcher {
+        use std::io::{BufRead, Write};
+        let mut conn = std::os::unix::net::UnixStream::connect(&d.socket).unwrap();
+        conn.write_all(format!("{}\n", json!({ "id": 1, "method": "hello", "params": { "client": "vscode" } })).as_bytes()).unwrap();
+        conn.write_all(format!("{}\n", json!({ "id": 2, "method": "voice.subscribe", "params": {} })).as_bytes()).unwrap();
+        let states: std::sync::Arc<std::sync::Mutex<Vec<String>>> = Default::default();
+        let sink = states.clone();
+        std::thread::spawn(move || {
+            for line in std::io::BufReader::new(conn).lines() {
+                let Ok(line) = line else { break };
+                let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) else { continue };
+                let state = if v["id"] == 2 {
+                    let first = &v["result"]["voice"];
+                    if first["enabled"] == true { first["state"].as_str().map(str::to_string) } else { Some("off".into()) }
+                } else if v["method"] == "voice" && v["params"]["kind"] == "state" {
+                    v["params"]["state"].as_str().map(str::to_string)
+                } else {
+                    None
+                };
+                if let Some(s) = state {
+                    let mut all = sink.lock().unwrap();
+                    if all.last() != Some(&s) {
+                        all.push(s);
+                    }
+                }
+            }
+        });
+        VoiceWatcher { states }
+    }
+    fn last(&self) -> Option<String> {
+        self.states.lock().unwrap().last().cloned()
+    }
+    fn seen(&self) -> Vec<String> {
+        self.states.lock().unwrap().clone()
+    }
+}
+
+/// T-35: Voice Mode in Overseer's conversation, with the fixture voice session (the simulated
+/// voice: the real listener in its simulated room, no microphone; the Claude fixture as Overseer's
+/// model). Each state shows in turn (off, listening, hearing you, thinking, speaking, muted, paused
+/// for a call), with the words as they are heard; a spoken request is a card that fills in as it
+/// advances (thinking, going out, sent); mute, cancel and yes work by key; a second client on the
+/// daemon's live channel, as VS Code's, is told the same states.
+#[test]
+fn t35_voice_mode_in_the_terminal() {
+    let t = tempfile::tempdir().unwrap();
+    let mode = t.path().join("claude-mode");
+    std::fs::write(&mode, "overseer").unwrap();
+    let mic = t.path().join("mic-users");
+    std::fs::write(&mic, "").unwrap();
+    let cues = t.path().join("cues.log");
+    let (bin, mode_s, mic_s, cues_s) = (listener_bin().display().to_string(), mode.display().to_string(), mic.display().to_string(), cues.display().to_string());
+    let d = Daemon::start(&[
+        ("OVERSEER_VOICE_SIMULATE", "1"),
+        ("OVERSEER_LISTENER", &bin),
+        ("OVERSEER_LISTENER_TEST_VOICE", "1"),
+        ("OVERSEER_LISTENER_TEST_MIC_USERS", &mic_s),
+        ("OVERSEER_TEST_AUDIO_LOG", &cues_s),
+        ("OVERSEER_CLAUDE_PATH", &fixture("claude-fixture.js")),
+        ("CLAUDE_FIXTURE_MODE_FILE", &mode_s),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE"),
+    ]);
+    let r = repo(&t.path().join("voice"));
+    let phone = d.ctl("task.create", json!({ "repo": r, "harness": "generic", "workspace_mode": "worktree", "program": "/bin/sleep", "args": ["120"], "prompt": "", "title": "Phone" }))["run"]["id"].as_str().unwrap().to_string();
+    let vscode = VoiceWatcher::open(&d);
+    let mut tui = Tui::attach(&d, 160, 48);
+    tui.until(10, |a| a.voice_state() == Some("off"));
+    tui.key(KeyCode::Char('o'));
+    assert_eq!(tui.app.mode, Mode::Overseer);
+    let state_now = |tui: &mut Tui, want: &str, label: &str, secs: u64| {
+        tui.until(secs, |a| a.voice_state() == Some(want));
+        let s = tui.until_screen(5, label);
+        // The same state in the daemon and in the second client (VS Code's live channel).
+        let end = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        while vscode.last().as_deref() != Some(want) && std::time::Instant::now() < end {
+            tui.pump(20);
+        }
+        assert_eq!(vscode.last().as_deref(), Some(want), "VS Code's live channel says {want} too");
+        s
+    };
+    let s = state_now(&mut tui, "off", "Voice off", 5);
+    assert!(s.contains("◎ Voice off  ctrl+v turns it on"), "{s}");
+    tui.snapshot("parity-t35-off");
+
+    // ctrl+v: on, listening.
+    tui.key_mod(KeyCode::Char('v'), crossterm::event::KeyModifiers::CONTROL);
+    let s = state_now(&mut tui, "listening", "◉ Listening", 30);
+    assert!(s.contains("talking to Overseer"), "{s}");
+    tui.snapshot("parity-t35-listening");
+    // A made-up voice in the room: hearing you, and the words as they are heard.
+    d.ctl("voice.simulate", json!({ "speechlike": 3, "words": "" }));
+    let s = state_now(&mut tui, "hearing", "◉ Hearing you", 15);
+    tui.snapshot("parity-t35-hearing");
+    drop(s);
+    tui.until(15, |a| a.voice_state() == Some("listening"));
+
+    // A spoken request: a card that fills in as it advances; thinking, then speaking.
+    let said = d.ctl("voice.say", json!({ "text": "Tell Phone to use the new wire format." }));
+    let id = said["request"].as_str().unwrap().to_string();
+    let mut stages: Vec<String> = Vec::new();
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(90);
+    loop {
+        let st = tui.app.voice_requests.iter().find(|r| r["id"] == id.as_str()).and_then(|r| r["state"].as_str().map(str::to_string));
+        if let Some(st) = st {
+            if stages.last() != Some(&st) {
+                stages.push(st.clone());
+                let s = tui.screen();
+                assert!(s.contains("you (spoken) › Tell Phone to use the new wire format."), "the card:\n{s}");
+                tui.snapshot(&format!("parity-t35-card-{st}"));
+            }
+            if st == "sent" {
+                break;
+            }
+        }
+        assert!(std::time::Instant::now() < end, "the card stopped at {stages:?}:\n{}", tui.screen());
+        tui.pump(20);
+    }
+    assert!(stages.iter().any(|s| s == "settling") && stages.last().map(String::as_str) == Some("sent"), "the card advanced: {stages:?}");
+    let s = tui.until_screen(10, "◇ ");
+    assert!(s.contains("Sent") || s.lines().any(|l| l.contains("◇ ")), "{s}");
+    assert!(tui.app.voice_heard.contains("Tell Phone"), "the words as heard: {:?}", tui.app.voice_heard);
+    assert!(tui.app.voice_seen.iter().any(|s| s == "thinking") && tui.app.voice_seen.iter().any(|s| s == "speaking"), "thinking and speaking shown: {:?}", tui.app.voice_seen);
+
+    // ctrl+x cancels the open request inside its window.
+    d.ctl("voice.set", json!({ "settle_seconds": 8 }));
+    tui.until(20, |a| a.voice_state() == Some("listening"));
+    let second = d.ctl("voice.say", json!({ "text": "Tell Phone to stop pushing to main." }))["request"].as_str().unwrap().to_string();
+    tui.until(60, |a| a.voice_requests.iter().any(|r| r["id"] == second.as_str() && r["state"] == "settling"));
+    let s = tui.until_screen(5, "Going out in a moment (ctrl+x cancels)");
+    drop(s);
+    tui.snapshot("parity-t35-settling");
+    tui.key_mod(KeyCode::Char('x'), crossterm::event::KeyModifiers::CONTROL);
+    tui.until(10, |a| a.voice_requests.iter().any(|r| r["id"] == second.as_str() && r["state"] == "cancelled"));
+    tui.until_screen(5, "Cancelled: nothing was sent");
+    let card = d.ctl("voice.requests", json!({}))["requests"].as_array().unwrap().iter().find(|r| r["id"] == second.as_str()).cloned().unwrap();
+    assert_eq!(card["state"], "cancelled");
+    tui.snapshot("parity-t35-cancelled");
+
+    // ctrl+y answers a read-back yes: a permission read back by voice.
+    d.ctl("voice.set", json!({ "settle_seconds": 1 }));
+    std::fs::write(&mode, "permission").unwrap();
+    let sessions = d.ctl("task.create", json!({ "repo": r, "harness": "claude", "prompt": "write a file", "title": "Sessions" }))["run"]["id"].as_str().unwrap().to_string();
+    d.wait_status(&sessions, |s| s == "waiting_for_user", 30);
+    std::fs::write(&mode, "overseer").unwrap();
+    tui.until(20, |a| a.voice_state() == Some("listening"));
+    let rb = d.ctl("voice.say", json!({ "text": "What does Sessions want?" }));
+    assert!(rb["read_back"]["said"].as_str().unwrap_or("").starts_with("Sessions wants"), "{rb}");
+    tui.until(10, |a| a.voice_asking);
+    let s = tui.until_screen(5, "waits for your yes");
+    assert!(s.contains("ctrl+y yes ctrl+n no"), "{s}");
+    tui.snapshot("parity-t35-read-back");
+    tui.key_mod(KeyCode::Char('y'), crossterm::event::KeyModifiers::CONTROL);
+    tui.until(5, |a| !a.voice_asking);
+    d.wait_status(&sessions, |s| s != "waiting_for_user", 20);
+    assert_ne!(d.run(&sessions)["status"], "waiting_for_user", "yes by key allowed it");
+    let answered = d.events(&sessions).into_iter().find(|e| e["kind"] == "permission_answered").expect("answered");
+    assert_eq!(answered["payload"]["allow"], true);
+
+    // ctrl+a: talk to an agent at work (Phone, once Sessions has finished), then back to Overseer.
+    d.wait_status(&sessions, |s| s == "completed", 30);
+    tui.key_mod(KeyCode::Char('a'), crossterm::event::KeyModifiers::CONTROL);
+    tui.until(10, |a| a.voice["target"] == phone.as_str());
+    assert_eq!(d.ctl("voice.get", json!({}))["target"], phone.as_str());
+    tui.until_screen(5, "talking to Phone");
+    tui.snapshot("parity-t35-talk-to");
+    while tui.app.voice["target"] != "overseer" {
+        tui.key_mod(KeyCode::Char('a'), crossterm::event::KeyModifiers::CONTROL);
+        tui.pump(300);
+    }
+    tui.until_screen(5, "talking to Overseer");
+    // ctrl+t mutes and unmutes.
+    tui.until(20, |a| a.voice_state() == Some("listening"));
+    tui.key_mod(KeyCode::Char('t'), crossterm::event::KeyModifiers::CONTROL);
+    let s = state_now(&mut tui, "muted", "◉ Muted", 10);
+    assert!(s.contains("ctrl+t unmute"), "{s}");
+    tui.snapshot("parity-t35-muted");
+    tui.key_mod(KeyCode::Char('t'), crossterm::event::KeyModifiers::CONTROL);
+    state_now(&mut tui, "listening", "◉ Listening", 30);
+
+    // Paused for a call: another app takes the microphone (the simulated room's record of it).
+    std::fs::write(&mic, "us.zoom.xos\n").unwrap();
+    let s = state_now(&mut tui, "paused", "◉ Paused for a call", 10);
+    assert!(s.contains("uses the microphone"), "{s}");
+    tui.snapshot("parity-t35-paused");
+    std::fs::write(&mic, "").unwrap();
+    state_now(&mut tui, "listening", "◉ Listening", 20);
+
+    // ctrl+v: off.
+    tui.key_mod(KeyCode::Char('v'), crossterm::event::KeyModifiers::CONTROL);
+    state_now(&mut tui, "off", "Voice off", 10);
+    for want in ["off", "listening", "hearing", "thinking", "speaking", "muted", "paused"] {
+        assert!(tui.app.voice_seen.iter().any(|s| s == want), "the terminal showed {want}: {:?}", tui.app.voice_seen);
+        assert!(vscode.seen().iter().any(|s| s == want), "VS Code's live channel was told {want}: {:?}", vscode.seen());
+    }
+    assert_eq!(tui.app.voice_seen, vscode.seen(), "the terminal showed every state VS Code's live channel was told, in the same order");
+    eprintln!("T-35 states: terminal {:?}; VS Code's channel {:?}; card {stages:?}", tui.app.voice_seen, vscode.seen());
+    d.ctl("run.interrupt", json!({ "run_id": phone }));
+}

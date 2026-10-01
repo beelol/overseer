@@ -1,0 +1,60 @@
+ ◆ Overseer  page 1/1 · 0 agents                                                                                                                                                         ○ reconnecting 
+╭ agents ──────────────────────────────╮                                                                                                                                                                
+│                                      │                                                                                                                                                                
+│                                      │                                                                                                                                                                
+│                                      │                                                                                                                                                                
+│                                      │                                                                                                                                                                
+│                                      │                                                                                                                                                                
+│                                      │                        ╭ keys ────────────────────────────────────────────────────────────────╮                                                                
+│                                      │                        │                                                                      │                                                                
+│                                      │                        │  ←↓↑→  h j k l       move between agents                             │                                                                
+│                                      │                        │  1 – 9               focus agent n on this page                      │                                                                
+│                                      │                        │  tab / shift+tab     next / previous agent                           │                                                                
+│                                      │                        │  J / K               pick the next / previous agent in the list      │                                                                
+│                                      │                        │  esc                 close the picked agent's conversation           │                                                                
+│                                      │                        │  L                   hide or show the agent list                     │                                                                
+│                                      │                        │  D                   dashboard mode ⇄ grid, same agent               │                                                                
+│                                      │                        │  tab  (dashboard)    list → review → conversation                    │                                                                
+│                                      │                        │  ] [   pgdn pgup     next / previous page                            │                                                                
+│                                      │                        │  i  enter            message the focused agent                       │                                                                
+│                                      │                        │  g  z                zoom: one agent's full view ⇄ grid              │                                                                
+│                                      │                        │  home / G            in the full view: top / bottom                  │                                                                
+│                                      │                        │  v                   review: Accept / Reject changes                 │                                                                
+│                                      │                        │  1 2 3  c  (review)  comparison: task start, latest run, worktree    │                                                                
+│                                      │                        │  t  (review)         Changed | All files                             │                                                                
+│                                      │                        │  a A  r R  (review)  Accept / Reject a change, a whole file          │                                                                
+│                                      │                        │  e  (review)         open the file in your $EDITOR                   │                                                                
+│                                      │                        │  F  (review)         Follow the agent's edits (a move pauses)        │                                                                
+│                                      │                        │  e  (in zoom)        expand tool inputs and results                  │                                                                
+│                                      │                        │  a  s  d             allow / deny: once, this session, with a note   │                                                                
+│                                      │                        │  w                   next agent waiting for you                      │                                                                
+│                                      │                        │  x                   interrupt the focused agent                     │                                                                
+│                                      │                        │  n                   start a new agent                               │                                                                
+│                                      │                        │  o                   Overseer: its conversation and Voice Mode       │                                                                
+│                                      │                        │  ctrl+v  (in o)      Voice Mode on / off                             │                                                                
+│                                      │                        │  ctrl+t  (in o)      Voice Mode: mute / unmute                       │                                                                
+│                                      │                        │  ctrl+a  (in o)      Voice Mode: talk to Overseer or an agent        │                                                                
+│                                      │                        │  ctrl+x  (in o)      Voice Mode: cancel the open request             │                                                                
+│                                      │                        │  ctrl+y / ctrl+n     yes / no: a read-back, a plan, a proposal       │                                                                
+│                                      │                        │  M                   merge back (asks before each step)              │                                                                
+│                                      │                        │  P                   open a GitHub pull request (gh)                 │                                                                
+│                                      │                        │  C                   remove a finished agent's worktree              │                                                                
+│                                      │                        │  f                   filter: all → active → needs you → archived     │                                                                
+│                                      │                        │  E                   archive a finished agent (Archived: restore)    │                                                                
+│                                      │                        │  /                   search agents (esc clears)                      │                                                                
+│                                      │                        │  A                   accounts and sign-in                            │                                                                
+│                                      │                        │  O                   phone access on / off                           │                                                                
+│                                      │                        │  ctrl+o              devices: pair a phone, revoke, scope            │                                                                
+│                                      │                        │  S                   Audio Mode: settings and preview                │                                                                
+│                                      │                        │  r                   reload (after X: start the daemon)              │                                                                
+│                                      │                        │  X                   stop all agents and the daemon                  │                                                                
+│                                      │                        │  q                   quit (agents keep running)                      │                                                                
+│                                      │                        │                                                                      │                                                                
+│                                      │                        ╰────────────────────────────────────────────────────── any key closes ╯                                                                
+│                                      │                                                                                                                                                                
+│                                      │                                                                                                                                                                
+│                                      │                                                                                                                                                                
+│                                      │                                                                                                                                                                
+│                                      │                                                                                                                                                                
+╰──── ◆ needs you ✦ to review ✓ merged ╯                                                                                                                                                                
+ ←↑↓→ move   J/K pick in the list   i message   g full view   v changes   a/s/d allow once/session/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                                

@@ -1,0 +1,44 @@
+ ◆ Overseer  page 1/1 · 0 agents                                                                                                 phone access off · ● connected 
+╭ agents ──────────────────────╮                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │      ╭ new agent ───────────────────────────────────────────────────────────────────────╮                                      
+│                              │      │                                                                                  │                                      
+│                              │      │   Repository  /private/var/folders/mk/vz_j1tqn0rz6w6f4ztwfv0gr0000gn/T/.tmpNrfA… │                                      
+│                              │      │   Harness     ‹ Claude Code claude-fixture 0.0.0 (synthetic) ›  (1/6)            │                                      
+│                              │      │                                                                                  │                                      
+│                              │      │   Account     Mac's default login · fix…@example.test  ✓ signed in               │                                      
+│                              │      │   Model       harness default                                                    │                                      
+│                              │      │   Effort      ‹ high ›  (4/6)                                                    │                                      
+│                              │      │   Permissions ‹ Accept edits ›  (3/5)                                            │                                      
+│                              │      │                                                                                  │                                      
+│                              │      │  ›Prompt      Report what you were started with▌                                 │                                      
+│                              │      │                                                                                  │                                      
+│                              │      │                                                                                  │                                      
+│                              │      ╰────────────────────────────────────────────────────── enter starts · esc cancels ╯                                      
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+│                              │                                                                                                                                
+╰───── ◆ you ✦ review ✓ merged ╯                                                                                                                                
+ tab next field   ←/→ choose   enter start   esc cancel                                                                                                         

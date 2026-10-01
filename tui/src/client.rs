@@ -27,6 +27,8 @@ pub enum Msg {
     Event(Value),
     /// The replay of retained events after the subscription cursor finished.
     Replayed,
+    /// Voice Mode's live channel (`voice.subscribe`): states, heard words, requests (T-35).
+    Voice(Value),
     /// Reply to a request made with [`Requests::request`].
     Reply { id: u64, result: Result<Value, String> },
 }
@@ -227,6 +229,9 @@ impl Inner {
             }
             Some("replayed") => {
                 let _ = self.tx.send(Msg::Replayed);
+            }
+            Some("voice") => {
+                let _ = self.tx.send(Msg::Voice(msg["params"].clone()));
             }
             Some("resync") => {
                 // The live stream lagged: resume from what was delivered.
