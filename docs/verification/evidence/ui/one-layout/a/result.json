@@ -1,0 +1,292 @@
+{
+  "checks": [
+    {
+      "name": "the start: two groups of files, the terminal and Explorer; the other window has its tab strip",
+      "ok": true,
+      "detail": {
+        "before": {
+          "title": "d.txt — ws-repo",
+          "sidebar": true,
+          "sidebarTitle": "Explorer",
+          "panel": true,
+          "auxiliary": false,
+          "auxiliaryWidth": 0,
+          "window": 1920,
+          "tabStrips": 2,
+          "breadcrumbs": 2,
+          "groups": [
+            {
+              "width": 781,
+              "tabs": [
+                "a.txt",
+                "c.txt"
+              ],
+              "active": "c.txt"
+            },
+            {
+              "width": 781,
+              "tabs": [
+                "c.txt",
+                "d.txt"
+              ],
+              "active": "d.txt"
+            }
+          ]
+        },
+        "secondBefore": {
+          "title": "README.md — notes-repo",
+          "sidebar": true,
+          "sidebarTitle": "Explorer",
+          "panel": false,
+          "auxiliary": false,
+          "auxiliaryWidth": 0,
+          "window": 1920,
+          "tabStrips": 1,
+          "breadcrumbs": 1,
+          "groups": [
+            {
+              "width": 1562,
+              "tabs": [
+                "README.md"
+              ],
+              "active": "README.md"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "home: the agents list on the left, the review in the middle, Overseer's conversation in the right side bar; the terminal is closed",
+      "ok": true,
+      "detail": {
+        "inA": {
+          "title": "ws-repo",
+          "sidebar": true,
+          "sidebarTitle": "Overseer",
+          "panel": false,
+          "auxiliary": true,
+          "auxiliaryWidth": 712,
+          "window": 1920,
+          "tabStrips": 0,
+          "breadcrumbs": 0,
+          "groups": [
+            {
+              "width": 846,
+              "tabs": [],
+              "active": ""
+            }
+          ]
+        },
+        "home": {
+          "mode": "composer",
+          "selected": "r-77b499de9627",
+          "title": "Live edits",
+          "back": true,
+          "width": 709
+        }
+      }
+    },
+    {
+      "name": "the other window keeps its tab strip and its tabs",
+      "ok": true,
+      "detail": {
+        "title": "README.md — notes-repo",
+        "sidebar": true,
+        "sidebarTitle": "Explorer",
+        "panel": false,
+        "auxiliary": false,
+        "auxiliaryWidth": 0,
+        "window": 1920,
+        "tabStrips": 1,
+        "breadcrumbs": 1,
+        "groups": [
+          {
+            "width": 1562,
+            "tabs": [
+              "README.md"
+            ],
+            "active": "README.md"
+          }
+        ]
+      }
+    },
+    {
+      "name": "no user setting changed",
+      "ok": true
+    },
+    {
+      "name": "an agent picked: its review in the middle (one tab row), its chat in the right panel with a back control",
+      "ok": true,
+      "detail": {
+        "picked": {
+          "title": "Review: Finished edit (2) — ws-repo",
+          "sidebar": true,
+          "sidebarTitle": "Overseer",
+          "panel": false,
+          "auxiliary": true,
+          "auxiliaryWidth": 712,
+          "window": 1920,
+          "tabStrips": 1,
+          "breadcrumbs": 0,
+          "groups": [
+            {
+              "width": 846,
+              "tabs": [
+                "Review: Finished edit (2)"
+              ],
+              "active": "Review: Finished edit (2)"
+            }
+          ]
+        },
+        "view": {
+          "mode": "chat",
+          "selected": "r-4b952aa4071c",
+          "title": "Finished edit",
+          "back": true,
+          "width": 709
+        }
+      }
+    },
+    {
+      "name": "back returns the right panel to Overseer's conversation",
+      "ok": true,
+      "detail": {
+        "mode": "composer",
+        "selected": "r-4b952aa4071c",
+        "title": "Finished edit",
+        "back": true,
+        "width": 709
+      }
+    },
+    {
+      "name": "running it again closes the panel and puts the owner's tabs back",
+      "ok": true,
+      "detail": {
+        "before": [
+          {
+            "width": 781,
+            "tabs": [
+              "a.txt",
+              "c.txt"
+            ],
+            "active": "c.txt"
+          },
+          {
+            "width": 781,
+            "tabs": [
+              "c.txt",
+              "d.txt"
+            ],
+            "active": "d.txt"
+          }
+        ],
+        "after": [
+          {
+            "width": 781,
+            "tabs": [
+              "a.txt",
+              "c.txt"
+            ],
+            "active": "c.txt"
+          },
+          {
+            "width": 781,
+            "tabs": [
+              "c.txt",
+              "d.txt"
+            ],
+            "active": "d.txt"
+          }
+        ]
+      }
+    },
+    {
+      "name": "the other window and the user settings are unchanged throughout",
+      "ok": true
+    }
+  ],
+  "measures": {
+    "command to the arranged layout (ms)": 3700,
+    "way A: layout": {
+      "title": "ws-repo",
+      "sidebar": true,
+      "sidebarTitle": "Overseer",
+      "panel": false,
+      "auxiliary": true,
+      "auxiliaryWidth": 712,
+      "window": 1920,
+      "tabStrips": 0,
+      "breadcrumbs": 0,
+      "groups": [
+        {
+          "width": 846,
+          "tabs": [],
+          "active": ""
+        }
+      ]
+    },
+    "the right panel's width (px) and share of the window": {
+      "width": 712,
+      "share": 0.37,
+      "review": 846
+    },
+    "widening the panel (the extension's log)": [
+      "2026-09-29 20:12:16.071 [info] one layout A: editor narrower: panel 289 → 709 px (target 656 of 1562)",
+      "2026-09-29 20:12:16.400 [info] one layout A: with the side bar back, panel 709 px"
+    ],
+    "tab rows over the review, breadcrumbs": {
+      "tabStrips": 0,
+      "breadcrumbs": 0
+    },
+    "1440x900 layout": {
+      "title": "Review: Finished edit (2) — ws-repo",
+      "sidebar": true,
+      "sidebarTitle": "Overseer",
+      "panel": false,
+      "auxiliary": true,
+      "auxiliaryWidth": 712,
+      "window": 1440,
+      "tabStrips": 1,
+      "breadcrumbs": 0,
+      "groups": [
+        {
+          "width": 366,
+          "tabs": [
+            "Review: Finished edit (2)"
+          ],
+          "active": "Review: Finished edit (2)"
+        }
+      ]
+    },
+    "panel width after the owner hides and shows the secondary side bar": 712,
+    "after running it again": {
+      "title": "c.txt — ws-repo",
+      "sidebar": true,
+      "sidebarTitle": "Overseer",
+      "panel": false,
+      "auxiliary": false,
+      "auxiliaryWidth": 0,
+      "window": 1920,
+      "tabStrips": 2,
+      "breadcrumbs": 2,
+      "groups": [
+        {
+          "width": 781,
+          "tabs": [
+            "a.txt",
+            "c.txt"
+          ],
+          "active": "c.txt"
+        },
+        {
+          "width": 781,
+          "tabs": [
+            "c.txt",
+            "d.txt"
+          ],
+          "active": "d.txt"
+        }
+      ]
+    }
+  }
+}

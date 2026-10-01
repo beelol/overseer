@@ -33,7 +33,10 @@
       this.whereBtn = ui.iconButton('location', 'Where am I', { action: 'where', shortcut: '⌥⌘M' }); this.whereBtn.id = 'where';
       if (this.opts.mode !== 'dashboard') this.whereBtn.hidden = true;
       actions.append(this.stopBtn, this.reviewBtn, this.whereBtn, this.moreBtn);
-      head.append(this.statusEl, titles, actions);
+      // AC-264: the Overseer view shows an agent's chat in place of home; back returns to Overseer.
+      this.backBtn = ui.iconButton('arrow-left', 'Back to Overseer', { action: 'back', shortcut: '⌥⌘U' }); this.backBtn.id = 'back-to-overseer';
+      if (this.opts.mode !== 'dashboard') this.backBtn.hidden = true;
+      head.append(this.backBtn, this.statusEl, titles, actions);
 
       this.scroll = el('div', 'chat-scroll'); this.scroll.id = 'scroll';
       const col = el('div', 'chat-column');
@@ -66,6 +69,7 @@
       this.root.replaceChildren(head, this.scroll, this.jump, bottom);
 
       this.stopBtn.addEventListener('click', () => this.post({ type: 'interrupt' }));
+      this.backBtn.addEventListener('click', () => this.post({ type: 'command', command: 'overseer.backToOverseer' }));
       this.reviewBtn.addEventListener('click', () => this.post({ type: 'openReview' }));
       this.moreBtn.addEventListener('click', () => this.menu());
       this.whereBtn.addEventListener('click', () => this.post({ type: 'command', command: 'overseer.whereAmI' }));
@@ -124,7 +128,7 @@
         items.push(w);
       }
       this.metaEl.replaceChildren(...items.flatMap((x, i) => (i ? [el('span', 'sep', '·'), x] : [x])));
-      if (run.exit_reason && /failed|interrupted|disconnected/.test(run.status)) this.metaEl.title = window.OverseerPlain ? window.OverseerPlain.plain(run.exit_reason, 400) : run.exit_reason; else this.metaEl.removeAttribute('title');
+      if ((run.plain_reason || run.exit_reason) && /failed|interrupted|disconnected/.test(run.status)) this.metaEl.title = run.plain_reason || (window.OverseerPlain ? window.OverseerPlain.plain(run.exit_reason, 400) : run.exit_reason); else this.metaEl.removeAttribute('title');
 
       this.stopBtn.hidden = child || !msg.active || !msg.interruptSupported || !msg.trusted;
       const worktree = msg.workspace && msg.workspace.kind === 'worktree';
@@ -209,7 +213,7 @@
       const run = this.msg.run, ws = this.msg.workspace;
       const dl = el('dl');
       const row = (k, v, wrap) => { if (!v) return; const dd = el('dd', wrap ? 'wrap' : null, v); dd.title = v; dl.append(el('dt', null, k), dd); };
-      row('Status', ui.statusText(run.status) + (run.exit_reason ? ` (${window.OverseerPlain ? window.OverseerPlain.plain(run.exit_reason, 400) : run.exit_reason})` : ''), true);
+      row('Status', ui.statusText(run.status) + ((run.plain_reason || run.exit_reason) ? ` (${run.plain_reason || (window.OverseerPlain ? window.OverseerPlain.plain(run.exit_reason, 400) : run.exit_reason)})` : ''), true);
       row('Harness', `${ui.HARNESS[run.harness] || run.harness} ${run.harness_version || ''}`.trim());
       row('Account', this.msg.profile);
       row('Model', run.model);

@@ -9,7 +9,7 @@
 // (AC-226).
 (function () {
   const ui = window.OverseerUI, el = ui.el;
-  const CARD_ICON = { started: 'rocket', report: 'note', ask: 'question', answer: 'comment', claim: 'symbol-folder', done: 'check', finding: 'eye', watch: 'eye', watch_ended: 'eye-closed', withdrawn: 'discard', cannot_answer: 'warning', hold: 'debug-pause', release: 'debug-continue', conflict: 'warning', check_in: 'checklist', aside: 'comment-discussion', needs: 'bell' };
+  const CARD_ICON = { started: 'rocket', report: 'note', ask: 'question', answer: 'comment', claim: 'symbol-folder', done: 'check', trouble: 'warning', while_away: 'history', finding: 'eye', watch: 'eye', watch_ended: 'eye-closed', withdrawn: 'discard', cannot_answer: 'warning', hold: 'debug-pause', release: 'debug-continue', conflict: 'warning', check_in: 'checklist', aside: 'comment-discussion', needs: 'bell' };
   const ACTIVE = new Set(['queued', 'starting', 'running', 'waiting_for_user', 'waiting_for_connection', 'waiting_for_memory']);
   const STAGE_ICON = { thinking: 'loading~spin', sending: 'send', waiting: 'question', starting: 'rocket', working: 'sync~spin', stuck: 'bell-dot', done: 'check', failed: 'error', aside: 'comment-discussion' };
   const STUCK_MS = 3 * 60 * 1000;
@@ -56,7 +56,12 @@
     const backLabel = el('span', 'home-back-agent-label');
     backAgent.append(ui.icon('eye', 'sm'), el('span', 'home-back-agent-verb', 'Back to'), backLabel, el('kbd', null, '⌥⌘U'));
     backAgent.addEventListener('click', () => post({ type: 'backToAgent', runId: backAgent.dataset.run }));
-    head.append(account, vToggle, vstrip, el('span', 'spacer'), needs, level, fresh, unaside);
+    head.append(account, vToggle, vstrip, el('span', 'spacer'), needs, unaside);
+    // The conversation's level and Start fresh sit at the bottom right, under the message box
+    // (the owner, 2026-09-30), in the composer's foot when it is there.
+    const footTools = el('span', 'home-foot-tools'); footTools.append(level, fresh);
+    const composerFoot = host.querySelector('.composer-foot');
+    if (composerFoot) composerFoot.append(footTools); else head.append(footTools);
     // The voice view's stage: the mark, the words heard and said, and the strip's controls.
     const stage = el('section', 'home-stage'); stage.id = 'voice-stage'; stage.hidden = true; stage.setAttribute('aria-label', 'Voice Mode');
     const voiceStage = window.OverseerVoiceStage && layers ? window.OverseerVoiceStage.create(stage, { post, layers }) : null;
@@ -242,7 +247,8 @@
         case 'waiting_for_connection': return { stage: 'stuck', text: `${title} waits for a connection`, run: run.id };
         case 'waiting_for_memory': return { stage: 'stuck', text: `${title} waits for memory`, run: run.id };
         case 'completed': return { stage: 'done', text: row.action === 'start' ? `${title} finished` : row.state === 'answered' || row.state === 'picked_up' ? `${title} is done with it` : `${title} finished`, run: run.id };
-        case 'failed': case 'disconnected': return { stage: 'failed', text: `${title} failed${run.exit_reason ? ': ' + plain(run.exit_reason, 90) : ''}`, run: run.id };
+        // The daemon's plain reason follows the agent's name ("reached its account's usage limit", AC-239).
+        case 'failed': case 'disconnected': return { stage: 'failed', text: run.plain_reason ? `${title} ${run.plain_reason.charAt(0).toLowerCase()}${run.plain_reason.slice(1)}` : `${title} failed${run.exit_reason ? ': ' + plain(run.exit_reason, 90) : ''}`, run: run.id };
         case 'interrupted': return { stage: 'failed', text: `${title} was stopped`, run: run.id };
         default: return { stage: 'done', text: `${title}: ${ui.statusText(run.status)}`, run: run.id };
       }
@@ -340,7 +346,8 @@
       const open = ((session && session.proposals) || []).filter(p => p.state === 'open' || p.state === 'settling');
       // Until the owner has spoken to Overseer (its run exists), home is the composer alone, with
       // only the Voice button and Needs you in its head; Voice Mode on shows the conversation.
-      const talked = !!(session && session.run_id) || voiceOn || voiceReqs.size > 0;
+      // What happened while the owner was away leads even before the first word (AC-253).
+      const talked = !!(session && session.run_id) || voiceOn || voiceReqs.size > 0 || messages.some(m => m.card && m.card.kind === 'while_away');
       const empty = !talked || (messages.length === 0 && open.length === 0 && !((session && session.cards) || []).length && !voiceReqs.size);
       // The head (voice on and off, Needs you) is always there; the conversation once there is one.
       list.hidden = empty;
@@ -382,15 +389,19 @@
       session(s) {
         session = s;
         const messages = (s && s.messages) || [];
+        // Before the owner's first word only the away line shows, not every agent's start (AC-253).
+        const before = !!s && !s.run_id && !voiceOn;
         const open = ((s && s.proposals) || []).filter(p => p.state === 'open' || p.state === 'settling');
         level.textContent = s && s.level ? { ask_first: 'Ask first', steer: 'Steer', auto: 'Auto' }[s.level] || s.level : '';
         const keep = new Set();
+        let away = null;
         for (const m of messages) {
           keep.add(m.id);
           let e = shown.get(m.id);
-          if (!e) { e = row(m); shown.set(m.id, e); place(e); }
+          if (!e) { e = row(m); shown.set(m.id, e); place(e); if (m.card && m.card.kind === 'while_away') away = e; }
           else if (m.card && m.card.kind === 'ask' && e.dataset.answer !== String(m.card.answer || '')) { const n = row(m); e.replaceWith(n); shown.set(m.id, n); e = n; }
           if (m.card && m.card.kind === 'ask') e.dataset.answer = String(m.card.answer || '');
+          e.hidden = before && !(m.card && m.card.kind === 'while_away');
         }
         for (const p of open) {
           const id = 'p:' + p.id; keep.add(id);
@@ -410,6 +421,8 @@
         for (const [id, e] of shown) if (!keep.has(id) && !id.startsWith('v:')) { e.remove(); shown.delete(id); }
         renderStages();
         list.scrollTop = list.scrollHeight;
+        // What happened while the owner was away leads (AC-253): in view once the layout settles.
+        if (away) { const lead = away; requestAnimationFrame(() => lead.scrollIntoView({ block: 'end' })); setTimeout(() => lead.isConnected && lead.scrollIntoView({ block: 'end' }), 700); }
       },
       /** A message came back for a proposal card (an error, a state). */
       proposalStatus(id, text) { const e = shown.get('p:' + id); if (e) e.querySelector('.proposal-status').textContent = plain(text); },
@@ -421,7 +434,8 @@
           voiceOn = on;
           document.body.dataset.voice = on ? 'on' : 'off';
           if (on && voiceStage) voiceStage.wake();
-          refreshVisibility();
+          // Before the first word the list held only the away line: redraw it whole or back again.
+          if (session && !session.run_id) this.session(session); else refreshVisibility();
         }
         // Stopped by failures: the stage stays to say why, with Turn on.
         stage.hidden = !(on || (v && v.stopped));

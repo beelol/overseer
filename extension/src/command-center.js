@@ -77,7 +77,8 @@ class CommandCenter {
     if (!m || typeof m !== 'object') return;
     const post = x => this.panel?.webview.postMessage(x);
     switch (m.type) {
-      case 'ready': if (this.pendingTarget) post({ type: 'composerTarget', target: this.pendingTarget }); await this.push(); await this.pushOverseer(); this.pushVoice(); this.voiceSource?.refresh(); this.pushActivity(); if (this.inDashboard) post({ type: 'dashboard', on: true }); if (this.aside) post({ type: 'aside', on: true }); if (this.head) post({ type: 'headAgent', agent: this.head }); return;
+      // Opening home is a visit: what happened while the owner was away leads (AC-253).
+      case 'ready': if (this.pendingTarget) post({ type: 'composerTarget', target: this.pendingTarget }); await this.push(); await this.client.request('overseer.visit', { surface: 'vscode' }).catch(() => undefined); await this.pushOverseer(); this.pushVoice(); this.voiceSource?.refresh(); this.pushActivity(); if (this.inDashboard) post({ type: 'dashboard', on: true }); if (this.aside) post({ type: 'aside', on: true }); if (this.head) post({ type: 'headAgent', agent: this.head }); return;
       // Voice Mode's controls in the view (AC-227).
       case 'voiceMute': await vscode.commands.executeCommand('overseer.voice.mute'); return;
       case 'voiceToggle': await vscode.commands.executeCommand('overseer.voice.toggle'); return;
@@ -165,8 +166,6 @@ class CommandCenter {
       case 'search': post({ type: 'searchHits', q: m.q, taskIds: await this.handlers.search(String(m.q || '')) }); return;
       case 'command': await vscode.commands.executeCommand(String(m.command), ...(m.args !== undefined ? [m.args] : [])); return;
       case 'openExternal': { const url = String(m.url || ''); if (/^https?:\/\//i.test(url)) await vscode.env.openExternal(vscode.Uri.parse(url)); return; }
-      case 'exitDashboard': await vscode.commands.executeCommand('overseer.exitDashboard'); return;
-      case 'dashboardWindow': await vscode.commands.executeCommand('overseer.openDashboardWindow'); return;
       case 'cleanupArchived': await vscode.commands.executeCommand('overseer.cleanupArchived'); return;
       default: {
         const runId = typeof m.runId === 'string' ? m.runId : this.chatRun;

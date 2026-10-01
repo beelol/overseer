@@ -19,13 +19,16 @@ if (installed.version !== required) { console.error(`Expected vsce ${required}; 
 run(process.execPath, [path.join(root, 'branch-diff/scripts/build-review.js')], root);
 run(process.execPath, [path.join(root, 'notifier/build.js')], root);
 run(process.execPath, [path.join(root, 'listener/build.js')], root); // Voice Mode's listener (Gate R)
+run(process.execPath, [path.join(root, 'menubar/build.js')], root); // Overseer in the menu bar (AC-262)
 // The daemon says which commit it was built from (hello's `build`, `overseerd version`): deploys record it (AC-214).
 const head = spawnSync('git', ['rev-parse', '--short=12', 'HEAD'], { cwd: repo, encoding: 'utf8' }).stdout.trim();
 const dirty = spawnSync('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: repo, encoding: 'utf8' }).stdout.trim() ? '-dirty' : '';
 run('cargo', ['build', '--release', '-p', 'overseerd'], repo, { ...process.env, OVERSEER_BUILD_COMMIT: head ? head + dirty : 'unknown' });
 fs.mkdirSync(path.join(root, 'bin'), { recursive: true });
 const target = path.join(root, 'bin', `overseerd-${process.platform}-${process.arch}`);
-fs.copyFileSync(path.join(repo, 'target/release/overseerd'), target);
+// cargo builds into CARGO_TARGET_DIR when it is set (the test runs and dev daemons set it).
+const cargoTarget = process.env.CARGO_TARGET_DIR ? path.resolve(repo, process.env.CARGO_TARGET_DIR) : path.join(repo, 'target');
+fs.copyFileSync(path.join(cargoTarget, 'release/overseerd'), target);
 fs.chmodSync(target, 0o755);
 const out = path.join(root, `overseer-${JSON.parse(fs.readFileSync(path.join(root, 'package.json'))).version}.vsix`);
 run(process.execPath, [path.resolve(tool, installed.bin.vsce), 'package', '--no-dependencies', '--allow-missing-repository', '-o', out], root);

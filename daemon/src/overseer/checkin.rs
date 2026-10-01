@@ -152,7 +152,8 @@ impl Daemon {
     /// An agent completed a turn: if it stays idle for the grace period, it is finished and a
     /// check-in says done, or drifting if it stopped short.
     pub fn finished_for_check_in(&self, run_id: &str, status: &str) -> Result<()> {
-        if !matches!(status, "completed" | "failed") {
+        // A failed run comes back to Overseer as trouble, with its reason (AC-239).
+        if status != "completed" {
             return Ok(());
         }
         if self.cadence_of(run_id) == Cadence::Off {
@@ -301,8 +302,8 @@ impl Daemon {
         let harness = session["harness"].as_str().unwrap_or("claude").to_string();
         // Questions and reports from the agents' channel ride the same turn; a turn with nothing
         // else is theirs.
-        let is_channel = |r: &String| r.starts_with("ask:") || r.starts_with("report:") || r.starts_with("finding:");
-        let cause = if per.iter().any(|(_, reasons)| reasons.iter().any(|r| !is_channel(r))) { "check_in" } else if per.iter().any(|(_, reasons)| reasons.iter().any(|r| r.starts_with("finding:"))) { "finding" } else if per.iter().any(|(_, reasons)| reasons.iter().any(|r| r.starts_with("ask:"))) { "ask" } else { "report" };
+        let is_channel = |r: &String| r.starts_with("ask:") || r.starts_with("report:") || r.starts_with("finding:") || r.starts_with(super::trouble::REASON);
+        let cause = if per.iter().any(|(_, reasons)| reasons.iter().any(|r| !is_channel(r))) { "check_in" } else if per.iter().any(|(_, reasons)| reasons.iter().any(|r| r.starts_with("finding:"))) { "finding" } else if per.iter().any(|(_, reasons)| reasons.iter().any(|r| r.starts_with(super::trouble::REASON))) { "trouble" } else if per.iter().any(|(_, reasons)| reasons.iter().any(|r| r.starts_with("ask:"))) { "ask" } else { "report" };
         self.overseer_turn_with_cause(&session, &prompt, &harness, session["model"].as_str(), cause)?;
         for (run, reasons) in &per {
             let reasons: Vec<&String> = reasons.iter().filter(|r| !is_channel(r)).collect();
@@ -316,9 +317,10 @@ impl Daemon {
     }
 
     /// Drops the due check-ins the daemon's own checks queued; keeps what came through the
-    /// channel (ask:, report:, finding:), which only a turn of Overseer's answers.
+    /// channel (ask:, report:, finding:) and agents in trouble, which only a turn of Overseer's
+    /// answers.
     fn drop_plain_check_ins(&self) -> Result<()> {
-        self.store.lock().unwrap().conn.execute("DELETE FROM check_in_queue WHERE reason NOT LIKE 'ask:%' AND reason NOT LIKE 'report:%' AND reason NOT LIKE 'finding:%'", [])?;
+        self.store.lock().unwrap().conn.execute("DELETE FROM check_in_queue WHERE reason NOT LIKE 'ask:%' AND reason NOT LIKE 'report:%' AND reason NOT LIKE 'finding:%' AND reason NOT LIKE 'trouble:%'", [])?;
         Ok(())
     }
 
@@ -330,11 +332,21 @@ impl Daemon {
         let mut questions = Vec::new();
         let mut reports = Vec::new();
         let mut findings = Vec::new();
+        let mut troubles = Vec::new();
         let mut texts = Vec::new();
+        // What each finished agent's work may take of the turn (AC-238).
+        let finishing = per.iter().filter(|(_, reasons)| reasons.iter().any(|r| r == "finished")).count().max(1);
+        let work_room = (TURN_BYTES / 2) / finishing;
         for (run, reasons) in per {
             let d = self.digest(run)?;
             let last_check = d.last_check_in.clone();
-            let plain: Vec<&String> = reasons.iter().filter(|r| !r.starts_with("ask:") && !r.starts_with("report:") && !r.starts_with("finding:")).collect();
+            let plain: Vec<&String> = reasons.iter().filter(|r| !r.starts_with("ask:") && !r.starts_with("report:") && !r.starts_with("finding:") && !r.starts_with(super::trouble::REASON)).collect();
+            let kinds: Vec<&str> = reasons.iter().filter_map(|r| r.strip_prefix(super::trouble::REASON)).collect();
+            if !kinds.is_empty() {
+                if let Some(item) = self.trouble_item(run, &kinds)? {
+                    troubles.push(item);
+                }
+            }
             for r in reasons {
                 if let Some(id) = r.strip_prefix("finding:") {
                     if let Some(mut f) = self.finding_json(id) {
@@ -360,19 +372,28 @@ impl Daemon {
                 }
             }
             if !plain.is_empty() {
-                items.push(json!({"id": d.id, "title": d.title, "status": d.status, "reasons": plain, "area": d.area, "changed": d.changed.iter().map(|c| c.path.clone()).collect::<Vec<_>>(), "asked": d.asked.iter().map(|a| a.text.clone()).collect::<Vec<_>>(), "last_check_in": last_check}));
+                let mut item = json!({"id": d.id, "title": d.title, "status": d.status, "reasons": plain, "area": d.area, "changed": d.changed.iter().map(|c| c.path.clone()).collect::<Vec<_>>(), "asked": d.asked.iter().map(|a| a.text.clone()).collect::<Vec<_>>(), "last_check_in": last_check});
+                // A finished agent's work in full (AC-238): its final message, its whole diff and
+                // its last test run.
+                if d.status == "completed" && plain.iter().any(|r| r.as_str() == "finished") {
+                    item["finished"] = self.finished_work(run, work_room)?;
+                }
+                items.push(item);
             }
             texts.push(self.digest_text(run)?);
         }
         let mut out = format!("{}\n", super::session::OPEN);
         if !items.is_empty() {
-            out.push_str(&format!("Check-in. For each agent below, decide whether it is doing what was asked (its task, the owner's later messages, your directions, its guardrails and its area) and answer with the check_in tool once per agent: result on_task, drifting or done, with a reason; for done, also what was left out, if anything. An agent that is on task hears nothing from you. For one that is drifting, use propose: at the Steer level a message or a hold, at the Auto level a redirect; at Ask first the owner decides. Judge what the agent is doing, not how. The level is {level}.\n\nCheck-in (JSON):\n{}\n\n", serde_json::to_string_pretty(&items)?));
+            out.push_str(&format!("Check-in. For each agent below, decide whether it is doing what was asked (its task, the owner's later messages, your directions, its guardrails and its area) and answer with the check_in tool once per agent: result on_task, drifting or done, with a reason; for done, also what was left out, if anything. An agent that is on task hears nothing from you. For one that is drifting, use propose: at the Steer level a message or a hold, at the Auto level a redirect; at Ask first the owner decides. Judge what the agent is doing, not how. An agent with `finished` has stopped: read its final message, its diff and its test output, and say in one or two sentences, citing the test output, whether it did what was asked (check_in with did_it). Then propose the next step: merge_back (or pull_request) when it did it and its tests pass, else a message to the agent with the fix; the owner says yes to either. The level is {level}.\n\nCheck-in (JSON):\n{}\n\n", serde_json::to_string_pretty(&items)?));
         }
         if !questions.is_empty() {
             out.push_str(&format!("Questions from agents. Answer each with the answer tool (its id and your text) from what you know: the roster, the digests, the other agents' reports and files; if only another agent can answer, ask it with propose (a message) and answer once it replies. The level is {level}.\n\nQuestions (JSON):\n{}\n\n", serde_json::to_string_pretty(&questions)?));
         }
         if !reports.is_empty() {
             out.push_str(&format!("Reports that came back from the agents you asked. Call rally for the repository's map, then propose in one proposal the areas (area actions) and shares it needs.\n\nReports (JSON):\n{}\n\n", serde_json::to_string_pretty(&reports)?));
+        }
+        if !troubles.is_empty() {
+            out.push_str(&format!("Agents in trouble: they stopped, reached a usage limit, lost their sign-in or went quiet. For each, tell the owner in one or two plain sentences what happened (its reason below; never an error code) and offer the fix with propose, one of its offers: continue (agent, profile: one of its other accounts, or a model) for a usage limit or a sign-in, retry (agent) for a failure that may pass, stop (agent) or a message for one that is stuck. At the Auto level it is done; otherwise the owner says yes. The level is {level}.\n\nTrouble (JSON):\n{}\n\n", serde_json::to_string_pretty(&troubles)?));
         }
         if !findings.is_empty() {
             out.push_str(&format!("Findings from watchers. The watcher only reads; you act on its subject at your level with propose: for stop, at Ask first propose a hold and say why, at Steer hold now (a redirect is a proposal), at Auto hold and redirect; for concern, a message to the subject or nothing, as you judge; when `held` is true the daemon already holds the subject (hold on stop) and what follows is still yours. Tell the owner what you did. The level is {level}.\n\nFindings (JSON):\n{}\n\n", serde_json::to_string_pretty(&findings)?));
@@ -383,7 +404,7 @@ impl Daemon {
     }
 
     /// The check_in tool: Overseer's result for one agent, recorded on that agent.
-    pub fn record_check_in(self: &Arc<Self>, agent: &str, result: &str, reason: &str, left_out: &str) -> Result<Value> {
+    pub fn record_check_in(self: &Arc<Self>, agent: &str, result: &str, reason: &str, left_out: &str, did_it: Option<bool>) -> Result<Value> {
         if !["on_task", "drifting", "done"].contains(&result) {
             bail!("a check-in result is on_task, drifting or done");
         }
@@ -395,8 +416,11 @@ impl Daemon {
             let session = self.overseer_session()?;
             let sid = session["id"].as_str().unwrap().to_string();
             let asked: Vec<String> = self.digest(agent)?.asked.iter().map(|a| a.text.clone()).collect();
-            let card = json!({"kind": "done", "agent": agent, "title": run.title, "asked": asked, "done": reason, "left_out": left_out});
-            self.append_session_message(&sid, "card", None, &format!("{} is done: {}{}", run.title, reason, if left_out.is_empty() { String::new() } else { format!(" Left out: {left_out}.") }), Some(&card))?;
+            // The verdict on finished work (AC-238), with the daemon's own record of its last test run.
+            let tests = if run.status == "completed" { self.last_test_run(agent)? } else { None };
+            let card = json!({"kind": "done", "agent": agent, "title": run.title, "asked": asked, "done": reason, "left_out": left_out, "did_it": did_it, "tests": tests});
+            let head = match did_it { Some(true) => "did it", Some(false) => "is not done yet", None => "is done" };
+            self.append_session_message(&sid, "card", None, &format!("{} {head}: {}{}", run.title, reason, if left_out.is_empty() { String::new() } else { format!(" Left out: {left_out}.") }), Some(&card))?;
         }
         Ok(json!({"agent": agent, "result": result, "recorded": true}))
     }

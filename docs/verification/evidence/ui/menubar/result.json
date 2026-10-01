@@ -1,0 +1,269 @@
+{
+  "checks": [
+    {
+      "name": "scripts/dev up starts the dev daemon's own item, pinned to its socket and its VS Code profile",
+      "ok": true,
+      "detail": {
+        "running": "74055",
+        "cfg": {
+          "socket": "/private/tmp/ovs-ui-SL8AVH/dr/mb/overseerd.sock",
+          "instance": "dev-mb",
+          "daemon": "/private/tmp/ovs-ui-SL8AVH/dr/mb/bin/overseerd",
+          "start": [
+            "/Users/bilal/.local/share/mise/installs/node/24.20.0/bin/node",
+            "/Users/bilal/projects/overseer/.claude/worktrees/menubar-check/scripts/dev",
+            "up",
+            "--name",
+            "mb",
+            "--no-build"
+          ],
+          "code": "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
+          "code_args": [
+            "--user-data-dir",
+            "/private/tmp/ovs-ui-SL8AVH/dr/mb/vscode/profile",
+            "--extensions-dir",
+            "/private/tmp/ovs-ui-SL8AVH/dr/mb/vscode/extensions"
+          ]
+        }
+      }
+    },
+    {
+      "name": "quiet: \"3 working\", nothing waits, overseer (2) and site (1), accounts named",
+      "ok": true,
+      "detail": {
+        "counts": {
+          "idle": 0,
+          "needs": 0,
+          "review": 0,
+          "total": 3,
+          "working": 3
+        },
+        "cursor": 25,
+        "dev": true,
+        "instance": "dev-mb",
+        "repos": [
+          {
+            "agents": [
+              {
+                "account": "Claude Max · bil…@testbox.com",
+                "kind": "working",
+                "run_id": "r-25cd0f915e99",
+                "status": "Working · now",
+                "title": "TUI grid resize flicker"
+              },
+              {
+                "account": "Claude Max · bil…@testbox.com",
+                "kind": "working",
+                "run_id": "r-696865ea81fb",
+                "status": "Working · now",
+                "title": "Gateway reconnect backoff"
+              }
+            ],
+            "count": 2,
+            "name": "overseer",
+            "root": "/private/tmp/ovs-ui-SL8AVH/overseer",
+            "waiting": false
+          },
+          {
+            "agents": [
+              {
+                "account": "Claude Pro · ana…@personal.example",
+                "kind": "working",
+                "run_id": "r-200972a7278c",
+                "status": "Working · now",
+                "title": "Pricing table copy"
+              }
+            ],
+            "count": 1,
+            "name": "site",
+            "root": "/private/tmp/ovs-ui-SL8AVH/site",
+            "waiting": false
+          }
+        ],
+        "summary": "3 working",
+        "voice": {
+          "available": true,
+          "enabled": false,
+          "muted": false
+        },
+        "waiting": []
+      }
+    },
+    {
+      "name": "needs you: both requests, newest first, as questions with their session rule",
+      "ok": true,
+      "detail": [
+        {
+          "account": "Claude Max · bil…@testbox.com",
+          "ago": "now",
+          "always": "Bash(cargo test:*) · this session",
+          "answerable": true,
+          "harness": "claude",
+          "question": "Run cargo test -p overseerd?",
+          "repo": "overseer",
+          "request_id": "req-bash",
+          "run_id": "r-1026125def2f",
+          "title": "Fix flaky gateway test"
+        },
+        {
+          "account": "Claude Pro · ana…@personal.example",
+          "ago": "now",
+          "always": "Bash(npm test:*) · this session",
+          "answerable": true,
+          "harness": "claude",
+          "question": "Run npm test?",
+          "repo": "site",
+          "request_id": "req-bash",
+          "run_id": "r-add0307f4502",
+          "title": "Checkout page redesign"
+        }
+      ]
+    },
+    {
+      "name": "Allow once pressed in the menu reaches the fixture agent (its tool call runs; no rule is kept)",
+      "ok": true,
+      "detail": {
+        "allowed": {
+          "status": 0,
+          "out": "wrote /Users/bilal/projects/overseer/.claude/worktrees/menubar-check/docs/verification/evidence/ui/menubar/2-allow-once.png (1 menu)\n{\"id\":4,\"result\":{\"ok\":true}}\nwrote /Users/bilal/projects/overseer/.claude/worktrees/menubar-check/docs/verification/evidence/ui/menubar/2-allow-once-after.png (1 menu)",
+          "err": "menu: go: snapshot true\nmenu: opening the menu (attempt 1)\nmenu: inside the menu: 18 items, windows [(1113, (1389.0, -1414.0, 318.0, 504.0))]\nmenu: capture: windows [(1113, (1389.0, -1414.0, 318.0, 504.0))]\nmenu: item (1390.0, -1441.0, 34.0, 22.0), menus [(1113, (1389.0, -1414.0, 318.0, 504.0))]\nmenu: pressing allow on request 1 of 2\nmenu: answered\nmenu: after the answer: 1 menus open\nmenu: item (1390.0, -1441.0, 34.0, 22.0), menus [(1113, (1389.0, -1414.0, 318.0, 504.0))]\nmenu: exit 0"
+        },
+        "npmAnswer": {
+          "behavior": "allow",
+          "updatedInput": {
+            "command": "npm test",
+            "description": "Run npm test"
+          }
+        }
+      }
+    },
+    {
+      "name": "Deny pressed in the menu reaches the fixture agent",
+      "ok": true,
+      "detail": {
+        "denied": {
+          "status": 0,
+          "out": "{\"id\":4,\"result\":{\"ok\":true}}",
+          "err": "menu: go: snapshot true\nmenu: opening the menu (attempt 1)\nmenu: inside the menu: 17 items, windows [(1122, (2236.0, -1414.0, 318.0, 416.0))]\nmenu: capture: windows [(1122, (2236.0, -1414.0, 318.0, 416.0))]\nmenu: pressing deny on request 0 of 1\nmenu: answered\nmenu: after the answer: 1 menus open\nmenu: exit 0"
+        },
+        "cargoAnswer": {
+          "behavior": "deny",
+          "message": "Denied by user in Overseer"
+        }
+      }
+    },
+    {
+      "name": "30 agents: \"12 working · 5 to review · 13 idle\", overseer 18, site 7, notes 5, at most 8 in a submenu, the waiting one first",
+      "ok": true,
+      "detail": [
+        [
+          "overseer",
+          18,
+          [
+            "Fix flaky gateway test: Needs you",
+            "Gateway reconnect backoff: Working · now",
+            "Menu-bar status item: Working · now",
+            "TUI grid resize flicker: Working · now",
+            "Swarm admission limits: Working · now",
+            "Account booking race: Working · now",
+            "Offline replay order: Working · now",
+            "Auto quota refresh: Working · now"
+          ]
+        ],
+        [
+          "site",
+          7,
+          [
+            "Checkout page redesign: Working · now",
+            "Pricing table copy: Working · now",
+            "Blog RSS feed: Working · now",
+            "Hero animation: To review",
+            "Footer links: Idle · now",
+            "Lighthouse fixes: Idle · now",
+            "Sitemap: Idle · now"
+          ]
+        ],
+        [
+          "notes",
+          5,
+          [
+            "Weekly notes digest: Working · now",
+            "Tag search: To review",
+            "Markdown export: Idle · now",
+            "Daily template: Idle · now",
+            "Backlinks: Idle · now"
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "Always allow (under Allow once's arrow) reaches the fixture agent with Claude Code's session rule",
+      "ok": true,
+      "detail": {
+        "always": {
+          "status": 0,
+          "out": "{\"id\":4,\"result\":{\"ok\":true}}",
+          "err": "menu: go: snapshot true\nmenu: opening the menu (attempt 1)\nmenu: inside the menu: 18 items, windows [(1191, (1389.0, -1414.0, 318.0, 440.0))]\nmenu: capture: windows [(1191, (1389.0, -1414.0, 318.0, 440.0))]\nmenu: pressing always on request 0 of 1\nmenu: answered\nmenu: after the answer: 1 menus open\nmenu: exit 0"
+        },
+        "flakyAnswer": {
+          "behavior": "allow",
+          "updatedInput": {
+            "command": "npm test",
+            "description": "Run npm test"
+          },
+          "updatedPermissions": [
+            {
+              "behavior": "allow",
+              "destination": "session",
+              "rules": [
+                {
+                  "ruleContent": "npm test:*",
+                  "toolName": "Bash"
+                }
+              ],
+              "type": "addRules"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "six waiting: the menu shows four and \"2 more waiting · Show all in Overseer…\" (see 4-six-waiting-*.png)",
+      "ok": true
+    },
+    {
+      "name": "choosing an agent in the menu opens it in the test VS Code",
+      "ok": true,
+      "detail": {
+        "chosen": "vscode://beelol.overseer/open-agent?run=r-e08e8090e856",
+        "target": {
+          "account": "Claude Max · bil…@testbox.com",
+          "kind": "needs",
+          "run_id": "r-e08e8090e856",
+          "status": "Needs you",
+          "title": "Gateway reconnect backoff"
+        }
+      }
+    },
+    {
+      "name": "with the daemon stopped the item says so, and Start Overseer brings it back",
+      "ok": true,
+      "detail": {
+        "started": {
+          "status": 0,
+          "out": "",
+          "err": "menu: go: snapshot false\nmenu: chose Start Overseer"
+        },
+        "back": {
+          "build": null,
+          "data_dir": "/private/tmp/ovs-ui-SL8AVH/dr/mb/home",
+          "instance": "dev-mb",
+          "pid": 65129,
+          "protocol": 1,
+          "socket": "/private/tmp/ovs-ui-SL8AVH/dr/mb/overseerd.sock",
+          "version": "0.1.0"
+        }
+      }
+    }
+  ]
+}

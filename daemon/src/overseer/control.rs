@@ -37,6 +37,9 @@ pub const ACTION_CLASSES: &[(&str, &str)] = &[
     ("start", STEER),
     ("answer", STEER),
     ("withdraw", STEER),
+    // AC-239: an agent that stopped goes on elsewhere, or tries again.
+    ("continue", STEER),
+    ("retry", STEER),
     ("archive", CONFIRM),
     ("permission", CONFIRM),
     ("merge_back", CONFIRM),
@@ -61,7 +64,7 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     ("agent.digest", "read"), ("agents.roster", "read"), ("conflicts.list", "read"), ("overseer.session", "read"), ("overseer.messages", "read"), ("agent.check_ins", "read"),
     ("overseer.tools", "read"), ("overseer.tool", "read"), ("run.queued", "read"), ("overseer.card", "read"), ("agent.holds", "read"), ("agent.guardrails", "read"),
     ("channel.messages", "read"), ("agent.briefings", "read"), ("overseer.rally", "read"), ("share.list", "read"), ("watch.list", "read"), ("watch.findings", "read"),
-    ("workspace.file", "read"), ("workspace.hunks", "read"), ("review.marks", "read"), ("repo.known", "read"),
+    ("workspace.file", "read"), ("workspace.hunks", "read"), ("review.marks", "read"), ("repo.known", "read"), ("menubar.snapshot", "read"),
     // What Overseer's Steer actions reach.
     ("task.create", STEER), ("run.follow_up", STEER), ("run.queue", STEER), ("run.unqueue", STEER), ("run.redirect", STEER), ("run.interrupt", STEER),
     ("agent.hold", STEER), ("agent.release", STEER), ("agent.guardrail", STEER), ("agent.guardrail_remove", STEER), ("agent.redirect", STEER),
@@ -77,7 +80,7 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     // Voice Mode (Gate R): the owner's own, never from the conversation.
     ("voice.get", "read"), ("voice.requests", "read"), ("voice.subscribe", "read"), ("voice.set", NEVER), ("voice.say", NEVER), ("voice.simulate", NEVER),
     ("voice.speak", NEVER), ("voice.focus", NEVER), ("voice.download", NEVER), ("voice.cancel", NEVER), ("voice.read_back", NEVER), ("voice.answer", NEVER),
-    ("overseer.token", NEVER), ("overseer.level", NEVER), ("agent.share_deny", NEVER), ("overseer.cap", NEVER), ("overseer.fresh", NEVER), ("overseer.send", NEVER), ("overseer.answer", NEVER), ("overseer.cancel", NEVER),
+    ("overseer.token", NEVER), ("overseer.level", NEVER), ("agent.share_deny", NEVER), ("overseer.cap", NEVER), ("overseer.fresh", NEVER), ("overseer.send", NEVER), ("overseer.visit", NEVER), ("overseer.answer", NEVER), ("overseer.cancel", NEVER),
     // Auto Mode and Swarm (claude/auto-swarm). Reads are reads. Starting a swarm, raising its
     // limits or deadline, changing its targets, resuming it, or starting an Auto root need the
     // owner's confirmation (the Swarm/Auto contract: Overseer's level grants no route, allocation
@@ -112,7 +115,7 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     ("auto.usage.thread.refresh", NEVER), ("auto.usage.export", NEVER), ("auto.usage.clear", NEVER),
     // What the owner does from VS Code or a phone (Gate N): their review marks, putting lines back,
     // a pull request, a sign-in and stopping everyone at once are not Overseer's to do.
-    ("review.accept", NEVER), ("review.unaccept", NEVER), ("review.import", NEVER), ("review.reject", NEVER),
+    ("review.accept", NEVER), ("review.unaccept", NEVER), ("review.import", NEVER), ("review.reject", NEVER), ("review.seen", NEVER),
     ("workspace.pr_open", NEVER), ("profile.device_login", NEVER), ("runs.stop_all", NEVER),
 ];
 

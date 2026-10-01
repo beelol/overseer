@@ -61,7 +61,7 @@ fn ac180_mcp_shim_serves_overseers_tools_from_the_daemon() {
     assert_eq!(replies[0]["result"]["serverInfo"]["name"], "overseer");
     assert_eq!(replies[0]["result"]["capabilities"]["tools"]["listChanged"], false);
     let tools: Vec<&str> = replies[1]["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
-    assert_eq!(tools, ["roster", "agent", "conflicts", "conversation", "changes", "diff", "file", "search", "usage", "check_in", "rally", "answer", "propose"]);
+    assert_eq!(tools, ["roster", "agent", "conflicts", "conversation", "changes", "diff", "file", "search", "usage", "accounts", "check_in", "rally", "answer", "propose"]);
     let roster = replies[2]["result"]["content"][0]["text"].as_str().unwrap();
     assert!(roster.contains(&run) && roster.contains("completed"), "roster names the run: {roster}");
     assert_eq!(replies[2]["result"]["isError"], false);
@@ -1334,9 +1334,17 @@ fn ac189_overseer_keeps_agents_on_task() {
     std::fs::write(&mode_file, "echo").unwrap();
     let partial = claude_task(&d, &repo, &mode_file, "echo", "Partial", "write the API and the docs [leave out: the docs]");
     d.wait_done(&partial, 30);
-    std::thread::sleep(Duration::from_secs(6));
-    let s = wait_overseer_idle(&d, 60);
-    let done = s["messages"].as_array().unwrap().iter().find(|m| m["source"] == "card" && m["card"]["kind"] == "done" && m["card"]["agent"] == partial).expect("done card");
+    // The check-in comes after the grace and the batch window, and reads the finished work first
+    // (AC-238): wait for its card rather than for a fixed time.
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    let done = loop {
+        let s = wait_overseer_idle(&d, 60);
+        if let Some(m) = s["messages"].as_array().unwrap().iter().find(|m| m["source"] == "card" && m["card"]["kind"] == "done" && m["card"]["agent"] == partial) {
+            break m.clone();
+        }
+        assert!(std::time::Instant::now() < deadline, "done card\n{}", overseer_trace(&d));
+        std::thread::sleep(Duration::from_millis(300));
+    };
     assert_eq!(done["card"]["left_out"], "the docs");
     // The same failure three times trips a check-in.
     let circles = claude_task(&d, &repo, &mode_file, "circles", "Loops", "fix the tests");
@@ -2578,11 +2586,21 @@ fn ac185_confirm_actions_permission_merge_back_and_pull_request() {
     let proposer = run_id(&d.generic(&repo, "worktree", "/bin/sh", &["-c", "echo proposed > proposed.txt"]));
     d.wait_done(&proposer, 20);
     let actions = json!([{"action": "permission", "agent": asker, "allow_request": true}, {"action": "merge_back", "agent": writer_id}, {"action": "pull_request", "agent": proposer}]);
-    // Not asked for by the owner: refused, each of them.
+    // Not asked for by the owner: a permission is refused. A check-in may propose the next step
+    // for a finished agent, the merge or the pull request (AC-238), and it waits for the yes even
+    // at Auto; declined, nothing happens.
     sql(&d, "UPDATE overseer_sessions SET last_cause='check_in';");
-    for a in actions.as_array().unwrap() {
+    let e = d.try_call("overseer.propose", json!({"actions": [actions[0]], "source": "test"})).unwrap_err();
+    assert!(e.contains("only when the owner asks"), "{e}");
+    for a in &actions.as_array().unwrap()[1..] {
+        let p = d.call("overseer.propose", json!({"actions": [a], "source": "test"}));
+        assert_eq!((p["state"].as_str(), p["done"].as_bool()), (Some("open"), Some(false)), "{p}");
+        assert_eq!(d.call("overseer.answer", json!({"id": p["proposal"], "yes": false, "surface": "ctl", "by": "owner"}))["state"], "no");
+    }
+    sql(&d, "UPDATE overseer_sessions SET last_cause='report';");
+    for a in &actions.as_array().unwrap()[1..] {
         let e = d.try_call("overseer.propose", json!({"actions": [a], "source": "test"})).unwrap_err();
-        assert!(e.contains("only when the owner asks"), "{e}");
+        assert!(e.contains("only when the owner asks"), "any other turn Overseer starts cannot: {e}");
     }
     // Asked for: read back, and at Auto still waiting for the yes.
     sql(&d, "UPDATE overseer_sessions SET last_cause='owner';");

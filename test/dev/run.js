@@ -34,6 +34,7 @@ async function check(name, fn) {
 function dev(home, root, args, { json = false, ok = true } = {}) {
   const env = { ...process.env, HOME: home, OVERSEER_DEV_ROOT: root, CARGO_HOME: process.env.CARGO_HOME || path.join(realHome, '.cargo'), RUSTUP_HOME: process.env.RUSTUP_HOME || path.join(realHome, '.rustup') };
   for (const k of Object.keys(env)) if (k.startsWith('OVERSEER_') && k !== 'OVERSEER_DEV_ROOT') delete env[k];
+  env.OVERSEER_DEV_MENUBAR = 'off'; // no dev item in the owner's menu bar from a test (AC-262)
   const r = cp.spawnSync(process.execPath, [DEV, ...args, ...(json ? ['--json'] : [])], { env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 15 * 60 * 1000 });
   if (ok && r.status !== 0) throw new Error(`scripts/dev ${args.join(' ')} exited ${r.status}:\n${r.stdout}\n${r.stderr}`);
   return json && r.status === 0 ? JSON.parse(r.stdout) : r;
@@ -201,7 +202,8 @@ async function snapshot(socket) {
   // ---------------------------------------------------------------- phase B
   const homeB = path.join(tmp, 'hb'); fs.mkdirSync(homeB);
   const rootB = path.join(tmp, 'rb');
-  const bin = path.join(repo, 'target/debug/overseerd');
+  // Where cargo put it: CARGO_TARGET_DIR when set (as scripts/dev resolves it), else <repo>/target.
+  const bin = path.join(process.env.CARGO_TARGET_DIR ? path.resolve(repo, process.env.CARGO_TARGET_DIR) : path.join(repo, 'target'), 'debug/overseerd');
   const stdEnv = { ...process.env, HOME: homeB, OVERSEER_CONTINUITY_PROBES: 'off', OVERSEER_CODEX_PATH: '/nonexistent/x', OVERSEER_CLAUDE_PATH: '/nonexistent/x', OVERSEER_OPENCODE_PATH: '/nonexistent/x' };
   for (const k of ['OVERSEER_HOME', 'OVERSEER_SOCKET', 'OVERSEER_INSTANCE']) delete stdEnv[k];
   let std, stdSocket, stdData, before, filesBefore;

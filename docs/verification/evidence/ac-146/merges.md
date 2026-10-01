@@ -1,5 +1,26 @@
 # AC-146: merges
 
+## Pull request #40 (one Overseer layout, Follow inside the review), 2026-09-30
+
+- **Finished:** phase 2 by its agent on 2026-09-29; the owner then rejected Follow opening files in a plain editor, and the rework put Follow inside the review (`26fabb77`..`d67dab5c`, "follow looks fantastic"); "Ask first" and "Start fresh" moved to the composer's foot (`861b905e`).
+- **Throwaway copy:** a first full run on the branch's own head (Rust 1,385, UI 76 of 79: theme and conversation fixed on the branch, chat passed alone); then main with #42 merged in and pushed (`df4e814d`, clean).
+- **Tests:** `scripts/test-all --jobs=1` at `nice -n 20` on `df4e814d`: Rust 1,414 passed, 0 failed; UI 78 of 80. review-width (the header past the edge at 900 px, from the new switch) fixed in the product (`b6bd0fb9`); chat (a classic scroll bar on this Mac takes 15 px; main fails it the same way) fixed in the scenario (`91e107ee`). review-width, chat, review, review-files, agent-head, overseer-window, home and gallery passed alone on the final head. Main gained no code between the copy and the merge.
+- **Merged:** squash, `4da1640e`. AC-264 verified at the merge; AC-99's record notes that an unchanged file now shows in Follow's view.
+
+## Pull request #42 (Overseer in the Mac's menu bar), 2026-09-30
+
+- **Finished:** built by its agent on 2026-09-29; the on-screen check passed 10 of 10 on 2026-09-30 with nobody at the Mac (the owner's yes to run it then).
+- **Throwaway copy:** main merged into `claude/menu-bar` (the fixture's `menubar` mode and #32's `tested` mode both kept) and pushed (`8ec869a4`).
+- **Tests:** `scripts/test-all --jobs=1` at `nice -n 20`: 78 of 81. Rust stopped at two real gaps, both the new methods missing from a class table: `protocol/protocol.json` (Gate N's gateway test; `21c1179e`, Mac only, the README's phone table and the phone's types regenerated) and Overseer's action classes in `daemon/src/overseer/control.rs` (AC-185; `3ed2eeff`: `menubar.snapshot` read, `review.seen` never). Then `cargo test --workspace --no-fail-fast`: 1,414 passed, 0 failed. review passed alone on the rebuilt copy (it missed twice before, in the full run and alone, as on #32's copy); conversation's miss is fixed on #40.
+- **Merged:** squash, `86e993fd`, with the owner's go-ahead to merge and deploy. AC-262 verified at the merge; AC-179's menu-bar part closed (AC-179 stays partial on the owner's notification screenshots).
+
+## Pull requests #32 (Overseer's brain) and #39 (the menu-bar mockup), 2026-09-30
+
+- **Finished:** #32 marked ready by its agent (head `2d5e67ba`, main merged in with the `extension/src/views.js` conflict resolved: main's tooltip with landing and account, `run.plain_reason` first). #39 is documentation only (the mockup and the owner's answers); #42 does not carry its files.
+- **Throwaway copy:** #32 plus main plus the two `CARGO_TARGET_DIR` fixes (`dded92c9`, `3dde3075`); #39 merged into main on its own.
+- **Tests:** #32: `scripts/test-all --jobs=1` at `nice -n 20`: Rust 1,401 passed, 0 failed; unit 25 of 25; source check; links; dev daemons 12 of 12; guided tests 7 of 7; deploy 6 of 6; 78 of 81 UI scenarios. talk and conversation passed alone on the first rerun, review on the second (AC-149's list of scenarios that miss under load; #32 does not touch the review). #39: the link check on the merged copy, 871 links, 0 broken.
+- **Merged:** squash, #39 `ac7a4143`, #32 `3ab9c1f7`, with the owner's go-ahead to merge and deploy (2026-09-30). AC-237, 238, 248 and 253 verified, AC-239 partial, records pointed at the merge.
+
 ## Pull requests #36 and #35 (the account every agent runs on; merge from the agent, and the review says what it shows), 2026-09-29
 
 - **Finished:** both marked ready by their agents. #36 (head `27a4564f`): AC-235 verified; the owner accepted (2026-09-29) that a long agent title can cut off the side bar row's account text (the hover and the accessible name keep it). #35 (head `994f78bf`): AC-232 and AC-243 verified; its question about the review's default in the owner's checkout became AC-263 (the owner chose Since task start everywhere).

@@ -43,8 +43,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     // The side bar's selection; the command palette's last chosen row keeps its own `.selected`.
     const selectedLabel = () => cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-list-row.selected')].filter(r => !r.closest('.quick-input-widget')).map(r => r.querySelector('.label-name')?.textContent.trim()).filter(Boolean).pop()`);
     const before = await labels(); const selBefore = await selectedLabel();
-    // What the filtered list shows is said in the search field ("N matches").
-    const message = () => s.searchFrame().then(f => f.eval(`window.__overseerSearch.count()`)).catch(() => '');
+    // What the filtered list shows is said beside the Agents title ("“query” · N matches"; AC-264: no search section).
+    const message = () => s.agentsDescription().then(t => /match|agent/.test(t) ? t : '').catch(() => '');
 
     // Search: open with the command palette, type, measure until the tree shows the match.
     const searchFor = async (q, expect, exact) => {
@@ -77,7 +77,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await s.screenshot('search-results');
     for (const o of out) check(`search ${o.label} ("${o.q}") shows ${o.expect} in the Agents view in under 200 ms`, o.labels.includes(o.expect) && o.count <= 2 && o.ms < 200, o);
     const narrowed = out.find(o => o.label === 'by message text (agent output)');
-    check('the search field says what the filtered list shows ("N matches") and the list hides the rest', narrowed.count < 10 && /match/.test(narrowed.message), { count: narrowed.count, message: narrowed.message });
+    check('the Agents title says what the filtered list shows ("N matches") and the list hides the rest', narrowed.count < 10 && /match/.test(narrowed.message), { count: narrowed.count, message: narrowed.message });
 
     // Clear from the keyboard: the full tree and the selection come back.
     await cdp.command('Overseer: Clear Search'); await delay(1200);

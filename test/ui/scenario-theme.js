@@ -16,7 +16,7 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
   if (!label) bad.push(e.outerHTML.slice(0, 80)); } return { checked: document.querySelectorAll('button, [role=radio], [role=treeitem], input, select, textarea').length, bad }; })()`;
 
 function lint() {
-  const files = ['tokens.css', 'base.css', 'chat.css', 'dashboard.css', 'new-task.css', 'run-panel.css', 'search-view.css', 'search-view.js', 'ui.js', 'chat.js', 'conversation.js', 'dashboard.js', 'composer.js', 'grid.js',
+  const files = ['tokens.css', 'base.css', 'chat.css', 'dashboard.css', 'new-task.css', 'run-panel.css', 'ui.js', 'chat.js', 'conversation.js', 'dashboard.js', 'composer.js', 'grid.js',
     'prompt-tools.js', 'markdown.js', 'new-task.js', 'run-panel.js'].map(f => 'extension/media/' + f)
     .concat(['extension/src/output-panel.js', 'extension/src/command-center.js', 'extension/src/new-task.js', 'extension/src/webview-html.js', 'extension/branch-diff/review/browser.css', 'extension/branch-diff/review/panel.js']);
   const hits = [];
