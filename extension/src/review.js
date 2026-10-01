@@ -428,8 +428,11 @@ class Review {
     this.persistFollow();
     if (/paused/.test(this.followNotes.get(runId) || '')) this.followNotes.delete(runId);
     if (state === 'following') {
+      // After the caller's Follow state reaches the review (panel.js posts it right after this
+      // returns): a reveal that arrived first found Follow still paused and was dropped, and Resume
+      // stayed where it was.
       const last = this.lastReveal.get(runId);
-      if (last) this.manager.reveal(runId, last);
+      if (last) queueMicrotask(() => this.manager.reveal(runId, last));
     }
   }
 

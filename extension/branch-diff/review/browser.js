@@ -816,9 +816,14 @@ function applyOverseer(o) {
   renderLand(o.land);
   // A switch made here wins over a message the host sent before it heard of it (older viewAt).
   if (o.view && o.view !== view && (Number(o.viewAt) || 0) >= viewChosenAt) setView(o.view);
+  // Still following: the file and line the last reveal named stay (an update of the review, such as
+  // its comparison choices, does not turn them back into the general note).
+  const keep = followState === 'following' && o.follow === 'following' && followStatus.textContent.startsWith('Following: ');
   followState = o.follow || 'off';
-  followNote = o.followNote || '';
-  followStatus.textContent = followState === 'paused' ? (/paused/.test(o.followNote || '') ? o.followNote : 'Follow paused by your navigation') : followState === 'following' ? (o.followNote || 'Following agent edits') : '';
+  if (!keep) {
+    followNote = o.followNote || '';
+    followStatus.textContent = followState === 'paused' ? (/paused/.test(o.followNote || '') ? o.followNote : 'Follow paused by your navigation') : followState === 'following' ? (o.followNote || 'Following agent edits') : '';
+  }
   renderFollow();
 }
 // Overseer (AC-263): the header names the comparison shown, and Since task start, Latest run and

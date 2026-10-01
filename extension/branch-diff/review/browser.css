@@ -292,6 +292,10 @@ button.land.primary:hover { background: var(--ov-accent-bg-hover, var(--vscode-b
 #compare button { min-width: 0; flex: 0 1 auto; }
 #compare button[aria-pressed="true"] { flex: none; }
 #compare .cmp-word, #base-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The shown comparison is named in words; the others are icons one click away, their names in the
+   tooltip and label, so the review keeps AC-54's text budget. */
+#compare button.cmp[aria-pressed="false"] .cmp-word { display: none; }
+#compare button.cmp[aria-pressed="false"] { padding: 0 6px; }
 @media (max-width: 700px) { #compare .cmp-more[aria-pressed="false"] #base-label { display: none; } }
 @media (max-width: 440px) { #compare { padding: 0 var(--ov-space-2, 8px); gap: 2px; } #compare button { padding: 0 6px; } }
 
@@ -311,7 +315,8 @@ button.file-reject .file-glyph { color: var(--ov-removed, var(--vscode-gitDecora
 @media (max-width: 560px) { button.file-accept, button.file-reject { padding: 0 var(--ov-space-1, 4px); } }
 /* Narrow cards keep every header button on the card: below 440 px Accept file and Reject file are
    icons (their words stay in the tooltip and label); while "Save your edits" shows on a card below
-   600 px, the file buttons, line counts and Unsaved step aside (each change keeps Accept and Reject). */
+   600 px, the file buttons and line counts step aside (each change keeps Accept and Reject); Unsaved
+   stays, the review's one mark of the owner's unsaved typing. */
 .diff-file { container-type: inline-size; }
 @container (max-width: 440px) {
   .file-header button.file-accept .file-word, .file-header button.file-reject .file-word { display: none; }
@@ -325,5 +330,5 @@ button.file-reject .file-glyph { color: var(--ov-removed, var(--vscode-gitDecora
 }
 @container (max-width: 600px) {
   .file-header:has(.save-file:not([hidden])) button.file-accept, .file-header:has(.save-file:not([hidden])) button.file-reject,
-  .file-header:has(.save-file:not([hidden])) .stats, .file-header:has(.save-file:not([hidden])) .unsaved { display: none; }
+  .file-header:has(.save-file:not([hidden])) .stats { display: none; }
 }
