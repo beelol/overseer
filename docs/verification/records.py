@@ -2779,9 +2779,18 @@ rec(262, "Overseer in the Mac's menu bar", "verified", date="2026-09-30", commit
     limits="The menu bar itself is drawn by the system in macOS 26, so each capture draws the item from its own button above the captured menu.",
     blocker="—")
 
-rec(263, "The review opens on \"Since task start\", with the other comparisons one click away", "not started", date="—", commit="—",
-    expected="See the RFC criterion (the owner's decision of 2026-09-29 on pull request #35's question).",
-    actual="Not started: #35 (AC-232) opens a finished agent's review on Since task start in its own worktree and keeps Latest run in the owner's checkout; the owner chose Since task start everywhere, with Latest run and Entire worktree one click away.", live="—", blocker="Its own agent.")
+rec(263, "The review opens on \"Since task start\", with the other comparisons one click away", "verified", date="2026-09-30",
+    commit="31e1a39c (pull request #38, merged 2026-09-30)",
+    harness="Generic fixture programs and the Claude Code fixture on the packaged VSIX in isolated VS Code profiles; no accounts, no paid turns",
+    steps="""1. `node test/ui/scenario-review-compare.js` ([evidence](https://github.com/beelol/overseer/tree/31e1a39c/docs/verification/evidence/ui/review-compare)): an agent in its own worktree and one in the owner's checkout, each finished; the review opened from each; Latest run and Entire worktree clicked; a change and a whole file accepted and rejected; typing in the review.
+2. `scenario-review`, `review-merge`, `review-files`, `review-marks`, `review-width`, `hunks`, `scopes`, `audit`, `inventory`, `overseer-window`, `gallery` alone on the merged copy; the full run's Rust (1,415 passed).""",
+    expected="See the RFC criterion (the owner's decision of 2026-09-29 on pull request #35's question, and the Accept / Reject wording the same day).",
+    actual="""- Both agents' reviews open on **Since task start**; the header names the comparison shown, in words, and the other two (Latest run, Entire worktree) are one click each as icon buttons with their names in the tooltip and label (this keeps the review inside AC-54's text budget: 173 of 175).
+- Each change reads **Accept** and **Reject**; each file has **Accept file** and **Reject file**, a coloured check and X on narrow cards (the owner, 2026-09-30); Reject puts the agent's lines back on disk and says so. No "Keep", "Undo" or "Save" for the agent's work.
+- **Save your edits** appears only once the owner has typed, and an unsaved file stays marked in the review.
+- With #40's Follow | Diffs only toolbar: the comparison row sits under it and keeps whichever view is open.""",
+    evidence="[review-compare screenshots and log](https://github.com/beelol/overseer/tree/31e1a39c/docs/verification/evidence/ui/review-compare)",
+    live="Fixtures only.", blocker="—")
 
 rec(264, "One Overseer layout, and it looks like Focus Mode without its side effects", "verified", date="2026-09-30",
     commit="4da1640e (pull request #40, merged 2026-09-30)",
@@ -2997,7 +3006,7 @@ SHORT_BLOCKERS = {
     260: "verified",
     261: "verified",
     262: "verified",
-    263: "not started (the owner, 2026-09-29)",
+    263: "verified",
     264: "verified",
 }
 TOTAL = 53

@@ -1,5 +1,11 @@
 # AC-146: merges
 
+## Pull request #38 (the review opens on Since task start; Accept and Reject), 2026-09-30
+
+- **Finished:** built by its agent; main (with #40 and #42) merged in by a builder (`acf519dc`: #40's Follow | Diffs only toolbar kept, #38's comparison row under it), the owner's coloured check and X for narrow cards (`78371acd`).
+- **Throwaway copy:** #38 with main. `scripts/test-all --jobs=1`: Rust 1,415 passed, dev 12/12, guided 7/7, deploy 6/6, links; the UI was stopped at scenario 28 by the coordinator's 2-hour limit, and the rest ran one at a time. Real failures from #38, each passing on main: audit (the review's text 198 against 175), inventory (the unsaved mark hidden on narrow cards), codex-follow (Resume's jump sent before the review knew Follow was back), notify-agents (timing). Fixed in `15c05bf8` (the comparison row's other choices as icons: 173; the unsaved mark kept; the jump after the state); audit, inventory, notify-agents, follow, main and the review scenarios passed alone. The hand-written loop also ran five LIVE scenarios test-all skips (see the hand-off's pitfalls).
+- **Merged:** squash, `31e1a39c`. AC-263 verified; AC-232's text now quotes "Save your edits".
+
 ## Pull request #40 (one Overseer layout, Follow inside the review), 2026-09-30
 
 - **Finished:** phase 2 by its agent on 2026-09-29; the owner then rejected Follow opening files in a plain editor, and the rework put Follow inside the review (`26fabb77`..`d67dab5c`, "follow looks fantastic"); "Ask first" and "Start fresh" moved to the composer's foot (`861b905e`).
