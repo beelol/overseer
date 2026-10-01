@@ -560,7 +560,7 @@ What a phone can do, method by method:
 | `overseer.tool` | Run one of Overseer's tools for an agent | The Mac only: it is for the agents' own Overseer tools, never a phone | — |
 | `overseer.tools` | The Overseer tools an agent may use | The Mac only: it is for the agents' own Overseer tools, never a phone | — |
 | `profile.login_command` | The sign-in command for a terminal | The Mac only: it needs a terminal on the Mac; a phone uses profile.device_login | — |
-| `review.seen` | Share the reviewed marks VS Code keeps, so every surface counts "to review" the same | The Mac only: written by VS Code and the TUI on the Mac (AC-262, T-26); every client reads the marks through `state` and the `review_seen` event | — |
+| `review.seen` | Share the reviewed marks VS Code keeps, so every surface counts "to review" the same | The Mac only: written by VS Code and the TUI on the Mac (AC-262, T-26); the phone reads the marks through state | — |
 | `run.delegate` | Delegate a work unit from a run (managed child) | The Mac only: auto routing and Swarm come to the phone later (the partial merge, AC-204) | — |
 | `run.result` | A managed child's result | The Mac only: auto routing and Swarm come to the phone later (the partial merge, AC-204) | — |
 | `settings.get` | Continuity settings | The Mac only: continuity is set on the Mac | — |
