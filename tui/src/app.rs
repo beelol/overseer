@@ -202,6 +202,12 @@ enum Pending {
     AudioSet,
     AudioPreview,
     OverseerSession,
+    VoiceSubscribe,
+    VoiceRequests,
+    VoiceSet,
+    VoiceCancel,
+    VoiceAnswer,
+    VoiceRoster,
     OverseerSend,
     OverseerAnswer,
     AudioVoices,
@@ -591,6 +597,18 @@ pub struct App {
     follow_due: Option<Instant>,
     /// The note typed while denying a permission (T-31).
     pub deny_note: String,
+    /// Voice Mode as the daemon last said (`voice.get` and its live channel, T-35): Null when the
+    /// daemon has none.
+    pub voice: Value,
+    /// The words as they are heard.
+    pub voice_heard: String,
+    /// Spoken requests by id (`voice.requests` and live `request` messages): the cards' states.
+    pub voice_requests: Vec<Value>,
+    /// A read-back or a plan waits for a yes: ctrl+y / ctrl+n answer it.
+    pub voice_asking: bool,
+    voice_plan: Option<String>,
+    /// Every state shown, in order (for tests and the latency checks).
+    pub voice_seen: Vec<String>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -670,6 +688,12 @@ impl App {
             last_edit: HashMap::new(),
             follow_due: None,
             deny_note: String::new(),
+            voice: Value::Null,
+            voice_heard: String::new(),
+            voice_requests: Vec::new(),
+            voice_asking: false,
+            voice_plan: None,
+            voice_seen: Vec::new(),
         }
     }
 
@@ -1049,6 +1073,8 @@ impl App {
                 self.audio.known = false;
                 self.audio_inflight = false;
                 self.request_audio();
+                // Voice Mode's live channel (T-35); a daemon without it answers with an error.
+                self.request("voice.subscribe", json!({}), Pending::VoiceSubscribe);
             }
             Msg::Refused(why) => {
                 self.connected = false;
@@ -1074,6 +1100,7 @@ impl App {
                 }
             }
             Msg::Replayed => {}
+            Msg::Voice(m) => self.on_voice(m),
             Msg::Event(ev) => self.on_event(ev),
             Msg::Reply { id, result } => {
                 if let Some(why) = self.pending.remove(&id) {
@@ -1267,6 +1294,40 @@ impl App {
                 self.dirty = true;
             }
             (Pending::OverseerSession, Err(e)) => self.say(format!("Overseer: {e}"), true),
+            (Pending::VoiceSubscribe, Ok(v)) => {
+                self.set_voice(v["voice"].clone());
+                self.request("voice.requests", json!({ "limit": 20 }), Pending::VoiceRequests);
+            }
+            // A daemon without Voice Mode: the conversation says it is unavailable.
+            (Pending::VoiceSubscribe, Err(_)) => self.voice = Value::Null,
+            (Pending::VoiceSet, Ok(v)) => self.set_voice(v),
+            (Pending::VoiceRequests, Ok(v)) => {
+                for r in v["requests"].as_array().cloned().unwrap_or_default() {
+                    self.voice_request(r);
+                }
+            }
+            (Pending::VoiceCancel, Ok(v)) => {
+                let done = v["cancelled"] == true;
+                self.say(if done { "Cancelled: nothing was sent" } else { "No spoken request is open to cancel" }, false);
+                self.request("voice.requests", json!({ "limit": 20 }), Pending::VoiceRequests);
+            }
+            (Pending::VoiceAnswer, Ok(_)) => {
+                self.voice_asking = false;
+                self.voice_plan = None;
+                self.say("Answered", false);
+            }
+            (Pending::VoiceRoster, Ok(v)) => {
+                // Talk to: Overseer, then each agent at work, in turn.
+                let active: Vec<String> = v["roster"].as_array().into_iter().flatten()
+                    .filter(|a| matches!(a["status"].as_str(), Some("queued" | "starting" | "running" | "waiting_for_user")))
+                    .filter_map(|a| a["id"].as_str().map(str::to_string)).collect();
+                let mut targets = vec!["overseer".to_string()];
+                targets.extend(active);
+                let now = self.voice["target"].as_str().unwrap_or("overseer").to_string();
+                let next = targets.iter().position(|t| *t == now).map(|i| (i + 1) % targets.len()).unwrap_or(0);
+                let target = targets[next].clone();
+                self.request("voice.set", json!({ "target": target }), Pending::VoiceSet);
+            }
             (Pending::OverseerSend, Ok(_)) => self.request("overseer.session", json!({}), Pending::OverseerSession),
             (Pending::OverseerSend, Err(e)) => self.say(format!("Overseer: {e}"), true),
             (Pending::OverseerAnswer, Ok(v)) => {
@@ -2211,6 +2272,9 @@ impl App {
         self.mode = Mode::Overseer;
         self.overseer_scroll = 0;
         self.request("overseer.session", json!({}), Pending::OverseerSession);
+        if self.voice.is_object() {
+            self.request("voice.requests", json!({ "limit": 20 }), Pending::VoiceRequests);
+        }
     }
 
     /// Keys in the conversation: type and Enter sends; ctrl+y / ctrl+n answer the first proposal
@@ -2219,6 +2283,21 @@ impl App {
         let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
         match k.code {
             KeyCode::Esc => self.mode = Mode::Grid,
+            // Voice Mode (T-35): on and off, mute, talk to, cancel the open request.
+            KeyCode::Char('v') if ctrl => self.voice_toggle(),
+            KeyCode::Char('t') if ctrl => {
+                let muted = self.voice["muted"] == true;
+                self.request("voice.set", json!({ "muted": !muted }), Pending::VoiceSet);
+            }
+            KeyCode::Char('a') if ctrl => self.request("agents.roster", json!({}), Pending::VoiceRoster),
+            KeyCode::Char('x') if ctrl => {
+                let open = self.voice_requests.iter().find(|r| matches!(r["state"].as_str(), Some("settling" | "thinking" | "taken" | "waiting"))).and_then(|r| r["id"].as_str()).unwrap_or("").to_string();
+                self.request("voice.cancel", json!({ "id": open }), Pending::VoiceCancel);
+            }
+            // A read-back or a plan that waits for a spoken yes takes the keyboard's too.
+            KeyCode::Char('y') | KeyCode::Char('n') if ctrl && self.voice_asking => {
+                self.request("voice.answer", json!({ "yes": k.code == KeyCode::Char('y') }), Pending::VoiceAnswer);
+            }
             KeyCode::Char('y') | KeyCode::Char('n') if ctrl => {
                 let yes = k.code == KeyCode::Char('y');
                 let open = self.overseer["proposals"].as_array().and_then(|p| p.iter().find(|x| x["state"] == "open")).map(|p| p["id"].as_str().unwrap_or("").to_string());
@@ -2247,6 +2326,112 @@ impl App {
             _ => {}
         }
         self.dirty = true;
+    }
+
+    /// Voice Mode's settings and state from the daemon (T-35).
+    fn set_voice(&mut self, v: Value) {
+        if !v.is_object() {
+            return;
+        }
+        self.voice = v;
+        self.note_voice_state();
+    }
+
+    /// The state shown now: off, or the daemon's state.
+    pub fn voice_state(&self) -> Option<&str> {
+        if !self.voice.is_object() {
+            return None;
+        }
+        Some(if self.voice["enabled"] != true { "off" } else { self.voice["state"].as_str().unwrap_or("starting") })
+    }
+
+    fn note_voice_state(&mut self) {
+        if let Some(s) = self.voice_state().map(str::to_string) {
+            if self.voice_seen.last() != Some(&s) {
+                self.voice_seen.push(s);
+            }
+        }
+        self.dirty = true;
+    }
+
+    fn voice_request(&mut self, r: Value) {
+        let Some(id) = r["id"].as_str().map(str::to_string) else { return };
+        match self.voice_requests.iter_mut().find(|x| x["id"].as_str() == Some(id.as_str())) {
+            Some(x) => *x = r,
+            None => self.voice_requests.push(r),
+        }
+        self.voice_requests.sort_by_key(|r| r["ts"].as_i64().unwrap_or(0));
+        let n = self.voice_requests.len();
+        if n > 40 {
+            self.voice_requests.drain(..n - 40);
+        }
+    }
+
+    /// The live channel (as VS Code's voice.js `live`): states, heard words, requests, read-backs.
+    fn on_voice(&mut self, m: Value) {
+        match m["kind"].as_str().unwrap_or_default() {
+            "state" if self.voice.is_object() => {
+                self.voice["state"] = m["state"].clone();
+                self.voice["reason"] = m["reason"].clone();
+                if m["state"] == "off" {
+                    self.voice["enabled"] = json!(false);
+                } else {
+                    self.voice["enabled"] = json!(true);
+                }
+                self.voice["muted"] = json!(m["state"] == "muted");
+                self.note_voice_state();
+            }
+            "target" if self.voice.is_object() => self.voice["target"] = m["target"].clone(),
+            "heard" | "not_meant" => self.voice_heard = m["text"].as_str().unwrap_or_default().to_string(),
+            "read_back" => self.voice_asking = m["lapsed"] != true && !m["agent"].is_null(),
+            "confirm" if m["lapsed"] == true => {
+                self.voice_plan = None;
+                self.voice_asking = false;
+            }
+            "request" => {
+                let r = m["request"].clone();
+                if r["state"] == "waiting" {
+                    self.voice_plan = r["id"].as_str().map(str::to_string);
+                    self.voice_asking = true;
+                } else if self.voice_plan.is_some() && self.voice_plan.as_deref() == r["id"].as_str() {
+                    self.voice_plan = None;
+                    self.voice_asking = false;
+                }
+                self.voice_request(r);
+            }
+            "toast" => {
+                if m["cancel"] == true {
+                    self.voice_asking = false;
+                }
+                let text = m["text"].as_str().unwrap_or_default().to_string();
+                if !text.is_empty() {
+                    self.say(if m["cancel"] == true { format!("{text} (ctrl+x cancels)") } else { text }, false);
+                }
+            }
+            _ => return,
+        }
+        self.dirty = true;
+    }
+
+    /// `ctrl+v`: Voice Mode on or off; the daemon listens and speaks, the terminal only asks.
+    fn voice_toggle(&mut self) {
+        if !self.voice.is_object() {
+            self.say("Voice Mode is unavailable: this daemon has no voice session", true);
+            return;
+        }
+        if self.voice["enabled"] == true {
+            self.request("voice.set", json!({ "enabled": false }), Pending::VoiceSet);
+            return;
+        }
+        if self.voice["available"] != true && self.voice["simulated"] != true {
+            self.say("Voice Mode needs the listener, which ships with Overseer on macOS", true);
+            return;
+        }
+        if self.voice["model"]["downloaded"] != true {
+            self.say("Voice Mode needs its speech model: turn it on once in VS Code, which downloads it after asking", true);
+            return;
+        }
+        self.request("voice.set", json!({ "enabled": true }), Pending::VoiceSet);
     }
 
     fn open_audio(&mut self) {

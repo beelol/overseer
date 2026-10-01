@@ -75,6 +75,7 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | O / Ctrl-O | Phone access on or off / Devices: pair a phone, revoke, scope (Devices moved from `D` to Ctrl-O when `D` became dashboard mode, T-40) |
 | A | Accounts: sign-in status; `s` signs in (the provider's own login, in this terminal), `S` device code for ChatGPT |
 | S | Audio Mode: on or off, track, system voice, a private Commander folder, preview (the daemon plays) |
+| ctrl+v / ctrl+t / ctrl+a / ctrl+x (in `o`) | Voice Mode (T-35): on or off, mute, talk to Overseer or an agent, cancel the open spoken request; ctrl+y / ctrl+n answer a read-back or a plan that waits for a yes (else a proposal). The voice line on top shows the state and the words as they are heard; spoken requests are cards like typed ones |
 | ? | Help |
 | q | Quit (agents keep running) |
 
@@ -378,13 +379,13 @@ Each command in `extension/package.json` has a row: the TUI's key (every key her
 | `overseer.stopAll` | Stop Agents and Daemon… | `X` | |
 | `overseer.startDaemon` | Start Daemon | `r` | |
 | `overseer.audioMode` | Audio Mode and Reactor Cues… | `S` | |
-| `overseer.voice.toggle` | Voice Mode: Turn On or Off | | Voice Mode's keys come with T-35 |
+| `overseer.voice.toggle` | Voice Mode: Turn On or Off | `ctrl+v` | |
 | `overseer.voice.open` | Voice Mode: Show | `o` | |
-| `overseer.voice.mute` | Voice Mode: Mute or Unmute | | Voice Mode's keys come with T-35 |
-| `overseer.voice.talkTo` | Voice Mode: Talk To… | | Voice Mode's keys come with T-35 |
-| `overseer.voice.cancel` | Voice Mode: Cancel the Request | | Voice Mode's keys come with T-35 |
-| `overseer.voice.yes` | Voice Mode: Yes | | Voice Mode's keys come with T-35 |
-| `overseer.voice.no` | Voice Mode: No | | Voice Mode's keys come with T-35 |
+| `overseer.voice.mute` | Voice Mode: Mute or Unmute | `ctrl+t` | |
+| `overseer.voice.talkTo` | Voice Mode: Talk To… | `ctrl+a` | |
+| `overseer.voice.cancel` | Voice Mode: Cancel the Request | `ctrl+x` | |
+| `overseer.voice.yes` | Voice Mode: Yes | `ctrl+y` | |
+| `overseer.voice.no` | Voice Mode: No | `ctrl+n` | |
 | `overseer.voice.simulate` | Voice Mode: Simulate the Voice (development) | | A development aid of VS Code's for the simulated voice; tests use the daemon's `voice.simulate` |
 | `overseer.testNotification` | Test Notification | | The Mac's notifications are sent by VS Code's notifier; the terminal rings its bell (T-24) |
 | `overseer.showLog` | Show Daemon Log | | A VS Code view of the daemon's log file, which any terminal can read directly |

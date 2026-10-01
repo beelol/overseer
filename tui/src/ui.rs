@@ -163,9 +163,38 @@ fn overseer_view(f: &mut Frame, app: &App, area: Rect) {
             first = false;
         }
     };
-    for m in s["messages"].as_array().cloned().unwrap_or_default() {
+    // Spoken requests (T-35) are the same cards as typed ones: the words, then how far they got.
+    let spoken_of = |m: &serde_json::Value| -> Option<(String, String)> {
+        if m["source"] != "owner" || m["surface"] != "voice" {
+            return None;
+        }
+        let text = m["text"].as_str()?;
+        let at = text.rfind("Request V-")?;
+        let rest = &text[at + "Request ".len()..];
+        let (id, words) = rest.split_once(": ")?;
+        Some((id.to_string(), words.to_string()))
+    };
+    let messages = s["messages"].as_array().cloned().unwrap_or_default();
+    let in_conversation: Vec<String> = messages.iter().filter_map(|m| spoken_of(m).map(|x| x.0)).collect();
+    let mut timeline: Vec<serde_json::Value> = messages.clone();
+    for r in &app.voice_requests {
+        if !in_conversation.iter().any(|id| r["id"].as_str() == Some(id.as_str())) {
+            timeline.push(serde_json::json!({ "source": "owner", "surface": "voice", "ts": r["ts"], "voice": r }));
+        }
+    }
+    timeline.sort_by_key(|m| m["ts"].as_i64().unwrap_or(0));
+    let request_of = |id: &str| app.voice_requests.iter().find(|r| r["id"].as_str() == Some(id)).cloned();
+    for m in timeline {
         let source = m["source"].as_str().unwrap_or("system");
         let text = m["text"].as_str().unwrap_or("");
+        let spoken = if m["voice"].is_object() { Some((m["voice"]["words"].as_str().unwrap_or("").to_string(), Some(m["voice"].clone()))) } else { spoken_of(&m).map(|(id, words)| (words, request_of(&id))) };
+        if let Some((words, request)) = spoken {
+            wrap(&words, " you (spoken) › ", Style::new().add_modifier(Modifier::BOLD), &mut lines);
+            if let Some((stage, color)) = request.as_ref().and_then(voice_stage) {
+                lines.push(Line::from(Span::styled(format!("   ◇ {stage}"), Style::new().fg(color))));
+            }
+            continue;
+        }
         match source {
             "owner" => wrap(text, " you › ", Style::new().add_modifier(Modifier::BOLD), &mut lines),
             // Overseer's replies are Markdown (AC-245): bullets, bold and headings as a terminal draws them.
@@ -200,19 +229,97 @@ fn overseer_view(f: &mut Frame, app: &App, area: Rect) {
         lines.push(Line::from(Span::styled(" Nothing yet. Type to Overseer: what your agents are doing, or what one of them should do next.", Style::new().fg(MUTED))));
     }
     let draft_h = (app.overseer_draft.lines().count().max(1) as u16).min(4) + 1;
-    let body_h = (h as usize).saturating_sub(2 + draft_h as usize);
+    let voice = voice_line(app, inner_w);
+    let body_h = (h as usize).saturating_sub(2 + draft_h as usize + voice.len());
     let end = lines.len().saturating_sub(app.overseer_scroll.min(lines.len()));
     let start = end.saturating_sub(body_h);
     let shown: Vec<Line> = lines[start..end].to_vec();
-    let mut all = shown;
+    let mut all = voice;
+    all.extend(shown);
     all.push(Line::from(Span::styled(" ".repeat(inner_w.min(120)).replace(' ', "─"), Style::new().fg(MUTED))));
     let draft = if app.overseer_draft.is_empty() { " › type a message for Overseer".to_string() } else { format!(" › {}", app.overseer_draft) };
     all.push(Line::from(Span::styled(draft, if app.overseer_draft.is_empty() { Style::new().fg(MUTED) } else { Style::new().fg(accent()) })));
     let block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(accent()))
         .title(Span::styled(format!(" ◆ Overseer · {level} "), Style::new().add_modifier(Modifier::BOLD)))
-        .title_bottom(Line::from(Span::styled(" enter sends · ctrl+y / ctrl+n answer a proposal · esc closes ", Style::new().fg(MUTED))).right_aligned());
+        .title_bottom(Line::from(Span::styled(" enter sends · ctrl+y / ctrl+n yes / no · ctrl+v voice · esc closes ", Style::new().fg(MUTED))).right_aligned());
     f.render_widget(Clear, r);
     f.render_widget(Paragraph::new(all).block(block).wrap(Wrap { trim: false }), r);
+}
+
+/// Voice Mode's words for its states, as VS Code's (extension/src/voice.js `LABEL`).
+pub fn voice_label(state: &str) -> &'static str {
+    match state {
+        "off" => "Voice off",
+        "starting" => "Starting",
+        "listening" => "Listening",
+        "hearing" => "Hearing you",
+        "thinking" => "Thinking",
+        "speaking" => "Speaking",
+        "muted" => "Muted",
+        "paused" => "Paused for a call",
+        "failed" => "Voice stopped",
+        _ => "Voice Mode",
+    }
+}
+
+/// A spoken request's stage, in VS Code's words (extension/media/home.js `VOICE_STAGE`).
+fn voice_stage(r: &serde_json::Value) -> Option<(String, Color)> {
+    let (stage, text) = match r["state"].as_str()? {
+        "taken" | "thinking" => ("thinking", "Overseer is thinking"),
+        "settling" => ("sending", "Going out in a moment (ctrl+x cancels)"),
+        "waiting" => ("waiting", "Waits for your yes (ctrl+y / ctrl+n)"),
+        "waiting_turn" => ("thinking", "Waits for the requests before it"),
+        "sent" => ("done", "Sent"),
+        "partly_sent" => ("failed", "Partly sent: the card says what"),
+        "cancelled" => ("done", "Cancelled: nothing was sent"),
+        "corrected" => ("done", "Corrected by what you said next"),
+        "superseded" => ("done", "Replaced by your correction"),
+        "joined" => ("done", "Joined with what you said next"),
+        "not_sent" => ("failed", "Not sent"),
+        "answered" => ("done", "Answered"),
+        "done" => ("done", "Done"),
+        "not_for_overseer" => ("aside", "Not meant for Overseer: kept as context"),
+        _ => return None,
+    };
+    let text = match r["done"].as_str() {
+        Some(d) if !d.is_empty() && matches!(r["state"].as_str(), Some("sent" | "not_sent" | "done" | "partly_sent")) => fit(&crate::words::plain(d).replace('\n', " "), 100),
+        _ => text.to_string(),
+    };
+    let color = match stage { "failed" => Color::Red, "waiting" => waiting(), "done" => Color::Green, _ => accent() };
+    Some((text, color))
+}
+
+/// The voice line on top of Overseer's conversation (T-35): the state, who it talks to, the words
+/// as they are heard, and the keys. The daemon listens and speaks; the terminal only shows.
+fn voice_line(app: &App, width: usize) -> Vec<Line<'static>> {
+    let Some(state) = app.voice_state() else {
+        return vec![Line::from(Span::styled(" ◎ Voice Mode is unavailable with this daemon", Style::new().fg(MUTED)))];
+    };
+    let key = |k: &'static str| Span::styled(k, Style::new().fg(accent()).add_modifier(Modifier::BOLD));
+    let word = |w: &'static str| Span::styled(w, Style::new().fg(MUTED));
+    if state == "off" {
+        let why = app.voice["reason"].as_str().filter(|r| !r.is_empty()).map(|r| format!(" ({})", crate::words::plain(r))).unwrap_or_default();
+        return vec![Line::from(vec![Span::styled(format!(" ◎ Voice off{why}  "), Style::new().fg(MUTED)), key("ctrl+v"), word(" turns it on")]), Line::raw("")];
+    }
+    let color = match state { "hearing" => Color::Green, "speaking" | "thinking" => accent(), "muted" | "paused" => waiting(), "failed" => Color::Red, _ => Color::Cyan };
+    let target = match app.voice["target"].as_str() {
+        None | Some("overseer") | Some("") => "Overseer".to_string(),
+        Some(id) => app.state.run(id).map(|r| r.title.clone()).unwrap_or_else(|| id.to_string()),
+    };
+    let reason = app.voice["reason"].as_str().filter(|r| !r.is_empty()).map(|r| format!(" ({})", crate::words::plain(r))).unwrap_or_default();
+    let mut out = vec![Line::from(vec![
+        Span::styled(format!(" ◉ {}", voice_label(state)), Style::new().fg(color).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{reason} · talking to {} ", fit(&target, 30)), Style::new().fg(MUTED)),
+        key(" ctrl+v"), word(" off "), key("ctrl+t"), word(if state == "muted" { " unmute " } else { " mute " }), key("ctrl+a"), word(" talk to "), key("ctrl+x"), word(" cancel"),
+    ])];
+    if !app.voice_heard.is_empty() {
+        out.push(Line::from(vec![Span::styled("   heard: ", Style::new().fg(MUTED)), Span::styled(format!("“{}”", fit(&app.voice_heard, width.saturating_sub(14))), Style::new().add_modifier(Modifier::ITALIC))]));
+    }
+    if app.voice_asking {
+        out.push(Line::from(vec![Span::styled("   waits for your yes  ", Style::new().fg(waiting()).add_modifier(Modifier::BOLD)), key("ctrl+y"), word(" yes "), key("ctrl+n"), word(" no")]));
+    }
+    out.push(Line::raw(""));
+    out
 }
 
 fn header(f: &mut Frame, app: &App, area: Rect) {
@@ -296,7 +403,7 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         Mode::Pairing => &[("p", "new code"), ("esc", "close")],
         Mode::Audio => &[("space", "on/off"), ("1/2/3", "track"), ("tab", "cue"), ("p", "preview"), ("v", "voice"), ("i", "import"), ("esc", "close")],
         Mode::AudioImport => &[("type", "private folder path"), ("enter", "import"), ("esc", "back")],
-        Mode::Overseer => &[("type", "to Overseer"), ("enter", "send"), ("ctrl+y/n", "yes/no to a proposal"), ("j/k", "scroll"), ("esc", "close")],
+        Mode::Overseer => &[("type", "to Overseer"), ("enter", "send"), ("ctrl+y/n", "yes/no"), ("ctrl+v", "voice on/off"), ("ctrl+t", "mute"), ("ctrl+a", "talk to"), ("ctrl+x", "cancel"), ("esc", "close")],
         Mode::Search => &[("type", "to search title, repo, harness, model, prompt"), ("enter", "keep"), ("esc", "clear")],
         Mode::Changes => &[("F", "Follow"), ("n/p", "change"), ("a/A", "Accept change/file"), ("r/R", "Reject change/file"), ("j/k", "file"), ("t", "Changed | All files"), ("1/2/3 c", "comparison"), ("e", "your editor"), ("J/K", "scroll"), ("ctrl+r", "reload"), ("esc", "back")],
         Mode::Grid if app.dashboard_shown() && app.dash_col == 0 => &[("J/K j/k", "next / previous agent"), ("tab", "review, conversation"), ("i", "message"), ("a/s/d", "allow once/session/deny"), ("g", "full view"), ("w", "next waiting"), ("n", "new"), ("D", "grid"), ("?", "help"), ("q", "quit")],
@@ -864,6 +971,11 @@ pub const HELP: &[(&str, &str)] = &[
     ("x", "interrupt the focused agent"),
     ("n", "start a new agent"),
     ("o", "Overseer: its conversation and Voice Mode"),
+    ("ctrl+v  (in o)", "Voice Mode on / off"),
+    ("ctrl+t  (in o)", "Voice Mode: mute / unmute"),
+    ("ctrl+a  (in o)", "Voice Mode: talk to Overseer or an agent"),
+    ("ctrl+x  (in o)", "Voice Mode: cancel the open request"),
+    ("ctrl+y / ctrl+n", "yes / no: a read-back, a plan, a proposal"),
     ("M", "merge back (asks before each step)"),
     ("P", "open a GitHub pull request (gh)"),
     ("C", "remove a finished agent's worktree"),
@@ -882,7 +994,7 @@ pub const HELP: &[(&str, &str)] = &[
 fn help(f: &mut Frame, area: Rect) {
     let rows = HELP;
     // Two columns when one would not fit the terminal's height and two fit its width.
-    let cols: usize = if rows.len() as u16 + 4 > area.height.saturating_sub(2) && area.width >= 2 * 72 + 4 { 2 } else { 1 };
+    let cols: usize = if rows.len() as u16 + 4 > area.height.saturating_sub(2) && area.width >= 120 { 2 } else { 1 };
     let per = rows.len().div_ceil(cols);
     let w = (72 * cols as u16).min(area.width.saturating_sub(4));
     let h = (per as u16 + 4).min(area.height.saturating_sub(2));

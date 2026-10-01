@@ -1,0 +1,48 @@
+ ◆ Overseer  page 1/1 · 1 agent · ● 1 working                                                                                    phone access off · ● connected 
+╭ agents ────────────────╭ ◆ Overseer · Ask first ────────────────────────────────────────────────────────────────────────────────────╮━━━━━━━━━━ Program · 1s ┓
+│ voice  1 working       │ ◉ Hearing you · talking to Overseer  ctrl+v off ctrl+t mute ctrl+a talk to ctrl+x cancel                   │                        ┃
+│›● Phone                │                                                                                                            │                        ┃
+│                        │ ▶ Started Phone (generic) in voice                                                                         │                        ┃
+│                        │──────────────────────────────────────────────────────────────────────────────────────────────────────────  │                        ┃
+│                        │ › type a message for Overseer                                                                              │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+│                        │                                                                                                            │                        ┃
+╰───── ◆ you ✦ review ✓ m╰──────────────────────────────────────── enter sends · ctrl+y / ctrl+n yes / no · ctrl+v voice · esc closes ╯━━━━━━━━━━━━━━━━━━━━━━━━┛
+ type to Overseer   enter send   ctrl+y/n yes/no   ctrl+v voice on/off   ctrl+t mute   ctrl+a talk to   ctrl+x cancel   esc close                               

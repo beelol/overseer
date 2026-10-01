@@ -5,8 +5,6 @@
 │                                      │                                                                                                                                                                
 │                                      │                                                                                                                                                                
 │                                      │                                                                                                                                                                
-│                                      │                                                                                                                                                                
-│                                      │                                                                                                                                                                
 │                                      │                        ╭ keys ────────────────────────────────────────────────────────────────╮                                                                
 │                                      │                        │                                                                      │                                                                
 │                                      │                        │  ←↓↑→  h j k l       move between agents                             │                                                                
@@ -33,6 +31,11 @@
 │                                      │                        │  x                   interrupt the focused agent                     │                                                                
 │                                      │                        │  n                   start a new agent                               │                                                                
 │                                      │                        │  o                   Overseer: its conversation and Voice Mode       │                                                                
+│                                      │                        │  ctrl+v  (in o)      Voice Mode on / off                             │                                                                
+│                                      │                        │  ctrl+t  (in o)      Voice Mode: mute / unmute                       │                                                                
+│                                      │                        │  ctrl+a  (in o)      Voice Mode: talk to Overseer or an agent        │                                                                
+│                                      │                        │  ctrl+x  (in o)      Voice Mode: cancel the open request             │                                                                
+│                                      │                        │  ctrl+y / ctrl+n     yes / no: a read-back, a plan, a proposal       │                                                                
 │                                      │                        │  M                   merge back (asks before each step)              │                                                                
 │                                      │                        │  P                   open a GitHub pull request (gh)                 │                                                                
 │                                      │                        │  C                   remove a finished agent's worktree              │                                                                
@@ -48,9 +51,6 @@
 │                                      │                        │  q                   quit (agents keep running)                      │                                                                
 │                                      │                        │                                                                      │                                                                
 │                                      │                        ╰────────────────────────────────────────────────────── any key closes ╯                                                                
-│                                      │                                                                                                                                                                
-│                                      │                                                                                                                                                                
-│                                      │                                                                                                                                                                
 │                                      │                                                                                                                                                                
 │                                      │                                                                                                                                                                
 │                                      │                                                                                                                                                                

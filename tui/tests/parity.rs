@@ -1443,3 +1443,223 @@ fn t36_nothing_left_out_without_a_reason() {
     }
     snapshot(term.backend().buffer(), "parity-t36-help");
 }
+
+/// The listener, built once (its simulated room: no microphone, a made-up voice for Overseer).
+fn listener_bin() -> std::path::PathBuf {
+    static BIN: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+    BIN.get_or_init(|| {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf();
+        let target = std::env::var_os("CARGO_TARGET_DIR").map(std::path::PathBuf::from).unwrap_or_else(|| root.join("target"));
+        let ok = std::process::Command::new(env!("CARGO")).args(["build", "-q", "-p", "overseer-listener"]).current_dir(&root).status().map(|s| s.success()).unwrap_or(false);
+        let bin = target.join("debug/overseer-listener");
+        assert!(ok || bin.exists(), "could not build overseer-listener");
+        bin
+    })
+    .clone()
+}
+
+/// A second client on Voice Mode's live channel, as VS Code's daemon client subscribes
+/// (extension/src/daemon-client.js): the states it is told, in order.
+struct VoiceWatcher {
+    states: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+}
+
+impl VoiceWatcher {
+    fn open(d: &Daemon) -> VoiceWatcher {
+        use std::io::{BufRead, Write};
+        let mut conn = std::os::unix::net::UnixStream::connect(&d.socket).unwrap();
+        conn.write_all(format!("{}\n", json!({ "id": 1, "method": "hello", "params": { "client": "vscode" } })).as_bytes()).unwrap();
+        conn.write_all(format!("{}\n", json!({ "id": 2, "method": "voice.subscribe", "params": {} })).as_bytes()).unwrap();
+        let states: std::sync::Arc<std::sync::Mutex<Vec<String>>> = Default::default();
+        let sink = states.clone();
+        std::thread::spawn(move || {
+            for line in std::io::BufReader::new(conn).lines() {
+                let Ok(line) = line else { break };
+                let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) else { continue };
+                let state = if v["id"] == 2 {
+                    let first = &v["result"]["voice"];
+                    if first["enabled"] == true { first["state"].as_str().map(str::to_string) } else { Some("off".into()) }
+                } else if v["method"] == "voice" && v["params"]["kind"] == "state" {
+                    v["params"]["state"].as_str().map(str::to_string)
+                } else {
+                    None
+                };
+                if let Some(s) = state {
+                    let mut all = sink.lock().unwrap();
+                    if all.last() != Some(&s) {
+                        all.push(s);
+                    }
+                }
+            }
+        });
+        VoiceWatcher { states }
+    }
+    fn last(&self) -> Option<String> {
+        self.states.lock().unwrap().last().cloned()
+    }
+    fn seen(&self) -> Vec<String> {
+        self.states.lock().unwrap().clone()
+    }
+}
+
+/// T-35: Voice Mode in Overseer's conversation, with the fixture voice session (the simulated
+/// voice: the real listener in its simulated room, no microphone; the Claude fixture as Overseer's
+/// model). Each state shows in turn (off, listening, hearing you, thinking, speaking, muted, paused
+/// for a call), with the words as they are heard; a spoken request is a card that fills in as it
+/// advances (thinking, going out, sent); mute, cancel and yes work by key; a second client on the
+/// daemon's live channel, as VS Code's, is told the same states.
+#[test]
+fn t35_voice_mode_in_the_terminal() {
+    let t = tempfile::tempdir().unwrap();
+    let mode = t.path().join("claude-mode");
+    std::fs::write(&mode, "overseer").unwrap();
+    let mic = t.path().join("mic-users");
+    std::fs::write(&mic, "").unwrap();
+    let cues = t.path().join("cues.log");
+    let (bin, mode_s, mic_s, cues_s) = (listener_bin().display().to_string(), mode.display().to_string(), mic.display().to_string(), cues.display().to_string());
+    let d = Daemon::start(&[
+        ("OVERSEER_VOICE_SIMULATE", "1"),
+        ("OVERSEER_LISTENER", &bin),
+        ("OVERSEER_LISTENER_TEST_VOICE", "1"),
+        ("OVERSEER_LISTENER_TEST_MIC_USERS", &mic_s),
+        ("OVERSEER_TEST_AUDIO_LOG", &cues_s),
+        ("OVERSEER_CLAUDE_PATH", &fixture("claude-fixture.js")),
+        ("CLAUDE_FIXTURE_MODE_FILE", &mode_s),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE"),
+    ]);
+    let r = repo(&t.path().join("voice"));
+    let phone = d.ctl("task.create", json!({ "repo": r, "harness": "generic", "workspace_mode": "worktree", "program": "/bin/sleep", "args": ["120"], "prompt": "", "title": "Phone" }))["run"]["id"].as_str().unwrap().to_string();
+    let vscode = VoiceWatcher::open(&d);
+    let mut tui = Tui::attach(&d, 160, 48);
+    tui.until(10, |a| a.voice_state() == Some("off"));
+    tui.key(KeyCode::Char('o'));
+    assert_eq!(tui.app.mode, Mode::Overseer);
+    let state_now = |tui: &mut Tui, want: &str, label: &str, secs: u64| {
+        tui.until(secs, |a| a.voice_state() == Some(want));
+        let s = tui.until_screen(5, label);
+        // The same state in the daemon and in the second client (VS Code's live channel).
+        let end = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        while vscode.last().as_deref() != Some(want) && std::time::Instant::now() < end {
+            tui.pump(20);
+        }
+        assert_eq!(vscode.last().as_deref(), Some(want), "VS Code's live channel says {want} too");
+        s
+    };
+    let s = state_now(&mut tui, "off", "Voice off", 5);
+    assert!(s.contains("◎ Voice off  ctrl+v turns it on"), "{s}");
+    tui.snapshot("parity-t35-off");
+
+    // ctrl+v: on, listening.
+    tui.key_mod(KeyCode::Char('v'), crossterm::event::KeyModifiers::CONTROL);
+    let s = state_now(&mut tui, "listening", "◉ Listening", 30);
+    assert!(s.contains("talking to Overseer"), "{s}");
+    tui.snapshot("parity-t35-listening");
+    // A made-up voice in the room: hearing you, and the words as they are heard.
+    d.ctl("voice.simulate", json!({ "speechlike": 3, "words": "" }));
+    let s = state_now(&mut tui, "hearing", "◉ Hearing you", 15);
+    tui.snapshot("parity-t35-hearing");
+    drop(s);
+    tui.until(15, |a| a.voice_state() == Some("listening"));
+
+    // A spoken request: a card that fills in as it advances; thinking, then speaking.
+    let said = d.ctl("voice.say", json!({ "text": "Tell Phone to use the new wire format." }));
+    let id = said["request"].as_str().unwrap().to_string();
+    let mut stages: Vec<String> = Vec::new();
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(90);
+    loop {
+        let st = tui.app.voice_requests.iter().find(|r| r["id"] == id.as_str()).and_then(|r| r["state"].as_str().map(str::to_string));
+        if let Some(st) = st {
+            if stages.last() != Some(&st) {
+                stages.push(st.clone());
+                let s = tui.screen();
+                assert!(s.contains("you (spoken) › Tell Phone to use the new wire format."), "the card:\n{s}");
+                tui.snapshot(&format!("parity-t35-card-{st}"));
+            }
+            if st == "sent" {
+                break;
+            }
+        }
+        assert!(std::time::Instant::now() < end, "the card stopped at {stages:?}:\n{}", tui.screen());
+        tui.pump(20);
+    }
+    assert!(stages.iter().any(|s| s == "settling") && stages.last().map(String::as_str) == Some("sent"), "the card advanced: {stages:?}");
+    let s = tui.until_screen(10, "◇ ");
+    assert!(s.contains("Sent") || s.lines().any(|l| l.contains("◇ ")), "{s}");
+    assert!(tui.app.voice_heard.contains("Tell Phone"), "the words as heard: {:?}", tui.app.voice_heard);
+    assert!(tui.app.voice_seen.iter().any(|s| s == "thinking") && tui.app.voice_seen.iter().any(|s| s == "speaking"), "thinking and speaking shown: {:?}", tui.app.voice_seen);
+
+    // ctrl+x cancels the open request inside its window.
+    d.ctl("voice.set", json!({ "settle_seconds": 8 }));
+    tui.until(20, |a| a.voice_state() == Some("listening"));
+    let second = d.ctl("voice.say", json!({ "text": "Tell Phone to stop pushing to main." }))["request"].as_str().unwrap().to_string();
+    tui.until(60, |a| a.voice_requests.iter().any(|r| r["id"] == second.as_str() && r["state"] == "settling"));
+    let s = tui.until_screen(5, "Going out in a moment (ctrl+x cancels)");
+    drop(s);
+    tui.snapshot("parity-t35-settling");
+    tui.key_mod(KeyCode::Char('x'), crossterm::event::KeyModifiers::CONTROL);
+    tui.until(10, |a| a.voice_requests.iter().any(|r| r["id"] == second.as_str() && r["state"] == "cancelled"));
+    tui.until_screen(5, "Cancelled: nothing was sent");
+    let card = d.ctl("voice.requests", json!({}))["requests"].as_array().unwrap().iter().find(|r| r["id"] == second.as_str()).cloned().unwrap();
+    assert_eq!(card["state"], "cancelled");
+    tui.snapshot("parity-t35-cancelled");
+
+    // ctrl+y answers a read-back yes: a permission read back by voice.
+    d.ctl("voice.set", json!({ "settle_seconds": 1 }));
+    std::fs::write(&mode, "permission").unwrap();
+    let sessions = d.ctl("task.create", json!({ "repo": r, "harness": "claude", "prompt": "write a file", "title": "Sessions" }))["run"]["id"].as_str().unwrap().to_string();
+    d.wait_status(&sessions, |s| s == "waiting_for_user", 30);
+    std::fs::write(&mode, "overseer").unwrap();
+    tui.until(20, |a| a.voice_state() == Some("listening"));
+    let rb = d.ctl("voice.say", json!({ "text": "What does Sessions want?" }));
+    assert!(rb["read_back"]["said"].as_str().unwrap_or("").starts_with("Sessions wants"), "{rb}");
+    tui.until(10, |a| a.voice_asking);
+    let s = tui.until_screen(5, "waits for your yes");
+    assert!(s.contains("ctrl+y yes ctrl+n no"), "{s}");
+    tui.snapshot("parity-t35-read-back");
+    tui.key_mod(KeyCode::Char('y'), crossterm::event::KeyModifiers::CONTROL);
+    tui.until(5, |a| !a.voice_asking);
+    d.wait_status(&sessions, |s| s != "waiting_for_user", 20);
+    assert_ne!(d.run(&sessions)["status"], "waiting_for_user", "yes by key allowed it");
+    let answered = d.events(&sessions).into_iter().find(|e| e["kind"] == "permission_answered").expect("answered");
+    assert_eq!(answered["payload"]["allow"], true);
+
+    // ctrl+a: talk to an agent at work (Phone, once Sessions has finished), then back to Overseer.
+    d.wait_status(&sessions, |s| s == "completed", 30);
+    tui.key_mod(KeyCode::Char('a'), crossterm::event::KeyModifiers::CONTROL);
+    tui.until(10, |a| a.voice["target"] == phone.as_str());
+    assert_eq!(d.ctl("voice.get", json!({}))["target"], phone.as_str());
+    tui.until_screen(5, "talking to Phone");
+    tui.snapshot("parity-t35-talk-to");
+    while tui.app.voice["target"] != "overseer" {
+        tui.key_mod(KeyCode::Char('a'), crossterm::event::KeyModifiers::CONTROL);
+        tui.pump(300);
+    }
+    tui.until_screen(5, "talking to Overseer");
+    // ctrl+t mutes and unmutes.
+    tui.until(20, |a| a.voice_state() == Some("listening"));
+    tui.key_mod(KeyCode::Char('t'), crossterm::event::KeyModifiers::CONTROL);
+    let s = state_now(&mut tui, "muted", "◉ Muted", 10);
+    assert!(s.contains("ctrl+t unmute"), "{s}");
+    tui.snapshot("parity-t35-muted");
+    tui.key_mod(KeyCode::Char('t'), crossterm::event::KeyModifiers::CONTROL);
+    state_now(&mut tui, "listening", "◉ Listening", 30);
+
+    // Paused for a call: another app takes the microphone (the simulated room's record of it).
+    std::fs::write(&mic, "us.zoom.xos\n").unwrap();
+    let s = state_now(&mut tui, "paused", "◉ Paused for a call", 10);
+    assert!(s.contains("uses the microphone"), "{s}");
+    tui.snapshot("parity-t35-paused");
+    std::fs::write(&mic, "").unwrap();
+    state_now(&mut tui, "listening", "◉ Listening", 20);
+
+    // ctrl+v: off.
+    tui.key_mod(KeyCode::Char('v'), crossterm::event::KeyModifiers::CONTROL);
+    state_now(&mut tui, "off", "Voice off", 10);
+    for want in ["off", "listening", "hearing", "thinking", "speaking", "muted", "paused"] {
+        assert!(tui.app.voice_seen.iter().any(|s| s == want), "the terminal showed {want}: {:?}", tui.app.voice_seen);
+        assert!(vscode.seen().iter().any(|s| s == want), "VS Code's live channel was told {want}: {:?}", vscode.seen());
+    }
+    assert_eq!(tui.app.voice_seen, vscode.seen(), "the terminal showed every state VS Code's live channel was told, in the same order");
+    eprintln!("T-35 states: terminal {:?}; VS Code's channel {:?}; card {stages:?}", tui.app.voice_seen, vscode.seen());
+    d.ctl("run.interrupt", json!({ "run_id": phone }));
+}
