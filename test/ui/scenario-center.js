@@ -27,12 +27,13 @@ const { Session, makeRepo, latestVsix, delay, until, repoRoot } = require('./har
     const editX = sh(repoX, 'X edits', `sed -i '' 's/^L3: original$/L3: edited in X/' a.txt`);
     busy = sh(repoY, 'Y live', `sed -i '' 's/^L7: original$/L7: edited in Y/' b.txt; i=0; while [ $i -lt 120 ]; do echo tick $i; sleep 1; i=$((i+1)); done`);
     const runState = id => s.ctl('state').runs.find(r => r.id === id);
-    for (const t of [nested, editX]) for (let i = 0; i < 40 && runState(t.run.id).status !== 'completed'; i++) await delay(300);
+    for (const t of [nested, editX]) await until(() => runState(t.run.id).status, st => st === 'completed', 60000, 300);
 
     // Gate K: the agents column is the Overseer side bar (it replaces the dashboard's rail, AC-67);
     // Explorer is not needed and the window's folder does not limit the list.
-    await s.openOverseerView(); await delay(1500);
-    let rows = await s.agentRows();
+    // The list once it shows both repositories and the nested agents down to the grandchild.
+    await s.openOverseerView();
+    let rows = await until(() => s.agentRows(), rs => ['repo-x', 'repo-y', 'X nested agents', 'child task', 'grandchild task'].every(l => rs.some(r => r.label === l)), 30000, 200);
     const repos = rows.filter(r => r.level === 1).map(r => r.label);
     const explorerShown = await cdp.evalWorkbench(`[...document.querySelectorAll('.part.sidebar .pane-header')].some(h => h.offsetParent && /Folders|open-folder/i.test(h.textContent))`);
     check('the Overseer side bar replaces Explorer and lists repositories not open in the window', !explorerShown && repos.includes('repo-x') && repos.includes('repo-y') && !repos.includes('open-folder'), { explorerShown, repos });
@@ -42,17 +43,15 @@ const { Session, makeRepo, latestVsix, delay, until, repoRoot } = require('./har
     const levels = rows.filter(r => ['grandchild task', 'child task', 'X nested agents', 'repo-x'].includes(r.label)).map(r => [r.label, r.level]);
     const at = (label, rs = rows) => rs.filter(r => r.label === label).pop();
     check('agents list shows repository → task → native child → grandchild', at('repo-x')?.level === 1 && at('X nested agents')?.level === 2 && at('child task')?.level === 3 && at('grandchild task')?.level === 4, levels);
-    await s.clickAgentRow('child task', { twisty: true });
-    rows = await s.agentRows();
+    // Each click waits for the list to redraw with what it should show (15 s; the check then reads what was there).
+    const twisty = async (label, ok) => { await s.clickAgentRow(label, { twisty: true, settle: 0 }); return until(() => s.agentRows(), ok, 15000, 100); };
+    rows = await twisty('child task', rs => !rs.some(r => r.label === 'grandchild task') && at('child task', rs)?.expanded === 'false');
     const childCollapsed = !rows.some(r => r.label === 'grandchild task') && at('child task', rows).expanded === 'false';
-    await s.clickAgentRow('child task', { twisty: true });
-    const childExpanded = (await s.agentRows()).some(r => r.label === 'grandchild task');
-    await s.clickAgentRow('X nested agents', { twisty: true });
-    const taskCollapsed = !(await s.agentRows()).some(r => r.label === 'child task');
-    await s.clickAgentRow('X nested agents', { twisty: true });
-    await s.clickAgentRow('repo-y', { twisty: true });
-    const repoCollapsed = !(await s.agentRows()).some(r => r.label === 'Y live');
-    await s.clickAgentRow('repo-y', { twisty: true });
+    const childExpanded = (await twisty('child task', rs => rs.some(r => r.label === 'grandchild task'))).some(r => r.label === 'grandchild task');
+    const taskCollapsed = !(await twisty('X nested agents', rs => !rs.some(r => r.label === 'child task'))).some(r => r.label === 'child task');
+    await twisty('X nested agents', rs => rs.some(r => r.label === 'child task'));
+    const repoCollapsed = !(await twisty('repo-y', rs => !rs.some(r => r.label === 'Y live'))).some(r => r.label === 'Y live');
+    await twisty('repo-y', rs => rs.some(r => r.label === 'Y live'));
     check('expand/collapse at repository, task and native-child levels', childCollapsed && childExpanded && taskCollapsed && repoCollapsed, { childCollapsed, childExpanded, taskCollapsed, repoCollapsed });
 
     // Selecting runs across repositories switches the review and the conversation.
@@ -105,16 +104,16 @@ const { Session, makeRepo, latestVsix, delay, until, repoRoot } = require('./har
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'after reload');
     const restoredChat = await chatOf('Y live');
     const restoredReview = await reviewOf(busy.run.id);
-    await s.openOverseerView(); await delay(1500);
-    const selectedRows = (await s.agentRows()).filter(r => r.selected).map(r => r.label);
+    await s.openOverseerView();
+    const selectedRows = (await until(() => s.agentRows(), rs => rs.some(r => r.selected), 20000, 200)).filter(r => r.selected).map(r => r.label);
     check('Overseer restored after a window reload (same agent, its chat and review)', restoredChat && restoredReview && selectedRows.every(t => t === 'Y live'), { restoredChat, restoredReview, selectedRows });
     const view = await cdp.webview(`document.getElementById('title')?.textContent === 'Y live'`, 20000);
 
     // Narrow and wide windows.
     for (const [label, width, height] of [['narrow', 1024, 760], ['wide', 1900, 1100]]) {
       await cdp.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 0, mobile: false }, cdp.workbench);
-      await delay(1500);
-      const dims = await cdp.evalWorkbench(`({ w: innerWidth, groups: [...document.querySelectorAll('.editor-group-container')].map(g => Math.round(g.getBoundingClientRect().width)) })`);
+      // Once the window has laid itself out at the new size.
+      const dims = await until(() => cdp.evalWorkbench(`({ w: innerWidth, groups: [...document.querySelectorAll('.editor-group-container')].map(g => Math.round(g.getBoundingClientRect().width)) })`), d => d.w === width && d.groups.length >= 2 && d.groups.every(w => w > 150), 15000, 200);
       const fits = view && await view.eval(`document.documentElement.scrollWidth <= innerWidth + 1`);
       s.note('window ' + label, dims);
       await s.screenshot('window-' + label);

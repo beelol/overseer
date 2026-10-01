@@ -104,7 +104,7 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, until, 
     await reviewB.eval(`[...document.querySelectorAll('#tree .file')].find(b => b.textContent.includes('a.txt')).id = 'sel-a'`);
     const selA = await s.webviewPoint(reviewB, '#sel-a');
     await cdp.click(selA.x, selA.y);
-    await delay(500);
+    await until(() => reviewB.eval(`document.querySelector('#tree .file.active')?.textContent || ''`), t => t.includes('a.txt'), 10000);
     const selectedBefore = await reviewB.eval(`document.querySelector('#tree .file.active')?.textContent`);
     const tWrite = await timeUntil('write new file', () => fs.writeFileSync(path.join(wsB, 'x1.txt'), 'new\n'), reviewB, () => listed(reviewB, 'x1.txt'));
     const revBefore = await reviewB.eval(`[...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === 'b.txt')?.dataset.revision`);
@@ -132,7 +132,8 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, until, 
     await reviewB.waitFor(`['escape.txt','latin1.txt','big.txt'].every(p => [...document.querySelectorAll('.diff-file .file-path')].some(e => e.textContent === p))`, 10000);
     const stateOf = async name => {
       await reviewB.eval(`(() => { const e = [...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === ${JSON.stringify(name)}); e.scrollIntoView(); })()`);
-      await delay(1500);
+      // Its body has been read and drawn (rendered, deferred or unsupported), however long that takes.
+      await until(() => reviewB.eval(`[...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === ${JSON.stringify(name)})?.dataset.loadState || ''`), st => ['rendered', 'deferred', 'unsupported'].includes(st), 20000);
       return reviewB.eval(`(() => { const e = [...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === ${JSON.stringify(name)}); return { load: e.dataset.loadState, problem: e.querySelector('.file-problem')?.textContent || '', card: e.querySelector('.large-diff')?.textContent || '', save: e.querySelector('.save-file').disabled, readOnly: !!e.querySelector('.editor.modified .monaco-editor.read-only, .monaco-editor.readonly') }; })()`);
     };
     const esc = await stateOf('escape.txt'), latin = await stateOf('latin1.txt'), big = await stateOf('big.txt');
@@ -157,22 +158,23 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, until, 
     s.note('merge', cp.spawnSync('git', ['merge', 'other'], { cwd: wsB, encoding: 'utf8' }).stdout.trim());
     const conflictShown = await reviewB.waitFor(`[...document.querySelectorAll('#tree .file.conflicted')].some(b => /conflict\\.txt/.test(b.getAttribute('aria-label') || '') && /conflicted/.test(b.getAttribute('aria-label')))`, 30000).then(() => true, () => false);
     const conflictListed = await reviewB.waitFor(`[...document.querySelectorAll('.diff-file .file-path')].some(e => e.textContent === 'conflict.txt')`, 30000).catch(() => false);
-    check('merge conflict shown as Conflicted and listed in the review', conflictShown && conflictListed, { conflictShown, conflictListed });
+    // What the daemon and the review's tree had, so a miss says which side it was.
+    const conflictSeen = !(conflictShown && conflictListed) && { daemon: s.ctl('workspace.status', { workspace_id: taskB.workspace.id }).conflicted, tree: await reviewB.eval(`[...document.querySelectorAll('#tree .file')].map(b => b.className + ' ' + b.getAttribute('aria-label'))`) };
+    check('merge conflict shown as Conflicted and listed in the review', conflictShown && conflictListed, { conflictShown, conflictListed, conflictSeen });
     await s.screenshot('conflict');
     // Rename during an unsaved review edit: the draft is not silently lost.
     await reviewB.waitFor(`[...document.querySelectorAll('.diff-file')].some(e => e.querySelector('.file-path')?.textContent === 'a.txt' && e.dataset.loadState === 'rendered')`, 20000);
     await editLine(reviewB, 'a.txt', ' DRAFT-BEFORE-RENAME', '/EDIT.IN.B/');
     git(wsB, 'mv', '-f', 'a.txt', 'a-renamed.txt');
-    await delay(4000);
+    const draftSomewhere = await cdp.waitFor(`[...document.querySelectorAll('.tab')].some(t => /a\.txt|Untitled/.test(t.getAttribute('aria-label') || '') && t.classList.contains('dirty'))`, 20000).then(() => true, () => false);
     const docs = await cdp.evalWorkbench(`[...document.querySelectorAll('.tab')].map(t => t.getAttribute('aria-label')).join(' | ')`);
-    const draftSomewhere = await cdp.evalWorkbench(`[...document.querySelectorAll('.tab')].some(t => /a\.txt|Untitled/.test(t.getAttribute('aria-label') || '') && t.classList.contains('dirty'))`);
     check('draft survives a rename during edit (kept as a dirty buffer)', draftSomewhere, docs);
     await s.screenshot('rename-during-edit');
     await s.screenshot('unsupported-files');
 
     // AC-32/33: current checkout — review edit + save, native undo/redo, draft vs external write, reload recovery.
     const cur = s.ctl('task.create', { repo: repoA, harness: 'generic', workspace_mode: 'current', program: '/bin/sh', args: ['-c', 'echo "L2: current run edit" > run.txt'], prompt: '', title: 'C current' });
-    for (let i = 0; i < 20; i++) { if (s.ctl('state').runs.find(x => x.id === cur.run.id).status === 'completed') break; await delay(500); }
+    await until(() => s.ctl('state').runs.find(x => x.id === cur.run.id).status, st => st === 'completed', 60000, 300);
     fs.writeFileSync(path.join(repoA, 'a.txt'), fs.readFileSync(path.join(repoA, 'a.txt'), 'utf8').replace('L5: original', 'L5: user change before review'));
     await selectRun('C current');
     const reviewC = await reviewFor(repoA);
@@ -190,25 +192,26 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, until, 
     await editLine(reviewC, 'a.txt', ' SAVED-FROM-REVIEW', '/user.change/');
     const saveC = await s.webviewPoint(reviewC, '#save-target');
     await cdp.click(saveC.x, saveC.y);
-    await delay(1500);
+    await until(() => fs.readFileSync(path.join(repoA, 'a.txt'), 'utf8').includes('SAVED-FROM-REVIEW'), Boolean, 20000);
     check('current-checkout review edit saved to the checkout path', fs.readFileSync(path.join(repoA, 'a.txt'), 'utf8').includes('SAVED-FROM-REVIEW'));
     // Native diff editor: type, undo, redo.
     await reviewC.eval(`[...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === 'a.txt').querySelector('.open-native').id = 'native-a'`);
     const nat = await s.webviewPoint(reviewC, '#native-a');
     await cdp.click(nat.x, nat.y);
-    await cdp.waitFor(`!!document.querySelector('.monaco-diff-editor .editor.modified')`, 10000, 'native diff');
-    await delay(800);
+    await cdp.waitFor(`[...document.querySelectorAll('.monaco-diff-editor .editor.modified .view-lines .view-line')].some(l => /SAVED-FROM-REVIEW/.test(l.textContent))`, 30000, 'native diff');
     const modLine = await cdp.evalWorkbench(`(() => { const l = [...document.querySelectorAll('.monaco-diff-editor .editor.modified .view-lines .view-line')].find(l => /SAVED-FROM-REVIEW/.test(l.textContent)); const b = l.getBoundingClientRect(); return { x: b.left + 20, y: b.top + b.height / 2 }; })()`);
     await cdp.click(modLine.x, modLine.y);
     await cdp.key('End');
-    await cdp.type(' NATIVE-DRAFT');
-    await delay(300);
     const textNow = () => cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-diff-editor .editor.modified .view-lines .view-line')].map(l => l.textContent).join('\\n')`);
-    const typed = /NATIVE.DRAFT/.test(await textNow());
-    await cdp.key('z', { meta: true }); await delay(300);
-    const undone = !/NATIVE.DRAFT/.test(await textNow());
-    await cdp.key('z', { meta: true, shift: true }); await delay(300);
-    const redone = /NATIVE.DRAFT/.test(await textNow());
+    // Each step waits for the editor to show its result (a loaded machine draws it later), and
+    // the next key goes only once it has.
+    const drafted = t => /NATIVE.DRAFT/.test(t || '');
+    await cdp.type(' NATIVE-DRAFT');
+    const typed = drafted(await until(textNow, drafted, 10000));
+    await cdp.key('z', { meta: true });
+    const undone = !drafted(await until(textNow, t => !drafted(t), 10000));
+    await cdp.key('z', { meta: true, shift: true });
+    const redone = drafted(await until(textNow, drafted, 10000));
     check('native editor undo/redo on the selected file', typed && undone && redone, { typed, undone, redone });
     await s.screenshot('native-draft');
     // External agent write to the same line while the draft is unsaved.

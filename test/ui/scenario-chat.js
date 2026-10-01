@@ -8,7 +8,7 @@
 // Screenshots at 900 and 1600 px in Overseer Dark and Light.
 const fs = require('fs');
 const path = require('path');
-const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
+const { Session, makeRepo, latestVsix, delay, until, repoRoot } = require('./harness');
 
 (async () => {
   const s = new Session('chat');
@@ -25,14 +25,21 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
     const setTheme = async t => { const cur = JSON.parse(fs.readFileSync(settingsFile, 'utf8')); cur['workbench.colorTheme'] = t; fs.writeFileSync(settingsFile, JSON.stringify(cur, null, 2)); await delay(1800); };
-    const setWidth = async w => { await cdp.call('Emulation.setDeviceMetricsOverride', { width: w, height: 900, deviceScaleFactor: 0, mobile: false }, cdp.workbench); await delay(1500); };
+    // A width is in place once the window has it and the chat's frame has stopped resizing (two
+    // equal readings 200 ms apart), not after a fixed time.
+    let dash;
+    const setWidth = async w => {
+      await cdp.call('Emulation.setDeviceMetricsOverride', { width: w, height: 900, deviceScaleFactor: 0, mobile: false }, cdp.workbench);
+      await until(() => cdp.evalWorkbench('innerWidth'), x => x === w, 15000, 100);
+      if (dash) { let last = -1; await until(async () => { const x = await dash.eval('innerWidth'); const same = x === last; last = x; return same; }, Boolean, 10000, 200); }
+    };
     fs.writeFileSync(modeFile, 'showcase');
     const show = s.ctl('task.create', { repo, harness: 'claude', title: 'Refresh sessions once', prompt: 'Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests.' });
-    for (let i = 0; i < 40 && s.ctl('state').runs.find(r => r.id === show.run.id).status !== 'completed'; i++) await delay(300);
+    await until(() => s.ctl('state').runs.find(r => r.id === show.run.id).status, st => st === 'completed', 60000, 300);
 
     await cdp.command('Overseer: Open Overseer View');
     await s.selectRun(show.run.id);
-    const dash = await s.editorView();
+    dash = await s.editorView();
     await dash.waitFor(`!!document.querySelector('#conv .msg.agent table')`, 20000);
     await setWidth(1600);
 
@@ -61,8 +68,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     check('consecutive tool calls fold into one line; edits are chips; the turn ends with a quiet footer; the composer stays pinned',
       /6 steps/.test(layout.steps || '') && layout.edits.length >= 2 && /Done/.test(layout.foot || '') && /\$0\.04/.test(layout.foot || '') && layout.composerPinned, layout);
     // Expand the steps: readable rows (verb + target), not raw JSON.
-    await dash.eval(`document.querySelector('#conv .steps-fold > summary').click()`); await delay(300);
-    const rows = await dash.eval(`[...document.querySelectorAll('#conv .steps-fold .tool > summary')].map(s => s.textContent.trim())`);
+    await dash.eval(`document.querySelector('#conv .steps-fold > summary').click()`);
+    const rows = await until(() => dash.eval(`[...document.querySelectorAll('#conv .steps-fold .tool > summary')].filter(s => s.offsetParent).map(s => s.textContent.trim())`), r => r.length > 0, 10000, 100);
     check('expanded tool rows read like "Read README.md", "Ran npm test …" (no raw JSON)', rows.some(r => /^Read\s*README\.md/.test(r)) && rows.some(r => /^Ran\s*npm test/.test(r)) && rows.every(r => !/[{}]|"file_path"/.test(r)), rows);
 
     for (const theme of ['Overseer Dark', 'Overseer Light', 'Overseer']) {
@@ -72,10 +79,10 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await setTheme('Overseer Dark'); await setWidth(1280);
 
     // Jump to latest when scrolled up.
-    await dash.eval(`document.getElementById('scroll').scrollTop = 0; document.getElementById('scroll').dispatchEvent(new Event('scroll'))`); await delay(300);
-    const jump = await dash.eval(`!document.getElementById('jump').hidden`);
-    await dash.eval(`document.getElementById('jump').click()`); await delay(300);
-    const atEnd = await dash.eval(`(() => { const s = document.getElementById('scroll'); return s.scrollTop + s.clientHeight >= s.scrollHeight - 40; })()`);
+    await dash.eval(`document.getElementById('scroll').scrollTop = 0; document.getElementById('scroll').dispatchEvent(new Event('scroll'))`);
+    const jump = await until(() => dash.eval(`!document.getElementById('jump').hidden`), Boolean, 10000, 100);
+    await dash.eval(`document.getElementById('jump').click()`);
+    const atEnd = await until(() => dash.eval(`(() => { const s = document.getElementById('scroll'); return s.scrollTop + s.clientHeight >= s.scrollHeight - 40; })()`), Boolean, 10000, 100);
     check('scrolled up, Jump to latest appears and returns to the newest message', jump && atEnd, { jump, atEnd });
 
     // Streaming: earlier content does not move while new content arrives (no layout shift).
@@ -90,11 +97,20 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
       const mo = new MutationObserver(() => { const now = conv.querySelectorAll('.msg').length; if (now > last) { appends.push(performance.now()); last = now; } const p = pos(); p.forEach((y, i) => { if (i < start.length && y !== start[i]) moved.push([i, start[i], y]); }); });
       mo.observe(conv, { childList: true, subtree: true });
       const t0 = Date.now();
-      (function wait() { if (conv.querySelectorAll('.msg').length >= 2000 || Date.now() - t0 > 30000) { mo.disconnect(); resolve({ msgs: conv.querySelectorAll('.msg').length, moved: moved.slice(0, 5), movedCount: moved.length, observed: start.length }); } else setTimeout(wait, 200); })();
+      (function wait() { if (conv.querySelectorAll('.msg').length >= 2000 || Date.now() - t0 > 90000) { mo.disconnect(); resolve({ msgs: conv.querySelectorAll('.msg').length, moved: moved.slice(0, 5), movedCount: moved.length, observed: start.length }); } else setTimeout(wait, 200); })();
     })`);
     check('while a run streams, earlier content does not shift', shift.msgs >= 1990 && shift.movedCount === 0 && shift.observed >= 1, shift);
 
-    // 2,000-event conversation: scroll frame times and append latency.
+    // 2,000-event conversation: scroll frame times and append latency, measured once the stream
+    // has ended and the chat has stopped redrawing (no change to it for 1 s): what is timed is
+    // scrolling the conversation, not the tail of its rendering.
+    await until(() => s.ctl('state').runs.find(r => r.id === stream.run.id).status, st => !['queued', 'starting', 'running'].includes(st), 60000, 300);
+    const quiet = await dash.eval(`new Promise(resolve => {
+      const conv = document.getElementById('conv'); let lastChange = performance.now(); const t0 = performance.now();
+      const mo = new MutationObserver(() => { lastChange = performance.now(); }); mo.observe(conv, { childList: true, subtree: true, characterData: true, attributes: true });
+      (function wait() { const now = performance.now(); if (now - lastChange >= 1000 || now - t0 > 30000) { mo.disconnect(); resolve({ quietAfterMs: Math.round(now - t0) }); } else setTimeout(wait, 100); })();
+    })`);
+    s.note('chat quiet before the scroll measurement', quiet);
     const perf = await dash.eval(`new Promise(resolve => {
       const sc = document.getElementById('scroll'); sc.scrollTop = 0;
       // Frame interval (rAF to rAF) and the frame's own work (scroll, style and layout, forced synchronously).

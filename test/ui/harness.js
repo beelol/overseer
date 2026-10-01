@@ -379,7 +379,8 @@ function startMock(root, env = {}) {
   const child = cp.spawn(process.execPath, [path.join(repoRoot, 'fixtures/mock-openai/server.js')], { env: { ...process.env, MOCK_PORT: '0', MOCK_PORT_FILE: portFile, MOCK_LOG: path.join(root, 'mock.log'), ...env }, stdio: 'ignore' });
   children.add(child);
   child.on('exit', () => children.delete(child));
-  return { child, port: async () => { for (let i = 0; i < 50 && !fs.existsSync(portFile); i++) await delay(100); return Number(fs.readFileSync(portFile, 'utf8')); } };
+  // The port once the server has written it (a loaded machine starts node later than 5 s).
+  return { child, port: async () => Number(await until(() => fs.existsSync(portFile) && fs.readFileSync(portFile, 'utf8').trim(), Boolean, 30000, 100)) };
 }
 
 function openCodeConfig(port) {

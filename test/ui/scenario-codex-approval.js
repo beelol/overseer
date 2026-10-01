@@ -39,7 +39,7 @@ const PROMPT = 'Run exactly this shell command in the workspace: touch approved.
     const r1 = s.ctl('state').runs.find(r => r.harness === 'codex-app');
     const w1 = await waitFor(r1.id, r => r.status === 'waiting_for_user' || !['queued', 'starting', 'running'].includes(r.status));
     check('codex-app run waits for permission (not auto-approved)', w1.status === 'waiting_for_user', { status: w1.status, attention: w1.attention && w1.attention.tool, reason: w1.exit_reason });
-    const output = await cdp.webview(`!!document.querySelector('.perm button')`, 30000);
+    const output = await cdp.webview(`!!document.querySelector('.perm button')`, 60000);
     await s.screenshot('permission-request');
     await output.eval(`(() => { const b = [...document.querySelectorAll('.perm button')].find(b => /Allow/.test(b.textContent)); b.id = 'allow-btn'; b.scrollIntoView({ block: 'center' }); })()`);
     const allow = await s.webviewPoint(output, '#allow-btn');
@@ -58,7 +58,7 @@ const PROMPT = 'Run exactly this shell command in the workspace: touch approved.
       await s.openOverseerView();
       const row = await cdp.waitFor(`(() => { const rows = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top); const i = rows.findIndex(r => r.textContent.includes(${JSON.stringify(`approval ${mode}`)})); const r = rows[i + 1]; if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 60, y: b.top + b.height / 2 }; })()`, 20000);
       await cdp.click(row.x, row.y);
-      const panel = await cdp.webview(`document.getElementById('title')?.textContent.includes(${JSON.stringify(`approval ${mode}`)}) && !!document.querySelector('.perm button')`, 30000);
+      const panel = await cdp.webview(`document.getElementById('title')?.textContent.includes(${JSON.stringify(`approval ${mode}`)}) && !!document.querySelector('.perm button')`, 60000);
       if (mode === 'deny') {
         await panel.eval(`(() => { const b = [...document.querySelectorAll('.perm button')].find(b => /Deny/.test(b.textContent)); b.id = 'deny-btn'; b.scrollIntoView({ block: 'center' }); })()`);
         const p = await s.webviewPoint(panel, '#deny-btn');

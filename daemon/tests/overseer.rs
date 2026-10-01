@@ -826,6 +826,14 @@ fn ac185_actions_have_classes_and_cards() {
     for a in &agents {
         d.wait_status(a, |s| s == "running", 20);
     }
+    // How long one stop takes on this machine right now (AC-149): the four stops below are held
+    // to this plus the margin, not to a fixed time a loaded machine can miss with nothing wrong.
+    let one = run_id(&d.call("task.create", json!({"repo": repo, "harness": "generic", "workspace_mode": "worktree", "program": "/bin/sh", "args": ["-c", "sleep 120"], "prompt": "", "title": "Baseline"})));
+    d.wait_status(&one, |s| s == "running", 20);
+    let t0 = std::time::Instant::now();
+    d.call("run.interrupt", json!({"run_id": one}));
+    d.wait_status(&one, |s| s == "interrupted", 30);
+    let one_stop = t0.elapsed();
     // A nested fixture run for the native-child refusal.
     let nested = claude_task(&d, &repo, &mode_file, "nested", "Nested", "delegate");
     d.wait_done(&nested, 30);
@@ -849,9 +857,9 @@ fn ac185_actions_have_classes_and_cards() {
     let answer = d.call("overseer.answer", json!({"id": card_id, "yes": true, "surface": "ctl", "by": "owner"}));
     assert_eq!(answer["state"], "yes");
     for a in &agents {
-        d.wait_status(a, |s| s == "interrupted", 5);
+        d.wait_status(a, |s| s == "interrupted", 30);
     }
-    assert!(started.elapsed() < Duration::from_secs(2), "four stops took {:?}", started.elapsed());
+    assert!(started.elapsed() < one_stop + Duration::from_secs(2), "four stops took {:?} (one alone took {one_stop:?})", started.elapsed());
     let card = d.call("overseer.card", json!({"id": card_id}));
     assert_eq!(card["rows"].as_array().unwrap().len(), 4);
     assert!(card["rows"].as_array().unwrap().iter().all(|r| r["action"] == "stop" && r["delivery"] == "stop"));

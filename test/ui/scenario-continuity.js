@@ -41,7 +41,8 @@ const G = 2 ** 30;
   const behave = (codex, claude) => writeWhole(control, JSON.stringify({ codex, claude }));
   const network = v => writeWhole(netFile, JSON.stringify(v));
   const settingsFile = path.join(s.profile, 'User/settings.json');
-  const setTheme = async theme => { const cur = JSON.parse(fs.readFileSync(settingsFile, 'utf8')); cur['workbench.colorTheme'] = theme; fs.writeFileSync(settingsFile, JSON.stringify(cur, null, 2)); await delay(2500); };
+  // A theme is in place once the workbench carries its classes (15 s; a loaded machine applies it later).
+  const setTheme = async theme => { const was = await s.cdp.evalWorkbench(`document.querySelector('.monaco-workbench')?.className || ''`); const cur = JSON.parse(fs.readFileSync(settingsFile, 'utf8')); cur['workbench.colorTheme'] = theme; fs.writeFileSync(settingsFile, JSON.stringify(cur, null, 2)); await until(() => s.cdp.evalWorkbench(`document.querySelector('.monaco-workbench')?.className || ''`), c => c !== was, 15000, 100); };
   try {
     const repo = makeRepo(path.join(s.root, 'continuity-repo'), { dirty: false });
     s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'overseer.home.sendTo': 'agent' });
@@ -92,22 +93,22 @@ const G = 2 ** 30;
     // Compact where it sits (AC-54): one line and Got it; the explanation and the settings unfold from it.
     const compact = await dash.eval(`(() => { const n = document.querySelector('[data-continuity="notice"]'); const d = n && n.querySelector('details'); return d ? { open: d.open, text: n.innerText.replace(/\\s+/g, ' ').trim() } : null; })()`);
     check('until opened it is one line, Continuity is on · Got it, within the composer\'s text budget', compact && !compact.open && compact.text.length <= 30, compact);
-    { const at = await s.webviewPoint(dash, '[data-continuity="notice"] summary'); await cdp.click(at.x, at.y); await delay(600); }
-    const unfolded = await dash.eval(`(() => { const n = document.querySelector('[data-continuity="notice"]'); const d = n.querySelector('details'); const b = n.querySelector('[data-continuity="allow:allowModelDownloads"]'); return { open: d.open, allowVisible: !!(b && b.offsetParent), line: n.querySelector('.cont-line')?.textContent.slice(0, 40) }; })()`);
+    { const at = await s.webviewPoint(dash, '[data-continuity="notice"] summary'); await cdp.click(at.x, at.y); }
+    const unfolded = await until(() => dash.eval(`(() => { const n = document.querySelector('[data-continuity="notice"]'); const d = n.querySelector('details'); const b = n.querySelector('[data-continuity="allow:allowModelDownloads"]'); return { open: d.open, allowVisible: !!(b && b.offsetParent), line: n.querySelector('.cont-line')?.textContent.slice(0, 40) }; })()`), u => u && u.open && u.allowVisible, 10000, 100);
     check('opened, it says what may happen and its Allow is one click', unfolded && unfolded.open && unfolded.allowVisible && /^If the connection drops/.test(unfolded.line || ''), unfolded);
     await s.screenshot('notice-dark');
     { const at = await s.webviewPoint(dash, '[data-continuity="allow:allowModelDownloads"]'); await cdp.click(at.x, at.y); await delay(1200); }
     // Downloads first allowed: the one-time offer to keep the best-fitting model ready, declined.
     const offerToast = await cdp.waitFor(`[...document.querySelectorAll('.notification-toast, .notification-list-item')].map(t => t.innerText).find(t => /Keep qwen3-coder:30b ready for offline/.test(t)) || null`, 15000).catch(() => null);
     const notNow = await cdp.evalWorkbench(`(() => { const b = [...document.querySelectorAll('.notification-toast .monaco-button, .notification-list-item .monaco-button')].find(b => b.textContent.trim() === 'Not now'); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
-    if (notNow) { await cdp.click(notNow.x, notNow.y); await delay(1200); }
+    if (notNow) { await cdp.click(notNow.x, notNow.y); await until(() => s.ctl('continuity.prefetch_offer').show, shown => shown === false, 15000, 200); }
     const afterOffer = { prefetch: s.ctl('settings.get').settings.prefetch, again: s.ctl('continuity.prefetch_offer').show };
     check('when downloads are first allowed, Overseer offers once to keep the best-fitting model ready, naming it and its size; Not now leaves prefetch off', /Keep qwen3-coder:30b ready for offline\? \(already installed\)/.test(offerToast || '') && !!notNow && afterOffer.prefetch === false && afterOffer.again === false, { offerToast, afterOffer });
     const allowed = s.ctl('settings.get').settings.allowModelDownloads;
-    const switched = await dash.eval(`document.querySelector('[data-continuity="notice"] .cont-switch[data-setting="allowModelDownloads"] .state')?.textContent`);
+    const switched = await until(() => dash.eval(`document.querySelector('[data-continuity="notice"] .cont-switch[data-setting="allowModelDownloads"] .state')?.textContent`), t => t === 'allowed', 15000, 100);
     check('Allow downloads flips the setting in the daemon, and the notice shows it', allowed === true && switched === 'allowed', { allowed, switched });
-    { const at = await s.webviewPoint(dash, '[data-continuity="dismiss_notice"]'); await cdp.click(at.x, at.y); await delay(1200); }
-    const gone = await dash.eval(`!document.querySelector('[data-continuity="notice"]')`);
+    { const at = await s.webviewPoint(dash, '[data-continuity="dismiss_notice"]'); await cdp.click(at.x, at.y); }
+    const gone = await until(() => dash.eval(`!document.querySelector('[data-continuity="notice"]')`), Boolean, 15000, 100);
     check('Got it dismisses the notice, and the daemon records it', gone && s.ctl('continuity.notice').show === false, { gone, notice: s.ctl('continuity.notice') });
     s.ctl('settings.set', { values: { allowModelDownloads: false } });
 
@@ -135,7 +136,7 @@ const G = 2 ** 30;
     await pickMenu('Codex', "Mac's default login");
     network(OFFLINE);
     const off = await waitConn(/Offline/);
-    let side; for (let i = 0; i < 30 && !/offline/.test(side || ''); i++) { await delay(300); side = await sideMessage(); }
+    const side = await until(sideMessage, t => /offline/.test(t || ''), 30000, 300);
     const banner = await dash.waitFor(`(() => { const b = document.querySelector('[data-continuity="banner"]'); return b && !b.hidden ? b.textContent : null; })()`, 10000);
     const note = await dash.waitFor(`(() => { const n = document.querySelector('.view-composer .composer-note'); return n && /Offline/.test(n.textContent) ? { text: n.textContent, fix: n.querySelector('.fix')?.textContent, disabled: document.getElementById('start').disabled } : null; })()`, 10000);
     check('offline: the status bar says Offline with the reason', off && /Connection: Offline/.test(off.aria) && /Offline/.test(off.text), off);
@@ -143,17 +144,17 @@ const G = 2 ** 30;
     check('offline: the composer says so and blocks an online agent with the reason and a one-click move to a local model', /Overseer is offline/.test(banner || '') && note && /Offline: no network \(system\)\. Codex cannot be reached\./.test(note.text) && note.fix === 'Use a local model (qwen3-coder:30b)' && note.disabled, { banner, note });
     check('no view says online while offline', ![off.text, off.aria.replace('Connection: Offline', ''), side, banner, note.text].some(t => /\bonline\b/i.test(t || '')), { texts: [off.text, side, banner, note.text] });
     await s.screenshot('offline-composer-dark');
-    { const at = await s.webviewPoint(dash, '.view-composer .composer-note .fix'); await cdp.click(at.x, at.y); await delay(500); }
-    const chips = await dash.eval(`({ agent: document.querySelector('[data-chip="agent"]').getAttribute('aria-label'), model: document.querySelector('[data-chip="model"]').getAttribute('aria-label') })`);
+    { const at = await s.webviewPoint(dash, '.view-composer .composer-note .fix'); await cdp.click(at.x, at.y); }
+    const chips = await until(() => dash.eval(`({ agent: document.querySelector('[data-chip="agent"]').getAttribute('aria-label'), model: document.querySelector('[data-chip="model"]').getAttribute('aria-label') })`), c => /Local model/.test(c.agent) && /Best fit · qwen3-coder:30b/.test(c.model), 15000, 100);
     check('one click moves the composer to the best local model', /Local model/.test(chips.agent) && /Best fit · qwen3-coder:30b/.test(chips.model), chips);
 
     // ---- A local agent started from the composer, offline (AC-94) ----
     const before = s.ctl('state').runs.length;
     { const at = await s.webviewPoint(dash, '#task'); await cdp.click(at.x, at.y); await delay(200); await cdp.type('write local.txt hello from the composer; say done'); await delay(200); await cdp.key('Enter'); }
-    let localRun; for (let i = 0; i < 60 && !localRun; i++) { await delay(300); localRun = s.ctl('state').runs.find((r, j) => j >= before && !r.parent_run_id && r.harness === 'opencode-serve'); }
+    const localRun = await until(() => s.ctl('state').runs.find((r, j) => j >= before && !r.parent_run_id && r.harness === 'opencode-serve'), Boolean, 60000, 300);
     // Ask first is the default: the local agent asks before it writes, as any agent would, and is allowed.
     let asked = false;
-    if (localRun) for (let i = 0; i < 100; i++) { const r = state(localRun.id); if (/completed|failed/.test(r?.status || '')) break; if (r?.status === 'waiting_for_user' && r.attention?.request_id) { asked = true; s.ctl('run.permission', { run_id: localRun.id, request_id: r.attention.request_id, allow: true }); } await delay(300); }
+    if (localRun) for (const end = Date.now() + 120000; Date.now() < end;) { const r = state(localRun.id); if (/completed|failed/.test(r?.status || '')) break; if (r?.status === 'waiting_for_user' && r.attention?.request_id) { asked = true; s.ctl('run.permission', { run_id: localRun.id, request_id: r.attention.request_id, allow: true }); } await delay(300); }
     const localDone = localRun && await waitStatus(localRun.id, /completed|failed/);
     const ws = localRun && s.ctl('state').workspaces.find(w => w.id === localRun.workspace_id);
     const wrote = ws && fs.existsSync(path.join(ws.path, 'local.txt')) ? fs.readFileSync(path.join(ws.path, 'local.txt'), 'utf8') : null;
@@ -165,7 +166,7 @@ const G = 2 ** 30;
     // ---- Transition to local (AC-91): both chats, the side bar folds the predecessor ----
     behave('network', 'ok');
     const moved = s.ctl('task.create', { repo, harness: 'codex', title: 'Rename the helpers', prompt: 'write moved.txt done by the local model; say done' });
-    let successor; for (let i = 0; i < 100 && !successor; i++) { await delay(300); successor = s.ctl('continuity.handoffs').handoffs.find(h => h.predecessor === moved.run.id)?.successor; }
+    const successor = await until(() => s.ctl('continuity.handoffs').handoffs.find(h => h.predecessor === moved.run.id)?.successor, Boolean, 120000, 300);
     await waitStatus(successor, /completed|failed/);
     // The handed-off agent folds under its successor in the side bar; until it has, two rows carry
     // the title and a click on the lower one opens the predecessor. Wait for the fold itself.
@@ -176,8 +177,8 @@ const G = 2 ** 30;
     const opened = await dash.waitFor(`[...document.querySelectorAll('#conv .cont-note')].map(n => n.textContent)`, 15000);
     const rows = await s.agentRows();
     const folded = rows.find(r => /^Earlier: Codex/.test(r.label || ''));
-    if (!folded) { await s.clickAgentRow('Rename the helpers', { twisty: true }); }
-    const rows2 = await s.agentRows();
+    if (!folded) { await s.clickAgentRow('Rename the helpers', { twisty: true, settle: 0 }); }
+    const rows2 = await until(() => s.agentRows(), rs => rs.some(r => /^Earlier: Codex/.test(r.label || '')), 15000, 200);
     const earlier = rows2.find(r => /^Earlier: Codex/.test(r.label || ''));
     check('the successor is the task\'s agent; its chat says where it continues from', state(moved.run.id)?.status === 'handed_off' && opened.some(t => /^Continued from "Rename the helpers" after the connection was lost at \d\d:\d\d\./.test(t)) && opened.some(t => /^This agent continues the work of another\./.test(t)), opened);
     check('the side bar folds the handed-off Codex under the agent that took over, with the reason', !!earlier && /handed off · the connection was lost/.test(earlier.description || ''), earlier || rows2);
@@ -215,7 +216,7 @@ const G = 2 ** 30;
     await s.selectAgent('Update the docs');
     dash = await s.editorView(`document.getElementById('title')?.textContent === 'Update the docs' && !!document.querySelector('#conv [data-continuity-card="waiting"]')`);
     { const at = await s.webviewPoint(dash, '[data-continuity="handoff:local"]'); await cdp.click(at.x, at.y); }
-    let taken; for (let i = 0; i < 60 && !taken; i++) { await delay(300); taken = s.ctl('continuity.handoffs').handoffs.find(h => h.predecessor === waiting.run.id); }
+    const taken = await until(() => s.ctl('continuity.handoffs').handoffs.find(h => h.predecessor === waiting.run.id), Boolean, 60000, 300);
     const takenDone = taken && await waitStatus(taken.successor, /completed|failed/);
     const shownNext = await dash.waitFor(`document.getElementById('title')?.textContent === 'Update the docs' && [...document.querySelectorAll('#conv .cont-note')].some(n => /^Continued from/.test(n.textContent))`, 20000).then(() => true, () => false);
     check('Use a local model now makes the handoff and shows the agent that took over', taken && taken.reason === 'user' && takenDone === 'completed' && shownNext, { taken, takenDone, shownNext });
@@ -232,7 +233,7 @@ const G = 2 ** 30;
     check('the side bar and the status bar say nothing about being offline any more', !(/offline/i.test((await sideMessage()) || '')) && /Connection: Online/.test((await connectionItem()).aria), { side: await sideMessage() });
     await s.screenshot('back-online-dark');
     { const at = await s.webviewPoint(dash, '[data-continuity="handoff:back"]'); await cdp.click(at.x, at.y); }
-    let backRun; for (let i = 0; i < 60 && !backRun; i++) { await delay(300); backRun = s.ctl('continuity.handoffs').handoffs.find(h => h.predecessor === successor)?.successor; }
+    const backRun = await until(() => s.ctl('continuity.handoffs').handoffs.find(h => h.predecessor === successor)?.successor, Boolean, 60000, 300);
     const backDone = backRun && await waitStatus(backRun, /completed|failed/);
     const first = state(moved.run.id), resumed = backRun && state(backRun);
     const starts = fs.readFileSync(harnessLog, 'utf8').trim().split('\n').map(l => JSON.parse(l)).filter(x => x.who === 'codex');
@@ -241,8 +242,7 @@ const G = 2 ** 30;
     await s.screenshot('switched-back-dark');
     // Back online, a new agent is the online one again (the last local start does not become the default).
     dash = await newAgent();
-    await delay(600);
-    const defaultAgent = await dash.eval(`document.querySelector('[data-chip="agent"]').getAttribute('aria-label')`);
+    const defaultAgent = await until(() => dash.eval(`document.querySelector('[data-chip="agent"]').getAttribute('aria-label')`), a => /Codex/.test(a || ''), 15000, 100);
     check('back online, a new agent defaults to the online agent again, not the local one', /Codex/.test(defaultAgent || ''), defaultAgent);
 
     // ---- The light theme: the same states ----

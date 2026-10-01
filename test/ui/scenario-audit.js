@@ -58,11 +58,19 @@ const HEIGHT = 860;
     s.note('runs', Object.fromEntries(Object.entries(runs).map(([k, v]) => [k, { id: v.run.id, status: state(v.run.id)?.status }])));
     s.ctl('account.create', { provider: 'openai', name: 'ChatGPT Work' });
 
+    // A theme is in place once the workbench carries its classes (VS Code names the theme in the
+    // workbench's class list), a width once the window has it; each view is then measured once it
+    // has settled (below). 15 s each; a loaded machine applies them later, never differently.
+    const themeClasses = () => cdp.evalWorkbench(`document.querySelector('.monaco-workbench')?.className || ''`);
     const setTheme = async theme => {
-      const cur = JSON.parse(fs.readFileSync(settingsFile, 'utf8')); cur['workbench.colorTheme'] = theme;
-      fs.writeFileSync(settingsFile, JSON.stringify(cur, null, 2)); await delay(2000);
+      const cur = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+      if (cur['workbench.colorTheme'] === theme) return;
+      const was = await themeClasses();
+      cur['workbench.colorTheme'] = theme;
+      fs.writeFileSync(settingsFile, JSON.stringify(cur, null, 2));
+      await until(themeClasses, c => c !== was, 15000, 100);
     };
-    const setWidth = async w => { await cdp.call('Emulation.setDeviceMetricsOverride', { width: w, height: HEIGHT, deviceScaleFactor: 0, mobile: false }, cdp.workbench); await delay(1500); };
+    const setWidth = async w => { await cdp.call('Emulation.setDeviceMetricsOverride', { width: w, height: HEIGHT, deviceScaleFactor: 0, mobile: false }, cdp.workbench); await until(() => cdp.evalWorkbench('innerWidth'), x => x === w, 15000, 100); };
     // A view is measured once it has settled: two equal readings 500 ms apart. A transient state
     // (text that comes and goes while the view updates) is not what the owner reads; it is recorded
     // with the words that differed, so it can be found, and never counted.

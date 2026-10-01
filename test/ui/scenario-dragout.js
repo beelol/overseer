@@ -4,7 +4,7 @@
 // Pin to Grid (row action) puts the agent on the grid.
 const fs = require('fs');
 const path = require('path');
-const { Session, makeRepo, latestVsix, delay } = require('./harness');
+const { Session, makeRepo, latestVsix, delay, until } = require('./harness');
 
 (async () => {
   const s = new Session('dragout');
@@ -19,36 +19,38 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer/.test(e.textContent))`, 60000, 'status bar');
     const make = title => s.ctl('task.create', { repo, harness: 'generic', program: '/bin/echo', args: [`${title} says hello`], prompt: '', title });
     const a = make('Drag me'), b = make('Open me beside'), c = make('Pin me');
-    for (let i = 0; i < 30 && s.ctl('state').runs.some(r => ['queued', 'starting', 'running'].includes(r.status)); i++) await delay(300);
-    await s.openOverseerView(); await delay(1500);
+    await until(() => !s.ctl('state').runs.some(r => ['queued', 'starting', 'running'].includes(r.status)), Boolean, 60000, 300);
+    await s.openOverseerView();
     const rowPoint = title => cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === ${JSON.stringify(title)}).pop(); if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 70, y: b.top + b.height / 2 }; })()`, 15000, title);
     const editorPoint = () => cdp.evalWorkbench(`(() => { const e = document.querySelector('.part.editor') .getBoundingClientRect(); return { x: e.left + e.width / 2, y: e.top + e.height / 2 }; })()`);
 
-    // Drag "Drag me" into the editor area.
-    const from = await rowPoint('Drag me');
+    // Drag "Drag me" into the editor area, once its row has stopped moving (the list draws its rows
+    // as they arrive; two equal readings 200 ms apart).
+    let lastFrom = null;
+    const from = await until(async () => { const p = await rowPoint('Drag me'); const same = lastFrom && p.x === lastFrom.x && p.y === lastFrom.y; lastFrom = p; return same && p; }, Boolean, 15000, 200) || lastFrom;
     const data = await cdp.drag(from, await editorPoint());
-    await delay(2500);
-    const opened = await cdp.webview(`document.body.dataset.runId === ${JSON.stringify(a.run.id)} && /says hello/.test(document.body.innerText)`, 15000).then(() => true, () => false);
-    const tabs = await cdp.evalWorkbench(`[...document.querySelectorAll('.tab')].map(t => t.getAttribute('aria-label'))`);
+    const opened = await cdp.webview(`document.body.dataset.runId === ${JSON.stringify(a.run.id)} && /says hello/.test(document.body.innerText)`, 30000).then(() => true, () => false);
+    const tabs = await until(() => cdp.evalWorkbench(`[...document.querySelectorAll('.tab')].map(t => t.getAttribute('aria-label'))`), ts => ts.some(t => /^Drag me/.test(t || '')), 15000, 200);
     await s.screenshot('dragged-into-editor');
     check('dragging an agent from the side bar into the editor area opens its chat there', !!data && opened && tabs.some(t => /^Drag me/.test(t || '')),
       { dragTypes: data?.items?.map(i => i.mimeType), opened, tabs });
 
     // Open to the Side from the context menu.
     const pt = await rowPoint('Open me beside');
-    await cdp.click(pt.x, pt.y, { button: 'right' }); await delay(800);
-    const item = await cdp.waitFor(`(() => { const a = [...document.querySelectorAll('.monaco-menu .action-item .action-label')].find(a => /^Open to the Side/.test(a.getAttribute('aria-label') || a.textContent.trim())); if (!a) return null; const r = a.getBoundingClientRect(); return { x: r.left + 20, y: r.top + r.height / 2 }; })()`, 5000, 'menu item');
-    await cdp.click(item.x, item.y); await delay(2000);
-    const beside = await cdp.webview(`document.body.dataset.runId === ${JSON.stringify(b.run.id)} && /says hello/.test(document.body.innerText)`, 15000).then(() => true, () => false);
+    await cdp.click(pt.x, pt.y, { button: 'right' });
+    const item = await cdp.waitFor(`(() => { const a = [...document.querySelectorAll('.monaco-menu .action-item .action-label')].find(a => /^Open to the Side/.test(a.getAttribute('aria-label') || a.textContent.trim())); if (!a) return null; const r = a.getBoundingClientRect(); return { x: r.left + 20, y: r.top + r.height / 2 }; })()`, 15000, 'menu item');
+    await cdp.click(item.x, item.y);
+    const beside = await cdp.webview(`document.body.dataset.runId === ${JSON.stringify(b.run.id)} && /says hello/.test(document.body.innerText)`, 30000).then(() => true, () => false);
     check('Open to the Side (context menu) opens the agent\'s chat beside', beside);
 
     // Pin to Grid from the row action.
-    const pp = await rowPoint('Pin me'); await cdp.move(pp.x, pp.y); await delay(500);
-    const pin = await cdp.evalWorkbench(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === 'Pin me').pop(); const a = [...r.querySelectorAll('.actions .action-label')].find(a => /^Pin to Grid/.test(a.getAttribute('aria-label') || '')); const b = a.getBoundingClientRect(); return { x: b.left + 8, y: b.top + 8 }; })()`);
-    await cdp.click(pin.x, pin.y); await delay(1000);
-    await cdp.command('Overseer: Toggle Agent Grid'); await delay(2500);
+    // The row's action once the hover has drawn it; the grid once it shows the pinned tile.
+    const pp = await rowPoint('Pin me'); await cdp.move(pp.x, pp.y);
+    const pin = await cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === 'Pin me').pop(); const a = r && [...r.querySelectorAll('.actions .action-label')].find(a => a.offsetParent && /^Pin to Grid/.test(a.getAttribute('aria-label') || '')); if (!a) return null; const b = a.getBoundingClientRect(); return { x: b.left + 8, y: b.top + 8 }; })()`, 15000, 'Pin to Grid action');
+    await cdp.click(pin.x, pin.y);
+    await cdp.command('Overseer: Toggle Agent Grid');
     const grid = await cdp.webview(`!!document.querySelector('.grid .tile')`, 20000);
-    const pinned = await grid.eval(`!!document.querySelector('.grid .tile[data-run=${JSON.stringify(c.run.id)}]')`);
+    const pinned = await grid.waitFor(`!!document.querySelector('.grid .tile[data-run=${JSON.stringify(c.run.id)}]')`, 20000).then(() => true, () => false);
     await s.screenshot('pinned-in-grid');
     check('Pin to Grid (row action) puts the agent on the grid', pinned);
   } catch (error) {

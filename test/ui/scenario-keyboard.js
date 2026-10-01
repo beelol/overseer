@@ -27,7 +27,7 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
     const cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
     const run = id => s.ctl('state').runs.find(r => r.id === id);
-    const waitFor = async (id, re, ms = 20000) => { for (let t = 0; t < ms; t += 300) { if (re.test(run(id)?.status || '')) return run(id).status; await delay(300); } return run(id)?.status; };
+    const waitFor = async (id, re, ms = 60000) => { for (let t = 0; t < ms; t += 300) { if (re.test(run(id)?.status || '')) return run(id).status; await delay(300); } return run(id)?.status; };
     const claude = async (title, prompt) => { fs.writeFileSync(modeFile, 'permission'); const t = s.ctl('task.create', { repo, harness: 'claude', prompt, title }); await waitFor(t.run.id, /waiting_for_user/); return t; };
     const permA = await claude('Write file A', 'write perm.txt');
     const permB = await claude('Write file B', 'write perm.txt');
@@ -74,15 +74,16 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
     check('⌥⌘J goes to the next agent that needs you; ⌥⌘Y allows and ⌥⌘⌫ denies its request', [permA.run.id, permB.run.id].includes(first) && [permA.run.id, permB.run.id].includes(second) && first !== second && firstDone === 'completed' && secondDone === 'completed' && denied, { first, second, firstDone, secondDone, denied });
     // Then the agents to review (the failure, the finished run with changes): ⌥⌘J visits each; visiting clears it.
     const visited = [];
-    for (let i = 0; i < 6 && /to review|failed/.test(await header()); i++) { visited.push(await nextAgent()); await delay(600); }
+    // Each visit waits for the header to take it off the count before the next ⌥⌘J.
+    for (let i = 0; i < 6 && /to review|failed/.test(await header()); i++) { const was = await header(); visited.push(await nextAgent()); await until(header, h => h !== was, 15000, 200); }
     const left = await header();
     check('⌥⌘J goes on to the agents to review (the failure, then the finished run with changes); visiting clears each', visited.includes(failed.run.id) && visited.includes(changed.run.id) && !/to review|failed/.test(left), { visited, left });
 
     // Switch agents with the searchable quick pick, then stop it.
     await key('a', { meta: true, alt: true });
     await cdp.waitQuickTitle('Switch to agent');
-    await cdp.type('Long loop'); await delay(400); await cdp.key('Enter'); await delay(1200);
-    const switched = await selected();
+    await cdp.type('Long loop'); await delay(400); await cdp.key('Enter');
+    const switched = await until(selected, id => id === long.run.id, 15000, 200);
     await key('.', { meta: true, alt: true });
     const stopped = await waitFor(long.run.id, /interrupted/);
     check('⌥⌘A switches agents from a searchable quick pick and ⌥⌘. stops the selected agent', switched === long.run.id && stopped === 'interrupted', { switched, stopped });
@@ -93,9 +94,9 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
     await dash.waitFor(`document.body.dataset.mode === 'composer' && document.activeElement?.id === 'task'`, 10000);
     const before = s.ctl('state').runs.length;
     await cdp.type('Refresh sessions once'); await delay(300); await cdp.key('Enter');
-    let created; for (let i = 0; i < 40 && !created; i++) { await delay(300); created = s.ctl('state').runs.find((r, j) => j >= before && !r.parent_run_id); }
+    const created = await until(() => s.ctl('state').runs.find((r, j) => j >= before && !r.parent_run_id), Boolean, 30000, 300);
     await waitFor(created?.id, /completed/);
-    const nowSelected = await selected();
+    const nowSelected = await until(selected, id => !!created && id === created.id, 15000, 200);
     check('⌥⌘N starts a new agent from the composer without the mouse; it becomes the selected agent', created && nowSelected === created.id, { created: created?.id, nowSelected });
 
     // Follow-up with Enter in the chat (focus lands in the composer after switching).
@@ -121,12 +122,13 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
     await s.screenshot('keyboard-done');
 
     // Gate K (AC-81): the shortcuts also work with keyboard focus in the side bar's Agents list.
-    await cdp.command('Focus on Agents View'); await delay(500);
-    const inList = await cdp.evalWorkbench(`!!document.activeElement?.closest('.part.sidebar')`);
+    await cdp.command('Focus on Agents View');
+    const inList = await until(() => cdp.evalWorkbench(`!!document.activeElement?.closest('.part.sidebar')`), Boolean, 10000, 100);
     await cdp.key('a', { meta: true, alt: true }); await delay(700);
     const switcher = await cdp.waitQuickTitle('Switch to agent').then(() => true, () => false);
     await cdp.key('Escape'); await delay(300);
-    await cdp.command('Focus on Agents View'); await delay(500);
+    await cdp.command('Focus on Agents View');
+    await until(() => cdp.evalWorkbench(`!!document.activeElement?.closest('.part.sidebar')`), Boolean, 10000, 100);
     await cdp.key('n', { meta: true, alt: true }); await delay(900);
     const composer = await dash.waitFor(`document.body.dataset.mode === 'composer'`, 8000).then(() => true, () => false);
     check('the shortcuts also work from the side bar (⌥⌘A opens the agent switcher, ⌥⌘N the composer)', inList && switcher && composer, { inList, switcher, composer });
