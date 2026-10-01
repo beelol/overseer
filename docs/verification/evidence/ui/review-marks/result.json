@@ -140,6 +140,52 @@
         },
         "side": "7 to review · 4 reviewed · 1 failed"
       }
+    },
+    {
+      "name": "T-26: a review opened in the terminal (review.seen through the daemon) clears only that mark in VS Code's side bar within 2 s",
+      "ok": true,
+      "detail": {
+        "beforeTui": {
+          "badge": "✦",
+          "side": "7 to review · 4 reviewed · 1 failed"
+        },
+        "afterTui": {
+          "badge": "✓",
+          "side": "6 to review · 5 reviewed · 1 failed",
+          "others": 6,
+          "tookMs": 259
+        }
+      }
+    },
+    {
+      "name": "T-26: the reviews opened in VS Code are marked in the daemon, so the terminal counts what the side bar counts",
+      "ok": true,
+      "detail": {
+        "daemonText": "6 to review · 5 reviewed · 1 failed",
+        "side": "6 to review · 5 reviewed · 1 failed",
+        "marks": [
+          [
+            "r-93d437f63b1b",
+            1790852174922,
+            1790852171568
+          ],
+          [
+            "r-5dfdd09759e3",
+            1790852177517,
+            1790852171902
+          ],
+          [
+            "r-ad5945ce0703",
+            1790852182797,
+            1790852172236
+          ],
+          [
+            "r-1e09b9ff5bd7",
+            1790852180108,
+            1790852170250
+          ]
+        ]
+      }
     }
   ]
 }
