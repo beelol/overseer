@@ -1,46 +1,46 @@
  ◆ Overseer  page 1/1 · 0 agents                                                                    phone access on · 1 phone · ● connected 
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                             ╭ pair a phone ──────────────────────────────────╮                                             
-                                             │                                                │                                             
-                                             │ With MacBook-Pro                               │                                             
-                                             │                                                │                                             
-                                             │ "Unknown Pixel" was not paired.                │                                             
-                                             │ p makes a new code · esc closes                │                                             
-                                             ╰─────────────────────── p new code · esc closes ╯                                             
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
+╭ agents ────────────────────╮                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │               ╭ pair a phone ──────────────────────────────────╮                                             
+│                            │               │                                                │                                             
+│                            │               │ With MacBook-Pro                               │                                             
+│                            │               │                                                │                                             
+│                            │               │ "Unknown Pixel" was not paired.                │art one.                                     
+│                            │               │ p makes a new code · esc closes                │                                             
+│                            │               ╰─────────────────────── p new code · esc closes ╯                                             
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+╰─── ◆ you ✦ review ✓ merged ╯                                                                                                              
  "Unknown Pixel" was not paired                                                                                                             

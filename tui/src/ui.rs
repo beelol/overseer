@@ -97,7 +97,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     header(f, app, head);
     match app.mode {
         Mode::Zoom { .. } => zoom(f, app, body),
-        Mode::Changes | Mode::Confirm(Confirm::Reject { .. }) => changes(f, app, body),
+        _ if app.dashboard_shown() && app.mode != Mode::Changes => dashboard(f, app, body),
+        Mode::Changes | Mode::Confirm(Confirm::Reject { .. }) => changes(f, app, body, true),
         _ if app.compact() && !(app.state.runs.is_empty() || app.visible().is_empty()) => compact_layout(f, app, body),
         _ => main_screen(f, app, body),
     }
@@ -217,7 +218,13 @@ fn header(f: &mut Frame, app: &App, area: Rect) {
     let dot = Style::new().fg(MUTED);
     let mut spans = vec![
         Span::styled(" ◆ Overseer ", Style::new().fg(accent()).add_modifier(Modifier::BOLD)),
-        Span::styled(format!(" page {}/{} ", app.page + 1, app.pages()), Style::new().add_modifier(Modifier::BOLD)),
+        if app.dashboard_shown() {
+            Span::styled(" dashboard ", Style::new().add_modifier(Modifier::BOLD))
+        } else if app.grid_only {
+            Span::styled(format!(" grid only · page {}/{} ", app.page + 1, app.pages()), Style::new().add_modifier(Modifier::BOLD))
+        } else {
+            Span::styled(format!(" page {}/{} ", app.page + 1, app.pages()), Style::new().add_modifier(Modifier::BOLD))
+        },
         Span::styled("· ", dot),
         Span::raw(format!("{} agent{}", visible.len(), if visible.len() == 1 { "" } else { "s" })),
     ];
@@ -289,10 +296,20 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         Mode::Overseer => &[("type", "to Overseer"), ("enter", "send"), ("ctrl+y/n", "yes/no to a proposal"), ("j/k", "scroll"), ("esc", "close")],
         Mode::Search => &[("type", "to search title, repo, harness, model, prompt"), ("enter", "keep"), ("esc", "clear")],
         Mode::Changes => &[("n/p", "change"), ("a/A", "Accept change/file"), ("r/R", "Reject change/file"), ("j/k", "file"), ("t", "Changed | All files"), ("1/2/3 c", "comparison"), ("e", "your editor"), ("J/K", "scroll"), ("ctrl+r", "reload"), ("esc", "back")],
+        Mode::Grid if app.dashboard_shown() && app.dash_col == 0 => &[("J/K j/k", "next / previous agent"), ("tab", "review, conversation"), ("i", "message"), ("a/d", "allow/deny"), ("g", "full view"), ("w", "next waiting"), ("n", "new"), ("D", "grid"), ("?", "help"), ("q", "quit")],
+        Mode::Grid if app.dashboard_shown() && app.dash_col == 1 => &[("J/K", "agent"), ("n/p", "change"), ("a/A", "Accept change/file"), ("r/R", "Reject change/file"), ("j/k", "file"), ("t", "Changed | All files"), ("1/2/3 c", "comparison"), ("e", "your editor"), ("pgup/pgdn", "scroll"), ("tab", "conversation"), ("D", "grid")],
+        Mode::Grid if app.dashboard_shown() => &[("J/K", "agent"), ("j/k pgup/pgdn", "scroll"), ("e", if app.expand_tools { "fold tools" } else { "tool details" }), ("i", "message"), ("a/d", "allow/deny"), ("tab", "list"), ("D", "grid"), ("?", "help")],
         Mode::Grid if app.picked && app.focused().is_some() => &[("J/K", "next / previous agent"), ("esc", "close the conversation"), ("pgup/pgdn", "scroll"), ("e", if app.expand_tools { "fold tools" } else { "tool details" }), ("i", "message"), ("v", "changes"), ("?", "help")],
         _ if area.width < 110 => &[("i", "message"), ("g", "full view"), ("a/d", "answer"), ("n", "new"), ("o", "Overseer"), ("?", "keys"), ("q", "quit")],
+        _ if app.grid_only => &[("←↑↓→", "move"), ("tab", "next agent"), ("i", "message"), ("g", "full view"), ("v", "changes"), ("a/d", "allow/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
         _ => &[("←↑↓→", "move"), ("J/K", "pick in the list"), ("i", "message"), ("g", "full view"), ("v", "changes"), ("a/d", "allow/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
     };
+    // Dashboard mode asked for (`--dashboard`) in a terminal too narrow for it: say so, on the grid.
+    if app.dashboard && !app.dashboard_shown() && matches!(app.mode, Mode::Grid) {
+        let text = format!(" Dashboard mode needs a terminal at least {} columns wide (this one is {}); showing the grid", crate::app::DASHBOARD_MIN_W, app.size.0);
+        f.render_widget(Paragraph::new(Line::from(vec![Span::styled(text, Style::new().fg(waiting())), Span::styled("   D", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::styled(" grid only", Style::new().fg(MUTED))])), area);
+        return;
+    }
     let mut spans = vec![Span::raw(" ")];
     for (k, v) in keys {
         spans.push(Span::styled(*k, Style::new().fg(accent()).add_modifier(Modifier::BOLD)));
@@ -332,6 +349,36 @@ fn main_screen(f: &mut Frame, app: &mut App, area: Rect) {
     }
 }
 
+/// Dashboard mode (T-40): the agent list on the left, the picked agent's review in the middle
+/// and its conversation on the right, like the Overseer layout in VS Code (AC-264). The column
+/// that takes the keys (Tab) is drawn as focused.
+fn dashboard(f: &mut Frame, app: &mut App, area: Rect) {
+    let (list_w, conv_w) = dashboard_widths(area.width, app.list_shown());
+    let [list, mid, conv] = Layout::horizontal([Constraint::Length(list_w), Constraint::Min(30), Constraint::Length(conv_w)]).areas(area);
+    app.dash_cols = [(list.x, list.width), (mid.x, mid.width), (conv.x, conv.width)];
+    if list_w > 0 {
+        agent_list(f, app, list);
+    }
+    let Some(run) = app.focused().cloned() else {
+        return empty(f, app, Rect { x: mid.x, width: mid.width + conv.width, ..mid });
+    };
+    if app.changes.run == run.id {
+        changes(f, app, mid, app.dash_col == 1);
+    } else {
+        let block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(MUTED)).title(Span::styled(" review ", Style::new().fg(MUTED)));
+        f.render_widget(Paragraph::new(Span::styled(" loading…", Style::new().fg(MUTED))).block(block), mid);
+    }
+    tile(f, app, &run, 0, conv, true);
+}
+
+/// Dashboard mode's list and conversation widths for a terminal `width` columns wide; the review
+/// takes the rest (at 160 columns: 32, 77 and 51).
+pub fn dashboard_widths(width: u16, list: bool) -> (u16, u16) {
+    let list_w = if list { (width / 5).clamp(30, 40) } else { 0 };
+    let conv_w = (width.saturating_sub(list_w) * 2 / 5).clamp(48, 84);
+    (list_w, conv_w)
+}
+
 /// The account in a few words for a list row: a named account's name, else the plan
 /// ("Claude Max") of the Mac's default login.
 fn account_word(app: &App, run: &Run) -> String {
@@ -365,7 +412,10 @@ fn row_mark(app: &App, run: &Run, now: i64) -> (&'static str, Color) {
 fn agent_list(f: &mut Frame, app: &mut App, area: Rect) {
     // The marks' legend, in short words when the list is narrow.
     let legend = [" ◆ needs you ✦ to review ✓ merged ", " ◆ you ✦ review ✓ merged ", " ◆ ✦ ✓ "].into_iter().find(|l| l.width() + 2 <= area.width as usize).unwrap_or("");
-    let block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(MUTED)).title(Span::styled(" agents ", Style::new().fg(MUTED)))
+    // In dashboard mode the list is drawn as focused while it takes the keys (T-40).
+    let active = app.dashboard_shown() && app.dash_col == 0;
+    let (border, kind) = if active { (Style::new().fg(accent()).add_modifier(Modifier::BOLD), BorderType::Thick) } else { (Style::new().fg(MUTED), BorderType::Rounded) };
+    let block = Block::bordered().border_type(kind).border_style(border).title(Span::styled(" agents ", if active { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else { Style::new().fg(MUTED) }))
         .title_bottom(Line::from(Span::styled(legend, Style::new().fg(MUTED))).right_aligned());
     let now = crate::model::now_ms();
     let inner = block.inner(area);
@@ -474,7 +524,9 @@ fn zoom(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed: bool) {
-    let focused = app.focus.as_deref() == Some(run.id.as_str());
+    // In dashboard mode the conversation column is drawn as focused only while it takes the keys.
+    let dimmed = zoomed && app.dashboard_shown() && app.mode != Mode::Changes && !matches!(app.mode, Mode::Zoom { .. }) && app.dash_col != 2;
+    let focused = app.focus.as_deref() == Some(run.id.as_str()) && !dimmed;
     let (glyph, color) = status_mark(&run.status);
     let border = if focused { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else { Style::new().fg(MUTED) };
     // The account it runs on (AC-235): provider and plan, the shortened email; on the bottom
@@ -583,7 +635,7 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
 
 /// The review (`v`, T-27 to T-29): the comparison in its header with the keys for the others,
 /// Changed or All files, and the selected file's changes, each with Accept and Reject.
-fn changes(f: &mut Frame, app: &mut App, area: Rect) {
+fn changes(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
     let c = app.changes.clone();
     let run = app.state.run(&c.run).cloned().unwrap_or_default();
     let label = c.comparison().map(|o| o.label.as_str()).unwrap_or("…");
@@ -599,7 +651,7 @@ fn changes(f: &mut Frame, app: &mut App, area: Rect) {
         Span::styled(format!("+{} ", total.0), Style::new().fg(Color::Green)),
         Span::styled(format!("−{} ", total.1), Style::new().fg(Color::Red)),
     ]);
-    let block = Block::bordered().border_type(BorderType::Thick).border_style(Style::new().fg(accent())).title(title);
+    let block = if active { Block::bordered().border_type(BorderType::Thick).border_style(Style::new().fg(accent())) } else { Block::bordered().border_type(BorderType::Rounded).border_style(muted) }.title(title);
     let inner = block.inner(area);
     f.render_widget(Clear, area);
     f.render_widget(block, area);
@@ -747,6 +799,8 @@ fn help(f: &mut Frame, area: Rect) {
         ("J / K", "pick the next / previous agent in the list"),
         ("esc", "close the picked agent's conversation"),
         ("L", "hide or show the agent list"),
+        ("D", "dashboard mode ⇄ grid, same agent"),
+        ("tab  (dashboard)", "list → review → conversation"),
         ("] [   pgdn pgup", "next / previous page"),
         ("i  enter", "message the focused agent"),
         ("g  z", "zoom: one agent's full view ⇄ grid"),
@@ -764,7 +818,7 @@ fn help(f: &mut Frame, area: Rect) {
         ("/", "search agents (esc clears)"),
         ("A", "accounts and sign-in"),
         ("O", "phone access on / off"),
-        ("D", "devices: pair a phone, revoke, scope"),
+        ("ctrl+o", "devices: pair a phone, revoke, scope"),
         ("S", "Audio Mode: settings and preview"),
         ("r", "reload (after X: start the daemon)"),
         ("X", "stop all agents and the daemon"),

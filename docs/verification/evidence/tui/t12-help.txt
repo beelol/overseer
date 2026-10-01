@@ -10,6 +10,10 @@ OPTIONS:
                     ignores OVERSEER_HOME and OVERSEER_SOCKET in its environment)
     --no-mouse      Leave the mouse to the terminal (text selection) instead of clicking tiles
     --no-bell       No terminal bell when an agent starts waiting for you
+    --dashboard     Start in dashboard mode: the agent list, the picked agent's review and its
+                    conversation side by side (needs 160 columns; D switches to the grid)
+    --grid          Show only the grid of agents (no list, no conversation column), e.g. in a
+                    second terminal beside one in dashboard mode
     -h, --help      Show this help
     -V, --version   Show the version
 
@@ -18,6 +22,8 @@ KEYS:
     tab / shift+tab next / previous agent      ] [   next / previous page (also PgDn/PgUp)
     J / K           pick in the agent list (its conversation beside the grid; esc closes it)
     L               hide or show the agent list
+    D               dashboard mode <-> the grid, on the picked agent (tab: list, review,
+                    conversation; J / K pick another agent from any column)
     i / enter       message the focused agent  g / z grid <-> the focused agent's full view
     a / d           allow / deny a permission  w     next agent waiting for you
     x               interrupt                  n     new agent
@@ -27,7 +33,7 @@ KEYS:
     v               review: comparisons, files, Accept / Reject (e: your $EDITOR)
     M               merge back (asks each step)
     /               search agents              A     accounts and sign-in
-    O               phone access on / off      D     devices: pair a phone, revoke, scope
+    O               phone access on / off      ctrl+o devices: pair a phone, revoke, scope
     S               Audio Mode, track, preview  e     in zoom: expand tool calls
     f               filter all/active/needs you ?     all keys
     q               quit (agents keep running)

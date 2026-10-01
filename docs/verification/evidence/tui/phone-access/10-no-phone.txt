@@ -1,40 +1,40 @@
  ◆ Overseer  page 1/1 · 0 agents                                                                              phone access on · ● connected 
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                    ╭ devices ─────────────────────────────────────────────────────────────────────────────────────────╮                    
-                    │                                                                                                  │                    
-                    │  phone access on · port 58432 · notifications on                                                 │                    
-                    │                                                                                                  │                    
-                    │  No phone is paired. Press p to pair one.                                                        │                    
-                    │                                                                                                  │                    
-                    │                                                                                                  │                    
-                    │                                                                                                  │                    
-                    ╰──────────────────────────────────────── switched on this Mac only · p pairs a phone · esc closes ╯                    
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
-                                                                                                                                            
+╭ agents ────────────────────╮                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                   ╭ devices ─────────────────────────────────────────────────────────────────────────────────────────╮                    
+│                   │                                                                                                  │                    
+│                   │  phone access on · port 53431 · notifications on                                                 │                    
+│                   │                                                                                                  │                    
+│                   │  No phone is paired. Press p to pair one.                                                        │                    
+│                   │                                                                                                  │                    
+│                   │                                                                                                  │                    
+│                   │                                                                                                  │                    
+│                   ╰──────────────────────────────────────── switched on this Mac only · p pairs a phone · esc closes ╯                    
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+│                            │                                                                                                              
+╰─── ◆ you ✦ review ✓ merged ╯                                                                                                              
  Revoked "Pixel 9"                                                                                                                          

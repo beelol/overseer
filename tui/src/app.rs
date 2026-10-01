@@ -19,6 +19,8 @@ pub const PAGE: usize = 16;
 /// The smallest tile the grid narrows to before it takes fewer columns (T-37).
 pub const MIN_TILE_W: u16 = 22;
 pub const MIN_TILE_H: u16 = 5;
+/// Dashboard mode's three columns need this many (T-40); narrower terminals stay on the grid.
+pub const DASHBOARD_MIN_W: u16 = 160;
 /// Pages of history fetched per run (5,000 events each), newest kept by the feed cap.
 const HISTORY_PAGES: usize = 10;
 const MAX_AUDIO_IMPORT_PATH: usize = 4096;
@@ -75,7 +77,7 @@ pub enum Mode {
     Search,
     /// Accounts and their sign-in status (`A`).
     Accounts,
-    /// Paired phones (`D`): revoke, scope, pair a phone.
+    /// Paired phones (Ctrl-O): revoke, scope, pair a phone.
     Devices,
     /// The pairing code as text and as a QR code, and the time it still works.
     Pairing,
@@ -423,6 +425,15 @@ pub struct App {
     pub conv_scroll: usize,
     /// `L` hides the agent list.
     pub list_hidden: bool,
+    /// Dashboard mode (T-40, `D` or `--dashboard`): the list, the picked agent's review and its
+    /// conversation side by side.
+    pub dashboard: bool,
+    /// The dashboard column that takes keys: 0 the list, 1 the review, 2 the conversation (Tab).
+    pub dash_col: usize,
+    /// The dashboard's columns from the last draw, as (x, width), for mouse clicks.
+    pub dash_cols: [(u16, u16); 3],
+    /// `--grid` (T-41): this terminal shows only the grid, no list and no conversation column.
+    pub grid_only: bool,
     /// Working directory's Git root (the default repository for new agents).
     pub cwd_repo: Option<String>,
     pending: HashMap<u64, Pending>,
@@ -473,7 +484,7 @@ pub struct App {
     next_job: u64,
     /// The last Open PR plan (kept between the confirmation and the prepare step).
     pr_plan: Option<Value>,
-    /// Phone access as the daemon reports it (`O`, `D`).
+    /// Phone access as the daemon reports it (`O`, Ctrl-O).
     pub phone: Phone,
     /// The pairing this terminal started, while its panel is open.
     pub pairing: Option<Pairing>,
@@ -519,6 +530,10 @@ impl App {
             picked: false,
             conv_scroll: 0,
             list_hidden: false,
+            dashboard: false,
+            dash_col: 0,
+            dash_cols: [(0, 0); 3],
+            grid_only: false,
             cwd_repo: None,
             pending: HashMap::new(),
             history_requested: HashSet::new(),
@@ -659,7 +674,62 @@ impl App {
     /// The list shows beside the grid from 100 columns (and 30 rows, below which the compact
     /// layout keeps the room), unless `L` hid it.
     pub fn list_shown(&self) -> bool {
-        !self.list_hidden && !self.compact()
+        !self.list_hidden && !self.compact() && !self.grid_only
+    }
+
+    /// Dashboard mode is on and the terminal is wide enough for its three columns (T-40).
+    pub fn dashboard_shown(&self) -> bool {
+        self.dashboard && !self.grid_only && self.size.0 >= DASHBOARD_MIN_W && !self.compact()
+    }
+
+    /// The review is on screen: its own view (`v`) or dashboard mode's middle column.
+    fn review_shown(&self) -> bool {
+        self.mode == Mode::Changes || self.dashboard_shown()
+    }
+
+    /// `D` (T-40): the grid ⇄ dashboard mode, on the same agent.
+    pub fn toggle_dashboard(&mut self) {
+        if self.grid_only {
+            self.say("This terminal shows the grid only (--grid); open dashboard mode in another terminal", false);
+            return;
+        }
+        if self.dashboard {
+            self.dashboard = false;
+            self.picked = false;
+            self.mode = Mode::Grid;
+            self.dirty = true;
+            return;
+        }
+        if self.size.0 < DASHBOARD_MIN_W || self.compact() {
+            self.say(format!("Dashboard mode needs a terminal at least {DASHBOARD_MIN_W} columns wide (this one is {}); staying on the grid", self.size.0), false);
+            return;
+        }
+        self.dashboard = true;
+        self.dash_col = 0;
+        self.mode = Mode::Grid;
+        if self.focus.is_none() {
+            if let Some(first) = self.list_ids().first().cloned() {
+                self.pick(&first);
+            }
+        }
+        self.picked = self.focus.is_some();
+        self.dash_sync();
+    }
+
+    /// Dashboard mode shows the picked agent's review: loads it when the picked agent changed.
+    pub fn dash_sync(&mut self) {
+        if !self.dashboard_shown() || !self.connected {
+            return;
+        }
+        if self.focus.is_none() {
+            self.settle_focus();
+        }
+        self.picked = self.focus.is_some();
+        if let Some(run) = self.focused().cloned() {
+            if self.changes.run != run.id {
+                self.load_review(&run);
+            }
+        }
     }
 
     /// Below 100×30 one focused tile and a compact list take the screen (T-09).
@@ -674,8 +744,10 @@ impl App {
                 self.conv_scroll = 0;
             }
             self.focus_index(i);
-            self.picked = true;
+            // A grid-only terminal (T-41) moves its focus; no conversation column opens.
+            self.picked = !self.grid_only;
             self.dirty = true;
+            self.dash_sync();
         }
     }
 
@@ -707,7 +779,7 @@ impl App {
         if self.compact() {
             return (w, h.saturating_sub(2));
         }
-        let (list_w, conv_w) = side_widths(w, self.list_shown(), self.picked && self.focus.is_some());
+        let (list_w, conv_w) = side_widths(w, self.list_shown(), self.picked && self.focus.is_some() && !self.grid_only);
         (w.saturating_sub(list_w + conv_w), h.saturating_sub(2))
     }
 
@@ -947,6 +1019,14 @@ impl App {
             }
         }
         changed |= self.phone_tick(now);
+        // Dashboard mode (from `--dashboard`, or a terminal grown wide enough) loads its review.
+        if self.dashboard && self.connected && self.dashboard_shown() {
+            let unsynced = self.focused().is_some_and(|r| r.id != self.changes.run) || (self.focus.is_none() && !self.visible().is_empty());
+            if unsynced {
+                self.dash_sync();
+                changed = true;
+            }
+        }
         changed
     }
 
@@ -991,8 +1071,12 @@ impl App {
             self.last_event.insert(root, Instant::now());
         }
         // The review follows marks and rejections made elsewhere (VS Code, the phone).
-        if self.mode == Mode::Changes && matches!(kind.as_str(), "review_mark" | "review_reject") && self.state.root_of(&run_id) == self.changes.run && !self.changes.loading {
+        if self.review_shown() && matches!(kind.as_str(), "review_mark" | "review_reject") && self.state.root_of(&run_id) == self.changes.run && !self.changes.loading {
             if kind == "review_reject" { self.load_diff() } else { self.load_file_diff() }
+        }
+        // Dashboard mode's review follows the picked agent's work as each turn ends (T-40).
+        if self.dashboard_shown() && kind == "turn_done" && self.state.root_of(&run_id) == self.changes.run && !self.changes.loading {
+            self.reload_review();
         }
         // The conversation with Overseer follows its own events while it is open.
         if matches!(self.mode, Mode::Overseer) && matches!(kind.as_str(), "overseer_message" | "proposal" | "proposal_answered" | "overseer_level" | "overseer_session") {
@@ -1632,10 +1716,15 @@ impl App {
 
     fn open_changes(&mut self) {
         let Some(run) = self.focused().cloned() else { return };
+        self.load_review(&run);
+        self.mode = Mode::Changes;
+    }
+
+    /// Loads an agent's review from the daemon (opening it counts as reviewing it, as in VS Code).
+    fn load_review(&mut self, run: &Run) {
         self.mark_reviewed(&run.id);
         let keep = std::mem::take(&mut self.changes.mine);
         self.changes = ChangesView { run: run.id.clone(), workspace: run.workspace_id.clone(), loading: true, mine: if self.changes.run == run.id { keep } else { HashMap::new() }, ..Default::default() };
-        self.mode = Mode::Changes;
         self.request("comparison.options", json!({ "run_id": run.id }), Pending::Comparisons { run: run.id.clone() });
     }
 
@@ -1936,7 +2025,7 @@ impl App {
 
     /// Called by the event loop after a suspended program (a sign-in) finished.
     pub fn after_exec(&mut self, result: Result<i32, String>) {
-        if self.mode == Mode::Changes && self.changes.editing.is_some() {
+        if self.review_shown() && self.changes.editing.is_some() {
             // T-39: back from the owner's editor; the review shows the file as it is now.
             match result {
                 Ok(_) => self.say("Back from your editor; the review shows your edits", false),
@@ -2057,6 +2146,16 @@ impl App {
 
     pub fn handle_mouse(&mut self, m: MouseEvent) {
         let inside = |(_, x, y, w, h): &(String, u16, u16, u16, u16)| m.column >= *x && m.column < x + w && m.row >= *y && m.row < y + h;
+        // Dashboard mode (T-40): a click gives its column the keys; the wheel scrolls under the pointer.
+        let dash_col = self.dashboard_shown().then(|| self.dash_cols.iter().position(|(x, w)| *w > 0 && m.column >= *x && m.column < x + w)).flatten();
+        if let (Some(col), true) = (dash_col, self.mode == Mode::Grid) {
+            match m.kind {
+                MouseEventKind::Down(MouseButton::Left) => self.dash_col = col,
+                MouseEventKind::ScrollUp if col == 1 => self.changes.scroll = self.changes.scroll.saturating_sub(3),
+                MouseEventKind::ScrollDown if col == 1 => self.changes.scroll = (self.changes.scroll + 3).min(self.changes.diff.len().saturating_sub(1)),
+                _ => {}
+            }
+        }
         if let MouseEventKind::Down(MouseButton::Left) = m.kind {
             if let Some((id, ..)) = self.list_hit.iter().find(|r| inside(r)).cloned() {
                 self.pick(&id);
@@ -2073,7 +2172,7 @@ impl App {
                 MouseEventKind::ScrollDown => self.scroll(-3),
                 _ => {}
             }
-        } else if self.picked && self.mode == Mode::Grid {
+        } else if self.picked && self.mode == Mode::Grid && dash_col != Some(1) {
             match m.kind {
                 MouseEventKind::ScrollUp => self.scroll_conv(3),
                 MouseEventKind::ScrollDown => self.scroll_conv(-3),
@@ -2101,7 +2200,8 @@ impl App {
                 self.phone_confirm(&c, k);
             }
             Mode::Confirm(Confirm::Reject { path, keys, .. }) => {
-                self.mode = Mode::Changes;
+                // Back to the review: its own view, or dashboard mode's middle column.
+                self.mode = if self.dashboard_shown() { Mode::Grid } else { Mode::Changes };
                 if matches!(k.code, KeyCode::Char('y') | KeyCode::Char('Y')) {
                     if let Some(first) = keys.first().cloned() {
                         let run = self.changes.run.clone();
@@ -2159,7 +2259,50 @@ impl App {
             Mode::Audio => self.audio_key(k),
             Mode::Overseer => self.overseer_key(k),
             Mode::AudioImport => self.audio_import_key(k),
+            Mode::Grid if self.dashboard_shown() => self.dashboard_key(k),
             Mode::Grid | Mode::Zoom { .. } => self.nav_key(k),
+        }
+    }
+
+    /// Dashboard mode's keys (T-40): `J`/`K` pick another agent from any column (the review and
+    /// the conversation follow), Tab moves between the columns, `D` returns to the grid on the
+    /// picked agent; the other keys go to the column that has focus.
+    fn dashboard_key(&mut self, k: KeyEvent) {
+        let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
+        let columns: Vec<usize> = if self.list_shown() { vec![0, 1, 2] } else { vec![1, 2] };
+        let at = columns.iter().position(|c| *c == self.dash_col).unwrap_or(0);
+        match k.code {
+            KeyCode::Char('D') => return self.toggle_dashboard(),
+            KeyCode::Tab => self.dash_col = columns[(at + 1) % columns.len()],
+            KeyCode::BackTab => self.dash_col = columns[(at + columns.len() - 1) % columns.len()],
+            KeyCode::Char('J') => self.pick_step(1),
+            KeyCode::Char('K') => self.pick_step(-1),
+            KeyCode::Char('v') => self.dash_col = 1,
+            KeyCode::Esc if self.dash_col != 0 => self.dash_col = if self.list_shown() { 0 } else { 1 },
+            KeyCode::Esc => {}
+            KeyCode::Char('L') => {
+                self.list_hidden = !self.list_hidden;
+                if !self.list_shown() && self.dash_col == 0 {
+                    self.dash_col = 1;
+                }
+            }
+            // The review column: the review's own keys (T-27 to T-29, T-39).
+            KeyCode::Char('r') if ctrl && self.dash_col == 1 => self.changes_key(k),
+            KeyCode::Down | KeyCode::Up | KeyCode::PageDown | KeyCode::PageUp
+            | KeyCode::Char('j' | 'k' | 'n' | 'p' | 'c' | '1' | '2' | '3' | 't' | 'a' | 'A' | 'r' | 'R' | 'e')
+                if self.dash_col == 1 =>
+            {
+                self.changes_key(k)
+            }
+            // The conversation column: scroll it and fold its tool details.
+            KeyCode::Char('k') | KeyCode::Up if self.dash_col == 2 => self.scroll_conv(1),
+            KeyCode::Char('j') | KeyCode::Down if self.dash_col == 2 => self.scroll_conv(-1),
+            // The list column: j/k walk the list like J/K.
+            KeyCode::Char('j') | KeyCode::Down => self.pick_step(1),
+            KeyCode::Char('k') | KeyCode::Up => self.pick_step(-1),
+            // The grid's own moves mean nothing here.
+            KeyCode::Left | KeyCode::Right | KeyCode::Char('h' | 'l' | '[' | ']' | '1'..='9') => self.dirty = false,
+            _ => self.nav_key(k),
         }
     }
 
@@ -2186,7 +2329,9 @@ impl App {
             // The agent list (T-25): J/K pick the next or previous agent; Esc closes its conversation.
             KeyCode::Char('J') => self.pick_step(1),
             KeyCode::Char('K') => self.pick_step(-1),
+            KeyCode::Char('L') if self.grid_only => self.say("This terminal shows the grid only (--grid)", false),
             KeyCode::Char('L') => self.list_hidden = !self.list_hidden,
+            KeyCode::Char('D') => self.toggle_dashboard(),
             KeyCode::Esc if self.picked => self.picked = false,
             // z, and g (T-38): the grid and the focused agent's full view, back on the same agent.
             KeyCode::Char('z') | KeyCode::Char('g') => self.mode = if zoom { Mode::Grid } else { Mode::Zoom { scroll: 0 } },
@@ -2215,7 +2360,8 @@ impl App {
             KeyCode::Char('v') => self.open_changes(),
             KeyCode::Char('A') => self.open_accounts(),
             KeyCode::Char('O') => self.toggle_phone_access(),
-            KeyCode::Char('D') => self.open_devices(),
+            // Devices moved from D to Ctrl-O when D became dashboard mode (T-40).
+            KeyCode::Char('o') if k.modifiers.contains(KeyModifiers::CONTROL) => self.open_devices(),
             KeyCode::Char('S') => self.open_audio(),
             KeyCode::Char('o') => self.open_overseer(),
             KeyCode::Char('P') => {

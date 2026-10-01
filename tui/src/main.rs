@@ -26,6 +26,10 @@ OPTIONS:
                     ignores OVERSEER_HOME and OVERSEER_SOCKET in its environment)
     --no-mouse      Leave the mouse to the terminal (text selection) instead of clicking tiles
     --no-bell       No terminal bell when an agent starts waiting for you
+    --dashboard     Start in dashboard mode: the agent list, the picked agent's review and its
+                    conversation side by side (needs 160 columns; D switches to the grid)
+    --grid          Show only the grid of agents (no list, no conversation column), e.g. in a
+                    second terminal beside one in dashboard mode
     -h, --help      Show this help
     -V, --version   Show the version
 
@@ -34,6 +38,8 @@ KEYS:
     tab / shift+tab next / previous agent      ] [   next / previous page (also PgDn/PgUp)
     J / K           pick in the agent list (its conversation beside the grid; esc closes it)
     L               hide or show the agent list
+    D               dashboard mode <-> the grid, on the picked agent (tab: list, review,
+                    conversation; J / K pick another agent from any column)
     i / enter       message the focused agent  g / z grid <-> the focused agent's full view
     a / d           allow / deny a permission  w     next agent waiting for you
     x               interrupt                  n     new agent
@@ -43,7 +49,7 @@ KEYS:
     v               review: comparisons, files, Accept / Reject (e: your $EDITOR)
     M               merge back (asks each step)
     /               search agents              A     accounts and sign-in
-    O               phone access on / off      D     devices: pair a phone, revoke, scope
+    O               phone access on / off      ctrl+o devices: pair a phone, revoke, scope
     S               Audio Mode, track, preview  e     in zoom: expand tool calls
     f               filter all/active/needs you ?     all keys
     q               quit (agents keep running)
@@ -60,6 +66,8 @@ fn main() -> Result<()> {
     let mut home: Option<PathBuf> = None;
     let mut mouse = true;
     let mut bell = true;
+    let mut dashboard = false;
+    let mut grid_only = false;
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
@@ -75,8 +83,13 @@ fn main() -> Result<()> {
             "--home" => home = args.next().map(PathBuf::from),
             "--no-mouse" => mouse = false,
             "--no-bell" => bell = false,
+            "--dashboard" => dashboard = true,
+            "--grid" => grid_only = true,
             other => anyhow::bail!("unknown option {other} (see --help)"),
         }
+    }
+    if dashboard && grid_only {
+        anyhow::bail!("--dashboard and --grid are for two terminals: pick one per terminal");
     }
     let mut daemon = Daemon::find(daemon_path.as_deref())?;
     // An explicit --home is deliberate; OVERSEER_HOME in the environment only counts for a dev TUI (AC-212).
@@ -97,6 +110,8 @@ fn main() -> Result<()> {
     let mut app = App::new(client.clone());
     app.set_jobs(jobs);
     app.cwd_repo = git_root();
+    app.dashboard = dashboard;
+    app.grid_only = grid_only;
     ui::set_truecolor(std::env::var("COLORTERM").map(|v| v.contains("truecolor") || v.contains("24bit")).unwrap_or(false));
 
     // ratatui::init sets raw mode and the alternate screen, and restores them on panic too.
