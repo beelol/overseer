@@ -7,7 +7,7 @@
 // responsiveness with truncation visible. The live counterpart is scenario-conversation-live.js.
 const fs = require('fs');
 const path = require('path');
-const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
+const { Session, makeRepo, latestVsix, delay, until, repoRoot } = require('./harness');
 
 (async () => {
   const s = new Session('conversation');
@@ -25,9 +25,9 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const claude = s.ctl('task.create', { repo, harness: 'claude', prompt: 'write perm.txt', title: 'claude write' });
     const burst = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'i=0; while [ $i -lt 6000 ]; do echo "burst line $i"; i=$((i+1)); done'], prompt: '', title: 'burst history' });
     const runState = id => s.ctl('state').runs.find(r => r.id === id);
-    for (let i = 0; i < 60 && runState(app.run.id).status !== 'waiting_for_user'; i++) await delay(500);
-    for (let i = 0; i < 60 && runState(claude.run.id).status !== 'waiting_for_user'; i++) await delay(500);
-    for (let i = 0; i < 60 && runState(burst.run.id).status !== 'completed'; i++) await delay(500);
+    await until(() => runState(app.run.id).status, st => st === 'waiting_for_user', 90000, 300);
+    await until(() => runState(claude.run.id).status, st => st === 'waiting_for_user', 90000, 300);
+    await until(() => runState(burst.run.id).status, st => st === 'completed', 90000, 300);
 
     await s.openOverseerView();
     // Gate K: agents are selected in the side bar; the chat shows in the editor area.
@@ -114,7 +114,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await selectRun('burst live', 'generic');
     const l = await panel(live.run.id).catch(async () => { await delay(3000); return cdp.webview(`window.__overseer?.selected?.() === ${JSON.stringify(live.run.id)}`, 30000); });
     await l.eval(`window.__lag = []; (function tick() { const t0 = performance.now(); if (window.__lag.length < 600) setTimeout(() => { window.__lag.push(performance.now() - t0 - 50); tick(); }, 50); })()`);
-    for (let i = 0; i < 60 && runState(live.run.id).status !== 'completed'; i++) await delay(500);
+    await until(() => runState(live.run.id).status, st => st === 'completed', 90000, 300);
     await delay(1500);
     const lag = await l.eval(`(() => { const a = window.__lag.slice().sort((x, y) => x - y); return { n: a.length, p95: Math.round(a[Math.floor(a.length * 0.95)] || 0), max: Math.round(a[a.length - 1] || 0), msgs: document.querySelectorAll('#conv .msg').length }; })()`);
     check('live burst keeps the panel responsive (event-loop lag p95 under 250 ms, the AC-35 bound) and shows the newest output', lag.n > 40 && lag.p95 < 250 && lag.msgs >= 4900, lag);

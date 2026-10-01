@@ -42,10 +42,10 @@ class Cdp {
     return data;
   }
 
-  call(method, params = {}, sessionId) {
+  call(method, params = {}, sessionId, timeout = 20000) {
     return new Promise((resolve, reject) => {
       const id = ++this.next;
-      const timer = setTimeout(() => { this.pending.delete(id); reject(new Error('CDP timeout: ' + method)); }, 20000);
+      const timer = setTimeout(() => { this.pending.delete(id); reject(new Error('CDP timeout: ' + method)); }, timeout);
       this.pending.set(id, { resolve, reject, timer }); this.socket.send(JSON.stringify({ id, method, params, sessionId }));
     });
   }
@@ -100,7 +100,8 @@ class Cdp {
 
   /** clip (optional): { x, y, width, height } in page pixels. */
   async screenshot(file, clip) {
-    const { data } = await this.call('Page.captureScreenshot', { format: 'png', ...(clip ? { clip: { ...clip, scale: 1 } } : {}) }, this.workbench);
+    // A screenshot waits for the window's next frame, which a loaded machine draws later: up to 60 s (AC-149).
+    const { data } = await this.call('Page.captureScreenshot', { format: 'png', ...(clip ? { clip: { ...clip, scale: 1 } } : {}) }, this.workbench, 60000);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, Buffer.from(data, 'base64'));
     return file;

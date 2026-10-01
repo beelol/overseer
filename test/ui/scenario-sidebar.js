@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
+const { Session, makeRepo, latestVsix, delay, until, repoRoot } = require('./harness');
 
 const BUDGET = 238;
 
@@ -42,7 +42,6 @@ const BUDGET = 238;
     await waitStatus(runs.watch.run.id, /running/);
 
     await cdp.command('View: Show Overseer');
-    await delay(2500);
     // Rows of the Agents view, in order.
     const agentRows = () => cdp.evalWorkbench(`(() => {
       const pane = [...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || ''));
@@ -55,7 +54,11 @@ const BUDGET = 238;
           logo: (bg.match(/logos\\/([a-z-]+)\\.svg/) || [])[1] || '', codicon: (icon?.className.match(/codicon-([a-z-]+)/) || [])[1] || '', expanded: r.getAttribute('aria-expanded') };
       });
     })()`);
-    let rows = await agentRows();
+    // The list once it has drawn every agent the checks below read, with its badge (30 s; the
+    // checks then report what was there).
+    const badged = (rs, label) => rs.filter(r => r.label === label).some(r => r.badge);
+    let rows = await until(agentRows, rs => !!rs && /\d+ working/.test(rs[0]?.label || '') && rs.some(r => r.label === 'Needs you') && rs.some(r => r.label === 'grandchild task')
+      && ['Refresh sessions once', 'Add a changelog entry', 'Migration dry-run', 'Watch the build'].every(l => badged(rs, l)), 30000, 200);
     s.note('agents view', rows);
     // Agent rows follow Needs you, so the last row with a label is the agent's own.
     const find = (label, from = rows) => from.filter(r => r.label === label).pop();
@@ -100,29 +103,33 @@ const BUDGET = 238;
     const vsix = cp.execFileSync('unzip', ['-l', latestVsix()], { encoding: 'utf8' });
     const variants = ['claudecode', 'codex', 'opencode'].every(n => vsix.includes(`media/logos/${n}-light.svg`) && vsix.includes(`media/logos/${n}-dark.svg`)) && vsix.includes('NOTICE.md');
     check('the VSIX ships light and dark variants of each logo and the notices', variants);
-    const theme = async name => { const cur = JSON.parse(fs.readFileSync(settingsFile, 'utf8')); cur['workbench.colorTheme'] = name; fs.writeFileSync(settingsFile, JSON.stringify(cur, null, 2)); await delay(1800); };
+    const theme = async name => { const cur = JSON.parse(fs.readFileSync(settingsFile, 'utf8')); cur['workbench.colorTheme'] = name; fs.writeFileSync(settingsFile, JSON.stringify(cur, null, 2)); };
+    // Each theme once the list has redrawn its logo for it (15 s; the check reports what was there).
+    const variant = t => /Light/.test(t) ? 'claudecode-light' : 'claudecode-dark';
     const shots = [];
     for (const t of ['Overseer Dark', 'Overseer Light', 'Default High Contrast']) {
-      await theme(t); rows = await agentRows();
+      await theme(t); rows = await until(agentRows, rs => !!rs && find('Refresh sessions once', rs)?.logo === variant(t), 15000, 200);
       shots.push({ theme: t, logo: find('Refresh sessions once', rows)?.logo });
       await s.screenshot('sidebar-' + t.toLowerCase().replace(/ /g, '-'));
     }
     check('logos switch variant with the theme (light theme uses the light variant; dark and high contrast the dark one)',
       shots[0].logo === 'claudecode-dark' && shots[1].logo === 'claudecode-light' && shots[2].logo === 'claudecode-dark', shots);
     await theme('Overseer Dark');
+    await until(agentRows, rs => !!rs && find('Refresh sessions once', rs)?.logo === 'claudecode-dark', 15000, 200);
 
-    // Badge on the Overseer activity icon = Needs you.
-    const attention = await cdp.evalWorkbench(`(() => { const a = [...document.querySelectorAll('.activitybar .action-item')].find(i => /Overseer/.test(i.querySelector('.action-label')?.getAttribute('aria-label') || '')); return a?.querySelector('.badge-content')?.textContent.trim(); })()`);
-    rows = await agentRows();
-    const needsCount = rows.find(r => r.label === 'Needs you')?.description;
+    // Badge on the Overseer activity icon = Needs you (read once both have drawn the same count, or after 15 s).
+    const badgeNow = () => cdp.evalWorkbench(`(() => { const a = [...document.querySelectorAll('.activitybar .action-item')].find(i => /Overseer/.test(i.querySelector('.action-label')?.getAttribute('aria-label') || '')); return a?.querySelector('.badge-content')?.textContent.trim(); })()`);
+    const pair = await until(async () => ({ attention: await badgeNow(), needs: (await agentRows())?.find(r => r.label === 'Needs you')?.description }), p => !!p.attention && p.attention === p.needs, 15000, 200);
+    const attention = pair.attention, needsCount = pair.needs;
     check('the Overseer activity icon badge matches Needs you', attention && attention === needsCount, { badge: attention, needs: needsCount });
 
     // Hover actions: stop on a working agent, archive and pin on a finished one; all named.
     const hover = async label => {
       const pt = await cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === ${JSON.stringify(label)} && r.getAttribute('aria-level') === '2').pop(); if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 80, y: b.top + b.height / 2 }; })()`, 10000, label);
-      await cdp.move(pt.x, pt.y); await delay(500);
-      return cdp.evalWorkbench(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === ${JSON.stringify(label)} && r.getAttribute('aria-level') === '2').pop();
-        return [...r.querySelectorAll('.actions .action-label')].filter(a => a.offsetParent).map(a => ({ name: a.getAttribute('aria-label') || a.title, x: a.getBoundingClientRect().left + 8, y: a.getBoundingClientRect().top + 8 })); })()`);
+      await cdp.move(pt.x, pt.y);
+      // The row's actions once the hover has drawn them.
+      return until(() => cdp.evalWorkbench(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === ${JSON.stringify(label)} && r.getAttribute('aria-level') === '2').pop();
+        return [...r.querySelectorAll('.actions .action-label')].filter(a => a.offsetParent).map(a => ({ name: a.getAttribute('aria-label') || a.title, x: a.getBoundingClientRect().left + 8, y: a.getBoundingClientRect().top + 8 })); })()`), acts => acts?.length > 0, 10000, 100);
     };
     const onWatch = await hover('Watch the build');
     const onDone = await hover('Refresh sessions once');
@@ -130,27 +137,32 @@ const BUDGET = 238;
       onWatch.some(a => a.name.startsWith('Stop')) && onDone.some(a => a.name.startsWith('Archive')) && onDone.some(a => a.name.startsWith('Pin to Grid')) && [...onWatch, ...onDone].every(a => a.name), { onWatch, onDone });
     await s.screenshot('hover-actions');
     // Pin by mouse.
-    const pin = onDone.find(a => a.name.startsWith('Pin to Grid')); await cdp.click(pin.x, pin.y); await delay(1200);
-    const pinnedAfter = (await hover('Refresh sessions once')).some(a => a.name.startsWith('Unpin from Grid'));
-    // Archive by keyboard: focus the row, Delete (⌘⌫ on macOS).
+    const pin = onDone.find(a => a.name.startsWith('Pin to Grid')); await cdp.click(pin.x, pin.y);
+    const pinnedAfter = (await until(() => hover('Refresh sessions once'), acts => acts.some(a => a.name.startsWith('Unpin from Grid')), 20000)).some(a => a.name.startsWith('Unpin from Grid'));
+    // Archive by keyboard: focus the row, Delete (⌘⌫ on macOS). The key goes to the row once
+    // the Agents view has keyboard focus on it, not after a fixed time.
     const rowPt = await cdp.evalWorkbench(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].find(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === 'Split the payment service'); const b = r.getBoundingClientRect(); return { x: b.left + 120, y: b.top + b.height / 2 }; })()`);
-    await cdp.click(rowPt.x, rowPt.y); await delay(1500);
-    await cdp.command('Focus on Agents View'); await delay(500);
-    await cdp.key('Backspace', { meta: true }); await delay(1500);
-    const archived = s.ctl('state').tasks.find(t => t.id === runs.nested.task.id).archived_ms;
+    await cdp.click(rowPt.x, rowPt.y);
+    await until(() => cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-list-row.selected')].some(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === 'Split the payment service')`), Boolean, 15000);
+    await cdp.command('Focus on Agents View');
+    const keyTarget = await until(() => cdp.evalWorkbench(`(() => { const a = document.activeElement; const pane = a?.closest('.pane'); return !!pane && /^Agents/.test(pane.querySelector('.pane-header')?.textContent.trim() || '') && a.querySelector('.monaco-list-row.focused .label-name')?.textContent.trim() === 'Split the payment service'; })()`), Boolean, 15000);
+    s.note('archive key goes to the focused Agents row', keyTarget);
+    await cdp.key('Backspace', { meta: true });
+    const archived = await until(() => s.ctl('state').tasks.find(t => t.id === runs.nested.task.id).archived_ms, Boolean, 20000);
     // The context menu offers the rest.
     const ctx = await cdp.evalWorkbench(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === 'Refresh sessions once').pop(); const b = r.getBoundingClientRect(); return { x: b.left + 120, y: b.top + b.height / 2 }; })()`);
-    await cdp.click(ctx.x, ctx.y, { button: 'right' }); await delay(800);
-    const menu = await cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-menu .action-item .action-label')].map(a => a.getAttribute('aria-label') || a.textContent.trim()).filter(Boolean)`);
+    await cdp.click(ctx.x, ctx.y, { button: 'right' });
+    const menu = await until(() => cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-menu .action-item .action-label')].map(a => a.getAttribute('aria-label') || a.textContent.trim()).filter(Boolean)`), m => m.some(x => x.startsWith('Archive')), 15000);
     await cdp.key('Escape');
     check('pin by mouse, archive by keyboard (⌘⌫ in the Agents view), and the context menu offers Open to the Side, Open Review, Merge Back and the rest',
       pinnedAfter && !!archived && ['Open to the Side', 'Open Review', 'Merge Back…', 'Unpin from Grid', 'Archive'].every(x => menu.some(m => m.startsWith(x.replace('…', '')))), { pinnedAfter, archived: !!archived, menu });
     // Archived agents are behind a filter.
     rows = await agentRows();
     const hidden = !rows.some(r => r.label === 'Split the payment service');
-    await cdp.command('Overseer: Show Archived Agents'); await delay(1200);
-    const inArchive = (await agentRows()).map(r => r.label);
-    await cdp.command('Overseer: Show Active Agents'); await delay(800);
+    await cdp.command('Overseer: Show Archived Agents');
+    const inArchive = (await until(agentRows, rs => !!rs && rs.some(r => r.label === 'Split the payment service'), 15000, 200) || []).map(r => r.label);
+    await cdp.command('Overseer: Show Active Agents');
+    await until(agentRows, rs => !!rs && rs.some(r => r.label === 'Watch the build') && !rs.some(r => r.label === 'Split the payment service'), 15000, 200);
     check('archived agents leave the list and appear under Show Archived Agents', hidden && inArchive.includes('Split the payment service') && !inArchive.includes('Watch the build'), { hidden, inArchive });
 
     // Every row has a screen-reader label.

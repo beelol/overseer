@@ -165,7 +165,7 @@ class Comparison {
         const publish = (entries, discovery = false) => {
           // A fast refresh with identical paths can retain its validated list.
           const old = this.snapshot;
-          const membership = list => JSON.stringify(list.map(e => [e.id, e.status, !!e.unsaved]));
+          const membership = list => JSON.stringify(list.map(e => [e.id, e.status, !!e.unsaved, !!e.conflicted]));
           if (discovery && old && !this.preview && old.mode === partial.mode && old.context?.mergeBase === context.mergeBase &&
               old.description?.headName === description.headName && old.description?.base === description.base &&
               membership(old.entries) === membership(entries)) return;
@@ -184,7 +184,9 @@ class Comparison {
       const stale = epoch !== this.epoch;
       const fingerprint = digest(JSON.stringify({
         inputs: next.inputs, description: next.description, warning: next.warning, error: next.error, mode: next.mode,
-        entries: next.entries.map(e => [e.id, e.revision, e.status, e.unsaved, e.problem]),
+        // A conflict can show up after the file's own change (Git writes the index last), with the
+        // same revision and status: it is part of what is published (AC-149's review flake).
+        entries: next.entries.map(e => [e.id, e.revision, e.status, e.unsaved, e.problem, !!e.conflicted]),
       }));
       this.appliedEpoch = epoch;
       if (fingerprint !== this.fingerprint || this.preview) {

@@ -1,7 +1,7 @@
 {
   "checks": [
     {
-      "name": "Needs you gathers permission requests, the failure and the finished run with changes, counted on the view and in the status bar",
+      "name": "Needs you gathers the permission requests, counted on the view and in the status bar; the failure and the finished run are to review",
       "ok": true,
       "detail": {
         "list": [
@@ -12,48 +12,41 @@
           {
             "title": "Write file B",
             "why": "Approve"
-          },
-          {
-            "title": "Broken build",
-            "why": "Failed"
-          },
-          {
-            "title": "Small edit",
-            "why": "Review"
           }
         ],
-        "badge": "4",
-        "status": "overseer-mark  Overseer 3 active   bell-dot  4, 3 agents running · 4 need you\nAgents keep running when VS Code closes.\nClick to open the dashboard."
+        "badge": "2",
+        "status": "overseer-mark  Overseer 3 active   bell-dot  2, 3 agents running · 2 need you\nAgents keep running when VS Code closes.\nClick to open the Overseer view.",
+        "header": "Agents 1 to review · 1 failed"
       }
     },
     {
       "name": "⌥⌘J goes to the next agent that needs you; ⌥⌘Y allows and ⌥⌘⌫ denies its request",
       "ok": true,
       "detail": {
-        "first": "r-1e2b2af70669",
-        "second": "r-174b06bb96a8",
+        "first": "r-3eb41b0e78f9",
+        "second": "r-bfa62d006738",
         "firstDone": "completed",
         "secondDone": "completed",
         "denied": true
       }
     },
     {
-      "name": "⌥⌘J walks the rest of Needs you (the failure and finished runs with changes); visiting clears each",
+      "name": "⌥⌘J goes on to the agents to review (the failure, then the finished run with changes); visiting clears each",
       "ok": true,
       "detail": {
         "visited": [
-          "r-ecc1adbf8701",
-          "r-1e2b2af70669",
-          "r-1104bf4bc343"
+          "r-acb93fd25edb",
+          "r-bfa62d006738",
+          "r-e45c991539f0"
         ],
-        "left": []
+        "left": "Agents"
       }
     },
     {
       "name": "⌥⌘A switches agents from a searchable quick pick and ⌥⌘. stops the selected agent",
       "ok": true,
       "detail": {
-        "switched": "r-5da34302d2d7",
+        "switched": "r-35abea88fc30",
         "stopped": "interrupted"
       }
     },
@@ -61,8 +54,8 @@
       "name": "⌥⌘N starts a new agent from the composer without the mouse; it becomes the selected agent",
       "ok": true,
       "detail": {
-        "created": "r-3e6f0fbae49c",
-        "nowSelected": "r-3e6f0fbae49c"
+        "created": "r-be4dcb925b36",
+        "nowSelected": "r-be4dcb925b36"
       }
     },
     {
@@ -85,7 +78,7 @@
       "name": "every control in the dashboard has a screen-reader label",
       "ok": true,
       "detail": {
-        "checked": 46,
+        "checked": 58,
         "bad": []
       }
     }

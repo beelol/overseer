@@ -314,6 +314,12 @@ async function mcpClient() {
     out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed', resetsAt: reset, rateLimitType: 'five_hour', unifiedWindows: { five_hour: { utilization: used, resetsAt: reset }, seven_day: { utilization: 0.4, resetsAt: reset + 86400 * 3 } } }, uuid: 'fixture', session_id: sid });
     assistant([{ type: 'text', text: 'done' }]);
     result(false, 'done');
+  } else if (mode === 'gated') {
+    // Waits until `<mode file>.gate` exists, then ends its turn: a test makes several agents
+    // finish together however loaded the machine is (AC-189's "finishing together").
+    while (!(modeFile && fs.existsSync(modeFile + '.gate'))) await sleep(50);
+    assistant([{ type: 'text', text: 'gate opened' }]);
+    result(false, 'gate opened');
   } else if (mode === 'echo') {
     // Reports what Overseer sent: arguments (effort, permission mode, model, resume) and the content kinds.
     const content = first.message.content;

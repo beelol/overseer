@@ -1455,9 +1455,15 @@ fn ac51_worktree_tree_lists_one_directory_marks_changes_and_stays_inside() {
     let big = ws_path(&d, &created).join("big");
     std::fs::create_dir_all(&big).unwrap();
     for i in 0..6000 { std::fs::write(big.join(format!("f{i:05}.txt")), "").unwrap(); }
+    // Every listing reads the worktree's changes first (6,000 new files here), which a loaded
+    // machine slows for any directory; what must stay fast is listing the big directory itself,
+    // so it is measured against listing a small one of the same worktree just before.
+    let t0 = std::time::Instant::now();
+    d.call("workspace.tree", json!({"workspace_id": id, "dir": "src"}));
+    let small = t0.elapsed();
     let t0 = std::time::Instant::now();
     let listing = d.call("workspace.tree", json!({"workspace_id": id, "dir": "big"}));
-    assert!(t0.elapsed() < Duration::from_secs(2), "{:?}", t0.elapsed());
+    assert!(t0.elapsed() < small + Duration::from_secs(2), "{:?} (a small directory took {small:?})", t0.elapsed());
     assert_eq!(listing["total"], 6000);
     assert_eq!(listing["truncated"], true);
     assert_eq!(listing["entries"].as_array().unwrap().len(), 5000);
@@ -1775,12 +1781,24 @@ fn auto_usage_inspection_reports_paused_when_retention_cleanup_fails_then_recove
     assert_eq!(learning.query_row("SELECT COUNT(*) FROM auto_measurements", [], |row| row.get::<_, i64>(0)).unwrap(), 0);
 }
 
+/// How long an ordinary dispatch takes on this machine right now. A lock that holds dispatch
+/// adds seconds (the store waits up to 5 s on a busy database), so "not held" is this plus a
+/// margin, not a fixed time a loaded machine can miss with no lock at all.
+fn ordinary_dispatch(d: &Daemon, project: &Path) -> Duration {
+    let started = std::time::Instant::now();
+    let created = d.generic(project, "worktree", "/bin/sh", &["-c", "echo baseline"]);
+    let took = started.elapsed();
+    assert_eq!(d.wait_done(&run_id(&created), 30)["status"], "completed");
+    took
+}
+
 #[test]
 fn unattended_learning_expiry_does_not_delay_execution_dispatch() {
     use rusqlite::params;
     let root = tmp();
     let project = repo(&root.path().join("repo"));
     let d = Daemon::start(&[("OVERSEER_TEST_AUTO_MAINTENANCE_MS", "50")]);
+    let baseline = ordinary_dispatch(&d, &project);
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
     const DAY: i64 = 86_400_000;
     let learning = rusqlite::Connection::open(d.home.path().join("overseer.sqlite.learning")).unwrap();
@@ -1801,8 +1819,8 @@ fn unattended_learning_expiry_does_not_delay_execution_dispatch() {
     std::thread::sleep(Duration::from_millis(200));
     let started = std::time::Instant::now();
     let created = d.generic(&project, "worktree", "/bin/sh", &["-c", "echo dispatched"]);
-    assert!(started.elapsed() < Duration::from_secs(2),
-        "learning maintenance must not hold execution dispatch behind its database lock");
+    assert!(started.elapsed() < baseline + Duration::from_secs(2),
+        "learning maintenance must not hold execution dispatch behind its database lock: {:?} (an ordinary dispatch took {baseline:?})", started.elapsed());
     assert_eq!(d.wait_done(&run_id(&created), 10)["status"], "completed");
     learning.execute_batch("COMMIT").unwrap();
 
@@ -1823,6 +1841,7 @@ fn locked_learning_inspection_cannot_hold_execution_dispatch_for_its_sqlite_time
     let root = tmp();
     let project = repo(&root.path().join("repo"));
     let d = Daemon::start(&[]);
+    let baseline = ordinary_dispatch(&d, &project);
     let learning = rusqlite::Connection::open(d.home.path().join("overseer.sqlite.learning")).unwrap();
     learning.execute_batch("BEGIN EXCLUSIVE").unwrap();
     let (created, elapsed, inspection) = std::thread::scope(|scope| {
@@ -1834,8 +1853,8 @@ fn locked_learning_inspection_cannot_hold_execution_dispatch_for_its_sqlite_time
         learning.execute_batch("COMMIT").unwrap();
         (created, elapsed, pending.join().unwrap())
     });
-    assert!(elapsed < Duration::from_secs(2),
-        "user inspection held execution dispatch for {elapsed:?} while learning SQLite was locked");
+    assert!(elapsed < baseline + Duration::from_secs(2),
+        "user inspection held execution dispatch for {elapsed:?} while learning SQLite was locked (an ordinary dispatch took {baseline:?})");
     assert_eq!(inspection.unwrap()["learning_paused"], true);
     assert_eq!(d.wait_done(&run_id(&created), 10)["status"], "completed");
 }
@@ -2908,6 +2927,37 @@ fn handoff_replay_does_not_launch_a_committed_but_unstarted_continuation() {
         "recovery must never start an uncertain handoff turn");
 }
 
+/// The installed OpenCode CLI must answer local metadata within the daemon's fixed 8 s bound;
+/// on a loaded machine its start-up alone can miss it ("OpenCode metadata read timed out"). These
+/// tests are about what the metadata says, so only that timeout is asked again, up to 90 s in
+/// all; any other error fails at once.
+fn opencode_inspect(d: &Daemon, params: serde_json::Value) -> serde_json::Value {
+    let deadline = std::time::Instant::now() + Duration::from_secs(90);
+    loop {
+        match d.try_call("auto.opencode.local.inspect", params.clone()) {
+            Ok(value) => return value,
+            Err(error) if error.contains("metadata read timed out") && std::time::Instant::now() < deadline => continue,
+            Err(error) => panic!("auto.opencode.local.inspect {params} failed: {error}"),
+        }
+    }
+}
+
+/// Auto pauses a decision whose discovery missed the decision deadline and offers Refresh
+/// (dispatching the same work unit again decides again). A loaded machine can slow the
+/// installed OpenCode CLI past that deadline; when the local profile's own discovery is what
+/// failed, refresh until it answers in time, up to 90 s. Any other outcome returns at once.
+fn dispatch_once_discovered(d: &Daemon, request: &serde_json::Value, profile: &serde_json::Value) -> serde_json::Value {
+    let deadline = std::time::Instant::now() + Duration::from_secs(90);
+    loop {
+        let outcome = d.call("auto.dispatch", request.clone());
+        let missed = outcome["state"] == "paused" && outcome["discovery_failures"].as_array().is_some_and(|failures|
+            failures.iter().any(|f| f["profile_id"] == *profile && f["reason"] == "metadata_or_auth_unavailable"));
+        if !missed || std::time::Instant::now() >= deadline {
+            return outcome;
+        }
+    }
+}
+
 #[test]
 fn auto_opencode_metadata_keeps_real_local_endpoints_separate_without_cloud_routes() {
     let Some(program) = std::env::var_os("PATH").and_then(|path| std::env::split_paths(&path)
@@ -2931,7 +2981,7 @@ fn auto_opencode_metadata_keeps_real_local_endpoints_separate_without_cloud_rout
         ("XDG_DATA_HOME",data_home.to_str().unwrap()),
         ("XDG_CACHE_HOME",cache_home.to_str().unwrap())]);
     let before = d.call("state", json!({}));
-    let preflight = d.call("auto.opencode.local.inspect",
+    let preflight = opencode_inspect(&d,
         json!({"profile_id":"system-opencode","repo":repo}));
     assert_eq!(preflight["catalog"]["models"].as_array().unwrap().len(), 2);
     assert_eq!(preflight["repo"], json!(repo));
@@ -2943,7 +2993,7 @@ fn auto_opencode_metadata_keeps_real_local_endpoints_separate_without_cloud_rout
     let created = d.call("task.create", json!({"repo":repo,"workspace_mode":"current",
         "harness":"generic","program":"/bin/true","prompt":"metadata workspace"}));
     let workspace_id = created["workspace"]["id"].as_str().unwrap();
-    let inspected = d.call("auto.opencode.local.inspect",
+    let inspected = opencode_inspect(&d,
         json!({"profile_id":"system-opencode","workspace_id":workspace_id}));
     let models = inspected["catalog"]["models"].as_array().unwrap();
     assert_eq!(models.len(), 2, "{inspected}");
@@ -2959,7 +3009,7 @@ fn auto_opencode_metadata_keeps_real_local_endpoints_separate_without_cloud_rout
     let isolated = d.call("profile.create", json!({"name":"Isolated local provider",
         "harness":"opencode"}));
     let profile_id = isolated["id"].as_str().unwrap();
-    let isolated_read = d.call("auto.opencode.local.inspect", json!({"profile_id":profile_id,
+    let isolated_read = opencode_inspect(&d, json!({"profile_id":profile_id,
         "workspace_id":workspace_id}));
     assert_eq!(isolated_read["local_execution_config_verified"]["local_a/fixture-a"], true,
         "credential-free isolated local provider can be considered for a future Auto route: {isolated_read}");
@@ -2997,7 +3047,7 @@ fn auto_opencode_isolated_local_provider_executes_real_harness_against_a_mock_en
         .env("MOCK_PORT_FILE", &port_file).env("MOCK_LOG", &mock_log)
         .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
         .spawn().unwrap());
-    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
     while !port_file.exists() {
         assert!(std::time::Instant::now() < deadline, "local mock provider did not start");
         std::thread::sleep(Duration::from_millis(10));
@@ -3040,7 +3090,7 @@ fn auto_selected_opencode_child_uses_guarded_alternate_local_endpoint() {
         .env("MOCK_PORT_FILE", &port_file).env("MOCK_LOG", &mock_log)
         .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
         .spawn().unwrap());
-    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
     while !port_file.exists() {
         assert!(std::time::Instant::now() < deadline, "local mock provider did not start");
         std::thread::sleep(Duration::from_millis(10));
@@ -3119,7 +3169,7 @@ fn auto_dispatch_selects_reachable_local_opencode_provider_after_another_fails()
         .env("MOCK_PORT_FILE", &port_file).env("MOCK_LOG", &mock_log)
         .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
         .spawn().unwrap());
-    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
     while !port_file.exists() {
         assert!(std::time::Instant::now() < deadline, "local mock provider did not start");
         std::thread::sleep(Duration::from_millis(10));
@@ -3153,15 +3203,13 @@ fn auto_dispatch_selects_reachable_local_opencode_provider_after_another_fails()
     // Prepare metadata before testing route selection; the decision itself
     // still has its fixed deadline and cannot launch from unknown metadata.
     let workspace = d.run(&parent)["workspace_id"].as_str().unwrap().to_string();
-    let catalog = (0..3).find_map(|_| d.try_call("auto.opencode.local.inspect", json!({
-        "profile_id":local["id"],"workspace_id":workspace
-    })).ok()).expect("installed OpenCode did not return local metadata after bounded setup");
+    let catalog = opencode_inspect(&d, json!({"profile_id":local["id"],"workspace_id":workspace}));
     assert_eq!(catalog["catalog"]["models"].as_array().unwrap().len(), 2);
     let request = json!({"work_unit_id":"local-auto-route-1","parent_run_id":parent,
         "min_tier":"general","required_tools":[],"sandbox":"read_only",
         "allowed_profiles":[local["id"]],"preferred_harness":"opencode",
         "prompt":"reply hello","title":"local summary"});
-    let selected = d.call("auto.dispatch", request.clone());
+    let selected = dispatch_once_discovered(&d, &request, &local["id"]);
     assert_eq!(selected["state"], "dispatched", "{selected}");
     assert_eq!(selected["run"]["harness"], "opencode");
     assert_eq!(selected["decision"]["selected"],
@@ -3185,12 +3233,13 @@ fn auto_dispatch_selects_reachable_local_opencode_provider_after_another_fails()
     assert!(stats.status.success(), "OpenCode stats failed: {}", String::from_utf8_lossy(&stats.stderr));
     let stats_text = String::from_utf8_lossy(&stats.stdout);
     assert!(stats_text.contains("gpt-oss-120b"), "controlled task did not appear in OpenCode stats: {stats_text}");
-    let after_stats = d.call("auto.opencode.local.inspect", json!({"profile_id":local["id"],
+    let after_stats = opencode_inspect(&d, json!({"profile_id":local["id"],
         "workspace_id":d.run(&parent)["workspace_id"]}));
     assert_eq!(after_stats["allowance"], "unknown",
         "token/cost statistics cannot become an invented subscription balance");
+    // The decision that dispatched (a refresh after a missed deadline recorded its pause first).
     let decision_event = d.events(&parent).into_iter()
-        .find(|event| event["kind"] == "auto_decision").unwrap();
+        .filter(|event| event["kind"] == "auto_decision").last().unwrap();
     assert_eq!(decision_event["payload"]["candidates"].as_array().unwrap().iter()
         .find(|item| item["id"] == selected["decision"]["selected"]).unwrap()["quota"], "unknown");
     assert_eq!(d.call("auto.decision.replay", json!({"event_seq":decision_event["seq"]}))["matches_recorded"], true);
@@ -3236,7 +3285,7 @@ fn auto_opencode_silent_503_budget_stops_while_daemon_is_down_without_duplicate(
             .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
         if let Some(status) = status { command.env("MOCK_HTTP_STATUS", status); }
         let server = MockServer(command.spawn().unwrap());
-        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        let deadline = std::time::Instant::now() + Duration::from_secs(30);
         while !port_file.exists() {
             assert!(std::time::Instant::now() < deadline, "{name} mock provider did not start");
             std::thread::sleep(Duration::from_millis(10));
@@ -5086,7 +5135,9 @@ fn auto_route_recovery_leaves_active_alternate_alone_and_informs_the_next_unit()
         ("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
         ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_MODE,FIXTURE_SLOW_MS"),
         ("FIXTURE_MODE", "managed-models"), ("CLAUDE_FIXTURE_MODE", "slow"),
-        ("FIXTURE_SLOW_MS", "4000")]);
+        // The alternate must still be working when the recovery run ends, however long a loaded
+        // machine takes to run it: 20 s, not 4.
+        ("FIXTURE_SLOW_MS", "20000")]);
     let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
         "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
     assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
@@ -5111,7 +5162,7 @@ fn auto_route_recovery_leaves_active_alternate_alone_and_informs_the_next_unit()
         .find(|run| run["id"] == alternate_id).unwrap();
     assert_eq!(active_alternate["status"], "running",
         "service recovery must not interrupt an active alternate");
-    assert_eq!(d.wait_done(&alternate_id, 15)["status"], "completed");
+    assert_eq!(d.wait_done(&alternate_id, 60)["status"], "completed");
     let next = d.call("auto.dispatch", json!({"work_unit_id":"recovery-next",
         "parent_run_id":parent,"min_tier":"general","required_tools":[],
         "allowed_profiles":["system-codex","system-claude"],
@@ -5255,7 +5306,7 @@ fn auto_hundred_local_routes_with_stalled_account_read_pause_before_deadline_and
         .env("MOCK_PORT_FILE", &port_file).env("MOCK_LOG", &mock_log)
         .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
         .spawn().unwrap());
-    let ready_deadline = Instant::now() + Duration::from_secs(5);
+    let ready_deadline = Instant::now() + Duration::from_secs(30);
     while !port_file.exists() {
         assert!(Instant::now() < ready_deadline, "local mock provider did not start");
         std::thread::sleep(Duration::from_millis(10));
@@ -5283,42 +5334,51 @@ fn auto_hundred_local_routes_with_stalled_account_read_pause_before_deadline_and
         "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
     assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
     let workspace = d.run(&parent)["workspace_id"].as_str().unwrap().to_string();
-    let catalog = (0..3).find_map(|_| d.try_call("auto.opencode.local.inspect", json!({
-        "profile_id":local["id"],"workspace_id":workspace
-    })).ok()).expect("installed OpenCode did not return the 100-route fixture metadata");
+    let catalog = opencode_inspect(&d, json!({"profile_id":local["id"],"workspace_id":workspace}));
     assert_eq!(catalog["catalog"]["models"].as_array().unwrap().len(), 100);
     let request = json!({"work_unit_id":"hundred-local-routes-1","parent_run_id":parent,
         "min_tier":"general","required_tools":["browser/navigate"],
         "sandbox":"read_only","allowed_profiles":[local["id"],"system-codex"],
         "prompt":"bounded browser audit"});
-    let start = Instant::now();
-    let outcome = std::thread::scope(|scope| {
-        let pending = scope.spawn(|| d.call("auto.dispatch", request));
-        let probe_deadline = Instant::now() + Duration::from_secs(3);
-        while !std::fs::read_to_string(&trace).unwrap_or_default().contains("model_read") {
-            assert!(Instant::now() < probe_deadline, "stalled account collector did not begin");
-            std::thread::sleep(Duration::from_millis(10));
-        }
-        let ui_start = Instant::now();
-        assert!(d.call("hello", json!({}))["protocol"].is_number());
-        assert!(ui_start.elapsed() < Duration::from_secs(2),
-            "another UI client waited behind the stalled hundred-route decision");
-        pending.join().unwrap()
-    });
-    assert_eq!(outcome["state"], "paused", "{outcome}");
-    assert!(start.elapsed() <= Duration::from_secs(11),
-        "hundred-route decision exceeded the 10+1 second tolerance");
-    let decision = d.events(&parent).into_iter().find(|event| event["kind"] == "auto_decision").unwrap();
-    assert!(decision["payload"]["discovery_failures"].as_array().unwrap().iter()
-        .any(|failure| failure["profile_id"] == "system-codex"
-            && failure["reason"] == "metadata_or_auth_unavailable"),
-        "the stalled account read must be excluded before the decision: {decision}");
+    // Every decision is held to the deadline and keeps the socket answering. The hundred local
+    // routes reach the selector only when the installed OpenCode CLI answers within its share of
+    // the deadline, which a loaded machine can prevent; the pause then offers Refresh (the same
+    // work unit decides again), taken until the local discovery answers, up to 90 s.
+    let attempts_end = Instant::now() + Duration::from_secs(90);
+    let decision = loop {
+        std::fs::write(&trace, "").unwrap();
+        let start = Instant::now();
+        let outcome = std::thread::scope(|scope| {
+            let pending = scope.spawn(|| d.call("auto.dispatch", request.clone()));
+            let probe_deadline = Instant::now() + Duration::from_secs(3);
+            while !std::fs::read_to_string(&trace).unwrap_or_default().contains("model_read") {
+                assert!(Instant::now() < probe_deadline, "stalled account collector did not begin");
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            let ui_start = Instant::now();
+            assert!(d.call("hello", json!({}))["protocol"].is_number());
+            assert!(ui_start.elapsed() < Duration::from_secs(2),
+                "another UI client waited behind the stalled hundred-route decision");
+            pending.join().unwrap()
+        });
+        assert_eq!(outcome["state"], "paused", "{outcome}");
+        assert!(start.elapsed() <= Duration::from_secs(11),
+            "hundred-route decision exceeded the 10+1 second tolerance");
+        let decision = d.events(&parent).into_iter().filter(|event| event["kind"] == "auto_decision").last().unwrap();
+        assert!(decision["payload"]["discovery_failures"].as_array().unwrap().iter()
+            .any(|failure| failure["profile_id"] == "system-codex"
+                && failure["reason"] == "metadata_or_auth_unavailable"),
+            "the stalled account read must be excluded before the decision: {decision}");
+        assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("model_read").count(), 1);
+        let local_missed = decision["payload"]["discovery_failures"].as_array().unwrap().iter()
+            .any(|failure| failure["profile_id"] == local["id"]);
+        if !local_missed || Instant::now() >= attempts_end { break decision; }
+    };
     let routes = decision["payload"]["selection_input"]["routes"].as_array().unwrap();
     assert_eq!(routes.len(), 100, "all bounded local candidates reached the selector");
     let pools = routes.iter().map(|route| route["pool_id"].as_str().unwrap()).collect::<BTreeSet<_>>();
     assert_eq!(pools.len(), 1, "one endpoint must retain one shared pool identity");
     assert_eq!(d.runs().len(), 1, "metadata reads and ineligible routes must not start a child");
-    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("model_read").count(), 1);
     assert!(!std::fs::read_to_string(&mock_log).unwrap_or_default().contains("/v1/chat/completions"),
         "catalog discovery must not send a paid or mock model request");
 }

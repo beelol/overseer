@@ -5,7 +5,7 @@
 // arrangement.
 const fs = require('fs');
 const path = require('path');
-const { Session, makeRepo, latestVsix, delay } = require('./harness');
+const { Session, makeRepo, latestVsix, delay, until } = require('./harness');
 
 (async () => {
   const s = new Session('modes');
@@ -20,10 +20,10 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer/.test(e.textContent))`, 60000, 'status bar');
     const edits = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', "sed -i '' 's/^L9: original$/L9: agent edit/' a.txt"], prompt: '', title: 'With changes' });
     const quiet = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/echo', args: ['nothing to change'], prompt: '', title: 'No changes' });
-    for (let i = 0; i < 30 && s.ctl('state').runs.some(r => ['queued', 'starting', 'running'].includes(r.status)); i++) await delay(300);
-    // Agents at work, so the grid and dashboard mode have something to show (the grid never opens empty, AC-113).
+    await until(() => !s.ctl('state').runs.some(r => ['queued', 'starting', 'running'].includes(r.status)), Boolean, 60000, 300);
+    // Agents at work, so the grid has something to show (the grid never opens empty, AC-113).
     const workers = ['Split payments', 'Refresh sessions', 'Migrate users', 'Fix flaky test'].map(title => s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'i=0; while [ $i -lt 600 ]; do echo "step $i"; i=$((i+1)); sleep 0.5; done'], prompt: '', title }));
-    for (let i = 0; i < 30 && s.ctl('state').runs.filter(r => r.status === 'running').length < 4; i++) await delay(300);
+    await until(() => s.ctl('state').runs.filter(r => r.status === 'running').length >= 4, Boolean, 60000, 300);
     await cdp.command('View: Show Explorer'); await delay(500);
     const arrangement = () => cdp.evalWorkbench(`(() => {
       const vis = sel => { const e = document.querySelector(sel); return !!e && e.offsetWidth > 0 && e.offsetHeight > 0; };
@@ -33,31 +33,35 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
         sidebar: vis('.part.sidebar'), sidebarTitle: document.querySelector('.part.sidebar .title-label')?.textContent.trim() || '', panel: vis('.part.panel'), auxiliary: vis('.part.auxiliarybar') };
     })()`);
     const same = (a, b) => JSON.stringify(a.groups) === JSON.stringify(b.groups) && a.sidebar === b.sidebar && a.panel === b.panel && a.auxiliary === b.auxiliary;
-    const select = async title => { await cdp.command('Overseer: Switch Agent…'); await cdp.waitQuickTitle('Switch to agent'); await cdp.type(title); await delay(300); await cdp.key('Enter'); await delay(2500); };
+    // Each step waits for the arrangement it should reach (or 30 s, and the check then reports what
+    // was there), not a fixed time: a loaded machine lays the window out later, never differently.
+    const select = async (title, ok) => { await cdp.command('Overseer: Switch Agent…'); await cdp.waitQuickTitle('Switch to agent'); await cdp.type(title); await delay(300); await cdp.key('Enter');
+      await cdp.webview(`document.getElementById('title')?.textContent === ${JSON.stringify(title)}`, 30000).catch(() => {}); return until(arrangement, ok, 30000, 200); };
     const gridRoundTrip = async label => {
       const before = await arrangement();
-      await cdp.command('Overseer: Toggle Agent Grid'); await delay(2500);
-      const dash = await cdp.webview(`document.body.dataset.mode === 'grid'`, 15000);
-      const during = await arrangement();
+      await cdp.command('Overseer: Toggle Agent Grid');
+      const dash = await cdp.webview(`document.body.dataset.mode === 'grid'`, 30000);
+      const during = await until(arrangement, a => a.groups.length === 1 && /^Overseer/.test(a.groups[0].active), 30000, 200);
       await s.screenshot(`grid-from-${label}`);
-      await cdp.command('Overseer: Toggle Agent Grid'); await delay(2500);
-      const after = await arrangement();
+      await cdp.command('Overseer: Toggle Agent Grid');
+      const after = await until(arrangement, a => same(before, a), 30000, 200);
       check(`${label}: the grid takes the editor area and closing it returns to the same arrangement`, during.groups.length === 1 && /^Overseer/.test(during.groups[0].active) && same(before, after), { before, during, after });
       return dash;
     };
 
     // Chat only.
-    await select('No changes');
-    await cdp.command('View: Toggle Terminal'); await delay(1200);
-    await cdp.command('View: Show Explorer'); await delay(600);
-    const chatOnly = await arrangement();
+    await select('No changes', a => a.groups.length === 1);
+    await cdp.command('View: Toggle Terminal');
+    await until(arrangement, a => a.panel, 30000, 200);
+    await cdp.command('View: Show Explorer');
+    const chatOnly = await until(arrangement, a => a.groups.length === 1 && a.sidebar && a.panel && !/Overseer/i.test(a.sidebarTitle), 30000, 200);
     check('starting point 1: the chat alone (one group), Explorer and terminal open', chatOnly.groups.length === 1 && chatOnly.sidebar && chatOnly.panel, chatOnly);
     await gridRoundTrip('chat only');
 
     // Review and chat.
-    await select('With changes');
-    await cdp.command('View: Show Explorer'); await delay(600);
-    const split = await arrangement();
+    await select('With changes', a => a.groups.length === 2 && /^Review/.test(a.groups[0].active) && /^Overseer/.test(a.groups[1].active));
+    await cdp.command('View: Show Explorer');
+    const split = await until(arrangement, a => a.groups.length === 2 && /^Review/.test(a.groups[0].active) && /^Overseer/.test(a.groups[1].active) && !/Overseer/i.test(a.sidebarTitle), 30000, 200);
     check('starting point 2: review on the left, chat on the right', split.groups.length === 2 && /^Review/.test(split.groups[0].active) && /^Overseer/.test(split.groups[1].active), split);
     await gridRoundTrip('review and chat');
   } catch (error) {

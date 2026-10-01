@@ -444,18 +444,19 @@ fn ac172_cues_wait_for_overseer_s_phrase_and_give_way_to_the_owner() {
         "{:?}",
         env.cue_log()
     );
-    // While the owner speaks, a routine cue is dropped.
+    // While the owner speaks, a routine cue is dropped. The owner talks for 20 s, so the agent's
+    // cue falls due while they speak however long a loaded machine takes to start the agent.
     live.clear();
     env.d.call(
         "voice.simulate",
-        json!({"speechlike": 3.0, "words": "just talking for a while now"}),
+        json!({"speechlike": 20.0, "words": "just talking for a while now"}),
     );
-    live.wait("hearing", 5, |v| {
+    live.wait("hearing", 30, |v| {
         v["kind"] == "state" && v["state"] == "hearing"
     });
     let before = env.cue_log().len();
     env.d.generic(&repo, "worktree", "/bin/echo", &["again"]);
-    live.wait("a dropped cue", 5, |v| {
+    live.wait("a dropped cue", 20, |v| {
         v["kind"] == "cue" && v["result"] == "dropped"
     });
     std::thread::sleep(Duration::from_millis(500));
@@ -468,8 +469,10 @@ fn ac172_cues_wait_for_overseer_s_phrase_and_give_way_to_the_owner() {
 
 // ---------------------------------------------------------------------- requests
 
+/// A working agent for the test's whole length: a loaded machine can stretch a test past a minute,
+/// and an agent that has finished is no longer one the owner's words can name.
 fn agent(d: &Daemon, repo: &Path, title: &str) -> String {
-    let created = d.call("task.create", json!({"repo": repo, "harness": "generic", "workspace_mode": "worktree", "program": "/bin/sleep", "args": ["60"], "prompt": "", "title": title}));
+    let created = d.call("task.create", json!({"repo": repo, "harness": "generic", "workspace_mode": "worktree", "program": "/bin/sleep", "args": ["600"], "prompt": "", "title": title}));
     created["run"]["id"].as_str().unwrap().to_string()
 }
 
@@ -2686,7 +2689,7 @@ fn ac169_two_agents_in_flight_and_a_new_one_get_the_card_s_text_byte_for_byte() 
         let run = row["run_id"].as_str().unwrap();
         let message = row["message"].as_str().unwrap();
         // "Sent" is the daemon's record; the agent's own event can land a moment later under load.
-        let deadline = Instant::now() + Duration::from_secs(15);
+        let deadline = Instant::now() + Duration::from_secs(60);
         let got: Vec<String> = loop {
             let got: Vec<String> = if row["action"] == "start" {
                 // Its first turn: Gate S's briefing, then Overseer's message.

@@ -359,12 +359,28 @@ class Session {
   }
 }
 
+/**
+ * Waits for a condition instead of a fixed time (AC-149): calls `get` until `ok(value)` holds or
+ * `ms` pass, and returns the last value either way, so the check that follows reports what was
+ * there. A loaded machine takes longer to get there; it never makes the check pass sooner.
+ */
+async function until(get, ok = Boolean, ms = 30000, step = 150) {
+  const end = Date.now() + ms;
+  for (;;) {
+    let value;
+    try { value = await get(); } catch (error) { value = undefined; if (Date.now() > end) throw error; }
+    if (ok(value) || Date.now() > end) return value;
+    await delay(step);
+  }
+}
+
 function startMock(root, env = {}) {
   const portFile = path.join(root, 'mock.port');
   const child = cp.spawn(process.execPath, [path.join(repoRoot, 'fixtures/mock-openai/server.js')], { env: { ...process.env, MOCK_PORT: '0', MOCK_PORT_FILE: portFile, MOCK_LOG: path.join(root, 'mock.log'), ...env }, stdio: 'ignore' });
   children.add(child);
   child.on('exit', () => children.delete(child));
-  return { child, port: async () => { for (let i = 0; i < 50 && !fs.existsSync(portFile); i++) await delay(100); return Number(fs.readFileSync(portFile, 'utf8')); } };
+  // The port once the server has written it (a loaded machine starts node later than 5 s).
+  return { child, port: async () => Number(await until(() => fs.existsSync(portFile) && fs.readFileSync(portFile, 'utf8').trim(), Boolean, 30000, 100)) };
 }
 
 function openCodeConfig(port) {
@@ -383,4 +399,4 @@ function latestVsix() {
   return path.join(dir, vsix);
 }
 
-module.exports = { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, git, delay, repoRoot };
+module.exports = { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, git, delay, until, repoRoot };

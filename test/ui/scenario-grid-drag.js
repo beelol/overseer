@@ -8,7 +8,7 @@
 // 4, 9 and 16 tiles in the three Overseer themes.
 const fs = require('fs');
 const path = require('path');
-const { Session, makeRepo, latestVsix, delay } = require('./harness');
+const { Session, makeRepo, latestVsix, delay, until } = require('./harness');
 
 const THEMES = ['Overseer Dark', 'Overseer Light', 'Overseer'];
 
@@ -24,17 +24,19 @@ const THEMES = ['Overseer Dark', 'Overseer Light', 'Overseer'];
     let cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
     const settingsFile = path.join(s.profile, 'User/settings.json');
-    const setTheme = async theme => { const cur = JSON.parse(fs.readFileSync(settingsFile, 'utf8')); cur['workbench.colorTheme'] = theme; fs.writeFileSync(settingsFile, JSON.stringify(cur, null, 2)); await delay(1800); };
+    // A theme is in place once the workbench carries its classes (15 s; a loaded machine applies it later).
+    const themeClasses = () => s.cdp.evalWorkbench(`document.querySelector('.monaco-workbench')?.className || ''`);
+    const setTheme = async theme => { const cur = JSON.parse(fs.readFileSync(settingsFile, 'utf8')); if (cur['workbench.colorTheme'] === theme) return; const was = await themeClasses(); cur['workbench.colorTheme'] = theme; fs.writeFileSync(settingsFile, JSON.stringify(cur, null, 2)); await until(themeClasses, c => c !== was, 15000, 100); };
     const titles = Array.from({ length: 17 }, (_, i) => `Agent ${String(i + 1).padStart(2, '0')}`);
     const ids = {};
     for (const t of titles) ids[t] = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/echo', args: [`${t} is done`], prompt: '', title: t }).run.id;
     const title = Object.fromEntries(Object.entries(ids).map(([t, id]) => [id, t]));
-    for (let i = 0; i < 40 && s.ctl('state').runs.some(r => ['queued', 'starting', 'running'].includes(r.status)); i++) await delay(300);
+    await until(() => !s.ctl('state').runs.some(r => ['queued', 'starting', 'running'].includes(r.status)), Boolean, 60000, 300);
 
     // One agent to start from: select it and Pin to Grid, then show the grid.
     await s.selectAgent(titles[0], { settle: 1500 });
     await cdp.command('Overseer: Pin to Grid'); await delay(800);
-    await cdp.command('Overseer: Toggle Agent Grid'); await delay(2000);
+    await cdp.command('Overseer: Toggle Agent Grid');
     let dash = await s.editorView(`document.body.dataset.mode === 'grid' && document.querySelectorAll('.grid .tile').length === 1`);
     const measure = () => dash.eval(`(() => { const out = {}; for (const t of document.querySelectorAll('.grid .tile')) { const r = t.getBoundingClientRect(); out[t.dataset.run] = { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), b: Math.round(r.bottom) }; } return { count: Object.keys(out).length, rects: out, layout: document.querySelector('.grid').dataset.layout }; })()`);
 
@@ -78,8 +80,8 @@ const THEMES = ['Overseer Dark', 'Overseer Light', 'Overseer'];
       // Chosen edges that build a 4×4: the first row to the right, then each agent below the one above it.
       const k = i - 1, target = k < 4 ? ids[titles[k - 1]] : ids[titles[k - 4]], edge = k < 4 ? 'right' : 'bottom';
       const preview = await tileMove(ids[t], target, edge);
-      await delay(400);
-      m = await measure();
+      // The grid once it has laid the tile out beside its target (8 s; the step records what was there).
+      m = await until(measure, x => x.count === i && !!x.rects[ids[t]] && !!x.rects[target] && beside(x.rects[ids[t]], x.rects[target], edge), 8000, 100);
       const ok = m.count === i && beside(m.rects[ids[t]], m.rects[target], edge);
       result.steps.push({ tiles: i, dragged: t, from: 'side bar', then: { edge, of: title[target] }, preview, beside: ok, layout: JSON.parse(m.layout) });
       allPlaced &&= placed; allBeside &&= ok; allPreview &&= preview.shown && preview.edge === edge && preview.target === target;
@@ -112,8 +114,8 @@ const THEMES = ['Overseer Dark', 'Overseer Light', 'Overseer'];
     await dash.eval(`(() => { const c = document.createElement('div'); c.id = 'kb-spot'; c.style.cssText = 'position:fixed;left:1px;top:1px;width:3px;height:3px;z-index:99'; document.body.append(c); return true; })()`);
     { const p = await s.webviewPoint(dash, '#kb-spot'); await cdp.click(p.x, p.y); await delay(200); }
     await dash.eval(`document.querySelector('.tile[data-run="${kbId}"]').focus()`);
-    await cdp.key('ArrowLeft', { alt: true }); await delay(800);
-    const kbAfter = (await measure()).rects[kbId];
+    await cdp.key('ArrowLeft', { alt: true });
+    const kbAfter = (await until(measure, x => !!x.rects[kbId] && x.rects[kbId].l < kbBefore.l, 10000, 100)).rects[kbId];
     check('Alt+Left moves the focused tile to the left (a keyboard path to place tiles)', kbAfter && kbAfter.l < kbBefore.l, { before: kbBefore, after: kbAfter });
 
     // A reload keeps the layout.
@@ -122,8 +124,7 @@ const THEMES = ['Overseer Dark', 'Overseer Light', 'Overseer'];
     cdp = await s.connect(); s.cdp = cdp;
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'after reload');
     dash = await cdp.webview(`document.body.dataset.mode === 'grid' && document.querySelectorAll('.grid .tile').length === 16`, 40000);
-    await delay(1000);
-    const afterReload = (await measure()).layout;
+    const afterReload = (await until(measure, x => x.layout === beforeReload, 10000, 200)).layout;
     check('a window reload keeps the grid layout exactly', afterReload === beforeReload, { same: afterReload === beforeReload });
     await s.screenshot('after-reload');
   } catch (error) {

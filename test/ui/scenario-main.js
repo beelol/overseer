@@ -3,7 +3,7 @@
 // turn Follow off, edit the worktree from the review, send a follow-up, interrupt.
 const fs = require('fs');
 const path = require('path');
-const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, delay, git } = require('./harness');
+const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, delay, until, git } = require('./harness');
 
 (async () => {
   const s = new Session(process.env.SCENARIO_NAME || 'main');
@@ -24,9 +24,8 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     await cdp.command('Overseer: Add Account');
     await cdp.pick('Add account: provider', 'OpenCode');
     await cdp.input('Name for the', 'OpenCode mock');
-    await delay(800);
+    const profile = await until(() => s.ctl('profile.list').find(p => p.name === 'OpenCode mock'), Boolean, 20000, 200);
     await cdp.key('Escape');
-    const profile = s.ctl('profile.list').find(p => p.name === 'OpenCode mock');
     check('profile created from UI', profile, profile && { id: profile.id, harness: profile.harness });
     fs.mkdirSync(path.join(profile.home, 'config/opencode'), { recursive: true });
     fs.writeFileSync(path.join(profile.home, 'config/opencode/opencode.json'), openCodeConfig(await mock.port()));
@@ -72,7 +71,10 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     // Manual scroll pauses Follow; position is then left alone until Resume.
     const point = await s.webviewPoint(review, '#diffs');
     await cdp.wheel(point.x, point.y + 100, 400);
-    await delay(500);
+    // Each step reads the review once it shows the step's result (15 s; the check reports what was there).
+    const isPaused = f => f.resume && /paused/i.test(f.state), isFollowing = f => !f.resume && /Following/.test(f.state);
+    const followNow = () => review.eval(`({ state: document.getElementById('follow-state').textContent, resume: (document.getElementById('follow').dataset.state === 'paused') })`);
+    await until(followNow, isPaused, 15000, 100);
     const paused = await review.eval(`({ state: document.getElementById('follow-state').textContent, resume: (document.getElementById('follow').dataset.state === 'paused'), top: document.getElementById('diffs').scrollTop })`);
     check('scroll pauses follow with visible Resume', paused.resume && /paused/i.test(paused.state), paused);
     await s.screenshot('paused');
@@ -81,34 +83,32 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     check('paused follow does not move the view', Math.abs(stillPaused.top - paused.top) < 2 && /paused/i.test(stillPaused.state), stillPaused);
     const resume = await s.webviewPoint(review, '#follow');
     await cdp.click(resume.x, resume.y);
-    await delay(800);
-    const resumed = await review.eval(`({ state: document.getElementById('follow-state').textContent, resume: (document.getElementById('follow').dataset.state === 'paused') })`);
+    const resumed = await until(followNow, isFollowing, 15000, 100);
     check('resume restarts follow', !resumed.resume && /Following/.test(resumed.state), resumed);
 
     // Selecting another file in the navigator also pauses Follow.
     await review.eval(`[...document.querySelectorAll('#tree .file')].find(b => b.textContent.includes('b.txt')).id = 'nav-b'`);
     const navB = await s.webviewPoint(review, '#nav-b');
     await cdp.click(navB.x, navB.y);
-    await delay(500);
-    const pausedBySelect = await review.eval(`({ state: document.getElementById('follow-state').textContent, resume: (document.getElementById('follow').dataset.state === 'paused') })`);
+    const pausedBySelect = await until(followNow, isPaused, 15000, 100);
     check('selecting another file pauses follow', pausedBySelect.resume && /paused/i.test(pausedBySelect.state), pausedBySelect);
     const resume2 = await s.webviewPoint(review, '#follow');
     await cdp.click(resume2.x, resume2.y);
-    await delay(500);
+    await until(followNow, isFollowing, 15000, 100);
     const baseTitle = await review.eval(`document.getElementById('base').title`);
     check('base icon identifies snapshot and provenance', /Latest run/.test(baseTitle) && /Base: [0-9a-f]{40}/.test(baseTitle) && /snapshot s-/.test(baseTitle), baseTitle);
 
     // Follow off preserves position during further edits.
     const box = await s.webviewPoint(review, '#follow');
     await cdp.click(box.x, box.y);
-    await delay(500);
+    await until(() => review.eval(`document.getElementById('follow').dataset.state`), st => st === 'off', 15000, 100);
     const offTop = await review.eval(`document.getElementById('diffs').scrollTop`);
     await delay(6000);
     const offAfter = await review.eval(`({ top: document.getElementById('diffs').scrollTop, checked: (document.getElementById('follow').dataset.state !== 'off') })`);
     check('follow off preserves position', !offAfter.checked && Math.abs(offAfter.top - offTop) < 2, { offTop, ...offAfter });
 
     // Wait for the run to finish its 8 edits.
-    for (let i = 0; i < 60; i++) { const r = s.ctl('state').runs.find(x => x.id === run.id); if (!['queued', 'starting', 'running'].includes(r.status)) break; await delay(1000); }
+    await until(() => s.ctl('state').runs.find(x => x.id === run.id).status, st => !['queued', 'starting', 'running'].includes(st), 120000, 500);
     const done = s.ctl('state').runs.find(x => x.id === run.id);
     check('run completed', done.status === 'completed', { status: done.status, reason: done.exit_reason });
     await s.screenshot('completed');
@@ -123,14 +123,13 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     const abs = { x: diffsPoint.x - diffsInner.x + linePoint.x, y: diffsPoint.y - diffsInner.y + linePoint.y };
     await cdp.click(abs.x, abs.y);
     await cdp.type('USER EDIT FROM REVIEW ');
-    await delay(1200);
-    const save = await review.eval(`(() => { const e = [...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === 'a.txt'); return { disabled: e.querySelector('.save-file').disabled, status: e.querySelector('.edit-status').textContent }; })()`);
+    const save = await until(() => review.eval(`(() => { const e = [...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === 'a.txt'); return { disabled: e.querySelector('.save-file').disabled, status: e.querySelector('.edit-status').textContent }; })()`), st => st && !st.disabled, 15000, 100);
     s.note('save button', save);
     await s.screenshot('edited-in-review');
     await review.eval(`[...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === 'a.txt').querySelector('.save-file').id = 'save-a'`);
     const savePoint = await s.webviewPoint(review, '#save-a');
     await cdp.click(savePoint.x, savePoint.y);
-    await delay(1500);
+    await until(() => fs.readFileSync(path.join(ws.path, 'a.txt'), 'utf8').includes('USER EDIT FROM REVIEW'), Boolean, 20000);
     const worktreeA = fs.readFileSync(path.join(ws.path, 'a.txt'), 'utf8');
     check('review edit saved to the selected worktree', worktreeA.includes('USER EDIT FROM REVIEW'), worktreeA.split('\n').find(l => l.includes('USER EDIT')));
     check('source checkout untouched', JSON.stringify(snapshotTree(repo)) === JSON.stringify(before), { status: snapshotTree(repo).status });
@@ -141,13 +140,13 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     await cdp.type('slow please');
     const send = await s.webviewPoint(output, '#send');
     await cdp.click(send.x, send.y);
-    for (let i = 0; i < 30; i++) { const r = s.ctl('state').runs.find(x => x.id === run.id); if (r.status === 'running') break; await delay(500); }
+    await until(() => s.ctl('state').runs.find(x => x.id === run.id).status, st => st === 'running', 30000, 300);
     await delay(3000);
     await s.screenshot('follow-up-running');
     await output.waitFor(`!document.getElementById('interrupt').disabled`, 10000);
     const stop = await s.webviewPoint(output, '#interrupt');
     await cdp.click(stop.x, stop.y);
-    for (let i = 0; i < 30; i++) { const r = s.ctl('state').runs.find(x => x.id === run.id); if (r.status === 'interrupted') break; await delay(500); }
+    await until(() => s.ctl('state').runs.find(x => x.id === run.id).status, st => st === 'interrupted', 30000, 300);
     const interrupted = s.ctl('state').runs.find(x => x.id === run.id);
     check('interrupt from UI', interrupted.status === 'interrupted', { status: interrupted.status, reason: interrupted.exit_reason });
     const turns = s.ctl('run.turns', { run_id: run.id });
@@ -158,10 +157,13 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
 
     // Native child selected in the tree: controls are disabled with an explanation.
     const deleg = s.ctl('task.create', { repo, harness: 'opencode', profile_id: profile.id, model: 'mock/mock-coder', prompt: 'please delegate twice', title: 'delegation' });
-    for (let i = 0; i < 40; i++) { if (s.ctl('state').runs.filter(r => r.task_id === deleg.task.id).length >= 3 && s.ctl('state').runs.find(r => r.id === deleg.run.id).status === 'completed') break; await delay(500); }
-    const icon = await cdp.waitFor(`(() => { const a = [...document.querySelectorAll('.activitybar .action-item a, .activitybar .action-label')].find(a => /^Overseer/.test(a.getAttribute('aria-label') || '')); if (!a) return null; const b = a.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`, 20000);
-    await cdp.click(icon.x, icon.y);
-    const childRow = await cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].find(r => r.offsetParent && /grandchild hi/.test(r.textContent)); if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 80, y: b.top + b.height / 2, text: r.textContent, level: Number(r.getAttribute('aria-level')) }; })()`, 20000, 'grandchild row');
+    // The real OpenCode CLI delegates twice against the mock server: on a loaded machine that takes
+    // longer than a fixed 20 s, so wait for the daemon to have both children and the parent done.
+    const delegated = await until(() => { const st = s.ctl('state'); return st.runs.filter(r => r.task_id === deleg.task.id).length >= 3 && st.runs.find(r => r.id === deleg.run.id).status === 'completed'; }, Boolean, 120000, 500);
+    s.note('delegation finished with its children', delegated);
+    // Show the Overseer side bar (clicking its icon while it is already shown would close it).
+    await s.openOverseerView();
+    const childRow = await cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].find(r => r.offsetParent && /grandchild hi/.test(r.textContent)); if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 80, y: b.top + b.height / 2, text: r.textContent, level: Number(r.getAttribute('aria-level')) }; })()`, 60000, 'grandchild row');
     // Gate K side bar: repository (1) → task (2) → native child (3) → grandchild (4).
     check('three-level native tree visible in the UI', childRow.level >= 4, { text: childRow.text, level: childRow.level });
     await cdp.click(childRow.x, childRow.y);

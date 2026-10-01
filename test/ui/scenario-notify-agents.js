@@ -6,7 +6,7 @@
 // permission toast names the agent and shows even while the Overseer view is open on another agent.
 const fs = require('fs');
 const path = require('path');
-const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
+const { Session, makeRepo, latestVsix, delay, until, repoRoot } = require('./harness');
 
 (async () => {
   const s = new Session('notify-agents');
@@ -27,7 +27,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
     const run = id => s.ctl('state').runs.find(r => r.id === id);
-    const waitFor = async (id, re, ms = 20000) => { for (let t = 0; t < ms; t += 300) { if (re.test(run(id)?.status || '')) return run(id).status; await delay(300); } return run(id)?.status; };
+    const waitFor = async (id, re, ms = 60000) => { for (let t = 0; t < ms; t += 300) { if (re.test(run(id)?.status || '')) return run(id).status; await delay(300); } return run(id)?.status; };
     // The test window never takes the owner's focus, but the harness makes its page act focused
     // (CDP focus emulation) so keys reach it. Here that is turned off and on, and the blur and focus
     // events macOS sends when the owner switches apps are emitted from VS Code's main process
@@ -35,8 +35,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const setFocus = async on => {
       await cdp.call('Emulation.setFocusEmulationEnabled', { enabled: on }, cdp.workbench).catch(() => {});
       await s.quiet?.main(`require('electron').BrowserWindow.getAllWindows().forEach(w => w.emit(${JSON.stringify(on ? 'focus' : 'blur')})), true`);
-      let st; for (let i = 0; i < 30; i++) { st = s.ctl('notices.get'); if (st.vscode_focused === on) break; await delay(300); }
-      return st;
+      return until(() => s.ctl('notices.get'), st => st.vscode_focused === on, 20000, 300);
     };
     const focusedState = await setFocus(true);
     check('a focused window tells the daemon so', focusedState.vscode_focused === true, focusedState);
@@ -57,7 +56,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await waitFor(done.run.id, /completed/);
     const broken = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'echo boom; exit 2'], prompt: '', title: 'Broken build' });
     await waitFor(broken.run.id, /failed/);
-    for (let i = 0; i < 30 && lines().length < 3; i++) await delay(200);
+    await until(() => lines().length >= 3, Boolean, 30000, 200);
+    // A fourth (a repeat) would be a failure: it gets the same 0.8 s as before to show.
     await delay(800);
     const got = lines();
     const one = (title, re, id) => got.filter(l => l.startsWith(title + '|')).length === 1 && got.some(l => l.startsWith(title + '|') && re.test(l) && l.endsWith(`open-agent?run=${id}`));
@@ -74,7 +74,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     // VS Code asks once before an extension handles a vscode:// link (as in scenario-notify, AC-52).
     const prompt = await cdp.waitFor(`(() => { const d = document.querySelector('.monaco-dialog-box'); if (!d) return null; const open = [...d.querySelectorAll('.monaco-button')].find(b => b.textContent.trim() === 'Open'); if (!open) return null; const r = open.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`, 10000, 'URI prompt').catch(() => null);
     if (prompt) await cdp.click(prompt.x, prompt.y);
-    const opened = await view.waitFor(`document.body.dataset.mode === 'chat' && window.__overseer.selected() === ${JSON.stringify(broken.run.id)}`, 15000).then(() => true, () => false);
+    const opened = await view.waitFor(`document.body.dataset.mode === 'chat' && window.__overseer.selected() === ${JSON.stringify(broken.run.id)}`, 30000).then(() => true, () => false);
     await s.screenshot('click-opens-the-agent');
     check('opening the notification\'s URL focuses that agent (its chat in the Overseer view)', opened, { opened, selected: await view.eval(`window.__overseer.selected()`) });
 
@@ -83,7 +83,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     fs.writeFileSync(modeFile, 'permission');
     const other = s.ctl('task.create', { repo, harness: 'claude', prompt: 'write perm.txt', title: 'Add the release notes' });
     await waitFor(other.run.id, /waiting_for_user/);
-    const toast = await cdp.waitFor(`[...document.querySelectorAll('.notification-toast, .notifications-toasts .monaco-list-row')].map(t => t.innerText).find(t => /release notes/.test(t)) || null`, 10000).catch(() => null);
+    const toast = await cdp.waitFor(`[...document.querySelectorAll('.notification-toast, .notifications-toasts .monaco-list-row')].map(t => t.innerText).find(t => /release notes/.test(t)) || null`, 30000).catch(() => null);
     await s.screenshot('toast-names-the-agent');
     check('the in-VS Code permission toast names the agent and shows while the Overseer view is open on another agent',
       /“Add the release notes” is waiting for permission to use Write/.test(toast || ''), { toast, showing: await view.eval(`window.__overseer.selected()`) });
