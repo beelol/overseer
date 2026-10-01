@@ -86,7 +86,7 @@
       // A spoken request (Voice Mode): the owner's words, not the notes the daemon adds for Overseer.
       const spoken = spokenOf(m);
       if (src === 'overseer') who.append(ui.mark('sm'), el('span', null, 'Overseer'));
-      else if (spoken) { const mic = ui.icon('mic', 'xs'); who.append(mic, el('span', null, 'You, by voice')); r.classList.add('spoken'); r.dataset.request = spoken[1]; }
+      else if (spoken) { const mic = ui.icon('mic', 'xs'); who.append(mic, el('span', null, 'You, by voice')); r.classList.add('spoken'); r.dataset.request = spoken[1]; spokenCard(r, who, spoken[2].trim(), m.ts); }
       else if (src === 'owner') who.append(ui.icon('account', 'xs'), el('span', null, 'You'));
       else who.append(ui.icon('info', 'xs'), el('span', null, { agent: 'An agent', system: 'Overseer' }[src] || 'Note'));
       let words = spoken ? spoken[2].trim() : m.text || '';
@@ -206,11 +206,23 @@
       return card;
     }
 
+    // A spoken request's card (AC-219): the words, the state (its stage line) and the time; the
+    // request's id stays in a data attribute for the tests and in the daemon's logs. Its accessible
+    // name reads "You, by voice, at 10:24: <the words>".
+    function spokenCard(e, who, words, ts) {
+      const at = ts ? new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+      if (at) { const t = el('time', 'home-when', at); t.dateTime = new Date(ts).toISOString(); who.append(t); }
+      const said = String(words).length > 120 ? String(words).slice(0, 119).trimEnd() + '…' : String(words);
+      e.setAttribute('role', 'group');
+      e.setAttribute('aria-label', `You, by voice${at ? ', at ' + at : ''}: ${said}`);
+    }
+
     // A spoken request that never reached the conversation (a built-in phrase, a stop, a
     // permission answered, a message straight to the agent spoken to): a row of its own, by time.
     function voiceRow(r) {
       const e = el('div', 'home-msg from-owner spoken voice-only'); e.dataset.id = 'v:' + r.id; e.dataset.ts = r.ts; e.dataset.request = r.id;
       const who = el('div', 'home-from'); who.append(ui.icon('mic', 'xs'), el('span', null, 'You, by voice'));
+      spokenCard(e, who, r.words || '', r.ts);
       const st = el('button', 'req-stage'); st.type = 'button'; st.hidden = true;
       st.addEventListener('click', () => { const s = stages.get('v:' + r.id); if (s && s.run) post({ type: 'openAgent', runId: s.run, work: s.stage === 'done' }); });
       e.append(who, el('div', 'home-text', r.words || ''), st);

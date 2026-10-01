@@ -264,7 +264,8 @@ pub fn leaks(screen: &str) -> Vec<String> {
             let w = w.trim_matches(|c: char| c == '.' || c == '…');
             let snake = w.contains('_') && w.split('_').all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase()));
             let id = w.split_once('-').is_some_and(|(p, r)| matches!(p, "r" | "p" | "sh" | "w") && r.len() >= 8 && r.chars().all(|c| c.is_ascii_hexdigit()));
-            if snake || id || w.starts_with("mcp__") || matches!(w, "claude" | "codex" | "opencode" | "tool-input" | "rate_limit") {
+            let request = w.strip_prefix("V-").is_some_and(|n| n.len() >= 3 && n.chars().all(|c| c.is_ascii_digit()));
+            if snake || id || request || w.starts_with("mcp__") || matches!(w, "claude" | "codex" | "opencode" | "tool-input" | "rate_limit") {
                 out.push(format!("{w:?} in {line:?}"));
             }
         }

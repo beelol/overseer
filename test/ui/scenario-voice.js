@@ -27,6 +27,20 @@ const { auditExpression } = require('./audit');
       OVERSEER_VOICE_SIMULATE: '1', OVERSEER_LISTENER_TEST_VOICE: '1', OVERSEER_LISTENER_TEST_MIC_USERS: micUsers,
     });
     const cdp = await s.connect();
+    // AC-219: no voice request id ("V-0001") on screen at any screenshot: the whole window's text,
+    // with every Overseer webview's text, tooltips and accessible names (content included).
+    const requestIds = [];
+    const VID = /\bV-\d{3,}\b/;
+    const ALL_TEXT = `(() => { const out = [document.body.innerText]; for (const e of document.querySelectorAll('[title], [aria-label]')) out.push(e.getAttribute('title') || '', e.getAttribute('aria-label') || ''); return out.filter(Boolean); })()`;
+    const shoot = s.screenshot.bind(s);
+    s.screenshot = async (label, clip) => {
+      const file = await shoot(label, clip);
+      const texts = [];
+      try { texts.push(...(await cdp.evalWorkbench(ALL_TEXT)).map(t => ['workbench', t])); } catch { /* the window is going */ }
+      try { for (const f of await cdp.webviews(`!document.querySelector('.monaco-workbench') && !!document.querySelector('link[href*="tokens.css"], #diffs')`)) { try { texts.push(...(await f.eval(ALL_TEXT)).map(t => ['webview', t])); } catch { /* a frame that went away */ } } } catch { /* no webviews */ }
+      for (const [where, t] of texts) { const m = VID.exec(t); if (m) requestIds.push({ at: label, where, id: m[0], text: t.slice(Math.max(0, m.index - 80), m.index + 80) }); }
+      return file;
+    };
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
 
     // Off until asked; turned on from the command palette (no model to download in the simulated room).
@@ -115,6 +129,9 @@ const { auditExpression } = require('./audit');
     // The spoken request's card is the conversation's card: the owner's words, then what was done.
     await view.waitFor(`[...document.querySelectorAll('#home-conv .home-msg.spoken')].some(m => /use the new wire format/.test(m.textContent)) && [...document.querySelectorAll('#home-conv .done-card .card-row')].some(r => /Phone/.test(r.textContent))`, 60000);
     const card = await view.eval(`(() => { const m = [...document.querySelectorAll('#home-conv .home-msg.spoken')].filter(m => /use the new wire format/.test(m.textContent)).pop(); const r = [...document.querySelectorAll('#home-conv .done-card .card-row')].filter(r => /Phone/.test(r.textContent)).pop(); return { words: m.querySelector('.home-text').textContent, stage: m.querySelector('.req-stage')?.textContent, row: r.textContent, full: r.title }; })()`);
+    // AC-219: the card shows the words, the state and the time, and its accessible name reads without an id.
+    const named = await view.eval(`(() => { const m = [...document.querySelectorAll('#home-conv .home-msg.spoken')].filter(m => /use the new wire format/.test(m.textContent)).pop(); return { name: m.getAttribute('aria-label'), role: m.getAttribute('role'), time: m.querySelector('time.home-when')?.textContent || '', stage: m.querySelector('.req-stage:not([hidden])')?.textContent || '', request: m.dataset.request || '' }; })()`);
+    check('the request card shows the words, the state and the time, and its accessible name reads without the request id (AC-219)', /^V-\d{3,}$/.test(named.request) && named.role === 'group' && /^You, by voice, at \d{1,2}:\d{2}.*: Tell Phone to use the new wire format/.test(named.name || '') && !/\bV-\d{3,}\b/.test(named.name || '') && /\d{1,2}:\d{2}/.test(named.time) && named.stage.length > 0 && !/\bV-\d{3,}\b/.test(card.full || '') && /^\(by voice\) The owner said/.test(card.full || ''), { ...named, sentToAgent: card.full });
     check('the request card shows the owner\'s words and the text sent to the agent', /Tell Phone to use the new wire format/.test(card.words) && /Phone/.test(card.row) && /The owner said: “Tell Phone to use the new wire format\.”/.test(card.full || ''), card);
     await s.screenshot('request-card-overseer');
 
@@ -390,7 +407,7 @@ const { auditExpression } = require('./audit');
         await s.selectRun(id).catch(() => {});
         await delay(1500);
         const frame = await cdp.webview(`!!document.querySelector('.view-chat')`, 10000).catch(() => null);
-        const shows = frame ? await frame.eval(`document.body.innerText.includes('(voice, request') && document.body.innerText.includes('The owner said: “Tell Gateway and Ledger')`) : false;
+        const shows = frame ? await frame.eval(`document.body.innerText.includes('(by voice) The owner said') && !/\\bV-\\d{3,}\\b/.test(document.body.innerText) && document.body.innerText.includes('The owner said: “Tell Gateway and Ledger')`) : false;
         chats.push({ tag, id, shows });
         await s.screenshot(`chat-${['gateway', 'ledger', 'new-agent'][i]}-${tag}`);
       }
@@ -443,6 +460,7 @@ const { auditExpression } = require('./audit');
     const cardsText = await view.eval(`document.getElementById('home-conv').innerText`);
     const tokens = cardsText.match(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b[a-z]+_[a-z_]+\b|\b(?:Error|panicked|anyhow)\b|Caused by/g) || [];
     check('no card of the voice scenario shows an internal token or a raw error (AC-228)', tokens.length === 0, { tokens: [...new Set(tokens)] });
+    check('no screenshot of the voice scenario shows a voice request id, in any text, tooltip or accessible name (AC-219)', requestIds.length === 0 && s.shot > 30, { screenshots: s.shot, found: requestIds.slice(0, 10) });
     void continuity;
     void phone;
   } catch (e) {

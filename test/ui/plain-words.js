@@ -8,6 +8,7 @@
 /** The words and shapes that must never reach the owner, each with why. */
 const PATTERNS = [
   ['an internal id', /(?<![\w/.-])(?:r|p|sh|w)-[0-9a-f]{8,}\b/],
+  ['a voice request id (AC-219)', /\bV-\d{3,}\b/],
   ['a snake_case state', /\b(?:waiting_for_(?:user|connection|memory)|not_for_overseer|already_answered|merge_back|pull_request|ask_first|every_turn|rate_limit|tool_use|tool_result|turn_done|picked_up|not_sent|partly_sent|handed_off|cancel_requested|answered_by|workspace_id|run_id)\b/],
   ['a tool name', /\bmcp__[A-Za-z0-9_]+/],
   ['a lowercase harness id', /(?<![\w./@~:-])(?:claude|codex|opencode)(?:-app|-serve)?(?![\w./@-])/],

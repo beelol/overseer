@@ -165,7 +165,11 @@ fn overseer_view(f: &mut Frame, app: &App, area: Rect) {
         let source = m["source"].as_str().unwrap_or("system");
         let text = m["text"].as_str().unwrap_or("");
         match source {
-            "owner" => wrap(text, " you › ", Style::new().add_modifier(Modifier::BOLD), &mut lines),
+            // A spoken request: the owner's words, not Overseer's notes or the request's id (AC-219).
+            "owner" => match crate::words::spoken(text) {
+                Some(words) => wrap(words, " you (by voice) › ", Style::new().add_modifier(Modifier::BOLD), &mut lines),
+                None => wrap(text, " you › ", Style::new().add_modifier(Modifier::BOLD), &mut lines),
+            },
             // Overseer's replies are Markdown (AC-245): bullets, bold and headings as a terminal draws them.
             "overseer" => {
                 let mut first = true;
