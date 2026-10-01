@@ -1,5 +1,11 @@
 # AC-146: merges
 
+## Pull request #44 (VS Code reads the daemon's reviewed marks; T-26), 2026-10-01
+
+- **Finished:** built by a builder on the coordinator's brief; 11 lines in `extension/src/extension.js` and two checks in `scenario-review-marks`.
+- **Throwaway copy:** #44 with main (clean). It changes no Rust. Unit 25/25, the extension's check, links (875, 0 broken); the UI scenarios one at a time (LIVE, ON SCREEN and perf skipped as test-all does): 70 of 72; continuity and review passed alone.
+- **Merged:** squash. T-26 verified (ticked in `docs/rfcs/tui.md`).
+
 ## Pull request #43 (the terminal UI's parity slice), 2026-10-01
 
 - **Finished:** built by its agent (T-25, T-27 to T-29, T-37 to T-39), main merged in after #38, #40 and #42 (clean), the to-review marks and counts added (T-26 partial), marked ready.

@@ -307,7 +307,7 @@ agent list, the review screen, and the two numbered ways of showing a picked age
 
 ### Criteria
 
-Status (pull request #43, merged 2026-10-01 as e5836534; tests in `tui/tests/parity.rs`, evidence `docs/verification/evidence/tui/parity-*`): T-25, T-27, T-28, T-37, T-38 and T-39 verified. T-26 partial: the daemon shares the reviewed marks (`state.reviewed`, the `review_seen` event, a merge marks its runs reviewed) and the TUI and the menu bar read them, but VS Code's side bar does not yet, so a review opened in the terminal does not clear VS Code's mark. T-29 partial: accepting and rejecting in the terminal is checked through the daemon, not yet in a VS Code window. T-30 to T-36, T-40 and T-41 not started.
+Status (pull request #43, merged 2026-10-01 as e5836534; tests in `tui/tests/parity.rs`, evidence `docs/verification/evidence/tui/parity-*`): T-25 to T-28, T-37, T-38 and T-39 verified (T-26 with pull request #44, merged as its own commit: VS Code reads the daemon's reviewed marks; `scenario-review-marks` sees a terminal's `review.seen` clear VS Code's mark in 259 ms). T-29 partial: accepting and rejecting in the terminal is checked through the daemon, not yet in a VS Code window. T-30 to T-36, T-40 and T-41 not started.
 
 - [x] **T-25 — An agent list beside the grid.** The main screen keeps the pages of nine and adds an
   agent list on the left: agents grouped by repository, the most recently active repository and
@@ -321,7 +321,7 @@ Status (pull request #43, merged 2026-10-01 as e5836534; tests in `tui/tests/par
   show the grouped list, each row's account and marks, and the repository counts. `J` three times
   shows the third agent's conversation and Esc returns to the grid with that agent focused. A
   search for one repository leaves only its group. No rendered line is wider than the terminal.
-- [ ] **T-26 — The same counts and the same unreviewed marks as VS Code.** The header shows
+- [x] **T-26 — The same counts and the same unreviewed marks as VS Code.** The header shows
   working, needs you, to review, reviewed and failed, the same five counts as VS Code's rollup,
   with zero counts left out. Whether a finished agent has been reviewed is kept by the daemon, not
   by one VS Code window, so opening an agent's review in the TUI clears its mark in VS Code and the
