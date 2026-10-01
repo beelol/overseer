@@ -1,0 +1,60 @@
+ ◆ Overseer  page 1/1 · 5 agents · ● 2 working · ◆ 2 need you · ✦ 14 to review · 1 reviewed · ✗ 1 failed · /docs-site                                                    phone access off · ● connected 
+╭ agents ──────────────────────────────╮┏ 1 ✓ Docs page 4 ━━━━━━━━━━━━━━━━━━━━ Program · 0s ┓╭ 2 ✓ Docs page 3 ───────────────────── Program · 0s ╮╭ 3 ✓ Docs page 2 ──────────────────── Program · 0s ╮
+│ docs-site  4 to review · 1 merged    │┃ output of docs page 4                             ┃│ output of docs page 3                              ││ output of docs page 2                             │
+│›✓ Docs page 4                      ✦ │┃                                                   ┃│                                                    ││                                                   │
+│ ✓ Docs page 3                      ✦ │┃                                                   ┃│                                                    ││                                                   │
+│ ✓ Docs page 2                      ✦ │┃                                                   ┃│                                                    ││                                                   │
+│ ✓ Docs page 1                      ✦ │┃                                                   ┃│                                                    ││                                                   │
+│ ✓ Add the features list            ✓ │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┃                                                   ┃│                                                    ││                                                   │
+│                                      │┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰ completed ─────────────────────────────────────────╯╰ completed ────────────────────────────────────────╯
+│                                      │╭ 4 ✓ Docs page 1 ──────────────────── Program · 0s ╮╭ 5 ✓ Add the features list ─────────── Program · 0s ╮                                                     
+│                                      ││ output of docs page 1                             ││ output of the features list                        │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+│                                      ││                                                   ││                                                    │                                                     
+╰──── ◆ needs you ✦ to review ✓ merged ╯╰ completed ────────────────────────────────────────╯╰ ✓ Merged into main (d194b15) C clean up ───────────╯                                                     
+ ←↑↓→ move   J/K pick in the list   i message   g full view   v changes   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                                               

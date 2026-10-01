@@ -126,6 +126,7 @@
       "oversight": "record<json>",
       "overseer": "json",
       "landings": "record<json>",
+      "reviewed": "record<number>?",
       "daemon": {
         "pid": "number",
         "started_ms": "number",
@@ -267,6 +268,9 @@
       "request": "json?"
     },
     "retention": "json",
+    "review_seen": {
+      "marks": "record<number>"
+    },
     "review_mark": {
       "key": "string",
       "path": "string",
@@ -2745,7 +2749,7 @@
       "class": "mac_only",
       "summary": "Share the reviewed marks VS Code keeps, so every surface counts \"to review\" the same",
       "phone": "mac_only",
-      "reason": "Written by VS Code on the Mac (AC-262); the phone reads the counts through state",
+      "reason": "Written by VS Code and the TUI on the Mac (AC-262, T-26); the phone reads the marks through state",
       "params": {
         "marks": "json"
       },

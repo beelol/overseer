@@ -3789,7 +3789,9 @@ impl Daemon {
         };
         // What each agent's work became (AC-243): merged, stopped on conflicts, or a pull request.
         let landings = crate::merge::landings_for_state(&store.conn, &runs, &turns)?;
-        Ok(json!({"cursor": store.max_seq()?, "tasks": tasks, "runs": run_values, "workspaces": workspaces, "profiles": store.profiles()?, "turns": turns, "oversight": oversight, "overseer": overseer, "landings": landings,
+        // Whose review the owner has opened (or merged) since it ended, shared by every surface (T-26).
+        let reviewed = crate::menubar::reviewed_marks(&store.conn)?;
+        Ok(json!({"cursor": store.max_seq()?, "tasks": tasks, "runs": run_values, "workspaces": workspaces, "profiles": store.profiles()?, "turns": turns, "oversight": oversight, "overseer": overseer, "landings": landings, "reviewed": reviewed,
             "daemon": {"pid": std::process::id(), "started_ms": self.started_ms, "version": env!("CARGO_PKG_VERSION"), "parser_version": adapters::PARSER_VERSION,
                 "swarm_storage": if self.swarm_storage_blocked.load(std::sync::atomic::Ordering::SeqCst) { "blocked" } else { "ready" }}}))
     }

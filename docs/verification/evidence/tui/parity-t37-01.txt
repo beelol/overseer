@@ -1,0 +1,60 @@
+ ◆ Overseer  page 1/1 · 1 agent                                                                                                                                          phone access off · ● connected 
+╭ agents ──────────────────────────────╮┏ 1 ✓ Delegates to sub-agents ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Claude Code · 0s ┓
+│ fits                                 │┃ › Delegate to a sub-agent                                                                                                                                    ┃
+│›✓ Delegates to sub-a… Claude Fixt…   │┃ ↳ grandchild task                                                                                                                                            ┃
+│                                      │┃ │ grandchild says hi                                                                                                                                         ┃
+│                                      │┃ ↳ child task                                                                                                                                                 ┃
+│                                      │┃ ⚙ Agent child task ✓                                                                                                                                         ┃
+│                                      │┃ │ child done                                                                                                                                                 ┃
+│                                      │┃ all done                                                                                                                                                     ┃
+│                                      │┃ ■ done · 1 in / 1 out                                                                                                                                        ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+│                                      │┃                                                                                                                                                              ┃
+╰──────────────── ◆ needs you ✓ merged ╯┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Claude Fixture · fix…@example.test ┛
+ ←↑↓→ move   J/K pick in the list   i message   z zoom   v changes   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                                                    

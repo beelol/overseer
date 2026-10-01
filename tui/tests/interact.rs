@@ -1,4 +1,4 @@
-//! T-02, T-04 and T-05: pages of nine, keyboard and mouse navigation, help, and typing to
+//! T-02, T-04 and T-05: pages of agents (sixteen per page since T-37), keyboard and mouse navigation, help, and typing to
 //! agents. Real overseerd; generic fixture agents and the SYNTHETIC Claude fixture.
 mod support;
 
@@ -17,12 +17,19 @@ fn claude_daemon(mode: &str) -> Daemon {
     Daemon::start(&[("OVERSEER_CLAUDE_PATH", &claude), ("CLAUDE_FIXTURE_MODE", mode), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE")])
 }
 
+/// Agents with a tile on screen: a title after its slot number ("7 ✓ agent 15"); the agent list's
+/// rows (T-25) have no number.
 fn titles_on_screen(s: &str, n: usize) -> Vec<usize> {
-    (1..=n).filter(|i| s.contains(&format!("agent {i:02}"))).collect()
+    (1..=n)
+        .filter(|i| {
+            let t = format!("agent {i:02}");
+            s.lines().any(|l| l.match_indices(&t).any(|(at, _)| l[..at].chars().rev().nth(3).is_some_and(|c| c.is_ascii_digit())))
+        })
+        .collect()
 }
 
 #[test]
-fn t02_pages_of_nine_newest_first() {
+fn t02_pages_newest_first() {
     let t = tempfile::tempdir().unwrap();
     let d = Daemon::start(&[]);
     let repo = repo(&t.path().join("many"));
@@ -32,25 +39,21 @@ fn t02_pages_of_nine_newest_first() {
     }
     let mut tui = Tui::attach(&d, 200, 60);
     tui.until(10, |a| a.visible().len() == 20);
+    // T-37: sixteen per page (a 4×4 grid), the rest on page 2.
     let s = tui.screen();
-    assert!(s.contains("page 1/3"), "{s}");
-    assert_eq!(titles_on_screen(&s, 20), (12..=20).collect::<Vec<_>>(), "page 1 is the newest nine");
+    assert!(s.contains("page 1/2"), "{s}");
+    assert_eq!(titles_on_screen(&s, 20), (5..=20).collect::<Vec<_>>(), "page 1 is the newest sixteen");
     tui.snapshot("t02-page-1");
     tui.key(KeyCode::Char(']'));
     let s = tui.screen();
-    assert!(s.contains("page 2/3"), "{s}");
-    assert_eq!(titles_on_screen(&s, 20), (3..=11).collect::<Vec<_>>());
+    assert!(s.contains("page 2/2"), "{s}");
+    assert_eq!(titles_on_screen(&s, 20), (1..=4).collect::<Vec<_>>());
     tui.snapshot("t02-page-2");
     tui.key(KeyCode::PageDown);
-    let s = tui.screen();
-    assert!(s.contains("page 3/3"));
-    assert_eq!(titles_on_screen(&s, 20), vec![1, 2]);
-    tui.snapshot("t02-page-3");
-    tui.key(KeyCode::Char(']'));
-    assert!(tui.screen().contains("page 3/3"), "stays on the last page");
+    assert!(tui.screen().contains("page 2/2"), "stays on the last page");
     tui.key(KeyCode::PageUp);
     tui.key(KeyCode::Char('['));
-    assert!(tui.screen().contains("page 1/3"));
+    assert!(tui.screen().contains("page 1/2"));
 
     // Focus follows the agent: focus agent 15 (slot 6 on page 1), then a new agent starts.
     tui.key(KeyCode::Char('6'));
@@ -81,45 +84,54 @@ fn t04_keyboard_navigation_help_and_mouse() {
     let d = Daemon::start(&[]);
     let repo = repo(&t.path().join("nav"));
     let mut ids = Vec::new();
-    for i in 1..=12 {
+    for i in 1..=20 {
         ids.push(d.sh(&repo, &format!("agent {i:02}"), "echo hi"));
     }
     ids.reverse(); // newest first, as shown
     let mut tui = Tui::attach(&d, 180, 54);
-    tui.until(10, |a| a.visible().len() == 12);
+    tui.until(10, |a| a.visible().len() == 20);
+    // T-37: page 1 is a 4×4 grid of the newest sixteen, page 2 a 2×2 of the other four.
     let at = |tui: &Tui| tui.app.focus.as_deref().and_then(|f| ids.iter().position(|i| i == f));
     assert_eq!(at(&tui), Some(0), "the newest agent starts focused");
     tui.key(KeyCode::Right);
     assert_eq!(at(&tui), Some(1));
     tui.key(KeyCode::Char('l'));
     assert_eq!(at(&tui), Some(2));
-    // Past the right edge: page 2 (three agents, one row).
     tui.key(KeyCode::Right);
-    assert_eq!((at(&tui), tui.app.page), (Some(9), 1));
+    assert_eq!(at(&tui), Some(3));
+    // Past the right edge: page 2's same row.
+    tui.key(KeyCode::Right);
+    assert_eq!((at(&tui), tui.app.page), (Some(16), 1));
     tui.key(KeyCode::Left);
-    assert_eq!((at(&tui), tui.app.page), (Some(2), 0), "back to page 1's rightmost tile");
+    assert_eq!((at(&tui), tui.app.page), (Some(3), 0), "back to page 1's rightmost tile");
     tui.key(KeyCode::Down);
-    assert_eq!(at(&tui), Some(5));
+    assert_eq!(at(&tui), Some(7));
     tui.key(KeyCode::Char('j'));
-    assert_eq!(at(&tui), Some(8));
+    assert_eq!(at(&tui), Some(11));
     tui.key(KeyCode::Down);
-    assert_eq!(at(&tui), Some(8), "no row below");
+    assert_eq!(at(&tui), Some(15));
+    tui.key(KeyCode::Down);
+    assert_eq!(at(&tui), Some(15), "no row below");
     tui.key(KeyCode::Char('k'));
     tui.key(KeyCode::Char('h'));
-    assert_eq!(at(&tui), Some(4));
+    assert_eq!(at(&tui), Some(10));
     tui.key(KeyCode::Char('1'));
     assert_eq!(at(&tui), Some(0));
     tui.key(KeyCode::Char('9'));
     assert_eq!(at(&tui), Some(8));
+    for _ in 0..7 {
+        tui.key(KeyCode::Tab);
+    }
+    assert_eq!((at(&tui), tui.app.page), (Some(15), 0));
     tui.key(KeyCode::Tab);
-    assert_eq!((at(&tui), tui.app.page), (Some(9), 1), "tab walks across pages");
+    assert_eq!((at(&tui), tui.app.page), (Some(16), 1), "tab walks across pages");
     tui.key(KeyCode::Char('1'));
-    assert_eq!(at(&tui), Some(9), "1–9 are slots on the current page");
+    assert_eq!(at(&tui), Some(16), "1–9 are slots on the current page");
     tui.key(KeyCode::BackTab);
-    assert_eq!(at(&tui), Some(8));
+    assert_eq!(at(&tui), Some(15));
     tui.key(KeyCode::Char('1'));
     tui.key(KeyCode::BackTab);
-    assert_eq!(at(&tui), Some(11), "shift+tab wraps to the last agent");
+    assert_eq!(at(&tui), Some(19), "shift+tab wraps to the last agent");
 
     // The focused tile is unmistakable: thick accent border and its title.
     tui.key(KeyCode::Char('['));

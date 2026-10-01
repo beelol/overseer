@@ -1,0 +1,60 @@
+ ◆ Overseer  page 1/2 · 17 agents                                                                                                                                        phone access off · ● connected 
+╭ agents ──────────────────────────────╮╭ 1 ✓ agent 17 ────────── Program · 0s ╮┏ 2 ✓ agent 16 ━━━━━━━━━━ Program · 0s ┓╭ 3 ✓ agent 15 ────────── Program · 0s ╮╭ 4 ✓ agent 14 ────────── Program · 0s ╮
+│ fits                                 ││ I am agent 17                        │┃ I am agent 16                        ┃│ I am agent 15                        ││ I am agent 14                        │
+│ ✓ agent 17                           ││                                      │┃                                      ┃│                                      ││                                      │
+│›✓ agent 16                           ││                                      │┃                                      ┃│                                      ││                                      │
+│ ✓ agent 15                           ││                                      │┃                                      ┃│                                      ││                                      │
+│ ✓ agent 14                           ││                                      │┃                                      ┃│                                      ││                                      │
+│ ✓ agent 13                           ││                                      │┃                                      ┃│                                      ││                                      │
+│ ✓ agent 12                           ││                                      │┃                                      ┃│                                      ││                                      │
+│ ✓ agent 11                           ││                                      │┃                                      ┃│                                      ││                                      │
+│ ✓ agent 10                           ││                                      │┃                                      ┃│                                      ││                                      │
+│ ✓ agent 09                           ││                                      │┃                                      ┃│                                      ││                                      │
+│ ✓ agent 08                           ││                                      │┃                                      ┃│                                      ││                                      │
+│ ✓ agent 07                           ││                                      │┃                                      ┃│                                      ││                                      │
+│ ✓ agent 06                           ││                                      │┃                                      ┃│                                      ││                                      │
+│ ✓ agent 05                           │╰ completed ───────────────────────────╯┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯
+│ ✓ agent 04                           │╭ 5 ✓ agent 13 ────────── Program · 0s ╮╭ 6 ✓ agent 12 ────────── Program · 0s ╮╭ 7 ✓ agent 11 ────────── Program · 0s ╮╭ 8 ✓ agent 10 ────────── Program · 0s ╮
+│ ✓ agent 03                           ││ I am agent 13                        ││ I am agent 12                        ││ I am agent 11                        ││ I am agent 10                        │
+│ ✓ agent 02                           ││                                      ││                                      ││                                      ││                                      │
+│ ✓ Delegates to sub-a… Claude Fixt…   ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      │╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯
+│                                      │╭ 9 ✓ agent 09 ────────── Program · 0s ╮╭ 10 ✓ agent 08 ───────── Program · 0s ╮╭ 11 ✓ agent 07 ───────── Program · 0s ╮╭ 12 ✓ agent 06 ───────── Program · 0s ╮
+│                                      ││ I am agent 09                        ││ I am agent 08                        ││ I am agent 07                        ││ I am agent 06                        │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      │╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯
+│                                      │╭ 13 ✓ agent 05 ───────── Program · 0s ╮╭ 14 ✓ agent 04 ───────── Program · 0s ╮╭ 15 ✓ agent 03 ───────── Program · 0s ╮╭ 16 ✓ agent 02 ───────── Program · 0s ╮
+│                                      ││ I am agent 05                        ││ I am agent 04                        ││ I am agent 03                        ││ I am agent 02                        │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+╰──────────────── ◆ needs you ✓ merged ╯╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯
+ ←↑↓→ move   J/K pick in the list   i message   z zoom   v changes   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                                                    

@@ -1,11 +1,11 @@
  ◆ Overseer  page 1/1 · 1 agent · ● 1 active                                                                                     phone access off · ● connected 
-┏ changes · Edits two files · Latest run · 2 files +2 −0 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃› M README.md +1 −0                             │ @@ -1 +1,2 @@                                                                                               ┃
-┃  A src/deep/nested/new.rs +1 −0                │  # fixture                                                                                                  ┃
-┃                                                │ +more docs                                                                                                  ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
-┃                                                │                                                                                                             ┃
+┏ review · Edits two files · Latest run · 2 files +2 −0 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 1 Since task start   2 [Latest run]   3 Entire worktree (not available)   t [Changed] | All files                                                            ┃
+┃                                                                                                                                                              ┃
+┃› M README.md +1 −0                             │ README.md  change 1 of 1 · 0 accepted                                                                       ┃
+┃  A src/deep/nested/new.rs +1 −0                │ › @@ -1,0 +2,1 @@  a Accept · r Reject                                                                      ┃
+┃                                                │    # fixture                                                                                                ┃
+┃                                                │   +more docs                                                                                                ┃
 ┃                                                │                                                                                                             ┃
 ┃                                                │                                                                                                             ┃
 ┃                                                │                                                                                                             ┃
@@ -41,4 +41,4 @@
 ┃                                                │                                                                                                             ┃
 ┃                                                │                                                                                                             ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
- j/k file   J/K scroll diff   c comparison   r refresh   v/esc back                                                                                             
+ n/p change   a/A Accept change/file   r/R Reject change/file   j/k file   t Changed | All files   1/2/3 c comparison   e your editor   J/K scroll   ctrl+r relo

@@ -42,7 +42,7 @@ fn t09_readable_at_a_glance_at_three_sizes() {
     for glyph in ["✓ Refresh sessions once", "✗ Migration dry-run", "■ Long soak test", "● Watch the build", "◆ Add a changelog entry"] {
         assert!(s.contains(glyph), "missing {glyph}:\n{s}");
     }
-    assert!(s.contains("page 1/1") && s.contains("● 3 active") && s.contains("◆ 1 needs you"), "{s}");
+    assert!(s.contains("page 1/1") && s.contains("● 2 working · ◆ 1 needs you · ✦ 5 to review"), "VS Code's counts (T-26):\n{s}");
     assert!(s.contains("error: relation users_v2 missing"), "stderr shown:\n{s}");
     assert!(s.contains("Refactor the payment service so every provider adapter shares one retry and idempotency …") || s.contains("…"), "long titles shortened:\n{s}");
     tui.snapshot("t09-200x60");
@@ -199,7 +199,7 @@ fn t12_help_explains_options_and_keys() {
     let out = Command::new(env!("CARGO_BIN_EXE_overseer-tui")).arg("--help").output().unwrap();
     let text = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
-    for s in ["--daemon PATH", "--home DIR", "--no-mouse", "page 1 is the newest nine", "allow / deny", "quit (agents keep running)"] {
+    for s in ["--daemon PATH", "--home DIR", "--no-mouse", "page 1 is the newest sixteen", "allow / deny", "quit (agents keep running)"] {
         assert!(text.contains(s), "help lacks {s}:\n{text}");
     }
     std::fs::write(Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().join("docs/verification/evidence/tui/t12-help.txt"), text.as_bytes()).unwrap();

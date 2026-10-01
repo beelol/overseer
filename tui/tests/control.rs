@@ -96,7 +96,7 @@ fn t07_zoom_shows_the_whole_conversation_with_scrollback() {
     let s = tui.screen();
     assert!(s.contains("row 1999") && !s.contains("row 0\n") && !s.contains("row 1000 "), "{s}");
     tui.snapshot("t07-zoom-bottom");
-    tui.key(KeyCode::Char('g'));
+    tui.key(KeyCode::Home);
     let s = tui.screen();
     assert!(s.contains("│ row 0 ") || s.contains("┃ row 0 "), "top of history:\n{s}");
     assert!(!s.contains("row 1999"));
@@ -209,13 +209,14 @@ fn t14_changes_view_lists_files_and_diffs_like_the_review() {
     assert_eq!(tui.app.mode, Mode::Changes);
     tui.until(10, |a| a.changes.files.len() == 2 && !a.changes.loading);
     let s = tui.screen();
-    assert!(s.contains("changes · Edits two files · Latest run · 2 files +2 −0"), "{s}");
+    assert!(s.contains("review · Edits two files · Latest run · 2 files +2 −0"), "{s}");
     assert!(s.contains("M README.md +1 −0") && s.contains("A src/deep/nested/new.rs +1 −0"), "{s}");
     assert!(s.contains("+more docs"), "diff of the first file:\n{s}");
     tui.snapshot("t14-changes");
     tui.key(KeyCode::Char('j'));
-    let s = tui.screen();
-    assert!(s.contains("+fn main() {}") && !s.contains("+more docs"), "{s}");
+    // The diff comes from the daemon (workspace.hunks, T-29), a moment later.
+    let s = tui.until_screen(10, "+fn main() {}");
+    assert!(!s.contains("+more docs"), "{s}");
     // Another comparison, like the review's comparison picker.
     tui.key(KeyCode::Char('c'));
     tui.until(10, |a| !a.changes.loading && a.changes.option == 1 && !a.changes.files.is_empty());

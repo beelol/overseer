@@ -1,0 +1,44 @@
+ ◆ Overseer  page 1/1 · 1 agent                                                                                                  phone access off · ● connected 
+┏ review · Edits two of five · Since task start · 2 files +3 −2 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 1 [Since task start]   2 Latest run   3 Entire worktree (not available)   t Changed | [All files]                                                            ┃
+┃                                                                                                                                                              ┃
+┃›   README.md                                   │ README.md  unchanged · read-only                                                                            ┃
+┃  M a.txt +2 −2                                 │    # fixture                                                                                                ┃
+┃  M b.txt +1 −0                                 │                                                                                                             ┃
+┃    c.txt                                       │                                                                                                             ┃
+┃    d.txt                                       │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┃                                                │                                                                                                             ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+ n/p change   a/A Accept change/file   r/R Reject change/file   j/k file   t Changed | All files   1/2/3 c comparison   e your editor   J/K scroll   ctrl+r relo

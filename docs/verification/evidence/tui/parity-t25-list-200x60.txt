@@ -1,0 +1,60 @@
+ ◆ Overseer  page 1/2 · 20 agents · ● 2 working · ◆ 2 need you · ✦ 14 to review · 1 reviewed · ✗ 1 failed                                                                phone access off · ● connected 
+╭ agents ──────────────────────────────╮┏ 1 ◆ Write the release notes ━━━━━━━━━┓╭ 2 ◆ Tidy the login page ─────────────╮╭ 3 ● Watch build 2 ───── Program · 2s ╮╭ 4 ● Watch build 1 ───── Program · 2s ╮
+│ web-app                              │┃ › Write the release notes            ┃│ › Tidy the login page                ││ output of watch build 2              ││ output of watch build 1              │
+│   2 working · 2 needs you · 4 to rev…│┃ ✎ perm.txt                           ┃│ ✎ perm.txt                           ││                                      ││                                      │
+│›◆ Write the release notes Personal ◆ │┃ ⚙ Write perm.txt …                   ┃│ ⚙ Write perm.txt …                   ││                                      ││                                      │
+│ ◆ Tidy the login page   Claude Max ◆ │┃ ◆ wants Write perm.txt               ┃│ ◆ wants Write perm.txt               ││                                      ││                                      │
+│ ● Watch build 2                      │┃                                      ┃│                                      ││                                      ││                                      │
+│ ● Watch build 1                      │┃                                      ┃│                                      ││                                      ││                                      │
+│ ✓ Web task 4                       ✦ │┃                                      ┃│                                      ││                                      ││                                      │
+│ ✓ Web task 3                       ✦ │┃                                      ┃│                                      ││                                      ││                                      │
+│ ✓ Web task 2                       ✦ │┃                                      ┃│                                      ││                                      ││                                      │
+│ ✓ Web task 1                       ✦ │┃                                      ┃│                                      ││                                      ││                                      │
+│                                      │┃                                      ┃│                                      ││                                      ││                                      │
+│ api-server  6 to review · 1 failed   │┃                                      ┃│                                      ││                                      ││                                      │
+│ ✗ Migration dry-run                ✦ │┃                                      ┃│                                      ││                                      ││                                      │
+│ ✓ Endpoint 6                       ✦ │┗ ◆ Write perm.txt  a allow d deny ━━━━┛╰ ◆ Write perm.txt  a allow d deny ────╯╰──────────────────────────────────────╯╰──────────────────────────────────────╯
+│ ✓ Endpoint 5                       ✦ │╭ 5 ✓ Web task 4 ──────── Program · 0s ╮╭ 6 ✓ Web task 3 ──────── Program · 0s ╮╭ 7 ✓ Web task 2 ──────── Program · 0s ╮╭ 8 ✓ Web task 1 ──────── Program · 0s ╮
+│ ✓ Endpoint 4                       ✦ ││ output of web task 4                 ││ output of web task 3                 ││ output of web task 2                 ││ output of web task 1                 │
+│ ✓ Endpoint 3                       ✦ ││                                      ││                                      ││                                      ││                                      │
+│ ✓ Endpoint 2                       ✦ ││                                      ││                                      ││                                      ││                                      │
+│ ✓ Endpoint 1                       ✦ ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│ docs-site  4 to review · 1 merged    ││                                      ││                                      ││                                      ││                                      │
+│ ✓ Docs page 4                      ✦ ││                                      ││                                      ││                                      ││                                      │
+│ ✓ Docs page 3                      ✦ ││                                      ││                                      ││                                      ││                                      │
+│ ✓ Docs page 2                      ✦ ││                                      ││                                      ││                                      ││                                      │
+│ ✓ Docs page 1                      ✦ ││                                      ││                                      ││                                      ││                                      │
+│ ✓ Add the features list            ✓ ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      │╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯
+│                                      │╭ 9 ✗ Migration dry-run ─ Program · 0s ╮╭ 10 ✓ Endpoint 6 ─────── Program · 0s ╮╭ 11 ✓ Endpoint 5 ─────── Program · 0s ╮╭ 12 ✓ Endpoint 4 ─────── Program · 0s ╮
+│                                      ││ error: relation users_v2 missing     ││ output of endpoint 6                 ││ output of endpoint 5                 ││ output of endpoint 4                 │
+│                                      ││ · failed: exit code 1                ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      │╰ failed · exit code 1 ────────────────╯╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯
+│                                      │╭ 13 ✓ Endpoint 3 ─────── Program · 0s ╮╭ 14 ✓ Endpoint 2 ─────── Program · 0s ╮╭ 15 ✓ Endpoint 1 ─────── Program · 0s ╮╭ 16 ✓ Docs page 4 ────── Program · 0s ╮
+│                                      ││ output of endpoint 3                 ││ output of endpoint 2                 ││ output of endpoint 1                 ││ output of docs page 4                │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+│                                      ││                                      ││                                      ││                                      ││                                      │
+╰──── ◆ needs you ✦ to review ✓ merged ╯╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯
+ ←↑↓→ move   J/K pick in the list   i message   g full view   v changes   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                                               

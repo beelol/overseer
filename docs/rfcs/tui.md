@@ -42,9 +42,19 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | 1–9 | Focus tile n on this page |
 | Tab / Shift-Tab | Next / previous agent (across pages) |
 | ] / [ , PgDn / PgUp | Next / previous page |
+| J / K | Pick the next / previous agent in the agent list: its conversation opens in a column beside the grid (PgUp/PgDn, Home/End scroll it; e tool details) (T-25) |
+| Esc | Close the picked agent's conversation; the grid stays on that agent (T-25) |
+| L | Hide or show the agent list (T-25) |
 | i, Enter | Compose a message to the focused agent (Enter sends, Esc closes, Alt-Enter new line) |
-| z | Zoom: focused agent full screen with scrollback (j/k, PgUp/PgDn, g/G; z or Esc returns) |
-| v | Changes: the focused agent's changed files and their diffs (j/k file, J/K scroll, c comparison) |
+| g, z | The grid ⇄ the focused agent's full view: its whole conversation with scrollback (j/k, PgUp/PgDn, Home/G) and tool details; g, z or Esc returns to the grid on that agent (T-38) |
+| v | Review: the focused agent's changes through the daemon, opening on its default comparison (Since task start) (T-27) |
+| 1 / 2 / 3, c (review) | Since task start / Latest run / Entire worktree; c cycles every available comparison (T-27) |
+| t (review) | Changed ⇄ All files (T-28) |
+| j / k, n / p, J / K (review) | Next / previous file, next / previous change, scroll (T-29) |
+| a / A (review) | Accept the change / every change of the file (T-29) |
+| r / R (review) | Reject the change / every change of the file, after y/n (T-29) |
+| e (review) | Open the file at the change in `$EDITOR` (else `vi`); the review refreshes when it exits (T-39) |
+| Ctrl-R (review) | Reload the review (T-29) |
 | e (zoom) | Expand or fold every tool call's input and result |
 | a / d | Allow / deny the focused agent's pending permission |
 | w | Jump to the next agent waiting for you |

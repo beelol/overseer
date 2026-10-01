@@ -1,0 +1,60 @@
+ ◆ Overseer  page 1/1 · 4 agents                                                                                                                                         phone access off · ● connected 
+╭ agents ──────────────────────────────╮╭ 1 ✓ agent 04 ────────────────────────────────────────────────── Program · 0s ╮╭ 2 ✓ agent 03 ────────────────────────────────────────────────── Program · 0s ╮
+│ fits                                 ││ I am agent 04                                                                ││ I am agent 03                                                                │
+│ ✓ agent 04                           ││                                                                              ││                                                                              │
+│ ✓ agent 03                           ││                                                                              ││                                                                              │
+│ ✓ agent 02                           ││                                                                              ││                                                                              │
+│›✓ Delegates to sub-a… Claude Fixt…   ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      ││                                                                              ││                                                                              │
+│                                      │╰ completed ───────────────────────────────────────────────────────────────────╯╰ completed ───────────────────────────────────────────────────────────────────╯
+│                                      │╭ 3 ✓ agent 02 ────────────────────────────────────────────────── Program · 0s ╮┏ 4 ✓ Delegates to sub-agents ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Claude Code · 0s ┓
+│                                      ││ I am agent 02                                                                │┃ › Delegate to a sub-agent                                                    ┃
+│                                      ││                                                                              │┃ ↳ grandchild task                                                            ┃
+│                                      ││                                                                              │┃ │ grandchild says hi                                                         ┃
+│                                      ││                                                                              │┃ ↳ child task                                                                 ┃
+│                                      ││                                                                              │┃ ⚙ Agent child task ✓                                                         ┃
+│                                      ││                                                                              │┃ │ child done                                                                 ┃
+│                                      ││                                                                              │┃ all done                                                                     ┃
+│                                      ││                                                                              │┃ ■ done · 1 in / 1 out                                                        ┃
+│                                      ││                                                                              │┃                                                                              ┃
+│                                      ││                                                                              │┃                                                                              ┃
+│                                      ││                                                                              │┃                                                                              ┃
+│                                      ││                                                                              │┃                                                                              ┃
+│                                      ││                                                                              │┃                                                                              ┃
+│                                      ││                                                                              │┃                                                                              ┃
+│                                      ││                                                                              │┃                                                                              ┃
+│                                      ││                                                                              │┃                                                                              ┃
+│                                      ││                                                                              │┃                                                                              ┃
+│                                      ││                                                                              │┃                                                                              ┃
+│                                      ││                                                                              │┃                                                                              ┃
+│                                      ││                                                                              │┃                                                                              ┃
+│                                      ││                                                                              │┃                                                                              ┃
+│                                      ││                                                                              │┃                                                                              ┃
+│                                      ││                                                                              │┃                                                                              ┃
+│                                      ││                                                                              │┃                                                                              ┃
+│                                      ││                                                                              │┃                                                                              ┃
+│                                      ││                                                                              │┃                                                                              ┃
+│                                      ││                                                                              │┃                                                                              ┃
+╰──────────────── ◆ needs you ✓ merged ╯╰ completed ───────────────────────────────────────────────────────────────────╯┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Claude Fixture · fix…@example.test ┛
+ ←↑↓→ move   J/K pick in the list   i message   z zoom   v changes   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                                                    

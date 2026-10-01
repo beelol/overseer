@@ -14,7 +14,7 @@ use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-const HELP: &str = "overseer-tui — nine live Overseer agents per page, from the same overseerd daemon VS Code uses.
+const HELP: &str = "overseer-tui — up to sixteen live Overseer agents per page, from the same overseerd daemon VS Code uses.
 
 USAGE:
     overseer-tui [OPTIONS]
@@ -32,20 +32,23 @@ OPTIONS:
 KEYS:
     ←↓↑→ / h j k l  move between agents        1–9   focus agent n on this page
     tab / shift+tab next / previous agent      ] [   next / previous page (also PgDn/PgUp)
-    i / enter       message the focused agent  z     zoom (full screen, scrollback)
+    J / K           pick in the agent list (its conversation beside the grid; esc closes it)
+    L               hide or show the agent list
+    i / enter       message the focused agent  g / z grid <-> the focused agent's full view
     a / d           allow / deny a permission  w     next agent waiting for you
     x               interrupt                  n     new agent
     C               remove a finished agent's worktree (branch kept)
     P               open a GitHub pull request (your git credentials and gh)
     X               stop all agents and the daemon (r starts it again)
-    v               changes (files, diffs)     M     merge back (asks each step)
+    v               review: comparisons, files, Accept / Reject (e: your $EDITOR)
+    M               merge back (asks each step)
     /               search agents              A     accounts and sign-in
     O               phone access on / off      D     devices: pair a phone, revoke, scope
     S               Audio Mode, track, preview  e     in zoom: expand tool calls
     f               filter all/active/needs you ?     all keys
     q               quit (agents keep running)
 
-Agents are pages of nine, newest first: page 1 is the newest nine.";
+Top-level agents, newest first; the grid fits the count, up to sixteen: page 1 is the newest sixteen.";
 
 enum Ev {
     Daemon(Msg),
@@ -187,7 +190,9 @@ fn main() -> Result<()> {
                 }
                 let _ = execute!(std::io::stdout(), DisableBracketedPaste);
                 ratatui::restore();
-                println!("{} — Overseer resumes when it finishes.\n", exec.title);
+                if !exec.edit {
+                    println!("{} — Overseer resumes when it finishes.\n", exec.title);
+                }
                 let status = std::process::Command::new(&exec.program).args(&exec.args).envs(exec.env.iter().map(|(k, v)| (k, v))).status();
                 terminal = ratatui::init();
                 let _ = execute!(std::io::stdout(), EnableBracketedPaste);

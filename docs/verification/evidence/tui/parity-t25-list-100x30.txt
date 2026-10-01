@@ -1,0 +1,30 @@
+ ◆ Overseer  page 1/2 · 20 agents · ● 2 working · ◆ 2 need you       phone access off · ● connected 
+╭ agents ────────────────────╮┏ 1 ◆ Write the rele… ┓╭ 2 ◆ Tidy the login … ╮╭ 3 ● Watch build 2 ──╮
+│ web-app                    │┃ ✎ perm.txt          ┃│ ✎ perm.txt           ││ output of watch     │
+│   2 working · 2 needs you …│┃ ⚙ Write perm.txt …  ┃│ ⚙ Write perm.txt …   ││ build 2             │
+│›◆ Write the re… Personal ◆ │┃ ◆ wants Write       ┃│ ◆ wants Write        ││                     │
+│ ◆ Tidy the l… Claude Max ◆ │┃   perm.txt          ┃│   perm.txt           ││                     │
+│ ● Watch build 2            │┗ ◆ …  a allow d deny ┛╰ ◆ …  a allow d deny ─╯╰─────────────────────╯
+│ ● Watch build 1            │╭ 4 ● Watch build 1 ──╮╭ 5 ✓ Web task 4 ──────╮╭ 6 ✓ Web task 3 ─────╮
+│ ✓ Web task 4             ✦ ││ output of watch     ││ output of web task 4 ││ output of web task 3│
+│ ✓ Web task 3             ✦ ││ build 1             ││                      ││                     │
+│ ✓ Web task 2             ✦ ││                     ││                      ││                     │
+│ ✓ Web task 1             ✦ │╰─────────────────────╯╰ completed ───────────╯╰ completed ──────────╯
+│                            │╭ 7 ✓ Web task 2 ─────╮╭ 8 ✓ Web task 1 ──────╮╭ 9 ✗ Migration dry-… ╮
+│ api-server                 ││ output of web task 2││ output of web task 1 ││ error: relation     │
+│   6 to review · 1 failed   ││                     ││                      ││ users_v2 missing    │
+│ ✗ Migration dry-run      ✦ ││                     ││                      ││ · failed: exit code │
+│ ✓ Endpoint 6             ✦ ││                     ││                      ││   1                 │
+│ ✓ Endpoint 5             ✦ │╰ completed ──────────╯╰ completed ───────────╯╰ failed · exit code 1╯
+│ ✓ Endpoint 4             ✦ │╭ 10 ✓ Endpoint 6 ────╮╭ 11 ✓ Endpoint 5 ─────╮╭ 12 ✓ Endpoint 4 ────╮
+│ ✓ Endpoint 3             ✦ ││ output of endpoint 6││ output of endpoint 5 ││ output of endpoint 4│
+│ ✓ Endpoint 2             ✦ ││                     ││                      ││                     │
+│ ✓ Endpoint 1             ✦ ││                     ││                      ││                     │
+│                            │╰ completed ──────────╯╰ completed ───────────╯╰ completed ──────────╯
+│ docs-site                  │╭ 13 ✓ Endpoint 3 ────╮╭ 14 ✓ Endpoint 2 ─────╮╭ 15 ✓ Endpoint 1 ────╮
+│   4 to review · 1 merged   ││ output of endpoint 3││ output of endpoint 2 ││ output of endpoint 1│
+│ ✓ Docs page 4            ✦ ││                     ││                      ││                     │
+│ ✓ Docs page 3            ✦ ││                     ││                      ││                     │
+│ ✓ Docs page 2            ✦ ││                     ││                      ││                     │
+╰─── ◆ you ✦ review ✓ merged ╯╰ completed ──────────╯╰ completed ───────────╯╰ completed ──────────╯
+ i message   g full view   a/d answer   n new   o Overseer   ? keys   q quit                        

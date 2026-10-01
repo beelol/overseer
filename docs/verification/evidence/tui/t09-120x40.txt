@@ -1,40 +1,40 @@
- ◆ Overseer  page 1/1 · 9 agents · ● 3 active · ◆ 1 needs you                            phone access off · ● connected 
-┏ 1 ✓ Write API docs ━━━━ generic · 0s ┓╭ 2 ✓ Bump dependencies ─ generic · 0s ╮╭ 3 ✓ Tidy lint warnings  generic · 0s ╮
-┃ step 2 done                          ┃│ step 1 done                          ││ step 0 done                          │
-┃                                      ┃│                                      ││                                      │
-┃                                      ┃│                                      ││                                      │
-┃                                      ┃│                                      ││                                      │
-┃                                      ┃│                                      ││                                      │
-┃                                      ┃│                                      ││                                      │
-┃                                      ┃│                                      ││                                      │
-┃                                      ┃│                                      ││                                      │
-┃                                      ┃│                                      ││                                      │
-┃                                      ┃│                                      ││                                      │
-┃                                      ┃│                                      ││                                      │
-┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯
-╭ 4 ◆ Add a changelog en…  claude · 4s ╮╭ 5 ● Watch the build ─── generic · 4s ╮╭ 6 ● Refactor the paym…  generic · 5s ╮
-│ › Add a changelog entry for the      ││ watching the build…                  ││ Reading                              │
-│   session refresh change             ││                                      ││ web-app/src/payments/providers/stripe│
-│ ✎ perm.txt                           ││                                      ││ /adapters/refund-reconciliation-worke│
-│ ⚙ Write perm.txt …                   ││                                      ││ r.ts                                 │
-│ ◆ wants Write perm.txt               ││                                      ││                                      │
-│                                      ││                                      ││                                      │
-│                                      ││                                      ││                                      │
-│                                      ││                                      ││                                      │
-│                                      ││                                      ││                                      │
-│                                      ││                                      ││                                      │
-╰ ◆ Write perm.txt  a allow d deny ────╯╰──────────────────────────────────────╯╰──────────────────────────────────────╯
-╭ 7 ■ Long soak test ──── generic · 0s ╮╭ 8 ✗ Migration dry-run ─ generic · 0s ╮╭ 9 ✓ Refresh sessions …  generic · 0s ╮
-│ soaking                              ││ migration dry-run: 3 pending         ││ Sessions now refresh once.           │
-│ · interrupted: interrupted by user   ││ error: relation users_v2 missing     ││ 2 tests passing                      │
-│   (exit signal 2)                    ││ · failed: exit code 1                ││                                      │
-│                                      ││                                      ││                                      │
-│                                      ││                                      ││                                      │
-│                                      ││                                      ││                                      │
-│                                      ││                                      ││                                      │
-│                                      ││                                      ││                                      │
-│                                      ││                                      ││                                      │
-│                                      ││                                      ││                                      │
-│                                      ││                                      ││                                      │
-╰ interrupted · by user (exit signal 2)╯╰ failed · exit code 1 ────────────────╯╰ completed ───────────────────────────╯
- ←↑↓→ move   i message   z zoom   v changes   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q
+ ◆ Overseer  page 1/1 · 9 agents · ● 2 working · ◆ 1 needs you · ✦ 5 to review · ✗ 1 failed    phones off · ● connected 
+╭ agents ────────────────────╮┏ 1 ✓ Write API docs ━━━━━━━━┓╭ 2 ✓ Bump dependencies ─────╮╭ 3 ✓ Tidy lint warnings ────╮
+│ web-app                    │┃ step 2 done                ┃│ step 1 done                ││ step 0 done                │
+│   1 working · 1 needs you …│┃                            ┃│                            ││                            │
+│ ◆ Add a ch… Claude Fixt… ◆ │┃                            ┃│                            ││                            │
+│ ● Refactor the payment…    │┃                            ┃│                            ││                            │
+│ ✓ Refresh sessions once  ✦ │┃                            ┃│                            ││                            │
+│                            │┃                            ┃│                            ││                            │
+│ api-server                 │┃                            ┃│                            ││                            │
+│   1 working · 4 to review …│┃                            ┃│                            ││                            │
+│ ● Watch the build          │┃                            ┃│                            ││                            │
+│›✓ Write API docs         ✦ │┃                            ┃│                            ││                            │
+│ ✓ Bump dependencies      ✦ │┃                            ┃│                            ││                            │
+│ ✓ Tidy lint warnings     ✦ │┗ completed ━━━━━━━━━━━━━━━━━┛╰ completed ─────────────────╯╰ completed ─────────────────╯
+│ ■ Long soak test         ✦ │╭ 4 ◆ Add a changelog entry ─╮╭ 5 ● Watch the build ───────╮╭ 6 ● Refactor the payment … ╮
+│ ✗ Migration dry-run      ✦ ││ › Add a changelog entry for││ watching the build…        ││ Reading                    │
+│                            ││   the session refresh      ││                            ││ web-app/src/payments/provid│
+│                            ││   change                   ││                            ││ ers/stripe/adapters/refund-│
+│                            ││ ✎ perm.txt                 ││                            ││ reconciliation-worker.ts   │
+│                            ││ ⚙ Write perm.txt …         ││                            ││                            │
+│                            ││ ◆ wants Write perm.txt     ││                            ││                            │
+│                            ││                            ││                            ││                            │
+│                            ││                            ││                            ││                            │
+│                            ││                            ││                            ││                            │
+│                            ││                            ││                            ││                            │
+│                            │╰ ◆ Write…  a allow d deny ──╯╰────────────────────────────╯╰────────────────────────────╯
+│                            │╭ 7 ■ Long soak test ────────╮╭ 8 ✗ Migration dry-run ─────╮╭ 9 ✓ Refresh sessions once ─╮
+│                            ││ soaking                    ││ error: relation users_v2   ││ Sessions now refresh once. │
+│                            ││ · interrupted: interrupted ││ missing                    ││ 2 tests passing            │
+│                            ││   by user (exit signal 2)  ││ migration dry-run: 3       ││                            │
+│                            ││                            ││ pending                    ││                            │
+│                            ││                            ││ · failed: exit code 1      ││                            │
+│                            ││                            ││                            ││                            │
+│                            ││                            ││                            ││                            │
+│                            ││                            ││                            ││                            │
+│                            ││                            ││                            ││                            │
+│                            ││                            ││                            ││                            │
+│                            ││                            ││                            ││                            │
+╰─── ◆ you ✦ review ✓ merged ╯╰ interrupted · by user (exit╯╰ failed · exit code 1 ──────╯╰ completed ─────────────────╯
+ ←↑↓→ move   J/K pick in the list   i message   g full view   v changes   a/d allow/deny   w next waiting   ]/[ page   n
