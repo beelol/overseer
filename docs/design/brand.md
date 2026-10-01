@@ -35,7 +35,8 @@ Made from the sources with `sips -z N N <source> --out <export>`; the macOS icon
 | Inside Overseer's views: the composer's "What's next?" heading, "From Overseer" on messages, "Overseer will" on proposals | Full-colour mark, 128 px | `extension/media/overseer-logo.png` (the `.overseer-mark` class in `base.css`) |
 | macOS notification helper (`Overseer Notifier.app`) | Full-colour app icon on the macOS grid | `extension/notifier/AppIcon.png` (`overseer-app-icon-macos-1024.png`), made into `AppIcon.icns` at build |
 | Phone app icon and splash (Gate N) | Full-colour app icon; grayscale mark on the door (AC-136) | The phone app's generators read `extension/media/overseer.svg`, so they pick up the single-colour mark; its full-colour icon comes from `overseer-app-icon-1024.png` when Gate N adopts it |
-| Monochrome surfaces still to come (macOS menu bar template image, Android monochrome icon) | Single-colour SVG | `overseer-mark.svg` |
+| macOS menu-bar item (`Overseer Menu.app`, AC-262) | Single-colour silhouette as a template image, 18 pt, so macOS paints it the menu bar's colour; the dot beside it is Overseer's violet from `tokens.js`; a dev daemon's item adds a "!" in the lower corner | `StatusIcon.png` and `StatusIcon@2x.png`, made from `overseer-icon-flat.png` by `extension/menubar/build.js` (`sips -z 18 18`, `36 36`) |
+| Monochrome surfaces still to come (Android monochrome icon) | Single-colour SVG | `overseer-mark.svg` |
 
 ## Rules
 

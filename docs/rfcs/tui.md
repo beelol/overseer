@@ -242,7 +242,7 @@ T-23 and T-24 came with pull request #6 (code at 47312f3, merged into main as ea
 
 Status: proposed on 2026-09-30 from the owner's request: "a tui that does pretty much everything
 the same way" as Overseer in VS Code, "it's just convenient to use the terminal for everything
-else." Criteria T-25 to T-39 below. The owner decided the shape the same day:
+else." Criteria T-25 to T-41 below. The owner decided the shape the same day:
 
 - **The TUI we have stays the base.** Nothing is rebuilt. The main screen is still the pages of
   nine, with an agent list added on the side. Picking an agent in the list shows its
@@ -406,7 +406,31 @@ agent list, the review screen, and the two numbered ways of showing a picked age
   to the review with that line shown as the owner's edit and the terminal restored (no leftover
   raw mode or alternate screen).
 
+- [ ] **T-40 — Dashboard mode for big screens.** An option beside the grid (the owner, 2026-09-30:
+  "screens are pretty big now … agents on the left for now are good, and then review in the middle,
+  and then the chat on the right as a dashboard mode, as just an option"): the agent list on the
+  left, the picked agent's review in the middle (the T-27 to T-29 review) and its conversation on
+  the right, like the Overseer layout in VS Code (AC-264). A key (`D`, shown in `?`) switches between
+  the grid and dashboard mode and keeps the picked agent; `--dashboard` starts in it. Picking another
+  agent in the list changes the review and the conversation together; Tab moves focus between the
+  three columns. **Verify:** snapshots at 240×70 and 200×60 with 9 fixture agents show the three
+  columns; `J` changes both the review and the conversation to the next agent; `D` returns to the
+  grid on that agent; below 160 columns dashboard mode says it needs a wider terminal and stays on
+  the grid.
+- [ ] **T-41 — A grid-only terminal beside it.** `overseer-tui --grid` shows only the grid of agents
+  (no list, no conversation column), so the owner can keep the grid in a second terminal and
+  dashboard mode in the first (the owner: "maybe you can open a second TUI, and then I can view the
+  agent grid only on the second TUI, like two terminals. Maybe that's the best use case"). Both
+  terminals are clients of the same daemon and stay live; picking an agent in the grid-only
+  terminal does not move the other. **Verify:** two TUIs against one fixture daemon, one with
+  `--grid` and one with `--dashboard`; a new fixture agent appears in both; answering a permission
+  in one clears it in the other; snapshots of both.
+
 ### Open for later
+
+- Swapping one of dashboard mode's columns for the grid of agents (the owner, 2026-09-30, "just
+  theorizing"): with the grid on screen the agent list isn't needed, so the grid could take the
+  left or the middle. T-41's second terminal covers the need for now.
 
 - How sub-agents show: drilled into from their parent, or seen as tiles next to the others (the
   owner, 2026-09-30: "maybe assume all top level for now"; "not a priority, needs more thought").

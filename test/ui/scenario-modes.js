@@ -1,9 +1,8 @@
-// (In the immersive dashboard, AC-102, the tab strips are hidden: the groups are compared by their shares.)
-// Packaged-UI scenario for AC-79 (grid and dashboard mode in the new layout), fixture runs only.
+// Packaged-UI scenario for AC-79 (the grid in the new layout), fixture runs only. (Dashboard mode,
+// Focus Mode, is retired by AC-264: the Overseer layout is scenario-overseer-window.js.)
 // From the chat-only arrangement (an agent without changes) and the review-and-chat arrangement
 // (an agent with changes): the grid opens in the editor area and closing it returns to the same
-// arrangement; dashboard mode hides the panel and secondary side bar, keeps the side bar on the
-// Overseer agents list, and Exit returns to the same arrangement and parts.
+// arrangement.
 const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay } = require('./harness');
@@ -46,16 +45,6 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
       check(`${label}: the grid takes the editor area and closing it returns to the same arrangement`, during.groups.length === 1 && /^Overseer/.test(during.groups[0].active) && same(before, after), { before, during, after });
       return dash;
     };
-    const dashboardRoundTrip = async label => {
-      const before = await arrangement();
-      await cdp.command('Overseer: Enter Focus Mode'); await delay(4000);
-      const during = await arrangement();
-      await s.screenshot(`dashboard-from-${label}`);
-      await cdp.command('Overseer: Exit Focus Mode'); await delay(3000);
-      const after = await arrangement();
-      check(`${label}: dashboard mode hides the panel and secondary side bar, keeps the side bar on Overseer, and Exit returns to the same arrangement`,
-        !during.panel && !during.auxiliary && during.sidebar && /Overseer/i.test(during.sidebarTitle) && (during.groups.every(g => g.active === '') ? JSON.stringify(during.groups.map(g => g.share)) === JSON.stringify(before.groups.map(g => g.share)) : JSON.stringify(during.groups.map(g => g.active)) === JSON.stringify(before.groups.map(g => g.active))) && same(before, after), { before, during, after });
-    };
 
     // Chat only.
     await select('No changes');
@@ -64,7 +53,6 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     const chatOnly = await arrangement();
     check('starting point 1: the chat alone (one group), Explorer and terminal open', chatOnly.groups.length === 1 && chatOnly.sidebar && chatOnly.panel, chatOnly);
     await gridRoundTrip('chat only');
-    await dashboardRoundTrip('chat only');
 
     // Review and chat.
     await select('With changes');
@@ -72,7 +60,6 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     const split = await arrangement();
     check('starting point 2: review on the left, chat on the right', split.groups.length === 2 && /^Review/.test(split.groups[0].active) && /^Overseer/.test(split.groups[1].active), split);
     await gridRoundTrip('review and chat');
-    await dashboardRoundTrip('review and chat');
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}

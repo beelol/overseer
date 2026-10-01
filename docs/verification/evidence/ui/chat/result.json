@@ -4,8 +4,9 @@
       "name": "your prompt is a bubble on the right; the agent reply is plain text in a centered column of about 720 px",
       "ok": true,
       "detail": {
-        "columnWidth": 422,
-        "available": 422,
+        "columnWidth": 407,
+        "available": 407,
+        "scrollBar": 15,
         "centered": true,
         "userRight": 16,
         "userBubble": true,
@@ -17,7 +18,7 @@
         "highlighted": true,
         "link": "https://datatracker.ietf.org/doc/html/rfc6749#section-6",
         "longPath": "…/auth/session-refresh-coordinator.ts",
-        "longPathTitle": "/private/tmp/ovs-ui-UuT2W4/overseer-home/worktrees/chat-repo-ead324d3/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
+        "longPathTitle": "/private/tmp/ovs-ui-Bw9MZS/overseer-home/worktrees/chat-repo-0ee67d19/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
         "steps": "6 stepsRead · Searched · Found files · Created · Edited · Ran",
         "edits": [
           "session-refresh-coordinator.ts",
@@ -31,8 +32,9 @@
       "name": "the reply renders as Markdown: heading, list, table, highlighted code with its language, link with its URL, long path shortened with the full path as tooltip",
       "ok": true,
       "detail": {
-        "columnWidth": 422,
-        "available": 422,
+        "columnWidth": 407,
+        "available": 407,
+        "scrollBar": 15,
         "centered": true,
         "userRight": 16,
         "userBubble": true,
@@ -44,7 +46,7 @@
         "highlighted": true,
         "link": "https://datatracker.ietf.org/doc/html/rfc6749#section-6",
         "longPath": "…/auth/session-refresh-coordinator.ts",
-        "longPathTitle": "/private/tmp/ovs-ui-UuT2W4/overseer-home/worktrees/chat-repo-ead324d3/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
+        "longPathTitle": "/private/tmp/ovs-ui-Bw9MZS/overseer-home/worktrees/chat-repo-0ee67d19/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
         "steps": "6 stepsRead · Searched · Found files · Created · Edited · Ran",
         "edits": [
           "session-refresh-coordinator.ts",
@@ -58,8 +60,9 @@
       "name": "consecutive tool calls fold into one line; edits are chips; the turn ends with a quiet footer; the composer stays pinned",
       "ok": true,
       "detail": {
-        "columnWidth": 422,
-        "available": 422,
+        "columnWidth": 407,
+        "available": 407,
+        "scrollBar": 15,
         "centered": true,
         "userRight": 16,
         "userBubble": true,
@@ -71,7 +74,7 @@
         "highlighted": true,
         "link": "https://datatracker.ietf.org/doc/html/rfc6749#section-6",
         "longPath": "…/auth/session-refresh-coordinator.ts",
-        "longPathTitle": "/private/tmp/ovs-ui-UuT2W4/overseer-home/worktrees/chat-repo-ead324d3/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
+        "longPathTitle": "/private/tmp/ovs-ui-Bw9MZS/overseer-home/worktrees/chat-repo-0ee67d19/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
         "steps": "6 stepsRead · Searched · Found files · Created · Edited · Ran",
         "edits": [
           "session-refresh-coordinator.ts",
@@ -119,7 +122,7 @@
         "p95": 9.2,
         "median": 8.3,
         "max": 9,
-        "workP95": 0.3,
+        "workP95": 0.2,
         "workMax": 0.3
       }
     },

@@ -1280,7 +1280,8 @@ rec(99, "The review is where files live", "verified", commit="10b8f73 (merge of 
     actual="""- Changes only while the agent has changes, with status and counts; All files lists the worktree one folder at a time (.git left out).
 - A nested unchanged file opens as its whole text, is edited and saved (disk checked), then counts as changed; a changed file too.
 - No editor tab stays open (a background tab VS Code opens for a dirty file closes on Save).
-- 10,000-file worktree: the first level shows in well under 500 ms.""",
+- 10,000-file worktree: the first level shows in well under 500 ms.
+- Since pull request #40 (merged 2026-09-30 as 4da1640e), an unchanged file picked in the review's All files list shows in Follow's view in the review (read-only, in place), not as a browsed row among the diffs; editing and saving a changed file in the review is unchanged (scenario-review-files).""",
     evidence="[review-files scenario](evidence/ui/review-files/)", live="—")
 rec(100, "Nothing shown twice", "verified", commit="10b8f73 (merge of pull request #11, Gate M)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
     steps="`node test/ui/scenario-inventory.js`: the one-time offer to take Explorer's place; an inventory of agents, files, changed files and unsaved edits in each arrangement (chat alone, review beside the chat, grid, dashboard).",
@@ -1817,10 +1818,10 @@ rec(178, "The phone app uses the owner's mark", "not started", date="—", commi
     actual="Not started.", live="—", blocker="Not started: the phone app's agent (Gate N) replaces its placeholder marks with the owner's files in docs/design/brand/.")
 rec(179, "The Mac surfaces use the owner's mark", "partial", commit="8653510", date="2026-09-27", harness="none (the packaged VSIX and the helper's build)",
     proven="the notification helper's `.icns` is built from `docs/design/brand/exports/overseer-app-icon-macos-1024.png` by `extension/notifier/build.js` (sips for every macOS size, iconutil); the brand scenario unpacks the installed helper's icon and finds every size, the owner's violet tile (`node test/ui/scenario-brand.js`); Overseer has no menu-bar item and no other Mac app, so those parts do not apply yet",
-    deferred="a screenshot of a real notification banner and of the helper in Finder: macOS asks the owner to allow the helper's notifications, and screenshots of the desktop need the owner's screen-recording permission; the menu-bar image when a menu-bar item exists",
+    deferred="a screenshot of a real notification banner and of the helper in Finder: macOS asks the owner to allow the helper's notifications, and screenshots of the desktop need the owner's screen-recording permission",
     expected="See the RFC criterion (Brand) and [docs/design/brand.md](../design/brand.md).",
     actual="See proven and deferred.",
-    evidence="[helper icon as installed](evidence/ui/brand/notifier-app-icon.png), [brand scenario](evidence/ui/brand/)", live="—",
+    evidence="[helper icon as installed](evidence/ui/brand/notifier-app-icon.png), [brand scenario](evidence/ui/brand/), [the menu-bar item with the flat mark as a template image, light and dark](evidence/ui/menubar/) (AC-262, pull request #42, merged as 86e993fd)", live="—",
     blocker="Owner: run Overseer: Test Notification in VS Code, allow notifications when macOS asks, and screenshot the banner and the helper (Overseer Notifier) in Finder.")
 
 # Gate O, Audio Mode (added by the owner on 2026-09-26; docs/rfcs/audio-mode.md). The daemon and VS Code came with pull
@@ -2763,7 +2764,7 @@ rec(261, "One Sign In, clearly Overseer's or clearly not", "verified", commit="b
     evidence="[one-signin scenario](evidence/ui/one-signin/) (three screenshots, result.json)",
     live="Fixtures only.", limits="VS Code's own Accounts icon in the activity bar stays (it is VS Code's menu, not a Sign In control).")
 
-rec(262, "Overseer in the Mac's menu bar", "verified", date="2026-09-30", commit="b1dc6da8 (branch claude/menu-bar, pull request #42, not merged yet)",
+rec(262, "Overseer in the Mac's menu bar", "verified", date="2026-09-30", commit="86e993fd (pull request #42, merged 2026-09-30)",
     harness="The Claude fixture's menubar mode (\"ask:\", \"busy:\", \"fail\" in the prompt) behind a dev daemon (scripts/dev); SYNTHETIC accounts (a fixture-account.json per profile); no paid turns",
     proven="the owner's yes on the mockup (pull request #39, 2026-09-29, through the coordinating session); the daemon side of every menu state and answer; on screen (2026-09-30, with nobody at the Mac): every state of the Verify clause captured from the real NSMenu in light and dark, the answers pressed in the menu reaching the fixture agents, an agent chosen opening in a test VS Code, and the stopped daemon with Start Overseer",
     steps="""1. Mockup: `docs/design/menu-bar/index.html` on pull request #39, with the owner's answers (violet dot, four requests then \"N more waiting\", Always allow under Allow once's arrow, Quit, the dev item's \"!\").
@@ -2778,12 +2779,21 @@ rec(262, "Overseer in the Mac's menu bar", "verified", date="2026-09-30", commit
     limits="The menu bar itself is drawn by the system in macOS 26, so each capture draws the item from its own button above the captured menu.",
     blocker="—")
 
-rec(263, "The review opens on \"Since task start\", with the other comparisons one click away", "not started", date="—", commit="—",
-    expected="See the RFC criterion (the owner's decision of 2026-09-29 on pull request #35's question).",
-    actual="Not started: #35 (AC-232) opens a finished agent's review on Since task start in its own worktree and keeps Latest run in the owner's checkout; the owner chose Since task start everywhere, with Latest run and Entire worktree one click away.", live="—", blocker="Its own agent.")
+rec(263, "The review opens on \"Since task start\", with the other comparisons one click away", "verified", date="2026-09-30",
+    commit="31e1a39c (pull request #38, merged 2026-09-30)",
+    harness="Generic fixture programs and the Claude Code fixture on the packaged VSIX in isolated VS Code profiles; no accounts, no paid turns",
+    steps="""1. `node test/ui/scenario-review-compare.js` ([evidence](https://github.com/beelol/overseer/tree/31e1a39c/docs/verification/evidence/ui/review-compare)): an agent in its own worktree and one in the owner's checkout, each finished; the review opened from each; Latest run and Entire worktree clicked; a change and a whole file accepted and rejected; typing in the review.
+2. `scenario-review`, `review-merge`, `review-files`, `review-marks`, `review-width`, `hunks`, `scopes`, `audit`, `inventory`, `overseer-window`, `gallery` alone on the merged copy; the full run's Rust (1,415 passed).""",
+    expected="See the RFC criterion (the owner's decision of 2026-09-29 on pull request #35's question, and the Accept / Reject wording the same day).",
+    actual="""- Both agents' reviews open on **Since task start**; the header names the comparison shown, in words, and the other two (Latest run, Entire worktree) are one click each as icon buttons with their names in the tooltip and label (this keeps the review inside AC-54's text budget: 173 of 175).
+- Each change reads **Accept** and **Reject**; each file has **Accept file** and **Reject file**, a coloured check and X on narrow cards (the owner, 2026-09-30); Reject puts the agent's lines back on disk and says so. No "Keep", "Undo" or "Save" for the agent's work.
+- **Save your edits** appears only once the owner has typed, and an unsaved file stays marked in the review.
+- With #40's Follow | Diffs only toolbar: the comparison row sits under it and keeps whichever view is open.""",
+    evidence="[review-compare screenshots and log](https://github.com/beelol/overseer/tree/31e1a39c/docs/verification/evidence/ui/review-compare)",
+    live="Fixtures only.", blocker="—")
 
 rec(264, "One Overseer layout, and it looks like Focus Mode without its side effects", "verified", date="2026-09-30",
-    commit="f1c79897 (branch claude/one-layout, pull request #40, not merged yet)",
+    commit="4da1640e (pull request #40, merged 2026-09-30)",
     harness="Generic fixture programs, the Claude Code fixture as Overseer and the simulated voice on the packaged VSIX in isolated VS Code 1.139.1 profiles (background, transparent test windows); no accounts, no paid turns",
     steps="""1. Phase 1: `node test/ui/scenario-one-layout-a.js` and `scenario-one-layout-b.js` at 09144f1f ([comparison and screenshots](https://github.com/beelol/overseer/blob/09144f1f/docs/verification/evidence/ui/one-layout/README.md)): way A (Overseer's panel in the secondary side bar) and way B (the window reopened on an Overseer-owned workspace file), each with a second window of the same profile. The owner chose B.
 2. `node test/ui/scenario-overseer-window.js` ([evidence](https://github.com/beelol/overseer/blob/f1c79897/docs/verification/evidence/ui/overseer-window)): a first launch with the offer on; a cluttered window (Explorer, the terminal running a command, two groups of files, one with unsaved words) and a second window on another folder; one click on the status bar's Workspace button; the agents list, an agent picked, the chat's back arrow, ⌥⌘U twice, Voice Mode turned on, Follow; the button again; then the Light and bold themes.
@@ -2798,7 +2808,9 @@ rec(264, "One Overseer layout, and it looks like Focus Mode without its side eff
 - **First launch:** the offer "Set up the Overseer layout?" (Set Up, Not Now) appears once and never again.
 - **Screenshots:** 1920×1080 and 1440×900 in Overseer Dark, Overseer Light and Overseer.
 - **Focus Mode retired:** its commands, ⌥⌘O, its window and its settings are removed; settings it left applied are put back when Overseer starts. AC-250's three-column workspace is replaced by this layout.
-- **Also asked by the owner:** #34's separate Worktree tree view is removed (the review's file list is a "Changed | All files" switch), and the side bar has no Search section (Search Agents opens VS Code's input box from the Agents view).""",
+- **Also asked by the owner:** #34's separate Worktree tree view is removed (the review's file list is a "Changed | All files" switch), and the side bar has no Search section (Search Agents opens VS Code's input box from the Agents view).
+- **Follow inside the review (the owner, 2026-09-30, after rejecting Follow in a plain editor; "follow looks fantastic" on the screenshots):** a Follow | Diffs only switch in the review's header. Follow shows the file the agent is in, read-only in the review's own editor, live and scrolled to the agent's line, changed lines marked with what they were; the list is All files, and a picked file shows in place until the agent moves or "Follow the agent" is pressed. Diffs only shows the diffs with Changed. Below 700 px the switch is two icons with their names as tooltips. "Ask first" and "Start fresh" sit at the bottom right, under the message box (the owner). Evidence: [overseer-window](evidence/ui/overseer-window/), [agent-head](evidence/ui/agent-head/), [home](evidence/ui/home/), [review-width](evidence/ui/review-width/).
+- **The merge check (on #40 with main and #42 merged in):** Rust 1,414 passed; UI 78 of 80; review-width (the header past the edge at 900 px) fixed in the product, chat (a classic scroll bar on this Mac, failing on main too) fixed in the scenario; review-width, chat, review, review-files, agent-head, overseer-window, home and gallery passed alone.""",
     evidence="[overseer-window scenario](https://github.com/beelol/overseer/blob/f1c79897/docs/verification/evidence/ui/overseer-window) (22 screenshots, result.json), [phase 1 comparison](https://github.com/beelol/overseer/blob/09144f1f/docs/verification/evidence/ui/one-layout/README.md); `extension/src/overseer-window.js`",
     live="Fixture agents and the Claude Code fixture only; the owner's VS Code, daemon and logins were never involved.",
     limits="Reopening the window stops what runs in its terminals (said before it happens). Other extensions see the Overseer window as a different workspace, so what they remember per folder is kept separately there. An unsaved untitled file stays with the owner's folder (VS Code keeps it there; not measured here).")
@@ -2993,9 +3005,9 @@ SHORT_BLOCKERS = {
     259: "verified",
     260: "verified",
     261: "verified",
-    262: "not started (the owner, 2026-09-29)",
-    263: "not started (the owner, 2026-09-29)",
-    264: "not started (the owner, 2026-09-29)",
+    262: "verified",
+    263: "verified",
+    264: "verified",
 }
 TOTAL = 53
 

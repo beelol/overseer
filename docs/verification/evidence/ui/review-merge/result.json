@@ -4,7 +4,7 @@
       "name": "fixture: the agent committed data/features.js on its branch and left .env untracked",
       "ok": true,
       "detail": {
-        "log": "8fa560b add features\ndf9cb34 fixture base",
+        "log": "44c23d3 add features\n64016bc fixture base",
         "status": "?? .env"
       }
     },
@@ -34,16 +34,16 @@
       }
     },
     {
-      "name": "Save says what it does (\"Save your changes to the agent's copy\") and shows only once you have edits",
+      "name": "Save says what it does (\"Save your edits\") and shows only once you have typed",
       "ok": true,
       "detail": {
-        "save": "Save your changes to the agent's copy",
+        "save": "Save your edits",
         "saveHidden": true,
-        "saveTitle": "Save your changes to the agent's copy (Cmd+S): writes your edits to this file in the agent's worktree. It does not keep or undo the agent's change.",
-        "keep": "Keep",
-        "undo": "Undo",
-        "keepTitle": "Keep: the agent's change stays, and this hunk is marked reviewed (nothing is committed or staged)",
-        "undoTitle": "Undo: put back what was there before the agent's change, in the agent's copy (Cmd+Z in the native editor brings it back)"
+        "saveTitle": "Save your edits (Cmd+S): writes what you typed to this file. It does not accept or reject the agent's changes.",
+        "keep": "Accept",
+        "undo": "Reject",
+        "keepTitle": "Accept: the agent's change stays and is marked accepted (nothing is committed or staged)",
+        "undoTitle": "Reject: take the agent's change out and put back what was there before (Cmd+Z in the native editor brings it back)"
       }
     },
     {
@@ -61,16 +61,16 @@
       }
     },
     {
-      "name": "each hunk is a clear choice: Keep (the agent's change stays) or Undo (put back what was there)",
+      "name": "each change is a clear choice: Accept (the agent's change stays) or Reject (put back what was there)",
       "ok": true,
       "detail": {
-        "save": "Save your changes to the agent's copy",
+        "save": "Save your edits",
         "saveHidden": true,
-        "saveTitle": "Save your changes to the agent's copy (Cmd+S): writes your edits to this file in the agent's worktree. It does not keep or undo the agent's change.",
-        "keep": "Keep",
-        "undo": "Undo",
-        "keepTitle": "Keep: the agent's change stays, and this hunk is marked reviewed (nothing is committed or staged)",
-        "undoTitle": "Undo: put back what was there before the agent's change, in the agent's copy (Cmd+Z in the native editor brings it back)"
+        "saveTitle": "Save your edits (Cmd+S): writes what you typed to this file. It does not accept or reject the agent's changes.",
+        "keep": "Accept",
+        "undo": "Reject",
+        "keepTitle": "Accept: the agent's change stays and is marked accepted (nothing is committed or staged)",
+        "undoTitle": "Reject: take the agent's change out and put back what was there before (Cmd+Z in the native editor brings it back)"
       }
     },
     {
@@ -118,7 +118,7 @@
       "name": "merged: main has the agent's file, and the pre-commit hook ran for the commit of .env",
       "ok": true,
       "detail": {
-        "log": "215f51a Merge overseer/add-the-features-list into main (Overseer merge back)\n503fdd6 Overseer: Add the features list\n8fa560b add features",
+        "log": "690e36b Merge overseer/add-the-features-list into main (Overseer merge back)\n319b539 Overseer: Add the features list\n44c23d3 add features",
         "hooks": "pre-commit overseer/add-the-features-list\npre-commit overseer/add-the-features-list\npre-commit overseer/add-the-features-list\n"
       }
     },
@@ -128,7 +128,7 @@
       "detail": {
         "hidden": false,
         "state": "merged",
-        "text": "Merged into main (215f51a)",
+        "text": "Merged into main (690e36b)",
         "buttons": [
           "cleanup-now:Clean up"
         ]
@@ -137,30 +137,30 @@
     {
       "name": "its conversation says it once, with the commit (no raw \"merge back\" lines)",
       "ok": true,
-      "detail": "Merged into main (215f51a)"
+      "detail": "Merged into main (690e36b)"
     },
     {
       "name": "the side bar reads \"Merged into main (commit)\"",
       "ok": true,
       "detail": {
         "label": "Add the features list",
-        "description": "Merged into main (215f51a) · now",
+        "description": "Merged into main (690e36b) · now",
         "level": 2,
         "expanded": null,
         "selected": true,
         "focused": true,
-        "aria": "Add the features list, done · Merged into main (215f51a), Program"
+        "aria": "Add the features list, done · Merged into main (690e36b), Program"
       }
     },
     {
       "name": "the review reads \"Merged into main (commit)\" and offers Clean up, no Merge",
       "ok": true,
-      "detail": "Merged into main (215f51a)\nClean up"
+      "detail": "Merged into main (690e36b)\nClean up"
     },
     {
       "name": "the grid tile reads \"Merged into main (commit)\"",
       "ok": true,
-      "detail": "Merged into main (215f51a)"
+      "detail": "Merged into main (690e36b)"
     },
     {
       "name": "a merge stopped on conflicts says so in the chat, with Finish merge and Cancel merge",
@@ -176,7 +176,7 @@
     {
       "name": "main is untouched while the merge is stopped",
       "ok": true,
-      "detail": "4b469fa main changes L5\n215f51a Merge overseer/add-the-features-list into main (Overseer merge back)"
+      "detail": "754b2bd main changes L5\n690e36b Merge overseer/add-the-features-list into main (Overseer merge back)"
     },
     {
       "name": "Open PR refuses the worktree in the middle of the merge",

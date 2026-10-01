@@ -19,6 +19,7 @@ if (installed.version !== required) { console.error(`Expected vsce ${required}; 
 run(process.execPath, [path.join(root, 'branch-diff/scripts/build-review.js')], root);
 run(process.execPath, [path.join(root, 'notifier/build.js')], root);
 run(process.execPath, [path.join(root, 'listener/build.js')], root); // Voice Mode's listener (Gate R)
+run(process.execPath, [path.join(root, 'menubar/build.js')], root); // Overseer in the menu bar (AC-262)
 // The daemon says which commit it was built from (hello's `build`, `overseerd version`): deploys record it (AC-214).
 const head = spawnSync('git', ['rev-parse', '--short=12', 'HEAD'], { cwd: repo, encoding: 'utf8' }).stdout.trim();
 const dirty = spawnSync('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: repo, encoding: 'utf8' }).stdout.trim() ? '-dirty' : '';

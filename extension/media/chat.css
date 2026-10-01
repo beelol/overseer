@@ -5,6 +5,7 @@
 .chat { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--ov-bg); background-image: var(--ov-backdrop); }
 .chat-head { flex: none; display: flex; align-items: center; gap: var(--ov-space-2); height: 48px; padding: 0 var(--ov-space-3) 0 var(--ov-space-4); border-bottom: 1px solid var(--ov-border); }
 .chat-head .status { margin-right: 2px; }
+.chat-head #back-to-overseer { margin-left: calc(-1 * var(--ov-space-2)); }
 .chat-titles { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
 .chat-head h1 { margin: 0; font-size: var(--ov-font-lg); font-weight: var(--ov-weight-semibold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-meta { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--ov-muted); font-size: var(--ov-font-sm); white-space: nowrap; overflow: hidden; }

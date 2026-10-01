@@ -1,6 +1,7 @@
 // Modified for Overseer from Branch Diff (Local) review/editing-client.js
 // (https://github.com/beelol/branch-diff @ fbc6eb807fd41d8fd1a004977e1aa637a4f7c900, MIT).
-// Changes: hunk Reject operations; a rejected hunk operation is discarded, never kept as a draft.
+// Changes: hunk and file Reject operations; a rejected hunk operation is discarded, never kept as a draft;
+// Save ("Save your edits") shows only once the owner has typed (AC-263).
 const LIMIT = 2 * 1024 * 1024;
 const byteLength = text => new TextEncoder().encode(text).length;
 
@@ -38,8 +39,9 @@ export class EditingClient {
   focused() { return [...this.rows.values()].find(row => row.editor?.getModifiedEditor().hasTextFocus()); }
   held(row) { return !!row.edit && (row.edit.sequence > row.edit.ack || !!row.edit.failed); }
   pending(row) { return !!row.edit && row.edit.sequence > row.edit.ack && !row.edit.failed; }
-  /** Overseer: whether this file has edits of yours not saved yet (typed, syncing, unsaved in VS Code, or a failed save). */
-  edited(row) { return !!row.entry?.unsaved || this.pending(row) || !!row.edit?.saving || !!row.edit?.saveError || !!row.edit?.typed; }
+  /** Overseer: whether this file has edits of yours not saved yet (typed, unsaved in VS Code, or a failed save of
+   *  them). A Reject in progress is the agent's change going out, not your typing (AC-263). */
+  edited(row) { return !!row.edit?.typed || (!!row.edit?.saveError && !row.edit?.operation) || (!!row.entry?.unsaved && !row.edit?.operation); }
   state() { return [...this.drafts.values()]; }
   persist() { this.api.vscode.setState({ ...(this.api.vscode.getState() || {}), drafts: this.state() }); }
   enabled(row) {
@@ -53,11 +55,11 @@ export class EditingClient {
     if (row.editor && row.editable !== enabled) { row.editor.updateOptions({ readOnly: !enabled, domReadOnly: !enabled, originalEditable: false }); row.editable = enabled; }
     row.save.disabled = !this.enabled(row) || !!row.edit?.saving;
     // Overseer: read-only sides (a staged file's index) hide Save instead of showing it disabled,
-    // and (AC-232) Save shows only once there are edits of yours to save, so it never reads as
+    // and (AC-232, AC-263) "Save your edits" shows only once you have typed, so it never reads as
     // accepting the agent's change.
     row.save.hidden = this.api.snapshot()?.mode !== 'workingTree' || (!!row.body && !row.body.editable) || !this.edited(row);
     row.element.dataset.editable = String(enabled);
-    row.editStatus.textContent = row.edit?.failed ? 'Draft needs attention' : row.edit?.saveError ? 'Save failed' : row.edit?.saving ? 'Saving…' : this.pending(row) ? 'Syncing…' : '';
+    row.editStatus.textContent = row.edit?.failed ? 'Draft needs attention' : row.edit?.saveError ? (row.edit.operation ? 'Reject failed' : 'Save failed') : row.edit?.saving ? (row.edit.operation ? 'Rejecting…' : 'Saving…') : this.pending(row) ? 'Syncing…' : '';
     row.editStatus.title = row.edit?.failed || row.edit?.saveError || '';
     row.element.dataset.editState = row.edit?.failed ? 'conflict' : this.pending(row) ? 'pending' : 'ready';
   }
@@ -91,7 +93,7 @@ export class EditingClient {
       this.api.notice('This edit is unavailable or exceeds the 2 MiB preview limit. Use Open in Native Diff.'); return;
     }
     const edit = this.stream(row);
-    edit.sequence++; edit.typed = true;
+    edit.sequence++; if (!row.rejecting) edit.typed = true;
     const payload = { type: 'edit', repository: edit.repository, id: row.entry.id, stream: edit.stream,
       version: edit.version, revision: edit.revision, sequence: edit.sequence, documentVersion: edit.documentVersion,
       changes: event.changes.map(c => ({ offset: c.rangeOffset, length: c.rangeLength, text: c.text })) };
@@ -103,8 +105,14 @@ export class EditingClient {
     this.api.vscode.postMessage(payload);
   }
 
-  /** The next edit+save on this row is an Overseer hunk Reject (not typed text). */
-  hunkOperation(row, key) { this.stream(row).hunk = key; }
+  /** Overseer (AC-263): Reject puts `text` (the file without the agent's change) in place and writes it.
+   *  It is not the owner's typing, so it never shows "Save your edits". */
+  reject(row, text, key) {
+    const edit = this.stream(row); edit.hunk = key; edit.operation = true;
+    row.rejecting = true;
+    try { replaceText(row.modified, text); } finally { row.rejecting = false; }
+    this.save(row);
+  }
 
   save(row) {
     if (!this.enabled(row) || row.edit?.saving) return;
@@ -152,7 +160,7 @@ export class EditingClient {
       if (value.type === 'editAccepted' || value.type === 'saveFailed') {
         edit.ack = Math.max(edit.ack, value.sequence); edit.documentVersion = value.documentVersion;
         if (value.saved || value.type === 'saveFailed') edit.saving = false;
-        if (value.saved) edit.typed = false;
+        if (value.saved) { edit.typed = false; edit.operation = false; }
         if (value.type === 'saveFailed') { edit.saveError = value.message; this.api.notice(value.message); }
         if (edit.ack === edit.sequence) { this.drafts.delete(value.id); row.renderedRevision = undefined; this.api.changed(row); }
       } else if (edit.hunk) {
@@ -160,7 +168,7 @@ export class EditingClient {
         // agent edited it), so nothing was written. Drop the local change and show the file again.
         this.api.vscode.postMessage({ type: 'endEdit', repository: this.api.repository, id: value.id, stream: edit.stream, sequence: edit.sequence + 1 });
         row.edit = undefined; this.drafts.delete(value.id); row.renderedRevision = undefined;
-        this.api.notice('Reject was not applied: this file changed while the hunk was being rejected (conflict). Nothing was overwritten; review the current content.');
+        this.api.notice('Reject was not applied: this file changed while the change was being rejected (conflict). Nothing was overwritten; review the current content.');
         document.body.dataset.hunkConflict = String(Date.now());
         this.api.changed(row);
       } else {

@@ -38,7 +38,8 @@ const env = (() => {
   for (const k of Object.keys(e)) if (k.startsWith('OVERSEER_') && k !== 'OVERSEER_DEPLOY_CACHE' && k !== 'OVERSEER_CODE') delete e[k];
   return e;
 })();
-const target = ['--user-data-dir', profile, '--extensions-dir', extensions, '--skip-notifier-registration'];
+// --skip-menubar: the menu-bar item is copied but never registered as a login item or started (AC-262).
+const target = ['--user-data-dir', profile, '--extensions-dir', extensions, '--skip-notifier-registration', '--skip-menubar'];
 function deploy(args) { return cp.spawnSync(process.execPath, [DEPLOY, ...args, ...target], { env, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, timeout: 30 * 60 * 1000 }); }
 const ok = r => { if (r.status !== 0) throw new Error(`scripts/deploy exited ${r.status}:\n${r.stdout}\n${r.stderr.split('\n').slice(-25).join('\n')}`); return r; };
 
@@ -86,6 +87,14 @@ const history = () => JSON.parse(fs.readFileSync(path.join(home, 'Library/Applic
     assert.strictEqual(installedBuild(), A);
     assert.deepStrictEqual(history().map(h => h.build), [A]);
     assert.ok(fs.existsSync(path.join(home, 'Library/Application Support/Overseer', history()[0].vsix)), 'the VSIX is kept');
+    if (process.platform === 'darwin') {
+      // AC-262: the menu-bar item beside the data, pointing at the installed daemon; nothing started.
+      const menu = path.join(home, 'Library/Application Support/Overseer/menubar');
+      assert.ok(fs.existsSync(path.join(menu, 'Overseer Menu.app/Contents/MacOS/overseer-menu')), 'the menu-bar item is copied');
+      const cfg = JSON.parse(fs.readFileSync(path.join(menu, 'menubar.json'), 'utf8'));
+      assert.strictEqual(cfg.daemon, daemonBin()); assert.strictEqual(cfg.socket, socket);
+      assert.strictEqual(cp.spawnSync('pgrep', ['-f', path.join(menu, 'Overseer Menu.app')]).status, 1, 'the test started no menu-bar item');
+    }
   });
 
   const work = path.join(tmp, 'work');

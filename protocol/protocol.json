@@ -527,7 +527,8 @@
         "head": "string?",
         "branch": "string?",
         "branches": "string[]",
-        "options": "Comparison[]"
+        "options": "Comparison[]",
+        "folder_edits": "boolean"
       }
     },
     "workspace.diff": {
@@ -2731,6 +2732,27 @@
       "reason": "Auto routing and Swarm come to the phone later (the partial merge, AC-204)",
       "params": "json",
       "result": "json"
+    },
+    "menubar.snapshot": {
+      "class": "mac_only",
+      "summary": "Everything the Mac menu-bar item shows, in one read",
+      "phone": "mac_only",
+      "reason": "The menu-bar item is the Mac's own surface (AC-262); the phone reads state and events",
+      "params": {},
+      "result": "json"
+    },
+    "review.seen": {
+      "class": "mac_only",
+      "summary": "Share the reviewed marks VS Code keeps, so every surface counts \"to review\" the same",
+      "phone": "mac_only",
+      "reason": "Written by VS Code on the Mac (AC-262); the phone reads the counts through state",
+      "params": {
+        "marks": "json"
+      },
+      "result": {
+        "ok": "boolean",
+        "kept": "number"
+      }
     }
   }
 }

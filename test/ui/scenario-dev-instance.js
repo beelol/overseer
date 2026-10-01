@@ -28,6 +28,7 @@ function call(socket, method, params = {}) {
   const root = path.join(s.root, 'dr');
   const env = { ...process.env, OVERSEER_DEV_ROOT: root };
   for (const k of Object.keys(env)) if (k.startsWith('OVERSEER_') && k !== 'OVERSEER_DEV_ROOT' && k !== 'OVERSEER_CODE') delete env[k];
+  env.OVERSEER_DEV_MENUBAR = 'off'; // no dev item in the owner's menu bar from a test (AC-262)
   const dev = (...args) => {
     const r = cp.spawnSync(process.execPath, [DEV, ...args], { env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
     s.note(`$ scripts/dev ${args.join(' ')} → exit ${r.status}`, (r.stdout + r.stderr).trim().split('\n').slice(-6).join(' | '));
