@@ -31,9 +31,12 @@ async function check(name, fn) {
 }
 
 /** Runs scripts/dev with the temporary HOME and dev root (cargo and rustup keep their real homes). */
-function dev(home, root, args, { json = false, ok = true } = {}) {
+function dev(home, root, args, { json = false, ok = true, extra = {} } = {}) {
   const env = { ...process.env, HOME: home, OVERSEER_DEV_ROOT: root, CARGO_HOME: process.env.CARGO_HOME || path.join(realHome, '.cargo'), RUSTUP_HOME: process.env.RUSTUP_HOME || path.join(realHome, '.rustup') };
   for (const k of Object.keys(env)) if (k.startsWith('OVERSEER_') && k !== 'OVERSEER_DEV_ROOT') delete env[k];
+  // Login folders come only from the test (AC-221), never from the shell running it.
+  delete env.CLAUDE_CONFIG_DIR; delete env.CODEX_HOME;
+  Object.assign(env, extra);
   env.OVERSEER_DEV_MENUBAR = 'off'; // no dev item in the owner's menu bar from a test (AC-262)
   const r = cp.spawnSync(process.execPath, [DEV, ...args, ...(json ? ['--json'] : [])], { env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 15 * 60 * 1000 });
   if (ok && r.status !== 0) throw new Error(`scripts/dev ${args.join(' ')} exited ${r.status}:\n${r.stdout}\n${r.stderr}`);
@@ -177,6 +180,87 @@ async function snapshot(socket) {
     }
     background.destroy();
     await call(a.socket, 'run.interrupt', { run_id: asks });
+  });
+
+  await check("AC-221: an owner-login instance passes exactly its chosen login folders to its harnesses, never the Mac's default; its bin/ holds the listener", async () => {
+    // The owner's logins stand in as fixture folders; the harnesses the instance finds on PATH
+    // under the temporary HOME record their environment (Claude runs as the fixture; Codex never runs).
+    const logins = path.join(tmp, 'logins'), claudeDir = path.join(logins, 'claude'), codexDir = path.join(logins, 'codex');
+    for (const d of [claudeDir, codexDir]) fs.mkdirSync(d, { recursive: true });
+    fs.writeFileSync(path.join(claudeDir, 'fixture-account.json'), JSON.stringify({ email: 'owner-fixture@example.invalid', plan: 'max' }));
+    // The Mac's default login under this HOME: a decoy that must never be used.
+    fs.mkdirSync(path.join(homeA, '.claude'), { recursive: true }); fs.writeFileSync(path.join(homeA, '.claude/fixture-account.json'), JSON.stringify({ email: 'default-login@example.invalid', plan: 'pro' }));
+    const record = path.join(tmp, 'harness-env'); fs.mkdirSync(record);
+    const local = path.join(homeA, '.local/bin'); fs.mkdirSync(local, { recursive: true });
+    fs.writeFileSync(path.join(local, 'claude'), `#!/bin/sh\nenv > ${JSON.stringify(path.join(record, 'claude'))}.$$\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(path.join(repo, 'fixtures/fake-harness/claude-fixture.js'))} "$@"\n`, { mode: 0o755 });
+    fs.writeFileSync(path.join(local, 'codex'), `#!/bin/sh\nenv > ${JSON.stringify(path.join(record, 'codex'))}.$$\nexit 1\n`, { mode: 0o755 });
+    const extra = { CLAUDE_CONFIG_DIR: claudeDir, CODEX_HOME: codexDir };
+    const o = dev(homeA, rootA, ['up', '--name', 'o', '--owner-logins', '--no-build'], { json: true, extra });
+    assert.strictEqual(o.logins, 'owner');
+    assert.deepStrictEqual(o.login_dirs, { CLAUDE_CONFIG_DIR: fs.realpathSync(claudeDir), CODEX_HOME: fs.realpathSync(codexDir) });
+    assert.ok(dev(homeA, rootA, ['status', '--name', 'o']).stdout.includes(`only from CLAUDE_CONFIG_DIR=${fs.realpathSync(claudeDir)}, CODEX_HOME=${fs.realpathSync(codexDir)}`), 'status names the folders');
+    const e = envOf(o.pid);
+    for (const s of ['OVERSEER_HARNESS_ENV_PASSTHROUGH=CLAUDE_CONFIG_DIR,CODEX_HOME', `CLAUDE_CONFIG_DIR=${fs.realpathSync(claudeDir)}`, `CODEX_HOME=${fs.realpathSync(codexDir)}`, 'OVERSEER_OPENCODE_PATH=/nonexistent/']) assert.ok(e.includes(s), `the daemon has ${s}`);
+    for (const s of ['OVERSEER_CLAUDE_PATH=', 'OVERSEER_CODEX_PATH=', 'OVERSEER_TEST_SYSTEM_HOME=']) assert.ok(!e.includes(s), `no ${s}: the real harnesses, with the chosen logins`);
+    // Its desktop logins are the chosen folders, for the harness and for what Overseer reads of the account.
+    const profiles = await call(o.socket, 'profile.list');
+    const system = h => (profiles.profiles || profiles).find(p => p.is_system && p.harness === h);
+    assert.strictEqual((await call(o.socket, 'profile.login_command', { id: system('claude').id })).env.CLAUDE_CONFIG_DIR, fs.realpathSync(claudeDir));
+    assert.strictEqual((await call(o.socket, 'profile.login_command', { id: system('codex').id })).env.CODEX_HOME, fs.realpathSync(codexDir));
+    // A Claude agent: every launch of the harness got exactly the chosen folders.
+    const r = makeRepo(path.join(tmp, 'repo-owner'));
+    const run = (await call(o.socket, 'task.create', { repo: r, harness: 'claude', prompt: 'hi', title: 'Owner login agent' })).run.id;
+    for (let k = 0; k < 100; k++) { const st = (await call(o.socket, 'state')).runs.find(x => x.id === run)?.status; if (/completed|failed|interrupted/.test(st || '')) break; await delay(200); }
+    assert.strictEqual((await call(o.socket, 'state')).runs.find(x => x.id === run).status, 'completed');
+    const launches = fs.readdirSync(record).filter(f => f.startsWith('claude.')).map(f => Object.fromEntries(fs.readFileSync(path.join(record, f), 'utf8').split('\n').filter(l => l.includes('=')).map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)])));
+    assert.ok(launches.length >= 1, 'the harness ran');
+    for (const env of launches) {
+      assert.strictEqual(env.CLAUDE_CONFIG_DIR, fs.realpathSync(claudeDir), 'Claude gets the chosen folder');
+      assert.strictEqual(env.CODEX_HOME, fs.realpathSync(codexDir));
+      assert.strictEqual(env.HOME, homeA);
+      assert.ok(!Object.keys(env).some(k => /^(ANTHROPIC_|OPENAI_)|_API_KEY$|^CLAUDE_CODE_OAUTH_TOKEN$/.test(k)), 'no other credential');
+    }
+    const ident = await call(o.socket, 'profile.status', { id: system('claude').id }).catch(err => ({ error: err.message }));
+    assert.ok(!JSON.stringify(ident).includes('default-login@example.invalid'), `never the Mac's default login: ${JSON.stringify(ident)}`);
+    // The listener: the checkout's Overseer Listener in the instance's bin/.
+    if (process.platform === 'darwin') assert.ok(fs.existsSync(path.join(rootA, 'o/bin/Overseer Listener.app/Contents/MacOS')), "bin/ holds the checkout's Overseer Listener");
+
+    // Only a Claude folder: Codex and OpenCode are off. No folder: nothing starts.
+    const p = dev(homeA, rootA, ['up', '--name', 'p', '--owner-logins', '--no-build'], { json: true, extra: { CLAUDE_CONFIG_DIR: claudeDir } });
+    const pe = envOf(p.pid);
+    assert.ok(pe.includes('OVERSEER_HARNESS_ENV_PASSTHROUGH=CLAUDE_CONFIG_DIR ') || pe.endsWith('OVERSEER_HARNESS_ENV_PASSTHROUGH=CLAUDE_CONFIG_DIR'), 'only the Claude folder is passed');
+    assert.ok(pe.includes('OVERSEER_CODEX_PATH=/nonexistent/dev-instance-without-a-chosen-login') && !pe.includes('CODEX_HOME='), 'Codex is off without its folder');
+    const codexProfile = (await call(p.socket, 'profile.list')).find(x => x.is_system && x.harness === 'codex');
+    if (codexProfile) {
+      const err = await call(p.socket, 'profile.login_command', { id: codexProfile.id }).then(() => null, x => x.message);
+      assert.ok(/not installed/i.test(err || ''), `Codex cannot fall back to the Mac's login: ${err}`);
+    }
+    const none = dev(homeA, rootA, ['up', '--name', 'q', '--owner-logins', '--no-build'], { ok: false });
+    assert.strictEqual(none.status, 1); assert.ok(none.stderr.includes('--owner-logins uses only the login folders it is given'), none.stderr);
+    assert.ok(!fs.readdirSync(record).some(f => f.startsWith('codex.')), 'Codex never ran');
+    dev(homeA, rootA, ['clean', '--name', 'o']); dev(homeA, rootA, ['clean', '--name', 'p']); dev(homeA, rootA, ['clean', '--name', 'q'], { ok: false });
+  });
+
+  await check("AC-221: an owner check's VS Code is an ordinary window: launched without --inspect-brk (not the tests' transparent background launch), with native dialogs", async () => {
+    // A stand-in `code` inside an app bundle, so the background launch would be chosen for a test window.
+    const app = path.join(tmp, 'Fake Code.app'), bin = path.join(app, 'Contents/Resources/app/bin'); fs.mkdirSync(bin, { recursive: true });
+    const calls = path.join(tmp, 'code-calls.txt');
+    fs.writeFileSync(path.join(bin, 'code'), `#!/bin/sh\nprintf '%s\\n' "$*" >> ${JSON.stringify(calls)}\nexit 0\n`, { mode: 0o755 });
+    const vsix = path.join(tmp, 'stand-in.vsix'); fs.writeFileSync(vsix, 'not a real extension');
+    const check = { name: 'owner-window', title: 'An owner window', gate: 'T', criteria: ['AC-221'], source: 'test/dev/run.js', ref: 'self',
+      prepare: { vscode: true, owner_logins: true, scratch_repo: true, fixture_agents: [] }, steps: [{ id: '1', criteria: ['AC-221'], title: 'Look', do: 'Look.', record: 'Seen?' }] };
+    const file = path.join(tmp, 'owner-window.json'); fs.writeFileSync(file, JSON.stringify(check));
+    const extra = { OVERSEER_CODE: path.join(bin, 'code'), CLAUDE_CONFIG_DIR: path.join(tmp, 'logins/claude') };
+    dev(homeA, rootA, ['test', 'owner-window', '--file', file, '--start', '--no-build', '--vsix', vsix], { extra });
+    for (let k = 0; k < 50 && !(fs.existsSync(calls) && fs.readFileSync(calls, 'utf8').includes('--new-window')); k++) await delay(100);
+    const lines = fs.readFileSync(calls, 'utf8').split('\n').filter(Boolean);
+    const window = lines.find(l => l.includes('--new-window'));
+    assert.ok(window, `the window was opened through VS Code's own command: ${JSON.stringify(lines)}`);
+    assert.ok(!window.includes('--inspect-brk'), `no --inspect-brk: ${window}`);
+    const settings = JSON.parse(fs.readFileSync(path.join(rootA, 'check-owner-window/vscode/profile/User/settings.json'), 'utf8'));
+    assert.notStrictEqual(settings['window.dialogStyle'], 'custom', 'native dialogs');
+    dev(homeA, rootA, ['test', 'owner-window', '--file', file, '--finish', '--evidence', path.join(tmp, 'owner-window-evidence')], { extra });
+    dev(homeA, rootA, ['clean', '--name', 'check-owner-window'], { ok: false });
   });
 
   await check('AC-209: tui --dry-run resolves the instance; a stopped instance is refused', () => {

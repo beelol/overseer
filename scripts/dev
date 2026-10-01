@@ -117,7 +117,9 @@ LOGINS AND PAID TURNS
   By default an instance has no logins: Claude is the repository's fixture harness, Codex and
   OpenCode are off, the desktop logins point at an empty folder, Ollama at a closed port, and
   Continuity's network probes are off. --owner-logins (per instance, shown by status) uses the
-  real harnesses with the owner's logins: paid turns then follow AGENTS.md (ChatGPT:
+  real harnesses with the owner's logins from the folders it is given, and only those: set
+  CLAUDE_CONFIG_DIR and/or CODEX_HOME. A harness without a folder is off, and the Mac's default
+  login (~/.claude, ~/.codex) is never used. Paid turns then follow AGENTS.md (ChatGPT:
   gpt-5.6-luna at low effort; Claude: haiku, light use). Nothing here signs in or out.
 
 RULES
@@ -269,6 +271,10 @@ function names() {
   try { return fs.readdirSync(DEV_ROOT).filter(n => exists(path.join(DEV_ROOT, n, 'instance.json'))).sort(); } catch { return []; }
 }
 
+/** The login folders an instance with the owner's logins may use (AC-221), and what stands for a harness without one. */
+const LOGIN_KEYS = ['CLAUDE_CONFIG_DIR', 'CODEX_HOME'];
+const NO_LOGIN = '/nonexistent/dev-instance-without-a-chosen-login';
+
 /** The instance daemon's environment: nothing inherited that points at another Overseer. */
 function daemonEnv(i, meta) {
   const env = {};
@@ -278,11 +284,16 @@ function daemonEnv(i, meta) {
     OVERSEER_GATEWAY_PORT: String(meta.port), OVERSEER_NOTIFY_COMMAND: path.join(i.bin, 'notify'),
   });
   if (!meta.mdns) env.OVERSEER_GATEWAY_MDNS = 'off';
-  // Owner logins from chosen folders (CLAUDE_CONFIG_DIR, CODEX_HOME): the daemon passes only an
-  // allow-list to harnesses, so name them, or the harness falls back to the Mac's default login.
+  // Owner logins from chosen folders only (AC-221): the daemon passes exactly CLAUDE_CONFIG_DIR and
+  // CODEX_HOME to its harnesses (and reads the accounts there); a harness whose folder was not given
+  // is off, so nothing falls back to the Mac's default login (~/.claude, ~/.codex, OpenCode's).
   if (meta.logins === 'owner') {
-    const dirs = ['CLAUDE_CONFIG_DIR', 'CODEX_HOME'].filter(k => process.env[k]);
-    if (dirs.length) env.OVERSEER_HARNESS_ENV_PASSTHROUGH = dirs.join(',');
+    const dirs = meta.login_dirs || {};
+    for (const k of LOGIN_KEYS) { if (dirs[k]) env[k] = dirs[k]; else delete env[k]; }
+    env.OVERSEER_HARNESS_ENV_PASSTHROUGH = LOGIN_KEYS.filter(k => dirs[k]).join(',');
+    if (!dirs.CLAUDE_CONFIG_DIR) env.OVERSEER_CLAUDE_PATH = NO_LOGIN;
+    if (!dirs.CODEX_HOME) env.OVERSEER_CODEX_PATH = NO_LOGIN;
+    env.OVERSEER_OPENCODE_PATH = NO_LOGIN;
   }
   if (meta.logins !== 'owner') {
     Object.assign(env, {
@@ -305,6 +316,23 @@ function clientEnv(i) {
   const env = {};
   for (const [k, v] of Object.entries(process.env)) if (!k.startsWith('OVERSEER_') && k !== 'OVERSEERD') env[k] = v;
   return Object.assign(env, { OVERSEER_INSTANCE: i.id, OVERSEER_HOME: i.home, OVERSEER_SOCKET: i.socket, OVERSEERD: i.daemon });
+}
+
+/**
+ * The owner's login folders for --owner-logins (AC-221): CLAUDE_CONFIG_DIR and CODEX_HOME from the
+ * environment (an --restart keeps the ones it was started with). Without either, nothing starts:
+ * a dev Overseer never falls back to the Mac's default login.
+ */
+function loginDirs(old) {
+  const dirs = {};
+  for (const k of LOGIN_KEYS) {
+    const v = process.env[k] || old?.login_dirs?.[k];
+    if (!v) continue;
+    if (!exists(v) || !fs.statSync(v).isDirectory()) die(`${k}=${v} is not a folder`);
+    dirs[k] = real(v);
+  }
+  if (!Object.keys(dirs).length) die('--owner-logins uses only the login folders it is given: set CLAUDE_CONFIG_DIR and/or CODEX_HOME to them (a harness without one is off; the Mac\'s default login is never used)');
+  return dirs;
 }
 
 async function startDaemon(i, meta) {
@@ -345,7 +373,7 @@ function describe(st, i) {
     `  daemon    ${st.running ? `pid ${st.pid}, ` : ''}socket ${st.socket}`,
     `  data      ${st.home}`,
     `  gateway   port ${st.port} (mDNS ${st.mdns ? 'on, as _overseer-dev._tcp' : 'off'})`,
-    `  logins    ${st.logins === 'owner' ? "the owner's (--owner-logins): paid turns follow AGENTS.md" : 'none: Claude fixture harness; Codex and OpenCode off'}`,
+    `  logins    ${st.logins === 'owner' ? `the owner's (--owner-logins), only from ${LOGIN_KEYS.filter(k => st.login_dirs?.[k]).map(k => `${k}=${st.login_dirs[k]}`).join(', ') || 'no folder'}: paid turns follow AGENTS.md` : 'none: Claude fixture harness; Codex and OpenCode off'}`,
   ];
   if (st.code?.profile) lines.push(`  VS Code   profile ${st.code.profile}`);
   lines.push('Next:',
@@ -403,6 +431,7 @@ async function up(o) {
     socket: i.socket, home: i.home, bin: i.bin, port: old?.port || await pickPort(i),
     mdns: !!o['--mdns'],
     logins: o['--owner-logins'] ? 'owner' : 'fixture', code: old?.code,
+    ...(o['--owner-logins'] ? { login_dirs: loginDirs(old) } : {}),
   };
   writeMeta(i, meta);
   const hello = await startDaemon(i, meta);
