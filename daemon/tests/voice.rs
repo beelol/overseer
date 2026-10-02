@@ -2695,7 +2695,8 @@ fn ac169_two_agents_in_flight_and_a_new_one_get_the_card_s_text_byte_for_byte() 
                 // Its first turn: Gate S's briefing, then Overseer's message.
                 env.d.call("run.turns", json!({"run_id": run}))[0]["prompt"]
                     .as_str()
-                    .map(|p| vec![p.rsplit("From Overseer: ").next().unwrap().to_string()])
+                    // What Overseer knows (AC-231) follows it, shown as its own briefing line.
+                    .map(|p| vec![p.rsplit("From Overseer: ").next().unwrap().split("\n\n[What Overseer knows").next().unwrap().to_string()])
                     .unwrap_or_default()
             } else {
                 env.d

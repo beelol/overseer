@@ -1033,13 +1033,16 @@ impl Daemon {
     /// A start on Auto's pick: the route chosen when it was proposed, pinned, through Auto's own
     /// launch (its booking and admission).
     fn start_on_route(self: &Arc<Self>, a: &Value, proposal: &str, by: &str) -> Result<String> {
-        let prompt = format!("{FROM_OVERSEER}{}", a["prompt"].as_str().unwrap_or(""));
+        // What Overseer knows goes with the request (AC-231).
+        let context = self.start_context(a["repo"].as_str().unwrap_or(""), a["prompt"].as_str().unwrap_or(""));
+        let prompt = [format!("{FROM_OVERSEER}{}", a["prompt"].as_str().unwrap_or("")), context.clone()].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join("\n\n");
         let title = a["title"].as_str().filter(|t| !t.is_empty()).map(str::to_string).unwrap_or_else(|| a["prompt"].as_str().unwrap_or("").chars().take(60).collect());
         let started = crate::server::dispatch(self, "auto.start", &json!({"work_unit_id": a["route"]["work_unit"], "repo": a["repo"], "prompt": prompt, "title": title, "pinned_route": a["route"]["route_id"], "workspace_mode": a["workspace_mode"].as_str().unwrap_or("worktree")}))?;
         if started["state"] == "paused" {
             bail!("Auto's pick is no longer available ({}); ask again", plain_route_reason(started["pause_reason"].as_str().or(started["decision"]["reason"].as_str()).unwrap_or("")));
         }
         let run = started["run"]["id"].as_str().ok_or_else(|| anyhow!("Auto started no agent"))?.to_string();
+        self.record_start_context(&run, &context);
         {
             let store = self.store.lock().unwrap();
             if let Some(t) = store.turns(&run)?.first() {
@@ -1517,10 +1520,13 @@ impl Daemon {
                         bail!("the account {name} is signed out");
                     }
                 }
-                let prompt = format!("{FROM_OVERSEER}{}", a["prompt"].as_str().unwrap_or(""));
+                // What Overseer knows goes with the request (AC-231).
+                let context = self.start_context(a["repo"].as_str().unwrap_or(""), a["prompt"].as_str().unwrap_or(""));
+                let prompt = [format!("{FROM_OVERSEER}{}", a["prompt"].as_str().unwrap_or("")), context.clone()].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join("\n\n");
                 let title = a["title"].as_str().map(str::to_string).unwrap_or_else(|| a["prompt"].as_str().unwrap_or("").chars().take(60).collect());
                 let created = self.create_task(&json!({"repo": a["repo"], "harness": harness, "prompt": prompt, "title": title, "profile_id": a["profile_id"], "model": a["model"], "effort": a["effort"], "permission_mode": a["permission_mode"], "workspace_mode": a["workspace_mode"]}))?;
                 let run = created["run"]["id"].as_str().unwrap_or("").to_string();
+                self.record_start_context(&run, &context);
                 {
                     let store = self.store.lock().unwrap();
                     if let Some(t) = store.turns(&run)?.first() {
