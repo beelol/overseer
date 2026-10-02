@@ -216,7 +216,7 @@
       const waiting = run.status === 'waiting_for_user' || !!att;
       const busy = ACTIVE.has(run.status) && run.harness !== 'generic' && !waiting;
       tile.input.disabled = busy || (!att && String(run.capabilities?.follow_up || '').startsWith('unsupported'));
-      tile.input.placeholder = att ? 'Deny with a note' : waiting ? 'Reply' : busy ? (window.OverseerContinuityText && window.OverseerContinuityText.isWaiting(run.status) ? 'Message for when it continues' : 'Working…') : 'Reply';
+      tile.input.placeholder = att ? 'Why not?' : waiting ? 'Reply' : busy ? (window.OverseerContinuityText && window.OverseerContinuityText.isWaiting(run.status) ? 'Message for when it continues' : 'Working…') : 'Reply';
       tile.input.title = att ? 'Denies the request; the agent reads your note as the reason' : '';
     }
 

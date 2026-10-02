@@ -92,9 +92,9 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await cdp.command('Overseer: Toggle Agent Grid');
     await view.waitFor(`!!document.querySelector('.grid .tile[data-run=${JSON.stringify(tileAgent)}] .tile-perm:not([hidden])')`, 20000);
     const tileSel = `.grid .tile[data-run=${JSON.stringify(tileAgent)}]`;
-    const tile = await view.eval(`(() => { const t = document.querySelector(${JSON.stringify(tileSel)}); const i = t.querySelector('.tile-input input'); i.id = 'tile-reply'; return { disabled: i.disabled, placeholder: i.placeholder, buttons: [...t.querySelectorAll('.tile-perm [data-permission]')].map(b => b.dataset.permission + ':' + b.textContent) }; })()`);
+    const tile = await view.eval(`(() => { const t = document.querySelector(${JSON.stringify(tileSel)}); const i = t.querySelector('.tile-input input'); i.id = 'tile-reply'; return { disabled: i.disabled, placeholder: i.placeholder, title: i.title, buttons: [...t.querySelectorAll('.tile-perm [data-permission]')].map(b => b.dataset.permission + ':' + b.textContent) }; })()`);
     await s.screenshot('grid-tile-waiting');
-    check('the grid tile\'s reply box is enabled on a waiting permission agent', tile.disabled === false && /Deny with a note/.test(tile.placeholder) && tile.buttons.join() === 'allow:Allow,deny:Deny', tile);
+    check('the grid tile\'s reply box is enabled on a waiting permission agent', tile.disabled === false && /Why not\?/.test(tile.placeholder) && /Denies the request/.test(tile.title || '') && tile.buttons.join() === 'allow:Allow,deny:Deny', tile);
     const tileNote = 'Leave perm.txt alone.';
     for (let i = 0; i < 3; i++) {
       const at = await s.webviewPoint(view, '#tile-reply'); await cdp.click(at.x, at.y);
