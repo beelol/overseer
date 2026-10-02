@@ -5,6 +5,8 @@
 //     the whole worktree, and a file picked there shows in the same place (the owner, 2026-09-30:
 //     "follow would go where the review section is"). No VS Code editor opens.
 //   - Diffs only: the review of what changed (the vendored Branch Diff webview), its list Changed.
+//   - Manual edit (AC-252): the file Follow shows opens as a VS Code editor where the review is, at
+//     the same line, to edit by hand; ⌥⌘E switches between it and Follow.
 // The head also knows the selected agent's worktree: its files, its changes against the comparison
 // base, and it marks the agent's changes in any of its files the owner opens as an editor (added and
 // changed lines tinted with a bar in the gutter, a changed line saying what it was, removed lines
@@ -46,7 +48,7 @@ class AgentHead {
     context.subscriptions.push(this.status, this.decorationsEmitter, ...Object.values(this.types),
       vscode.window.registerFileDecorationProvider({ onDidChangeFileDecorations: this.decorationsEmitter.event, provideFileDecoration: uri => this.fileDecoration(uri) }),
       vscode.window.onDidChangeVisibleTextEditors(editors => { for (const e of editors) this.annotate(e); this.updateStatus(); }),
-      vscode.window.onDidChangeActiveTextEditor(e => this.updateContext(e)),
+      vscode.window.onDidChangeActiveTextEditor(e => { this.updateContext(e); this.updateStatus(); }),
       vscode.workspace.onDidChangeTextDocument(e => this.onDocumentChange(e)),
       vscode.workspace.onDidSaveTextDocument(doc => { if (this.root && within(this.root, doc.uri.fsPath)) this.refreshSoon(); }),
       vscode.window.tabGroups.onDidChangeTabs(() => this.updateStatus()));
@@ -83,6 +85,65 @@ class AgentHead {
   toggleMode(runId) {
     runId = runId || this.runId;
     if (runId) return this.setMode(runId, this.modeFor(runId) === 'follow' ? 'diffs' : 'follow');
+  }
+
+  // ------------------------------------------------------------ Follow and Manual edit (AC-252)
+
+  /** Remembers an agent's mode without showing anything (the caller opens it). */
+  remember(runId, mode) {
+    this.modes.set(runId, mode);
+    this.context.workspaceState.update('overseer.head.modes', Object.fromEntries([...this.modes].slice(-300)));
+  }
+
+  /** True while the owner edits a file of the agent's worktree in a VS Code editor (Manual edit). */
+  inManualEdit() {
+    const e = vscode.window.activeTextEditor;
+    return !!(e && this.root && e.document.uri.scheme === 'file' && within(this.root, e.document.uri.fsPath));
+  }
+
+  /**
+   * Follow: the agent's review in Follow, in front (from Manual edit, back to the review where the
+   * editor was). Opened when it is not on screen.
+   */
+  async follow(runId) {
+    runId = runId || this.runId;
+    if (!runId) return;
+    this.remember(runId, 'follow');
+    this.updateContext(vscode.window.activeTextEditor);
+    const found = this.review.manager.panelFor(runId);
+    if (!found) { if (this.handlers.ensureShown) await this.handlers.ensureShown(runId); else await this.review.open(runId); }
+    else { this.review.manager.postOverseer(found.session); await this.review.followAgain(runId); }
+    await this.focus(runId);
+    this.log(`head: ${runId} in Follow`);
+    this.updateStatus();
+  }
+
+  /**
+   * Manual edit: the file Follow shows (else the one the agent was in last, else its first change)
+   * opens as a VS Code editor where the review is, at the same line, the agent's changes marked;
+   * saves land in the agent's worktree. Follow goes on behind it.
+   */
+  async manualEdit(runId) {
+    runId = runId || this.runId;
+    if (!runId) { vscode.window.showInformationMessage('No agent to edit: open one first (⌥⌘A).'); return; }
+    if (this.runId !== runId || !this.root) await this.select(runId);
+    if (!this.root) { vscode.window.showInformationMessage('That agent\'s worktree was removed: there is nothing to edit.'); return; }
+    const found = this.review.manager.panelFor(runId);
+    const shown = found?.session.followShown?.runId === runId && found.session.followShown.path ? found.session.followShown
+      : (this.review.lastFile?.get(runId) || await this.defaultTarget(runId).catch(() => undefined));
+    if (!shown?.path) { vscode.window.showInformationMessage('The agent has not opened a file yet: nothing to edit.'); return; }
+    const line = Math.max(0, Number(shown.line || 1) - 1);
+    const editor = await vscode.window.showTextDocument(vscode.Uri.file(path.join(this.root, shown.path)), {
+      viewColumn: found?.panel.viewColumn || vscode.ViewColumn.Active, preview: false, preserveFocus: false, selection: new vscode.Range(line, 0, line, 0) });
+    editor.revealRange(new vscode.Range(line, 0, line, 0), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+    this.log(`head: ${runId} in Manual edit (${shown.path}:${line + 1})`);
+    this.updateStatus();
+  }
+
+  /** One key for both (⌥⌘E): in Manual edit, back to Follow; anywhere else, Manual edit. */
+  toggleManualEdit(runId) {
+    if (this.inManualEdit() && (!runId || runId === this.runId)) return this.follow(this.runId);
+    return this.manualEdit(runId || this.runId);
   }
 
   // ------------------------------------------------------------ the agent shown
@@ -268,18 +329,29 @@ class AgentHead {
   updateContext(editor) {
     const inHead = !!(editor && this.root && editor.document.uri.scheme === 'file' && within(this.root, editor.document.uri.fsPath));
     vscode.commands.executeCommand('setContext', 'overseer.headEditor', inHead);
-    vscode.commands.executeCommand('setContext', 'overseer.headMode', this.runId ? this.modeFor(this.runId) : '');
+    vscode.commands.executeCommand('setContext', 'overseer.headMode', this.runId ? (inHead ? 'manual' : this.modeFor(this.runId)) : '');
   }
 
 
 
   updateStatus() {
     const runId = this.runId;
+    const title = this.model.run(runId)?.title || 'the agent';
+    if (runId && this.inManualEdit()) {
+      this.status.text = '$(edit) Manual edit';
+      this.status.tooltip = `Editing ${title}'s worktree yourself; saves land there. Click to follow it again (⌥⌘E).`;
+      this.status.command = 'overseer.head.toggleManualEdit';
+      this.status.accessibilityInformation = { label: `Manual edit: ${title}` };
+      this.status.show();
+      return;
+    }
     if (!runId || !this.review.manager.panelFor(runId)) { this.status.hide(); return; }
-    const mode = this.modeFor(runId), title = this.model.run(runId)?.title || 'the agent';
+    const mode = this.modeFor(runId);
     this.status.text = mode === 'follow' ? '$(eye) Follow' : '$(diff-multiple) Diffs only';
     this.status.tooltip = mode === 'follow' ? `Following ${title}: the review shows the file it is in, live. Click for Diffs only.` : `${title}: Diffs only (the review of what changed). Click to follow it.`;
     this.status.command = 'overseer.head.toggleMode';
+    // Read aloud (and by the scenarios): which agent the review is about.
+    this.status.accessibilityInformation = { label: mode === 'follow' ? `Follow: ${title}` : `Diffs only: ${title}` };
     this.status.show();
   }
 }
