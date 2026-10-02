@@ -118,6 +118,7 @@ Mergeability against main, checked 2026-09-30 00:00 with `git merge-tree --write
 
 ## Owner decisions on record
 
+- Goals (2026-10-02): an agent goal's default limits are 20 tries or 4 hours (1a); at Auto, setting Overseer's own goal goes out after the 2-second window like other typed things, at the other levels it needs a yes (2b, "auto is fine"). Still open: question 3 (Claude Code's own `/goal` or Overseer continuing every agent the same way). The owner asked what the model picker is called (today: the setting "Auto routing", the RFC auto-mode.md, "route picking" in orchestrator.md); offered names: Auto pick, Smart routing, Model picker, keep Auto routing.
 - Stop pauses an agent's queue; queued messages go out only when the owner resumes them by hand (2026-10-02): AC-265, not started, next builder.
 
 - Menu bar (AC-262):

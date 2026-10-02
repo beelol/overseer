@@ -551,8 +551,10 @@ names).
 Set by talking to Overseer: "keep going until the tests pass on main", "until every criterion on
 the tracker is met or waits on me". Overseer reads it back in one sentence with its check ("I'll
 keep working until `scripts/test-all` passes on main; I'll check after each agent finishes. Go?")
-and the owner says yes. The read-back is asked at every level, Auto included: a goal commits
-Overseer to turns it would not otherwise take.
+and the owner says yes. At Ask first and Steer the read-back waits for a yes; at Auto it goes out
+after the same 2-second window as anything else the owner types, and can be stopped in that window
+(the owner, 2026-10-02: "auto is fine"). The default limits below are the owner's choice of the same
+day.
 
 - **Where it lives.** In the daemon, with who set it, from which surface and when. It survives a
   restart; after one, Overseer checks the goal once before doing anything else for it.
