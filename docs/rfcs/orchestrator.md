@@ -475,6 +475,177 @@ One switch per watch is for the owner who does not want to wait for a model turn
 stop**. With it on, the daemon holds B the instant A files a *stop*, at any level. What happens
 next is still Overseer's, at its level.
 
+## Goals
+
+The owner's request (2026-09-28): give an agent a goal it keeps working toward until it holds,
+and give Overseer itself one by talking to it. Tracked by AC-224 (an agent's goal) and AC-225
+(Overseer's goal) in the main RFC. Design only; nothing is built. The preview is
+[docs/design/goals](../design/goals/index.html).
+
+### What a goal is
+
+A goal is a **condition in plain words** plus **how it is checked**. Nothing else: no plan, no
+steps. The agent, or Overseer, decides how to get there.
+
+| Check | How it is decided | Costs |
+| --- | --- | --- |
+| **A command passes** | The daemon runs the command in the agent's worktree (for Overseer's goal: in the named repository's checkout or a fresh worktree of the named branch) when a turn ends. Exit code 0 holds; anything else does not, and the last 40 lines of output are the reason. | No model turn. Time to run the command (10 minutes at most, then it counts as not holding). |
+| **Overseer reads the work** | A check-in (the one in [Keeping agents on task](#keeping-agents-on-task)) with the goal as its question: the digest, the new messages, the diff and the last test output. Its answer is *holds* or *not yet*, with one sentence why. | One Overseer turn per check. |
+| **The owner says so** | The goal never holds by itself. When the agent says it is done, a card asks the owner *Holds* or *Not yet*; *Not yet* takes a sentence, which becomes the next turn's direction. | Nothing until the owner answers. |
+
+- **Default check.** A goal set with a command ("until `cargo test --workspace` passes") is
+  checked by the command. A goal with none is checked by Overseer reading the work. The owner's
+  check is chosen explicitly ("until I say it's done").
+- **Who may set a command.** The owner, typing it or approving it. Overseer may propose a command
+  for a goal it was given in words ("until the tests pass" in a Rust repository becomes `cargo
+  test --workspace`), and the proposal shows the exact command; it never takes one from an
+  agent's text. The command runs with the agent's own permissions in its own worktree, nothing
+  wider.
+- **One goal per agent, one for Overseer.** A new goal replaces the old one, and the
+  conversation says so.
+- **States.** *Working toward it*, *holds* (done), *stuck* (with a reason), *waiting on you*,
+  *paused* (a limit, a hold or a recovery), *cleared*. Every change of state is an event with its
+  reason, so every surface reads the same thing.
+
+### An agent's goal
+
+Set from the agent's chat (a goal chip in the composer, or `/goal` typed there), from the row's
+menu, from the phone or the terminal UI, or by telling Overseer ("keep Docs going until the
+links check passes"). Setting it from the conversation is a Steer action, so the level applies.
+
+**Where the harness has goals of its own, they are used.** Claude Code's `/goal` keeps the agent
+going with a Stop hook until its condition holds. When the agent runs on a Claude Code version
+that has it, Overseer sends `/goal <condition>` as the agent's next input, exactly as the owner
+would type it, and the harness does the continuing inside one turn of Overseer's. The daemon
+still checks when the harness stops: Claude Code's own check is the model's judgment, and a
+command check is the daemon's to run. If the daemon's check does not hold, the daemon continues
+the agent as below. Which versions have `/goal` is read from the harness's own help at the
+first launch and kept with the profile; a version without it falls back to the daemon. The repo
+records nothing about Codex having goals of its own; if Codex or OpenCode gains one, it is used
+the same way, by version.
+
+**Where it has none (Codex, OpenCode, a generic program, or Claude Code without `/goal`), the
+daemon holds the goal.** At the end of each turn:
+
+1. The daemon runs the check.
+2. If it holds: the goal is *done*, the card says so with the evidence (the command's last lines,
+   or Overseer's sentence), and nothing more is sent.
+3. If not, and no limit is reached: the daemon continues the agent with one message, from
+   Overseer, that restates the goal and gives the reason it does not hold yet:
+   *"Goal: `cargo test --workspace` passes. Not yet: 2 tests fail in `store::tests` (output
+   below). Keep going."* It is delivered like any queued message, at the end of the turn.
+4. If a limit is reached, or the agent is going in circles: the goal is *stuck* and the card says
+   why in one line. The agent stays as it is; nothing is reverted.
+
+**Going in circles.** Three continuations in a row with the same failing reason and no change to
+the agent's files is *stuck: no progress after three tries*. The same free check Overseer already
+runs for a command failing three times.
+
+**Clearing.** The owner clears a goal from the goal line, the chat or the conversation. A
+continuation already queued is withdrawn; a turn in flight finishes as a normal turn. On Claude
+Code, clearing also sends the harness's own clear (`/goal` with no condition, or what its help
+names).
+
+### Overseer's goal
+
+Set by talking to Overseer: "keep going until the tests pass on main", "until every criterion on
+the tracker is met or waits on me". Overseer reads it back in one sentence with its check ("I'll
+keep working until `scripts/test-all` passes on main; I'll check after each agent finishes. Go?")
+and the owner says yes. The read-back is asked at every level, Auto included: a goal commits
+Overseer to turns it would not otherwise take.
+
+- **Where it lives.** In the daemon, with who set it, from which surface and when. It survives a
+  restart; after one, Overseer checks the goal once before doing anything else for it.
+- **When Overseer works on it.** At the end of each of its own turns and whenever an agent
+  finishes, fails or comes back with trouble, it checks the goal. If it does not hold, it takes
+  the next step within its level: start an agent, message one, propose a merge, give an agent a
+  goal of its own. The level gates every action exactly as in [Asking first](#asking-first); a
+  goal never raises it. At Ask first, a goal mostly produces proposals, and Overseer waits for
+  them.
+- **Progress.** A goal line at the top of the conversation: the condition, the last check and
+  its result, what Overseer is doing about it ("2 agents working: Store fix, Flaky test"). Asked
+  "how's it going?", Overseer answers from the same record. It reports by itself only when the
+  goal holds, is stuck, or waits on the owner.
+- **Waiting on the owner.** When the only way forward is the owner's (a Confirm action, a
+  permission, a proposal at Ask first, a question), the goal is *waiting on you*: one card, asked
+  once, in Needs you. Overseer takes no more turns for the goal until the owner answers.
+- **Stops.** When the goal holds (a report: what was done, by which agents, the check's
+  evidence), when it is stuck (the reason, and what Overseer would try next if allowed), when it
+  is cleared, or when a limit is reached.
+
+An agent's goal and Overseer's goal compose: Overseer working on "tests pass on main" may give
+the agent fixing a test its own goal, "`cargo test -p store` passes". The agent's goal is
+continued by the daemon with no Overseer turn; Overseer looks again when that agent's goal is
+done or stuck.
+
+### What the owner sees
+
+- **On the agent's row**, under the title: the goal mark, the condition (one line, cut to fit) and
+  the state: *2 of 20 · not yet: 2 tests fail*, *done*, *stuck: no progress after three tries*,
+  *waiting on you*. The terminal UI shows the same line in the tile; the phone shows it under the
+  agent's name.
+- **In the agent's chat**, a goal line pinned above the composer with the same state and *Clear*
+  and *Edit*; each continuation reads as a turn from Overseer with the reason, and each check is a
+  small line between turns ("Checked: not yet, 2 failing").
+- **In Overseer's conversation**, the global goal pinned at the top; *Goal set*, *Goal done* and
+  *Goal stuck* cards for both kinds; agent goals Overseer set appear on its action cards.
+- **Done and stuck** are the two states that reach the owner when away: a notification (where
+  AC-240's notifications are on) and one attention cue in Audio Mode.
+
+Owner-facing text never shows an internal id, an error class or an HTTP code. A stuck reason is a
+sentence: "stopped after 20 tries; the last one still had 1 failing test".
+
+### Limits
+
+Every goal has limits; whichever is reached first stops it, and the card names which.
+
+| Limit | Agent goal default | Overseer goal default |
+| --- | --- | --- |
+| Continuations (turns started for the goal) | 20 | Counted in Overseer's 100 self-started turns a day; no separate cap |
+| Time since the goal was set | 4 hours | 24 hours |
+| Usage | The account's own limit (then recovery, below) | The same, for each agent it starts |
+| No progress | Three continuations with the same reason and no file change | Three of its own checks in a row with the same reason and nothing done in between |
+
+- The owner can change the limits when setting the goal ("for at most 5 tries", "until tonight")
+  or on the goal line.
+- **Paid turns.** A continuation is a paid turn like any other. Building and verifying goals
+  follows the project's paid-turn rules: fixtures throughout, and any live check runs only on the
+  allowed model at low effort, one attempt per step. The defaults above are for the owner's own
+  use; the verifying fixtures use limits of 3 to 5.
+- A turn that answers the owner is never counted, as before.
+
+### With Auto, the account booking and recovery
+
+- **Overseer's Auto level.** Auto lets Overseer act on a goal without asking; it does not lift
+  any Confirm action, any limit or any cap. Setting Overseer's goal still takes the owner's yes.
+- **An agent's permission mode.** A goal does not change it. An agent on Ask first that waits for
+  a permission is *waiting on you*; nothing answers the permission for it.
+- **Route picking and the account booking.** Each continuation is a new turn, admitted through
+  the one account booking like any other: with route picking on, it may be booked on an account
+  with room; with it off, it uses the agent's own route. A goal never books around a refusal.
+- **Recovery (AC-239).** When an agent working on a goal hits a usage limit, fails or goes
+  silent, recovery runs first, unchanged: Overseer explains it and offers (at Auto, does) the
+  fix. The goal is *paused* meanwhile. An agent continued on another account or model keeps its
+  goal, its count and its limits; continuation resumes after the successor's first turn ends. A
+  recovery that is declined or fails makes the goal *stuck* with the recovery's reason.
+- **Holds and redirects.** A held agent's goal is *paused*; a release resumes it. A redirect
+  keeps the goal unless the owner or the redirect says otherwise; the card asks when unclear.
+- **Swarm.** A swarm's goal is its objective, kept by its director. Overseer does not continue
+  swarm workers; a goal set on a swarm becomes a revision of its objective, through the swarm's
+  own controls.
+
+### Protocol and data (indicative)
+
+- **Methods.** `goal.set` (target: an agent or Overseer; condition; check: command, read or
+  owner; limits), `goal.clear`, `goal.get`, `goal.answer` (the owner's *holds* / *not yet*).
+  Reading is `read`, setting and clearing are `control` with a request id, for the phone.
+- **Store (additive).** `goals` (target, condition, check, limits, set by, surface, time, state,
+  reason, count) and `goal_checks` (time, result, evidence).
+- **Events.** `goal_set`, `goal_check`, `goal_continued`, `goal_state` (with its reason),
+  `goal_cleared`.
+- **Code.** A new `daemon/src/overseer/goals.rs`, called from where a turn ends (as check-ins
+  and the finished-work check are) and from trouble recovery.
+
 ## With Voice Mode
 
 Voice Mode (Gate R, [its RFC](voice-mode.md)) is separate work. This gate does not build it. The
@@ -734,3 +905,5 @@ AC-180 to AC-202 in the main RFC are the acceptance criteria. Each has its Verif
 | AC-200 | What agents say is data |
 | AC-201 | Regression coverage |
 | AC-202 | Orchestration session (owner-confirmed) |
+| AC-224 | Goals for an agent ([Goals](#goals)) |
+| AC-225 | Goals for Overseer ([Goals](#goals)) |

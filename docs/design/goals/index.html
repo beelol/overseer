@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overseer Goals Preview</title>
+<style>
+/* Colours are Overseer Dark and Overseer Light from extension/design/tokens.js. */
+:root {
+  --chrome: #121118; --bg: #17161D; --raised: #211F2A; --raised2: #282633; --hover: #24222E; --selected: #2F2A45;
+  --border: #2A2835; --borderStrong: #38354A;
+  --text: #E8E6F0; --muted: #A7A3B9; --faint: #6C687F;
+  --accent: #A48BFF; --accentStrong: #6E4FE6; --onAccent: #FFFFFF; --accentSoft: #2F2A45;
+  --green: #4CC38A; --amber: #E5A33C; --red: #F0707B; --blue: #7AA2F7;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --chrome: #F2F1F7; --bg: #FBFAFD; --raised: #FFFFFF; --raised2: #EFEEF5; --hover: #EBEAF2; --selected: #E3DDFB;
+    --border: #E4E2EC; --borderStrong: #D2CFDE;
+    --text: #1C1A26; --muted: #5C576F; --faint: #9A96AC;
+    --accent: #6B47E0; --accentStrong: #6B47E0; --onAccent: #FFFFFF; --accentSoft: #ECE8FB;
+    --green: #1A7449; --amber: #915608; --red: #C92F45; --blue: #2F5FCC;
+  }
+}
+:root[data-theme="light"] {
+  --chrome: #F2F1F7; --bg: #FBFAFD; --raised: #FFFFFF; --raised2: #EFEEF5; --hover: #EBEAF2; --selected: #E3DDFB;
+  --border: #E4E2EC; --borderStrong: #D2CFDE;
+  --text: #1C1A26; --muted: #5C576F; --faint: #9A96AC;
+  --accent: #6B47E0; --accentStrong: #6B47E0; --onAccent: #FFFFFF; --accentSoft: #ECE8FB;
+  --green: #1A7449; --amber: #915608; --red: #C92F45; --blue: #2F5FCC;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+main { max-width: 1180px; margin: 0 auto; padding: 32px 16px 64px; }
+header { display: flex; gap: 14px; align-items: center; margin-bottom: 8px; }
+header img { width: 40px; height: 40px; }
+h1 { font-size: 24px; margin: 0; }
+h2 { font-size: 19px; margin: 44px 0 6px; }
+h2 .n { display: inline-block; min-width: 28px; padding: 0 8px; margin-right: 8px; border-radius: 6px; background: var(--accentStrong); color: var(--onAccent); text-align: center; }
+p { color: var(--muted); max-width: 820px; margin: 6px 0; }
+.caption { font-size: 13px; color: var(--faint); margin-top: 8px; max-width: 820px; }
+code { font: 12.5px ui-monospace, "SF Mono", Menlo, monospace; background: var(--raised2); padding: 1px 5px; border-radius: 4px; }
+
+.pair { display: grid; grid-template-columns: 340px 1fr; gap: 16px; margin-top: 14px; }
+@media (max-width: 860px) { .pair { grid-template-columns: 1fr; } }
+.win { border: 1px solid var(--borderStrong); border-radius: 12px; background: var(--chrome); overflow: hidden; font-size: 13px; }
+.win > .bar { padding: 7px 12px; color: var(--faint); font-size: 12px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
+.win > .bar b { color: var(--muted); font-weight: 600; }
+
+/* Agent rows */
+.rows { padding: 6px; }
+.row { padding: 8px 10px; border-radius: 6px; }
+.row.sel { background: var(--selected); }
+.row .top { display: flex; gap: 8px; align-items: center; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.dot.run { background: var(--accent); } .dot.idle { background: var(--faint); } .dot.ok { background: var(--green); } .dot.warn { background: var(--amber); }
+.row .title { font-weight: 600; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.row .h { color: var(--faint); font-size: 12px; }
+.goal { display: flex; gap: 6px; align-items: baseline; margin: 3px 0 0 16px; font-size: 12px; color: var(--muted); min-width: 0; }
+.goal .cond { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; }
+.goal .st { flex: none; white-space: nowrap; }
+.gm { flex: none; width: 12px; height: 12px; border: 1.5px solid currentColor; border-radius: 50%; position: relative; top: 2px; color: var(--accent); }
+.gm::after { content: ""; position: absolute; inset: 2.5px; border-radius: 50%; background: currentColor; }
+.ok { color: var(--green); } .warn { color: var(--amber); } .bad { color: var(--red); } .acc { color: var(--accent); } .f { color: var(--faint); }
+
+/* Chat */
+.chat { background: var(--bg); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.turn { max-width: 640px; }
+.turn .who { font-size: 12px; color: var(--faint); margin-bottom: 3px; display: flex; gap: 6px; align-items: center; }
+.turn .who img { width: 14px; height: 14px; }
+.bubble { background: var(--raised); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; }
+.bubble.me { background: var(--accentSoft); border-color: transparent; margin-left: auto; }
+.turn.me { align-self: flex-end; }
+.bubble.from { border-left: 3px solid var(--accent); }
+.tool { font: 12px ui-monospace, "SF Mono", Menlo, monospace; color: var(--muted); background: var(--raised2); border-radius: 6px; padding: 6px 9px; }
+.check { font-size: 12px; color: var(--faint); display: flex; gap: 8px; align-items: center; }
+.check::before, .check::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.goalbar { display: flex; gap: 10px; align-items: center; background: var(--raised); border: 1px solid var(--borderStrong); border-radius: 10px; padding: 8px 12px; margin: 0 18px 0; font-size: 13px; flex-wrap: wrap; }
+.goalbar .cond { font-weight: 600; flex: 1; min-width: 180px; }
+.prog { height: 4px; border-radius: 99px; background: var(--raised2); width: 120px; overflow: hidden; }
+.prog i { display: block; height: 100%; background: var(--accent); }
+.btn { font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--borderStrong); background: var(--raised2); color: var(--text); }
+.btn.p { background: var(--accentStrong); border-color: transparent; color: var(--onAccent); }
+.composer { margin: 0 18px 16px; border: 1px solid var(--borderStrong); border-radius: 10px; padding: 9px 12px; color: var(--faint); background: var(--raised); display: flex; gap: 8px; align-items: center; }
+.chip { font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--accentSoft); color: var(--accent); }
+.pinned { padding-top: 12px; background: var(--bg); }
+
+/* Cards */
+.card { background: var(--raised); border: 1px solid var(--borderStrong); border-radius: 12px; padding: 12px 14px; max-width: 640px; }
+.card .head { display: flex; gap: 8px; align-items: center; font-weight: 600; margin-bottom: 4px; }
+.card .head img { width: 16px; height: 16px; }
+.card .body { color: var(--muted); }
+.card .acts { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.card.done { border-left: 3px solid var(--green); }
+.card.stuck { border-left: 3px solid var(--amber); }
+.card.wait { border-left: 3px solid var(--accent); }
+.card ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
+.states { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 14px; }
+.ev { font: 12px ui-monospace, "SF Mono", Menlo, monospace; background: var(--raised2); border-radius: 6px; padding: 6px 9px; margin-top: 6px; color: var(--muted); white-space: pre-wrap; }
+
+.choice { border: 1px solid var(--borderStrong); border-radius: 12px; padding: 12px 16px; margin-top: 12px; background: var(--raised); max-width: 900px; }
+.choice h3 { margin: 0 0 6px; font-size: 16px; }
+.choice ol { margin: 6px 0 0; padding-left: 22px; color: var(--muted); }
+.choice li b { color: var(--text); }
+.prop { font-size: 11px; padding: 1px 6px; border-radius: 99px; background: var(--accentSoft); color: var(--accent); margin-left: 6px; }
+</style>
+</head>
+<body>
+<main>
+<header>
+  <img src="../brand/exports/overseer-logo-64.png" alt="Overseer">
+  <div><h1>Goals</h1></div>
+</header>
+<p>A goal is a condition in plain words and how it is checked: a command that must pass, Overseer reading the work, or you saying so. An agent keeps going until its goal holds; Overseer can have one too. Static mockups for the design in <code>docs/rfcs/orchestrator.md</code> (Goals). Nothing here is built.</p>
+
+<h2>An agent with a goal</h2>
+<p>The agent's row carries one goal line under its title. In its chat the goal is pinned above the composer; each check is a thin line between turns, and each continuation reads as a turn from Overseer that says why it is not done yet.</p>
+<div class="pair">
+  <div class="win">
+    <div class="bar"><b>Agents</b> · 4</div>
+    <div class="rows">
+      <div class="row sel">
+        <div class="top"><span class="dot run"></span><span class="title">Store fix</span><span class="h">Codex</span></div>
+        <div class="goal"><span class="gm"></span><span class="cond"><code>cargo test -p store</code> passes</span><span class="st">· 3 of 20 · not yet: 2 failing</span></div>
+      </div>
+      <div class="row">
+        <div class="top"><span class="dot ok"></span><span class="title">Docs links</span><span class="h">Claude Code</span></div>
+        <div class="goal ok"><span class="gm" style="color:var(--green)"></span><span class="cond">links check passes</span><span class="st">· done</span></div>
+      </div>
+      <div class="row">
+        <div class="top"><span class="dot warn"></span><span class="title">Flaky focus test</span><span class="h">Codex</span></div>
+        <div class="goal warn"><span class="gm" style="color:var(--amber)"></span><span class="cond">focus scenario passes 3 times in a row</span><span class="st">· stuck: no progress</span></div>
+      </div>
+      <div class="row">
+        <div class="top"><span class="dot idle"></span><span class="title">Site sections</span><span class="h">Claude Code</span></div>
+        <div class="goal"><span class="gm"></span><span class="cond">every section has copy</span><span class="st acc">· waiting on you</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="win">
+    <div class="bar"><b>Store fix</b> · Codex · worktree store-fix</div>
+    <div class="chat">
+      <div class="turn"><div class="who">Store fix</div><div class="bubble">I changed the migration so the index is created after the table. Two tests in <code>store::tests</code> still fail on the old column name; looking at them next.</div></div>
+      <div class="check">Checked <code>cargo test -p store</code> · not yet, 2 failing</div>
+      <div class="turn"><div class="who"><img src="../brand/exports/overseer-logo-64.png" alt="">From Overseer · goal, try 3 of 20</div>
+        <div class="bubble from">Goal: <code>cargo test -p store</code> passes. Not yet: 2 tests fail in <code>store::tests</code>.<div class="tool">test store::tests::reopen_keeps_rows ... FAILED<br>test store::tests::index_after_table ... FAILED</div>Keep going.</div></div>
+      <div class="turn"><div class="who">Store fix</div><div class="bubble">Both used <code>run_state</code>; renamed to <code>state</code> to match the migration.</div></div>
+    </div>
+    <div class="pinned">
+      <div class="goalbar"><span class="gm"></span><span class="cond">Goal: <code>cargo test -p store</code> passes</span><span class="f">try 3 of 20 · 3 h 19 min left</span><span class="prog"><i style="width:15%"></i></span><button class="btn">Edit</button><button class="btn">Clear</button></div>
+    </div>
+    <div class="composer"><span class="chip">Goal</span>Message Store fix…</div>
+  </div>
+</div>
+<p class="caption">On Claude Code with its own goal command, the row and pinned line look the same; the continuing happens inside the harness and the check lines appear when it stops. The terminal UI shows the goal line in the tile; the phone shows it under the agent's name.</p>
+
+<h2>Overseer's own goal</h2>
+<p>Set by talking. Overseer reads the goal and its check back and waits for a yes, at every level. Then the goal is pinned at the top of the conversation with who set it and when, and Overseer reports only when it holds, is stuck, or needs you.</p>
+<div class="win" style="margin-top:14px">
+  <div class="bar"><img src="../brand/exports/overseer-logo-64.png" alt="" style="width:14px;height:14px"><b>Overseer</b> · level: Steer</div>
+  <div class="pinned">
+    <div class="goalbar"><span class="gm"></span><span class="cond">Goal: <code>scripts/test-all</code> passes on main</span><span class="f">set by you from VS Code, 14:02 · last check 15:10: 3 failing · 2 agents on it</span><button class="btn">Clear</button></div>
+  </div>
+  <div class="chat">
+    <div class="turn me"><div class="bubble me">keep going until the tests pass on main</div></div>
+    <div class="turn"><div class="who"><img src="../brand/exports/overseer-logo-64.png" alt="">Overseer</div>
+      <div class="card wait"><div class="head">Set this goal?</div><div class="body">I'll keep working until <code>scripts/test-all</code> passes on main, checking after each agent finishes. At most 24 hours; my turns count toward today's 100.</div>
+      <div class="acts"><button class="btn p">Yes, set it</button><button class="btn">Change the check</button><button class="btn">No</button></div></div></div>
+    <div class="check">Goal set 14:02</div>
+    <div class="turn"><div class="who"><img src="../brand/exports/overseer-logo-64.png" alt="">Overseer · started 2 agents for the goal</div>
+      <div class="card"><div class="head">Working on: tests pass on main</div><div class="body">Checked main: 5 failing in 2 places.</div>
+      <ul><li><b>Store fix</b> (Codex) · goal <code>cargo test -p store</code> passes</li><li><b>Flaky focus test</b> (Codex) · goal: focus scenario passes 3 times in a row</li></ul></div></div>
+    <div class="turn me"><div class="bubble me">how's it going?</div></div>
+    <div class="turn"><div class="who"><img src="../brand/exports/overseer-logo-64.png" alt="">Overseer</div><div class="bubble">3 of 5 fixed. Store fix is on its third try with 2 left; Flaky focus test is stuck after three tries with the same failure. I'd like to start a watcher that runs it on its own copy. Go?</div></div>
+  </div>
+  <div class="composer"><span class="chip">Overseer</span>Ask Overseer…</div>
+</div>
+
+<h2>Done, stuck and waiting on you</h2>
+<p>The three states that reach you. Each says why in one sentence and carries its evidence; none shows an internal id or an error code. Done and stuck also notify you when you are away.</p>
+<div class="states">
+  <div class="card done"><div class="head"><span class="gm" style="color:var(--green)"></span>Store fix: goal done</div><div class="body"><code>cargo test -p store</code> passed after 4 tries.</div><div class="ev">test result: ok. 112 passed; 0 failed</div><div class="acts"><button class="btn p">Review</button><button class="btn">Merge</button></div></div>
+  <div class="card stuck"><div class="head"><span class="gm" style="color:var(--amber)"></span>Flaky focus test: goal stuck</div><div class="body">No progress after three tries: the same window-focus failure each time and no file changed.</div><div class="acts"><button class="btn p">Give it 3 more</button><button class="btn">Tell it something</button><button class="btn">Clear goal</button></div></div>
+  <div class="card stuck"><div class="head"><span class="gm" style="color:var(--amber)"></span>Store fix: goal stuck</div><div class="body">Stopped after 20 tries; the last one still had 1 failing test.</div><div class="acts"><button class="btn p">Raise the limit</button><button class="btn">Clear goal</button></div></div>
+  <div class="card wait"><div class="head"><span class="gm"></span>Site sections: is it done?</div><div class="body">The goal is checked by you. The agent says every section has copy.</div><div class="acts"><button class="btn p">Holds</button><button class="btn">Not yet…</button></div></div>
+  <div class="card wait"><div class="head"><img src="../brand/exports/overseer-logo-64.png" alt="">Goal waiting on you</div><div class="body">Tests pass on main once Store fix is merged. Merging needs your yes.</div><div class="acts"><button class="btn p">Merge Store fix</button><button class="btn">Not now</button></div></div>
+  <div class="card done"><div class="head"><img src="../brand/exports/overseer-logo-64.png" alt="">Goal done: tests pass on main</div><div class="body">Store fix and Flaky focus test merged; <code>scripts/test-all</code> passed on main at 16:48. 2 agents, 11 turns.</div></div>
+</div>
+<p class="caption">While an agent's goal waits for a recovery (a usage limit, say), its line reads <span class="f">paused: continuing on your other account</span>; it keeps its count and goes on after the new account's first turn.</p>
+
+<h2>Choices for you</h2>
+<div class="choice"><h3><span class="n" style="display:inline-block;min-width:24px;padding:0 6px;margin-right:6px;border-radius:6px;background:var(--accentStrong);color:var(--onAccent);text-align:center">1</span>An agent goal's default limits</h3>
+<ol><li><b>20 tries or 4 hours</b><span class="prop">proposed</span></li><li><b>10 tries or 2 hours</b>: cheaper, stops sooner</li><li><b>No default</b>: you give a limit with every goal</li></ol></div>
+<div class="choice"><h3><span class="n" style="display:inline-block;min-width:24px;padding:0 6px;margin-right:6px;border-radius:6px;background:var(--accentStrong);color:var(--onAccent);text-align:center">2</span>Setting Overseer's goal at Auto</h3>
+<ol><li><b>Always a yes</b>, as above<span class="prop">proposed</span></li><li><b>At Auto it goes after the 2-second window</b>, like other things you type</li></ol></div>
+<div class="choice"><h3><span class="n" style="display:inline-block;min-width:24px;padding:0 6px;margin-right:6px;border-radius:6px;background:var(--accentStrong);color:var(--onAccent);text-align:center">3</span>Claude Code agents</h3>
+<ol><li><b>Use Claude Code's own <code>/goal</code></b>, with Overseer's check when it stops<span class="prop">proposed</span>: fewer restarts, but Claude decides when to stop</li><li><b>Overseer continues every agent the same way</b>: one behaviour and one count across Claude Code and Codex</li></ol></div>
+</main>
+</body>
+</html>
