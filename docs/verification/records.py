@@ -2357,15 +2357,25 @@ rec(217, "Turning it on is visible", "verified", date="2026-09-29", commit="c8e8
 rec(218, "A voice worth listening to", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
-rec(219, "No internal ids in front of the owner", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
-    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(219, "No internal ids in front of the owner", "verified", date="2026-10-02", commit="c1441171 (pull request #47, merged 2026-10-02)",
+    harness="The simulated voice and the Claude Code fixture on the packaged VSIX in isolated VS Code profiles; daemon and TUI tests; no paid turns",
+    steps="""1. `node test/ui/scenario-voice.js`: 32 of 32, including the spoken card's accessible name, time and stage, and no request id in the text, tooltips or accessible names of all 60 screenshots ([evidence](evidence/ui/voice/)).
+2. `cargo test -p overseerd --test voice`, `--test overseer_surfaces`; `cargo test -p overseer-tui --test words`.""",
+    expected="See the RFC criterion.",
+    actual="""- Agents are told "(by voice) The owner said: …", never "(voice, request V-0001) …"; a replaced request is named in words; home's spoken card shows its time, never an id; plain words turn any leftover id into "the request"; the TUI shows a spoken request's words alone.
+- AC-245's text check and the TUI's leak check now fail on a request id.""",
+    live="Simulated voice only.", blocker="—")
 rec(220, "Dictation is not a call", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
-rec(221, "A dev Overseer uses only the logins it was given", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
-    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(221, "A dev Overseer uses only the logins it was given", "verified", date="2026-10-02", commit="c1441171 (pull request #47, merged 2026-10-02)",
+    harness="`test/dev/run.js` with fixture login folders, a decoy default login under a temporary HOME and stand-in `claude`, `codex` and `code` that record their environment; nothing of the owner's is read",
+    steps="""1. `node test/dev/run.js`: 14 of 14, two new checks; `node test/dev/guided.js` 7 of 7.""",
+    expected="See the RFC criterion.",
+    actual="""- `scripts/dev up --owner-logins` takes its folders from `CLAUDE_CONFIG_DIR` and/or `CODEX_HOME` and passes exactly those to the harnesses; the daemon's system profiles use the same folders, so nothing reads `~/.claude` or `~/.codex` (the decoy is never read).
+- A harness without a folder is off, OpenCode is off, and with no folder `up` refuses (it used to fall back to the Mac's default logins).
+- An owner check's VS Code launches without `--inspect-brk` and keeps native dialogs.""",
+    live="Stand-ins only; no real login was used.", blocker="—")
 rec(222, "Noise filtering is the owner's choice", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
@@ -2418,9 +2428,13 @@ rec(229, "Heard right before it acts", "not started", date="—", commit="—",
 rec(230, "Permission modes by conversation", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
     actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
-rec(231, "Agents start with what Overseer knows", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
-    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(231, "Agents start with what Overseer knows", "verified", date="2026-10-02", commit="752f33d7 (pull request #48, merged 2026-10-02)",
+    harness="The Claude Code fixture as Overseer and in echo mode as the agent; daemon tests; no paid turns",
+    steps="""1. `cargo test -p overseerd --test overseer_brain ac231_agents_start_with_what_overseer_knows`; unit tests in `overseer::context`.""",
+    expected="See the RFC criterion.",
+    actual="""- When Overseer starts an agent, the daemon adds a block after the request, with no model involved: the files named in the conversation that exist (in this repository or another), the repositories named, where the other agents' work is, and the owner's last six messages (minus any the prompt already quotes); at most 3 KiB, redacted. Both start paths (Auto's pick and Overseer's own harness) add it; the agent's chat shows it as "Overseer added what it knows".
+- The test's conversation names a file in another repository, then starts an agent: the agent's prompt cites the file, names the other repository and quotes the owner; a second start with Auto routing off finds a file by its repository's name.""",
+    live="Fixtures only.", blocker="—")
 rec(232, "The review says what it shows", "verified", date="2026-09-29", commit="994f78bf (branch claude/review-merge, pull request #35, merged as 0fad2bee)",
     harness="Generic fixture programs on the packaged VSIX (isolated VS Code profile, background window) and the real daemon binary with real Git; no accounts, no paid turns",
     proven="the whole Verify clause: an agent that commits a new file (then has a turn that changes nothing, the owner's case) shows it added, every line added and no removed line, with the right count in the packaged review; Save reads \"Save your changes to the agent's copy\" and shows only with edits; each hunk offers Keep or Undo in words; with no remote the chat offers Merge into main and Publish to GitHub and the review Merge into main, and Open PR offers the local merge in a quick pick, never a dialog",
@@ -2508,7 +2522,7 @@ rec(238, "Overseer checks finished work and offers the next step", "verified", d
 - Nothing happened without a yes: the repository's HEAD did not move and the failing agent got no turn; the owner's yes sent the fix. A check-in may propose merge_back or pull_request only for a finished agent and they always wait for a yes; archive and the other Confirm actions stay the owner's own to ask for.""",
     evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/ebb245e2/daemon/tests/overseer_brain.rs) (`ac238_*`)",
     live="Fixtures only: the verdict's quality with a live model is not judged here.")
-rec(239, "Stuck, failed and limited agents come back to Overseer", "partial", date="2026-09-29", commit="3ab9c1f7 (pull request #32, merged 2026-09-30)",
+rec(239, "Stuck, failed and limited agents come back to Overseer", "verified", date="2026-10-02", commit="3ab9c1f7 (pull request #32) and 752f33d7 (pull request #48, merged 2026-10-02)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the daemon side of the Verify clause: ratelimit, failed-reason and a silent agent each give one Overseer turn and a card with a plain reason; continuing on the other account carries the work on a second fixture profile in the same worktree; neither the conversation nor the daemon's state shows an error class or HTTP code",
     steps="""1. `cargo test --test overseer_brain ac239_stuck_failed_and_limited_agents_come_back_to_overseer`, plus the unit test `overseer::trouble::tests::reasons_are_plain`.
@@ -2517,11 +2531,12 @@ rec(239, "Stuck, failed and limited agents come back to Overseer", "partial", da
     actual="""- Cards, with no model: "Limited reached its account's usage limit.", "Broken failed: Migration failed: relation users_v2 does not exist.", "Quiet has said nothing for a while as it works."; each with its offers. Each gave exactly one Overseer turn (cause `trouble`), kept until Overseer has a run like the agents' questions.
 - Overseer proposed continue on Work, a retry, and (at Auto) stopped the silent agent itself. The yes on continue ended the limited run as handed off and started its successor on the Work profile in the same task and worktree, through Continuity's handoff with the permission mode carried; the retry sent the unfinished turn again.
 - At Auto a failing agent is retried once by Overseer; the second retry waits for the owner's yes, so a repeating failure is not a loop.
-- The daemon's state gives failed runs a `plain_reason` ("Reached its account's usage limit"); the conversation holds no `[rate_limit]`, `429` or "turn reported failure". The agents tree tooltip, home's stage line and the chat's status show `plain_reason` first.""",
+- The daemon's state gives failed runs a `plain_reason` ("Reached its account's usage limit"); the conversation holds no `[rate_limit]`, `429` or "turn reported failure". The agents tree tooltip, home's stage line and the chat's status show `plain_reason` first.
+- On screen (pull request #48, `node test/ui/scenario-trouble.js`, 14 checks, [evidence](evidence/ui/trouble/)): an agent hits the fixture's usage limit; home's card and the stage line read "… reached its account's usage limit", Overseer proposes continuing on the second account, and Yes continues the work there in the same task and worktree. No `[rate_limit]`, `429`, "API Error" or "turn reported failure" on home, the side bar's tooltip or the chat; the daemon's own `trouble` record no longer shows as a bare word in the chat (extension and phone).""",
     evidence="[daemon/tests/overseer_brain.rs](https://github.com/beelol/overseer/blob/ebb245e2/daemon/tests/overseer_brain.rs) (`ac239_*`), [trouble.rs](https://github.com/beelol/overseer/blob/ebb245e2/daemon/src/overseer/trouble.rs)",
     live="Fixtures only.",
     limits="Another account cannot resume a harness's own session (its session store is per account), so the work continues as a successor run with a handoff prompt in the same worktree, as Continuity does. `exit_reason` keeps the daemon's record, including the error class, for AC-16.",
-    blocker="No UI scenario yet checks the VS Code surfaces (tree tooltip, home's stage line, chat status) for a raw error with a limited agent; they read `plain_reason` but that is unproven on screen.")
+    blocker="—")
 rec(240, "You hear about it outside VS Code", "partial", commit="53c26853 (branch claude/signin-notify-keys, pull request #30)", date="2026-09-28",
     harness="Claude fixture and generic programs on the daemon, a dev daemon (scripts/dev) and the packaged VSIX; the notification goes to a logging command, never a real banner; no paid tokens",
     proven="while no VS Code window has the OS focus (each window reports it with `ui.window`), or VS Code is closed, an agent needing permission, asking a question, finishing or failing posts one notification titled with the agent, saying what it needs and in which repository, grouped per agent (the notifier's `--thread`), with a click URL for that agent (`vscode://beelol.overseer/open-agent?run=ID`); a focused window writes none; `overseer.notifications.needsYou`, `finished` and `failed` choose the kinds (`notices.set`); on a dev daemon a fixture permission, finish and failure each write one entry to the instance's `notifications.log` with the agent's title and its URL, and a focused window writes none; opening that URL in VS Code opens that agent's chat; the in-VS Code permission toast names the agent and shows while the Overseer view is open on another agent",
@@ -2534,9 +2549,16 @@ rec(240, "You hear about it outside VS Code", "partial", commit="53c26853 (branc
     actual="All pass. [notifications.log from the scenario](evidence/ui/notify-agents/notifications.log). The AC-45 background-notice tests still pass (`ac45_no_notice_when_nothing_is_running` now allows the finished run's own notification).",
     evidence="[notify-agents scenario](evidence/ui/notify-agents/); `daemon/src/notices.rs`, `daemon/tests/notices.rs`, `extension/src/notices.js`, `test/dev/run.js`",
     live="Fixtures only; no banner was shown.", blocker="The TUI on click with VS Code closed has no route; the real banner and click are owner checks.")
-rec(241, "A waiting agent can always be answered", "not started", date="—", commit="—",
-    expected="See the RFC criterion (the usability audit of 2026-09-28).",
-    actual="Not started: proposed by the usability audit (docs/audits/2026-09-28-usability.md).", live="—", blocker="To be built by its own agent.")
+rec(241, "A waiting agent can always be answered", "verified", date="2026-10-02", commit="c1441171 (pull request #47, merged 2026-10-02)",
+    harness="The Claude Code fixture (`permission`, `permission-twice`) on the packaged VSIX; daemon and TUI tests; no paid turns",
+    steps="""1. `node test/ui/scenario-answer-waiting.js`: 8 of 8 ([evidence](evidence/ui/answer-waiting/)).
+2. `cargo test -p overseerd --test answer_waiting` (3); `cargo test -p overseer-tui` (t05, t31).
+3. The merge check on #47 with #48 and main: Rust 1,446, UI 72 of 74; audit (the grid's text 1001 against 993 with the tile's placeholder) fixed (\"Why not?\", the explanation in the tooltip), audit, answer-waiting and grid passed alone.""",
+    expected="See the RFC criterion.",
+    actual="""- While a permission waits, the chat and the grid tile take a reply: it denies the request and the agent reads the reply as the reason (the fixture's stdin log); in the TUI, the composer (`i`) does the same.
+- Allow once, Allow for this session (when the harness offers its rule) and Deny are offered; after Allow for this session the daemon answers the same rule itself (Write asked twice, the owner once).
+- Overseer's proposal to a blocked agent says it is blocked on the owner's permission and offers to answer it first; saying yes gives "Waiting on you", never "Done".""",
+    live="Fixtures only.", blocker="—")
 rec(242, "Keys act only on what you can see", "verified", commit="13b71844 (branch claude/signin-notify-keys, pull request #30)", date="2026-09-28",
     harness="Claude fixture (permission, echo, overseer modes) and generic programs on the packaged VSIX; no paid tokens",
     steps="""1. `node test/unit/on-screen.js`: which agents are on screen (the Overseer view's chat, chats taken out, reviews); ⌥⌘Y's target; a palette command's target.
@@ -2962,9 +2984,9 @@ SHORT_BLOCKERS = {
     216: "not started (added by the owner on 2026-09-28)",
     217: "not started (added by the owner on 2026-09-28)",
     218: "not started (added by the owner on 2026-09-28)",
-    219: "not started (added by the owner on 2026-09-28)",
+    219: "verified",
     220: "not started (added by the owner on 2026-09-28)",
-    221: "not started (added by the owner on 2026-09-28)",
+    221: "verified",
     222: "not started (added by the owner on 2026-09-28)",
     223: "not started (added by the owner on 2026-09-28)",
     224: "not started (added by the owner on 2026-09-28)",
@@ -2974,7 +2996,7 @@ SHORT_BLOCKERS = {
     228: "not started (added by the owner on 2026-09-28)",
     229: "not started (added by the owner on 2026-09-28)",
     230: "not started (added by the owner on 2026-09-28)",
-    231: "not started (added by the owner on 2026-09-28)",
+    231: "verified",
     232: "not started (added by the owner on 2026-09-28)",
     233: "not started (added by the owner on 2026-09-28)",
     234: "not started (added by the owner on 2026-09-28)",
@@ -2982,9 +3004,9 @@ SHORT_BLOCKERS = {
     236: "not started (the usability audit, 2026-09-28)",
     237: "not started (the usability audit, 2026-09-28)",
     238: "not started (the usability audit, 2026-09-28)",
-    239: "not started (the usability audit, 2026-09-28)",
+    239: "verified",
     240: "partial: notifications while VS Code is unfocused or closed, a click opens the agent, the setting (pull request #30); the TUI on click and the owner's real banner remain",
-    241: "not started (the usability audit, 2026-09-28)",
+    241: "verified",
     242: "verified",
     243: "not started (the usability audit, 2026-09-28)",
     244: "not started (the usability audit, 2026-09-28)",

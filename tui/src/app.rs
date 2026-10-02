@@ -1805,6 +1805,11 @@ impl App {
         if fu.starts_with("unsupported") {
             return Some(format!("{} does not take follow-ups", run.harness));
         }
+        // A waiting agent always takes a reply (AC-241): with a permission waiting it denies it
+        // with the reply as the reason.
+        if run.permission_request().is_some() {
+            return None;
+        }
         if run.active() && run.harness != "generic" {
             return Some("a turn is running; wait for it or press x to interrupt".into());
         }
@@ -1822,6 +1827,12 @@ impl App {
             return;
         }
         self.drafts.remove(&run.id);
+        if let Some(request_id) = run.permission_request() {
+            // Deny with a note (AC-241): the agent reads the reply as the reason.
+            self.request("run.permission", json!({ "run_id": run.id, "request_id": request_id, "allow": false, "message": text }), Pending::Permission { allow: false, session: false });
+            self.mode = if matches!(self.mode, Mode::Compose) { Mode::Grid } else { self.mode.clone() };
+            return;
+        }
         self.request("run.follow_up", json!({ "run_id": run.id, "prompt": text }), Pending::FollowUp { run: run.id.clone(), text: text.clone() });
         self.mode = if matches!(self.mode, Mode::Compose) { Mode::Grid } else { self.mode.clone() };
     }

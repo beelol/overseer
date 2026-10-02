@@ -136,13 +136,15 @@
       this.why.textContent = '';
       const busy = msg.active && run.harness !== 'generic';
       this.busy = busy;
-      const canSend = !child && msg.followUpSupported && msg.trusted;
+      // A permission waits (AC-241): the reply denies it, with the reply as the reason the agent reads.
+      this.asking = !child && run.attention && run.attention.kind === 'permission' ? run.attention : undefined;
+      const canSend = !child && (msg.followUpSupported || !!this.asking) && msg.trusted;
       this.sendBtn.disabled = !canSend; this.prompt.disabled = !canSend;
       this.prompt.placeholder = child ? 'Sub-agents are steered through their parent' : !msg.trusted ? 'Trust this workspace to talk to agents'
-        : !msg.followUpSupported ? `${ui.HARNESS[run.harness] || run.harness} does not take follow-ups` : busy ? (window.OverseerContinuityText && window.OverseerContinuityText.isWaiting(run.status) ? 'Message for when it continues' : 'Message for when it finishes · ⌥⏎ stops and sends') : 'Reply…  (@ to mention a file)';
-      this.sendBtn.replaceChildren(ui.icon(busy ? 'history' : 'arrow-up'));
-      this.sendBtn.title = !canSend ? this.prompt.placeholder : busy ? 'Send when this turn ends (Enter) · stop and send now (⌥Enter)' : 'Send (Enter)';
-      this.sendBtn.setAttribute('aria-label', busy ? 'Queue message' : 'Send');
+        : this.asking ? 'Deny with a note: tell it why, or what to do instead' : !msg.followUpSupported ? `${ui.HARNESS[run.harness] || run.harness} does not take follow-ups` : busy ? (window.OverseerContinuityText && window.OverseerContinuityText.isWaiting(run.status) ? 'Message for when it continues' : 'Message for when it finishes · ⌥⏎ stops and sends') : 'Reply…  (@ to mention a file)';
+      this.sendBtn.replaceChildren(ui.icon(busy && !this.asking ? 'history' : 'arrow-up'));
+      this.sendBtn.title = !canSend ? this.prompt.placeholder : this.asking ? 'Deny and send this note (Enter)' : busy ? 'Send when this turn ends (Enter) · stop and send now (⌥Enter)' : 'Send (Enter)';
+      this.sendBtn.setAttribute('aria-label', this.asking ? 'Deny with this note' : busy ? 'Queue message' : 'Send');
       this.tools.refresh();
       this.renderQueued(msg.queued);
       this.worktree = worktree; this.child = child;
@@ -202,11 +204,7 @@
       const d = window.OverseerConversation.describe(att.tool, att.input);
       const text = el('span', 'needs-text', `Allow ${d.pending || d.verb} ${d.target || ''}?`.replace(/\s+\?$/, '?'));
       text.title = d.full || att.tool;
-      const allow = el('button', 'btn primary sm', 'Allow once'); allow.type = 'button'; allow.dataset.permission = 'allow';
-      allow.addEventListener('click', () => this.post({ type: 'permission', request_id: att.request_id, allow: true }));
-      const deny = el('button', 'btn sm', 'Deny'); deny.type = 'button'; deny.dataset.permission = 'deny';
-      deny.addEventListener('click', () => this.post({ type: 'permission', request_id: att.request_id, allow: false }));
-      this.permBar.replaceChildren(ui.icon('shield', 'sm'), text, allow, deny);
+      this.permBar.replaceChildren(ui.icon('shield', 'sm'), text, ...window.OverseerConversation.permissionButtons(att.always, m => this.post({ type: 'permission', request_id: att.request_id, ...m })));
     }
 
     renderDetails() {
@@ -260,7 +258,8 @@
       const text = this.prompt.value.trim();
       if (!text || this.sendBtn.disabled) return;
       const { prompt, options } = this.tools.take();
-      if (this.busy) this.post({ type: 'steer', text: prompt, options, how });
+      if (this.asking) this.post({ type: 'permission', request_id: this.asking.request_id, allow: false, message: prompt });
+      else if (this.busy) this.post({ type: 'steer', text: prompt, options, how });
       else this.post({ type: 'followUp', text: prompt, options });
       this.prompt.value = ''; this.drafts.delete(this.runId); this.grow(); this.stick = true;
       this.opts.onState && this.opts.onState();

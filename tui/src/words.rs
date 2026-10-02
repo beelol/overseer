@@ -70,6 +70,54 @@ pub fn plain(text: &str) -> String {
     out.trim().trim_start_matches([':', ';', ',', '.']).trim().to_string()
 }
 
+fn is_request_id(w: &str) -> bool {
+    w.strip_prefix("V-").is_some_and(|n| n.len() >= 3 && n.chars().all(|c| c.is_ascii_digit()))
+}
+
+/// A spoken request in Overseer's conversation reaches Overseer as its notes, then
+/// "Request V-0001: <the words>"; the owner reads the words alone, never the id (AC-219).
+pub fn spoken(text: &str) -> Option<&str> {
+    let at = text.rfind("Request V-")?;
+    if at > 0 && !text[..at].ends_with('\n') {
+        return None;
+    }
+    let rest = &text[at + "Request ".len()..];
+    let (id, words) = rest.split_once(": ")?;
+    is_request_id(id).then(|| words.trim())
+}
+
+/// A voice request's id in Overseer's own words reads "the request" (AC-219).
+fn requests(text: &str) -> String {
+    let mut out: Vec<String> = Vec::new();
+    for w in text.split(' ') {
+        let core = w.trim_matches(|c: char| !(c.is_alphanumeric() || c == '-'));
+        if !is_request_id(core) {
+            out.push(w.to_string());
+            continue;
+        }
+        let tail = &w[w.find(core).unwrap() + core.len()..];
+        if out.last().is_some_and(|p| p == "(request") {
+            out.pop();
+            continue;
+        }
+        let capital = out.last().map_or(true, |p| p.ends_with(['.', '!', '?']));
+        match out.last().map(String::as_str) {
+            Some("request" | "Request") => {
+                let p = out.pop().unwrap();
+                if out.last().is_some_and(|q| matches!(q.as_str(), "your" | "the" | "Your" | "The")) {
+                    out.push(format!("{p}{tail}"));
+                } else {
+                    let capital = p == "Request" || out.last().map_or(true, |q| q.ends_with(['.', '!', '?']));
+                    out.push(format!("{} request{tail}", if capital { "The" } else { "the" }));
+                }
+            }
+            Some("your" | "the" | "Your" | "The") => out.push(format!("request{tail}")),
+            _ => out.push(format!("{} request{tail}", if capital { "The" } else { "the" })),
+        }
+    }
+    out.join(" ")
+}
+
 /// An agent's state words in Overseer's replies (it reads the daemon's roster): "waiting for you".
 pub fn states(text: &str) -> String {
     // A proposal's or an agent's id echoed into the reply ("(proposal p-…)") is left out.
@@ -77,6 +125,7 @@ pub fn states(text: &str) -> String {
         let core = w.trim_matches(|c: char| !(c.is_alphanumeric() || c == '-'));
         !is_id(core) && *w != "(proposal"
     }).collect::<Vec<_>>().join(" ");
+    t = requests(&t);
     for (raw, word) in [("waiting_for_user", "waiting for you"), ("waiting_for_connection", "waiting for a connection"), ("waiting_for_memory", "waiting for memory"), ("handed_off", "handed off"), ("cancel_requested", "stopping")] {
         t = t.replace(raw, word);
     }
@@ -109,6 +158,16 @@ mod tests {
         assert_eq!(plain("start failed: the codex harness is not installed"), "start failed: the Codex harness is not installed");
         assert_eq!(plain("waiting_for_user since r-198adab9b2b0"), "waiting for user since");
         assert_eq!(plain("Ollama: Connection Failed: Connect error: Connection refused (os error 61)"), "Ollama: could not connect");
+    }
+
+    #[test]
+    fn no_voice_request_ids() {
+        assert_eq!(spoken("(Spoken aloud to you in Voice Mode.)\nRequest V-0001: Tell Phone to rebase."), Some("Tell Phone to rebase."));
+        assert_eq!(spoken("Request V-0012: hello"), Some("hello"));
+        assert_eq!(spoken("Tell the Request V-0001: team"), None);
+        assert_eq!(spoken("rebase onto main"), None);
+        assert_eq!(states("Request V-0001 went to Phone. V-0002 is waiting_for_user."), "The request went to Phone. The request is waiting for you.");
+        assert_eq!(states("I sent your request V-0003 to Phone."), "I sent your request to Phone.");
     }
 
     #[test]

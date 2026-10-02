@@ -135,6 +135,7 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .home-voice[data-state="hearing"] .home-voice-state, .home-voice[data-state="speaking"] .home-voice-state { color: var(--ov-accent); }
 .home-voice-heard { min-width: 0; max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ov-muted); }
 .home-voice-heard:empty { display: none; }
+.home-from .home-when { margin-left: auto; font-variant-numeric: tabular-nums; }
 .home-msg.spoken .home-from .codicon-mic, .proposal.spoken .proposal-head .codicon-mic { color: var(--ov-accent); }
 .tile-voice { color: var(--ov-accent); flex: none; }
 .tile-voice[hidden] { display: none; }

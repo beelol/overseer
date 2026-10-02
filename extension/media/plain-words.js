@@ -42,6 +42,7 @@
     t = t.replace(/\s*\((?:os error \d+|errno \d+)\)/gi, '').replace(/\bConnection refused\b/g, 'could not connect').replace(/\bECONNREFUSED\b/g, 'could not connect').replace(/\bENOENT\b/g, 'not found');
     t = t.replace(/\bhttps?:\/\/(?:127\.0\.0\.1|localhost)[^\s)]*/g, '').replace(/\bHTTP [1-5]\d\d\b/g, '').replace(/\s*\((?:[1-5]\d\d)\)/g, '');
     t = t.replace(/\s*\((?:r|p|sh|w)-[0-9a-f]{6,}\)/g, '').replace(/\b(?:r|p|sh|w)-[0-9a-f]{8,}\b/g, 'it');
+    t = requests(t);
     t = t.replace(/\bmcp__[A-Za-z0-9_]+/g, m => tool(m));
     t = t.replace(/\bthe (claude|codex|opencode|codex-app) harness\b/g, (m, h) => harness(h));
     t = t.replace(/(?<![\w./@~:-])(claude|codex|opencode)(-app|-serve)?(?![\w./@-])/g, (m, h, x) => harness(h + (x || '')));
@@ -54,8 +55,22 @@
     return t.length > max ? t.slice(0, max - 1).trimEnd() + '…' : t;
   }
 
+  /**
+   * A voice request's id ("V-0001") stays in the daemon's records and logs, never in what the owner
+   * reads (AC-219): "(voice, request V-0001)" goes, "request V-0001" and a bare "V-0001" read "the
+   * request" ("The request" at a sentence's start).
+   */
+  function requests(text) {
+    return String(text || '')
+      .replace(/^\((?:voice,\s*)?request V-\d{3,}[^)]*\)\s*/, '')
+      .replace(/\s*\((?:voice,\s*)?request V-\d{3,}[^)]*\)/g, '')
+      .replace(/\b([Tt]he|[Yy]our)\s+(?:voice\s+)?request\s+V-\d{3,}\b/g, '$1 request')
+      .replace(/\b([Rr])equest\s+V-\d{3,}\b/g, (m, r) => r === 'R' ? 'The request' : 'the request')
+      .replace(/\bV-\d{3,}\b/g, (m, at, all) => at === 0 || /[.!?]\s*$/.test(all.slice(0, at)) ? 'The request' : 'the request');
+  }
+
   /** An agent's state words in Overseer's own replies (it reads the daemon's roster): "waiting for you", not waiting_for_user. */
-  const states = text => String(text || '').replace(/\s*\((?:proposal\s+)?(?:r|p|sh|w)-[0-9a-f]{6,}\)/g, '').replace(/\b(waiting_for_user|waiting_for_connection|waiting_for_memory|handed_off|cancel_requested|not_for_overseer)\b/g, m => TOKENS[m]);
+  const states = text => requests(text).replace(/\s*\((?:proposal\s+)?(?:r|p|sh|w)-[0-9a-f]{6,}\)/g, '').replace(/\b(waiting_for_user|waiting_for_connection|waiting_for_memory|handed_off|cancel_requested|not_for_overseer)\b/g, m => TOKENS[m]);
 
   /** Who answered and where, in words: "You, in VS Code". */
   function answeredBy(by, surface) {
@@ -64,5 +79,5 @@
     return [who, where === undefined ? '' : where].filter(Boolean).join(', ');
   }
 
-  return { plain, states, harness, tool, answeredBy, HARNESS, TOKENS };
+  return { plain, states, requests, harness, tool, answeredBy, HARNESS, TOKENS };
 });

@@ -196,7 +196,11 @@ fn overseer_view(f: &mut Frame, app: &App, area: Rect) {
             continue;
         }
         match source {
-            "owner" => wrap(text, " you › ", Style::new().add_modifier(Modifier::BOLD), &mut lines),
+            // A spoken request: the owner's words, not Overseer's notes or the request's id (AC-219).
+            "owner" => match crate::words::spoken(text) {
+                Some(words) => wrap(words, " you (by voice) › ", Style::new().add_modifier(Modifier::BOLD), &mut lines),
+                None => wrap(text, " you › ", Style::new().add_modifier(Modifier::BOLD), &mut lines),
+            },
             // Overseer's replies are Markdown (AC-245): bullets, bold and headings as a terminal draws them.
             "overseer" => {
                 let mut first = true;
@@ -394,6 +398,7 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
     }
     let keys: &[(&str, &str)] = match app.mode {
         Mode::DenyNote { .. } => &[("type", "a note for the agent"), ("enter", "deny"), ("esc", "cancel")],
+        Mode::Compose if app.focused().is_some_and(|r| r.permission_request().is_some()) => &[("enter", "deny with this note"), ("alt+enter", "new line"), ("esc", "close (keeps draft)"), ("ctrl+u", "clear")],
         Mode::Compose => &[("enter", "send"), ("alt+enter", "new line"), ("esc", "close (keeps draft)"), ("ctrl+u", "clear")],
         Mode::Zoom { .. } => &[("e", if app.expand_tools { "fold tools" } else { "expand tools" }), ("j/k", "scroll"), ("home/G", "top/bottom"), ("i", "message"), ("a/s/d", "allow once/session/deny"), ("x", "interrupt"), ("g/z", "grid"), ("?", "help")],
         Mode::NewAgent => &[("tab", "next field"), ("←/→", "choose"), ("enter", "start"), ("esc", "cancel")],
@@ -933,7 +938,9 @@ fn composer(f: &mut Frame, app: &App, area: Rect) {
     let Some(run) = app.focused() else { return };
     let draft = app.drafts.get(&run.id).cloned().unwrap_or_default();
     let blocker = app.message_blocker(run);
-    let title = Line::from(vec![Span::styled(" message → ", Style::new().fg(MUTED)), Span::styled(short(&run.title, 50), Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::raw(" ")]);
+    // A permission waits (AC-241): the reply denies it, and the agent reads it as the reason.
+    let lead = if run.permission_request().is_some() { " deny with a note → " } else { " message → " };
+    let title = Line::from(vec![Span::styled(lead, Style::new().fg(MUTED)), Span::styled(short(&run.title, 50), Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::raw(" ")]);
     let mut block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(accent())).title(title);
     if let Some(why) = &blocker {
         block = block.title_bottom(Line::from(Span::styled(format!(" can't send now: {why} "), Style::new().fg(waiting()))));
@@ -967,6 +974,7 @@ pub const HELP: &[(&str, &str)] = &[
     ("F  (review)", "Follow the agent's edits (a move pauses)"),
     ("e  (in zoom)", "expand tool inputs and results"),
     ("a  s  d", "allow / deny: once, this session, with a note"),
+    ("i  (waiting)", "a reply denies the permission; the agent reads it as the reason"),
     ("w", "next agent waiting for you"),
     ("x", "interrupt the focused agent"),
     ("n", "start a new agent"),

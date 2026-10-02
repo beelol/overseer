@@ -151,6 +151,16 @@ pub fn base_env(program: &str) -> BTreeMap<String, String> {
     env
 }
 
+/// A login folder the daemon was given for its harnesses (`CLAUDE_CONFIG_DIR`, `CODEX_HOME` named in
+/// OVERSEER_HARNESS_ENV_PASSTHROUGH and set), as a dev daemon with the owner's logins has (AC-221).
+pub fn chosen_login_dir(key: &str) -> Option<String> {
+    if key.is_empty() {
+        return None;
+    }
+    let named = std::env::var("OVERSEER_HARNESS_ENV_PASSTHROUGH").ok()?.split(',').any(|k| k.trim() == key);
+    std::env::var(key).ok().filter(|v| named && !v.is_empty())
+}
+
 /// Names that must never reach a harness even if a profile tries to set them.
 pub fn forbidden_env(key: &str) -> bool {
     let k = key.to_ascii_uppercase();

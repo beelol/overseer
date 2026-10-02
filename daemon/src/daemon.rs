@@ -573,6 +573,14 @@ impl Daemon {
                     "claude" => { env.insert("CLAUDE_CONFIG_DIR".into(), sys.join(".claude").display().to_string()); }
                     _ => {}
                 }
+            } else {
+                // A dev daemon given the owner's logins from chosen folders (AC-221): its desktop
+                // login is that folder, for the harness and for what Overseer reads of the account
+                // (identity, usage), never the Mac's default ~/.claude or ~/.codex.
+                let key = match profile.harness.as_str() { "codex" => "CODEX_HOME", "claude" => "CLAUDE_CONFIG_DIR", _ => "" };
+                if let Some(dir) = adapters::chosen_login_dir(key) {
+                    env.insert(key.into(), dir);
+                }
             }
         }
         if let Some(home) = &profile.home {
@@ -2940,6 +2948,15 @@ impl Daemon {
                     }
                     ev("permission", "daemon", "exact", json!({"kind": "permission", "request_id": request_id, "tool": tool, "auto_allowed": "Overseer's own tool"}), None)?;
                     return Ok(());
+                }
+                // Allowed for this session already (AC-241): the same offer is answered by the
+                // daemon, so the owner is not asked again even if the harness asks.
+                if let Some(offer) = always.as_ref().filter(|o| o["label"].as_str().is_some_and(|l| store.allowed_for_session(&run.id, l).unwrap_or(false))) {
+                    if let Some(reply) = adapters::permission_reply_always(&run.harness, &request_id, true, &input, "", Some(offer)) {
+                        state.sends.push(reply);
+                        ev("permission", "daemon", "exact", json!({"kind": "permission", "request_id": request_id, "tool": tool, "input": input, "auto_allowed": "allowed for this session", "always": offer["label"]}), None)?;
+                        return Ok(());
+                    }
                 }
                 let mut attention = json!({"kind": "permission", "request_id": request_id, "tool": tool, "input": input});
                 if let Some(offer) = always { attention["always"] = offer; }

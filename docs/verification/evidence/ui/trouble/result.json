@@ -1,0 +1,101 @@
+{
+  "checks": [
+    {
+      "name": "the agent hit its usage limit, recorded with its raw reason in the daemon",
+      "ok": true,
+      "detail": {
+        "status": "failed",
+        "exit_reason": "turn reported failure; last error [rate_limit]: API Error: Request rejected (429) · rate limited",
+        "plain_reason": "Reached its account's usage limit"
+      }
+    },
+    {
+      "name": "home shows one Overseer card with the plain reason",
+      "ok": true,
+      "detail": {
+        "cards": [
+          "write the API reached its account's usage limit."
+        ],
+        "troubleMessages": 1
+      }
+    },
+    {
+      "name": "the request's stage line says it in the same plain words",
+      "ok": true,
+      "detail": [
+        "write the API reached its account's usage limit"
+      ]
+    },
+    {
+      "name": "Overseer proposes continuing on the other account (Work)",
+      "ok": true,
+      "detail": [
+        "Start “write the API” in /private/tmp/ovs-ui-9l737F/site on Claude Code",
+        "Continue write the API on account Work"
+      ]
+    },
+    {
+      "name": "home shows no error class or HTTP code (text, titles and labels)",
+      "ok": true,
+      "detail": {}
+    },
+    {
+      "name": "the side bar's tooltip gives the plain reason, no error class or HTTP code",
+      "ok": true,
+      "detail": {
+        "tip": "write the API\n\nfailed — Reached its account's usage limit\n\nClaude Code · Claude Fixture · fix…@example.test · Mac's default login\n\noverseer/write-the-api · site\nwrite the API\n\nfailed — Reached its account's usage limit\n\nClaude Code · Claude Fixture · fix…@example.test · Mac's default login\n\noverseer/write-the-api · site"
+      }
+    },
+    {
+      "name": "the agent's chat says it in plain words: its error, its status line's tooltip and its details",
+      "ok": true,
+      "detail": {
+        "errors": [
+          "Rate limited\nIt hit its usage limit. It can go on later, or on another account.",
+          "Rate limited\nIt hit its usage limit. It can go on later, or on another account."
+        ],
+        "meta": "Reached its account's usage limit",
+        "details": [
+          "Failed (Reached its account's usage limit)",
+          "Claude Code claude-fixture 0.0.0 (synthetic)"
+        ]
+      }
+    },
+    {
+      "name": "the agent's chat shows no error class or HTTP code (text, titles and labels)",
+      "ok": true,
+      "detail": {}
+    },
+    {
+      "name": "the agent's chat has no line naming the daemon's record (\"trouble\")",
+      "ok": true,
+      "detail": [
+        "Overseer added what it knows[What Overseer knows from its conversation with the owner (use what helps; ask Overseer for more):\nThe owner said: “start an agent to write the API”]"
+      ]
+    },
+    {
+      "name": "the agent's chat shows what Overseer added to its task",
+      "ok": true,
+      "detail": [
+        "Overseer added what it knows[What Overseer knows from its conversation with the owner (use what helps; ask Overseer for more):\nThe owner said: “start an agent to write the API”]"
+      ]
+    },
+    {
+      "name": "Yes continues the work on the second account, in the same task and worktree",
+      "ok": true,
+      "detail": {
+        "before": "handed_off",
+        "next": {
+          "profile": "p-74ef16a3213b",
+          "status": "completed",
+          "same_worktree": true
+        }
+      }
+    },
+    {
+      "name": "home after the continue still shows no error class or HTTP code",
+      "ok": true,
+      "detail": {}
+    }
+  ]
+}

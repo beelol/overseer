@@ -896,7 +896,7 @@ function seenBefore(w: Work, seq: number): boolean {
 /** Kinds that say nothing in a chat, and kinds the chat has a picture for; any other is a quiet line (conversation.js QUIET and KNOWN). */
 const QUIET = new Set([
   'session', 'task_created', 'reattached', 'interrupt_requested', 'workspace_removed', 'background_notice', 'daemon_stopping', 'status', 'usage', 'overseer_tool_call', 'overseer_action', 'outside_area',
-  'going_in_circles', 'check_in_started', 'watch_wake', 'watcher_started', 'watch_capped', 'watch_copy_removed', 'oversight_moved', 'dispatch', 'area', 'conflict', 'conflict_closed', 'push',
+  'going_in_circles', 'check_in_started', 'watch_wake', 'watcher_started', 'watch_capped', 'watch_copy_removed', 'oversight_moved', 'dispatch', 'area', 'conflict', 'conflict_closed', 'push', 'trouble',
 ]);
 const KNOWN = new Set([
   'auto_decision', 'turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed',
@@ -1161,7 +1161,7 @@ function add(w: Work, ev: DaemonEvent): void {
     case 'briefing': {
       // What Overseer added to the agent's prompt: one line, the briefing when it is opened.
       const place = placeFor(w, ev);
-      put(w, place.end, [{ ...base(place, `note:${ev.seq}`, run, ev.seq), kind: 'note', text: TEXT.oversight.briefing, status: null, icon: 'info', tooltip: null, detail: String(p['text'] || '') }]);
+      put(w, place.end, [{ ...base(place, `note:${ev.seq}`, run, ev.seq), kind: 'note', text: p['line'] ? String(p['line']) : TEXT.oversight.briefing, status: null, icon: 'info', tooltip: null, detail: String(p['text'] || '') }]);
       break;
     }
     // Overseer's own conversation (its proposals and message cards) and Auto's decisions are not

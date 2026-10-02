@@ -7,6 +7,7 @@ pub mod away;
 pub mod channel;
 pub mod checkin;
 pub mod conflicts;
+pub mod context;
 pub mod control;
 pub mod digest;
 pub mod finished;

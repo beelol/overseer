@@ -1,5 +1,11 @@
 # AC-146: merges
 
+## Pull requests #47 and #48 (plain words, answering a waiting agent, dev logins; Overseer as the manager), 2026-10-02
+
+- **Finished:** both built by builders on the coordinator's briefs and marked ready.
+- **Throwaway copy:** #47 and #48 merged onto main in one copy (clean). `test-all --no-ui`: Rust 1,446 passed, phone 152 and 477, dev, guided, deploy, links. UI one at a time (LIVE, ON SCREEN, perf skipped): 72 of 74; sidebar passed alone; audit failed alone (the grid's visible text 1001 against Gate J's 993, from #47's waiting tile placeholder "Deny with a note"): fixed on #47 (`d3b1202e`, "Why not?" with the explanation in the tooltip), then audit, answer-waiting and grid passed alone. popout passed with the Mac idle (owner away 5 hours).
+- **Merged:** squash, #47 `c1441171`, #48 `752f33d7`. AC-219, AC-221, AC-231, AC-239, AC-241 verified; AGENTS.md's `--owner-logins` line updated (AC-221).
+
 ## Pull request #46 (the TUI's T-30 to T-36), 2026-10-01
 
 - **Finished:** built by a builder on the coordinator's brief, one commit per criterion; it adds a `session-rule` mode to the shared Claude fixture.
