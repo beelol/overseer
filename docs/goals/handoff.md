@@ -119,6 +119,14 @@ Mergeability against main, checked 2026-09-30 00:00 with `git merge-tree --write
 ## Owner decisions on record
 
 - Goals (2026-10-02): an agent goal's default limits are 20 tries or 4 hours (1a); at Auto, setting Overseer's own goal goes out after the 2-second window like other typed things, at the other levels it needs a yes (2b, "auto is fine"). Still open: question 3 (Claude Code's own `/goal` or Overseer continuing every agent the same way). The owner asked what the model picker is called (today: the setting "Auto routing", the RFC auto-mode.md, "route picking" in orchestrator.md); offered names: Auto pick, Smart routing, Model picker, keep Auto routing.
+- Owner's answers, 2026-10-02 (later the same day):
+  - Goals (3a): Claude Code agents use Claude Code's own `/goal`, and Codex its equivalent however it works; Overseer monitors that the agent follows the goal (checks at each stop).
+  - TUI Devices key (4): the owner wants something canonical (Cmd-P or Ctrl-P, whichever has no conflict). Cmd keys never reach a terminal app; Ctrl-P is free; phone access already opens with `O`. Proposed to the owner: Devices inside `O` (no separate key), or Ctrl-P if they want one.
+  - Dashboard `J` and "reviewed" (5): explained again in plain words; proposed: an agent counts as reviewed only after its changes stay on screen a few seconds. Awaiting the answer.
+  - Overseer setting Auto by itself (6): `overseer.auto_repos` starts empty, and Overseer always tells the owner and asks before switching any agent to Auto (so the owner learns how it works). Build this into #49's follow-up.
+  - Live tests (7): up to $10, using the account logins (subscription usage only). Asked whether that includes the Claude login (the no-Claude rule since 2026-09-28).
+  - Undo and rewind (8): later. Undo reverses an agent's file changes; rewind pauses the current task and undoes its last step.
+  - Swarm (9): the owner starts Swarm; Overseer may suggest it for a giant or mixed (research plus building) task and ask. The model picker needs a name (it's "Auto routing" today, confused with the Auto permission mode); offered: Model picker (recommended), Smart routing, Auto pick.
 - Stop pauses an agent's queue; queued messages go out only when the owner resumes them by hand (2026-10-02): AC-265, not started, next builder.
 
 - Menu bar (AC-262):
