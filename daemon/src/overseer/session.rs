@@ -558,7 +558,18 @@ impl Daemon {
 
     // ------------------------------------------------------------------ proposals and actions
 
+    /// An action as the owner reads it; one for an agent still blocked on the owner's permission
+    /// says so (AC-241).
     fn describe(&self, a: &Value) -> String {
+        let line = self.describe_action(a);
+        let blocked = a["blocked_on"].as_str().is_some() && a["agent"].as_str().and_then(|id| self.run(id).ok()).as_ref().and_then(blocked_on_permission).is_some();
+        match a["blocked_on"].as_str().filter(|_| blocked) {
+            Some(b) => format!("{line} ({b}: answer the permission first?)"),
+            None => line,
+        }
+    }
+
+    fn describe_action(&self, a: &Value) -> String {
         let who = |id: &str| self.run(id).map(|r| r.title).unwrap_or_else(|_| id.to_string());
         match a["action"].as_str().unwrap_or("") {
             "message" => format!("Send {}: “{}”", who(a["agent"].as_str().unwrap_or("?")), a["text"].as_str().unwrap_or("")),
@@ -806,6 +817,13 @@ impl Daemon {
                 }
                 a["title"] = json!(run.title);
                 a["status_then"] = json!(run.status);
+                // An agent waiting on the owner's permission takes no message until it is answered
+                // (AC-241): the proposal says so instead of reporting it sent.
+                if matches!(kind, "message" | "redirect" | "answer" | "share" | "report") {
+                    if let Some(blocked) = blocked_on_permission(&run) {
+                        a["blocked_on"] = json!(blocked);
+                    }
+                }
                 checked.push(a);
             } else {
                 if a["repo"].as_str().unwrap_or("").is_empty() || a["prompt"].as_str().unwrap_or("").is_empty() {
@@ -899,6 +917,7 @@ impl Daemon {
         let id = format!("p-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
         let now = crate::daemon::now();
         let lines: Vec<String> = checked.iter().map(|a| self.describe(a)).collect();
+        let blocked: Vec<String> = checked.iter().filter_map(|a| a["blocked_on"].as_str().map(str::to_string)).collect();
         let last_message: Option<String> = self.store.lock().unwrap().conn.query_row("SELECT id FROM overseer_messages WHERE session_id=?1 AND source='overseer' ORDER BY seq DESC LIMIT 1", [&sid], |r| r.get(0)).ok();
         self.store.lock().unwrap().conn.execute("INSERT INTO overseer_proposals(id, session_id, message_id, ts, actions, state, source) VALUES(?1, ?2, ?3, ?4, ?5, 'open', ?6)", rusqlite::params![id, sid, last_message, now, serde_json::to_string(&checked)?, source])?;
         let state = if settle { "settling" } else { "open" };
@@ -922,6 +941,11 @@ impl Daemon {
             json!({"proposal": id, "state": "open", "done": false, "result": "Proposed to the owner; nothing happens until they say yes."})
         };
         out["starts"] = json!(starts);
+        if !blocked.is_empty() {
+            // Overseer tells the owner, and asks whether to answer the permission (AC-241).
+            out["blocked"] = json!(blocked);
+            out["result"] = json!(format!("{} Not delivered yet: {}. Tell the owner, and ask whether to answer the permission.", out["result"].as_str().unwrap_or(""), blocked.join("; ")));
+        }
         Ok(out)
     }
 
@@ -1096,7 +1120,9 @@ impl Daemon {
                 }
             });
         }
-        let result = format!("Done: {}.", done.join("; "));
+        // Nothing reached an agent blocked on the owner's permission: never "Done" (AC-241).
+        let waiting = done.iter().all(|t| t.contains(" is blocked on your permission"));
+        let result = format!("{}{}.", if waiting { "Waiting on you: " } else { "Done: " }, done.join("; "));
         let _ = session;
         finish("yes", &result)
     }
@@ -1297,6 +1323,11 @@ impl Daemon {
                 let text = a["text"].as_str().unwrap_or("").to_string();
                 let delivery = self.queue_message(agent, &text, "overseer", json!({"proposal": proposal, "by": by}))?;
                 self.dispatch_record(proposal, agent, "message", "add", &text, a["why"].as_str().unwrap_or("named"), if delivery == "queued" { "held" } else { "delivered" })?;
+                if delivery == "queued" {
+                    if let Some(blocked) = self.run(agent).ok().as_ref().and_then(blocked_on_permission) {
+                        return Ok(format!("{blocked}: \"{text}\" waits until you answer it"));
+                    }
+                }
                 Ok(format!("sent \"{text}\" to {title}{}", if delivery == "queued" { " (queued until its turn ends)" } else { "" }))
             }
             "stop" => {
@@ -1895,4 +1926,15 @@ fn handle_event(d: &Arc<Daemon>, e: &crate::store::Event) -> Result<()> {
 /// The events the session loop waits for, to keep them in one place.
 pub fn is_session_event(kind: &str) -> bool {
     matches!(kind, "output" | "turn_done" | "status")
+}
+
+/// "Phone is blocked on your permission to use Write" while the agent waits on the owner's
+/// permission (AC-241); None otherwise.
+pub(crate) fn blocked_on_permission(run: &crate::store::Run) -> Option<String> {
+    let a = run.attention.as_ref().filter(|a| a["kind"] == "permission")?;
+    if run.status != "waiting_for_user" {
+        return None;
+    }
+    let tool = a["tool"].as_str().filter(|t| !t.is_empty()).map(|t| format!(" to use {t}")).unwrap_or_default();
+    Some(format!("{} is blocked on your permission{tool}", run.title))
 }

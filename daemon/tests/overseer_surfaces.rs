@@ -138,7 +138,7 @@ fn ac199_a_typed_request_and_the_same_spoken_request_leave_cards_of_one_form() {
     }
     let sent = t["message"].as_str().unwrap();
     let spoken_text = v["message"].as_str().unwrap();
-    let source = format!("(voice, request {rq}) The owner said: “Tell Phone to use the new wire format.”\nFor you: ");
+    let source = format!("(by voice) The owner said: “Tell Phone to use the new wire format.”\nFor you: ");
     assert_eq!(spoken_text.strip_prefix(source.as_str()), Some(sent), "the spoken text is the typed text after its source: {spoken_text:?}");
     let strip = |a: &Value| {
         let mut a = a.clone();

@@ -4,6 +4,10 @@
 //   nested:      Agent -> child -> grandchild, with a duplicated event and the grandchild's
 //                messages delivered before its parent's tool_use (delayed parent)
 //   permission:  asks can_use_tool for Write, waits for allow/deny, writes the file if allowed
+//   permission-twice: asks for Write twice (one.txt, then two.txt), each time offering Claude Code's
+//                session rule for Write; it asks again whatever it was told, so only Overseer's own
+//                memory keeps the owner from being asked twice (AC-241). Each decision is appended
+//                to answers.jsonl in its worktree.
 //   ratelimit / quota / auth: emits the corresponding error result formats
 //   prose:       says it delegated but never launches a child
 //   background:  interim result while a background Agent runs, then a Write permission request
@@ -156,6 +160,23 @@ async function mcpClient() {
     const decision = reply.response.response;
     if (decision.behavior === 'allow') { fs.writeFileSync(file, decision.updatedInput.content); user([{ type: 'tool_result', tool_use_id: 'toolu_write', content: 'File created successfully at: ' + file }]); assistant([{ type: 'text', text: 'wrote perm.txt' }]); result(false, 'wrote'); }
     else { user([{ type: 'tool_result', tool_use_id: 'toolu_write', content: 'Permission denied: ' + decision.message, is_error: true }]); assistant([{ type: 'text', text: 'permission denied: ' + decision.message }]); result(false, 'denied'); }
+  } else if (mode === 'permission-twice') {
+    const suggestions = [{ type: 'addRules', rules: [{ toolName: 'Write' }], behavior: 'allow', destination: 'session' }];
+    let denied = false;
+    for (const [n, name] of [[1, 'one.txt'], [2, 'two.txt']]) {
+      const file = path.join(process.cwd(), name);
+      const input = { file_path: file, content: `${name}\n` };
+      assistant([{ type: 'tool_use', id: `toolu_write${n}`, name: 'Write', input }]);
+      out({ type: 'control_request', request_id: `req-${n}`, request: { subtype: 'can_use_tool', tool_name: 'Write', input, permission_suggestions: suggestions } });
+      const reply = await next(m => m.type === 'control_response' || (m.type === 'control_request' && m.request?.subtype === 'interrupt'));
+      if (reply.type === 'control_request') { result(true, 'interrupted'); await sleep(50); process.exit(130); }
+      const decision = reply.response.response;
+      fs.appendFileSync(path.join(process.cwd(), 'answers.jsonl'), JSON.stringify({ request_id: reply.response.request_id, ...decision }) + '\n');
+      if (decision.behavior === 'allow') { fs.writeFileSync(file, input.content); user([{ type: 'tool_result', tool_use_id: `toolu_write${n}`, content: 'File created successfully at: ' + file }]); }
+      else { user([{ type: 'tool_result', tool_use_id: `toolu_write${n}`, content: 'Permission denied: ' + decision.message, is_error: true }]); assistant([{ type: 'text', text: 'permission denied: ' + decision.message }]); denied = true; break; }
+    }
+    if (!denied) assistant([{ type: 'text', text: 'wrote one.txt and two.txt' }]);
+    result(false, denied ? 'denied' : 'wrote');
   } else if (mode === 'background') {
     assistant([{ type: 'tool_use', id: 'toolu_bg', name: 'Agent', input: { description: 'background child', prompt: 'hi' } }]);
     out({ type: 'system', subtype: 'background_tasks_changed', session_id: sid, tasks: [{ task_id: 't1', task_type: 'local_agent' }] });

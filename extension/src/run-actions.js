@@ -66,7 +66,9 @@ async function handleRunMessage({ client, model, steering }, runId, message, rep
     case 'interrupt': await client.request('run.interrupt', { run_id: runId }); return true;
     case 'continuity': return require('./continuity').handleMessage(steering?.continuity, runId, message);
     case 'permission':
-      await client.request('run.permission', { run_id: runId, request_id: String(message.request_id), allow: !!message.allow });
+      // Allow once, Allow for this session (the harness's rule) or Deny with a note (AC-241).
+      await client.request('run.permission', { run_id: runId, request_id: String(message.request_id), allow: !!message.allow || !!message.always,
+        ...(message.always ? { always: true } : {}), ...(!message.allow && message.message ? { message: String(message.message).slice(0, 4000) } : {}) });
       model.scheduleRefresh();
       return true;
     case 'raw': reply({ type: 'raw', raw: await client.request('run.raw_output', { run_id: runId, max_bytes: 512 * 1024 }) }); return true;

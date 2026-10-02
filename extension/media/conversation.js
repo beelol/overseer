@@ -425,8 +425,10 @@
           break;
         }
         case 'permission': {
-          if (p.auto_allowed) break; // Overseer's own tools: the daemon answered already (Gate S)
-          const card = { el: el('div', 'perm-card'), tool: p.tool, input: p.input, run: ev.run_id || this.rootId };
+          // Allowed for this session earlier (AC-241): answered by the daemon, shown as answered.
+          const session = p.auto_allowed === 'allowed for this session';
+          if (p.auto_allowed && !session) break; // Overseer's own tools: the daemon answered already (Gate S)
+          const card = { el: el('div', 'perm-card'), tool: p.tool, input: p.input, run: ev.run_id || this.rootId, always: p.always, answer: session ? 'session' : undefined };
           this.perms.set(p.request_id, card);
           this.container(ev).append(card.el);
           this.renderPermission(p.request_id, card);
@@ -434,7 +436,7 @@
         }
         case 'permission_answered': {
           const card = this.perms.get(p.request_id);
-          if (card) { card.answer = p.allow ? 'allowed' : 'denied'; this.renderPermission(p.request_id, card); }
+          if (card) { card.answer = p.allow ? (p.always ? 'session' : 'allowed') : 'denied'; this.renderPermission(p.request_id, card); }
           break;
         }
         case 'error': {
@@ -592,23 +594,19 @@
 
     renderPermission(id, card) {
       const pending = !card.answer && this.attention === id;
-      card.el.className = 'perm-card' + (pending ? ' pending' : ' ' + (card.answer || 'asked'));
+      card.el.className = 'perm-card' + (pending ? ' pending' : ' ' + (card.answer === 'session' ? 'allowed' : card.answer || 'asked'));
       const d = describe(card.tool, card.input);
       const what = `${d.pending || d.verb} ${d.target || ''}`.trim();
       const head = el('div', 'perm-head');
-      head.append(ui.icon(pending ? 'shield' : card.answer === 'allowed' ? 'check' : card.answer === 'denied' ? 'circle-slash' : 'shield', 'sm'),
-        el('span', null, pending ? `Allow ${what}?` : card.answer === 'allowed' ? `Allowed · ${what}` : card.answer === 'denied' ? `Denied · ${what}` : `Asked · ${what}`));
+      head.append(ui.icon(pending ? 'shield' : card.answer === 'allowed' || card.answer === 'session' ? 'check' : card.answer === 'denied' ? 'circle-slash' : 'shield', 'sm'),
+        el('span', null, pending ? `Allow ${what}?` : card.answer === 'allowed' ? `Allowed · ${what}` : card.answer === 'session' ? `Allowed for this session · ${what}` : card.answer === 'denied' ? `Denied · ${what}` : `Asked · ${what}`));
       head.title = d.full || card.tool;
       const kids = [head];
       if (pending) {
         const parsed = parseInput(card.input);
         const preview = parsed.command || parsed.content || parsed.new_string;
         if (preview) kids.push(el('pre', 'code perm-preview', String(preview).split('\n').slice(0, 8).join('\n')));
-        const allow = el('button', 'btn primary sm', 'Allow once'); allow.type = 'button'; allow.dataset.permission = 'allow';
-        allow.addEventListener('click', () => this.opts.post({ type: 'permission', request_id: id, allow: true }));
-        const deny = el('button', 'btn sm', 'Deny'); deny.type = 'button'; deny.dataset.permission = 'deny';
-        deny.addEventListener('click', () => this.opts.post({ type: 'permission', request_id: id, allow: false }));
-        const row = el('div', 'perm-actions'); row.append(allow, deny); kids.push(row);
+        const row = el('div', 'perm-actions'); row.append(...Conversation.permissionButtons(card.always, m => this.opts.post({ type: 'permission', request_id: id, ...m }))); kids.push(row);
       }
       const det = el('details', 'perm-input'); const s = el('summary', null, 'Request'); s.title = 'The exact request the agent sent';
       det.append(s, el('pre', 'code', JSON.stringify(card.input, null, 2).slice(0, 4000)));
@@ -618,6 +616,18 @@
   }
   Conversation.KNOWN = new Set(['auto_decision', 'turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed', 'proposal', 'proposal_answered', 'queued', 'briefing', 'overseer_message', 'redirect', 'hold', 'release', 'guardrail', 'guardrail_crossed', 'check_in', 'report', 'ask', 'claim', 'share', 'share_withdrawn', 'finding', 'watch_started', 'watch_ended', 'handoff', 'remote_command', 'merge_back', 'pull_request']);
   Conversation.describe = describe;
+  /**
+   * A waiting permission's answers (AC-241): Allow once, Allow for this session when the harness
+   * offers its rule (`always`: {label}), and Deny. A note goes with Deny from the reply box.
+   * `send({ allow, always? })` answers it.
+   */
+  Conversation.permissionButtons = (always, send, { short } = {}) => {
+    const b = (label, cls, kind, msg, tip) => { const x = el('button', cls, label); x.type = 'button'; x.dataset.permission = kind; if (tip) { x.title = tip; } x.addEventListener('click', () => send(msg)); return x; };
+    const out = [b(short ? 'Allow' : 'Allow once', 'btn primary sm', 'allow', { allow: true }, 'Allow this one request')];
+    if (always && always.label) out.push(b(short ? 'For session' : 'Allow for this session', 'btn sm', 'always', { allow: true, always: true }, `Allow and don't ask again: ${always.label}`));
+    out.push(b('Deny', 'btn sm', 'deny', { allow: false }, 'Deny it. To tell the agent why or what to do instead, type it in the reply box and send'));
+    return out;
+  };
 
   window.OverseerConversation = Conversation;
 })();

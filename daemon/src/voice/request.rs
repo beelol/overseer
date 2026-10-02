@@ -21,11 +21,11 @@ use std::time::{Duration, Instant};
 
 /// What Overseer is told about a spoken request that may not have been meant for it: it judges,
 /// and nothing has been said yet (AC-228).
-const VOICE_NOTE: &str = "(Spoken aloud to you in Voice Mode. Answer in one or two short sentences: they are read out. If this was not meant for you, reply exactly NOT_FOR_OVERSEER and propose nothing. When you message agents, write only what each should do; the daemon adds the owner's words. Give each action a confidence of high, medium or low; when low, ask one short question instead of proposing.)";
+const VOICE_NOTE: &str = "(Spoken aloud to you in Voice Mode. Answer in one or two short sentences: they are read out. If this was not meant for you, reply exactly NOT_FOR_OVERSEER and propose nothing. When you message agents, write only what each should do; the daemon adds the owner's words. Give each action a confidence of high, medium or low; when low, ask one short question instead of proposing. Never name a request's id (V-…) to the owner: say \"your request\".)";
 /// What Overseer is told about a spoken request that was surely for it (it names Overseer or gives
 /// a command): the daemon has already said "On it.", so Overseer answers or acts, and asks one
 /// short question when it cannot place what is meant (AC-228, AC-229).
-const VOICE_NOTE_TAKEN: &str = "(Spoken aloud to you in Voice Mode, and meant for you: answer it or act on it. Answer in one or two short sentences: they are read out. When you message agents, write only what each should do; the daemon adds the owner's words. Give each action a confidence of high, medium or low; when low, ask one short question instead of proposing.)";
+const VOICE_NOTE_TAKEN: &str = "(Spoken aloud to you in Voice Mode, and meant for you: answer it or act on it. Answer in one or two short sentences: they are read out. When you message agents, write only what each should do; the daemon adds the owner's words. Give each action a confidence of high, medium or low; when low, ask one short question instead of proposing. Never name a request's id (V-…) to the owner: say \"your request\".)";
 
 /// The rolling context: words heard that were not a request, kept in memory for ten minutes.
 struct Heard {
@@ -1886,13 +1886,12 @@ pub fn decorate(d: &Daemon, actions: &mut [Value]) -> Result<bool> {
             })
             .cloned()
     };
-    let (id, words) = match &open {
-        Some(o) => (o.id.clone(), o.words.clone()),
-        None => (String::new(), String::new()),
-    };
-    let head = match open.as_ref().and_then(|o| o.replaces_sent.clone()) {
-        Some(old) => format!("(voice, request {id}, replaces {old}, which was already sent)"),
-        None => format!("(voice, request {id})"),
+    let words = open.as_ref().map(|o| o.words.clone()).unwrap_or_default();
+    // The request's id stays in the daemon's records and logs, never in what the owner reads in
+    // the agent's chat (AC-219).
+    let head = match open.as_ref().and_then(|o| o.replaces_sent.as_ref()) {
+        Some(_) => "(by voice; it replaces an earlier spoken request that was already sent)".to_string(),
+        None => "(by voice)".to_string(),
     };
     let starts = actions.iter().filter(|a| a["action"] == "start").count() as u64;
     if starts > 8 {
@@ -2006,7 +2005,7 @@ pub fn decorate(d: &Daemon, actions: &mut [Value]) -> Result<bool> {
                 full = full.replacen(
                     &format!("“{words}”"),
                     &format!(
-                        "“{cut}…” (cut here: the whole request is {id} in Overseer's conversation)"
+                        "“{cut}…” (cut here: the whole request is in Overseer's conversation)"
                     ),
                     1,
                 );

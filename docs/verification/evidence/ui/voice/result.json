@@ -29,17 +29,17 @@
       "name": "hearing: the star grows with the voice and swings with its syllables",
       "ok": true,
       "detail": {
-        "frames": 176,
-        "max": 1.7928473724432887,
-        "min": 1.4414030048998543
+        "frames": 170,
+        "max": 1.7811669690711915,
+        "min": 1.393932817775886
       }
     },
     {
       "name": "levels arrive at least every 100 ms while the owner speaks (25 a second)",
       "ok": true,
       "detail": {
-        "jumps": 77,
-        "spacing": 44.10000002384186
+        "jumps": 74,
+        "spacing": 42.19999998807907
       }
     },
     {
@@ -47,17 +47,17 @@
       "ok": true,
       "detail": {
         "lag": 40,
-        "r": 0.9,
-        "frames": 176,
-        "levels": 77
+        "r": 0.89,
+        "frames": 170,
+        "levels": 74
       }
     },
     {
       "name": "speaking: rings of light cross the core and the star stays under 1.3x",
       "ok": true,
       "detail": {
-        "scale": 1.2032605584007563,
-        "glow": 0.415391442717739,
+        "scale": 1.2847098118579594,
+        "glow": 0.5087781036789635,
         "rings": 1,
         "still": false,
         "meter": null,
@@ -68,12 +68,24 @@
       "name": "thinking: the star turns, 12% larger",
       "ok": true,
       "detail": {
-        "scale": 1.1875118985351905,
-        "glow": 0.32862904622032735,
+        "scale": 1.1988195669494157,
+        "glow": 0.3522564672565097,
         "rings": 0,
         "still": false,
         "meter": null,
         "state": "thinking"
+      }
+    },
+    {
+      "name": "the request card shows the words, the state and the time, and its accessible name reads without the request id (AC-219)",
+      "ok": true,
+      "detail": {
+        "name": "You, by voice, at 2:55 PM: Tell Phone to use the new wire format.",
+        "role": "group",
+        "time": "2:55 PM",
+        "stage": "Phone is working · 0s",
+        "request": "V-0001",
+        "sentToAgent": "(by voice) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.\n\nWhy: you named it · added to its work\nheld 02:55:27 PM · sent 02:55:27 PM · delivered 02:55:27 PM"
       }
     },
     {
@@ -82,16 +94,16 @@
       "detail": {
         "words": "Tell Phone to use the new wire format.",
         "stage": "Phone is working · 0s",
-        "row": "Phonenamed · adddelivered12:59:45 AM",
-        "full": "(voice, request V-0001) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.\n\nWhy: named · delivery: add\nheld 12:59:45 AM · sent 12:59:45 AM · delivered 12:59:45 AM"
+        "row": "Phoneyou named it · added to its workdelivered02:55:27 PM",
+        "full": "(by voice) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.\n\nWhy: you named it · added to its work\nheld 02:55:27 PM · sent 02:55:27 PM · delivered 02:55:27 PM"
       }
     },
     {
       "name": "muted: the mark is still with the mute sign, and no listener runs",
       "ok": true,
       "detail": {
-        "scale": 1.0003685325842384,
-        "glow": 0.1804298074287741,
+        "scale": 1.000417324673107,
+        "glow": 0.18048596848526177,
         "rings": 0,
         "still": true,
         "meter": null,
@@ -106,10 +118,10 @@
       "name": "beside a streaming chat, the animation keeps up at 60 frames a second: work per frame p95 under 16 ms, and frames arrive at the display's rate",
       "ok": true,
       "detail": {
-        "n": 226,
-        "work_p95": 0.10000002384185791,
+        "n": 222,
+        "work_p95": 0.19999998807907104,
         "interval_median": 16.69999999999709,
-        "interval_p95": 18.30000000000291,
+        "interval_p95": 17.5,
         "dropped": 0,
         "groups": 2
       }
@@ -119,19 +131,19 @@
       "ok": true,
       "detail": {
         "visibility": "not shown",
-        "f1": 5534,
-        "f2": 5534
+        "f1": 5427,
+        "f2": 5427
       }
     },
     {
       "name": "reduced motion: a still mark and a level meter",
       "ok": true,
       "detail": {
-        "scale": 1.6899538582786167,
-        "glow": 0.829061892956929,
+        "scale": 1.6773462667650225,
+        "glow": 0.8180954064684789,
         "rings": 0,
         "still": true,
-        "meter": 0.8117104215042551,
+        "meter": 0.7968779609000266,
         "state": "hearing"
       }
     },
@@ -233,47 +245,47 @@
         "chats": [
           {
             "tag": "overseer",
-            "id": "r-cf8d15f5aaa5",
+            "id": "r-d8f600b21e8b",
             "shows": true
           },
           {
             "tag": "overseer",
-            "id": "r-c022e08158af",
+            "id": "r-5f820aaa782c",
             "shows": true
           },
           {
             "tag": "overseer",
-            "id": "r-554d070247dc",
+            "id": "r-7df4f68f7f8b",
             "shows": true
           },
           {
             "tag": "dark",
-            "id": "r-cf8d15f5aaa5",
+            "id": "r-d8f600b21e8b",
             "shows": true
           },
           {
             "tag": "dark",
-            "id": "r-c022e08158af",
+            "id": "r-5f820aaa782c",
             "shows": true
           },
           {
             "tag": "dark",
-            "id": "r-554d070247dc",
+            "id": "r-7df4f68f7f8b",
             "shows": true
           },
           {
             "tag": "light",
-            "id": "r-cf8d15f5aaa5",
+            "id": "r-d8f600b21e8b",
             "shows": true
           },
           {
             "tag": "light",
-            "id": "r-c022e08158af",
+            "id": "r-5f820aaa782c",
             "shows": true
           },
           {
             "tag": "light",
-            "id": "r-554d070247dc",
+            "id": "r-7df4f68f7f8b",
             "shows": true
           }
         ]
@@ -284,12 +296,12 @@
       "ok": true,
       "detail": {
         "label": "write the migration",
-        "description": "now",
+        "description": "now · Fixture · fix…@example.test",
         "level": 2,
         "expanded": null,
         "selected": true,
         "focused": false,
-        "aria": "write the migration, done, claude, Your login"
+        "aria": "write the migration, done, to review, Claude Code, Claude Fixture · fix…@example.test · Mac's default login"
       }
     },
     {
@@ -417,6 +429,14 @@
       "ok": true,
       "detail": {
         "tokens": []
+      }
+    },
+    {
+      "name": "no screenshot of the voice scenario shows a voice request id, in any text, tooltip or accessible name (AC-219)",
+      "ok": true,
+      "detail": {
+        "screenshots": 60,
+        "found": []
       }
     }
   ]

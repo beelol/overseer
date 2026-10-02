@@ -542,10 +542,9 @@ fn ac165_a_spoken_request_is_taken_at_once_planned_and_sent_with_the_owner_s_wor
     assert_eq!(rows.len(), 1, "{card}");
     let message = rows[0]["message"].as_str().unwrap();
     assert!(
-        message.contains(&format!(
-            "(voice, request {id}) The owner said: “Tell Phone to use the new wire format.”"
-        )),
-        "{message}"
+        message.contains("(by voice) The owner said: “Tell Phone to use the new wire format.”")
+            && !message.contains(id.as_str()),
+        "the agent reads the owner's words, never the request's id (AC-219): {message}"
     );
     assert!(
         message.contains("For you: Please use the new wire format."),
@@ -735,9 +734,7 @@ fn ac166_talking_to_one_chosen_agent() {
     assert_eq!(rows[0]["run_id"], phone.as_str());
     assert_eq!(
         rows[0]["message"],
-        json!(format!(
-            "(voice, request {id}) The owner said: “also add tests for the gateway please”"
-        ))
+        json!("(by voice) The owner said: “also add tests for the gateway please”")
     );
     // Archiving the agent: back to Overseer, said once.
     let task = env.d.run(&phone)["task_id"].as_str().unwrap().to_string();
@@ -1271,7 +1268,7 @@ fn queued_count(env: &Env, run: &str) -> usize {
 
 /// AC-170: a correction inside the window changes the targets and only the new ones get a
 /// message; "not Phone" leaves one out; a correction after the send is a follow-up to the same
-/// agents that names the request it replaces, which then reads superseded.
+/// agents that says it replaces an earlier request (in words: AC-219), which then reads superseded.
 #[test]
 fn ac170_a_correction_changes_the_targets_and_after_the_send_supersedes() {
     let env = voice_daemon(&[]);
@@ -1314,8 +1311,10 @@ fn ac170_a_correction_changes_the_targets_and_after_the_send_supersedes() {
     assert_eq!(rows[0]["run_id"], json!(cont));
     let message = rows[0]["message"].as_str().unwrap();
     assert!(
-        message.contains(&format!("replaces {fourth}, which was already sent")),
-        "{message}"
+        message.contains("it replaces an earlier spoken request that was already sent")
+            && !message.contains(fourth.as_str())
+            && !message.contains(fifth.as_str()),
+        "the replaced request is named in words, not by its id (AC-219): {message}"
     );
     assert!(
         message.contains("For you: Please rebase onto the release branch."),
@@ -2069,7 +2068,8 @@ fn ac173_each_bound_holds() {
         message.chars().count()
     );
     assert!(
-        message.contains(&format!("the whole request is {id}")),
+        message.contains("the whole request is in Overseer's conversation")
+            && !message.contains(id.as_str()),
         "{message}"
     );
     assert_eq!(

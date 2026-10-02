@@ -25,6 +25,17 @@ check('Ollama is not answering: http://127.0.0.1:9/api/version: Connection Faile
 check('Done: start failed: the codex harness is not installed on this Mac.', s => clean(s) && /Codex is not installed/.test(s) && !/\bcodex\b/.test(s), 'a lowercase harness id (AC-245)');
 check('tell @Write the copy (r-198adab9b2b0) to use a friendlier tone', s => !/r-[0-9a-f]/.test(s), 'a run id (AC-245)');
 check('Used mcp__overseer__propose', s => !/mcp__/.test(s) && /propose \(Overseer\)/.test(s), 'a tool name (AC-245)');
+// AC-219: a voice request's id never reaches the owner, in an error, a stage or Overseer's reply.
+const VID = /\bV-\d{3,}\b/;
+check('V-0004 is not waiting: it has been sent or closed', s => !VID.test(s) && s === 'The request is not waiting: it has been sent or closed', 'a request id in an error (AC-219)');
+check('Done: sent your request V-0002 to Phone.', s => !VID.test(s) && /your request to Phone/.test(s), 'a request id in a result (AC-219)');
+check('(voice, request V-0003, replaces V-0002, which was already sent) The owner said: “rebase”', s => !VID.test(s) && /^The owner said/.test(s), 'the message head an agent was sent (AC-219)');
+{
+  const st = window.OverseerPlain.states('Request V-0001 went to Phone. V-0002 is still waiting_for_user.\n  - **Phone** (request V-0001)');
+  const good = !VID.test(st) && st.startsWith('The request went to Phone. The request is still waiting for you.') && st.includes('\n  - **Phone**');
+  if (!good) failures++;
+  console.log(good ? 'ok  ' : 'FAIL', "Overseer's reply naming request ids ->", JSON.stringify(st));
+}
 check('Sent.', s => s === 'Sent.', 'plain words stay as they are');
 check('Starting Draft agent', s => s === 'Starting Draft agent', 'plain words stay as they are');
 console.log(failures ? `${failures} failed` : 'every raw text became plain words');

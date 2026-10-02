@@ -1,94 +1,97 @@
-[2026-09-29T07:59:15.722Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-29T07:59:18.521Z] PASS Voice Mode is off until the owner turns it on
-[2026-09-29T07:59:19.920Z] PASS the voice view opens listening, and the status bar says so
-[2026-09-29T07:59:19.920Z] PASS the mark is centred in the voice view (measured) {"cx":541,"w":223.4375,"vw":1082}
-[2026-09-29T07:59:20.158Z] screenshot docs/verification/evidence/ui/voice/01-listening-overseer.png
-[2026-09-29T07:59:33.228Z] PASS noise (typing, taps, a door, music) never moves the mark and never reads as hearing {"levels":0,"maxScale":1}
-[2026-09-29T07:59:34.085Z] screenshot docs/verification/evidence/ui/voice/02-hearing-overseer.png
-[2026-09-29T07:59:36.588Z] PASS hearing: the star grows with the voice and swings with its syllables {"frames":176,"max":1.7928473724432887,"min":1.4414030048998543}
-[2026-09-29T07:59:36.589Z] PASS levels arrive at least every 100 ms while the owner speaks (25 a second) {"jumps":77,"spacing":44.10000002384186}
-[2026-09-29T07:59:36.591Z] PASS the star follows the level curve within 100 ms (best-aligned lag) {"lag":40,"r":0.9,"frames":176,"levels":77}
-[2026-09-29T07:59:38.234Z] screenshot docs/verification/evidence/ui/voice/03-speaking-overseer.png
-[2026-09-29T07:59:38.235Z] PASS speaking: rings of light cross the core and the star stays under 1.3x {"scale":1.2032605584007563,"glow":0.415391442717739,"rings":1,"still":false,"meter":null,"state":"speaking"}
-[2026-09-29T07:59:43.882Z] screenshot docs/verification/evidence/ui/voice/04-thinking-overseer.png
-[2026-09-29T07:59:43.882Z] PASS thinking: the star turns, 12% larger {"scale":1.1875118985351905,"glow":0.32862904622032735,"rings":0,"still":false,"meter":null,"state":"thinking"}
-[2026-09-29T07:59:45.295Z] PASS the request card shows the owner's words and the text sent to the agent {"words":"Tell Phone to use the new wire format.","stage":"Phone is working · 0s","row":"Phonenamed · adddelivered12:59:45 AM","full":"(voice, request V-0001) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.\n\nWhy: named · delivery: add\nheld 12:59:45 AM · sent 12:59:45 AM · delivered 12:59:45 AM"}
-[2026-09-29T07:59:45.509Z] screenshot docs/verification/evidence/ui/voice/05-request-card-overseer.png
-[2026-09-29T07:59:46.787Z] PASS muted: the mark is still with the mute sign, and no listener runs {"scale":1.0003685325842384,"glow":0.1804298074287741,"rings":0,"still":true,"meter":null,"state":"muted"}
-[2026-09-29T07:59:47.005Z] screenshot docs/verification/evidence/ui/voice/06-muted-overseer.png
-[2026-09-29T07:59:59.254Z] screenshot docs/verification/evidence/ui/voice/07-listening-dark.png
-[2026-09-29T07:59:59.773Z] screenshot docs/verification/evidence/ui/voice/08-hearing-dark.png
-[2026-09-29T08:00:02.523Z] screenshot docs/verification/evidence/ui/voice/09-speaking-dark.png
-[2026-09-29T08:00:07.518Z] screenshot docs/verification/evidence/ui/voice/10-thinking-dark.png
-[2026-09-29T08:00:10.914Z] screenshot docs/verification/evidence/ui/voice/11-muted-dark.png
-[2026-09-29T08:00:12.280Z] screenshot docs/verification/evidence/ui/voice/12-paused-dark.png
-[2026-09-29T08:00:24.389Z] screenshot docs/verification/evidence/ui/voice/13-listening-light.png
-[2026-09-29T08:00:24.904Z] screenshot docs/verification/evidence/ui/voice/14-hearing-light.png
-[2026-09-29T08:00:27.638Z] screenshot docs/verification/evidence/ui/voice/15-speaking-light.png
-[2026-09-29T08:00:32.630Z] screenshot docs/verification/evidence/ui/voice/16-thinking-light.png
-[2026-09-29T08:00:36.032Z] screenshot docs/verification/evidence/ui/voice/17-muted-light.png
-[2026-09-29T08:00:37.393Z] screenshot docs/verification/evidence/ui/voice/18-paused-light.png
-[2026-09-29T08:00:39.938Z] screenshot docs/verification/evidence/ui/voice/19-hearing-grayscale.png
-[2026-09-29T08:00:42.392Z] screenshot docs/verification/evidence/ui/voice/20-listening-grayscale.png
-[2026-09-29T08:00:42.393Z] PASS screenshots of each state in the three themes and in grayscale
-[2026-09-29T08:00:50.864Z] editor groups 2
-[2026-09-29T08:00:52.322Z] screenshot docs/verification/evidence/ui/voice/21-beside-a-streaming-chat.png
-[2026-09-29T08:00:54.625Z] PASS beside a streaming chat, the animation keeps up at 60 frames a second: work per frame p95 under 16 ms, and frames arrive at the display's rate {"n":226,"work_p95":0.10000002384185791,"interval_median":16.69999999999709,"interval_p95":18.30000000000291,"dropped":0,"groups":2}
-[2026-09-29T08:01:01.098Z] PASS no frame is drawn while the stage is not shown (the view shows an agent) {"visibility":"not shown","f1":5534,"f2":5534}
-[2026-09-29T08:01:07.145Z] PASS reduced motion: a still mark and a level meter {"scale":1.6899538582786167,"glow":0.829061892956929,"rings":0,"still":true,"meter":0.8117104215042551,"state":"hearing"}
-[2026-09-29T08:01:07.359Z] screenshot docs/verification/evidence/ui/voice/22-reduced-motion.png
-[2026-09-29T08:01:10.680Z] screenshot docs/verification/evidence/ui/voice/23-permission-toast.png
-[2026-09-29T08:01:13.688Z] PASS the toast's Cancel withdraws the answer inside the window: the agent still waits {"clicked":true,"still":"waiting_for_user"}
-[2026-09-29T08:01:13.899Z] screenshot docs/verification/evidence/ui/voice/24-permission-cancelled.png
-[2026-09-29T08:01:17.357Z] screenshot docs/verification/evidence/ui/voice/25-toast-before-window-overseer.png
-[2026-09-29T08:01:19.430Z] screenshot docs/verification/evidence/ui/voice/26-toast-sent-overseer.png
-[2026-09-29T08:01:23.410Z] screenshot docs/verification/evidence/ui/voice/27-toast-before-window-dark.png
-[2026-09-29T08:01:25.563Z] screenshot docs/verification/evidence/ui/voice/28-toast-sent-dark.png
-[2026-09-29T08:01:29.925Z] screenshot docs/verification/evidence/ui/voice/29-toast-before-window-light.png
-[2026-09-29T08:01:32.076Z] screenshot docs/verification/evidence/ui/voice/30-toast-sent-light.png
-[2026-09-29T08:01:32.649Z] PASS the toast names what was answered with Cancel, then reads Sent, in the three themes [{"tag":"overseer","before":true,"after":true},{"tag":"dark","before":true,"after":true},{"tag":"light","before":true,"after":true}]
-[2026-09-29T08:01:35.730Z] screenshot docs/verification/evidence/ui/voice/31-paused-overseer.png
-[2026-09-29T08:01:35.933Z] PASS paused for a call: shown with the app, and listening again after {"text":"Paused for a call","title":"Paused for a call: Paused while Zoom uses the microphone"}
-[2026-09-29T08:01:39.201Z] screenshot docs/verification/evidence/ui/voice/32-talking-to-continuity.png
-[2026-09-29T08:01:40.756Z] PASS who is spoken to switches from the strip, by command and by voice, and the strip shows it {"byStrip":true,"byCommand":true,"byVoice":true,"back":true}
-[2026-09-29T08:01:42.170Z] screenshot docs/verification/evidence/ui/voice/33-voice-mark-side-bar.png
-[2026-09-29T08:01:44.873Z] screenshot docs/verification/evidence/ui/voice/34-voice-mark-grid.png
-[2026-09-29T08:01:52.735Z] PASS the voice mark is on the targeted agent in the side bar and the grid while the request is open, and goes when it closes {"settling":"settling","sideMarked":true,"gridMarked":true,"unmarked":true}
-[2026-09-29T08:01:54.662Z] screenshot docs/verification/evidence/ui/voice/35-yes-waiting.png
-[2026-09-29T08:01:54.731Z] PASS mute, cancel and yes by keyboard only {"keyMuted":true,"keyUnmuted":true,"cancelled":"cancelled","waiting":"waiting","yesShown":true,"yesDone":"sent"}
-[2026-09-29T08:02:01.037Z] screenshot docs/verification/evidence/ui/voice/36-home-voice-strip.png
-[2026-09-29T08:02:01.038Z] PASS home shows the voice strip, the spoken request marked as spoken, and Overseer’s plan for it {"mode":"composer","strip":true,"state":"Speaking","words":"Tell Writer to add a changelog.","spokenMark":true,"plan":true}
-[2026-09-29T08:02:11.100Z] screenshot docs/verification/evidence/ui/voice/37-card-held.png
-[2026-09-29T08:02:12.346Z] screenshot docs/verification/evidence/ui/voice/38-card-advanced.png
-[2026-09-29T08:02:12.346Z] PASS a card fills in as its dispatches advance (held, then the next state on the daemon's events) ["held","answered"]
-[2026-09-29T08:02:21.713Z] screenshot docs/verification/evidence/ui/voice/39-card-three-targets-overseer.png
-[2026-09-29T08:02:25.064Z] screenshot docs/verification/evidence/ui/voice/40-chat-gateway-overseer.png
-[2026-09-29T08:02:28.415Z] screenshot docs/verification/evidence/ui/voice/41-chat-ledger-overseer.png
-[2026-09-29T08:02:31.742Z] screenshot docs/verification/evidence/ui/voice/42-chat-new-agent-overseer.png
-[2026-09-29T08:02:34.731Z] screenshot docs/verification/evidence/ui/voice/43-card-three-targets-dark.png
-[2026-09-29T08:02:37.958Z] screenshot docs/verification/evidence/ui/voice/44-chat-gateway-dark.png
-[2026-09-29T08:02:41.191Z] screenshot docs/verification/evidence/ui/voice/45-chat-ledger-dark.png
-[2026-09-29T08:02:44.391Z] screenshot docs/verification/evidence/ui/voice/46-chat-new-agent-dark.png
-[2026-09-29T08:02:47.382Z] screenshot docs/verification/evidence/ui/voice/47-card-three-targets-light.png
-[2026-09-29T08:02:50.622Z] screenshot docs/verification/evidence/ui/voice/48-chat-gateway-light.png
-[2026-09-29T08:02:53.852Z] screenshot docs/verification/evidence/ui/voice/49-chat-ledger-light.png
-[2026-09-29T08:02:57.060Z] screenshot docs/verification/evidence/ui/voice/50-chat-new-agent-light.png
-[2026-09-29T08:02:57.074Z] PASS two agents in flight and a new one: the card has three rows and each chat shows the owner's words, in the three themes {"evState":"sent","rows":3,"chats":[{"tag":"overseer","id":"r-cf8d15f5aaa5","shows":true},{"tag":"overseer","id":"r-c022e08158af","shows":true},{"tag":"overseer","id":"r-554d070247dc","shows":true},{"tag":"dark","id":"r-cf8d15f5aaa5","shows":true},{"tag":"dark","id":"r-c022e08158af","shows":true},{"tag":"dark","id":"r-554d070247dc","shows":true},{"tag":"light","id":"r-cf8d15f5aaa5","shows":true},{"tag":"light","id":"r-c022e08158af","shows":true},{"tag":"light","id":"r-554d070247dc","shows":true}]}
-[2026-09-29T08:02:57.074Z] PASS the new agent appears in the side bar with its prompt {"label":"write the migration","description":"now","level":2,"expanded":null,"selected":true,"focused":false,"aria":"write the migration, done, claude, Your login"}
-[2026-09-29T08:02:59.496Z] screenshot docs/verification/evidence/ui/voice/51-stopped-after-four-crashes.png
-[2026-09-29T08:02:59.499Z] PASS four crashes turn Voice Mode off, and the view says why {"reason":"the listener stopped four times in ten minutes (last: killed by signal 9)"}
-[2026-09-29T08:03:05.108Z] screenshot docs/verification/evidence/ui/voice/52-width-360-overseer.png
-[2026-09-29T08:03:06.765Z] screenshot docs/verification/evidence/ui/voice/53-width-900-overseer.png
-[2026-09-29T08:03:08.455Z] screenshot docs/verification/evidence/ui/voice/54-width-1280-overseer.png
-[2026-09-29T08:03:11.541Z] screenshot docs/verification/evidence/ui/voice/55-width-360-dark.png
-[2026-09-29T08:03:13.137Z] screenshot docs/verification/evidence/ui/voice/56-width-900-dark.png
-[2026-09-29T08:03:14.728Z] screenshot docs/verification/evidence/ui/voice/57-width-1280-dark.png
-[2026-09-29T08:03:17.807Z] screenshot docs/verification/evidence/ui/voice/58-width-360-light.png
-[2026-09-29T08:03:19.404Z] screenshot docs/verification/evidence/ui/voice/59-width-900-light.png
-[2026-09-29T08:03:20.994Z] screenshot docs/verification/evidence/ui/voice/60-width-1280-light.png
-[2026-09-29T08:03:21.569Z] audits [{"tag":"overseer","w":360,"viewWidth":302,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"overseer","w":900,"viewWidth":842,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"overseer","w":1280,"viewWidth":1222,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"dark","w":360,"viewWidth":302,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"dark","w":900,"viewWidth":842,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"dark","w":1280,"viewWidth":1222,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"light","w":360,"viewWidth":302,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"light","w":900,"viewWidth":842,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"light","w":1280,"viewWidth":1222,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0}]
-[2026-09-29T08:03:21.569Z] PASS no horizontal overflow and no long unbroken runs at 360, 900 and 1280 px in the three themes [{"tag":"overseer","w":360,"viewWidth":302,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"overseer","w":900,"viewWidth":842,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"overseer","w":1280,"viewWidth":1222,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"dark","w":360,"viewWidth":302,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"dark","w":900,"viewWidth":842,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"dark","w":1280,"viewWidth":1222,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"light","w":360,"viewWidth":302,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"light","w":900,"viewWidth":842,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"light","w":1280,"viewWidth":1222,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0}]
-[2026-09-29T08:03:21.569Z] PASS the accessible-name audit: every control has a name and a tooltip (the voice view and home’s strip) {"view":[0,0,0,0,0,0,0,0,0],"home":[]}
-[2026-09-29T08:03:21.569Z] PASS the visible-text audit: the voice view’s own text stays within 60 characters, and home’s strip within 60 {"view":17,"home":8}
-[2026-09-29T08:03:21.570Z] PASS no card of the voice scenario shows an internal token or a raw error (AC-228) {"tokens":[]}
-[2026-09-29T08:03:21.790Z] background window: main-process events [{"ms":221,"what":"window created","show":true}]
+[2026-10-01T21:54:58.541Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-10-01T21:54:58.802Z] background launch: VS Code window constructor not found; the first window may come to the front
+[2026-10-01T21:55:01.348Z] PASS Voice Mode is off until the owner turns it on
+[2026-10-01T21:55:02.746Z] PASS the voice view opens listening, and the status bar says so
+[2026-10-01T21:55:02.747Z] PASS the mark is centred in the voice view (measured) {"cx":541,"w":223.4375,"vw":1082}
+[2026-10-01T21:55:02.866Z] screenshot docs/verification/evidence/ui/voice/01-listening-overseer.png
+[2026-10-01T21:55:15.944Z] PASS noise (typing, taps, a door, music) never moves the mark and never reads as hearing {"levels":0,"maxScale":1}
+[2026-10-01T21:55:16.666Z] screenshot docs/verification/evidence/ui/voice/02-hearing-overseer.png
+[2026-10-01T21:55:19.186Z] PASS hearing: the star grows with the voice and swings with its syllables {"frames":170,"max":1.7811669690711915,"min":1.393932817775886}
+[2026-10-01T21:55:19.187Z] PASS levels arrive at least every 100 ms while the owner speaks (25 a second) {"jumps":74,"spacing":42.19999998807907}
+[2026-10-01T21:55:19.191Z] PASS the star follows the level curve within 100 ms (best-aligned lag) {"lag":40,"r":0.89,"frames":170,"levels":74}
+[2026-10-01T21:55:20.716Z] screenshot docs/verification/evidence/ui/voice/03-speaking-overseer.png
+[2026-10-01T21:55:20.738Z] PASS speaking: rings of light cross the core and the star stays under 1.3x {"scale":1.2847098118579594,"glow":0.5087781036789635,"rings":1,"still":false,"meter":null,"state":"speaking"}
+[2026-10-01T21:55:26.127Z] screenshot docs/verification/evidence/ui/voice/04-thinking-overseer.png
+[2026-10-01T21:55:26.157Z] PASS thinking: the star turns, 12% larger {"scale":1.1988195669494157,"glow":0.3522564672565097,"rings":0,"still":false,"meter":null,"state":"thinking"}
+[2026-10-01T21:55:27.169Z] PASS the request card shows the words, the state and the time, and its accessible name reads without the request id (AC-219) {"name":"You, by voice, at 2:55 PM: Tell Phone to use the new wire format.","role":"group","time":"2:55 PM","stage":"Phone is working · 0s","request":"V-0001","sentToAgent":"(by voice) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.\n\nWhy: you named it · added to its work\nheld 02:55:27 PM · sent 02:55:27 PM · delivered 02:55:27 PM"}
+[2026-10-01T21:55:27.169Z] PASS the request card shows the owner's words and the text sent to the agent {"words":"Tell Phone to use the new wire format.","stage":"Phone is working · 0s","row":"Phoneyou named it · added to its workdelivered02:55:27 PM","full":"(by voice) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.\n\nWhy: you named it · added to its work\nheld 02:55:27 PM · sent 02:55:27 PM · delivered 02:55:27 PM"}
+[2026-10-01T21:55:27.278Z] screenshot docs/verification/evidence/ui/voice/05-request-card-overseer.png
+[2026-10-01T21:55:28.588Z] PASS muted: the mark is still with the mute sign, and no listener runs {"scale":1.000417324673107,"glow":0.18048596848526177,"rings":0,"still":true,"meter":null,"state":"muted"}
+[2026-10-01T21:55:28.702Z] screenshot docs/verification/evidence/ui/voice/06-muted-overseer.png
+[2026-10-01T21:55:40.960Z] screenshot docs/verification/evidence/ui/voice/07-listening-dark.png
+[2026-10-01T21:55:41.495Z] screenshot docs/verification/evidence/ui/voice/08-hearing-dark.png
+[2026-10-01T21:55:44.236Z] screenshot docs/verification/evidence/ui/voice/09-speaking-dark.png
+[2026-10-01T21:55:49.368Z] screenshot docs/verification/evidence/ui/voice/10-thinking-dark.png
+[2026-10-01T21:55:52.198Z] screenshot docs/verification/evidence/ui/voice/11-muted-dark.png
+[2026-10-01T21:55:53.598Z] screenshot docs/verification/evidence/ui/voice/12-paused-dark.png
+[2026-10-01T21:56:05.719Z] screenshot docs/verification/evidence/ui/voice/13-listening-light.png
+[2026-10-01T21:56:06.236Z] screenshot docs/verification/evidence/ui/voice/14-hearing-light.png
+[2026-10-01T21:56:08.953Z] screenshot docs/verification/evidence/ui/voice/15-speaking-light.png
+[2026-10-01T21:56:14.083Z] screenshot docs/verification/evidence/ui/voice/16-thinking-light.png
+[2026-10-01T21:56:17.118Z] screenshot docs/verification/evidence/ui/voice/17-muted-light.png
+[2026-10-01T21:56:18.521Z] screenshot docs/verification/evidence/ui/voice/18-paused-light.png
+[2026-10-01T21:56:20.818Z] screenshot docs/verification/evidence/ui/voice/19-hearing-grayscale.png
+[2026-10-01T21:56:23.627Z] screenshot docs/verification/evidence/ui/voice/20-listening-grayscale.png
+[2026-10-01T21:56:23.686Z] PASS screenshots of each state in the three themes and in grayscale
+[2026-10-01T21:56:31.938Z] editor groups 2
+[2026-10-01T21:56:33.256Z] screenshot docs/verification/evidence/ui/voice/21-beside-a-streaming-chat.png
+[2026-10-01T21:56:35.630Z] PASS beside a streaming chat, the animation keeps up at 60 frames a second: work per frame p95 under 16 ms, and frames arrive at the display's rate {"n":222,"work_p95":0.19999998807907104,"interval_median":16.69999999999709,"interval_p95":17.5,"dropped":0,"groups":2}
+[2026-10-01T21:56:42.127Z] PASS no frame is drawn while the stage is not shown (the view shows an agent) {"visibility":"not shown","f1":5427,"f2":5427}
+[2026-10-01T21:56:48.179Z] PASS reduced motion: a still mark and a level meter {"scale":1.6773462667650225,"glow":0.8180954064684789,"rings":0,"still":true,"meter":0.7968779609000266,"state":"hearing"}
+[2026-10-01T21:56:48.278Z] screenshot docs/verification/evidence/ui/voice/22-reduced-motion.png
+[2026-10-01T21:56:51.404Z] screenshot docs/verification/evidence/ui/voice/23-permission-toast.png
+[2026-10-01T21:56:54.498Z] PASS the toast's Cancel withdraws the answer inside the window: the agent still waits {"clicked":true,"still":"waiting_for_user"}
+[2026-10-01T21:56:54.617Z] screenshot docs/verification/evidence/ui/voice/24-permission-cancelled.png
+[2026-10-01T21:56:58.118Z] screenshot docs/verification/evidence/ui/voice/25-toast-before-window-overseer.png
+[2026-10-01T21:56:59.980Z] screenshot docs/verification/evidence/ui/voice/26-toast-sent-overseer.png
+[2026-10-01T21:57:03.873Z] screenshot docs/verification/evidence/ui/voice/27-toast-before-window-dark.png
+[2026-10-01T21:57:06.054Z] screenshot docs/verification/evidence/ui/voice/28-toast-sent-dark.png
+[2026-10-01T21:57:10.056Z] screenshot docs/verification/evidence/ui/voice/29-toast-before-window-light.png
+[2026-10-01T21:57:12.052Z] screenshot docs/verification/evidence/ui/voice/30-toast-sent-light.png
+[2026-10-01T21:57:12.739Z] PASS the toast names what was answered with Cancel, then reads Sent, in the three themes [{"tag":"overseer","before":true,"after":true},{"tag":"dark","before":true,"after":true},{"tag":"light","before":true,"after":true}]
+[2026-10-01T21:57:15.949Z] screenshot docs/verification/evidence/ui/voice/31-paused-overseer.png
+[2026-10-01T21:57:16.455Z] PASS paused for a call: shown with the app, and listening again after {"text":"Paused for a call","title":"Paused for a call: Paused while Zoom uses the microphone"}
+[2026-10-01T21:57:19.443Z] screenshot docs/verification/evidence/ui/voice/32-talking-to-continuity.png
+[2026-10-01T21:57:21.105Z] PASS who is spoken to switches from the strip, by command and by voice, and the strip shows it {"byStrip":true,"byCommand":true,"byVoice":true,"back":true}
+[2026-10-01T21:57:22.398Z] screenshot docs/verification/evidence/ui/voice/33-voice-mark-side-bar.png
+[2026-10-01T21:57:25.130Z] screenshot docs/verification/evidence/ui/voice/34-voice-mark-grid.png
+[2026-10-01T21:57:32.835Z] PASS the voice mark is on the targeted agent in the side bar and the grid while the request is open, and goes when it closes {"settling":"settling","sideMarked":true,"gridMarked":true,"unmarked":true}
+[2026-10-01T21:57:34.596Z] screenshot docs/verification/evidence/ui/voice/35-yes-waiting.png
+[2026-10-01T21:57:34.800Z] PASS mute, cancel and yes by keyboard only {"keyMuted":true,"keyUnmuted":true,"cancelled":"cancelled","waiting":"waiting","yesShown":true,"yesDone":"sent"}
+[2026-10-01T21:57:40.777Z] screenshot docs/verification/evidence/ui/voice/36-home-voice-strip.png
+[2026-10-01T21:57:40.903Z] PASS home shows the voice strip, the spoken request marked as spoken, and Overseer’s plan for it {"mode":"composer","strip":true,"state":"Speaking","words":"Tell Writer to add a changelog.","spokenMark":true,"plan":true}
+[2026-10-01T21:57:51.211Z] screenshot docs/verification/evidence/ui/voice/37-card-held.png
+[2026-10-01T21:57:52.474Z] screenshot docs/verification/evidence/ui/voice/38-card-advanced.png
+[2026-10-01T21:57:52.605Z] PASS a card fills in as its dispatches advance (held, then the next state on the daemon's events) ["held","answered"]
+[2026-10-01T21:58:01.993Z] screenshot docs/verification/evidence/ui/voice/39-card-three-targets-overseer.png
+[2026-10-01T21:58:05.375Z] screenshot docs/verification/evidence/ui/voice/40-chat-gateway-overseer.png
+[2026-10-01T21:58:08.754Z] screenshot docs/verification/evidence/ui/voice/41-chat-ledger-overseer.png
+[2026-10-01T21:58:12.141Z] screenshot docs/verification/evidence/ui/voice/42-chat-new-agent-overseer.png
+[2026-10-01T21:58:15.255Z] screenshot docs/verification/evidence/ui/voice/43-card-three-targets-dark.png
+[2026-10-01T21:58:18.614Z] screenshot docs/verification/evidence/ui/voice/44-chat-gateway-dark.png
+[2026-10-01T21:58:21.991Z] screenshot docs/verification/evidence/ui/voice/45-chat-ledger-dark.png
+[2026-10-01T21:58:25.353Z] screenshot docs/verification/evidence/ui/voice/46-chat-new-agent-dark.png
+[2026-10-01T21:58:28.475Z] screenshot docs/verification/evidence/ui/voice/47-card-three-targets-light.png
+[2026-10-01T21:58:31.879Z] screenshot docs/verification/evidence/ui/voice/48-chat-gateway-light.png
+[2026-10-01T21:58:35.263Z] screenshot docs/verification/evidence/ui/voice/49-chat-ledger-light.png
+[2026-10-01T21:58:38.595Z] screenshot docs/verification/evidence/ui/voice/50-chat-new-agent-light.png
+[2026-10-01T21:58:38.778Z] PASS two agents in flight and a new one: the card has three rows and each chat shows the owner's words, in the three themes {"evState":"sent","rows":3,"chats":[{"tag":"overseer","id":"r-d8f600b21e8b","shows":true},{"tag":"overseer","id":"r-5f820aaa782c","shows":true},{"tag":"overseer","id":"r-7df4f68f7f8b","shows":true},{"tag":"dark","id":"r-d8f600b21e8b","shows":true},{"tag":"dark","id":"r-5f820aaa782c","shows":true},{"tag":"dark","id":"r-7df4f68f7f8b","shows":true},{"tag":"light","id":"r-d8f600b21e8b","shows":true},{"tag":"light","id":"r-5f820aaa782c","shows":true},{"tag":"light","id":"r-7df4f68f7f8b","shows":true}]}
+[2026-10-01T21:58:38.778Z] PASS the new agent appears in the side bar with its prompt {"label":"write the migration","description":"now · Fixture · fix…@example.test","level":2,"expanded":null,"selected":true,"focused":false,"aria":"write the migration, done, to review, Claude Code, Claude Fixture · fix…@example.test · Mac's default login"}
+[2026-10-01T21:58:40.311Z] screenshot docs/verification/evidence/ui/voice/51-stopped-after-four-crashes.png
+[2026-10-01T21:58:40.512Z] PASS four crashes turn Voice Mode off, and the view says why {"reason":"the listener stopped four times in ten minutes (last: killed by signal 9)"}
+[2026-10-01T21:58:46.106Z] screenshot docs/verification/evidence/ui/voice/52-width-360-overseer.png
+[2026-10-01T21:58:47.892Z] screenshot docs/verification/evidence/ui/voice/53-width-900-overseer.png
+[2026-10-01T21:58:49.689Z] screenshot docs/verification/evidence/ui/voice/54-width-1280-overseer.png
+[2026-10-01T21:58:52.957Z] screenshot docs/verification/evidence/ui/voice/55-width-360-dark.png
+[2026-10-01T21:58:54.712Z] screenshot docs/verification/evidence/ui/voice/56-width-900-dark.png
+[2026-10-01T21:58:56.481Z] screenshot docs/verification/evidence/ui/voice/57-width-1280-dark.png
+[2026-10-01T21:58:59.757Z] screenshot docs/verification/evidence/ui/voice/58-width-360-light.png
+[2026-10-01T21:59:01.529Z] screenshot docs/verification/evidence/ui/voice/59-width-900-light.png
+[2026-10-01T21:59:03.297Z] screenshot docs/verification/evidence/ui/voice/60-width-1280-light.png
+[2026-10-01T21:59:04.087Z] audits [{"tag":"overseer","w":360,"viewWidth":302,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"overseer","w":900,"viewWidth":842,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"overseer","w":1280,"viewWidth":1222,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"dark","w":360,"viewWidth":302,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"dark","w":900,"viewWidth":842,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"dark","w":1280,"viewWidth":1222,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"light","w":360,"viewWidth":302,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"light","w":900,"viewWidth":842,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"light","w":1280,"viewWidth":1222,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0}]
+[2026-10-01T21:59:04.087Z] PASS no horizontal overflow and no long unbroken runs at 360, 900 and 1280 px in the three themes [{"tag":"overseer","w":360,"viewWidth":302,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"overseer","w":900,"viewWidth":842,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"overseer","w":1280,"viewWidth":1222,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"dark","w":360,"viewWidth":302,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"dark","w":900,"viewWidth":842,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"dark","w":1280,"viewWidth":1222,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"light","w":360,"viewWidth":302,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"light","w":900,"viewWidth":842,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0},{"tag":"light","w":1280,"viewWidth":1222,"overflow":0,"unnamed":0,"chrome":17,"longRuns":0}]
+[2026-10-01T21:59:04.087Z] PASS the accessible-name audit: every control has a name and a tooltip (the voice view and home’s strip) {"view":[0,0,0,0,0,0,0,0,0],"home":[]}
+[2026-10-01T21:59:04.087Z] PASS the visible-text audit: the voice view’s own text stays within 60 characters, and home’s strip within 60 {"view":17,"home":8}
+[2026-10-01T21:59:04.089Z] PASS no card of the voice scenario shows an internal token or a raw error (AC-228) {"tokens":[]}
+[2026-10-01T21:59:04.089Z] PASS no screenshot of the voice scenario shows a voice request id, in any text, tooltip or accessible name (AC-219) {"screenshots":60,"found":[]}
+[2026-10-01T21:59:04.306Z] background window: main-process events [{"ms":202,"what":"window created","show":false},{"ms":251,"what":"app became active"},{"ms":280,"what":"window shown"},{"ms":306,"what":"window focused"}]
