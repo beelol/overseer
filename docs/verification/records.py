@@ -2837,6 +2837,10 @@ rec(264, "One Overseer layout, and it looks like Focus Mode without its side eff
     live="Fixture agents and the Claude Code fixture only; the owner's VS Code, daemon and logins were never involved.",
     limits="Reopening the window stops what runs in its terminals (said before it happens). Other extensions see the Overseer window as a different workspace, so what they remember per folder is kept separately there. An unsaved untitled file stays with the owner's folder (VS Code keeps it there; not measured here).")
 
+rec(265, "Stop pauses an agent's queue", "not started", date="—", commit="—",
+    expected="See the RFC criterion (the owner, 2026-10-02: \"stop should pause the queue; you have to manually play the queue of messages again for them to keep sending\").",
+    actual="Not started: today a stop ends the turn and the next queued message (a spoken redirect, say) starts the next turn, so the agent keeps going (found by pull request #50's scenario).", live="—", blocker="A builder, after the current pull requests.")
+
 SHORT_BLOCKERS = {
     154: "verified",
     155: "verified",
@@ -3030,6 +3034,7 @@ SHORT_BLOCKERS = {
     262: "verified",
     263: "verified",
     264: "verified",
+    265: "not started (the owner, 2026-10-02)",
 }
 TOTAL = 53
 

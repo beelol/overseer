@@ -118,6 +118,8 @@ Mergeability against main, checked 2026-09-30 00:00 with `git merge-tree --write
 
 ## Owner decisions on record
 
+- Stop pauses an agent's queue; queued messages go out only when the owner resumes them by hand (2026-10-02): AC-265, not started, next builder.
+
 - Menu bar (AC-262):
   - dot violet;
   - Needs you capped at 4, then "N more waiting";
