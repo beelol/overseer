@@ -86,7 +86,13 @@ class Voice {
 
   live(m) {
     if (!m) return;
-    if (m.kind === 'state' && this.voice) { this.voice.state = m.state; this.voice.reason = m.reason; if (m.state === 'off') this.voice.enabled = false; this.render(); this.changed(); }
+    // On and off from another surface too (the terminal's ctrl+v, T-35): any state but off is on.
+    if (m.kind === 'state' && this.voice) {
+      const was = !!this.voice.enabled;
+      this.voice.state = m.state; this.voice.reason = m.reason; this.voice.enabled = m.state !== 'off'; this.voice.muted = m.state === 'muted';
+      if (was !== this.voice.enabled) vscode.commands.executeCommand('setContext', 'overseer.voiceOn', this.voice.enabled);
+      this.render(); this.changed();
+    }
     if (m.kind === 'target' && this.voice) { this.voice.target = m.target; this.titleTarget().then(() => { this.render(); this.changed(); this.post({ type: 'live', msg: { ...m, target_title: this.voice.target_title } }); }); return; }
     if (m.kind === 'targets') { this.targeted = new Set(m.runs || []); this.changed('targets'); }
     if (m.kind === 'heard' || m.kind === 'not_meant') { this.heard = m.text || ''; this.changed(); }
