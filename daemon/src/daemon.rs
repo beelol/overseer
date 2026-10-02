@@ -2355,7 +2355,7 @@ impl Daemon {
         Ok(PathBuf::from(launch.control_socket))
     }
 
-    fn send_stdin(&self, run: &Run, data: &str) -> Result<()> {
+    pub(crate) fn send_stdin(&self, run: &Run, data: &str) -> Result<()> {
         let sock = self.control_socket(run)?;
         let reply = shim::control(&sock, &json!({"op": "stdin", "data": data}))?;
         if reply["ok"] != true {
@@ -3779,7 +3779,9 @@ impl Daemon {
             let session: Option<(String, String, Option<String>)> = store.conn.query_row("SELECT id, level, run_id FROM overseer_sessions WHERE archived_ms IS NULL ORDER BY started_ms DESC LIMIT 1", [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).optional()?;
             match session {
                 Some((id, level, run_id)) => {
-                    let open: i64 = store.conn.query_row("SELECT COUNT(*) FROM overseer_proposals WHERE session_id=?1 AND state='open'", [&id], |r| r.get(0))?;
+                    // A waiting permission put to the owner as a yes/no (AC-230) counts once, as
+                    // its agent's own Needs you item.
+                    let open: i64 = store.conn.query_row("SELECT COUNT(*) FROM overseer_proposals WHERE session_id=?1 AND state='open' AND COALESCE(cause, '') <> 'needs'", [&id], |r| r.get(0))?;
                     let decisions: i64 = store.conn.query_row("SELECT COUNT(*) FROM conflicts WHERE state='open' AND kind IN ('same_lines', 'area_crossed')", [], |r| r.get(0))?;
                     let last: Option<i64> = store.conn.query_row("SELECT MAX(ts) FROM overseer_messages WHERE session_id=?1", [&id], |r| r.get::<_, Option<i64>>(0)).ok().flatten();
                     json!({"session": id, "level": level, "run_id": run_id, "open_proposals": open, "conflicts_needing_decision": decisions, "last_message_ms": last})

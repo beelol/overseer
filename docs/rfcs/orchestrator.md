@@ -257,7 +257,14 @@ tiers Voice Mode uses (AC-171), so typing and speaking follow one set of rules.
 | **Look** | Questions about the agents; select or track an agent; the grid; pin | At once |
 | **Steer** | Message, share within one repository, ask for a report, set an area, hold, release, guardrail, redirect, stop, watch, up to three new agents | As the level says (next section) |
 | **Confirm** | Answering a permission request; merge back; a pull request; archive; more than three new agents; starting a swarm or raising its limit; a share across repositories | Only when the owner asked. Read back in one sentence, then a yes. At every level |
-| **Not from the conversation** | Accounts and sign-in; phone access and devices; settings; cleanup; review actions; loosening a permission mode; stopping the daemon; Overseer's own level and caps | Overseer opens the place in the UI and says so |
+| **Not from the conversation** | Accounts and sign-in; phone access and devices; settings; cleanup; review actions; stopping the daemon; Overseer's own level and caps | Overseer opens the place in the UI and says so |
+
+An agent's permission mode (Ask first, Accept edits, Auto) is a Steer action since AC-230: the owner
+sets it by conversation, typed or spoken, and starts agents in a stated mode. The owner decided
+(2026-09-28) that Overseer may set Auto on its own, within its level and only in the repositories
+the owner allows (`overseer.auto_repos`, set on the Mac); each time, the reason is recorded on the
+agent and its card. A waiting permission request comes up by itself in the conversation as a
+yes/no, and Voice Mode reads it out.
 
 - **One, several or all.** Every Steer action can name one agent, several, or all of them:
   "stop everyone", "hold everything in `overseer` until I'm back".
