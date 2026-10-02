@@ -30,6 +30,7 @@ OPTIONS:
                     conversation side by side (needs 160 columns; D switches to the grid)
     --grid          Show only the grid of agents (no list, no conversation column), e.g. in a
                     second terminal beside one in dashboard mode
+    --focus RUN     Open that agent full screen (a notification clicked with VS Code closed)
     -h, --help      Show this help
     -V, --version   Show the version
 
@@ -70,6 +71,7 @@ fn main() -> Result<()> {
     let mut bell = true;
     let mut dashboard = false;
     let mut grid_only = false;
+    let mut focus_on: Option<String> = None;
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
@@ -87,6 +89,7 @@ fn main() -> Result<()> {
             "--no-bell" => bell = false,
             "--dashboard" => dashboard = true,
             "--grid" => grid_only = true,
+            "--focus" => focus_on = Some(args.next().filter(|r| !r.is_empty()).ok_or_else(|| anyhow::anyhow!("--focus needs an agent's run id"))?),
             other => anyhow::bail!("unknown option {other} (see --help)"),
         }
     }
@@ -114,6 +117,7 @@ fn main() -> Result<()> {
     app.cwd_repo = git_root();
     app.dashboard = dashboard;
     app.grid_only = grid_only;
+    app.focus_on = focus_on;
     ui::set_truecolor(std::env::var("COLORTERM").map(|v| v.contains("truecolor") || v.contains("24bit")).unwrap_or(false));
 
     // ratatui::init sets raw mode and the alternate screen, and restores them on panic too.

@@ -527,6 +527,9 @@ pub struct App {
     pub dash_cols: [(u16, u16); 3],
     /// `--grid` (T-41): this terminal shows only the grid, no list and no conversation column.
     pub grid_only: bool,
+    /// `--focus RUN` (AC-240): the agent a notification was about, opened full screen once the
+    /// first state arrives.
+    pub focus_on: Option<String>,
     /// Working directory's Git root (the default repository for new agents).
     pub cwd_repo: Option<String>,
     pending: HashMap<u64, Pending>,
@@ -645,6 +648,7 @@ impl App {
             dash_col: 0,
             dash_cols: [(0, 0); 3],
             grid_only: false,
+            focus_on: None,
             cwd_repo: None,
             pending: HashMap::new(),
             history_requested: HashSet::new(),
@@ -953,6 +957,30 @@ impl App {
         self.page = i / self.page_size();
         self.dirty = true;
         self.ensure_history();
+    }
+
+    /// `--focus RUN` (AC-240, a notification clicked with VS Code closed): that agent, full screen,
+    /// under a filter that shows it. A child's id opens its top-level agent.
+    fn open_focus_on(&mut self) {
+        let Some(id) = self.focus_on.take() else { return };
+        let mut root = id.clone();
+        while let Some(parent) = self.state.run(&root).and_then(|r| r.parent_run_id.clone()) {
+            root = parent;
+        }
+        if self.state.run(&root).is_none() {
+            self.say("The agent from the notification is no longer here", true);
+            return;
+        }
+        for filter in [self.filter, Filter::All, Filter::Archived] {
+            self.filter = filter;
+            if let Some(i) = self.index_of(&root) {
+                self.focus_index(i);
+                self.mode = Mode::Zoom { scroll: 0 };
+                return;
+            }
+        }
+        self.filter = Filter::All;
+        self.settle_focus();
     }
 
     /// Keeps focus on the same agent after the list changed (new agents, filter changes).
@@ -1270,6 +1298,7 @@ impl App {
                             self.client.subscribe();
                         }
                         self.settle_focus();
+                        self.open_focus_on();
                         self.ensure_history();
                         if !self.accounts_read {
                             self.accounts_read = true;

@@ -146,13 +146,23 @@ impl Tui {
         Tui::attach_with(d, w, h, true)
     }
 
+    /// Like `attach`, as `overseer-tui --focus RUN` (AC-240).
+    pub fn attach_focus(d: &Daemon, w: u16, h: u16, run: &str) -> Tui {
+        Tui::attach_opts(d, w, h, false, Some(run.to_string()))
+    }
+
     fn attach_with(d: &Daemon, w: u16, h: u16, spawn: bool) -> Tui {
+        Tui::attach_opts(d, w, h, spawn, None)
+    }
+
+    fn attach_opts(d: &Daemon, w: u16, h: u16, spawn: bool, focus: Option<String>) -> Tui {
         let (tx, rx) = channel();
         let daemon = spawn.then(|| overseer_tui::locate::Daemon { binary: d.bin.clone(), home: Some(d.home.path().to_path_buf()) });
         let jobs = tx.clone();
         let client = Arc::new(Client::start(daemon, d.socket.clone(), tx));
         let mut app = App::new(client.clone() as Arc<dyn Requests>);
         app.set_jobs(jobs);
+        app.focus_on = focus;
         let mut t = Tui { app, client, rx, term: Terminal::new(TestBackend::new(w, h)).unwrap() };
         t.until(10, |a| a.connected);
         t.pump(400);

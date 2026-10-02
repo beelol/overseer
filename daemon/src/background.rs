@@ -317,10 +317,13 @@ fn register_notifier(app: &std::path::Path) {
 /// macOS only lets an app use notifications when LaunchServices launched it, so it is started
 /// with `open -n -W` and reports through a result file. Tests with fake helpers set
 /// `OVERSEER_TEST_NOTIFIER_DIRECT` to execute the fake directly instead.
-fn run_notifier(app: &std::path::Path, title: &str, body: &str, open: &str, thread: Option<&str>) -> Result<i32, String> {
+fn run_notifier(app: &std::path::Path, title: &str, body: &str, open: &str, thread: Option<&str>, tui: Option<&str>) -> Result<i32, String> {
     let mut args = vec!["--title", title, "--body", body, "--open", open];
     if let Some(thread) = thread {
         args.extend(["--thread", thread]);
+    }
+    if let Some(tui) = tui {
+        args.extend(["--tui", tui]);
     }
     if std::env::var_os("OVERSEER_TEST_NOTIFIER_DIRECT").is_some() {
         return std::process::Command::new(app.join("Contents/MacOS/notifier")).args(args).output().map(|o| o.status.code().unwrap_or(-1)).map_err(|e| e.to_string());
@@ -354,15 +357,26 @@ pub fn notify_command() -> Option<String> {
 
 /// [`notify`] with the URL a click opens and the thread it is grouped under (one per agent, AC-240).
 pub fn notify_with(title: &str, body: &str, open: &str, thread: Option<&str>) -> String {
+    notify_agent(title, body, open, thread, None)
+}
+
+/// [`notify_with`] and, for an agent, the shell command that opens the TUI on it: what a click
+/// does when VS Code is closed (AC-240). A notify command gets it as its fourth argument.
+pub fn notify_agent(title: &str, body: &str, open: &str, thread: Option<&str>, tui: Option<&str>) -> String {
     if let Some(cmd) = notify_command() {
-        let ok = std::process::Command::new(&cmd).arg(title).arg(body).arg(open).status().map(|s| s.success()).unwrap_or(false);
+        let mut command = std::process::Command::new(&cmd);
+        command.arg(title).arg(body).arg(open);
+        if let Some(tui) = tui {
+            command.arg(tui);
+        }
+        let ok = command.status().map(|s| s.success()).unwrap_or(false);
         return format!("{cmd} ({})", if ok { "ok" } else { "failed" });
     }
     #[cfg(target_os = "macos")]
     {
         let mut note = String::new();
         match notifier_app() {
-            Some(app) => match run_notifier(&app, title, body, open, thread) {
+            Some(app) => match run_notifier(&app, title, body, open, thread, tui) {
                 Ok(0) => return "overseer-notifier (ok)".into(),
                 Ok(3) => note = "overseer-notifier (denied); ".into(),
                 Ok(5) => note = "overseer-notifier (permission not answered yet); ".into(),
