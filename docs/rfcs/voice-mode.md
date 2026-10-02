@@ -397,6 +397,14 @@ Also told: Continuity (same change), Migration note (new agent, writes the note)
 
 A sent message cannot be unsent, and nothing pretends otherwise.
 
+A request that starts or redirects an agent is read back before it goes, as the question it is:
+"Start an agent in the site repo to draft the page's sections?" The settle window is then as long
+as the read-back takes to say, plus the setting, so the owner hears all of it and can still correct
+it (AC-229). The recognizer is given Overseer's vocabulary (repo, agent, merge, worktree…), the
+agents' titles and the repositories' names, so "repo" is not heard as "rebuild". A request that
+names Overseer and gives it an instruction is Overseer's whatever its own judgement says: when it
+answers "not for me", the daemon asks it again, once, saying so.
+
 ## What voice may do
 
 The daemon enforces the tiers, whatever the plan says.
@@ -416,7 +424,8 @@ The owner decided (2026-09-27) that permissions may be answered by voice, and th
 doubt it was taken.
 
 1. Overseer reads the request back in one sentence: "Codex wants to run `npm install` in
-   overseer. Allow?"
+   overseer. Allow?" It does so by itself the moment the request starts to wait (AC-230), with
+   no need to ask; the conversation shows the same question with Yes and No.
 2. The owner answers. Only a clear yes or no counts; silence for 20 s or anything unclear is no
    answer, and the request stays waiting.
 3. At once: a sound and a toast. The sound is an Audio Mode cue, so it follows Audio Mode's rules:
