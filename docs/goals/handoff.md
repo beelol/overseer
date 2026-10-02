@@ -112,6 +112,10 @@ Mergeability against main, checked 2026-09-30 00:00 with `git merge-tree --write
 - **#39 (menu-bar mockup) merged** (`ac7a4143`): docs only, link check passed (871 links, 0 broken); #42 did not carry these files.
 - **#42's menu-bar check started 2026-09-30 01:30** (the Mac idle 83 minutes): worktree `.claude/worktrees/menubar-check` (detached at `b1dc6da8`), target `/private/tmp/claude-501/menubar-check-target`, `$TMPDIR/overseer-quiet-window` held for its duration. **#42's menu-bar check: the owner said yes** (2026-09-30), to run while the Mac is unused. Run it when the keyboard and mouse have been idle 10+ minutes (`ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1e9); exit}'` in seconds), no full run holds the lock, and no other UI scenario is going; create `$TMPDIR/overseer-quiet-window` for its duration so builders hold their scenarios, and remove it after.
 
+## The gap list (owner, 2026-10-01)
+
+[gap-to-orchestrator.md](gap-to-orchestrator.md): what's missing before Overseer beats using Codex and Claude Code directly, as a full orchestrator that swarms, picks models and switches when usage runs out. The owner will ask about it again; keep it current. Owner's instruction the same day: build efficiently (combine merge checks, run Rust-only builders beside screen tests, rerun only what failed).
+
 ## Owner decisions on record
 
 - Menu bar (AC-262):
