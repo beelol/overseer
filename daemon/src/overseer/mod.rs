@@ -12,6 +12,7 @@ pub mod control;
 pub mod digest;
 pub mod finished;
 pub mod mcp;
+pub mod modes;
 pub mod needs;
 pub mod session;
 pub mod trouble;
@@ -118,6 +119,15 @@ pub(crate) fn tool_list(role: &str) -> Vec<Value> {
         fields["profile"] = json!({"type": "string"});
         fields["effort"] = json!({"type": "string", "enum": ["low", "medium", "high", "xhigh"]});
         fields["permission_mode"] = json!({"type": "string"});
+        // A permission mode by conversation (AC-230): mode (agent, mode: Ask first, Accept edits or
+        // Auto, why); Auto set without the owner asking only in the repositories the owner allows.
+        fields["mode"] = json!({"type": "string", "enum": ["Ask first", "Accept edits", "Auto"]});
+        if let Some(kinds) = fields["action"]["enum"].as_array_mut() {
+            kinds.push(json!("mode"));
+        }
+        if let Some(d) = propose["description"].as_str() {
+            propose["description"] = json!(d.replacen("retry (agent: send the turn that did not finish again).", "retry (agent: send the turn that did not finish again), mode (agent, mode: Ask first, Accept edits or Auto, why: its permission mode; when you set Auto without the owner asking, the reason is required and it is allowed only in the repositories the owner allows).", 1));
+        }
         tools.push(propose);
     }
     tools
