@@ -49,6 +49,7 @@ pub(super) fn play(d: &Arc<Daemon>, line: Line, preview: bool) -> Result<()> {
         return Ok(());
     }
     let mut opened = source.open_line(line)?;
+    super::test_hold("DECODED", &serde_json::json!({"revision":source.revision}))?;
     if CANCEL_EPOCH.load(Ordering::SeqCst) != epoch {
         return Ok(());
     }

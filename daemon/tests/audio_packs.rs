@@ -509,3 +509,168 @@ fn source_fields_and_enablement_revision_are_strict_and_never_model_authority() 
         .is_err());
     assert_eq!(d.call("audio.get", json!({})), selected);
 }
+
+struct AudioGate(PathBuf);
+impl Drop for AudioGate {
+    fn drop(&mut self) {
+        let _ = std::fs::write(self.0.join("release"), b"release");
+    }
+}
+fn gate_ready(gate: &Path) -> Value {
+    let deadline = Instant::now() + Duration::from_secs(15);
+    loop {
+        if let Ok(bytes) = std::fs::read(gate.join("ready.json")) {
+            if let Ok(value) = serde_json::from_slice(&bytes) {
+                return value;
+            }
+        }
+        assert!(
+            Instant::now() < deadline,
+            "synthetic audio admission gate never reached"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+fn audio_rpc(socket: &Path, method: &str, params: Value) -> Result<Value, String> {
+    use std::io::{BufRead, BufReader, Write};
+    let mut stream = std::os::unix::net::UnixStream::connect(socket).map_err(|e| e.to_string())?;
+    stream
+        .set_read_timeout(Some(Duration::from_secs(15)))
+        .unwrap();
+    writeln!(
+        stream,
+        "{}",
+        json!({"id":1,"method":method,"params":params})
+    )
+    .map_err(|e| e.to_string())?;
+    let mut line = String::new();
+    BufReader::new(stream)
+        .read_line(&mut line)
+        .map_err(|e| e.to_string())?;
+    let result: Value = serde_json::from_str(&line).map_err(|e| e.to_string())?;
+    if result.get("error").is_some() {
+        Err(result["error"]["message"].to_string())
+    } else {
+        Ok(result["result"].clone())
+    }
+}
+
+#[test]
+fn an_older_enable_cannot_publish_runtime_after_a_later_disable() {
+    let root = tmp();
+    let folder = root.path().join("ordering");
+    pack(&folder, "fixture-ordering");
+    let gate = root.path().join("transition-gate");
+    std::fs::create_dir(&gate).unwrap();
+    let release = AudioGate(gate.clone());
+    let log = root.path().join("audio.log");
+    let trace = root.path().join("transitions.log");
+    let d = Daemon::start(&[
+        ("OVERSEER_TEST_AUDIO_LOG", log.to_str().unwrap()),
+        (
+            "OVERSEER_TEST_AUDIO_TRANSITION_HOLD",
+            gate.to_str().unwrap(),
+        ),
+        (
+            "OVERSEER_TEST_AUDIO_TRANSITION_LOG",
+            trace.to_str().unwrap(),
+        ),
+    ]);
+    let initial = select(&d, &folder);
+    let socket = d.socket();
+    let enable_socket = socket.clone();
+    let initial_revision = initial["revision"].clone();
+    let enable = std::thread::spawn(move || {
+        audio_rpc(
+            &enable_socket,
+            "audio.set",
+            json!({"enabled":true,"expected_revision":initial_revision}),
+        )
+    });
+    let committed = gate_ready(&gate);
+    assert_eq!(committed["enabled"], true);
+    assert_eq!(
+        d.call("audio.get", json!({}))["revision"],
+        committed["revision"],
+        "older enable really committed before the hold"
+    );
+    let (tx, rx) = std::sync::mpsc::channel();
+    let disable_socket = socket.clone();
+    let expected = committed["revision"].clone();
+    let disable = std::thread::spawn(move || {
+        let r = audio_rpc(
+            &disable_socket,
+            "audio.set",
+            json!({"enabled":false,"expected_revision":expected}),
+        );
+        let _ = tx.send(r.clone());
+        r
+    });
+    // On the old source the disable completes during this hold, then the released
+    // older enable wrongly writes the runtime true. On the guarded source it waits
+    // only for the short commit/runtime boundary. Completion itself is not the assertion.
+    let _ = rx.recv_timeout(Duration::from_secs(2));
+    drop(release);
+    enable.join().unwrap().unwrap();
+    disable.join().unwrap().unwrap();
+    assert_eq!(d.call("audio.get", json!({}))["enabled"], false);
+    let values: Vec<Value> = std::fs::read_to_string(&trace)
+        .unwrap()
+        .lines()
+        .map(|s| serde_json::from_str(s).unwrap())
+        .collect();
+    assert_eq!(
+        values.len(),
+        2,
+        "both actual runtime updates must be observed"
+    );
+    assert_eq!(
+        values.last().unwrap()["enabled"],
+        false,
+        "actual runtime must agree with the last committed disable"
+    );
+    assert_eq!(
+        values.last().unwrap()["revision"],
+        d.call("audio.get", json!({}))["revision"]
+    );
+}
+
+#[test]
+fn source_change_after_decode_preserves_live_preview_in_new_pack_only() {
+    let root = tmp();
+    let a = root.path().join("pack-a");
+    let b = root.path().join("pack-b");
+    pack(&a, "fixture-a");
+    pack(&b, "fixture-b");
+    let gate = root.path().join("decoded-gate");
+    std::fs::create_dir(&gate).unwrap();
+    let release = AudioGate(gate.clone());
+    let log = root.path().join("audio.log");
+    let d = Daemon::start(&[
+        ("OVERSEER_TEST_AUDIO_LOG", log.to_str().unwrap()),
+        ("OVERSEER_TEST_AUDIO_DECODED_HOLD", gate.to_str().unwrap()),
+    ]);
+    let selected = select(&d, &a);
+    assert_eq!(
+        d.call("audio.preview", json!({"key":"agent_started"}))["queued"],
+        true
+    );
+    let decoded = gate_ready(&gate);
+    assert_eq!(decoded["revision"], selected["revision"]);
+    assert!(!log.exists(), "A decoded but has not been admitted");
+    let switched = select(&d, &b);
+    assert!(switched["revision"].as_i64() > decoded["revision"].as_i64());
+    drop(release);
+    assert_eq!(
+        wait_log(&log, 1),
+        "fixture-b:agent_started\n",
+        "the original live cue resolves B; A is never admitted"
+    );
+    std::thread::sleep(Duration::from_millis(100));
+    assert_eq!(
+        std::fs::read_to_string(&log).unwrap(),
+        "fixture-b:agent_started\n",
+        "there is exactly one receipt, without a second preview request"
+    );
+    assert_eq!(d.call("audio.get", json!({}))["enabled"], false);
+}
