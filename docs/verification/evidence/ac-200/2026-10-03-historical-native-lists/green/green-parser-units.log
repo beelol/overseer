@@ -1,0 +1,8 @@
+
+running 3 tests
+test overseer::session::native_migration_tests::ambiguous_group_refuses_without_removing_saved_arguments ... ok
+test overseer::session::native_migration_tests::exact_scratch_and_continuity_argument_groups_preserve_neighbor_policy ... ok
+test overseer::session::native_migration_tests::remaining_tool_policy_refuses_spaced_and_inline_encodings ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 330 filtered out; finished in 0.00s
+

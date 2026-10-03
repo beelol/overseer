@@ -1,0 +1,6 @@
+
+running 1 test
+test ac184_overseer_reads_on_demand_and_only_reads ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 36 filtered out; finished in 1.77s
+

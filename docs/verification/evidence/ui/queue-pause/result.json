@@ -1,0 +1,51 @@
+{
+  "checks": [
+    {
+      "name": "typed AltEnter redirect and real spoken addition are queued before Stop mid-turn",
+      "ok": true
+    },
+    {
+      "name": "Stop ends the current turn and no queued message is sent within 10 seconds",
+      "ok": true
+    },
+    {
+      "name": "chat shows both messages paused in order with Send queued, Clear and Remove",
+      "ok": true,
+      "detail": "Queue pausedSend queuedClearPaused1. typed directionRemovePaused2. (by voice) The owner said: “also add the spoken direction”Remove"
+    },
+    {
+      "name": "stopped agent stays in grid with both paused messages in order",
+      "ok": true,
+      "detail": "Queue pausedSend queuedClearPaused1. typed directionRemovePaused2. (by voice) The owner said: “also add the spoken direction”Remove"
+    },
+    {
+      "name": "Send queued sends first direction and spoken message follows only after its turn ends",
+      "ok": true,
+      "detail": [
+        [
+          1,
+          "original work",
+          "interrupted"
+        ],
+        [
+          2,
+          "typed direction",
+          "completed"
+        ],
+        [
+          3,
+          "From Overseer: (by voice) The owner said: “also add the spoken direction”",
+          "completed"
+        ]
+      ]
+    },
+    {
+      "name": "Remove removes only the chosen message",
+      "ok": true
+    },
+    {
+      "name": "Clear retains pause and sends nothing",
+      "ok": true
+    }
+  ]
+}

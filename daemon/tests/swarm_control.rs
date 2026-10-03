@@ -99,8 +99,20 @@ fn daemon_stop_all_preserves_unconfirmed_swarm_worker_after_control_loss() {
     assert_eq!(attempts, 1);
     signal(shim["child_pid"].as_i64().unwrap(), 9);
     d.wait_done(worker, 5);
-    let err = d.try_call("run.follow_up", json!({"run_id":worker,"prompt":"continue"})).unwrap_err();
-    assert!(err.contains("Swarm worker"), "unexpected follow-up result: {err}");
+    let turns = d.call("run.turns", json!({"run_id":worker}));
+    let queue = d.call("run.queued", json!({"run_id":worker}));
+    let snapshots: i64 = db.query_row("SELECT COUNT(*) FROM snapshots", [], |row| row.get(0)).unwrap();
+    for (method, params) in [
+        ("run.follow_up", json!({"run_id":worker,"prompt":"continue"})),
+        ("run.queue", json!({"run_id":worker,"text":"continue"})),
+        ("run.redirect", json!({"run_id":worker,"text":"continue"})),
+    ] {
+        let err = d.try_call(method, params).unwrap_err();
+        assert!(err.contains("Swarm worker"), "{method}: {err}");
+        assert_eq!(d.call("run.turns", json!({"run_id":worker})), turns);
+        assert_eq!(d.call("run.queued", json!({"run_id":worker})), queue);
+        assert_eq!(db.query_row("SELECT COUNT(*) FROM snapshots", [], |row| row.get::<_,i64>(0)).unwrap(), snapshots);
+    }
 }
 
 #[test]

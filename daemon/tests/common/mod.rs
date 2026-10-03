@@ -352,6 +352,32 @@ pub fn signal(pid: i64, sig: i32) {
     }
 }
 
+/// Read the synthetic native launch capability through its real MCP config.
+/// Agent/watcher configurations keep their existing environment token route.
+pub fn native_capability_from_args(args: &[String], harness: &str) -> String {
+    let command_args: Vec<String> = if harness == "claude" {
+        let at = args.iter().position(|arg| arg == "--mcp-config").expect("actual MCP config");
+        let config: Value = serde_json::from_slice(&std::fs::read(&args[at + 1]).unwrap()).unwrap();
+        let server = &config["mcpServers"]["overseer"];
+        if let Some(token) = server["env"]["OVERSEER_MCP_TOKEN"].as_str() { return token.to_string(); }
+        server["args"].as_array().unwrap().iter().map(|v| v.as_str().unwrap().to_string()).collect()
+    } else {
+        let inline = args.iter().find_map(|arg| arg.strip_prefix("mcp_servers.overseer.args=")).expect("actual Codex MCP args");
+        serde_json::from_str(inline).unwrap()
+    };
+    let at = command_args.iter().position(|arg| arg == "--capability-file").expect("immutable capability file");
+    std::fs::read_to_string(&command_args[at + 1]).unwrap()
+}
+
+pub fn native_capability(d: &Daemon, run: &str) -> String {
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.busy_timeout(Duration::from_secs(5)).unwrap();
+    let dir: String = db.query_row("SELECT run_dir FROM runs WHERE id=?1", [run], |r| r.get(0)).unwrap();
+    let launch: Value = serde_json::from_slice(&std::fs::read(Path::new(&dir).join("launch.json")).unwrap()).unwrap();
+    let args = launch["args"].as_array().unwrap().iter().map(|v| v.as_str().unwrap().to_string()).collect::<Vec<_>>();
+    native_capability_from_args(&args, "claude")
+}
+
 pub fn launch_info(d: &Daemon, run: &str) -> (Value, PathBuf) {
     let dir = d.home.path().join("runs").join(run);
     let mut gens: Vec<PathBuf> = std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.path()).collect();

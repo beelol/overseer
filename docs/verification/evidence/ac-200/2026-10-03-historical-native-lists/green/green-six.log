@@ -1,0 +1,11 @@
+
+running 6 tests
+test ac200_claude_frozen_accounts_14_migrates ... ok
+test ac200_claude_frozen_gate_s_13_migrates ... ok
+test ac200_claude_modified_historical_groups_refuse ... ok
+test ac200_codex_frozen_accounts_14_migrates ... ok
+test ac200_codex_frozen_gate_s_13_migrates ... ok
+test ac200_codex_modified_historical_groups_refuse ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 8.73s
+

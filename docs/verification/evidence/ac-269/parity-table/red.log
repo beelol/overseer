@@ -1,0 +1,19 @@
+   Compiling overseer-tui v0.1.0 (/private/tmp/overseer-mods-parity-docs-20261003/tui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.28s
+     Running tests/parity.rs (/private/tmp/overseer-closeout-verify-target/debug/deps/parity-62bfe094fb899b7a)
+
+running 1 test
+
+thread 't36_nothing_left_out_without_a_reason' panicked at tui/tests/parity.rs:1425:5:
+VS Code commands with no TUI key and no reason in docs/rfcs/tui.md: ["overseer.mods", "overseer.appliedMods"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test t36_nothing_left_out_without_a_reason ... FAILED
+
+failures:
+
+failures:
+    t36_nothing_left_out_without_a_reason
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 18 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p overseer-tui --test parity`
