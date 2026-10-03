@@ -1,9 +1,11 @@
 //! AC-269 Gate S: authenticated native reads are projections, never management authority.
-//! RED fixtures only so far; no new production code until an observed assertion RED.
+//! Direct daemon boundary and real MCP-wire fixtures use isolated synthetic runs.
 mod common;
 use common::*;
 use serde_json::{json, Value};
+use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
+use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
 fn db(d: &Daemon) -> rusqlite::Connection {
@@ -151,6 +153,80 @@ fn has_private_text(value: &Value) -> bool {
         Value::Array(values) => values.iter().any(has_private_text),
         _ => false,
     }
+}
+
+// The real stdio shim, with no inherited credentials or harness process. The
+// guard closes/kills/waits even on failure; stdout is drained while it runs.
+struct McpChild(Child);
+impl Drop for McpChild {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+fn mcp_exchange(d: &Daemon, token: &str, requests: &[Value]) -> Vec<Value> {
+    let mut child = McpChild(
+        Command::new(BIN)
+            .args(["mcp", "--socket", &d.socket().display().to_string()])
+            .env_clear()
+            .env("OVERSEER_MCP_TOKEN", token)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap(),
+    );
+    let stdout = child.0.stdout.take().unwrap();
+    let reader = std::thread::spawn(move || {
+        BufReader::new(stdout)
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(&line.unwrap()).unwrap())
+            .collect::<Vec<_>>()
+    });
+    let mut stdin = child.0.stdin.take().unwrap();
+    for request in requests {
+        writeln!(stdin, "{request}").unwrap();
+    }
+    drop(stdin);
+    let deadline = Instant::now() + Duration::from_secs(15);
+    let status = loop {
+        if let Some(status) = child.0.try_wait().unwrap() {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            let _ = child.0.kill();
+            let _ = child.0.wait();
+            let _ = reader.join();
+            panic!("finite MCP exchange did not exit within 15 seconds");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    let replies = reader.join().unwrap();
+    assert!(status.success(), "MCP shim failed: {status}");
+    replies
+}
+fn mcp_metadata(reply: &Value) -> Value {
+    assert!(reply.get("error").is_none(), "MCP protocol error: {reply}");
+    assert_eq!(
+        reply["result"]["isError"], false,
+        "Mods read refused: {reply}"
+    );
+    assert_eq!(reply["result"]["content"][0]["type"], "text");
+    serde_json::from_str(reply["result"]["content"][0]["text"].as_str().unwrap())
+        .expect("MCP Mods content is JSON metadata")
+}
+fn assert_mcp_discovery(reply: &Value) {
+    let tools = reply["result"]["tools"].as_array().unwrap();
+    let mods: Vec<_> = tools.iter().filter(|tool| tool["name"] == "mods").collect();
+    assert_eq!(mods.len(), 1, "strict read tool is discoverable once");
+    assert_eq!(
+        mods[0]["inputSchema"]["properties"]["operation"]["enum"],
+        json!(["list", "why"])
+    );
+    assert_eq!(mods[0]["inputSchema"]["additionalProperties"], false);
+    assert!(!tools.iter().any(|tool| tool["name"]
+        .as_str()
+        .is_some_and(|name| name.starts_with("mods."))));
 }
 
 #[test]
@@ -605,4 +681,177 @@ fn daemon_created_watcher_reads_only_its_actual_subject() {
         json!({"actions":[{"action":"mod","operation":"bind","role":"overseer"}]}),
     );
     assert_eq!(d.call("mods.list", json!({})), before);
+}
+
+/// Actual stdio JSON-RPC, not a direct overseer.tool call: the shim carries
+/// daemon-issued tokens for real ordinary and shared Overseer runs.
+#[test]
+fn actual_mcp_mods_reads_preserve_role_projection_and_private_authority() {
+    let t = tmp();
+    let repo = repo(&t.path().join("repo"));
+    let mode = t.path().join("mode");
+    std::fs::write(&mode, "overseer").unwrap();
+    let fixture = repo_root().join("fixtures/fake-harness/claude-fixture.js");
+    let d = Daemon::start(&[
+        ("OVERSEER_TEST_AUTO_DISABLED", "1"),
+        ("OVERSEER_CLAUDE_PATH", fixture.to_str().unwrap()),
+        ("CLAUDE_FIXTURE_MODE_FILE", mode.to_str().unwrap()),
+        (
+            "OVERSEER_HARNESS_ENV_PASSTHROUGH",
+            "CLAUDE_FIXTURE_MODE_FILE",
+        ),
+    ]);
+    d.call("agent.cadence", json!({"cadence":"off","by":"owner"}));
+    let own = run(&d, &repo, "MCP ordinary reader");
+    let other = run(&d, &repo, "MCP unrelated task");
+    let visible = install_local(
+        &d,
+        &t.path().join("MCP_PRIVATE_SELF_SOURCE"),
+        "wire-self",
+        "PRIVATE_MCP_SELF_BODY",
+    );
+    let hidden = install_local(
+        &d,
+        &t.path().join("MCP_PRIVATE_UNRELATED_SOURCE"),
+        "wire-unrelated",
+        "PRIVATE_MCP_OTHER_BODY",
+    );
+    let mine = bind(&d, &visible, &own);
+    let theirs = bind(&d, &hidden, &other);
+    // Record actual private text in the ordinary run's immutable turn, then
+    // disable its desired binding so pending differs from that saved delivery.
+    d.call(
+        "run.follow_up",
+        json!({"run_id":own,"prompt":"Continue the synthetic task."}),
+    );
+    d.wait_done(&own, 20);
+    let revision = d.call("mods.list", json!({}))["revision"].clone();
+    d.call("mods.bind", json!({"expected_revision":revision,"binding":{"id":mine,"mod_id":visible["id"],"version":visible["version"],"fingerprint":visible["fingerprint"],"scope":{"kind":"agent","run_id":own},"enabled":false}}));
+    d.call(
+        "overseer.send",
+        json!({"text":"Report synthetic state only.","surface":"ctl","harness":"claude"}),
+    );
+    let session = d.call("overseer.session", json!({}));
+    let overseer = session["run_id"].as_str().unwrap().to_string();
+    wait_own_done(&d, &overseer);
+    let revision = d.call("mods.list", json!({}))["revision"].clone();
+    d.call("mods.bind", json!({"expected_revision":revision,"binding":{"mod_id":visible["id"],"version":visible["version"],"fingerprint":visible["fingerprint"],"scope":{"kind":"overseer"},"enabled":true}}));
+    let ordinary_token = token(&d, &own, "agent");
+    let overseer_token = token(&d, &overseer, "overseer");
+    let before = authority_snapshot(&d);
+    let ordinary = mcp_exchange(
+        &d,
+        &ordinary_token,
+        &[
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"mods-fixture","version":"1"}}}),
+            json!({"jsonrpc":"2.0","method":"notifications/initialized"}),
+            json!({"jsonrpc":"2.0","id":2,"method":"tools/list"}),
+            json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"mods","arguments":{"operation":"list"}}}),
+            json!({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"mods","arguments":{"operation":"why","run_id":own}}}),
+            json!({"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"mods","arguments":{"operation":"why","run_id":other}}}),
+            json!({"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"mods.bind","arguments":{"actor":"owner","role":"overseer"}}}),
+        ],
+    );
+    assert_eq!(ordinary.len(), 6, "notification gets no reply");
+    for (index, reply) in ordinary.iter().enumerate() {
+        assert_eq!(reply["id"], index + 1);
+        assert_eq!(reply["jsonrpc"], "2.0");
+    }
+    assert_eq!(ordinary[0]["result"]["serverInfo"]["name"], "overseer");
+    assert_mcp_discovery(&ordinary[1]);
+    let list = mcp_metadata(&ordinary[2]);
+    assert_eq!(list["installed"].as_array().unwrap().len(), 1);
+    assert_eq!(list["installed"][0]["fingerprint"], visible["fingerprint"]);
+    assert_eq!(list["bindings"].as_array().unwrap().len(), 1);
+    assert_eq!(list["bindings"][0]["id"], mine);
+    let why = mcp_metadata(&ordinary[3]);
+    assert_eq!(why["context"]["run_id"], own);
+    assert_eq!(why["desired"]["versions"], json!([]));
+    assert_eq!(
+        why["last_turn"]["plan"]["versions"][0]["fingerprint"],
+        visible["fingerprint"]
+    );
+    assert_eq!(why["last_turn"]["outcome"], "transport_accepted");
+    assert_eq!(why["pending"], true);
+    for denied in &ordinary[4..] {
+        assert_eq!(
+            denied["result"]["isError"], true,
+            "MCP refusal must be a tool error"
+        );
+        assert!(denied.get("error").is_none());
+        assert!(!denied["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .is_empty());
+    }
+    let owner = mcp_exchange(
+        &d,
+        &overseer_token,
+        &[
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"mods-fixture","version":"1"}}}),
+            json!({"jsonrpc":"2.0","method":"notifications/initialized"}),
+            json!({"jsonrpc":"2.0","id":2,"method":"tools/list"}),
+            json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"mods","arguments":{"operation":"list"}}}),
+            json!({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"mods","arguments":{"operation":"why","run_id":overseer}}}),
+        ],
+    );
+    assert_eq!(owner.len(), 4);
+    for (index, reply) in owner.iter().enumerate() {
+        assert_eq!(reply["id"], index + 1);
+        assert_eq!(reply["jsonrpc"], "2.0");
+    }
+    assert_eq!(owner[0]["result"]["serverInfo"]["name"], "overseer");
+    assert_mcp_discovery(&owner[1]);
+    let owner_list = mcp_metadata(&owner[2]);
+    assert_eq!(owner_list["installed"].as_array().unwrap().len(), 2);
+    assert!(owner_list["installed"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|v| v["fingerprint"] == hidden["fingerprint"]));
+    let owner_why = mcp_metadata(&owner[3]);
+    assert_eq!(owner_why["context"]["run_id"], overseer);
+    assert_eq!(
+        owner_why["desired"]["versions"][0]["fingerprint"],
+        visible["fingerprint"]
+    );
+    assert_eq!(
+        owner_why["pending"], true,
+        "new desired Overseer binding was not delivered"
+    );
+    for read in [&list, &why, &owner_list, &owner_why] {
+        assert!(!has_private_text(read));
+        for private in [
+            "PRIVATE_MCP_SELF_BODY",
+            "PRIVATE_MCP_OTHER_BODY",
+            "MCP_PRIVATE_SELF_SOURCE",
+            "MCP_PRIVATE_UNRELATED_SOURCE",
+        ] {
+            assert!(
+                !read.to_string().contains(private),
+                "MCP reply leaked private text/source: {private}"
+            );
+        }
+    }
+    for read in [&list, &why] {
+        for private in ["wire-unrelated", theirs.as_str()] {
+            assert!(
+                !read.to_string().contains(private),
+                "ordinary MCP read leaked unrelated metadata"
+            );
+        }
+    }
+    assert_eq!(
+        authority_snapshot(&d),
+        before,
+        "MCP reads/refusals changed authority/configuration or admitted a turn"
+    );
+    for id in [&own, &overseer] {
+        assert!(
+            d.events(id)
+                .iter()
+                .any(|e| e["kind"] == "overseer_tool_call" && e["payload"]["name"] == "mods"),
+            "the daemon recorded actual shim calls on the authenticated run"
+        );
+    }
 }
