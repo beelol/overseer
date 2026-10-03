@@ -22,7 +22,7 @@ Two current inherited-profile incompatibilities are test assumptions, not establ
 - AC190 starts under off, then expects second agent briefing/channel true at1566–1573. It only recognizes forced_on at1556; off legitimately suppresses these.
 - AC189 begins by expecting turn3/6/finished checks at1349–1363 with inherited cadence. Under off these correctly never occur.
 
-## Smallest setting-aware fixture correction (not authored/run)
+## Smallest setting-aware fixture correction
 
 1. AC190: read/assert effective `agent.channel` for eligible fixture agents before mutation. Keep normal auto assertions; on branch assert actual lone-agent MCP launch config, off branch keep two overlapping real fixture agents but assert no appended task/queued briefing, no MCP config, no channel-origin report/ask/claim events and no report/ask rows. Preserve the exact typed prompts/files. After off assertions, explicitly set owner channel on for NEW agents to execute the existing report/ask/claim/answer/idempotence tests; identify this transition in the log. Existing explicit global-off and per-run-on tests remain intact. Never quietly force on before the inherited-off assertions.
 2. AC189: assert global `agent.cadence` initially. Under inherited off, an actual fixture completes seven turns, trips the existing free-check event, passes the established grace/batch window and has no cadence/free-check check-in starts/results. Then explicitly owner-enable every:3 for a fresh steady fixture and retain all existing 3/6/finished, drifting, done, per-run cadence, global-off and batching assertions. Do not return early and drop the enabled control cases. Default/on retain their current strong assertions.
@@ -52,7 +52,7 @@ for profile in off on; do
   printf 'source=%s channel=%s check_ins=%s\n' "$(git rev-parse HEAD)" "$channel" "$checks" > "/private/tmp/ac201-final-matrix/$profile-profile.log"
   nice -n 20 cargo test -p overseerd --test protocol --test protocol_shapes --test overseer --test overseer_continuity --test overseer_surfaces -- --test-threads=2 2>&1 | tee "/private/tmp/ac201-final-matrix/$profile-rust.log"
   # Only after root releases the full-run UI lock, at most one scenario at a time.
-  for scenario in home talk parity; do
+  for scenario in home home-overseer talk parity oversight; do
     nice -n 20 node "test/ui/scenario-$scenario.js" 2>&1 | tee "/private/tmp/ac201-final-matrix/$profile-$scenario.log"
     # Immediately preserve this run's scenario.log/result/screenshots under a profile-specific path:
     # the next profile uses the same evidence directory and otherwise overwrites them.
@@ -61,6 +61,10 @@ done
 unset OVERSEER_CHANNEL_DEFAULT OVERSEER_CHECK_INS
 ```
 
-`--only=home,talk,parity` on scripts/test-all still repeats ALL non-UI steps and packaging; direct node commands avoid that repetition. Home covers starting agents vs talking to Overseer/Fresh/keyboard; talk covers actual proposal/yes/no/permission; parity covers existing native fixture transport, queue and redirect. Do not claim other UI scenarios ran in each setting. Full clean-clone default regression (all gate tests/scenarios discovered) is covered separately by the coordinator's exact final-source one-command gate, if it passes. If literal 'existing suites' is interpreted to require every existing packaged scenario in both profiles, the six targeted runs alone leave that clause partial; keep that scope decision explicit, not silently redefine it.
+`--only=home,talk,parity` on scripts/test-all still repeats ALL non-UI steps and packaging; direct node commands avoid that repetition. Home covers starting agents vs talking to Overseer/Fresh/keyboard; talk covers actual proposal/yes/no/permission; parity covers existing native fixture transport, queue and redirect. Do not claim other UI scenarios ran in each setting. Full clean-clone default regression (all gate tests/scenarios discovered) is covered separately by the coordinator's exact final-source one-command gate, if it passes. If literal 'existing suites' is interpreted to require every existing packaged scenario in both profiles, the ten targeted runs alone leave that clause partial; keep that scope decision explicit, not silently redefine it.
 
 No source changes, builds, tests, UI or paid calls executed during this review.
+
+## Authored checkpoint
+
+PR66 (`2566e833cb3a9f9d7e65ed3338e3751aa42d0fbb`) implements the test-only changes above and receipts in five scenarios: home, home-overseer, talk, parity and oversight. Source review and six JavaScript syntax checks passed. Oversight records its deliberate cadence-off transition. Cargo and packaged scenarios remain unrun; this checkpoint does not establish either profile. The original diagnosis above remains historical, and the expanded five-scenario command is the current planned subset.
