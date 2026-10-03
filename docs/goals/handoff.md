@@ -2,7 +2,26 @@
 
 Updated 2026-10-03 by Codex coordination. Main’s README and full RFC Verify clauses are authoritative, including AC274 and future owner edits. The active [everything goal](everything.md) remains open: 207/288 verified, 81 open. No new criterion was closed by the checkpoints below. No production deployment is authorized in this conversation.
 
-## Active verification and next actions
+## Current status and next actions
+
+Snapshot: 2026-10-03. Main's README and full RFC Verify clauses remain authoritative: 207/288 verified, 81 open. No criterion was closed by these checks. No merge-readiness or production deployment is established.
+
+- **Full gate / Voice:** Full47476 at frozen `fe643229957cb3f443613aee453a009c28516fe7` is terminal: 89/90 stages passed, including Rust1692 and cleanup. Only packaged UIvoice failed after four deliberate listener crashes. Isolated unchanged Voice13356 reproduced the same failure; both runs are finished. The screenshot shows Starting, with fixture state enabled1/muted0. The host baseline at `0ad0f86` actually produced one stale-snapshot RED and one explicit-reenable PASS; this does not establish the UI cause. Root10511 is running the bounded diagnostic scenario at docs-only `d2759ab` against the exact original VSIX (SHA256 cc250107fe2b875b8d9aced1d8452f9c50e5906864a7784f63d420262e98ffbd), alone. No product correction yet. [Full and isolated receipts](../verification/evidence/closeout/2026-10-03-full-fe643/README.md).
+- **Audio:** Corrected semantic source/test `e40407a` reached all nine selected cases: eight passed; expired authentication produced only `agent_started`, missing `agent_sign_in_required`. Root's single isolated exact auth rerun75377 at test-only diagnostic `31c8e9ec7dd20090be25bcb261fc7869658a3262` passed in3.534s with the unchanged61ea daemon hash and cleanup0/0; no failure diagnostic was reached. The prior missing cue remains a genuine intermittent/order-sensitive failure, with no product fix or closure claimed. mods_design owns source-only race diagnosis. The original enable-revision setup failure is preserved. Pack/source ordering and owned decoder/player shutdown remain unqualified; shutdown tests `f5ea30f` are frozen pending their actual baseline. Built-in asset preference remains pending; no private audio access or generation. [Eight-pass/one-failure evidence](https://github.com/beelol/overseer/blob/85ca38796a06f94612ef91f6b123e7598409701a/docs/verification/evidence/audio-twelve/semantic-e404-qualified/README.md). [Isolated receipt](https://github.com/beelol/overseer/tree/1e27fd7/docs/verification/evidence/audio-twelve/auth-isolated-31c8). A source review found a possible decoder exit/footprint-inspection race; a deterministic baseline is being authored, not a proven explanation of the missing cue.
+- **Native phone Task3:** After two preserved setup failures (type correction7079, missing Expo base config), the exact five phone-core cases ran at69de: three behavioral failures and two compatibility passes. The failures expose answer persistence, disconnected queuing and lost-acknowledgement replay. Typecheck passed. Audit_voice_eval is implementing the accepted private transient transport for typed and raw answers; no production runtime has been tested. Proof is in `/private/tmp/overseer-native-surfaces-phone-69de5d-20261003`, with owned groups0. The ten daemon projection cases remain unrun.
+- **Less tool noise runner:** Sixteen unchanged synthetic runner cases passed at source `e7a74019`, published with evidence at `5c2c8c419d7de71978f6ce9832c14d7f863d9e52`. The runner is still unregistered: no installed transformer, native result hook, recipe/install governance or token savings is qualified. AC271 remains partial. [Runner receipts and limits](https://github.com/beelol/overseer/blob/5c2c8c419d7de71978f6ce9832c14d7f863d9e52/docs/verification/evidence/ac-271/runner/root-read-fix/README.md).
+
+Root coordinates the next runtime allocation. Do not poll completed handles or start Cargo, daemon, player, packaged UI or paid checks without a new allocation. Keep frozen candidates and other agents' source unchanged. Private POD assets remain local-only and outside worktrees, artifacts and releases; the owner's production daemon and profiles remain untouched.
+
+## Historical checkpoints and evidence
+
+The chronology below records earlier snapshots, not current ownership or live processes. Older LIVE, uncompiled, unrun and next-step statements are superseded by the current-status block above. Preserve their links and failed/setup receipts; they do not establish a current full pass.
+
+- Previous full abf: terminal88/89; isolated same-source Voice57 subsequently passed, without explaining the original Rust failure. [Receipts](../verification/evidence/closeout/2026-10-03-full-abf/qualification.md).
+- Original seventeen-case audio baseline: two passes/fifteen reached feature failures; six folder tests stopped at the missing source method before later assertions. [Preserved baseline](https://github.com/beelol/overseer/tree/f714fbf73657dc9a70e7607843a528e9ed851738/docs/verification/evidence/audio-twelve/2026-10-03-baseline).
+- Original runner startup failures and controlled sandbox probes remain evidence, superseded by the sixteen-case qualification above. [Earlier probes](../verification/evidence/ac-271/2026-10-03-runner-probe/README.md).
+
+### Earlier verification snapshots
 
 **Current results and ownership:** Isolated Voice13356 is TERMINAL exit1 at the same full-run failure: scenario-voice.js434 after four listener crashes. Screenshot shows Starting; owned SQLite confirms enabled1/muted0, so cached-toggle disabling is not the observed cause. Full89/90 and isolated reproduction evidence now live under `docs/verification/evidence/closeout/2026-10-03-full-fe643/` (89 command receipts plus the in-process cleanup stage). Queue_pause owns a separate branch with deterministic delayed-snapshot host baseline and bounded failure-time daemon/webview diagnostics; no fix before evidence. Full candidate stays unchanged and not ready.
 
@@ -44,7 +63,7 @@ Native approvals: unchanged baselinefff9216 reproduced both recovery defects; so
 
 Native speech: diagnostic3bbd089 compiled only (33.55s, fresh metadata, no test bodies); published checkpointdab3a11. New opt-in CI controller9fb19943 is local/frozen, nine tests UNRUN, no workflow dispatch or native synthesis. audit_voice_eval is holding. The original native85-sample CI failure remains unresolved; do not lower assertions or silently skip it.
 
-## Current builders and frozen slices
+### Earlier builders and frozen slices
 
 **queue_pause: typed native approvals and recovery.** Checkout `/private/tmp/overseer-native-pending-20261003`, branch `codex/native-pending-lifecycle`, published checkpoint `f643033c48411136bae5a8e3a02e1ab5df317f69`. Frozen implementation5b96da3 passed `cargo check -p overseerd --tests` with actual nice20/jobs1, fresh compiler metadata and zero errors. Evidence is on that branch under `docs/verification/evidence/ac-274/task2-slice2/compile-check-5b96`. This is not binary or runtime qualification. The new f643 fixtures remain uncompiled and unrun.
 
@@ -74,7 +93,7 @@ That CI job also exposed a distinct native speech failure: `memspeech::tests::a_
 
 **Keep this file current, and tell whoever comes after you to do the same.** Update it and push it to main the moment anything changes: a merge or deploy, an owner decision, a builder started or finished, a PR opened or closed, a new criterion. Also update your own memory's resume note. The owner asked for both (2026-09-29), so the next agent never loses work when usage or a session runs out.
 
-## Current takeover (2026-10-02)
+### Earlier takeover (2026-10-02)
 
 Fresh package24107 at clean42b8d24 completed; daemon build42b8d24a0507, VSIX SHA25672403a702da715c103dd959ace6c53988f0d87bd6bf752b3247596d640a90266. Root Mods UI87893 finished exit1: all behavior and six theme/width checks passed, but final plain-words gate exposed raw harness/status/run IDs. Finished reviewed [draft PR74](https://github.com/beelol/overseer/pull/74), a400de63ed44100d1e651adb9442f5f9b274ffb9, fixes labels and untitled fallback; actual webview and host RED/GREEN, host16/16 and all unit files30/30. Integrated into pushed follow-up e6ec7a7; fresh package/rerun still due. Audit UI73640 on42 package passed exit0 with unchanged budgets and cleanup. Logs /private/tmp/overseer-followup-{mods,audit}-ui-20261003.log; generated screenshots remain in follow-up, not staged. Source changed only via reviewed merges; this checkout is now evidence-dirty, so prepare a clean package checkout for next build. Compiler returned to TUI, now17focused cases green and further bounded coverage underway. UI idle. Native first-call and Task2 pending plans reviewed, baseline fixture authoring authorized in their own branches; neither has compiler slot or runtime-wiring approval yet.
 
