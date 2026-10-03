@@ -61,7 +61,7 @@ fn ac180_mcp_shim_serves_overseers_tools_from_the_daemon() {
     assert_eq!(replies[0]["result"]["serverInfo"]["name"], "overseer");
     assert_eq!(replies[0]["result"]["capabilities"]["tools"]["listChanged"], false);
     let tools: Vec<&str> = replies[1]["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
-    assert_eq!(tools, ["roster", "agent", "conflicts", "conversation", "changes", "diff", "file", "search", "usage", "accounts", "check_in", "rally", "answer", "propose"]);
+    assert_eq!(tools, ["roster", "mods", "agent", "conflicts", "conversation", "changes", "diff", "file", "search", "usage", "accounts", "check_in", "rally", "answer", "propose"]);
     let roster = replies[2]["result"]["content"][0]["text"].as_str().unwrap();
     assert!(roster.contains(&run) && roster.contains("completed"), "roster names the run: {roster}");
     assert_eq!(replies[2]["result"]["isError"], false);
@@ -89,7 +89,7 @@ fn ac180_tokens_decide_who_may_call_what() {
     let agent = d.call("overseer.token", json!({"run_id": "r-agent", "role": "agent"}))["token"].as_str().unwrap().to_string();
     let tools = d.call("overseer.tools", json!({"token": agent}));
     let names: Vec<&str> = tools["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
-    assert_eq!(names, ["roster", "report", "ask", "claim"], "an agent has the roster and its channel");
+    assert_eq!(names, ["roster", "mods", "report", "ask", "claim"], "an agent has the roster, its Mods metadata and its channel");
     let err = d.try_call("overseer.tool", json!({"token": agent, "name": "agent", "arguments": {"id": "x"}})).unwrap_err();
     assert!(err.contains("no tool agent"), "{err}");
     assert!(d.try_call("overseer.token", json!({"run_id": "r", "role": "king"})).is_err());

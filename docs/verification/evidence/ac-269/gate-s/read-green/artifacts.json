@@ -1,0 +1,36 @@
+{
+  "commit": "e78fb216fad8f09df8497fb389094d6ed877a2c8",
+  "source_root": "/private/tmp/overseer-mods-gate-s-20261003",
+  "jobs": 1,
+  "test_threads": 1,
+  "executables": {
+    "mods_delivery": "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_delivery-8b4ec620c8d5b954",
+    "mods_bindings": "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_bindings-9cb6192a0d9fadaf",
+    "overseer": "/private/tmp/overseer-closeout-verify-target/debug/deps/overseer-9ab135698735fa27",
+    "mods_gate_s": "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_gate_s-00b0d44fe604f213"
+  },
+  "sha256": {
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/mods/library.rs": "bc26154e515e958c9575fbb3a5ec8b656dceb6fe6e7994ac83a0904f33a381cb",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/mods/manifest.rs": "f81260ae6212547a7fba814465b077f86c57eaf3a547481cf867c5f9f7ae0a79",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/mods/delivery.rs": "105653af7a1e76b4b4ed9274eaa616e7d30d5058a61333425a8b44c1a120f7ac",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/mods/mod.rs": "2bc212c10a66d9d7acd6513f5987a74e64101e68d9bbd09c87cc2c1ea812223e",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/mods/read.rs": "2d4f934c14cf13fb792f51c1fa23f317fdb8b66e3596f98731cea88faf37b66a",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/mods/bindings.rs": "ed2622f08f10cb8cd57ace4f9f73adcf18673e6c105bd89074ae0ff5b7bf5f86",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/overseer/mod.rs": "47899fbd11b745a8f426313a061a1647f880a84eca37903e71df58f8397bd6b4",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/overseer/session.rs": "dfc0a1c1b842748e3d9a0c5843a19fd272a61dfb1ca36c0f66fbec6134bb35df",
+    "/private/tmp/overseer-closeout-verify-target/debug/overseerd.d": "09ac07e60b15063381fad648d1c9710f71a95de6951d3e743577671398976600",
+    "/private/tmp/overseer-closeout-verify-target/debug/overseerd": "e23f353f4bca7ad38a947a8285c7f4adf7244243ead0f3178186c46c4ba649ae",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/tests/mods_delivery.rs": "42e4535b4fe302d659e42e34088b82ed632f9501c4e50bf8710789651d85d015",
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_delivery-8b4ec620c8d5b954": "41aba1090116fd213611b6b97baf32a1efe03233e4eceffe4e12988bdf432809",
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_delivery-8b4ec620c8d5b954.d": "324998ca4c52d457d1bc64cec829a02d1438643d4b2c1493e1bd3ae90e02e826",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/tests/mods_bindings.rs": "b29f26216ac4b1dc3dd92e487e8161dbc204b352ede749f62a2fb345b34a983f",
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_bindings-9cb6192a0d9fadaf": "020a640b79d92886253a0a7da84f1f2daaaa56be5c01341d92f16da9c5bdf554",
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_bindings-9cb6192a0d9fadaf.d": "818a2f1367e7030be8cffc8472d16e0e5729e4a862a30c97169611d886f9770a",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/tests/overseer.rs": "8180c9d8d6ad23c235ed85be33fd0d57c83a335828407cc48531d657b55d2568",
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/overseer-9ab135698735fa27": "81df03e9d5bc7a749887be7bac5b0ad7b9ef50a640d4ff149628af0829057540",
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/overseer-9ab135698735fa27.d": "5d4f2dc3274f3187cb33f8ae1a98e2d97a17b3c333870e2115166149bd850dbe",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/tests/mods_gate_s.rs": "a2b63a57cabf41a1ad54f2b4405a5239d8831f8d024f18a271cb2e29e45b7644",
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_gate_s-00b0d44fe604f213": "b83d1f022e69771400300fc9746cecf347d236c2bb1a68618d58e472598a1b2a",
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_gate_s-00b0d44fe604f213.d": "88983da802bae9785cb7256c0f5fedef1d1a89cb6acc7cc275b2e963892be7ea"
+  }
+}

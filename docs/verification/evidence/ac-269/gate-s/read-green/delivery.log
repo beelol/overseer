@@ -1,0 +1,26 @@
+
+running 21 tests
+test actual_paused_queue_admits_mods_only_on_owner_release_after_restart ... ok
+test common::base32::tests::base32_round_trips_and_matches_rfc_vectors ... ok
+test common::noise::tests::a_wrong_pairing_secret_fails_in_the_first_message ... ok
+test common::noise::tests::large_messages_are_chunked_and_joined ... ok
+test common::noise::tests::noise_vectors_match_the_shared_file ... ok
+test credential_text_keeps_private_delivery_bytes_but_public_views_and_replay_are_redacted ... ok
+test dynamic_local_model_selection_is_explicitly_unsupported_before_local_effects ... ok
+test failed_live_stdin_attempt_is_reported_uncertain_and_preserves_open_occupancy ... ok
+test future_local_candidate_bound_refuses_required_uncertainty_actionably ... ok
+test live_stdin_changes_next_turn_only_and_removal_keeps_saved_history ... ok
+test malformed_manifest_error_redacts_source_without_losing_error_code ... ok
+test native_child_controls_precede_mods_and_missing_proof_stays_unknown ... ok
+test no_mod_transport_is_unchanged_and_first_follow_up_snapshots_capture_full_text ... ok
+test oversize_optional_text_is_bypassed_whole_and_required_text_refuses_before_spawn ... ok
+test pre_effect_failure_records_unknown_consumption_and_legacy_latest_turn_is_unknown ... ok
+test prepared_snapshot_without_transport_acceptance_is_pending_after_restart ... ok
+test required_future_local_model_is_unqualified_without_inventory_or_admission ... ok
+test retry_after_restart_and_removal_reuses_original_snapshot_without_duplicate_text ... ok
+test shared_overseer_session_delivers_separate_binding_on_first_and_subsequent_turns ... ok
+test snapshot_admission_is_atomic_and_held_turn_uses_settings_at_release ... ok
+test unknown_future_local_model_preserves_required_and_owner_off_precedence ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.49s
+

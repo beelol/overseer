@@ -3,6 +3,7 @@ pub mod bindings;
 pub mod delivery;
 pub mod library;
 pub mod manifest;
+pub(crate) mod read;
 
 use crate::{server::ProtoError, store::Store};
 use anyhow::Result;
