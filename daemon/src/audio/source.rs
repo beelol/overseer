@@ -55,6 +55,11 @@ fn revision(conn: &Connection) -> Result<i64> {
         .filter(|n| *n >= 0)
         .unwrap_or(0))
 }
+/// Cheap opt-in check for Voice's separate nonspoken acknowledgement. It does
+/// not consult pack mappings or decode private media on the AC-165 latency path.
+pub(super) fn enabled(d: &Arc<Daemon>) -> Result<bool> {
+    Ok(meta(&d.store.lock().unwrap().conn, "audio.reactor.enabled")?.as_deref() == Some("1"))
+}
 fn loaded(conn: &Connection) -> Result<(Selection, bool, i64)> {
     let selected = if let Some(raw) = meta(conn, "audio.source.selection")? {
         serde_json::from_str(&raw).map_err(|_| anyhow!("Stored audio settings need repair."))?

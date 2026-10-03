@@ -107,65 +107,150 @@ pub(super) fn play_checked(
         if !NATIVE_DESCRIPTOR_PLAYER_QUALIFIED {
             bail!("Opened-descriptor playback is awaiting qualification.");
         }
-        let mut command = Command::new("/usr/bin/afplay");
-        command
-            .arg("/dev/fd/0")
-            .env_clear()
-            .stdin(Stdio::from(opened.file))
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        group(&mut command);
-        let mut child = {
-            let mut active = ACTIVE.lock().unwrap();
-            if CANCEL_EPOCH.load(Ordering::SeqCst) != epoch {
-                return Ok(false);
-            }
-            let child = ReapedChild(
-                command
-                    .spawn()
-                    .map_err(|_| anyhow!("Cannot start the audio player."))?,
-            );
-            *active = Some(child.0.id());
-            child
-        };
-        drop(admission);
-        let deadline = Instant::now() + Duration::from_millis(opened.duration_ms + 2000);
-        loop {
-            {
-                let mut active = ACTIVE.lock().unwrap();
-                match child.0.try_wait() {
-                    Ok(Some(status)) => {
-                        *active = None;
-                        return if CANCEL_EPOCH.load(Ordering::SeqCst) != epoch {
-                            Ok(false)
-                        } else if status.success() {
-                            Ok(true)
-                        } else {
-                            Err(anyhow!("The audio player could not play this file."))
-                        };
-                    }
-                    Err(_) => {
-                        *active = None;
-                        bail!("Cannot supervise the audio player.");
-                    }
-                    Ok(None) => {}
-                }
-                if Instant::now() >= deadline || CANCEL_EPOCH.load(Ordering::SeqCst) != epoch {
-                    unsafe {
-                        libc::kill(-(child.0.id() as i32), libc::SIGKILL);
-                    }
-                    // Keep the PID owned until kill, then remove it before the Drop reap.
-                    *active = None;
-                    if CANCEL_EPOCH.load(Ordering::SeqCst) != epoch {
-                        return Ok(false);
-                    }
-                    bail!("The audio player exceeded its time limit.");
-                }
-            }
-            std::thread::sleep(Duration::from_millis(10));
-        }
+        return native_play(opened.file, opened.duration_ms, epoch, admission);
     }
     Err(anyhow!(
         "Audio source changed repeatedly; this cue was skipped."
     ))
+}
+
+// AC-165 exception: the already approved nonspoken Heard bytes retain their
+// existing identity. This is not a notification Line or a user-pack mapping.
+const HEARD_BYTES: &[u8] = include_bytes!("../../assets/reactor/agent_queued.mp3");
+const HEARD_DURATION_MS: u64 = 350;
+
+/// Called by the one shared worker after Voice arbitration/enablement epoch
+/// checks. Native playback remains explicitly unqualified; visual heard_signal
+/// and conversational acknowledgement are still emitted by Voice's own path.
+pub(super) fn heard_feedback(d: &Arc<Daemon>) -> Result<bool> {
+    let _serial = SERIAL
+        .try_lock()
+        .map_err(|_| anyhow!("Audio is already playing."))?;
+    let epoch = CANCEL_EPOCH.load(Ordering::SeqCst);
+    if !source::enabled(d)? {
+        return Ok(false);
+    }
+    let synthetic = std::env::var_os("OVERSEER_TEST_VOICE_FEEDBACK_LOG");
+    let file = if synthetic.is_none() {
+        if !NATIVE_DESCRIPTOR_PLAYER_QUALIFIED {
+            bail!("Nonspoken descriptor playback is awaiting qualification.");
+        }
+        // Only existing distributable bytes are written to an unlinked owned FD.
+        // No private pack or pathname/copy fallback participates in this signal.
+        let mut file = tempfile::tempfile()
+            .map_err(|_| anyhow!("Cannot prepare the nonspoken feedback descriptor."))?;
+        file.write_all(HEARD_BYTES)
+            .map_err(|_| anyhow!("Cannot prepare nonspoken feedback."))?;
+        file.seek(SeekFrom::Start(0))
+            .map_err(|_| anyhow!("Cannot rewind nonspoken feedback."))?;
+        Some(file)
+    } else {
+        None
+    };
+    let admission = source::admission_guard();
+    if CANCEL_EPOCH.load(Ordering::SeqCst) != epoch || !source::enabled(d)? {
+        return Ok(false);
+    }
+    if let Some(path) = synthetic {
+        let _active = ACTIVE.lock().unwrap();
+        if CANCEL_EPOCH.load(Ordering::SeqCst) != epoch {
+            return Ok(false);
+        }
+        let mut log = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .map_err(|_| anyhow!("Cannot record nonspoken feedback."))?;
+        writeln!(log, "feedback:heard")
+            .map_err(|_| anyhow!("Cannot record nonspoken feedback."))?;
+        return Ok(true);
+    }
+    native_play(
+        file.ok_or_else(|| anyhow!("Nonspoken feedback is unavailable."))?,
+        HEARD_DURATION_MS,
+        epoch,
+        admission,
+    )
+}
+
+fn native_play(
+    file: std::fs::File,
+    duration_ms: u64,
+    epoch: u64,
+    admission: std::sync::MutexGuard<'static, ()>,
+) -> Result<bool> {
+    let mut command = Command::new("/usr/bin/afplay");
+    command
+        .arg("/dev/fd/0")
+        .env_clear()
+        .stdin(Stdio::from(file))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    group(&mut command);
+    let mut child = {
+        let mut active = ACTIVE.lock().unwrap();
+        if CANCEL_EPOCH.load(Ordering::SeqCst) != epoch {
+            return Ok(false);
+        }
+        let child = ReapedChild(
+            command
+                .spawn()
+                .map_err(|_| anyhow!("Cannot start the audio player."))?,
+        );
+        *active = Some(child.0.id());
+        child
+    };
+    drop(admission);
+    let deadline = Instant::now() + Duration::from_millis(duration_ms + 2000);
+    loop {
+        {
+            let mut active = ACTIVE.lock().unwrap();
+            match child.0.try_wait() {
+                Ok(Some(status)) => {
+                    *active = None;
+                    return if CANCEL_EPOCH.load(Ordering::SeqCst) != epoch {
+                        Ok(false)
+                    } else if status.success() {
+                        Ok(true)
+                    } else {
+                        Err(anyhow!("The audio player could not play this file."))
+                    };
+                }
+                Err(_) => {
+                    *active = None;
+                    bail!("Cannot supervise the audio player.");
+                }
+                Ok(None) => {}
+            }
+            if Instant::now() >= deadline || CANCEL_EPOCH.load(Ordering::SeqCst) != epoch {
+                unsafe {
+                    libc::kill(-(child.0.id() as i32), libc::SIGKILL);
+                }
+                // Keep the PID owned until kill, then remove it before the Drop reap.
+                *active = None;
+                if CANCEL_EPOCH.load(Ordering::SeqCst) != epoch {
+                    return Ok(false);
+                }
+                bail!("The audio player exceeded its time limit.");
+            }
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sha2::{Digest, Sha256};
+    #[test]
+    fn heard_reuses_approved_nonspoken_bytes_without_a_thirteenth_pack_line() {
+        assert_eq!(HEARD_BYTES.len(), 2684);
+        assert_eq!(
+            format!("{:x}", Sha256::digest(HEARD_BYTES)),
+            "37fe68af5b1f3782a285d90428d90345645c529fa8f2f9182cb64be2a945dd11"
+        );
+        assert_eq!(Line::ALL.len(), 12);
+        assert_eq!(Line::parse("voice_heard_feedback"), None);
+        assert_eq!(Line::parse("agent_queued"), None);
+    }
 }
