@@ -1,0 +1,32 @@
+// AC-265: the extension mirrors every queued message and only explicit controls resume it.
+const assert = require('assert');
+const Module = require('module');
+const { EventEmitter } = require('events');
+const original = Module._load;
+const vscode = { workspace: { isTrusted: true } };
+Module._load = function (name, ...rest) { return name === 'vscode' ? vscode : original.call(this, name, ...rest); };
+const { Steering, handleRunMessage } = require('../../extension/src/run-actions');
+(async () => {
+  const client = new EventEmitter(); const calls = [];
+  const queue = { paused: true, queued: [{ id: 1, text: 'typed direction', redirect: true, source: 'owner' }, { id: 2, text: 'From Overseer: spoken direction', source: 'overseer' }] };
+  client.request = async (method, params) => { calls.push({ method, params }); return method === 'run.queued' ? queue : {}; };
+  const model = { run: () => undefined, emitter: { fire() {} }, scheduleRefresh() {} };
+  const steering = new Steering(client, model);
+  await steering.refresh('a');
+  assert.strictEqual(steering.queued('a').paused, true);
+  assert.deepStrictEqual(steering.queued('a').messages.map(m => [m.id, m.text]), [[1, 'typed direction'], [2, 'spoken direction']]);
+  assert.strictEqual(calls.some(c => c.method === 'run.resume_queue'), false, 'refresh never resumes');
+  client.emit('event', { kind: 'queue_changed', run_id: 'a' });
+  await new Promise(r => setImmediate(r));
+  assert.strictEqual(calls.filter(c => c.method === 'run.queued').length, 2);
+  const env = { client, model, steering };
+  await handleRunMessage(env, 'a', { type: 'steer', how: 'resume' }, () => {});
+  await handleRunMessage(env, 'a', { type: 'steer', how: 'clear' }, () => {});
+  await handleRunMessage(env, 'a', { type: 'steer', how: 'cancel', id: 2 }, () => {});
+  assert(calls.some(c => c.method === 'run.resume_queue'));
+  assert(calls.some(c => c.method === 'run.clear_queue'));
+  assert(calls.some(c => c.method === 'run.unqueue' && c.params.id === 2));
+  vscode.workspace.isTrusted = false;
+  await assert.rejects(handleRunMessage(env, 'a', { type: 'steer', how: 'resume' }, () => {}), /trusted/);
+  console.log('ok AC-265 full paused queue, explicit resume/clear/remove, trusted workspace');
+})().catch(e => { console.error(e); process.exitCode = 1; });

@@ -76,6 +76,8 @@ pub enum Mode {
     Help,
     /// Typing a message to the focused agent (drafts live in `drafts`).
     Compose,
+    /// The focused agent's queued messages; s sends, c clears, d removes the selected one.
+    Queue,
     Confirm(Confirm),
     NewAgent,
     /// What the focused agent changed: files and their diff against a comparison base.
@@ -159,6 +161,7 @@ enum Pending {
     FollowUp { run: String, text: String },
     Permission { allow: bool, session: bool },
     Interrupt,
+    QueueAction,
     Harnesses,
     Accounts,
     ProfileStatus(String),
@@ -497,6 +500,7 @@ pub struct App {
     /// The focused agent (a top-level run id); focus follows the agent, not the slot.
     pub focus: Option<String>,
     pub page: usize,
+    pub queue_cursor: usize,
     pub filter: Filter,
     pub mode: Mode,
     pub drafts: HashMap<String, String>,
@@ -630,6 +634,7 @@ impl App {
             feeds: HashMap::new(),
             focus: None,
             page: 0,
+            queue_cursor: 0,
             filter: Filter::All,
             mode: Mode::Grid,
             drafts: HashMap::new(),
@@ -1257,7 +1262,7 @@ impl App {
             self.request("overseer.session", json!({}), Pending::OverseerSession);
         }
         // Statuses, turns and new runs come from `state`, reloaded like VS Code does.
-        if (matches!(kind.as_str(), "status" | "turn_started" | "turn_done" | "permission" | "permission_answered" | "child" | "child_reparented" | "task_created" | "workspace_removed" | "reattached" | "profile" | "review_seen" | "merge_back" | "task_archived")
+        if (matches!(kind.as_str(), "status" | "turn_started" | "turn_done" | "permission" | "permission_answered" | "child" | "child_reparented" | "task_created" | "workspace_removed" | "reattached" | "profile" | "review_seen" | "merge_back" | "task_archived" | "queued" | "queue_changed")
             || (!run_id.is_empty() && self.state.run(&run_id).is_none()))
             && self.state_due.is_none()
         {
@@ -1424,9 +1429,9 @@ impl App {
                 self.history_requested.remove(&root);
                 self.say(format!("history: {e}"), true);
             }
-            (Pending::FollowUp { run, .. }, Ok(_)) => {
+            (Pending::FollowUp { run, .. }, Ok(value)) => {
                 let title = self.state.run(&run).map(|r| r.title.clone()).unwrap_or_default();
-                self.say(format!("Sent to {}", short(&title, 40)), false);
+                self.say(format!("{} {}", if value["delivery"] == "queued" { "Queued for" } else { "Sent to" }, short(&title, 40)), false);
                 self.state_due = Some(Instant::now() + Duration::from_millis(60));
             }
             (Pending::FollowUp { run, text }, Err(e)) => {
@@ -1441,7 +1446,11 @@ impl App {
                 self.say(if session { "Allowed for this session" } else if allow { "Allowed once" } else { "Denied" }, false);
                 self.state_due = Some(Instant::now() + Duration::from_millis(60));
             }
-            (Pending::Interrupt, Ok(_)) => self.say("Interrupt sent", false),
+            (Pending::Interrupt, Ok(_)) => self.say("Stopped; queued messages stay paused", false),
+            (Pending::QueueAction, Ok(_)) => {
+                self.notice = None;
+                self.request_state();
+            },
             (Pending::Harnesses, Ok(v)) => {
                 let list = v.as_array().cloned().unwrap_or_default();
                 self.form.harnesses = list.iter().map(|h| (h["harness"].as_str().unwrap_or_default().to_string(), h["installed"].as_bool().unwrap_or(false), h["version"].as_str().unwrap_or_default().to_string())).filter(|h| h.1).collect();
@@ -1839,9 +1848,6 @@ impl App {
         if run.permission_request().is_some() {
             return None;
         }
-        if run.active() && run.harness != "generic" {
-            return Some("a turn is running; wait for it or press x to interrupt".into());
-        }
         None
     }
 
@@ -1862,7 +1868,9 @@ impl App {
             self.mode = if matches!(self.mode, Mode::Compose) { Mode::Grid } else { self.mode.clone() };
             return;
         }
-        self.request("run.follow_up", json!({ "run_id": run.id, "prompt": text }), Pending::FollowUp { run: run.id.clone(), text: text.clone() });
+        let queued = run.queue["paused"] == true || (run.active() && run.harness != "generic");
+        let params = if queued { json!({"run_id":run.id,"text":text,"source":"owner"}) } else { json!({"run_id":run.id,"prompt":text}) };
+        self.request(if queued { "run.queue" } else { "run.follow_up" }, params, Pending::FollowUp { run: run.id.clone(), text: text.clone() });
         self.mode = if matches!(self.mode, Mode::Compose) { Mode::Grid } else { self.mode.clone() };
     }
 
@@ -2715,6 +2723,12 @@ impl App {
             self.try_quit();
             return;
         }
+        if k.code == KeyCode::Char('Q') && matches!(self.mode, Mode::Grid | Mode::Zoom { .. } | Mode::Changes) {
+            if self.focused().is_some() {
+                self.queue_cursor = 0; self.mode = Mode::Queue; self.notice = None;
+            }
+            return;
+        }
         match self.mode.clone() {
             Mode::Help => self.mode = Mode::Grid,
             Mode::Confirm(c @ (Confirm::PhoneOff { .. } | Confirm::PhoneOnAndPair | Confirm::Revoke { .. } | Confirm::Pair { .. })) => {
@@ -2785,6 +2799,7 @@ impl App {
                 }
             },
             Mode::Compose => self.compose_key(k),
+            Mode::Queue => self.queue_key(k),
             Mode::NewAgent => self.form_key(k),
             Mode::Changes => self.changes_key(k),
             Mode::Search => self.search_key(k),
@@ -2991,6 +3006,25 @@ impl App {
                 }
             }
             _ => self.dirty = false,
+        }
+    }
+
+    fn queue_key(&mut self, k: KeyEvent) {
+        let Some(run) = self.focused().cloned() else { self.mode = Mode::Grid; return };
+        let messages = run.queue["messages"].as_array().cloned().unwrap_or_default();
+        self.queue_cursor = self.queue_cursor.min(messages.len().saturating_sub(1));
+        match k.code {
+            KeyCode::Esc | KeyCode::Char('Q') | KeyCode::Char('q') => self.mode = Mode::Grid,
+            KeyCode::Down | KeyCode::Char('j') => self.queue_cursor = (self.queue_cursor + 1).min(messages.len().saturating_sub(1)),
+            KeyCode::Up | KeyCode::Char('k') => self.queue_cursor = self.queue_cursor.saturating_sub(1),
+            KeyCode::Char('s') => self.request("run.resume_queue", json!({"run_id":run.id}), Pending::QueueAction),
+            KeyCode::Char('c') => self.request("run.clear_queue", json!({"run_id":run.id}), Pending::QueueAction),
+            KeyCode::Char('d') => {
+                if let Some(m) = messages.get(self.queue_cursor) {
+                    self.request("run.unqueue", json!({"run_id":run.id,"id":m["id"]}), Pending::QueueAction);
+                }
+            }
+            _ => {}
         }
     }
 

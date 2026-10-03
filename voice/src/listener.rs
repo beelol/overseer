@@ -10,7 +10,7 @@ use crate::endpoint::{EndAction, EndConfig, Endpointer};
 use crate::gate::{GateConfig, GateEvent, SpeechGate};
 use crate::pcm::{self, FRAME, RATE};
 use crate::protocol::{Command, Event, Source};
-use crate::recognize::{Recognizer, VOCABULARY};
+use crate::recognize::Recognizer;
 use crate::speak::{self, SpeakEvent, Speaker};
 use crate::words;
 use anyhow::Result;
@@ -225,9 +225,7 @@ impl<W: Write> State<W> {
     }
 
     fn hint(&self) -> String {
-        format!("{VOCABULARY} {}", self.opts_hint)
-            .trim()
-            .to_string()
+        crate::recognize::prompt(&self.opts_hint)
     }
 
     fn ask(&mut self, job: Job, audio: Vec<f32>, start_ms: u64, tx: &mpsc::Sender<Msg>) {

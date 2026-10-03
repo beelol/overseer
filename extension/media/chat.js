@@ -141,7 +141,7 @@
       const canSend = !child && (msg.followUpSupported || !!this.asking) && msg.trusted;
       this.sendBtn.disabled = !canSend; this.prompt.disabled = !canSend;
       this.prompt.placeholder = child ? 'Sub-agents are steered through their parent' : !msg.trusted ? 'Trust this workspace to talk to agents'
-        : this.asking ? 'Deny with a note: tell it why, or what to do instead' : !msg.followUpSupported ? `${ui.HARNESS[run.harness] || run.harness} does not take follow-ups` : busy ? (window.OverseerContinuityText && window.OverseerContinuityText.isWaiting(run.status) ? 'Message for when it continues' : 'Message for when it finishes · ⌥⏎ stops and sends') : 'Reply…  (@ to mention a file)';
+        : this.asking ? 'Deny with a note: tell it why, or what to do instead' : !msg.followUpSupported ? `${ui.HARNESS[run.harness] || run.harness} does not take follow-ups` : msg.queued?.paused ? 'Queue paused · add a message or Send queued' : busy ? (window.OverseerContinuityText && window.OverseerContinuityText.isWaiting(run.status) ? 'Message for when it continues' : 'Message for when it finishes · ⌥⏎ stops and sends') : 'Reply…  (@ to mention a file)';
       this.sendBtn.replaceChildren(ui.icon(busy && !this.asking ? 'history' : 'arrow-up'));
       this.sendBtn.title = !canSend ? this.prompt.placeholder : this.asking ? 'Deny and send this note (Enter)' : busy ? 'Send when this turn ends (Enter) · stop and send now (⌥Enter)' : 'Send (Enter)';
       this.sendBtn.setAttribute('aria-label', this.asking ? 'Deny with this note' : busy ? 'Queue message' : 'Send');
@@ -265,12 +265,32 @@
       this.opts.onState && this.opts.onState();
     }
 
-    renderQueued(q) {
-      this.queuedEl.hidden = !q;
-      if (!q) { this.queuedEl.replaceChildren(); return; }
-      const cancel = el('button', 'link', 'Cancel'); cancel.type = 'button'; cancel.addEventListener('click', () => this.post({ type: 'steer', how: 'cancel' }));
-      const text = el('span', 'queued-text', ui.firstLine(q.text, 80)); text.title = q.text;
-      this.queuedEl.replaceChildren(ui.icon(q.how === 'interrupt' ? 'debug-stop' : 'history', 'sm'), el('span', 'muted', q.how === 'interrupt' ? 'Stopping, then sending' : 'Queued'), text, cancel);
+    renderQueued(q) { Chat.renderQueue(this.queuedEl, q, this.post); }
+
+    // Chat and grid show the same complete queue, with explicit owner controls (AC-265).
+    static renderQueue(target, q, post) {
+      const messages = q?.messages || q?.queued || (q?.text ? [q] : []);
+      const signature = JSON.stringify([!!q?.paused, messages]);
+      if (target.dataset.queueSignature === signature) return;
+      target.dataset.queueSignature = signature;
+      target.hidden = !messages.length && !q?.paused;
+      if (target.hidden) { target.replaceChildren(); return; }
+      target.dataset.paused = String(!!q?.paused);
+      const button = (label, how, id) => {
+        const b = el('button', 'link', label); b.type = 'button';
+        b.dataset.queueAction = how; if (id != null) b.dataset.queueId = String(id);
+        b.addEventListener('click', () => post({ type: 'steer', how, ...(id != null ? { id } : {}) })); return b;
+      };
+      const head = el('div', 'queued-head');
+      head.append(ui.icon(q?.paused ? 'debug-pause' : 'history', 'sm'), el('span', 'muted', q?.paused ? 'Queue paused' : 'Queued'), el('span', 'spacer'));
+      if (q?.paused) head.append(button('Send queued', 'resume'));
+      const clear = button('Clear', 'clear'); clear.disabled = !messages.length; head.append(clear);
+      const rows = messages.map((m, i) => {
+        const row = el('div', 'queued-row'); row.dataset.queueId = String(m.id);
+        const text = el('span', 'queued-text', `${i + 1}. ${m.text.replace(/^From Overseer: /, '')}`); text.title = m.text;
+        row.append(el('span', 'muted', q?.paused ? 'Paused' : m.redirect || m.how === 'interrupt' ? 'Stopping, then sending' : 'Queued'), text, button('Remove', 'cancel', m.id)); return row;
+      });
+      target.replaceChildren(head, ...rows);
     }
     mentionFiles(m) { this.tools.files(m); }
 
