@@ -80,6 +80,31 @@ fn ambiguous_native_tool_policy(args: &[String]) -> bool {
     })
 }
 
+// Exact daemon-generated Overseer tool epochs, independently frozen from
+// 4c371ec (Gate S) and 3ab9c1f (accounts). These are complete ordered lists,
+// never a subset test. The current catalog retains current-version migration.
+fn legacy_overseer_tool_lists() -> Vec<Vec<String>> {
+    const GATE_S: &[&str] = &[
+        "roster", "agent", "conflicts", "conversation", "changes", "diff", "file", "search",
+        "usage", "check_in", "rally", "answer", "propose",
+    ];
+    const ACCOUNTS: &[&str] = &[
+        "roster", "agent", "conflicts", "conversation", "changes", "diff", "file", "search",
+        "usage", "accounts", "check_in", "rally", "answer", "propose",
+    ];
+    let mut lists: Vec<Vec<String>> = [GATE_S, ACCOUNTS].into_iter()
+        .map(|tools| tools.iter().map(|name| (*name).to_string()).collect()).collect();
+    lists.push(super::tool_list("overseer").iter()
+        .map(|tool| tool["name"].as_str().unwrap_or("").to_string()).collect());
+    lists
+}
+
+fn remove_legacy_group_variant(args: &mut Vec<String>, at: usize, groups: &[Vec<String>]) -> Result<()> {
+    let group = groups.iter().find(|group| args.get(at..at+group.len()) == Some(group.as_slice()))
+        .ok_or_else(|| anyhow!("legacy Overseer MCP argument group is ambiguous"))?;
+    remove_legacy_group(args, at, group)
+}
+
 fn remove_legacy_group(args: &mut Vec<String>, at: usize, group: &[String]) -> Result<()> {
     if args.get(at..at+group.len()) != Some(group) {
         bail!("legacy Overseer MCP argument group is ambiguous");
@@ -353,7 +378,7 @@ impl Daemon {
     /// Ambiguous/overwritten configuration refuses instead of dropping policy
     /// or allowing two competing MCP configurations in the native launch.
     pub(crate) fn without_legacy_overseer_args(&self, run_id: &str, harness: &str, workspace: &Path, mut args: Vec<String>) -> Result<Vec<String>> {
-        let allowed = super::tool_list("overseer").iter().map(|t| format!("mcp__overseer__{}", t["name"].as_str().unwrap_or(""))).collect::<Vec<_>>().join(",");
+        let tool_lists = legacy_overseer_tool_lists();
         let denied = "Bash,Edit,Write,MultiEdit,NotebookEdit,WebFetch,WebSearch,Agent,Task,TodoWrite,KillShell,BashOutput,ToolSearch,AskUserQuestion,EnterPlanMode,ExitPlanMode";
         let socket = crate::paths::socket_path().display().to_string();
         let exe = self.exe.display().to_string();
@@ -381,8 +406,11 @@ impl Daemon {
             if body != expected {
                 bail!("legacy Overseer MCP config is not the exact daemon-generated configuration");
             }
-            let group = vec!["--mcp-config".into(), path.clone(), "--strict-mcp-config".into(), "--allowedTools".into(), allowed, "--disallowedTools".into(), denied.into()];
-            remove_legacy_group(&mut args, at, &group)?;
+            let groups: Vec<Vec<String>> = tool_lists.iter().map(|tools| {
+                let allowed = tools.iter().map(|name| format!("mcp__overseer__{name}")).collect::<Vec<_>>().join(",");
+                vec!["--mcp-config".into(), path.clone(), "--strict-mcp-config".into(), "--allowedTools".into(), allowed, "--disallowedTools".into(), denied.into()]
+            }).collect();
+            remove_legacy_group_variant(&mut args, at, &groups)?;
             // Replacing the generated group later in the launch must not
             // change precedence of an additional saved role tool policy.
             if ambiguous_native_tool_policy(&args) {
@@ -394,11 +422,15 @@ impl Daemon {
                 .ok_or_else(||anyhow!("legacy Overseer Codex config has no exact credential group"))?;
             let token: String = serde_json::from_str(credential)?;
             qualify_token(&token)?;
-            let mut group = vec!["-c".into(), format!("mcp_servers.overseer.command={}",json!(exe)), "-c".into(), format!("mcp_servers.overseer.args=[\"mcp\",\"--socket\",{}]",json!(socket)), "-c".into(), format!("mcp_servers.overseer.env={{ OVERSEER_MCP_TOKEN = {} }}",json!(token))];
-            for tool in super::tool_list("overseer") {
-                group.extend(["-c".into(),format!("mcp_servers.overseer.tools.{}.approval_mode=\"approve\"",tool["name"].as_str().unwrap_or(""))]);
-            }
-            remove_legacy_group(&mut args, at, &group)?;
+            let group = vec!["-c".into(), format!("mcp_servers.overseer.command={}",json!(exe)), "-c".into(), format!("mcp_servers.overseer.args=[\"mcp\",\"--socket\",{}]",json!(socket)), "-c".into(), format!("mcp_servers.overseer.env={{ OVERSEER_MCP_TOKEN = {} }}",json!(token))];
+            let groups: Vec<Vec<String>> = tool_lists.iter().map(|tools| {
+                let mut candidate = group.clone();
+                for tool in tools {
+                    candidate.extend(["-c".into(),format!("mcp_servers.overseer.tools.{tool}.approval_mode=\"approve\"")]);
+                }
+                candidate
+            }).collect();
+            remove_legacy_group_variant(&mut args, at, &groups)?;
             if args.iter().any(|arg|arg.starts_with("mcp_servers.overseer.")) { bail!("ambiguous remaining legacy Overseer Codex config"); }
         }
         Ok(args)
