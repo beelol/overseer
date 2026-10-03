@@ -22,6 +22,7 @@ const { VsCodeChat } = require('./vscode-chat');
 const { OverseerChat } = require('./overseer-chat');
 const { SwarmControls } = require('./swarm-controls');
 const { Continuity } = require('./continuity');
+const { ModsPanel } = require('./mods');
 const { AutoUsage } = require('./auto-usage');
 const features = require('./features');
 const { Voice } = require('./voice');
@@ -70,6 +71,7 @@ async function activate(context) {
   const devLabel = pin ? ` ${pin.instance || 'dev'}` : '';
   const model = new Model(client);
   const autoUsage = new AutoUsage(client, context);
+  const mods = new ModsPanel({ context, client, model, log: say });
   const swarmControls = new SwarmControls(client, () => model.refresh(true), run =>
     vscode.window.showWarningMessage(`Stop ${run.category} swarm?`, { modal: true,
       detail: 'Queued jobs will be cancelled and active workers asked to stop. Unconfirmed exits remain visible.' }, 'Stop Swarm')
@@ -1212,6 +1214,8 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.publishToGitHub', guard(async arg => { requireTrust(); const id = runArg(arg); if (id) await landing.publish(id); })),
     vscode.commands.registerCommand('overseer.openPullRequest', guard(async arg => { const id = await pickAgent(arg, { title: 'Open a pull request for which agent?', fits: hasWorktree, none: 'No agent has a worktree to open a pull request from.' }); if (id) await pullRequests.open(id); })),
     vscode.commands.registerCommand('overseer.startDaemon', guard(async () => { client.disposed = false; await client.start(); await model.refresh(); updateStatus(); })),
+    vscode.commands.registerCommand('overseer.mods', guard(() => mods.open())),
+    vscode.commands.registerCommand('overseer.appliedMods', guard(async arg => { const id = await pickAgent(arg, { title: 'Inspect Mods for which agent?', none: 'No agent exists yet. The library is available.' }); await mods.open({ runId: id }); })),
     vscode.commands.registerCommand('overseer.showLog', () => log.show()),
     vscode.commands.registerCommand('overseer.restartDaemonConnection', guard(async () => { client.dispose(); client.disposed = false; await client.start(); })),
     vscode.workspace.onDidGrantWorkspaceTrust(() => model.emitter.fire()),
