@@ -2,9 +2,7 @@
 
 # Side RFC: Plugins — rules, skills, styles and limits you plug into your agents
 
-Status: owner request (2026-09-27). A product proposal for the owner to agree or change. Nothing is
-built and no criteria are on the ledger. The [draft criteria](#draft--not-agreed-acceptance-criteria)
-at the end are not agreed; they get AC numbers only after the owner agrees on the product.
+Status: the owner agreed the architecture on 2026-09-27 (see the final two sections) and requested active development on 2026-10-02. Nothing is built yet. The earlier proposal below is historical where it differs from the chosen approach. The [first-release design](mods-first-release.md) develops the two requested bundled options, Clear prose and Less tool noise, with proposed verification criteria. Draft criteria are not verified ACs.
 
 ## The request
 
