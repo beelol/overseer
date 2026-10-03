@@ -1,0 +1,195 @@
+{
+  "checks": [
+    {
+      "name": "the working agent's review sits beside its chat in the main window",
+      "ok": true,
+      "detail": [
+        {
+          "tabs": [
+            "Review: Live edits (1)"
+          ],
+          "active": "Review: Live edits (1)"
+        },
+        {
+          "tabs": [
+            "Overseer"
+          ],
+          "active": "Overseer"
+        }
+      ]
+    },
+    {
+      "name": "Pop Out Follow moves the review into a separate window",
+      "ok": true,
+      "detail": {
+        "windows": [
+          {
+            "id": 2,
+            "title": "Review: Live edits (1) — pop-repo",
+            "visible": true,
+            "focused": false
+          },
+          {
+            "id": 1,
+            "title": "Overseer — pop-repo",
+            "visible": true,
+            "focused": false
+          }
+        ],
+        "auxTabs": [
+          "Review: Live edits (1)"
+        ]
+      }
+    },
+    {
+      "name": "the main window keeps Overseer and the chat (no review there)",
+      "ok": true,
+      "detail": [
+        {
+          "tabs": [
+            "Overseer"
+          ],
+          "active": "Overseer"
+        }
+      ]
+    },
+    {
+      "name": "the separate window keeps following the agent live (two screenshots seconds apart; its file grew)",
+      "ok": true,
+      "detail": {
+        "first": 7,
+        "later": 11
+      }
+    },
+    {
+      "name": "selecting another agent: the separate window shows its review; the main window its chat",
+      "ok": true,
+      "detail": {
+        "windows": [
+          {
+            "id": 2,
+            "title": "Review: Other agent (1) — pop-repo",
+            "visible": true,
+            "focused": false
+          },
+          {
+            "id": 1,
+            "title": "Overseer — pop-repo",
+            "visible": true,
+            "focused": false
+          }
+        ],
+        "main": [
+          {
+            "tabs": [
+              "Overseer"
+            ],
+            "active": "Overseer"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Return Follow brings the review back beside the chat and its window closes",
+      "ok": true,
+      "detail": {
+        "windows": [
+          {
+            "id": 1,
+            "title": "Overseer — pop-repo",
+            "visible": true,
+            "focused": false
+          }
+        ],
+        "main": [
+          {
+            "tabs": [
+              "Review: Live edits (1)"
+            ],
+            "active": "Review: Live edits (1)"
+          },
+          {
+            "tabs": [
+              "Overseer"
+            ],
+            "active": "Overseer"
+          }
+        ]
+      }
+    },
+    {
+      "name": "closing the separate window returns the review to the main window beside the chat",
+      "ok": true,
+      "detail": {
+        "windows": [
+          {
+            "id": 1,
+            "title": "Overseer — pop-repo",
+            "visible": true,
+            "focused": false
+          }
+        ],
+        "main": [
+          {
+            "tabs": [
+              "Review: Live edits (1)"
+            ],
+            "active": "Review: Live edits (1)"
+          },
+          {
+            "tabs": [
+              "Overseer"
+            ],
+            "active": "Overseer"
+          }
+        ]
+      }
+    },
+    {
+      "name": "the separate window never took the focus from the owner's apps (main-process events)",
+      "ok": true,
+      "detail": {
+        "events": [
+          {
+            "ms": 181,
+            "what": "window created",
+            "show": true
+          },
+          {
+            "ms": 233,
+            "what": "window shown"
+          },
+          {
+            "ms": 8565,
+            "what": "floating window opened hidden"
+          },
+          {
+            "ms": 8577,
+            "what": "window created",
+            "show": true
+          },
+          {
+            "ms": 8598,
+            "what": "window shown"
+          },
+          {
+            "ms": 18677,
+            "what": "floating window opened hidden"
+          },
+          {
+            "ms": 18687,
+            "what": "window created",
+            "show": true
+          },
+          {
+            "ms": 18706,
+            "what": "window shown"
+          }
+        ]
+      }
+    }
+  ],
+  "frontmost": {
+    "ChatGPT": 81
+  }
+}

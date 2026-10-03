@@ -1,0 +1,40 @@
+[
+  {
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "overseer_native_publication",
+      "src_path": "/private/tmp/overseer-native-publication-20261003/daemon/tests/overseer_native_publication.rs",
+      "edition": "2021",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/overseer_native_publication-a2ba3717acf0f03e",
+    "fresh": false,
+    "sha256": "662b65263615fba2f5fbe033e9811c75c3d4ea7c6c8d049c710c3a86ee254e06"
+  },
+  {
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "overseerd",
+      "src_path": "/private/tmp/overseer-native-publication-20261003/daemon/src/main.rs",
+      "edition": "2021",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+    "fresh": false,
+    "sha256": "19dfdeb369df9807189298c7fdbf6a1ba1b19c8fce69ddd979bbb4e18988a102"
+  }
+]

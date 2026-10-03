@@ -1,0 +1,26 @@
+
+running 2 tests
+stage=before_origin; observation=actual early wire reply; actual run=r-8fbaf3980247 turn=u-af11f7748f43; actual native reply={"content":[{"text":"refused: native action has no recorded origin for its turn","type":"text"}],"isError":true}; proposals=[]
+stage=before_bind; observation=actual early wire reply; actual run=r-0b3ed19b3e1d turn=u-acf9f98bd8be
+thread 'ac200_first_native_call_waits_for_durable_origin_publication' panicked at daemon/tests/overseer_native_publication.rs:273:5:
+assertion `left == right` failed: a genuine first owner native call must succeed after publication: {"content":[{"text":"refused: native action has no recorded origin for its turn","type":"text"}],"isError":true}
+  left: Bool(true)
+ right: false
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+; actual native reply={"content":[{"text":"refused: native action is not from the active Overseer conversation","type":"text"}],"isError":true}; proposals=[]
+
+thread 'ac200_first_native_call_waits_for_actual_run_binding' panicked at daemon/tests/overseer_native_publication.rs:273:5:
+assertion `left == right` failed: a genuine first owner native call must succeed after publication: {"content":[{"text":"refused: native action is not from the active Overseer conversation","type":"text"}],"isError":true}
+  left: Bool(true)
+ right: false
+test ac200_first_native_call_waits_for_durable_origin_publication ... FAILED
+test ac200_first_native_call_waits_for_actual_run_binding ... FAILED
+
+failures:
+
+failures:
+    ac200_first_native_call_waits_for_actual_run_binding
+    ac200_first_native_call_waits_for_durable_origin_publication
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 4 filtered out; finished in 2.21s
+

@@ -169,12 +169,13 @@ const G = 2 ** 30;
     const successor = await until(() => s.ctl('continuity.handoffs').handoffs.find(h => h.predecessor === moved.run.id)?.successor, Boolean, 120000, 300);
     await waitStatus(successor, /completed|failed/);
     // The handed-off agent folds under its successor in the side bar; until it has, two rows carry
-    // the title and a click on the lower one opens the predecessor. Wait for the fold itself.
-    const titled = await until(async () => (await s.agentRows()).filter(r => r.label === 'Rename the helpers'), rs => rs.length === 1, 60000);
+    // the title and a click on the lower one opens the predecessor. A single row can also
+    // still be the stale Codex predecessor, so wait for the local successor and its fold.
+    const titled = await until(async () => (await s.agentRows()).filter(r => r.label === 'Rename the helpers'), rs => rs.length === 1 && /, Local model(?:,|$)/.test(rs[0].aria || '') && rs[0].expanded !== null, 60000);
     s.note('rows titled "Rename the helpers" before the click', titled);
     await s.selectAgent('Rename the helpers');
     dash = await s.editorView(`document.getElementById('title')?.textContent === 'Rename the helpers'`);
-    const opened = await dash.waitFor(`[...document.querySelectorAll('#conv .cont-note')].map(n => n.textContent)`, 15000);
+    const opened = await dash.waitFor(`(() => { const notes = [...document.querySelectorAll('#conv .cont-note')].map(n => n.textContent); return notes.some(t => t.startsWith('Continued from ')) && notes.some(t => t.startsWith('This agent continues the work of another.')) ? notes : null; })()`, 15000);
     const rows = await s.agentRows();
     const folded = rows.find(r => /^Earlier: Codex/.test(r.label || ''));
     if (!folded) { await s.clickAgentRow('Rename the helpers', { twisty: true, settle: 0 }); }

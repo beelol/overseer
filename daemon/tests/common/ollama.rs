@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 
 pub const GIB: u64 = 1024 * 1024 * 1024;
 
@@ -22,6 +22,9 @@ pub struct State {
     pub loaded_size: HashMap<String, u64>,
     /// How long a load takes.
     pub load_ms: u64,
+    /// The next load can be held until a test has observed actual daemon memory samples.
+    pub next_load_gate: Option<Arc<LoadBarrier>>,
+    pub pending_loads: HashMap<String, Arc<LoadBarrier>>,
     /// (method, path, body) of every request, in order.
     pub requests: Vec<(String, String, Value)>,
     /// Models the registry offers, by the name asked for.
@@ -33,6 +36,59 @@ pub struct State {
     pub pull_step_ms: u64,
     /// The machine whose memory follows what is loaded here, when a test asks for that.
     pub machine: Option<Machine>,
+}
+
+#[derive(Default)]
+pub struct LoadBarrier {
+    state: Mutex<(bool, bool, bool)>, // entered, released, cancelled
+    changed: Condvar,
+}
+
+impl LoadBarrier {
+    fn enter(&self) -> bool {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+        let mut state = self.state.lock().unwrap();
+        state.0 = true;
+        self.changed.notify_all();
+        while !state.1 && !state.2 {
+            let now = std::time::Instant::now();
+            if now >= deadline { return false; }
+            state = self.changed.wait_timeout(state, deadline - now).unwrap().0;
+        }
+        !state.2
+    }
+
+    fn cancelled(&self) -> bool { self.state.lock().unwrap().2 }
+
+    fn cancel(&self) {
+        self.state.lock().unwrap().2 = true;
+        self.changed.notify_all();
+    }
+}
+
+/// Only the synthetic HTTP response is held; the daemon sampler and RPCs remain real.
+/// Dropping the guard cancels a held response so a failed test cannot leave a load blocked.
+pub struct LoadGate(Arc<LoadBarrier>);
+
+impl LoadGate {
+    pub fn wait_entered(&self) {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        let mut state = self.0.state.lock().unwrap();
+        while !state.0 {
+            let now = std::time::Instant::now();
+            assert!(now < deadline, "synthetic load never reached its response gate");
+            state = self.0.changed.wait_timeout(state, deadline - now).unwrap().0;
+        }
+    }
+
+    pub fn release(&self) {
+        self.0.state.lock().unwrap().1 = true;
+        self.0.changed.notify_all();
+    }
+}
+
+impl Drop for LoadGate {
+    fn drop(&mut self) { self.0.cancel(); }
 }
 
 /// A machine's memory as a file the daemon reads (`OVERSEER_TEST_MEMORY`): what is available is
@@ -117,6 +173,14 @@ impl Ollama {
             }
         });
         Ollama { port, state, stop }
+    }
+
+    pub fn hold_next_load(&self) -> LoadGate {
+        let barrier = Arc::new(LoadBarrier::default());
+        let mut state = self.state.lock().unwrap();
+        assert!(state.next_load_gate.is_none(), "a synthetic next-load gate is already armed");
+        state.next_load_gate = Some(barrier.clone());
+        LoadGate(barrier)
     }
 
     pub fn url(&self) -> String {
@@ -244,20 +308,38 @@ fn respond(method: &str, path: &str, body: &Value, state: &Arc<Mutex<State>>) ->
         ("POST", "/api/generate") => {
             let tag = latest(body["model"].as_str().unwrap_or_default());
             if body["keep_alive"] == 0 {
-                let mut s = state.lock().unwrap();
-                s.loaded.retain(|m| m["name"] != tag.as_str());
-                s.write_memory();
+                {
+                    let mut s = state.lock().unwrap();
+                    // Serialize cancellation with the final insertion into /api/ps. The gate
+                    // wait releases its own lock and never holds this fixture-state lock.
+                    if let Some(gate) = s.pending_loads.remove(&tag) { gate.cancel(); }
+                    s.loaded.retain(|m| m["name"] != tag.as_str());
+                    s.write_memory();
+                }
                 return (200, json!({"model": tag, "done": true, "done_reason": "unload"}));
             }
-            let (wait, known) = {
-                let s = state.lock().unwrap();
-                (s.load_ms, s.tags.iter().any(|t| t["name"] == tag.as_str()))
+            let (wait, known, gate) = {
+                let mut s = state.lock().unwrap();
+                let gate = s.next_load_gate.take();
+                if let Some(gate) = &gate { s.pending_loads.insert(tag.clone(), gate.clone()); }
+                (s.load_ms, s.tags.iter().any(|t| t["name"] == tag.as_str()), gate)
             };
             if !known {
                 return (404, json!({"error": format!("model '{tag}' not found")}));
             }
-            std::thread::sleep(std::time::Duration::from_millis(wait));
+            if let Some(gate) = &gate {
+                if !gate.enter() {
+                    state.lock().unwrap().pending_loads.remove(&tag);
+                    return (200, json!({"model": tag, "done": true, "done_reason": "cancelled"}));
+                }
+            } else {
+                std::thread::sleep(std::time::Duration::from_millis(wait));
+            }
             let mut s = state.lock().unwrap();
+            s.pending_loads.remove(&tag);
+            if gate.as_ref().is_some_and(|gate| gate.cancelled()) {
+                return (200, json!({"model": tag, "done": true, "done_reason": "cancelled"}));
+            }
             let disk = s.tags.iter().find(|t| t["name"] == tag.as_str()).and_then(|t| t["size"].as_u64()).unwrap_or(0);
             let bytes = s.loaded_size.get(&tag).copied().unwrap_or(disk + 6 * GIB);
             let context = body["options"]["num_ctx"].as_u64().unwrap_or(4096);

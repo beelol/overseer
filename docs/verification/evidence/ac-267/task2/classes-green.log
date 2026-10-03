@@ -1,0 +1,768 @@
+   Compiling overseerd v0.1.0 (/Users/bilal/.codex/worktrees/mods-bundles/overseer/daemon)
+warning: variable does not need to be mutable
+    --> daemon/tests/overseer.rs:1135:9
+     |
+1135 |     let mut d = overseer_daemon(&mode_file);
+     |         ----^
+     |         |
+     |         help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` on by default
+
+warning: function `wait_check_ins` is never used
+    --> daemon/tests/overseer.rs:1246:4
+     |
+1246 | fn wait_check_ins(d: &Daemon, run: &str, n: usize, secs: u64) -> Vec<Value> {
+     |    ^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` on by default
+
+warning: `overseerd` (test "overseer") generated 2 warnings (run `cargo fix --test "overseer"` to apply 1 suggestion)
+warning: variable does not need to be mutable
+   --> daemon/tests/common/ollama.rs:282:9
+    |
+282 |     let mut send = |conn: &mut TcpStream, v: Value| -> std::io::Result<()> {
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: `overseerd` (test "downloads") generated 1 warning (run `cargo fix --test "downloads"` to apply 1 suggestion)
+warning: value assigned to `note` is never read
+   --> daemon/src/background.rs:377:17
+    |
+377 |         let mut note = String::new();
+    |                 ^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` on by default
+
+warning: methods `workspace_diff` and `state` are never used
+    --> daemon/src/daemon.rs:3653:12
+     |
+433  | impl Daemon {
+     | ----------- methods in this implementation
+...
+3653 |     pub fn workspace_diff(&self, workspace_id: &str, base: &str) -> Result<Value> {
+     |            ^^^^^^^^^^^^^^
+...
+3708 |     pub fn state(&self) -> Result<Value> {
+     |            ^^^^^
+     |
+     = note: `#[warn(dead_code)]` on by default
+
+warning: field `device_name` is never read
+  --> daemon/src/gateway/mod.rs:86:9
+   |
+84 | pub struct Session {
+   |            ------- field in this struct
+85 |     pub device_id: String,
+86 |     pub device_name: String,
+   |         ^^^^^^^^^^^
+
+warning: method `is_clean` is never used
+   --> daemon/src/git.rs:299:12
+    |
+298 | impl Status {
+    | ----------- method in this implementation
+299 |     pub fn is_clean(&self) -> bool {
+    |            ^^^^^^^^
+
+warning: function `tree_has` is never used
+   --> daemon/src/git.rs:356:8
+    |
+356 | pub fn tree_has(workspace: &Path, tree_ish: &str, path: &str) -> bool {
+    |        ^^^^^^^^
+
+warning: function `show_blob` is never used
+   --> daemon/src/git.rs:360:8
+    |
+360 | pub fn show_blob(workspace: &Path, tree_ish: &str, path: &str) -> Result<Vec<u8>> {
+    |        ^^^^^^^^^
+
+warning: function `worktree_list` is never used
+   --> daemon/src/git.rs:368:8
+    |
+368 | pub fn worktree_list(repo: &Path) -> Vec<PathBuf> {
+    |        ^^^^^^^^^^^^^
+
+warning: field `model` is never read
+   --> daemon/src/opencode_bridge.rs:260:9
+    |
+243 | pub struct Turn {
+    |            ---- field in this struct
+...
+260 |     pub model: String,
+    |         ^^^^^
+
+warning: function `is_session_event` is never used
+    --> daemon/src/overseer/session.rs:1933:8
+     |
+1933 | pub fn is_session_event(kind: &str) -> bool {
+     |        ^^^^^^^^^^^^^^^^
+
+warning: constant `DELIVERY_LIMIT` is never used
+  --> daemon/src/mods/manifest.rs:10:11
+   |
+10 | pub const DELIVERY_LIMIT: usize = 16 * 1024;
+   |           ^^^^^^^^^^^^^^
+
+warning: method `child_by_native` is never used
+    --> daemon/src/store.rs:1120:12
+     |
+189  | impl Store {
+     | ---------- method in this implementation
+...
+1120 |     pub fn child_by_native(&self, parent: &str, native: &str) -> Result<Option<Run>> {
+     |            ^^^^^^^^^^^^^^^
+
+warning: `overseerd` (bin "overseerd" test) generated 11 warnings
+warning: variable does not need to be mutable
+   --> daemon/tests/gateway.rs:771:9
+    |
+771 |     let mut hello = |label: &str, d: &Daemon, p: &mut phone::Paired| {
+    |         ----^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: `overseerd` (test "gateway") generated 1 warning (run `cargo fix --test "gateway"` to apply 1 suggestion)
+warning: value assigned to `wave` is never read
+    --> daemon/tests/swarm_runtime.rs:1850:13
+     |
+1850 |     let mut wave = 0;
+     |             ^^^^
+     |
+     = help: maybe it is overwritten before being read?
+     = note: `#[warn(unused_assignments)]` on by default
+
+warning: `overseerd` (test "swarm_runtime") generated 1 warning
+warning: `overseerd` (test "overseer_continuity") generated 1 warning (1 duplicate)
+warning: `overseerd` (test "continuity") generated 1 warning (1 duplicate)
+warning: `overseerd` (test "ollama_install") generated 1 warning (1 duplicate)
+warning: `overseerd` (test "local_runs") generated 1 warning (1 duplicate)
+warning: `overseerd` (test "netsim") generated 1 warning (1 duplicate)
+warning: variable does not need to be mutable
+    --> daemon/tests/swarm_admission.rs:1724:9
+     |
+1724 |     let mut try_admit = |n: usize, when: i64| admit(&d, &id, &format!("j{n}"), "codex-a",
+     |         ----^^^^^^^^^
+     |         |
+     |         help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` on by default
+
+warning: `overseerd` (test "swarm_admission") generated 1 warning (run `cargo fix --test "swarm_admission"` to apply 1 suggestion)
+warning: unused variable: `phone`
+   --> daemon/tests/overseer_surfaces.rs:101:9
+    |
+101 |     let phone = sleeper(&env.d, &repo, "Phone");
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_phone`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: `overseerd` (test "overseer_surfaces") generated 1 warning
+warning: `overseerd` (test "handoff") generated 1 warning (1 duplicate)
+warning: methods `book_shared_account`, `shared_booking_draw`, and `mark_shared_booking_uncertain` are never used
+    --> daemon/src/account_booking.rs:1203:12
+     |
+1171 | impl Store {
+     | ---------- methods in this implementation
+...
+1203 |     pub fn book_shared_account(&self, req: &AccountBookingRequest<'_>) -> Result<BookingDecision> {
+     |            ^^^^^^^^^^^^^^^^^^^
+...
+1255 |     pub fn shared_booking_draw(
+     |            ^^^^^^^^^^^^^^^^^^^
+...
+1387 |     pub fn mark_shared_booking_uncertain(&self, id: &str) -> Result<()> {
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` on by default
+
+warning: methods `blocking_window` and `allowance_unknown` are never used
+   --> daemon/src/auto_quota.rs:139:12
+    |
+60  | impl QuotaSnapshot {
+    | ------------------ methods in this implementation
+...
+139 |     pub fn blocking_window(&self, model: &str) -> Option<&QuotaWindow> {
+    |            ^^^^^^^^^^^^^^^
+...
+145 |     pub fn allowance_unknown(&self, model: &str) -> bool {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: function `auto_local_execution_guard` is never used
+   --> daemon/src/auto_opencode.rs:177:8
+    |
+177 | pub fn auto_local_execution_guard(profile: &crate::store::Profile, project: &Path,
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: fields `resolved_model_version` and `task_signature` are never read
+   --> daemon/src/auto_consumption.rs:169:9
+    |
+166 | pub struct DeltaContext<'a> {
+    |            ------------ fields in this struct
+...
+169 |     pub resolved_model_version: Option<&'a str>,
+    |         ^^^^^^^^^^^^^^^^^^^^^^
+170 |     pub task_signature: Option<&'a crate::auto_select::TaskSignature>,
+    |         ^^^^^^^^^^^^^^
+    |
+    = note: `DeltaContext` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: function `estimate_from_actual_window_delta` is never used
+   --> daemon/src/auto_consumption.rs:291:8
+    |
+291 | pub fn estimate_from_actual_window_delta(
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `apply_scoped_fit` is never used
+   --> daemon/src/auto_fit.rs:204:8
+    |
+204 | pub fn apply_scoped_fit(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: variant `Provider` is never constructed
+  --> daemon/src/auto_health.rs:10:5
+   |
+9  | pub enum Scope {
+   |          ----- variant in this enum
+10 |     Provider(String),
+   |     ^^^^^^^^
+   |
+   = note: `Scope` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: methods `workspace_diff` and `state` are never used
+    --> daemon/src/daemon.rs:3653:12
+     |
+433  | impl Daemon {
+     | ----------- methods in this implementation
+...
+3653 |     pub fn workspace_diff(&self, workspace_id: &str, base: &str) -> Result<Value> {
+     |            ^^^^^^^^^^^^^^
+...
+3708 |     pub fn state(&self) -> Result<Value> {
+     |            ^^^^^
+
+warning: field `public` is never read
+  --> daemon/src/gateway/noise.rs:40:9
+   |
+38 | pub struct Keypair {
+   |            ------- field in this struct
+39 |     pub private: Vec<u8>,
+40 |     pub public: Vec<u8>,
+   |         ^^^^^^
+
+warning: constant `ALLOWED_FIELDS` is never used
+  --> daemon/src/gateway/push.rs:16:11
+   |
+16 | pub const ALLOWED_FIELDS: &[&str] = &[
+   |           ^^^^^^^^^^^^^^
+
+warning: struct `Reading` is never constructed
+  --> daemon/src/net.rs:79:12
+   |
+79 | pub struct Reading {
+   |            ^^^^^^^
+
+warning: function `read` is never used
+  --> daemon/src/net.rs:97:8
+   |
+97 | pub fn read(probes: bool) -> Reading {
+   |        ^^^^
+
+warning: constant `METHOD_CLASSES` is never used
+  --> daemon/src/overseer/control.rs:57:11
+   |
+57 | pub const METHOD_CLASSES: &[(&str, &str)] = &[
+   |           ^^^^^^^^^^^^^^
+
+warning: function `method_class` is never used
+   --> daemon/src/overseer/control.rs:134:8
+    |
+134 | pub fn method_class(method: &str) -> Option<&'static str> {
+    |        ^^^^^^^^^^^^
+
+warning: methods `insert_task_and_run`, `insert_task_and_run_bound`, `child_by_native`, and `put_auto_allowance_estimate` are never used
+    --> daemon/src/store.rs:965:12
+     |
+189  | impl Store {
+     | ---------- methods in this implementation
+...
+965  |     pub fn insert_task_and_run(&self, t: &Task, r: &Run, attempt_id: Option<&str>,
+     |            ^^^^^^^^^^^^^^^^^^^
+...
+972  |     pub fn insert_task_and_run_bound(&self, t: &Task, r: &Run, attempt_id: Option<&str>,
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1120 |     pub fn child_by_native(&self, parent: &str, native: &str) -> Result<Option<Run>> {
+     |            ^^^^^^^^^^^^^^^
+...
+2512 |     pub fn put_auto_allowance_estimate(&self, profile_id: &str, generation: i64,
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `parse_meminfo` is never used
+   --> daemon/src/sys.rs:114:8
+    |
+114 | pub fn parse_meminfo(text: &str) -> Result<(u64, u64)> {
+    |        ^^^^^^^^^^^^^
+
+warning: function `parse_psi` is never used
+   --> daemon/src/sys.rs:127:8
+    |
+127 | pub fn parse_psi(text: &str) -> Pressure {
+    |        ^^^^^^^^^
+
+warning: `overseerd` (bin "overseerd") generated 26 warnings (9 duplicates)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 45.04s
+     Running unittests src/main.rs (/private/tmp/overseer-mods-target/debug/deps/overseerd-e1f16db50435eb72)
+
+running 4 tests
+test gateway::classes::tests::every_method_a_phone_may_call_describes_its_parameters ... ok
+test gateway::classes::tests::scopes_follow_the_classes ... ok
+test gateway::classes::tests::every_daemon_method_has_a_class_and_every_class_has_a_method ... ok
+test gateway::classes::tests::the_readme_lists_every_method_with_its_phone_status ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 302 filtered out; finished in 0.08s
+
+     Running tests/account_shown.rs (/private/tmp/overseer-mods-target/debug/deps/account_shown-c7cc3209b4a5a975)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/answer_waiting.rs (/private/tmp/overseer-mods-target/debug/deps/answer_waiting-48da1670116aec1d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/audio.rs (/private/tmp/overseer-mods-target/debug/deps/audio-39f6eec212c5aa6b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 0.00s
+
+     Running tests/auto_allocation.rs (/private/tmp/overseer-mods-target/debug/deps/auto_allocation-bf66c186693358db)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+     Running tests/auto_gate_s.rs (/private/tmp/overseer-mods-target/debug/deps/auto_gate_s-d952e7468d9d3178)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/auto_intent.rs (/private/tmp/overseer-mods-target/debug/deps/auto_intent-3fa06f32967ebb9b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/auto_learning_volume.rs (/private/tmp/overseer-mods-target/debug/deps/auto_learning_volume-8acd34bc02dcf886)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/auto_privacy.rs (/private/tmp/overseer-mods-target/debug/deps/auto_privacy-630d617b83e1ed56)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/claude_readings.rs (/private/tmp/overseer-mods-target/debug/deps/claude_readings-f86d0d3d43a9e7fa)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/continuity.rs (/private/tmp/overseer-mods-target/debug/deps/continuity-217851f091671428)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+     Running tests/dev_instance.rs (/private/tmp/overseer-mods-target/debug/deps/dev_instance-841fa7641b7fe11f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/downloads.rs (/private/tmp/overseer-mods-target/debug/deps/downloads-6a0f9d7eb1c4aca2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/gateway.rs (/private/tmp/overseer-mods-target/debug/deps/gateway-08f23ea1e4b1ea3c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out; finished in 0.00s
+
+     Running tests/handoff.rs (/private/tmp/overseer-mods-target/debug/deps/handoff-9c02f14bf58af495)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s
+
+     Running tests/local_runs.rs (/private/tmp/overseer-mods-target/debug/deps/local_runs-2bc54a437ca3aeb4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+     Running tests/menubar.rs (/private/tmp/overseer-mods-target/debug/deps/menubar-d57bbe62a2eca2aa)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/mods.rs (/private/tmp/overseer-mods-target/debug/deps/mods-4ecca9ee9dddd9be)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+     Running tests/mods_bindings.rs (/private/tmp/overseer-mods-target/debug/deps/mods_bindings-9cb6192a0d9fadaf)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+     Running tests/netsim.rs (/private/tmp/overseer-mods-target/debug/deps/netsim-5516ab9f970e43cc)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/notices.rs (/private/tmp/overseer-mods-target/debug/deps/notices-56b2581e3b2ecba2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+     Running tests/ollama_install.rs (/private/tmp/overseer-mods-target/debug/deps/ollama_install-ff81ecbec6416b6c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/one_view.rs (/private/tmp/overseer-mods-target/debug/deps/one_view-306be1a746cb5bbe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/overseer.rs (/private/tmp/overseer-mods-target/debug/deps/overseer-9ab135698735fa27)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 36 filtered out; finished in 0.00s
+
+     Running tests/overseer_brain.rs (/private/tmp/overseer-mods-target/debug/deps/overseer_brain-956806c4aa25c8eb)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+     Running tests/overseer_continuity.rs (/private/tmp/overseer-mods-target/debug/deps/overseer_continuity-a305ea9428f6b72b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/overseer_probes.rs (/private/tmp/overseer-mods-target/debug/deps/overseer_probes-5158f2b51cba7277)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/overseer_surfaces.rs (/private/tmp/overseer-mods-target/debug/deps/overseer_surfaces-50e2098d3c740395)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/phone_methods.rs (/private/tmp/overseer-mods-target/debug/deps/phone_methods-2a526188f3258abd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+     Running tests/protocol.rs (/private/tmp/overseer-mods-target/debug/deps/protocol-10f2716bec78c88a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 193 filtered out; finished in 0.00s
+
+     Running tests/protocol_shapes.rs (/private/tmp/overseer-mods-target/debug/deps/protocol_shapes-a905fffd76abad79)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/review_merge.rs (/private/tmp/overseer-mods-target/debug/deps/review_merge-41cdb45f89f5e617)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+     Running tests/shared_launch.rs (/private/tmp/overseer-mods-target/debug/deps/shared_launch-d04f435eeb228dde)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+
+     Running tests/swarm_admission.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_admission-eb2929e4cd1ba907)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 45 filtered out; finished in 0.00s
+
+     Running tests/swarm_atlas.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_atlas-e00b4d9c47ce967b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 21 filtered out; finished in 0.00s
+
+     Running tests/swarm_availability.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_availability-9fc5690a65f66e56)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.00s
+
+     Running tests/swarm_benefit.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_benefit-e64837191228ca14)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+     Running tests/swarm_broker.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_broker-637b23f4872fe4d1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.00s
+
+     Running tests/swarm_checkpoint.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_checkpoint-cfb74f10a16e030b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/swarm_claim_ledger.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_claim_ledger-562c700d63cc683e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/swarm_conflict.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_conflict-675a306e8496173f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s
+
+     Running tests/swarm_context.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_context-0a2b1c5daae4848f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+
+     Running tests/swarm_control.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_control-b2d62913c3cac0c1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+     Running tests/swarm_create.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_create-e10f7b303f7d8a0e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/swarm_director.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_director-796fa545d4aea266)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.00s
+
+     Running tests/swarm_director_loop.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_director_loop-6080f4a1bbe74c14)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+     Running tests/swarm_director_owner.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_director_owner-a7d261e86121ec19)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/swarm_director_process.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_director_process-2b2cc2aa680908ca)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 0.00s
+
+     Running tests/swarm_dispatch.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_dispatch-1f2a390db11664d2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+     Running tests/swarm_dispatch_incident.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_dispatch_incident-0a5db4bbe6a93e11)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/swarm_effects.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_effects-4bbf9f2833509cb2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/swarm_evaluation.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_evaluation-bd3aae1f11c9aaaf)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/swarm_faults.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_faults-89cc55bfb5506b83)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+
+     Running tests/swarm_final_report.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_final_report-c591f892c0138da1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/swarm_gate_s.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_gate_s-e8d12daf4ce186df)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/swarm_integration.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_integration-900a7da4762b2c57)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.00s
+
+     Running tests/swarm_ledgerpay.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_ledgerpay-53ecf416c1a777ca)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/swarm_native.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_native-5533b1b1699b1aae)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 0.00s
+
+     Running tests/swarm_plan.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_plan-682ca086f0fc52a0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.00s
+
+     Running tests/swarm_policy.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_policy-1513deb6f1c41ae5)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.00s
+
+     Running tests/swarm_reproduction.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_reproduction-a4c17c3c1ab432f8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/swarm_revision_replay.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_revision_replay-662cb147c720fd40)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+     Running tests/swarm_routing.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_routing-6c9be897e50f9819)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/swarm_runtime.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_runtime-3a788f9c24a5012e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 31 filtered out; finished in 0.00s
+
+     Running tests/swarm_scenarios.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_scenarios-9943e33b930e01dd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+     Running tests/swarm_scheduler.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_scheduler-5421541aaf2c9bfd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+     Running tests/swarm_sensitive_fields.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_sensitive_fields-de17abac898465af)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/swarm_session_reuse.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_session_reuse-642523a11e8e442b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/swarm_settings.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_settings-0b92385e0a07a2dc)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+     Running tests/swarm_start.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_start-557b54653101b81b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/swarm_state.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_state-40d5140bb759d88f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 25 filtered out; finished in 0.00s
+
+     Running tests/swarm_stop_replay.rs (/private/tmp/overseer-mods-target/debug/deps/swarm_stop_replay-d8efbc83f48bc9d2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/voice.rs (/private/tmp/overseer-mods-target/debug/deps/voice-7fc3da7fc50d939b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 46 filtered out; finished in 0.00s
+
+     Running tests/voice_live.rs (/private/tmp/overseer-mods-target/debug/deps/voice_live-0d9e07098113e2c9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
