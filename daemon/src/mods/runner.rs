@@ -422,6 +422,14 @@ mod mac {
         }
         let metadata = metadata.into_iter().collect::<Vec<_>>().join(" ");
         let scratch = profile_string(scratch)?;
+        #[cfg(test)]
+        let diagnostic_root = if std::env::var_os("OVERSEER_MODS_RUNNER_TEST_ROOT_READ").is_some() {
+            "(allow file-read-data (literal \"/\"))"
+        } else {
+            ""
+        };
+        #[cfg(not(test))]
+        let diagnostic_root = "";
         // System dyld/native libraries only, not a developer toolchain/home.
         // Extra runtime allowances require actual scoped helper evidence.
         Ok(format!(
@@ -434,6 +442,7 @@ mod mac {
 (allow file-read* (subpath {scratch}))
 (allow file-write* (subpath {scratch}))
 (allow file-read-data (literal "/dev/null") (literal "/dev/urandom") (literal "/dev/random"))
+{diagnostic_root}
 "#
         ))
     }
