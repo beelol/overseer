@@ -309,6 +309,9 @@ fn response(store: &Store, row: &Item, answer: &Value) -> Result<String> {
     let mut answer: native_requests::Answer =
         serde_json::from_value(answer.clone()).map_err(|_| refuse("invalid_answer"))?;
     if let native_requests::Answer::Questions { answers } = &mut answer {
+        if request.family() != Family::Questions {
+            return Err(refuse("invalid_answer"));
+        }
         let q = if protocol == Protocol::Claude21288 {
             &envelope["request"]["input"]["questions"]
         } else {
