@@ -1,0 +1,11 @@
+
+running 1 test
+test daemon_shutdown_reaps_a_decoder_held_during_source_validation_before_exit ... FAILED
+
+failures:
+
+failures:
+    daemon_shutdown_reaps_a_decoder_held_during_source_validation_before_exit
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.22s
+

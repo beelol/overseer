@@ -1,0 +1,4 @@
+
+thread 'successful_decoder_exit_between_wait_and_memory_check_keeps_valid_selection' panicked at daemon/tests/audio_packs.rs:828:27:
+valid decoder output/exit must survive the exit-before-RSS race: "Cannot supervise audio validation memory."
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

@@ -1,0 +1,4 @@
+
+thread 'source_change_after_decode_preserves_live_preview_in_new_pack_only' panicked at daemon/tests/common/mod.rs:138:66:
+audio.preview {"key":"agent_started"} failed: The canonical Audio Mode preview queue is not yet integrated.
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

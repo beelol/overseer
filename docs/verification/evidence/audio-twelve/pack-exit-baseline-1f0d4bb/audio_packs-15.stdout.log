@@ -1,0 +1,11 @@
+
+running 1 test
+test resolved_permission_after_source_switch_never_reappears_in_new_pack ... FAILED
+
+failures:
+
+failures:
+    resolved_permission_after_source_switch_never_reappears_in_new_pack
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 16.25s
+

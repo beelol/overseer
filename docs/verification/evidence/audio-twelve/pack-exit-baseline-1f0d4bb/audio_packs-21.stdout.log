@@ -1,0 +1,11 @@
+
+running 1 test
+test a_closing_audio_runtime_refuses_new_source_admission_before_daemon_exit ... FAILED
+
+failures:
+
+failures:
+    a_closing_audio_runtime_refuses_new_source_admission_before_daemon_exit
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.95s
+

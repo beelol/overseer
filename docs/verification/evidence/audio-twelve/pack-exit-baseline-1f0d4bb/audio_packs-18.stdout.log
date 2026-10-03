@@ -1,0 +1,11 @@
+
+running 1 test
+test genuinely_failed_decoder_exit_still_refuses_unchanged_source ... FAILED
+
+failures:
+
+failures:
+    genuinely_failed_decoder_exit_still_refuses_unchanged_source
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.11s
+

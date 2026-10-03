@@ -1,0 +1,4 @@
+
+thread 'daemon_shutdown_reaps_a_decoder_held_during_source_validation_before_exit' panicked at daemon/tests/audio_packs.rs:966:5:
+decoder must be cancelled/reaped before daemon exit, not orphaned until its timeout
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

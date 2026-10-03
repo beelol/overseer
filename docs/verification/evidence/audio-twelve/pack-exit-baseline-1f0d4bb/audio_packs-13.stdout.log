@@ -1,0 +1,11 @@
+
+running 1 test
+test source_change_after_decode_preserves_live_preview_in_new_pack_only ... FAILED
+
+failures:
+
+failures:
+    source_change_after_decode_preserves_live_preview_in_new_pack_only
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.46s
+

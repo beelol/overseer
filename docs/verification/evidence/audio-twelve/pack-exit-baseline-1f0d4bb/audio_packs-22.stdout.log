@@ -1,0 +1,11 @@
+
+running 1 test
+test disabling_audio_cancels_and_reaps_source_validation_without_changing_selected_folder ... FAILED
+
+failures:
+
+failures:
+    disabling_audio_cancels_and_reaps_source_validation_without_changing_selected_folder
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 1.03s
+

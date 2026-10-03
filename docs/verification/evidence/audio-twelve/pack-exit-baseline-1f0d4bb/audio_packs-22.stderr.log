@@ -1,0 +1,4 @@
+
+thread 'disabling_audio_cancels_and_reaps_source_validation_without_changing_selected_folder' panicked at daemon/tests/audio_packs.rs:1072:5:
+source validation must finish cancelled promptly: Err(Timeout)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

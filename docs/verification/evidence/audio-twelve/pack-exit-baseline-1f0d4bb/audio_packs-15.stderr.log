@@ -1,0 +1,4 @@
+
+thread 'resolved_permission_after_source_switch_never_reappears_in_new_pack' panicked at daemon/tests/audio_packs.rs:527:9:
+synthetic audio admission gate never reached
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

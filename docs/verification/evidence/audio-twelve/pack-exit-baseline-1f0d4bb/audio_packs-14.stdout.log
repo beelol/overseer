@@ -1,0 +1,11 @@
+
+running 1 test
+test disable_after_source_switch_cancels_unstarted_preview_and_next_explicit_preview_works ... FAILED
+
+failures:
+
+failures:
+    disable_after_source_switch_cancels_unstarted_preview_and_next_explicit_preview_works
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.49s
+

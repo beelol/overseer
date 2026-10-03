@@ -1,0 +1,11 @@
+
+running 1 test
+test all_twelve_explicit_previews_use_the_folder_while_audio_stays_off ... FAILED
+
+failures:
+
+failures:
+    all_twelve_explicit_previews_use_the_folder_while_audio_stays_off
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.48s
+

@@ -1,0 +1,380 @@
+{
+  "source": "1f0d4bb175dbce1667b04095f936f080d71fc278",
+  "stages": {
+    "process-baseline": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.071
+    },
+    "package-clean": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 5.423
+    },
+    "build": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 20.766
+    },
+    "no-run": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 21.892
+    },
+    "audio_packs-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.283
+    },
+    "audio_packs-00": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.633
+    },
+    "audio_packs-01": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.541
+    },
+    "audio_packs-02": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.515
+    },
+    "audio_packs-03": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.527
+    },
+    "audio_packs-04": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.472
+    },
+    "audio_packs-05": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.478
+    },
+    "audio_packs-06": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.485
+    },
+    "audio_packs-07": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.189
+    },
+    "audio_packs-08": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.162
+    },
+    "audio_packs-09": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.182
+    },
+    "audio_packs-10": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.127
+    },
+    "audio_packs-11": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.494
+    },
+    "audio_packs-12": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 2.548
+    },
+    "audio_packs-13": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.466
+    },
+    "audio_packs-14": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.497
+    },
+    "audio_packs-15": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 16.25
+    },
+    "audio_packs-16": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.112
+    },
+    "audio_packs-17": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.119
+    },
+    "audio_packs-18": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.118
+    },
+    "audio_packs-19": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.128
+    },
+    "audio_packs-20": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.227
+    },
+    "audio_packs-21": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.96
+    },
+    "audio_packs-22": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 1.038
+    },
+    "cleanup": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.38
+    }
+  },
+  "artifacts": [
+    {
+      "name": "overseerd",
+      "source": "/private/tmp/overseer-audio-decode-exit-20261003/daemon/src/main.rs",
+      "source_sha256": "bae529078887e73338dc261d043bd76c030586f9f837916e4101a80c0232296e",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+      "sha256": "b165f30c6d2aec0565d8c4ae3931fba4fb56b48871f5469ff8a8dac97352a9aa",
+      "fresh": false,
+      "dependency_sha256": "77313fc5788b07fd4e1821b1ebc9f41450c76813e4539f3faa0e15d4526b5f29"
+    },
+    {
+      "name": "audio_packs",
+      "source": "/private/tmp/overseer-audio-decode-exit-20261003/daemon/tests/audio_packs.rs",
+      "source_sha256": "ae4fb94f4adaf833e5ea19accba6e2d5d4a09434ca963df77b3a0e133df5723f",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/audio_packs-9d3e5ea0364da7b5",
+      "sha256": "ab8953a52d8bf9230a7e040953f80fb09e5056ded6dfd081118fa477f5b157dd",
+      "fresh": false,
+      "dependency_sha256": "5d53d305066d81e9ce1c633950deac572f4137247eea88d5077252aa94467420"
+    }
+  ],
+  "tests": [
+    {
+      "target": "audio_packs",
+      "name": "public_inventory_is_the_exact_twelve_phrases_and_old_keys_are_not_previews",
+      "code": 0
+    },
+    {
+      "target": "audio_packs",
+      "name": "complete_folder_selection_stays_off_private_in_place_and_survives_restart",
+      "code": 0
+    },
+    {
+      "target": "audio_packs",
+      "name": "incomplete_unknown_and_wrong_schema_manifests_leave_the_prior_selection_unchanged",
+      "code": 0
+    },
+    {
+      "target": "audio_packs",
+      "name": "unsafe_manifest_paths_and_non_audio_files_are_refused_without_private_path_errors",
+      "code": 0
+    },
+    {
+      "target": "audio_packs",
+      "name": "a_stale_source_revision_cannot_replace_another_clients_selected_folder",
+      "code": 0
+    },
+    {
+      "target": "audio_packs",
+      "name": "removing_the_selected_folder_shows_unavailable_without_switching_to_builtin",
+      "code": 0
+    },
+    {
+      "target": "audio_packs",
+      "name": "all_twelve_explicit_previews_use_the_folder_while_audio_stays_off",
+      "code": 101
+    },
+    {
+      "target": "audio_packs",
+      "name": "legacy_private_selection_migrates_unavailable_without_enabling_or_falling_back",
+      "code": 0
+    },
+    {
+      "target": "audio_packs",
+      "name": "manifest_media_and_duration_limits_refuse_without_committing_selection",
+      "code": 0
+    },
+    {
+      "target": "audio_packs",
+      "name": "truncated_wav_and_non_decodable_mp3_refuse_without_committing_selection",
+      "code": 0
+    },
+    {
+      "target": "audio_packs",
+      "name": "parent_symlink_and_fifo_refuse_without_committing_selection",
+      "code": 0
+    },
+    {
+      "target": "audio_packs",
+      "name": "source_fields_and_enablement_revision_are_strict_and_never_model_authority",
+      "code": 0
+    },
+    {
+      "target": "audio_packs",
+      "name": "an_older_enable_cannot_publish_runtime_after_a_later_disable",
+      "code": 0
+    },
+    {
+      "target": "audio_packs",
+      "name": "source_change_after_decode_preserves_live_preview_in_new_pack_only",
+      "code": 101
+    },
+    {
+      "target": "audio_packs",
+      "name": "disable_after_source_switch_cancels_unstarted_preview_and_next_explicit_preview_works",
+      "code": 101
+    },
+    {
+      "target": "audio_packs",
+      "name": "resolved_permission_after_source_switch_never_reappears_in_new_pack",
+      "code": 101
+    },
+    {
+      "target": "audio_packs",
+      "name": "successful_decoder_exit_between_wait_and_memory_check_keeps_valid_selection",
+      "code": 101
+    },
+    {
+      "target": "audio_packs",
+      "name": "exited_decoder_with_malformed_stdout_still_refuses_unchanged_source",
+      "code": 101
+    },
+    {
+      "target": "audio_packs",
+      "name": "genuinely_failed_decoder_exit_still_refuses_unchanged_source",
+      "code": 101
+    },
+    {
+      "target": "audio_packs",
+      "name": "live_held_decoder_with_injected_unreadable_memory_still_refuses",
+      "code": 0
+    },
+    {
+      "target": "audio_packs",
+      "name": "daemon_shutdown_reaps_a_decoder_held_during_source_validation_before_exit",
+      "code": 101
+    },
+    {
+      "target": "audio_packs",
+      "name": "a_closing_audio_runtime_refuses_new_source_admission_before_daemon_exit",
+      "code": 101
+    },
+    {
+      "target": "audio_packs",
+      "name": "disabling_audio_cancels_and_reaps_source_validation_without_changing_selected_folder",
+      "code": 101
+    }
+  ],
+  "allocation": "after_full_cleanup",
+  "since_ms": 1791058269445,
+  "cleanup_counts": {
+    "ours": 0,
+    "others": 0
+  }
+}

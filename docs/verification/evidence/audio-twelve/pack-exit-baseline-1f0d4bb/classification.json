@@ -1,0 +1,209 @@
+[
+  {
+    "target": "audio_packs",
+    "name": "public_inventory_is_the_exact_twelve_phrases_and_old_keys_are_not_previews",
+    "code": 0,
+    "index": 0,
+    "classification": "PASS (reached original assertion)",
+    "stdout": "audio_packs-00.stdout.log",
+    "stderr": "audio_packs-00.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "complete_folder_selection_stays_off_private_in_place_and_survives_restart",
+    "code": 0,
+    "index": 1,
+    "classification": "PASS (reached original assertion)",
+    "stdout": "audio_packs-01.stdout.log",
+    "stderr": "audio_packs-01.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "incomplete_unknown_and_wrong_schema_manifests_leave_the_prior_selection_unchanged",
+    "code": 0,
+    "index": 2,
+    "classification": "PASS (reached original assertion)",
+    "stdout": "audio_packs-02.stdout.log",
+    "stderr": "audio_packs-02.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "unsafe_manifest_paths_and_non_audio_files_are_refused_without_private_path_errors",
+    "code": 0,
+    "index": 3,
+    "classification": "PASS (reached original assertion)",
+    "stdout": "audio_packs-03.stdout.log",
+    "stderr": "audio_packs-03.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "a_stale_source_revision_cannot_replace_another_clients_selected_folder",
+    "code": 0,
+    "index": 4,
+    "classification": "PASS (reached original assertion)",
+    "stdout": "audio_packs-04.stdout.log",
+    "stderr": "audio_packs-04.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "removing_the_selected_folder_shows_unavailable_without_switching_to_builtin",
+    "code": 0,
+    "index": 5,
+    "classification": "PASS (reached original assertion)",
+    "stdout": "audio_packs-05.stdout.log",
+    "stderr": "audio_packs-05.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "all_twelve_explicit_previews_use_the_folder_while_audio_stays_off",
+    "code": 101,
+    "index": 6,
+    "classification": "Integration prerequisite: canonical preview queue absent; downstream assertions unreached",
+    "stdout": "audio_packs-06.stdout.log",
+    "stderr": "audio_packs-06.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "legacy_private_selection_migrates_unavailable_without_enabling_or_falling_back",
+    "code": 0,
+    "index": 7,
+    "classification": "PASS (reached original assertion)",
+    "stdout": "audio_packs-07.stdout.log",
+    "stderr": "audio_packs-07.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "manifest_media_and_duration_limits_refuse_without_committing_selection",
+    "code": 0,
+    "index": 8,
+    "classification": "PASS (reached original assertion)",
+    "stdout": "audio_packs-08.stdout.log",
+    "stderr": "audio_packs-08.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "truncated_wav_and_non_decodable_mp3_refuse_without_committing_selection",
+    "code": 0,
+    "index": 9,
+    "classification": "PASS (reached original assertion)",
+    "stdout": "audio_packs-09.stdout.log",
+    "stderr": "audio_packs-09.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "parent_symlink_and_fifo_refuse_without_committing_selection",
+    "code": 0,
+    "index": 10,
+    "classification": "PASS (reached original assertion)",
+    "stdout": "audio_packs-10.stdout.log",
+    "stderr": "audio_packs-10.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "source_fields_and_enablement_revision_are_strict_and_never_model_authority",
+    "code": 0,
+    "index": 11,
+    "classification": "PASS (reached original assertion)",
+    "stdout": "audio_packs-11.stdout.log",
+    "stderr": "audio_packs-11.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "an_older_enable_cannot_publish_runtime_after_a_later_disable",
+    "code": 0,
+    "index": 12,
+    "classification": "PASS (reached original assertion)",
+    "stdout": "audio_packs-12.stdout.log",
+    "stderr": "audio_packs-12.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "source_change_after_decode_preserves_live_preview_in_new_pack_only",
+    "code": 101,
+    "index": 13,
+    "classification": "Integration prerequisite: canonical preview queue absent; downstream assertions unreached",
+    "stdout": "audio_packs-13.stdout.log",
+    "stderr": "audio_packs-13.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "disable_after_source_switch_cancels_unstarted_preview_and_next_explicit_preview_works",
+    "code": 101,
+    "index": 14,
+    "classification": "Integration prerequisite: canonical preview queue absent; downstream assertions unreached",
+    "stdout": "audio_packs-14.stdout.log",
+    "stderr": "audio_packs-14.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "resolved_permission_after_source_switch_never_reappears_in_new_pack",
+    "code": 101,
+    "index": 15,
+    "classification": "Integration prerequisite: semantic worker absent; held admission gate unreached",
+    "stdout": "audio_packs-15.stdout.log",
+    "stderr": "audio_packs-15.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "successful_decoder_exit_between_wait_and_memory_check_keeps_valid_selection",
+    "code": 101,
+    "index": 16,
+    "classification": "Intended decoder-exit RED: successful owned zombie refused by memory check",
+    "stdout": "audio_packs-16.stdout.log",
+    "stderr": "audio_packs-16.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "exited_decoder_with_malformed_stdout_still_refuses_unchanged_source",
+    "code": 101,
+    "index": 17,
+    "classification": "Earlier decoder memory refusal; intended exit/output negative guard unreached",
+    "stdout": "audio_packs-17.stdout.log",
+    "stderr": "audio_packs-17.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "genuinely_failed_decoder_exit_still_refuses_unchanged_source",
+    "code": 101,
+    "index": 18,
+    "classification": "Earlier decoder memory refusal; intended exit/output negative guard unreached",
+    "stdout": "audio_packs-18.stdout.log",
+    "stderr": "audio_packs-18.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "live_held_decoder_with_injected_unreadable_memory_still_refuses",
+    "code": 0,
+    "index": 19,
+    "classification": "PASS (reached original assertion)",
+    "stdout": "audio_packs-19.stdout.log",
+    "stderr": "audio_packs-19.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "daemon_shutdown_reaps_a_decoder_held_during_source_validation_before_exit",
+    "code": 101,
+    "index": 20,
+    "classification": "Intended shutdown RED: owned decoder alive after daemon exit",
+    "stdout": "audio_packs-20.stdout.log",
+    "stderr": "audio_packs-20.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "a_closing_audio_runtime_refuses_new_source_admission_before_daemon_exit",
+    "code": 101,
+    "index": 21,
+    "classification": "Intended closing RED: folder source mutation accepted while closing",
+    "stdout": "audio_packs-21.stdout.log",
+    "stderr": "audio_packs-21.stderr.log"
+  },
+  {
+    "target": "audio_packs",
+    "name": "disabling_audio_cancels_and_reaps_source_validation_without_changing_selected_folder",
+    "code": 101,
+    "index": 22,
+    "classification": "Intended disable RED: source-validation RPC did not finish within test bound",
+    "stdout": "audio_packs-22.stdout.log",
+    "stderr": "audio_packs-22.stderr.log"
+  }
+]

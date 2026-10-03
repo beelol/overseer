@@ -1,0 +1,4 @@
+
+thread 'exited_decoder_with_malformed_stdout_still_refuses_unchanged_source' panicked at daemon/tests/audio_packs.rs:873:5:
+must reach exit/output refusal, not setup/earlier memory refusal: Cannot supervise audio validation memory.
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

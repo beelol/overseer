@@ -1,0 +1,67 @@
+[
+  {
+    "target": "audio_packs",
+    "name": "public_inventory_is_the_exact_twelve_phrases_and_old_keys_are_not_previews",
+    "code": 0
+  },
+  {
+    "target": "audio_packs",
+    "name": "complete_folder_selection_stays_off_private_in_place_and_survives_restart",
+    "code": 0
+  },
+  {
+    "target": "audio_packs",
+    "name": "incomplete_unknown_and_wrong_schema_manifests_leave_the_prior_selection_unchanged",
+    "code": 0
+  },
+  {
+    "target": "audio_packs",
+    "name": "unsafe_manifest_paths_and_non_audio_files_are_refused_without_private_path_errors",
+    "code": 0
+  },
+  {
+    "target": "audio_packs",
+    "name": "a_stale_source_revision_cannot_replace_another_clients_selected_folder",
+    "code": 0
+  },
+  {
+    "target": "audio_packs",
+    "name": "removing_the_selected_folder_shows_unavailable_without_switching_to_builtin",
+    "code": 0
+  },
+  {
+    "target": "audio_packs",
+    "name": "legacy_private_selection_migrates_unavailable_without_enabling_or_falling_back",
+    "code": 0
+  },
+  {
+    "target": "audio_packs",
+    "name": "manifest_media_and_duration_limits_refuse_without_committing_selection",
+    "code": 0
+  },
+  {
+    "target": "audio_packs",
+    "name": "truncated_wav_and_non_decodable_mp3_refuse_without_committing_selection",
+    "code": 0
+  },
+  {
+    "target": "audio_packs",
+    "name": "parent_symlink_and_fifo_refuse_without_committing_selection",
+    "code": 0
+  },
+  {
+    "target": "audio_packs",
+    "name": "source_fields_and_enablement_revision_are_strict_and_never_model_authority",
+    "code": 0
+  },
+  {
+    "target": "audio_packs",
+    "name": "an_older_enable_cannot_publish_runtime_after_a_later_disable",
+    "code": 0
+  },
+  {
+    "target": "audio_packs",
+    "name": "live_held_decoder_with_injected_unreadable_memory_still_refuses",
+    "code": 0
+  }
+]
