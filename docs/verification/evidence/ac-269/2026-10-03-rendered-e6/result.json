@@ -1,0 +1,152 @@
+{
+  "checks": [
+    {
+      "name": "Clear prose off and Less tool noise planned without active switch",
+      "ok": true
+    },
+    {
+      "name": "preview displays contents and does not install",
+      "ok": true
+    },
+    {
+      "name": "confirmed installation keeps bindings empty",
+      "ok": true
+    },
+    {
+      "name": "mid-turn disable leaves immutable applied text and shows pending desired change",
+      "ok": true
+    },
+    {
+      "name": "Overseer has its own binding while the all-agents binding remains disabled",
+      "ok": true
+    },
+    {
+      "name": "reconnect reads retained bindings without enabling anything new",
+      "ok": true
+    },
+    {
+      "name": "Overseer Dark at 1440: named controls and no horizontal overflow",
+      "ok": true,
+      "detail": {
+        "size": {
+          "width": 1082,
+          "overflow": false
+        },
+        "audit": {
+          "chars": 2539,
+          "dropped": 0,
+          "longRuns": [],
+          "overflow": [],
+          "unnamed": [],
+          "sample": "Mods | Refresh | Native configuration is unverified. Global text suppression and dynamic local model delivery are unsupported. Child coverage is unknown. Prose quality is untested. Token savings: not measured. | Library | Mods are optional. Preview and install a pinned version, then choose where to enable it. | Preview local folder… | Preview update from folder… | Clear prose | Concise, complete s",
+          "width": 1082
+        },
+        "unnamedFields": 0
+      }
+    },
+    {
+      "name": "Overseer Dark at 640: named controls and no horizontal overflow",
+      "ok": true,
+      "detail": {
+        "size": {
+          "width": 282,
+          "overflow": false
+        },
+        "audit": {
+          "chars": 2539,
+          "dropped": 0,
+          "longRuns": [],
+          "overflow": [],
+          "unnamed": [],
+          "sample": "Mods | Refresh | Native configuration is unverified. Global text suppression and dynamic local model delivery are unsupported. Child coverage is unknown. Prose quality is untested. Token savings: not measured. | Library | Mods are optional. Preview and install a pinned version, then choose where to enable it. | Preview local folder… | Preview update from folder… | Clear prose | Concise, complete s",
+          "width": 282
+        },
+        "unnamedFields": 0
+      }
+    },
+    {
+      "name": "Overseer Light at 1440: named controls and no horizontal overflow",
+      "ok": true,
+      "detail": {
+        "size": {
+          "width": 1082,
+          "overflow": false
+        },
+        "audit": {
+          "chars": 2539,
+          "dropped": 0,
+          "longRuns": [],
+          "overflow": [],
+          "unnamed": [],
+          "sample": "Mods | Refresh | Native configuration is unverified. Global text suppression and dynamic local model delivery are unsupported. Child coverage is unknown. Prose quality is untested. Token savings: not measured. | Library | Mods are optional. Preview and install a pinned version, then choose where to enable it. | Preview local folder… | Preview update from folder… | Clear prose | Concise, complete s",
+          "width": 1082
+        },
+        "unnamedFields": 0
+      }
+    },
+    {
+      "name": "Overseer Light at 640: named controls and no horizontal overflow",
+      "ok": true,
+      "detail": {
+        "size": {
+          "width": 282,
+          "overflow": false
+        },
+        "audit": {
+          "chars": 2539,
+          "dropped": 0,
+          "longRuns": [],
+          "overflow": [],
+          "unnamed": [],
+          "sample": "Mods | Refresh | Native configuration is unverified. Global text suppression and dynamic local model delivery are unsupported. Child coverage is unknown. Prose quality is untested. Token savings: not measured. | Library | Mods are optional. Preview and install a pinned version, then choose where to enable it. | Preview local folder… | Preview update from folder… | Clear prose | Concise, complete s",
+          "width": 282
+        },
+        "unnamedFields": 0
+      }
+    },
+    {
+      "name": "Overseer at 1440: named controls and no horizontal overflow",
+      "ok": true,
+      "detail": {
+        "size": {
+          "width": 1082,
+          "overflow": false
+        },
+        "audit": {
+          "chars": 2539,
+          "dropped": 0,
+          "longRuns": [],
+          "overflow": [],
+          "unnamed": [],
+          "sample": "Mods | Refresh | Native configuration is unverified. Global text suppression and dynamic local model delivery are unsupported. Child coverage is unknown. Prose quality is untested. Token savings: not measured. | Library | Mods are optional. Preview and install a pinned version, then choose where to enable it. | Preview local folder… | Preview update from folder… | Clear prose | Concise, complete s",
+          "width": 1082
+        },
+        "unnamedFields": 0
+      }
+    },
+    {
+      "name": "Overseer at 640: named controls and no horizontal overflow",
+      "ok": true,
+      "detail": {
+        "size": {
+          "width": 282,
+          "overflow": false
+        },
+        "audit": {
+          "chars": 2539,
+          "dropped": 0,
+          "longRuns": [],
+          "overflow": [],
+          "unnamed": [],
+          "sample": "Mods | Refresh | Native configuration is unverified. Global text suppression and dynamic local model delivery are unsupported. Child coverage is unknown. Prose quality is untested. Token savings: not measured. | Library | Mods are optional. Preview and install a pinned version, then choose where to enable it. | Preview local folder… | Preview update from folder… | Clear prose | Concise, complete s",
+          "width": 282
+        },
+        "unnamedFields": 0
+      }
+    },
+    {
+      "name": "confirmed removal ends bindings and keeps historical snapshot",
+      "ok": true
+    }
+  ]
+}
