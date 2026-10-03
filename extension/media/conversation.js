@@ -614,7 +614,7 @@
       card.el.replaceChildren(...kids);
     }
   }
-  Conversation.KNOWN = new Set(['auto_decision', 'turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed', 'proposal', 'proposal_answered', 'queued', 'briefing', 'overseer_message', 'redirect', 'hold', 'release', 'guardrail', 'guardrail_crossed', 'check_in', 'report', 'ask', 'claim', 'share', 'share_withdrawn', 'finding', 'watch_started', 'watch_ended', 'handoff', 'remote_command', 'merge_back', 'pull_request']);
+  Conversation.KNOWN = new Set(['auto_decision', 'turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed', 'proposal', 'proposal_answered', 'queued', 'queue_changed', 'briefing', 'overseer_message', 'redirect', 'hold', 'release', 'guardrail', 'guardrail_crossed', 'check_in', 'report', 'ask', 'claim', 'share', 'share_withdrawn', 'finding', 'watch_started', 'watch_ended', 'handoff', 'remote_command', 'merge_back', 'pull_request']);
   Conversation.describe = describe;
   /**
    * A waiting permission's answers (AC-241): Allow once, Allow for this session when the harness

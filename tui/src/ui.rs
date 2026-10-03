@@ -131,8 +131,33 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Mode::Audio => audio_mode(f, app, area),
         Mode::AudioImport => audio_import(f, app, area),
         Mode::Overseer => overseer_view(f, app, area),
+        Mode::Queue => queue_view(f, app, area),
         _ => {}
     }
+}
+
+/// Owner controls for the shared daemon queue. No refresh, focus change or reconnect resumes it.
+fn queue_view(f: &mut Frame, app: &App, area: Rect) {
+    let Some(run) = app.focused() else { return };
+    let w = area.width.saturating_sub(4).min(100);
+    let h = area.height.saturating_sub(4).min(24);
+    let r = Rect { x: area.x + area.width.saturating_sub(w)/2, y: area.y + area.height.saturating_sub(h)/2, width:w, height:h };
+    let paused = run.queue["paused"] == true;
+    let block = Block::default().borders(Borders::ALL).title(format!(" {} · {} ", run.title, if paused { "Queue paused" } else { "Queued" })).border_style(Style::new().fg(accent()));
+    let inner = block.inner(r);
+    f.render_widget(Clear, r); f.render_widget(block, r);
+    let messages = run.queue["messages"].as_array().cloned().unwrap_or_default();
+    let mut lines = vec![Line::from(Span::styled("s Send queued   c Clear   d Remove   j/k select   Esc close", Style::new().fg(accent()))), Line::raw("")];
+    if messages.is_empty() { lines.push(Line::raw("No queued messages")); }
+    let visible = (inner.height as usize).saturating_sub(2).max(1);
+    let cursor = app.queue_cursor.min(messages.len().saturating_sub(1));
+    let start = cursor.saturating_sub(visible.saturating_sub(1));
+    for (i,m) in messages.iter().enumerate().skip(start).take(visible) {
+        let text = m["text"].as_str().unwrap_or("").trim_start_matches("From Overseer: ");
+        let row = format!("{} {}. {}{}", if i == cursor { "›" } else { " " }, i+1, if paused { "Paused " } else { "" }, text);
+        lines.push(Line::from(Span::styled(fit(&row, inner.width as usize), if i == cursor { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else { Style::new().fg(MUTED) })));
+    }
+    f.render_widget(Paragraph::new(lines), inner);
 }
 
 /// The conversation with Overseer (AC-199): the owner's words, Overseer's replies, the daemon's
@@ -397,6 +422,7 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         return;
     }
     let keys: &[(&str, &str)] = match app.mode {
+        Mode::Queue => &[("s", "Send queued"), ("c", "Clear"), ("d", "Remove"), ("j/k", "select"), ("esc", "close")],
         Mode::DenyNote { .. } => &[("type", "a note for the agent"), ("enter", "deny"), ("esc", "cancel")],
         Mode::Compose if app.focused().is_some_and(|r| r.permission_request().is_some()) => &[("enter", "deny with this note"), ("alt+enter", "new line"), ("esc", "close (keeps draft)"), ("ctrl+u", "clear")],
         Mode::Compose => &[("enter", "send"), ("alt+enter", "new line"), ("esc", "close (keeps draft)"), ("ctrl+u", "clear")],
@@ -751,7 +777,7 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
         (Some(feed), false) => tail_lines(feed, width, inner.height as usize),
         (None, _) => vec![Line::from(Span::styled("loading…", Style::new().fg(MUTED)))],
     };
-    let lines = if lines.is_empty() {
+    let mut lines = if lines.is_empty() {
         let prompt = app.state.task(&run.task_id).map(|t| t.prompt.clone()).unwrap_or_default();
         let mut out = Vec::new();
         if !prompt.trim().is_empty() {
@@ -762,6 +788,19 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     } else {
         lines
     };
+    // Keep the whole paused queue visible below the conversation, in its stored order (AC-265).
+    let messages = run.queue["messages"].as_array().cloned().unwrap_or_default();
+    if run.queue["paused"] == true || !messages.is_empty() {
+        let h = inner.height as usize;
+        let shown = messages.len().min(h.saturating_sub(2));
+        let room = h.saturating_sub(shown + 1);
+        if lines.len() > room { lines = lines.split_off(lines.len() - room); }
+        lines.push(Line::from(Span::styled(if run.queue["paused"] == true { "Queue paused · Q controls" } else { "Queued · Q controls" }, Style::new().fg(waiting()))));
+        for (i, m) in messages.iter().take(shown).enumerate() {
+            let text = m["text"].as_str().unwrap_or("").trim_start_matches("From Overseer: ");
+            lines.push(Line::from(Span::styled(fit(&format!("{}. {}{}", i+1, if run.queue["paused"] == true { "Paused " } else { "" }, text), width), Style::new().fg(MUTED))));
+        }
+    }
     f.render_widget(Paragraph::new(lines), Rect { x: inner.x + 1, width: inner.width.saturating_sub(1), ..inner });
 }
 
@@ -976,7 +1015,8 @@ pub const HELP: &[(&str, &str)] = &[
     ("a  s  d", "allow / deny: once, this session, with a note"),
     ("i  (waiting)", "a reply denies the permission; the agent reads it as the reason"),
     ("w", "next agent waiting for you"),
-    ("x", "interrupt the focused agent"),
+    ("x", "stop the focused agent and pause its queue"),
+    ("Q", "queued messages: s send, c clear, d remove"),
     ("n", "start a new agent"),
     ("o", "Overseer: its conversation and Voice Mode"),
     ("ctrl+v  (in o)", "Voice Mode on / off"),

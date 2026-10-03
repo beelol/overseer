@@ -1,0 +1,6 @@
+ok   old main constructor is paused before its exact options are changed
+ok   imported mainImpl constructor is registered before it has been loaded
+ok   unknown layout fails before launching instead of following arbitrary imports
+ok   reading installed source never runs its top-level code
+ok   source discovery has a bounded size
+5 of 5 passed

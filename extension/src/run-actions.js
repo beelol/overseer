@@ -16,22 +16,33 @@ class Steering {
   // This class only mirrors what the daemon holds, so the chat can show it.
   constructor(client, model) {
     this.client = client; this.model = model; this.pending = new Map(); // run id -> { text, how, id }
-    client.on('event', ev => { if (['queued', 'turn_started', 'redirect'].includes(ev.kind) && ev.run_id) this.refresh(ev.run_id); });
+    client.on('event', ev => { if (['queued', 'queue_changed', 'turn_started', 'redirect'].includes(ev.kind) && ev.run_id) this.refresh(ev.run_id); });
   }
-  queued(runId) { return this.pending.get(runId); }
+  queued(runId) {
+    const stored = this.model.run(runId)?.queue;
+    return stored ? this.mirror(stored) : this.pending.get(runId);
+  }
+  mirror(q) {
+    const messages = (q.queued || q.messages || []).map(m => ({ ...m, text: m.text.replace(/^From Overseer: /, ''), how: m.redirect ? 'interrupt' : 'queue' }));
+    return messages.length || q.paused ? { ...messages[0], messages, paused: !!q.paused } : undefined;
+  }
   async refresh(runId) {
     try {
       const r = await this.client.request('run.queued', { run_id: runId });
-      const first = (r.queued || [])[0];
-      if (first) this.pending.set(runId, { text: first.text.replace(/^From Overseer: /, ''), how: first.redirect ? 'interrupt' : 'queue', id: first.id, source: first.source });
+      const queue = this.mirror(r);
+      if (queue) this.pending.set(runId, queue);
       else this.pending.delete(runId);
     } catch { this.pending.delete(runId); }
     this.model.emitter.fire();
   }
-  async set(runId, text, options, how) {
+  async set(runId, text, options, how, id) {
+    if (how === 'resume' || how === 'clear') {
+      await this.client.request(how === 'resume' ? 'run.resume_queue' : 'run.clear_queue', { run_id: runId });
+      await this.refresh(runId); this.model.scheduleRefresh(); return;
+    }
     if (how === 'cancel') {
       const p = this.pending.get(runId);
-      if (p?.id) await this.client.request('run.unqueue', { run_id: runId, id: p.id });
+      if (id ?? p?.id) await this.client.request('run.unqueue', { run_id: runId, id: id ?? p.id });
       await this.refresh(runId);
       return;
     }
@@ -54,7 +65,7 @@ async function handleRunMessage({ client, model, steering }, runId, message, rep
       model.scheduleRefresh();
       return true;
     }
-    case 'steer': await steering.set(runId, String(message.text || ''), message.options, String(message.how || 'queue')); return true;
+    case 'steer': await steering.set(runId, String(message.text || ''), message.options, String(message.how || 'queue'), message.id); return true;
     case 'mentionFiles': {
       const run = model.run(runId);
       const params = message.workspace_id ? { workspace_id: String(message.workspace_id) } : message.repo ? { repo: String(message.repo) } : run ? { workspace_id: run.workspace_id } : undefined;

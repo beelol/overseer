@@ -726,6 +726,15 @@ pub fn load_guarded(tag: &str, context: u64, headroom: u64, keep_alive: &str) ->
                 let mem = sys::memory()?;
                 samples += 1;
                 lowest = lowest.min(mem.available);
+                // Fixture acknowledgement follows an actual sampler read, not elapsed time.
+                // Outside the existing explicit test-memory boundary nothing is written.
+                if std::env::var_os("OVERSEER_TEST_MEMORY").is_some() {
+                    if let Some(path) = std::env::var_os("OVERSEER_TEST_LOAD_SAMPLES") {
+                        use std::io::Write;
+                        let mut file = std::fs::OpenOptions::new().create(true).append(true).open(path)?;
+                        writeln!(file, "{}", json!({"tag": tag, "context": context, "sample": samples, "memory": mem}))?;
+                    }
+                }
                 if let Some(why) = must_stop_load(&mem, headroom) {
                     let _ = unload(tag);
                     bail!("the load of {tag} was cancelled and the model unloaded: {why}");

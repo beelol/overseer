@@ -160,14 +160,27 @@ async function mcpClient() {
     const decision = reply.response.response;
     if (decision.behavior === 'allow') { fs.writeFileSync(file, decision.updatedInput.content); user([{ type: 'tool_result', tool_use_id: 'toolu_write', content: 'File created successfully at: ' + file }]); assistant([{ type: 'text', text: 'wrote perm.txt' }]); result(false, 'wrote'); }
     else { user([{ type: 'tool_result', tool_use_id: 'toolu_write', content: 'Permission denied: ' + decision.message, is_error: true }]); assistant([{ type: 'text', text: 'permission denied: ' + decision.message }]); result(false, 'denied'); }
-  } else if (mode === 'permission-twice') {
+  } else if (['permission-twice', 'permission-changed-rule-behavior', 'permission-changed-rule-type', 'permission-changed-rule-destination', 'permission-suppress-always', 'permission-suppress-second'].includes(mode)) {
     const suggestions = [{ type: 'addRules', rules: [{ toolName: 'Write' }], behavior: 'allow', destination: 'session' }];
     let denied = false;
     for (const [n, name] of [[1, 'one.txt'], [2, 'two.txt']]) {
       const file = path.join(process.cwd(), name);
       const input = { file_path: file, content: `${name}\n` };
       assistant([{ type: 'tool_use', id: `toolu_write${n}`, name: 'Write', input }]);
-      out({ type: 'control_request', request_id: `req-${n}`, request: { subtype: 'can_use_tool', tool_name: 'Write', input, permission_suggestions: suggestions } });
+      if (n === 2) {
+        // Explicit test-only boundary: lets a test seed an old durable grant before the next ask.
+        if (process.env.FIXTURE_PERMISSION_SECOND_GATE) {
+          const deadline = Date.now() + 30000;
+          while (!fs.existsSync(process.env.FIXTURE_PERMISSION_SECOND_GATE) && Date.now() < deadline) await sleep(10);
+          if (!fs.existsSync(process.env.FIXTURE_PERMISSION_SECOND_GATE)) { result(true, 'second permission gate timed out'); return; }
+        }
+        if (mode === 'permission-changed-rule-behavior') suggestions[0].behavior = 'deny';
+        if (mode === 'permission-changed-rule-type') suggestions[0].type = 'replaceRules';
+        // Invalid native destination that deliberately produces the same presentation label.
+        if (mode === 'permission-changed-rule-destination') suggestions[0].destination = 'this session';
+      }
+      const suppressed = mode === 'permission-suppress-always' || (mode === 'permission-suppress-second' && n === 2);
+      out({ type: 'control_request', request_id: `req-${n}`, request: { subtype: 'can_use_tool', tool_name: 'Write', input, permission_suggestions: suggestions, ...(suppressed ? { suppress_always_allow_rule: true } : {}) } });
       const reply = await next(m => m.type === 'control_response' || (m.type === 'control_request' && m.request?.subtype === 'interrupt'));
       if (reply.type === 'control_request') { result(true, 'interrupted'); await sleep(50); process.exit(130); }
       const decision = reply.response.response;
@@ -318,6 +331,11 @@ async function mcpClient() {
     if (await step(total / 2)) { result(true, 'interrupted'); await sleep(50); process.exit(130); }
     assistant([{ type: 'text', text: 'Wrote draft.md.' }]);
     result(false, 'Wrote draft.md.');
+  } else if (mode === 'silent-result' || mode === 'silent-error') {
+    result(mode === 'silent-error', '');
+  } else if (mode === 'captured-actions') {
+    assistant([{ type: 'text', text: 'Proposed actions.\n\n```overseer-actions\n' + process.env.CLAUDE_FIXTURE_CAPTURE_ACTIONS + '\n```' }]);
+    result(false, 'fixture actions');
   } else if (mode === 'slow') {
     // Busy for a few seconds (steering tests); honours an interrupt; each turn echoes its prompt.
     const content = first.message.content;
@@ -325,7 +343,11 @@ async function mcpClient() {
     assistant([{ type: 'text', text: 'working on: ' + text }]);
     const stop = next(m => m.type === 'control_request' && m.request?.subtype === 'interrupt').then(() => 'interrupt');
     const done = sleep(Number(process.env.FIXTURE_SLOW_MS || 5000)).then(() => 'done');
-    if ((await Promise.race([stop, done])) === 'interrupt') { result(true, 'interrupted'); await sleep(50); process.exit(130); }
+    if ((await Promise.race([stop, done])) === 'interrupt') {
+      // Synthetic interrupt latency lets queue tests observe a real pending redirect before Stop.
+      await sleep(Number(process.env.FIXTURE_INTERRUPT_DELAY_MS || 0));
+      result(true, 'interrupted'); await sleep(50); process.exit(130);
+    }
     assistant([{ type: 'text', text: 'finished: ' + text }]);
     result(false, 'finished');
   } else if (mode === 'limits' || mode === 'limits-low') {
@@ -339,6 +361,17 @@ async function mcpClient() {
     // Waits until `<mode file>.gate` exists, then ends its turn: a test makes several agents
     // finish together however loaded the machine is (AC-189's "finishing together").
     while (!(modeFile && fs.existsSync(modeFile + '.gate'))) await sleep(50);
+    assistant([{ type: 'text', text: 'gate opened' }]);
+    result(false, 'gate opened');
+  } else if (mode === 'gated-briefing') {
+    // The initial lone turn and queued companion briefing have separate fixture barriers.
+    // A test can let the first turn finish while keeping the automatically queued next one busy.
+    const briefing = firstText.includes('[Briefing from Overseer:');
+    const gate = modeFile && modeFile + (briefing ? '.briefing.gate' : '.gate');
+    assistant([{ type: 'text', text: 'waiting at ' + (briefing ? 'briefing' : 'initial') + ' fixture gate' }]);
+    const deadline = Date.now() + 30000;
+    while (!(gate && fs.existsSync(gate)) && Date.now() < deadline) await sleep(10);
+    if (!(gate && fs.existsSync(gate))) throw new Error('briefing fixture barrier timed out');
     assistant([{ type: 'text', text: 'gate opened' }]);
     result(false, 'gate opened');
   } else if (mode === 'echo') {
@@ -587,6 +620,33 @@ async function mcpClient() {
     };
     // Not meant for Overseer (a spoken aside about something else): the exact reply the prompt asks for.
     const aside = words => /\b(dishes|dinner|groceries|laundry)\b/i.test(words);
+    // AC-230: an agent's permission mode by conversation, typed or spoken the same: "set Site to
+    // Accept edits", "put the site agent in Auto", "switch Site to ask first".
+    const modeFor = words => {
+      const m = /^(?:overseer,?\s*)?(?:set|put|switch|change) (?:the )?(.+?)(?: agent)? (?:to|in|on|into) (ask first|accept edits|auto)(?: mode)?[.!?]*$/i.exec(String(words || '').trim());
+      if (!m) return null;
+      const a = agents.find(x => x.title.toLowerCase().includes(m[1].toLowerCase()));
+      const label = { 'ask first': 'Ask first', 'accept edits': 'Accept edits', auto: 'Auto' }[m[2].toLowerCase()];
+      return a ? { action: { action: 'mode', agent: a.id, mode: label, confidence: 'high' }, reply: `Setting ${a.title} to ${label}.` } : { reply: `I could not find an agent called ${m[1]}.` };
+    };
+    // AC-229, AC-230: a start in a named repository ("start an agent in the site repo to …"),
+    // optionally in a stated mode ("in Auto"), with a correction's repository or task. The
+    // repository is the one of that name among the agents' (the state sent with the message).
+    const startIn = words => {
+      const m = /start (?:an|one) agent in the (\S+) repo(?:sitory)?(?: in (ask first|accept edits|auto)(?: mode)?)? to (.+?)[.!?]*(?:\s*\(correction[^:]*: (.*)\))?$/i.exec(String(words || '').trim());
+      if (!m) return null;
+      let [, name, mode, task, fix] = m;
+      if (fix) {
+        const r = /the (\S+) repo/i.exec(fix);
+        if (r) name = r[1];
+        else { const t = /\bto (.+?)[.!?]*$/i.exec(fix); if (t) task = t[1]; }
+      }
+      const repo = stateAgents.map(a => a.repo).find(r => r && path.basename(r).toLowerCase() === name.toLowerCase());
+      if (!repo) return { reply: `Which repository is ${name}?` };
+      const start = { action: 'start', repo, title: task.split(' ').slice(0, 3).join(' '), prompt: `Please ${task}.`, confidence: 'high' };
+      if (mode) start.permission_mode = { 'ask first': 'Ask first', 'accept edits': 'Accept edits', auto: 'Auto' }[mode.toLowerCase()];
+      return { action: start, reply: `Starting one agent in ${name}${mode ? ' in ' + start.permission_mode : ''}.` };
+    };
     // A spoken request (Voice Mode, Gate R): choose among the daemon's candidates, as the prompt
     // asks; with none, ask one short question and propose nothing. A correction's words give the
     // new task ("I meant wait for the review"); its names were already applied by the daemon.
@@ -597,6 +657,13 @@ async function mcpClient() {
       for (const voiceReq of voiceReqs) {
         let words = voiceReq[2].trim();
         if (aside(words) && /reply exactly NOT_FOR_OVERSEER/.test(said)) { replies.push('NOT_FOR_OVERSEER'); continue; }
+        // AC-229: words the recognizer garbled ("-overseer. Start…") misjudged as not for Overseer,
+        // as a model did in the owner's session, until the daemon says the request names it.
+        if (/^-/.test(words) && !/names you and gives you an instruction/.test(said)) { replies.push('NOT_FOR_OVERSEER'); continue; }
+        const mode = modeFor(words);
+        if (mode) { if (mode.action) await call('propose', { actions: [mode.action] }).catch(e => replies.push('refused: ' + e.message)); replies.push(mode.reply); continue; }
+        const inRepo = startIn(words);
+        if (inRepo) { if (inRepo.action) { remember(inRepo.action.title); await call('propose', { actions: [inRepo.action] }).catch(e => replies.push('refused: ' + e.message)); } replies.push(inRepo.reply); continue; }
         const nav = navFor(words);
         if (nav) { await call('propose', { actions: nav.actions }).catch(e => replies.push('refused: ' + e.message)); replies.push(nav.reply); continue; }
         // New agents: "…, and someone should write the note", "three agents should each …".
@@ -637,6 +704,17 @@ async function mcpClient() {
         }
       }
       reply = replies.join(' ');
+      assistant([{ type: 'text', text: reply }]);
+      result(false, reply);
+      mcp.close();
+      await sleep(100);
+      process.exit(0);
+    }
+    // Typed the same as spoken (AC-216): a permission mode, or a start in a named repository.
+    const typed = mcp && (modeFor(said) || startIn(said));
+    if (typed) {
+      const outcome = typed.action ? await call('propose', { actions: [typed.action] }).catch(e => 'refused: ' + e.message) : '';
+      reply = /^refused/.test(outcome) ? `I could not do that: ${outcome}` : typed.reply;
       assistant([{ type: 'text', text: reply }]);
       result(false, reply);
       mcp.close();
