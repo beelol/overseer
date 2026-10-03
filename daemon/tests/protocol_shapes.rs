@@ -25,6 +25,8 @@ fn mods_binding_methods_and_events_follow_generated_shapes() {
     let bound = d.call("mods.bind", json!({"expected_revision":installed["revision"],"binding":{
         "mod_id":"clear-prose","version":"1","fingerprint":installed["version"]["fingerprint"],
         "scope":{"kind":"all_agents"},"enabled":true}}));
+    d.call("run.follow_up", json!({"run_id":run,"prompt":"Capture the applied text shape."}));
+    d.wait_done(&run,10);
     let why = d.call("mods.why", json!({"run_id":run}));
     let list = d.call("mods.list", json!({}));
     let unbound = d.call("mods.unbind", json!({"binding_id":bound["binding"]["id"],"expected_revision":bound["revision"]}));
@@ -33,8 +35,9 @@ fn mods_binding_methods_and_events_follow_generated_shapes() {
         check(&doc, &doc["methods"][name]["result"], &value, name, &mut wrong);
     }
     let events = d.call("events.list", json!({"limit":1000}));
-    for event in events["events"].as_array().unwrap().iter().filter(|e| e["kind"] == "mods_changed") {
-        check(&doc, &doc["events"]["mods_changed"], &event["payload"], "mods_changed", &mut wrong);
+    for event in events["events"].as_array().unwrap().iter().filter(|e| e["kind"] == "mods_changed" || e["kind"] == "mods_applied") {
+        let kind = event["kind"].as_str().unwrap();
+        check(&doc, &doc["events"][kind], &event["payload"], kind, &mut wrong);
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }

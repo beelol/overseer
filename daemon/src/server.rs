@@ -1414,6 +1414,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     if method.starts_with("swarm.") && result.as_ref().is_err_and(storage_fault) {
         d.swarm_storage_blocked.store(true, Ordering::SeqCst);
     }
+    // Mods keep copied original bytes privately; every protocol presentation
+    // uses the existing decoded-value redaction boundary, including previews.
+    if method.starts_with("mods.") { return result.map(crate::daemon::redact_value); }
     result
 }
 

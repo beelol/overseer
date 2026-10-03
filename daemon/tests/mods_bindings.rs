@@ -265,8 +265,8 @@ fn same_named_version_update_keeps_binding_pinned_after_restart() {
         .contains("original warning"));
     assert!(!plan["rules_text"].as_str().unwrap().contains("new warning"));
     assert_eq!(
-        d.call("mods.list", json!({}))["support"]["delivery"],
-        "unsupported"
+        d.call("mods.list", json!({}))["support"]["native_configuration"],
+        "unverified"
     );
 }
 

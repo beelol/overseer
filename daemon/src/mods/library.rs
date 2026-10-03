@@ -352,7 +352,7 @@ pub fn list(d: &Daemon) -> Result<Value> {
         json!({"revision":revision(&store)?,"installed":versions.iter().map(Bundle::public).collect::<Vec<_>>(),
         "bindings":bindings,"available_bundled":[bundled()?.public()],
         "unavailable":[{"id":"less-tool-noise","reason":"Planned; external transformers are not implemented"}],
-        "support":{"delivery":"unsupported","native_configuration":"unverified","children":"unknown","global_text_suppression":"unsupported"}}),
+        "support":super::delivery::support()}),
     )
 }
 pub fn preview(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
@@ -383,7 +383,10 @@ pub fn preview(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
             "contents":bundle.files,"previous":previous,"operation":operation,"permissions":[],"unsupported":[],
             "notice":"Install copies this preview and never enables the mod"})
     };
-    Ok(result)
+    let mut visible = crate::daemon::redact_value(result.clone());
+    visible["contents_redacted"] = json!(visible["contents"] != result["contents"]);
+    visible["notice"] = json!("Install copies the private original preview and never enables it. Public text redacts credentials; fingerprints and byte counts refer to original bytes.");
+    Ok(visible)
 }
 pub fn install(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let _files = FILE_OPERATIONS.lock().unwrap();

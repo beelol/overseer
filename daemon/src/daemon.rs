@@ -2014,12 +2014,14 @@ impl Daemon {
             generic_meta = json!({});
         }
         generic_meta["opts"] = json!({"effort": effort, "mode": mode});
-        let turn = match &opts.retry_of {
+        let (turn, turn_mods) = match &opts.retry_of {
             // A turn sent again after a wait is the same turn: no new record and no new snapshot.
             Some(id) => {
                 let store = self.store.lock().unwrap();
                 store.conn.execute("UPDATE turns SET status='running', ended_ms=NULL WHERE id=?1 AND run_id=?2", rusqlite::params![id, run_id])?;
-                store.turns(run_id)?.into_iter().find(|t| &t.id == id).ok_or_else(|| anyhow!("turn {id} is not a turn of this run"))?
+                let turn = store.turns(run_id)?.into_iter().find(|t| &t.id == id).ok_or_else(|| anyhow!("turn {id} is not a turn of this run"))?;
+                let saved = crate::mods::delivery::snapshot(&store, id)?;
+                (turn, saved.map(|saved| crate::mods::delivery::TurnMods { saved }))
             }
             None => {
                 let snap = self.take_snapshot(&ws, "run-start")?;
@@ -2030,19 +2032,31 @@ impl Daemon {
                 // A successor's first turn carries the guardrails it took over (AC-187, AC-197).
                 let preface = if opts.handoff && !follow_up { [self.guardrail_preface(run_id), preface].into_iter().filter(|p| !p.is_empty()).collect::<Vec<_>>().join("\n\n") } else { preface };
                 let prompt_owned = if preface.is_empty() { prompt.to_string() } else { format!("{preface}\n\n{prompt}") };
-                let turn = Turn { id: format!("u-{}", short_id()), run_id: run_id.into(), n, prompt: prompt_owned, snapshot_id: Some(snap.id.clone()), started_ms: now(), ended_ms: None, status: "running".into() };
-                {
+                let (turn, turn_mods) = {
                     let store = self.store.lock().unwrap();
-                    if let (None, Some(profile_id)) = (run.relation_source.as_deref(), run.profile_id.as_deref()) {
-                        if !store.insert_turn_if_no_auto_claim(&turn, profile_id)? {
-                            bail!("{MANUAL_POOL_CONFLICT}");
-                        }
-                    } else {
-                        store.insert_turn(&turn)?;
-                    }
-                }
+                    // Watch membership is only a Mods selector. The stored security
+                    // role, harness arguments and tool permissions stay unchanged.
+                    let context = crate::mods::bindings::context_from_store(&store, &run, &ws)?;
+                    let bindings = crate::mods::bindings::stored(&store)?;
+                    let plan = crate::mods::bindings::resolve(&crate::mods::library::versions(&store)?,
+                        &bindings, &context, crate::mods::revision(&store)?)?;
+                    let prepared = crate::mods::delivery::prepare(plan, &context)?;
+                    let prompt_owned = match &prepared.message_preface {
+                        Some(text) => format!("{text}{prompt_owned}"), None => prompt_owned,
+                    };
+                    let turn = Turn { id: format!("u-{}", short_id()), run_id: run_id.into(), n,
+                        prompt: prompt_owned, snapshot_id: Some(snap.id.clone()), started_ms: now(),
+                        ended_ms: None, status: "running".into() };
+                    let mut saved = prepared.snapshot(&turn.id, run_id, &run.harness);
+                    saved["binding_snapshot"] = json!(bindings.iter().filter(|b| prepared.plan.decisions.iter()
+                        .any(|decision| decision.binding_id == b.id && decision.status != "not_in_scope"))
+                        .collect::<Vec<_>>());
+                    let profile = if run.relation_source.is_none() { run.profile_id.as_deref() } else { None };
+                    if !store.insert_turn_with_mods(&turn, profile, &saved)? { bail!("{MANUAL_POOL_CONFLICT}"); }
+                    (turn, Some(crate::mods::delivery::TurnMods { saved }))
+                };
                 self.emit(Some(&run.task_id), Some(run_id), "turn_started", "daemon", "exact", json!({"turn": turn, "snapshot": snap.commit_sha}))?;
-                turn
+                (turn, turn_mods)
             }
         };
         // What the harness receives: the turn's prompt, with its preface when it has one.
@@ -2050,6 +2064,7 @@ impl Daemon {
         let prompt = prompt_owned.as_str();
         let mut external_effect_attempted = false;
         let launch_result = (|| -> Result<()> {
+        if let Some(mods) = &turn_mods { mods.validate_prompt(prompt)?; }
         if follow_up && !continuity && ACTIVE.contains(&run.status.as_str()) {
             if let Some(line) = adapters::follow_up_via_stdin(&run.harness, prompt) {
                 external_effect_attempted = true;
@@ -2129,6 +2144,7 @@ impl Daemon {
             &LaunchReq {
                 cwd: Path::new(&ws.path),
                 prompt,
+                mods: turn_mods.as_ref(),
                 model: run.model.as_deref(),
                 effort: effort.as_deref().or(run.effort.as_deref()),
                 sandbox: Some(&sandbox),
@@ -2225,11 +2241,16 @@ impl Daemon {
                      WHERE id=?1 AND run_id=?2 AND ended_ms IS NULL",
                     rusqlite::params![turn.id, run.id, now()])?;
             }
+            crate::mods::delivery::record_outcome(self, &turn.id,
+                if external_effect_attempted { "uncertain_after_effect" } else { "failed_before_effect" },
+                "Message transport did not confirm acceptance; model consumption is unknown")?;
             return Err(error);
         }
         if let Some(reservation) = &mut resume_slot {
             reservation.release_after_start();
         }
+        crate::mods::delivery::record_outcome(self, &turn.id, "transport_accepted",
+            "Existing stdin or supervisor launch accepted the request; model consumption is unverified")?;
         Ok(turn)
     }
 

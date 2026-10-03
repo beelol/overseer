@@ -1,5 +1,6 @@
 //! Optional text bundles. This module never loads or executes mod code.
 pub mod bindings;
+pub mod delivery;
 pub mod library;
 pub mod manifest;
 

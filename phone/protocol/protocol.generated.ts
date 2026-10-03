@@ -268,6 +268,7 @@ export interface ModContext {
   account_id?: string | null;
   model?: string | null;
   native_thread_exists: boolean;
+  local_model_selection: boolean;
 }
 
 export interface ModDecision {
@@ -293,7 +294,7 @@ export interface ModPlan {
 export interface AppliedMods {
   context: ModContext;
   desired: ModPlan;
-  last_turn?: unknown | null;
+  last_turn?: TurnModSnapshot | null;
   pending: boolean;
   support: unknown;
   notice: string;
@@ -306,6 +307,27 @@ export interface KnownRepo {
   exists: boolean;
   branch?: string | null;
   default_branch?: string | null;
+}
+
+export interface TurnModSnapshot {
+  turn_id: string;
+  run_id: string;
+  plan: ModPlan;
+  context: ModContext;
+  binding_snapshot: Array<ModBinding>;
+  delivery: 'none' | 'unsupported' | 'message_text';
+  transport: string;
+  activation: 'next_turn';
+  children: 'unknown';
+  text: string;
+  digest: string;
+  added_bytes: number;
+  applied_fingerprints: Array<string>;
+  outcome: 'prepared' | 'transport_accepted' | 'failed_before_effect' | 'uncertain_after_effect';
+  outcome_ms: number;
+  outcome_detail?: string | null;
+  planned_fingerprints: Array<string>;
+  text_redacted: boolean;
 }
 
 /** The payload of every kind of event the app reads. Other kinds arrive as `unknown`. */
@@ -454,6 +476,9 @@ export interface EventPayloads {
     fingerprint?: string | null;
     revision: number;
     ended_bindings?: Array<string> | null;
+  };
+  mods_applied: {
+    snapshot: TurnModSnapshot;
   };
 }
 

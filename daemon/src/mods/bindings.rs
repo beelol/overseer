@@ -132,6 +132,8 @@ pub struct ModContext {
     pub account_id: Option<String>,
     pub model: Option<String>,
     pub native_thread_exists: bool,
+    /// Continuity can choose/rechoose this route's model after turn admission.
+    pub local_model_selection: bool,
 }
 #[derive(Clone, Debug, Serialize)]
 pub struct ModDecision {
@@ -207,6 +209,7 @@ pub fn context_from_store(store: &Store, run: &Run, workspace: &Workspace) -> Re
         account_id,
         model: run.model.clone(),
         native_thread_exists: run.native_id.is_some(),
+        local_model_selection: crate::continuity::is_local(run),
     })
 }
 fn context(store: &Store, id: &str) -> Result<ModContext> {
@@ -594,17 +597,5 @@ pub fn why(d: &Daemon, p: &Value) -> Result<Value> {
     }
     let request: Request = serde_json::from_value(p.clone())
         .map_err(|e| error("invalid_mod", format!("invalid run target: {e}")))?;
-    let store = d.store.lock().unwrap();
-    let c = context(&store, &request.run_id)?;
-    let plan = resolve(
-        &library::versions(&store)?,
-        &stored(&store)?,
-        &c,
-        revision(&store)?,
-    )?;
-    Ok(
-        json!({"context":c,"desired":plan,"last_turn":null,"pending":!plan.versions.is_empty(),
-        "support":{"delivery":"unsupported","native_configuration":"unverified","global_text_suppression":"unsupported","children":"unknown"},
-        "notice":"Bindings select desired text. Delivery is not implemented yet."}),
-    )
+    super::delivery::applied(d, &request.run_id)
 }

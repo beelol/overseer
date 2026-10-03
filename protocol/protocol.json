@@ -248,7 +248,8 @@
       "harness_version": "string?",
       "account_id": "string?",
       "model": "string?",
-      "native_thread_exists": "boolean"
+      "native_thread_exists": "boolean",
+      "local_model_selection": "boolean"
     },
     "ModDecision": {
       "binding_id": "string",
@@ -271,7 +272,7 @@
     "AppliedMods": {
       "context": "ModContext",
       "desired": "ModPlan",
-      "last_turn": "json?",
+      "last_turn": "TurnModSnapshot?",
       "pending": "boolean",
       "support": "json",
       "notice": "string"
@@ -283,6 +284,26 @@
       "exists": "boolean",
       "branch": "string?",
       "default_branch": "string?"
+    },
+    "TurnModSnapshot": {
+      "turn_id": "string",
+      "run_id": "string",
+      "plan": "ModPlan",
+      "context": "ModContext",
+      "binding_snapshot": "ModBinding[]",
+      "delivery": "'none'|'unsupported'|'message_text'",
+      "transport": "string",
+      "activation": "'next_turn'",
+      "children": "'unknown'",
+      "text": "string",
+      "digest": "string",
+      "added_bytes": "number",
+      "applied_fingerprints": "string[]",
+      "outcome": "'prepared'|'transport_accepted'|'failed_before_effect'|'uncertain_after_effect'",
+      "outcome_ms": "number",
+      "outcome_detail": "string?",
+      "planned_fingerprints": "string[]",
+      "text_redacted": "boolean"
     }
   },
   "events": {
@@ -430,6 +451,9 @@
       "fingerprint": "string?",
       "revision": "number",
       "ended_bindings": "string[]?"
+    },
+    "mods_applied": {
+      "snapshot": "TurnModSnapshot"
     }
   },
   "methods": {

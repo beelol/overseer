@@ -346,12 +346,18 @@ fn recovery_reconciles_committed_previews_and_orphan_versions() {
 }
 
 #[test]
-fn library_does_not_claim_delivery_before_it_exists() {
+fn library_distinguishes_message_delivery_from_runtime_qualification() {
     let d = Daemon::start(&[("OVERSEER_TEST_AUTO_DISABLED", "1")]);
     assert_eq!(
         d.call("mods.list", json!({}))["support"]["delivery"],
-        "unsupported"
+        "message_text"
     );
+    let support=d.call("mods.list",json!({}))["support"].clone();
+    assert_eq!(support["native_configuration"],"unverified");
+    assert_eq!(support["installed_runtime_qualification"],"unverified");
+    assert_eq!(support["children"],"unknown");
+    assert_eq!(support["global_text_suppression"],"unsupported");
+
 }
 
 #[test]
