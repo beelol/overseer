@@ -2982,6 +2982,19 @@ rec(273, "Reduction measurements show their actual scope and cost", "not started
     limits='No model turns, builds, tests, UI launches, owner credentials, or production changes in this publication.',
     blocker='Required second bundle remains later implementation work after the text release. Qualify isolated execution and each adapter; preserve missing runtime/live evidence explicitly.')
 
+rec(274, "Browser use and harness approvals work through pending requests", "not started",
+    date="2026-10-03", commit="9dc165d0b33fc69af9056b105fd1947040dce8b6 (inspected baseline; requirement publication only)",
+    verifier="Codex; source and official protocol inspection, no runtime qualification",
+    harness="Claude Code and Codex installed-version/transport inventory pending",
+    fixture="No new browser runtime fixture executed",
+    steps="Inspect existing adapters and official native approval/browser contracts; publish owner-requested AC and main-tracking goal instructions.",
+    expected="Complete AC-274 inventory, typed native responses, shared pending lifecycle, isolated browser flows and recorded native qualification.",
+    actual="Existing Claude can_use_tool and selected Codex approvals are bridged. Codex MCP elicitation is declined by the unknown-request branch; generic Codex decisions do not implement the documented permission-grant response. Claude Chrome has separate extension site authorization. These are inspection findings, not passing capability coverage.",
+    evidence="[browser and permission assessment](../audits/2026-10-03-browser-permissions.md); [criterion](../overseer-rfc.md)",
+    live="None; no paid turn or owner browser/profile access.",
+    limits="The generated environment/version header is historical ledger metadata, not a runtime qualification for AC-274. No claim that every native capability or external authorization is supported. Provider, extension and OS authority must be preserved.",
+    blocker="Implement the versioned request inventory and missing bridges, then verify all pending lifecycles and native browser routes; keep unavailable or unqualified routes explicit.")
+
 SHORT_BLOCKERS = {
     154: "verified",
     155: "verified",

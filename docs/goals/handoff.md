@@ -178,3 +178,7 @@ Still waiting on the owner:
 - **A loop over UI scenarios must skip the LIVE ones, as test-all does** (first line of the file contains `LIVE`). On 2026-09-30 the coordinator's hand-written loops for #38 and main ran background (a Claude Haiku turn, twice: against the owner's no-Claude rule), codex-approval, codex-follow, merge and offline-session (gpt-5.6-luna; two without an explicit low effort). The owner was told. Filter: `head -1 test/ui/scenario-$n.js | grep -q LIVE && continue`.
 - **Never `git commit -a` in a worktree after a full run there.** The run rewrites hundreds of evidence files; commit only the files you changed.
 - **`/private/tmp` is wiped on reboot.** Push work, and keep notes on main (this file) or in memory, not only in the scratchpad.
+
+## Owner addition: browser and pending approvals (2026-10-03)
+
+AC-274 is now part of the active closeout scope. Follow main’s README acceptance list and full RFC Verify clauses on every pass, including owner edits; do not freeze scope to this handoff or a branch. See docs/audits/2026-10-03-browser-permissions.md for inspected gaps. Native approval forwarding is preferred where delegated; external provider/extension/OS authorization stays explicit and pending until observed. No browser runtime coverage or criterion closure claimed.
