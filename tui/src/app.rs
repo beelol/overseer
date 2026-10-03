@@ -12,6 +12,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 mod phone;
+mod mods;
+pub use mods::{ModsView, Form as ModsForm, display as mods_display};
 pub use phone::{ago, code_groups, fingerprint, platform_name, Device, PairRequest, Pairing, PairingState, Phone};
 
 /// Agents on one screen at most (T-37); from the 17th the grid pages.
@@ -78,6 +80,8 @@ pub enum Mode {
     Compose,
     /// The focused agent's queued messages; s sends, c clears, d removes the selected one.
     Queue,
+    /// Optional text library and the selected run’s daemon-owned delivery facts.
+    Mods { run_id: Option<String> },
     Confirm(Confirm),
     NewAgent,
     /// What the focused agent changed: files and their diff against a comparison base.
@@ -125,6 +129,7 @@ pub struct AccountRow {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Confirm {
+    Mods { text: String },
     Interrupt(String),
     Quit,
     /// Merge back, step 1: commit the worktree and merge the target into the agent's branch.
@@ -156,6 +161,7 @@ pub enum Confirm {
 /// What a pending request was for.
 #[derive(Debug, Clone)]
 enum Pending {
+    Mods(mods::Request),
     State,
     History { root: String, run: String, page: usize },
     FollowUp { run: String, text: String },
@@ -505,6 +511,7 @@ pub struct App {
     pub mode: Mode,
     pub drafts: HashMap<String, String>,
     pub form: NewAgentForm,
+    pub mods: ModsView,
     pub notice: Option<(String, Instant, bool)>,
     pub connected: bool,
     pub quit: bool,
@@ -639,6 +646,7 @@ impl App {
             mode: Mode::Grid,
             drafts: HashMap::new(),
             form: NewAgentForm::default(),
+            mods: ModsView::default(),
             notice: None,
             connected: false,
             quit: false,
@@ -1099,6 +1107,7 @@ impl App {
                     self.say("The daemon is running again", false);
                 }
                 self.connect_generation += 1;
+                self.mods_reconnect();
                 self.state_inflight = false;
                 self.request_state();
                 self.phone_request();
@@ -1112,6 +1121,7 @@ impl App {
             Msg::Refused(why) => {
                 self.connected = false;
                 self.pending.clear();
+                self.mods_disconnect();
                 self.state_inflight = false;
                 self.say(why, true);
             }
@@ -1119,6 +1129,7 @@ impl App {
                 self.connected = false;
                 // Replies to requests on the old connection never come.
                 self.pending.clear();
+                self.mods_disconnect();
                 self.pair_starting = 0;
                 self.state_inflight = false;
                 self.audio.known = false;
@@ -1180,6 +1191,7 @@ impl App {
             }
         }
         changed |= self.phone_tick(now);
+        changed |= self.mods_tick(now);
         if self.follow_due.is_some_and(|due| now >= due) {
             self.follow_due = None;
             if let Some(path) = self.changes.follow_to.clone() {
@@ -1222,6 +1234,7 @@ impl App {
         }
         let run_id = ev["run_id"].as_str().unwrap_or_default().to_string();
         let kind = ev["kind"].as_str().unwrap_or_default().to_string();
+        self.mods_event(&kind, &run_id);
         if phone::is_phone_event(&kind) {
             self.on_phone_event(&kind, &ev);
         }
@@ -1272,6 +1285,7 @@ impl App {
 
     fn on_reply(&mut self, why: Pending, result: Result<Value, String>) {
         match (why, result) {
+            (Pending::Mods(p), result) => self.mods_reply(p, result),
             (Pending::State, Ok(v)) => {
                 self.state_inflight = false;
                 match serde_json::from_value::<State>(v) {
@@ -1282,6 +1296,7 @@ impl App {
                         let new: Vec<String> = now_waiting.difference(&self.waiting).cloned().collect();
                         self.waiting = now_waiting;
                         self.state = state;
+                        self.mods_state_changed();
                         if !first_load && !new.is_empty() {
                             // Someone needs you: one signal (T-24). The daemon's cue when its latest
                             // answer says it plays; in every other case the bell, in this same pass.
@@ -2731,6 +2746,8 @@ impl App {
         }
         match self.mode.clone() {
             Mode::Help => self.mode = Mode::Grid,
+            Mode::Mods { .. } => self.mods_key(k),
+            Mode::Confirm(Confirm::Mods { .. }) => self.mods_confirm(k),
             Mode::Confirm(c @ (Confirm::PhoneOff { .. } | Confirm::PhoneOnAndPair | Confirm::Revoke { .. } | Confirm::Pair { .. })) => {
                 self.phone_confirm(&c, k);
             }
@@ -2787,6 +2804,7 @@ impl App {
                             }
                         }
                         // The phone questions are answered in `phone_confirm`; Reject above.
+                        Confirm::Mods { .. } => {}
                         Confirm::Reject { .. } => {}
                         Confirm::PhoneOff { .. } | Confirm::PhoneOnAndPair | Confirm::Revoke { .. } | Confirm::Pair { .. } => {}
                     }
@@ -2914,6 +2932,7 @@ impl App {
             KeyCode::Char('O') => self.toggle_phone_access(),
             // Devices moved from D to Ctrl-O when D became dashboard mode (T-40).
             KeyCode::Char('o') if k.modifiers.contains(KeyModifiers::CONTROL) => self.open_devices(),
+            KeyCode::Char('m') => self.open_mods(),
             KeyCode::Char('S') => self.open_audio(),
             KeyCode::Char('o') => self.open_overseer(),
             KeyCode::Char('P') => {
