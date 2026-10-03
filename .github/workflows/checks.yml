@@ -9,11 +9,17 @@ on:
     branches: [main]
     paths-ignore: ['docs/**', '**/*.md']
   workflow_dispatch:
+    inputs:
+      native_speech_diagnostic:
+        description: One synthetic native speech attempt; skips full checks
+        type: boolean
+        default: false
 concurrency:
-  group: checks-${{ github.ref }}
+  group: checks-${{ github.ref }}${{ github.event_name == 'workflow_dispatch' && inputs.native_speech_diagnostic && '-native-speech' || '' }}
   cancel-in-progress: true
 jobs:
   checks:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.native_speech_diagnostic }}
     runs-on: macos-latest
     timeout-minutes: 40
     steps:
@@ -29,3 +35,36 @@ jobs:
         run: node test/unit/run.js
       - name: Extension source check
         run: npm run --silent check --prefix extension
+  native_speech_diagnostic:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.native_speech_diagnostic }}
+    runs-on: macos-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      CARGO_BUILD_JOBS: 1
+      RUST_TEST_THREADS: 1
+      CARGO_TARGET_DIR: ${{ runner.temp }}/overseer-native-speech-target
+      NATIVE_SPEECH_DIAGNOSTIC: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: One explicitly selected native diagnostic
+        run: >-
+          nice -n 20 python3 scripts/ci-native-speech-diagnostic.py
+          --out "${{ runner.temp }}/overseer-native-speech-evidence"
+          --expected-commit "${{ github.sha }}"
+          --invoke-native
+      - name: Bounded diagnostic receipts only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-speech-diagnostic-${{ github.run_id }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/overseer-native-speech-evidence/receipt.json
+            ${{ runner.temp }}/overseer-native-speech-evidence/diagnostic-source.d
+            ${{ runner.temp }}/overseer-native-speech-evidence/raw/build.stderr.log
+            ${{ runner.temp }}/overseer-native-speech-evidence/inventory.*.log
+            ${{ runner.temp }}/overseer-native-speech-evidence/native.*.log

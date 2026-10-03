@@ -3,6 +3,7 @@ import importlib.util
 import json
 from pathlib import Path
 import tempfile
+import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -122,6 +123,24 @@ class Boundaries(unittest.TestCase):
         with self.assertRaises(DIAG.Refused):self.run_diag()
         self.assertEqual((out/'owner.txt').read_text(),'untouched')
         self.assertEqual(self.calls,[])
+
+
+class CaptureBounds(unittest.TestCase):
+    # Tiny synthetic Python children only; no Cargo or native speech. Unrun checkpoint.
+    def test_timeout_kills_and_reaps_owned_child(self):
+        result=DIAG.capture([sys.executable,'-c','import time; time.sleep(10)'],
+            cwd=ROOT,environment={},seconds=0.1,limit=128)
+        self.assertTrue(result['timed_out'])
+        self.assertTrue(result['reaped'])
+        self.assertEqual(result['signal'],9)
+        self.assertLess(result['seconds'],3)
+
+    def test_output_cap_stops_and_preserves_only_bounded_bytes(self):
+        result=DIAG.capture([sys.executable,'-c',"import sys; sys.stdout.write('synthetic'*1024); sys.stdout.flush()"],
+            cwd=ROOT,environment={},seconds=2,limit=128)
+        self.assertTrue(result['output_limit'])
+        self.assertTrue(result['reaped'])
+        self.assertEqual(len(result['stdout'])+len(result['stderr']),128)
 
 
 if __name__ == '__main__':
