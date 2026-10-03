@@ -1073,12 +1073,39 @@ mod slice2 {
         assert_eq!(current["lifecycle"], "answered_awaiting_native"); s.no_protected_action();
     }
 
+    // An isolated pending-request test must not depend on the Voice suite's order
+    // or accept a stale listener after a failed source build.
+    fn simulated_listener_bin() -> PathBuf {
+        static BIN: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+        BIN.get_or_init(|| {
+            let root = repo_root();
+            let target = std::env::var_os("CARGO_TARGET_DIR").map(PathBuf::from)
+                .unwrap_or_else(|| root.join("target"));
+            let target = if target.is_absolute() { target } else { root.join(target) };
+            let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
+            let status = std::process::Command::new("nice")
+                .args(["-n", "20", cargo.as_str(), "build", "-q", "-p", "overseer-listener",
+                    "--bin", "overseer-listener", "--jobs", "1"])
+                .current_dir(&root).env("CARGO_TARGET_DIR", &target)
+                .env("CARGO_BUILD_JOBS", "1").status()
+                .expect("start the allocated same-source listener build");
+            assert!(status.success(), "same-source listener build failed; no stale binary fallback");
+            let bin = target.join("debug/overseer-listener");
+            assert!(bin.is_file(), "successful listener build did not produce its executable");
+            bin
+        }).clone()
+    }
+
     #[test]
     fn voice_checked_readback_keeps_typed_revision_and_exact_native_decline() {
+        let voice = tmp();
+        let listener = simulated_listener_bin().display().to_string();
+        let cue_log = voice.path().join("synthetic-cues.log").display().to_string();
         let mut frame = frozen("command_command_decline")["request"].clone();
         frame["params"]["threadId"] = json!("$THREAD"); frame["params"]["turnId"] = json!("$TURN");
         let s = Script::start_with_env("codex-app", "codex-cli 0.158.0", vec![emit(frame),mark(ONE)],
-            &[("OVERSEER_VOICE_SIMULATE","1")]);
+            &[("OVERSEER_VOICE_SIMULATE","1"), ("OVERSEER_LISTENER",listener.as_str()),
+                ("OVERSEER_LISTENER_TEST_VOICE","1"), ("OVERSEER_TEST_AUDIO_LOG",cue_log.as_str())]);
         s.marker(ONE,1); let item = s.requests()[0].clone();
         s.daemon.call("voice.set", json!({"enabled":true,"permission_answers":true,"settle_seconds":1}));
         let read = s.daemon.call("voice.read_back", json!({}));
