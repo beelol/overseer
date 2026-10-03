@@ -598,7 +598,7 @@ mod slice2 {
             if frame["params"]["turnId"].is_string() { frame["params"]["turnId"] = json!("$TURN"); }
         }
         let harness = v["harness"].as_str().unwrap();
-        let s = Script::start(harness,if harness=="claude" {"2.1.288 (Claude Code)"} else {"codex-cli 0.158.0"},vec![emit(frame),mark(ONE)]);
+        let s = Script::start(harness,if harness=="claude" {"2.1.288"} else {"codex-cli 0.158.0"},vec![emit(frame),mark(ONE)]);
         s.marker(ONE,1);
         assert_eq!(s.requests().len(),1,"frozen native frame reaches actual pending collection");
         (s,v)
@@ -776,6 +776,7 @@ mod slice2 {
         let rid=common::phone::uuid();
         let params=answer_params(&s,&item,json!({"kind":"questions","answers":{"field-0":[PRIVATE]}}));
         let accepted=phone.ask("run.request.answer",params.clone(),Some(&rid)).await.unwrap();
+        assert!(accepted.get("error").is_none(),"actual full-device typed answer boundary: {accepted}");
         assert_eq!(accepted["result"]["delivery"],"written");
         assert_eq!(wait_replies(&s,1),vec![json!({"id":7,"result":{"answers":{"question-id":{"answers":[PRIVATE]}}}})]);
         assert_private(&s);

@@ -1,0 +1,36 @@
+{
+  "source_commit": "7cc7df9a264e84b2edb0431d285a77fe795911b7",
+  "worktree_clean": true,
+  "source_root": "/private/tmp/overseer-native-pending-20261003",
+  "target": "/private/tmp/overseer-closeout-verify-target",
+  "package_id": "path+file:///private/tmp/overseer-native-pending-20261003/daemon#overseerd@0.1.0",
+  "test_source": "/private/tmp/overseer-native-pending-20261003/daemon/tests/pending_requests.rs",
+  "test_executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/pending_requests-3634fd170cfd2bc6",
+  "daemon_executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+  "test_fresh_artifact": true,
+  "dependency_paths_verified": true,
+  "dependency_test_path_kind": "relative to verified package/workspace root; Cargo JSON target.src_path is absolute",
+  "source_mtime_verified": true,
+  "test_count": 12,
+  "test_names": [
+    "slice2::authenticated_full_watch_and_revoked_devices_do_not_borrow_actor_text",
+    "slice2::competing_answer_claims_emit_one_exact_native_response",
+    "slice2::exact_receipt_token_writes_once_and_refuses_changed_digest_or_generation",
+    "slice2::frozen_typed_family_answers_reach_exact_native_transport",
+    "slice2::native_child_typed_answer_uses_parent_pipe_and_exact_native_id",
+    "slice2::native_resolution_before_owner_answer_emits_no_response",
+    "slice2::old_request_key_cannot_send_to_replacement_generation",
+    "slice2::permission_profile_widening_and_deny_removal_cannot_claim",
+    "slice2::persistent_native_veto_refuses_stale_always_but_allows_once",
+    "slice2::secret_typed_answer_is_private_in_results_history_and_device_once_cache",
+    "slice2::structured_questions_and_forms_refuse_legacy_bool",
+    "slice2::wrong_family_revision_and_caller_authority_emit_no_response"
+  ],
+  "sha256": {
+    "/private/tmp/overseer-closeout-verify-target/debug/overseerd": "2b244e021bda6bca974e05c7c27adcc5725611b308ae1c49cea4d7565d8fc0f6",
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/pending_requests-3634fd170cfd2bc6": "6f1b7dab68e5271aa8fee0a31bb99afd14a16eeb3948ed6f7f372d0b1f57767e",
+    "/private/tmp/overseer-native-pending-20261003/daemon/tests/pending_requests.rs": "a193f410dcbc91fe167ff27d424ec5f44a9fe71e8a92339dc8aa0ec36efead2a",
+    "/private/tmp/overseer-native-pending-20261003/daemon/src/pending_requests.rs": "999b8d95e002d833138046354ede591adb4b81dbd9960d81cb588644ff407422",
+    "/private/tmp/overseer-native-pending-20261003/daemon/src/daemon.rs": "7b18612854c0e6a7d3c90dbb6c404cc23806dee22407d52ceb37a7b849f20f46"
+  }
+}
