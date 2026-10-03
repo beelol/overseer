@@ -11,6 +11,65 @@ fn description() -> Value {
     serde_json::from_str(&std::fs::read_to_string(repo_root().join("protocol/protocol.json")).unwrap()).unwrap()
 }
 
+#[test]
+fn captured_overseer_reply_and_completion_match_the_protocol() {
+    let fixture = repo_root().join("fixtures/fake-harness/claude-fixture.js").display().to_string();
+    let d = Daemon::start(&[("OVERSEER_TEST_NET", "1"), ("OVERSEER_CONTINUITY_PROBES", "off"), ("OVERSEER_CLAUDE_PATH", &fixture)]);
+    d.call("overseer.send", json!({"text":"Request V-0210: please add tests", "surface":"ctl", "harness":"claude"}));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    let events = loop {
+        let events = d.call("events.list", json!({"limit":5000}))["events"].as_array().unwrap().clone();
+        if events.iter().any(|e| e["kind"] == "overseer_turn_processed") { break events; }
+        assert!(std::time::Instant::now() < deadline, "no processed completion: {events:?}");
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    };
+    let doc = description();
+    let mut wrong = Vec::new();
+    let completion = events.iter().find(|e| e["kind"] == "overseer_turn_processed").unwrap();
+    let reply = events.iter().find(|e| e["kind"] == "overseer_message" && e["payload"]["message"]["source"] == "overseer").unwrap();
+    for e in [reply, completion] {
+        check(&doc, &doc["events"][e["kind"].as_str().unwrap()], &e["payload"], "captured event", &mut wrong);
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+    assert_eq!(reply["payload"]["turn"], completion["payload"]["turn"]);
+    assert_eq!(completion["payload"]["turn"]["requests"], json!(["V-0210"]));
+    assert_eq!(completion["payload"]["turn"]["cause"], "owner");
+    assert!(reply["seq"].as_i64().unwrap() < completion["seq"].as_i64().unwrap());
+}
+
+#[test]
+fn ac274_native_session_grant_event_matches_the_typed_protocol() {
+    let r = tmp(); let site = repo(&r.path().join("repo"));
+    let fixture = repo_root().join("fixtures/fake-harness/claude-fixture.js").display().to_string();
+    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture),
+        ("FIXTURE_MODE", "permission-twice"), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE")]);
+    let run = run_id(&d.call("task.create", json!({"repo":site,"harness":"claude","prompt":"two writes"})));
+    let pending = d.wait_status(&run, |s| s == "waiting_for_user", 20);
+    d.call("run.permission", json!({"run_id":run,"request_id":pending["attention"]["request_id"],"allow":true,"always":true}));
+    d.wait_done(&run,20);
+    let events = d.events(&run);
+    let answered = events.iter().find(|event| event["kind"] == "permission_answered").unwrap();
+    let doc = description(); let mut wrong = Vec::new();
+    check(&doc,&doc["events"]["permission_answered"],&answered["payload"],"native grant event",&mut wrong);
+    assert!(wrong.is_empty(),"{}",wrong.join("\n"));
+    let grant = &answered["payload"]["grant"];
+    assert_eq!(grant["v"],1);
+    assert_eq!(grant["harness"],"claude");
+    assert_eq!(grant["family"],"can_use_tool");
+    assert_eq!(grant["scope"],"session");
+    assert_eq!(grant["host_replay_qualified"],true);
+    assert_eq!(grant["digest"].as_str().unwrap().len(),64);
+    // Public projection cannot be used to supply or recover the daemon's private ownership.
+    assert!(grant.get("native_id").is_none() && grant.get("run_id").is_none());
+    assert!(grant.get("suggestions").is_none() && grant.get("input").is_none());
+    for (field,value) in [("digest",Value::Null),("host_replay_qualified",json!("true")),("scope",json!("project"))] {
+        let mut invalid = answered["payload"].clone(); invalid["grant"][field] = value;
+        let mut rejected = Vec::new();
+        check(&doc,&doc["events"]["permission_answered"],&invalid,"invalid grant event",&mut rejected);
+        assert!(!rejected.is_empty(),"invalid typed grant was accepted: {invalid}");
+    }
+}
+
 /// Checks `value` against `shape`. Every field of an object must be described, every field that
 /// is not marked `?` must be there, and every type must match. Returns what is wrong, with its path.
 fn check(doc: &Value, shape: &Value, value: &Value, at: &str, wrong: &mut Vec<String>) {
@@ -180,7 +239,9 @@ fn ac134_the_daemon_sends_what_the_description_says() {
     }
     // What the app does not read is allowed to be there, and is named here so it is a choice.
     // overseer_message is Overseer's own conversation (Gate S): the phone reads it with Talk to Overseer (AC-128).
-    let quiet: std::collections::BTreeSet<String> = ["daemon_started", "interrupt_requested", "reattached", "daemon_stopping", "background_notice", "workspace_removed", "daemon_error", "merge_back", "overseer_message"].iter().map(|s| s.to_string()).collect();
+    // proposal and proposal_answered are that conversation's yes/no: a waiting permission comes up
+    // in it by itself (AC-230).
+    let quiet: std::collections::BTreeSet<String> = ["daemon_started", "interrupt_requested", "reattached", "daemon_stopping", "background_notice", "workspace_removed", "daemon_error", "merge_back", "overseer_message", "proposal", "proposal_answered"].iter().map(|s| s.to_string()).collect();
     let surprising: Vec<&String> = not_described.difference(&quiet).collect();
     assert!(surprising.is_empty(), "event kinds with no description: {surprising:?}");
     println!("{} methods and {} events of {} kinds match the description", checked.len(), events.len(), kinds.len());
