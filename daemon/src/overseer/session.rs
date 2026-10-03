@@ -834,6 +834,14 @@ impl Daemon {
                 }
                 self.refuse_swarm_worker_steering(kind, a, id, &run.title)?;
                 let mut a = a.clone();
+                if kind == "permission" {
+                    let att = run.attention.as_ref().filter(|x| x["kind"] == "permission")
+                        .ok_or_else(|| anyhow!("{} has no permission request waiting", run.title))?;
+                    a["request"] = att["request_id"].clone();
+                    // Overwrite/remove model-owned selectors; only the daemon freezes this offer.
+                    a.as_object_mut().unwrap().remove("revision");
+                    if att["typed_native"] == true { a["revision"] = att["revision"].clone(); }
+                }
                 if kind == "mode" {
                     self.check_mode_action(&mut a, owner_asked, &cause)?;
                 }
@@ -1205,7 +1213,8 @@ impl Daemon {
                 if kind == "permission" {
                     let pending = run.attention.as_ref().filter(|x| x["kind"] == "permission").and_then(|x| x["request_id"].as_str().map(str::to_string));
                     let asked = a["request"].as_str().filter(|r| !r.is_empty());
-                    if pending.is_none() || asked.is_some_and(|r| Some(r) != pending.as_deref()) {
+                    if pending.is_none() || asked.is_some_and(|r| Some(r) != pending.as_deref())
+                        || a["revision"].as_i64().is_some_and(|rev|run.attention.as_ref().and_then(|x|x["revision"].as_i64()) != Some(rev)) {
                         why = Some(format!("{}'s request was already answered", run.title));
                     }
                 } else if a["status_then"].as_str().is_some_and(|then| then != run.status) && !ACTIVE.contains(&run.status.as_str()) {
@@ -1442,9 +1451,37 @@ impl Daemon {
                     bail!("{title}'s waiting request is another one now; ask again");
                 }
                 let allow = a["allow_request"] == true || a["allow"] == true;
-                self.answer_permission(agent, &request, allow, "Denied by the owner through Overseer")?;
-                self.dispatch_record(proposal, agent, "permission", if allow { "allow" } else { "deny" }, "", a["why"].as_str().unwrap_or("named"), "delivered")?;
-                Ok(format!("{} {title}'s request", if allow { "allowed" } else { "denied" }))
+                let result = if attention["typed_native"] == true {
+                    let revision = a["revision"].as_i64().ok_or_else(|| anyhow!("stale_request: this proposal has no frozen native revision"))?;
+                    if attention["revision"].as_i64() != Some(revision) { bail!("stale_request: read the current native offer again"); }
+                    // Only a real owner entrance, never model/settle metadata, can
+                    // mint this confirmation after the stored proposal was claimed.
+                    let device = match crate::server::native_authority() {
+                        Some(crate::server::NativeAuthority::LocalOwner) => None,
+                        Some(crate::server::NativeAuthority::Device(id)) => Some(id),
+                        _ => bail!("native_unqualified: owner confirmation is required"),
+                    };
+                    {
+                        let store = self.store.lock().unwrap();
+                        let (state,actions): (String,String) = store.conn.query_row("SELECT state,actions FROM overseer_proposals WHERE id=?1", [proposal], |r|Ok((r.get(0)?,r.get(1)?)))?;
+                        let stored: Vec<Value> = serde_json::from_str(&actions)?;
+                        if state != "answering" || !stored.iter().any(|x|x["action"] == "permission" && x["agent"].as_str() == Some(agent)
+                            && x["request"].as_str() == Some(request.as_str()) && x["revision"].as_i64() == Some(revision)) {
+                            bail!("stale_request: this confirmation does not own the frozen native offer");
+                        }
+                    }
+                    crate::server::with_native_authority(crate::server::NativeAuthority::ConfirmedOverseer {
+                        request_key:request.clone(),revision,proposal:proposal.to_string(),device,
+                    }, || self.answer_permission_revision(agent,&request,allow,"Denied by the owner through Overseer",false,Some(revision)))?
+                } else { self.answer_permission(agent,&request,allow,"Denied by the owner through Overseer")? };
+                let delivery = result["delivery"].as_str().unwrap_or("written");
+                self.dispatch_record(proposal, agent, "permission", if allow { "allow" } else { "deny" }, "", a["why"].as_str().unwrap_or("named"), if delivery == "written" {"delivered"} else {"held"})?;
+                Ok(match delivery {
+                    "written" if attention["typed_native"] != true => format!("{} {title}'s request", if allow {"allowed"} else {"denied"}),
+                    "written" => format!("sent {} for {title}'s request; native completion is still pending", if allow {"allow"} else {"deny"}),
+                    "not_written" => format!("{title}'s answer was not sent; read the current request before another explicit answer"),
+                    _ => format!("{title}'s answer delivery is uncertain; it will not be sent again automatically"),
+                })
             }
             "merge_back" => {
                 let agent = a["agent"].as_str().unwrap_or("");

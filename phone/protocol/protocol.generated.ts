@@ -479,6 +479,12 @@ export interface NativeAnswerReceipt {
   lifecycle: 'pending' | 'answered_awaiting_native' | 'uncertain';
 }
 
+export type PermissionAnswerResult = LegacyPermissionAnswerResult | NativeAnswerReceipt;
+
+export interface LegacyPermissionAnswerResult {
+  ok: boolean;
+}
+
 /** The payload of every kind of event the app reads. Other kinds arrive as `unknown`. */
 export interface EventPayloads {
   task_created: {
@@ -956,9 +962,9 @@ export interface Methods {
     request_id: string;
     allow: boolean;
     message?: string | null;
-  }; result: {
-    ok: boolean;
-  } };
+    revision?: number | null;
+    always?: boolean | null;
+  }; result: PermissionAnswerResult };
   /** Stop every active agent; the daemon keeps running. */
   "runs.stop_all": { class: 'control'; params: Record<string, never>; result: {
     interrupted: Array<string>;

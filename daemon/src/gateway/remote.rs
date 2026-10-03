@@ -185,7 +185,7 @@ pub async fn handle(d: &Arc<Daemon>, ctx: &Ctx, bytes: Vec<u8>, tx: &mpsc::Sende
                             if class == Class::Control {
                                 let _ = daemon.emit(None, params["run_id"].as_str(), "remote_command", "user", "exact", json!({"method": method, "device": ctx.device_id, "request_id": request_id}));
                             }
-                            if matches!(method.as_str(), "run.request.answer" | "run.permission") {
+                            if matches!(method.as_str(), "run.request.answer" | "run.permission" | "overseer.answer" | "overseer.send") {
                                 server::with_native_authority(server::NativeAuthority::Device(ctx.device_id.clone()),
                                     || server::dispatch(&daemon, &method, &params))
                             } else {

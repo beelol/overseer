@@ -432,6 +432,10 @@
       "revision": "number",
       "delivery": "'written'|'not_written'|'uncertain'",
       "lifecycle": "'pending'|'answered_awaiting_native'|'uncertain'"
+    },
+    "PermissionAnswerResult": "LegacyPermissionAnswerResult|NativeAnswerReceipt",
+    "LegacyPermissionAnswerResult": {
+      "ok": "boolean"
     }
   },
   "events": {
@@ -1078,11 +1082,11 @@
         "run_id": "string",
         "request_id": "string",
         "allow": "boolean",
-        "message": "string?"
+        "message": "string?",
+        "revision": "number?",
+        "always": "boolean?"
       },
-      "result": {
-        "ok": "boolean"
-      }
+      "result": "PermissionAnswerResult"
     },
     "runs.stop_all": {
       "class": "control",
@@ -3038,7 +3042,7 @@
     },
     "run.resume_queue": {
       "class": "mac_only",
-      "summary": "Send an agent\u2019s paused queue",
+      "summary": "Send an agent’s paused queue",
       "phone": "not_yet",
       "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
       "params": "json",
@@ -3046,7 +3050,7 @@
     },
     "run.clear_queue": {
       "class": "mac_only",
-      "summary": "Clear an agent\u2019s queue",
+      "summary": "Clear an agent’s queue",
       "phone": "not_yet",
       "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
       "params": "json",

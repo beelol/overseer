@@ -88,7 +88,7 @@ pub(crate) enum NativeAuthority {
     LocalOwner,
     Device(String),
     ConfirmedVoice { request_key: String, revision: i64 },
-    ConfirmedOverseer { request_key: String, revision: i64, proposal: String },
+    ConfirmedOverseer { request_key: String, revision: i64, proposal: String, device: Option<String> },
 }
 thread_local! {
     static NATIVE_AUTHORITY: std::cell::RefCell<Option<NativeAuthority>> = const { std::cell::RefCell::new(None) };
@@ -335,7 +335,7 @@ async fn connection_loop(
                 let daemon = daemon.clone();
                 let method = method.clone();
                 tokio::task::spawn_blocking(move || {
-                    if matches!(method.as_str(), "run.request.answer" | "run.permission") {
+                    if matches!(method.as_str(), "run.request.answer" | "run.permission" | "overseer.answer" | "overseer.send") {
                         with_native_authority(NativeAuthority::LocalOwner, || dispatch(&daemon, &method, &params))
                     } else {
                         without_native_authority(|| dispatch(&daemon, &method, &params))
@@ -2834,7 +2834,7 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "run.interrupt" => d.interrupt(s(p, "run_id")?)?,
         "run.request.answer" => crate::pending_requests::answers::answer(d, p)?,
-        "run.permission" => d.answer_permission_with(s(p, "run_id")?, s(p, "request_id")?, p["allow"].as_bool().unwrap_or(false), p["message"].as_str().unwrap_or(""), p["always"].as_bool().unwrap_or(false))?,
+        "run.permission" => d.answer_permission_revision(s(p, "run_id")?, s(p, "request_id")?, p["allow"].as_bool().unwrap_or(false), p["message"].as_str().unwrap_or(""), p["always"].as_bool().unwrap_or(false), p.get("revision").map(|v| v.as_i64().filter(|n| *n > 0).ok_or_else(|| ProtoError::new("invalid_params", "A positive frozen revision is required"))).transpose()?)?,
         "run.requests" => crate::pending_requests::collection(&d.store.lock().unwrap(), p["run_id"].as_str(), false)?,
         "run.raw_output" => d.raw_output(s(p, "run_id")?, p["max_bytes"].as_u64().unwrap_or(256 * 1024).min(4 * 1024 * 1024) as usize)?,
         "run.turns" => json!(d.store.lock().unwrap().turns(s(p, "run_id")?)?),

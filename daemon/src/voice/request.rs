@@ -65,6 +65,7 @@ pub struct Open {
 struct ReadBack {
     run: String,
     request: String,
+    revision: Option<i64>,
     title: String,
     at: Instant,
 }
@@ -75,6 +76,7 @@ struct Answering {
     id: String,
     run: String,
     request: String,
+    revision: Option<i64>,
     allow: bool,
     title: String,
     until: Instant,
@@ -629,7 +631,8 @@ impl Voice {
                 }
                 self.st.lock().unwrap().awaiting_answer = false;
                 heard_signal(self);
-                return match self.d.overseer_answer(&p_id, yes, "voice", "owner (voice)") {
+                return match crate::server::with_native_authority(crate::server::NativeAuthority::LocalOwner,
+                    || self.d.overseer_answer(&p_id, yes, "voice", "owner (voice)")) {
                     Ok(r) => {
                         json!({"taken": true, "request": o.id, "answered": yes, "result": r["result"]})
                     }
@@ -1294,7 +1297,7 @@ impl Voice {
     pub fn read_back(self: &Arc<Self>) -> Value {
         let d = self.d.clone();
         let s = settings(&d).unwrap_or_default();
-        let waiting: Option<(String, String, String, String)> = d.roster().ok().and_then(|r| {
+        let waiting: Option<(String, String, String, String, Option<i64>)> = d.roster().ok().and_then(|r| {
             r.into_iter()
                 .filter(|l| l.status == "waiting_for_user")
                 .find_map(|l| {
@@ -1306,11 +1309,12 @@ impl Voice {
                             att["request_id"].as_str().unwrap_or("").to_string(),
                             l.title.clone(),
                             summarize(&att),
+                            att["revision"].as_i64(),
                         )
                     })
                 })
         });
-        let Some((run, request, title, what)) = waiting else {
+        let Some((run, request, title, what, revision)) = waiting else {
             speak_when_free(self, "Nothing is waiting for your permission.");
             return json!({"read_back": null});
         };
@@ -1328,6 +1332,7 @@ impl Voice {
         r.read_back = Some(ReadBack {
             run: run.clone(),
             request: request.clone(),
+            revision,
             title: title.clone(),
             at: Instant::now(),
         });
@@ -1336,7 +1341,7 @@ impl Voice {
         let line = format!("{title} wants to {what}. Allow?");
         speak_when_free(self, &line);
         self.emit(json!({"kind": "read_back", "agent": run, "title": title, "what": what}));
-        json!({"read_back": {"agent": run, "request": request, "said": line}})
+        json!({"read_back": {"agent": run, "request": request, "revision":revision, "said": line}})
     }
 
     /// "Handle what needs me", "tell it yes" by voice (AC-227): the conversation gets the same
@@ -1365,7 +1370,7 @@ impl Voice {
             self.emit(json!({"kind": "read_back", "lapsed": true}));
         }
         let one = if which { None } else { pending.clone().or_else(|| match waiting.as_slice() {
-            [w] => Some(ReadBack { run: w.run.clone(), request: w.request.clone(), title: w.title.clone(), at: Instant::now() }),
+            [w] => Some(ReadBack { run: w.run.clone(), request: w.request.clone(), revision: w.revision, title: w.title.clone(), at: Instant::now() }),
             _ => None,
         }) };
         let answered = match (ask, one) {
@@ -1414,6 +1419,7 @@ impl Voice {
                 id: id.clone(),
                 run: rb.run.clone(),
                 request: rb.request.clone(),
+                revision: rb.revision,
                 allow,
                 title: rb.title.clone(),
                 until: Instant::now() + Duration::from_secs(s.settle_seconds),
@@ -1618,17 +1624,16 @@ fn tick(v: &Arc<Voice>) {
         }
     };
     if let Some(a) = due {
-        let result = v.d.answer_permission(
-            &a.run,
-            &a.request,
-            a.allow,
-            if a.allow {
-                "Allowed by voice"
-            } else {
-                "Denied by voice"
-            },
-        );
+        let send = || v.d.answer_permission_revision(&a.run,&a.request,a.allow,
+            if a.allow {"Allowed by voice"} else {"Denied by voice"},false,a.revision);
+        let result = if let Some(revision) = a.revision {
+            crate::server::with_native_authority(crate::server::NativeAuthority::ConfirmedVoice {
+                request_key:a.request.clone(),revision,
+            },send)
+        } else { send() };
         let (state, text) = match result {
+            Ok(receipt) if receipt["delivery"] == "not_written" => ("not_sent", "Not sent: read the current native request before another answer.".to_string()),
+            Ok(receipt) if receipt["delivery"] == "uncertain" => ("uncertain", "Delivery is uncertain: the answer will not be sent again automatically.".to_string()),
             Ok(_) => (
                 "sent",
                 format!(
@@ -1658,6 +1663,7 @@ fn permission_still_waiting(d: &Arc<Daemon>, rb: &ReadBack) -> bool {
     d.run(&rb.run).ok().is_some_and(|run| {
         run.status == "waiting_for_user" && run.attention.as_ref().is_some_and(|a| {
             a["kind"] == "permission" && a["request_id"].as_str() == Some(rb.request.as_str())
+                && (a["typed_native"] != true || a["revision"].as_i64() == rb.revision)
         })
     })
 }
@@ -2430,12 +2436,8 @@ pub fn answer(_d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         x.confirm_at = None;
     }
     v.st.lock().unwrap().awaiting_answer = false;
-    let r = v.d.overseer_answer(
-        o.proposal.as_deref().unwrap_or(""),
-        yes,
-        "vscode",
-        "owner (keyboard)",
-    )?;
+    let r = crate::server::with_native_authority(crate::server::NativeAuthority::LocalOwner,
+        || v.d.overseer_answer(o.proposal.as_deref().unwrap_or(""),yes,"vscode","owner (keyboard)"))?;
     Ok(json!({"request": o.id, "answered": yes, "result": r["result"]}))
 }
 

@@ -4,7 +4,7 @@ use super::*;
 use crate::daemon::Daemon;
 use crate::server::{NativeAuthority, ProtoError};
 use crate::shim::LaunchFile;
-use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
+use std::sync::{Mutex, MutexGuard, TryLockError};
 
 fn gate_until<T>(lock: &Mutex<T>, deadline: Instant) -> Result<MutexGuard<'_, T>> {
     loop {
@@ -104,11 +104,19 @@ fn authority(store: &Store, a: &NativeAuthority, key: &str, revision: i64) -> Re
             request_key,
             revision: confirmed,
             proposal,
+            device,
         } => {
             if request_key != key || *confirmed != revision {
                 return Err(refuse("stale_request"));
             }
-            json!({"origin":"confirmed_overseer","proposal":proposal})
+            if let Some(id) = device {
+                authority(store, &NativeAuthority::Device(id.clone()), key, revision)?;
+            }
+            let mut actor = json!({"origin":"confirmed_overseer","proposal":proposal});
+            if let Some(id) = device {
+                actor["device_id"] = json!(id);
+            }
+            actor
         }
     })
 }
@@ -337,7 +345,7 @@ fn seal_no_contact(
     Ok(())
 }
 
-pub(crate) fn answer(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
+pub(crate) fn answer(d: &Daemon, p: &Value) -> Result<Value> {
     if !p.as_object().is_some_and(|o| {
         o.len() == 4
             && o.keys()
@@ -359,6 +367,9 @@ pub(crate) fn answer(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let owner = item(&d.store.lock().unwrap(), key)?.owner;
     let device = match &trusted {
         NativeAuthority::Device(id) => Some(d.native_device_gate(id)),
+        NativeAuthority::ConfirmedOverseer {
+            device: Some(id), ..
+        } => Some(d.native_device_gate(id)),
         _ => None,
     };
     let process = d.native_process_gate(&owner);
@@ -513,4 +524,70 @@ pub(crate) fn answer(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     tx.commit()?;
     let _ = d.events.send(event);
     Ok(result)
+}
+
+/// Boolean compatibility is deliberately limited to a checked stored offer.
+/// The public selector/revision is preserved through the same typed claim path.
+pub(crate) fn bool_answer(
+    d: &Daemon,
+    id: &str,
+    key: &str,
+    revision: Option<i64>,
+    allow: bool,
+    message: &str,
+    always: bool,
+) -> Result<Option<Value>> {
+    let value = {
+        let store = d.store.lock().unwrap();
+        let projection: Option<String> = store
+            .conn
+            .query_row(
+                "SELECT projection FROM native_pending_requests WHERE key=?1",
+                [key],
+                |r| r.get(0),
+            )
+            .optional()?;
+        let Some(projection) = projection else {
+            return Ok(None);
+        };
+        let row = item(&store, key)?;
+        if row.display != id && row.owner != id {
+            return Err(refuse("stale_request"));
+        }
+        let projection: Value = serde_json::from_str(&projection)?;
+        if projection["bool_compatible"] != true {
+            return Err(refuse("invalid_answer"));
+        }
+        let revision = revision.ok_or_else(|| refuse("invalid_params"))?;
+        let protocol = match row.protocol.as_str() {
+            "codex-0.158" => Protocol::Codex0158,
+            "claude-2.1.288" => Protocol::Claude21288,
+            _ => return Err(refuse("native_unqualified")),
+        };
+        let envelope: Value = serde_json::from_str(&row.envelope)?;
+        let NativeMessage::Owner(request) = native_requests::decode(protocol, &envelope)
+            .map_err(|_| refuse("native_unqualified"))?
+        else {
+            return Err(refuse("native_unqualified"));
+        };
+        if always {
+            return Err(refuse(if request.suppress_always() {
+                "native_veto"
+            } else {
+                "native_unqualified"
+            }));
+        }
+        let answer = match request.family() {
+            Family::Tool => json!({"kind":"tool","allow":allow,"message":message}),
+            Family::LegacyCommand | Family::LegacyFile => {
+                json!({"kind":"decision","decision":if allow {"approved"} else {"abort"}})
+            }
+            Family::Command | Family::File => {
+                json!({"kind":"decision","decision":if allow {"accept"} else {"decline"}})
+            }
+            _ => return Err(refuse("invalid_answer")),
+        };
+        json!({"run_id":id,"request_key":key,"revision":revision,"answer":answer})
+    };
+    answer(d, &value).map(Some)
 }

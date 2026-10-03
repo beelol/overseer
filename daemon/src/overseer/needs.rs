@@ -76,6 +76,7 @@ pub fn ask(words: &str) -> Option<Ask> {
 pub struct Waiting {
     pub run: String,
     pub request: String,
+    pub revision: Option<i64>,
     pub title: String,
     /// What it wants, in a few words ("change page.md", "run npm test").
     pub what: String,
@@ -83,6 +84,9 @@ pub struct Waiting {
 
 /// What it wants, said in a few words.
 pub fn summarize(att: &Value) -> String {
+    if att["typed_native"] == true {
+        if let Some(target) = att["target"].as_str() { return format!("run {}", target.chars().take(200).collect::<String>()); }
+    }
     let tool = att["tool"].as_str().unwrap_or("do something");
     let input = &att["input"];
     let detail = input["command"].as_str().or(input["file_path"].as_str()).or(input["path"].as_str()).map(|s| s.to_string());
@@ -103,7 +107,7 @@ impl Daemon {
             .filter(|r| r.parent_run_id.is_none() && r.status == "waiting_for_user" && self.run_role(&r.id) != "overseer")
             .filter_map(|r| {
                 let att = r.attention.clone().filter(|a| a["kind"] == "permission")?;
-                Some((r.created_ms, Waiting { run: r.id.clone(), request: att["request_id"].as_str().unwrap_or("").to_string(), title: r.title.clone(), what: summarize(&att) }))
+                Some((r.created_ms, Waiting { run: r.id.clone(), request: att["request_id"].as_str().unwrap_or("").to_string(), revision: att["revision"].as_i64(), title: r.title.clone(), what: summarize(&att) }))
             })
             .collect();
         out.sort_by_key(|(t, _)| *t);
@@ -156,7 +160,12 @@ impl Daemon {
             (Ask::Yes | Ask::No, [w]) => {
                 let allow = ask == Ask::Yes;
                 if answer {
-                    match self.answer_permission(&w.run, &w.request, allow, "Denied by the owner through Overseer") {
+                    let result = if w.revision.is_some() {
+                        self.overseer_propose(&json!([{"action":"permission","agent":w.run,"allow_request":allow,"why":"the owner answered the current Needs question"}]), "needs")
+                            .and_then(|p| self.overseer_answer(p["proposal"].as_str().unwrap_or(""), true, surface, "owner"))
+                    } else { self.answer_permission(&w.run, &w.request, allow, "Denied by the owner through Overseer") };
+                    match result {
+                        Ok(r) if w.revision.is_some() => (r["result"].as_str().unwrap_or("The native answer could not be confirmed.").to_string(), json!({"kind":"needs","state":"answered","agent":w.run})),
                         Ok(_) => (format!("{} {} to {}.", if allow { "Allowed" } else { "Denied" }, w.title, w.what), json!({"kind": "needs", "state": if allow { "allowed" } else { "denied" }, "agent": w.run})),
                         Err(e) => (format!("That could not be answered: {e}"), json!({"kind": "needs", "state": "failed", "agent": w.run})),
                     }

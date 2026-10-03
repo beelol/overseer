@@ -764,7 +764,7 @@ fn attention(public: &Value) -> Value {
     json!({"kind":if public["bool_compatible"] == true {"permission"} else {"native_request"},
         "request_id":public["key"],"typed_native":true,"revision":public["revision"],
         "tool":format!("Native {} request",public["family"].as_str().unwrap_or("capability")),
-        "input":{},"reason_code":public["reason_code"]})
+        "input":{},"target":public["target"],"reason_code":public["reason_code"]})
 }
 fn refresh_display_attention(store: &Store, display: &str) -> Result<()> {
     let row: Option<String> = store.conn.query_row("SELECT p.projection FROM native_pending_requests p JOIN runs r ON r.id=p.process_run_id WHERE p.display_run_id=?1 AND p.generation=r.process_generation AND p.lifecycle='pending' ORDER BY p.arrival_seq LIMIT 1",[display],|r|r.get(0)).optional()?;

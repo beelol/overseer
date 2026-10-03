@@ -2604,6 +2604,11 @@ impl Daemon {
         self.answer_permission_with(run_id, request_id, allow, message, false)
     }
 
+    pub(crate) fn answer_permission_revision(&self, run_id: &str, request_id: &str, allow: bool, message: &str, always: bool, revision: Option<i64>) -> Result<Value> {
+        if let Some(receipt) = crate::pending_requests::answers::bool_answer(self, run_id, request_id, revision, allow, message, always)? { return Ok(receipt); }
+        self.answer_permission_with(run_id, request_id, allow, message, always)
+    }
+
     /// `always`: allow, and take the request's Always allow offer (the harness's session rule,
     /// AC-262). Refused when the request offers none.
     pub fn answer_permission_with(&self, run_id: &str, request_id: &str, allow: bool, message: &str, always: bool) -> Result<Value> {
