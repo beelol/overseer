@@ -413,7 +413,7 @@ Each command in `extension/package.json` has a row: the TUI's key (every key her
 
 ### Criteria
 
-Status (pull request #43, merged 2026-10-01 as e5836534; tests in `tui/tests/parity.rs`, evidence `docs/verification/evidence/tui/parity-*`): T-25 to T-28, T-37, T-38 and T-39 verified (T-26 with pull request #44, merged as its own commit: VS Code reads the daemon's reviewed marks; `scenario-review-marks` sees a terminal's `review.seen` clear VS Code's mark in 259 ms). T-29 partial: accepting and rejecting in the terminal is checked through the daemon, not yet in a VS Code window. T-40 and T-41 verified with pull request #45 (`t40_dashboard_mode_for_big_screens`, `t41_a_grid_only_terminal_beside_it`, `t41_two_real_terminals_on_one_daemon`; evidence `parity-t40-*`, `parity-t41-*`); with it the phone Devices panel moved from `D` to Ctrl-O. T-30 to T-34 and T-36 verified with pull request #46 (`t30`..`t36` in `tui/tests/parity.rs`, evidence `parity-t30-*`..`parity-t36-*`; the `d` key now asks for a note before denying, and archived agents leave every filter but Archived, as in VS Code); T-35 (Voice Mode in the terminal) partial: the simulated voice drives every state and a second client sees the same sequence, but it is not checked in a VS Code window.
+Status (pull request #43, merged 2026-10-01 as e5836534; tests in `tui/tests/parity.rs`, evidence `docs/verification/evidence/tui/parity-*`): T-25 to T-28, T-37, T-38 and T-39 verified (T-26 with pull request #44, merged as its own commit: VS Code reads the daemon's reviewed marks; `scenario-review-marks` sees a terminal's `review.seen` clear VS Code's mark in 259 ms). T-29 verified in a VS Code window with pull request #51 (`scenario-tui-parity`). T-40 and T-41 verified with pull request #45 (`t40_dashboard_mode_for_big_screens`, `t41_a_grid_only_terminal_beside_it`, `t41_two_real_terminals_on_one_daemon`; evidence `parity-t40-*`, `parity-t41-*`); with it the phone Devices panel moved from `D` to Ctrl-O. T-30 to T-34 and T-36 verified with pull request #46 (`t30`..`t36` in `tui/tests/parity.rs`, evidence `parity-t30-*`..`parity-t36-*`; the `d` key now asks for a note before denying, and archived agents leave every filter but Archived, as in VS Code); T-35 verified in a VS Code window with pull request #51 (the same 19-state sequence in VS Code and a terminal client; it also fixed Voice Mode turned on outside VS Code never showing there).
 
 - [x] **T-25 — An agent list beside the grid.** The main screen keeps the pages of nine and adds an
   agent list on the left: agents grouped by repository, the most recently active repository and
@@ -448,7 +448,7 @@ Status (pull request #43, merged 2026-10-01 as e5836534; tests in `tui/tests/par
   contents read-only. The switch says which list is shown. **Verify:** an agent that edited 2 of 5
   files lists 2 in Changed and 5 in All files; an unchanged file's contents show; the switch
   snapshot.
-- [ ] **T-29 — Accept and Reject in the terminal.** In the review, `n`/`p` move between changes.
+- [x] **T-29 — Accept and Reject in the terminal.** In the review, `n`/`p` move between changes.
   `a` Accepts the change under the cursor and `A` the whole file; `r` Rejects the change and `R`
   the whole file, after a y/n that says how many lines go back to what was there before (reloading the review moves from `r` to Ctrl-R). Accept
   marks a change reviewed; Reject puts back the comparison's text in the agent's worktree. Both go
@@ -483,7 +483,7 @@ Status (pull request #43, merged 2026-10-01 as e5836534; tests in `tui/tests/par
 - [x] **T-34 — Archive and restore.** `E` archives a finished agent (y/n): it leaves the list and
   the grid, as in VS Code. The filter gains Archived, where `E` restores one. **Verify:** archiving
   a fixture agent in the TUI hides it in both the TUI and VS Code; restoring brings it back in both.
-- [ ] **T-35 — Voice Mode in the terminal.** Overseer's conversation (`o`) shows a Voice Mode line:
+- [x] **T-35 — Voice Mode in the terminal.** Overseer's conversation (`o`) shows a Voice Mode line:
   off, listening, hearing you, thinking, speaking, muted or paused for a call, and the words as they
   are heard. Spoken requests are the same cards as typed ones. Keys turn Voice Mode on and off,
   mute, cancel the open request, and answer a read-back yes or no. The daemon listens and speaks;

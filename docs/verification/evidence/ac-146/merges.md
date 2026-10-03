@@ -1,5 +1,11 @@
 # AC-146: merges
 
+## Pull requests #50 and #51 (the zero-friction loop measured, AC-240's TUI route; T-29 and T-35 in a VS Code window), 2026-10-02
+
+- **Finished:** both built by builders on the coordinator's briefs and marked ready; #51 changes no Rust, so it joined #50's check.
+- **Throwaway copy:** #50 with main (pushed), then #51 merged in. `test-all --no-ui` on #50 with main: Rust 1,450, phone 152 and 477, dev 14/14, guided, deploy, links. UI one at a time (LIVE, ON SCREEN, perf skipped): 74 of 76; popout fails while the owner is at the Mac; zero-friction failed in the combined copy (the scenario's ⌘Home sometimes opened VS Code's About box in a background test window): fixed in the scenario (`462a6135`, no product change), then passed twice alone on the combined copy.
+- **Merged:** squash, #50 `dda00d03`, #51 `1d5ac4a1`. AC-252 verified; AC-240 partial on the owner's real banner and click only; T-29 and T-35 verified (ticked in `docs/rfcs/tui.md`).
+
 ## Pull requests #47 and #48 (plain words, answering a waiting agent, dev logins; Overseer as the manager), 2026-10-02
 
 - **Finished:** both built by builders on the coordinator's briefs and marked ready.

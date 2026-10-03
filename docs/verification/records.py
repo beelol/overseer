@@ -2540,15 +2540,15 @@ rec(239, "Stuck, failed and limited agents come back to Overseer", "verified", d
 rec(240, "You hear about it outside VS Code", "partial", commit="53c26853 (branch claude/signin-notify-keys, pull request #30)", date="2026-09-28",
     harness="Claude fixture and generic programs on the daemon, a dev daemon (scripts/dev) and the packaged VSIX; the notification goes to a logging command, never a real banner; no paid tokens",
     proven="while no VS Code window has the OS focus (each window reports it with `ui.window`), or VS Code is closed, an agent needing permission, asking a question, finishing or failing posts one notification titled with the agent, saying what it needs and in which repository, grouped per agent (the notifier's `--thread`), with a click URL for that agent (`vscode://beelol.overseer/open-agent?run=ID`); a focused window writes none; `overseer.notifications.needsYou`, `finished` and `failed` choose the kinds (`notices.set`); on a dev daemon a fixture permission, finish and failure each write one entry to the instance's `notifications.log` with the agent's title and its URL, and a focused window writes none; opening that URL in VS Code opens that agent's chat; the in-VS Code permission toast names the agent and shows while the Overseer view is open on another agent",
-    deferred="a click with VS Code closed opens VS Code, not the TUI (a notification cannot focus a terminal app; the TUI is not reachable by URL); the real banner, its grouping by agent and a real click on the owner's Mac (owner-only, in a guided dev-daemon check)",
+    deferred="the real banner and click (owner-only)",
     steps="""1. `cargo test -p overseerd --test notices` (4 tests: unfocused window, focused window, VS Code closed, the setting) and the `notices::tests` unit tests.
 2. `node test/dev/run.js`: the AC-240 check on a dev daemon's notifications.log.
 3. `node test/unit/notices.js` (the window's focus and the kinds sent once per connection and on each change; the click URL).
 4. `node test/ui/scenario-notify-agents.js` ([evidence](evidence/ui/notify-agents/)): packaged VSIX; the window's blur and focus come from VS Code's main process with the test window kept behind the owner's apps.""",
     expected="See the RFC criterion (the usability audit of 2026-09-28).",
-    actual="All pass. [notifications.log from the scenario](evidence/ui/notify-agents/notifications.log). The AC-45 background-notice tests still pass (`ac45_no_notice_when_nothing_is_running` now allows the finished run's own notification).",
+    actual="All pass. [notifications.log from the scenario](evidence/ui/notify-agents/notifications.log). The AC-45 background-notice tests still pass (`ac45_no_notice_when_nothing_is_running` now allows the finished run's own notification). With VS Code closed, a click now opens the TUI on that agent (pull request #50, dda00d03): `overseer-tui --focus <run>`, which the notifier runs in Terminal through a self-deleting .command file; `cargo test -p overseerd --test notices` 9/9, `test/unit/notifier-click.js` (every route, no banner, no Terminal), the TUI's `ac240_focus_opens_that_agent_full_screen`.",
     evidence="[notify-agents scenario](evidence/ui/notify-agents/); `daemon/src/notices.rs`, `daemon/tests/notices.rs`, `extension/src/notices.js`, `test/dev/run.js`",
-    live="Fixtures only; no banner was shown.", blocker="The TUI on click with VS Code closed has no route; the real banner and click are owner checks.")
+    live="Fixtures only; no banner was shown.", blocker="Owner checks only: the real banner, its grouping by agent and a real click on the owner's Mac (including the first time Terminal opens the TUI's .command file), in a guided dev-daemon check.")
 rec(241, "A waiting agent can always be answered", "verified", date="2026-10-02", commit="c1441171 (pull request #47, merged 2026-10-02)",
     harness="The Claude Code fixture (`permission`, `permission-twice`) on the packaged VSIX; daemon and TUI tests; no paid turns",
     steps="""1. `node test/ui/scenario-answer-waiting.js`: 8 of 8 ([evidence](evidence/ui/answer-waiting/)).
@@ -2678,10 +2678,14 @@ rec(251, "Follow an agent on another screen", "verified", commit="7b6af3bf (bran
     evidence="[popout scenario](https://github.com/beelol/overseer/blob/7b6af3bf/docs/verification/evidence/ui/popout) (screenshots, result.json with the frontmost-app samples), `extension/src/arrangement.js` (popOut, popTo, popIn)",
     live="Fixture agents only.",
     limits="Moving the window onto the owner's second physical screen is done by hand and is not driven by the test (the separate window is an ordinary OS window). If VS Code ever refuses the move, the command says so once per VS Code version and names View: Move Editor into New Window. A review the owner drags out by hand is not known to Overseer as popped out: selecting another agent can bring a review back into the main window.")
-rec(252, "Zero-friction loop, measured", "not started", date="—", commit="—",
-    expected="See the RFC criterion (the owner's zero-friction goal, 2026-09-28).",
-    actual="Not started: added for the overnight zero-friction goal (docs/goals/zero-friction.md).", live="—", blocker="Overnight goal.")
-
+rec(252, "Zero-friction loop, measured", "verified", date="2026-10-02", commit="dda00d03 (pull request #50, merged 2026-10-02)",
+    harness="The packaged VSIX in isolated VS Code profiles with the Claude Code fixture and the simulated voice; no paid turns",
+    steps="""1. `node test/ui/scenario-zero-friction.js` from a cold window, typed and then spoken ([evidence](evidence/ui/zero-friction/): loop.json, result.json, 14 screenshots); `cargo test -p overseerd --test voice ac252_the_loop_by_voice_one_sentence_each`.
+2. The merge check on #50 with #51 and main: Rust 1,450, UI 74 of 76 (popout needs the owner away; zero-friction's ⌘Home sometimes opened VS Code's About box in a background test window, fixed in the scenario, then passed twice alone).""",
+    expected="See the RFC criterion.",
+    actual="""- Each of the 13 steps takes one action, with one yes (the typed start). Typed: open 1,756 ms, tell 1,541, follow 929, Manual edit 70, back to Follow 416, stop 181. Spoken: open 1,796, tell 2,983, follow 217, Manual edit 206, back to Follow 334, redirect 2,622, stop 220.
+- ⌥⌘E switches Follow ⇄ Manual edit (the real file in the agent's worktree at the same line; a saved line lands there); ⌥⌘O opens Talk to Overseer; "open Overseer", "follow <agent>", "manual edit" and "back to follow" need no model turn and no yes.""",
+    live="Fixtures and the simulated voice.", blocker="—")
 rec(253, "Overseer leads with what happened while you were away", "verified", date="2026-09-29", commit="3ab9c1f7 (pull request #32, merged 2026-09-30)",
     harness="Fixture harnesses only (fixtures/fake-harness/claude-fixture.js as Overseer and the agents, codex-app-fixture.js for Codex); no accounts, no paid turns",
     proven="the whole Verify clause: a packaged-UI scenario and a daemon test",
@@ -3021,7 +3025,7 @@ SHORT_BLOCKERS = {
     249: "not started (the usability audit, 2026-09-28)",
     250: "not started (the owner's zero-friction goal, 2026-09-28)",
     251: "not started: blocked by VS Code (no API to float a webview, 1.139.1); skipped on the owner's instruction",
-    252: "not started (the owner's zero-friction goal, 2026-09-28)",
+    252: "verified",
     253: "not started (the friction research, 2026-09-28)",
     254: "not started (the friction research, 2026-09-28)",
     255: "not started (the friction research, 2026-09-28)",
