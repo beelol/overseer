@@ -1,0 +1,4 @@
+
+thread 'slice2::written_typed_native_declines_preserve_once_only_no_workaround_ledger' panicked at daemon/tests/pending_requests.rs:643:9:
+rejected answer emits no native bytes
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

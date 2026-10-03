@@ -1,0 +1,89 @@
+{
+  "source": "9040eb52bc58baaf24685e1b08744e955c145982",
+  "qualification": "baseline only; corrected test UNRUN",
+  "case_05": {
+    "code": 101,
+    "signal": null,
+    "timed_out": false,
+    "output_limit": false,
+    "reaped": true,
+    "seconds": 2.01
+  },
+  "tests": [
+    {
+      "target": "pending_requests",
+      "name": "slice2::native_token_tool_cannot_inherit_local_owner_transport_authority",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::absent_receipt_status_tombstone_refuses_delayed_original_after_retry",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::active_claim_collection_reader_cannot_tombstone_held_owner_answer",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::lost_ack_reconciles_written_without_resend_or_rewriting_first_receipt",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::daemon_crash_after_claim_queries_tombstone_before_new_explicit_answer",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::written_typed_native_declines_preserve_once_only_no_workaround_ledger",
+      "code": 101
+    },
+    {
+      "target": "overseerd_unit",
+      "name": "pending_requests::answers::recovery_tests::unresolved_receipt_pages_advance_past_uncertain_rows_and_survive_reopen",
+      "code": 0
+    },
+    {
+      "target": "overseerd_unit",
+      "name": "pending_requests::answers::recovery_tests::historical_attempt_cannot_settle_a_new_token_or_terminal_request",
+      "code": 0
+    }
+  ],
+  "cleanup_owned_count": 0,
+  "other_processes": "Coordinator reported one unrelated transient Git process; not a native fixture cleanup claim.",
+  "artifacts": [
+    {
+      "name": "overseerd",
+      "source": "/private/tmp/overseer-native-pending-20261003/daemon/src/main.rs",
+      "source_sha256": "d169c87cc369a86300b182125c31b445c12cddfa7d3ccf53ed3973f0aba05250",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+      "sha256": "1c542a4dbc9adf765da1c540526bd2d70909a295f3bbff521b296e82c7b205f8",
+      "fresh": false,
+      "dependency_sha256": "0edd62a061f62db3f6662df627f3d1cf6a41781421b496f16c1b34d480fb6f26"
+    },
+    {
+      "name": "overseerd_unit",
+      "source": "/private/tmp/overseer-native-pending-20261003/daemon/src/main.rs",
+      "source_sha256": "d169c87cc369a86300b182125c31b445c12cddfa7d3ccf53ed3973f0aba05250",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/overseerd-e1f16db50435eb72",
+      "sha256": "1bba4b5c66d6242590ae12beab5c9719eb938e5a5d839b34b6557c472495da9d",
+      "fresh": false,
+      "dependency_sha256": "c30806998519823924956d1bbd579d52e6cf6d52c052e1300b97172cc3b92c21"
+    },
+    {
+      "name": "pending_requests",
+      "source": "/private/tmp/overseer-native-pending-20261003/daemon/tests/pending_requests.rs",
+      "source_sha256": "77f139a51fec49f40d2cace52e0934e166d9e745e288f19ee3e8e2536851dd5d",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/pending_requests-3634fd170cfd2bc6",
+      "sha256": "a479591a1e42905706440de323498de64d443c2bdee68a300426586eacaee7e4",
+      "fresh": false,
+      "dependency_sha256": "5afefc5acdc6cbac5ab3d850b1b9c6588599202aa64d34c5e5095d0ad45c05e4"
+    }
+  ],
+  "raw_failure_sha256": {
+    "case-05.stdout.log": "475da6d394eac0de81a9b54c4eae521fca123f951d4ca9e5eab86265b62e4e75",
+    "case-05.stderr.log": "fb158381eeca60a710c24eb6436457d6335d2f1fb74011c0d18f2a9d3e8d10e3"
+  }
+}

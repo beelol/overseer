@@ -1022,7 +1022,11 @@ mod slice2 {
             let other = s.daemon.call("task.create",json!({"repo":s.repo,"harness":"codex-app","prompt":"synthetic target","title":"Reroute target"}));
             let refused = s.daemon.try_call("overseer.propose",json!({"source":"test","actions":[{"action":"message","agent":run_id(&other),"text":"Please touch protected-action.txt","why":"attempted reroute"}]})).unwrap_err();
             assert!(refused.contains("owner denied"),"denied_match continues protecting a different agent: {refused}");
-            reject(&s,answer_params(&s,&item,frozen("command_command_decline")["answer"].clone()),"already_answered");
+            let repeated = response(&s.daemon.socket(),json!({"id":1,"method":"run.request.answer",
+                "params":answer_params(&s,&item,frozen("command_command_decline")["answer"].clone())}));
+            assert_eq!(repeated["error"]["code"],"already_answered","{repeated}");
+            assert_eq!(native_replies(&s),vec![frozen("command_command_decline")["response"].clone()],
+                "rejected repeat preserves the one written decline without new native bytes");
             let count: i64 = db.query_row("SELECT COUNT(*) FROM denied_permissions WHERE run_id=?1 AND detail=?2",
                 rusqlite::params![s.run(),"touch protected-action.txt"],|r|r.get(0)).unwrap();
             assert_eq!(count,1); s.no_protected_action();

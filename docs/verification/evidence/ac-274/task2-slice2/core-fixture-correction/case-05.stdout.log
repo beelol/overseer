@@ -1,0 +1,11 @@
+
+running 1 test
+test slice2::written_typed_native_declines_preserve_once_only_no_workaround_ledger ... FAILED
+
+failures:
+
+failures:
+    slice2::written_typed_native_declines_preserve_once_only_no_workaround_ledger
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 48 filtered out; finished in 2.00s
+
