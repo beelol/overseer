@@ -29,6 +29,12 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         created_ms INTEGER NOT NULL,
         UNIQUE(process_run_id,generation,native_id));
         CREATE INDEX IF NOT EXISTS native_pending_owner ON native_pending_requests(process_run_id,generation,arrival_seq);")?;
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS native_turn_contexts(
+        process_run_id TEXT NOT NULL REFERENCES runs(id), generation INTEGER NOT NULL,
+        thread_id TEXT NOT NULL, turn_id TEXT NOT NULL, active INTEGER NOT NULL,
+        PRIMARY KEY(process_run_id,generation,thread_id));",
+    )?;
     answers::migrate(conn)?;
     Ok(())
 }
@@ -285,6 +291,87 @@ fn diagnostic(store: &Store, run: &Run, reason: &str, out: &mut Vec<Event>) -> R
     Ok(())
 }
 
+/// Private live context is learned only from qualified native frames under the
+/// process gate and Store transaction. Request descriptors never set it.
+fn observe_turn(store: &Store, run: &Run, frame: &Value, out: &mut Vec<Event>) -> Result<bool> {
+    if run.harness != "codex-app" {
+        return Ok(true);
+    }
+    let method = frame["method"].as_str().unwrap_or("");
+    if !matches!(method, "turn/started" | "turn/completed") {
+        return Ok(true);
+    }
+    let (Some(thread), Some(turn)) = (
+        frame["params"]["threadId"]
+            .as_str()
+            .filter(|s| !s.is_empty()),
+        frame["params"]["turn"]["id"]
+            .as_str()
+            .filter(|s| !s.is_empty()),
+    ) else {
+        diagnostic(store, run, "native_context_conflict", out)?;
+        return Ok(false);
+    };
+    let previous: Option<(String, bool)> = store.conn.query_row(
+        "SELECT turn_id,active FROM native_turn_contexts WHERE process_run_id=?1 AND generation=?2 AND thread_id=?3",
+        params![run.id,run.process_generation,thread], |r| Ok((r.get(0)?,r.get(1)?))).optional()?;
+    let completion = method == "turn/completed";
+    if completion
+        && !previous
+            .as_ref()
+            .is_some_and(|(id, active)| id == turn && *active)
+    {
+        diagnostic(store, run, "native_context_conflict", out)?;
+        return Ok(false);
+    }
+    if completion || previous.as_ref().is_some_and(|(id, _)| id != turn) {
+        let rows: Vec<(String,String)> = store.conn.prepare(
+            "SELECT key,envelope FROM native_pending_requests WHERE process_run_id=?1 AND generation=?2 AND lifecycle IN ('pending','claimed','answered_awaiting_native','uncertain')")?
+            .query_map(params![run.id,run.process_generation], |r| Ok((r.get(0)?,r.get(1)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        for (key, envelope) in rows {
+            let envelope: Value = serde_json::from_str(&envelope)?;
+            if envelope["params"]["threadId"]
+                .as_str()
+                .or(envelope["params"]["conversationId"].as_str())
+                == Some(thread)
+            {
+                change(store, &key, "native_resolved", out)?;
+            }
+        }
+    }
+    store.conn.execute("INSERT INTO native_turn_contexts(process_run_id,generation,thread_id,turn_id,active) VALUES(?1,?2,?3,?4,?5)
+        ON CONFLICT(process_run_id,generation,thread_id) DO UPDATE SET turn_id=excluded.turn_id,active=excluded.active",
+        params![run.id,run.process_generation,thread,turn,!completion])?;
+    refresh_attention(store, run)?;
+    Ok(true)
+}
+
+fn current_context(
+    store: &Store,
+    run: &Run,
+    request: &NativeRequest,
+) -> Result<native_requests::Context> {
+    let mut context = request.context().clone();
+    if run.harness == "codex-app" {
+        if let Some(thread) = context.thread.as_deref() {
+            let current: Option<(String,bool)> = store.conn.query_row(
+                "SELECT turn_id,active FROM native_turn_contexts WHERE process_run_id=?1 AND generation=?2 AND thread_id=?3",
+                params![run.id,run.process_generation,thread], |r| Ok((r.get(0)?,r.get(1)?))).optional()?;
+            let Some((turn, true)) = current else {
+                return Err(answers::refuse("request_resolved"));
+            };
+            if context.turn.as_ref().is_some_and(|old| old != &turn) {
+                return Err(answers::refuse("request_resolved"));
+            }
+            if context.turn.is_some() {
+                context.turn = Some(turn);
+            }
+        }
+    }
+    Ok(context)
+}
+
 /// Called under the existing tail/store transaction before any legacy parsing.
 /// `true` consumes the private frame. No shim I/O occurs under this lock.
 pub fn intercept(
@@ -319,6 +406,22 @@ pub fn intercept(
         if !known_output(&run.harness, &frame) {
             diagnostic(store, run, "unsupported_native_kind", out)?;
             return Ok(true);
+        }
+        if matches!(
+            frame["method"].as_str(),
+            Some("turn/started" | "turn/completed")
+        ) {
+            let current = store
+                .run(&run.id)?
+                .ok_or_else(|| anyhow!("native process unavailable"))?;
+            if current.process_generation != run.process_generation {
+                return Ok(true);
+            }
+            if qualified_protocol(store, &current)?.0 == Some(Protocol::Codex0158) {
+                if !observe_turn(store, &current, &frame, out)? {
+                    return Ok(true);
+                }
+            }
         }
         return Ok(false);
     }
@@ -370,7 +473,13 @@ pub fn intercept(
         return Ok(true);
     };
     match native_requests::decode(protocol, &frame) {
-        Ok(NativeMessage::Owner(request)) => insert(store, &current, protocol, &request, out)?,
+        Ok(NativeMessage::Owner(request)) => {
+            if current_context(store, &current, &request).is_err() {
+                diagnostic(store, run, "native_context_conflict", out)?;
+            } else {
+                insert(store, &current, protocol, &request, out)?;
+            }
+        }
         Ok(NativeMessage::Resolved { id, context }) => {
             let native_id = tagged(&id.value());
             let row: Option<(String, String)> = store.conn.query_row(
@@ -599,7 +708,10 @@ fn insert(
 fn change(store: &Store, key: &str, lifecycle: &str, out: &mut Vec<Event>) -> Result<()> {
     let (owner,display,projection,revision,old): (String,String,String,i64,String) = store.conn.query_row(
         "SELECT process_run_id,display_run_id,projection,revision,lifecycle FROM native_pending_requests WHERE key=?1", [key], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)))?;
-    if !matches!(old.as_str(), "pending" | "claimed" | "answered_awaiting_native" | "uncertain") {
+    if !matches!(
+        old.as_str(),
+        "pending" | "claimed" | "answered_awaiting_native" | "uncertain"
+    ) {
         return Ok(());
     }
     let mut public: Value = serde_json::from_str(&projection)?;

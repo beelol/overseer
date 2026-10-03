@@ -19,7 +19,7 @@ fn gate_until<T>(lock: &Mutex<T>, deadline: Instant) -> Result<MutexGuard<'_, T>
         std::thread::sleep(Duration::from_millis(2));
     }
 }
-fn refuse(code: &'static str) -> anyhow::Error {
+pub(super) fn refuse(code: &'static str) -> anyhow::Error {
     ProtoError::new(
         code,
         match code {
@@ -137,9 +137,22 @@ fn live(store: &Store, row: &Item, run_id: &str) -> Result<Run> {
     if Path::new(&dir).join("interrupt.requested").exists() {
         return Err(refuse("request_resolved"));
     }
+    let protocol = match row.protocol.as_str() {
+        "codex-0.158" => Protocol::Codex0158,
+        "claude-2.1.288" => Protocol::Claude21288,
+        _ => return Err(refuse("native_unqualified")),
+    };
+    let envelope: Value =
+        serde_json::from_str(&row.envelope).map_err(|_| refuse("native_unqualified"))?;
+    let NativeMessage::Owner(request) =
+        native_requests::decode(protocol, &envelope).map_err(|_| refuse("native_unqualified"))?
+    else {
+        return Err(refuse("native_unqualified"));
+    };
+    super::current_context(store, &run, &request)?;
     Ok(run)
 }
-fn response(row: &Item, answer: &Value) -> Result<String> {
+fn response(store: &Store, row: &Item, answer: &Value) -> Result<String> {
     let protocol = match row.protocol.as_str() {
         "codex-0.158" => Protocol::Codex0158,
         "claude-2.1.288" => Protocol::Claude21288,
@@ -155,6 +168,10 @@ fn response(row: &Item, answer: &Value) -> Result<String> {
     else {
         return Err(refuse("native_unqualified"));
     };
+    let run = store
+        .run(&row.owner)?
+        .ok_or_else(|| refuse("stale_generation"))?;
+    let current_context = super::current_context(store, &run, &request)?;
     let mut answer: native_requests::Answer =
         serde_json::from_value(answer.clone()).map_err(|_| refuse("invalid_answer"))?;
     if let native_requests::Answer::Questions { answers } = &mut answer {
@@ -183,7 +200,7 @@ fn response(row: &Item, answer: &Value) -> Result<String> {
         }
         *answers = native;
     }
-    let value = native_requests::encode(&request, request.context(), &answer).map_err(|e| {
+    let value = native_requests::encode(&request, &current_context, &answer).map_err(|e| {
         refuse(match e {
             native_requests::CodecError::Enlarged => "scope_enlarged",
             native_requests::CodecError::NativeVeto => "native_veto",
@@ -363,7 +380,7 @@ pub(crate) fn answer(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         if row.revision != revision {
             return Err(refuse("stale_request"));
         }
-        response(&row, &p["answer"])?;
+        response(&store, &row, &p["answer"])?;
     }
     hold("validated_before_claim", key)?;
     let (token, digest, data, socket, generation, claimed_revision, actor) = {
@@ -383,7 +400,7 @@ pub(crate) fn answer(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         if row.revision != revision {
             return Err(refuse("stale_request"));
         }
-        let data = response(&row, &p["answer"])?;
+        let data = response(&store, &row, &p["answer"])?;
         let digest = format!("{:x}", Sha256::digest(data.as_bytes()));
         let token = format!("delivery-{}", uuid::Uuid::new_v4().simple());
         let socket = frozen_socket(&store, &row)?;

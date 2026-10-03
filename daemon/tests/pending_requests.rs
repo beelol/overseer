@@ -368,7 +368,8 @@ fn native_child_pending_identity_keeps_owning_parent_transport() {
                     "receiverThreadIds":["thr-child"],"prompt":"child fixture","agentsStates":{"thr-child":{"status":"running"}}
                 }}}),
             ),
-            emit(child),
+            emit(json!({"method":"turn/started","params":{"threadId":"thr-child","turn":{"id":"$TURN"}}})),
+        emit(child),
             mark(ONE),
         ],
     );
@@ -1170,7 +1171,7 @@ mod slice2 {
             emit(json!({"method":"item/completed","params":{"threadId":"$THREAD","turnId":"$TURN","item":{
                 "type":"collabAgentToolCall","id":"spawn-child","tool":"spawnAgent","status":"completed","senderThreadId":"$THREAD",
                 "receiverThreadIds":["thr-child"],"prompt":"child fixture","agentsStates":{"thr-child":{"status":"running"}}
-            }}})),emit(child),mark(ONE)]);
+            }}})),emit(json!({"method":"turn/started","params":{"threadId":"thr-child","turn":{"id":"child-turn"}}})),emit(child),mark(ONE)]);
         s.marker(ONE,1); let item=s.requests()[0].clone();
         assert_ne!(item["run_id"],item["process_run_id"]); assert_eq!(item["process_run_id"],s.run());
         let mut params=answer_params(&s,&item,json!({"kind":"decision","decision":"decline"})); params["run_id"]=item["run_id"].clone();
