@@ -1,0 +1,215 @@
+[
+  {
+    "variant": "original",
+    "results": [
+      {
+        "index": 0,
+        "exit": 0,
+        "seconds": 0.039,
+        "assertions_passed": true
+      },
+      {
+        "index": 1,
+        "exit": 0,
+        "seconds": 0.041,
+        "assertions_passed": true
+      },
+      {
+        "index": 2,
+        "exit": 0,
+        "seconds": 0.039,
+        "assertions_passed": true
+      },
+      {
+        "index": 3,
+        "timeout": true,
+        "stdout": "ok   identical texts have no hunks\nok   one line added in the middle is one added hunk\nok   one line removed is one removed hunk\nok   one line changed is a one-for-one hunk\nok   a new file is all added\nok   distant edits are separate hunks and rebuild the text\nok   interleaved edits rebuild the text exactly (random cases)\nok   a rewrite past the edit budget is one replaced hunk that still rebuilds the text\n8 passed, 0 failed\n"
+      }
+    ]
+  },
+  {
+    "variant": "natural-exit",
+    "results": [
+      {
+        "index": 0,
+        "exit": 0,
+        "seconds": 0.043,
+        "assertions_passed": true
+      },
+      {
+        "index": 1,
+        "exit": 0,
+        "seconds": 0.04,
+        "assertions_passed": true
+      },
+      {
+        "index": 2,
+        "exit": 0,
+        "seconds": 0.04,
+        "assertions_passed": true
+      },
+      {
+        "index": 3,
+        "exit": 0,
+        "seconds": 0.04,
+        "assertions_passed": true
+      },
+      {
+        "index": 4,
+        "exit": 0,
+        "seconds": 0.04,
+        "assertions_passed": true
+      },
+      {
+        "index": 5,
+        "exit": 0,
+        "seconds": 0.038,
+        "assertions_passed": true
+      },
+      {
+        "index": 6,
+        "exit": 0,
+        "seconds": 0.04,
+        "assertions_passed": true
+      },
+      {
+        "index": 7,
+        "exit": 0,
+        "seconds": 0.038,
+        "assertions_passed": true
+      },
+      {
+        "index": 8,
+        "exit": 0,
+        "seconds": 0.038,
+        "assertions_passed": true
+      },
+      {
+        "index": 9,
+        "exit": 0,
+        "seconds": 0.038,
+        "assertions_passed": true
+      },
+      {
+        "index": 10,
+        "exit": 0,
+        "seconds": 0.038,
+        "assertions_passed": true
+      },
+      {
+        "index": 11,
+        "exit": 0,
+        "seconds": 0.041,
+        "assertions_passed": true
+      },
+      {
+        "index": 12,
+        "exit": 0,
+        "seconds": 0.041,
+        "assertions_passed": true
+      },
+      {
+        "index": 13,
+        "exit": 0,
+        "seconds": 0.039,
+        "assertions_passed": true
+      },
+      {
+        "index": 14,
+        "exit": 0,
+        "seconds": 0.039,
+        "assertions_passed": true
+      },
+      {
+        "index": 15,
+        "exit": 0,
+        "seconds": 0.039,
+        "assertions_passed": true
+      },
+      {
+        "index": 16,
+        "exit": 0,
+        "seconds": 0.041,
+        "assertions_passed": true
+      },
+      {
+        "index": 17,
+        "exit": 0,
+        "seconds": 0.038,
+        "assertions_passed": true
+      },
+      {
+        "index": 18,
+        "exit": 0,
+        "seconds": 0.038,
+        "assertions_passed": true
+      },
+      {
+        "index": 19,
+        "exit": 0,
+        "seconds": 0.041,
+        "assertions_passed": true
+      },
+      {
+        "index": 20,
+        "exit": 0,
+        "seconds": 0.038,
+        "assertions_passed": true
+      },
+      {
+        "index": 21,
+        "exit": 0,
+        "seconds": 0.042,
+        "assertions_passed": true
+      },
+      {
+        "index": 22,
+        "exit": 0,
+        "seconds": 0.04,
+        "assertions_passed": true
+      },
+      {
+        "index": 23,
+        "exit": 0,
+        "seconds": 0.038,
+        "assertions_passed": true
+      },
+      {
+        "index": 24,
+        "exit": 0,
+        "seconds": 0.041,
+        "assertions_passed": true
+      },
+      {
+        "index": 25,
+        "exit": 0,
+        "seconds": 0.04,
+        "assertions_passed": true
+      },
+      {
+        "index": 26,
+        "exit": 0,
+        "seconds": 0.041,
+        "assertions_passed": true
+      },
+      {
+        "index": 27,
+        "exit": 0,
+        "seconds": 0.043,
+        "assertions_passed": true
+      },
+      {
+        "index": 28,
+        "exit": 0,
+        "seconds": 0.047,
+        "assertions_passed": true
+      },
+      {
+        "index": 29,
+        "exit": 0,
+        "seconds": 0.045,
+        "assertions_passed": true
+      }
+    ]
+  }
+]
