@@ -1057,3 +1057,88 @@ fn future_local_candidate_bound_refuses_required_uncertainty_actionably() {
         "{why}"
     );
 }
+
+#[test]
+fn actual_paused_queue_admits_mods_only_on_owner_release_after_restart() {
+    let t = tmp();
+    let repo = repo(&t.path().join("repo"));
+    let path = t.path().join("paused-release.jsonl");
+    let mut d = Daemon::start(&[("OVERSEER_TEST_AUTO_DISABLED", "1")]);
+    let version = install(&d);
+    let binding = bind(&d, &version, "all_agents", None, true);
+    let id = create(
+        &d,
+        &repo,
+        &path,
+        "The first admitted turn has its own snapshot.",
+    );
+    done(&d, &id);
+    let first = d.call("mods.why", json!({"run_id":id}))["last_turn"].clone();
+    // Actual AC265 public Stop owns the durable pause; this is not an agent hold.
+    d.call("run.interrupt", json!({"run_id":id}));
+    assert_eq!(d.call("run.queued", json!({"run_id":id}))["paused"], true);
+    bind(&d, &version, "all_agents", Some(&binding["id"]), false);
+    let message = "Use the settings chosen when the owner releases this queue.";
+    assert_eq!(
+        d.call("run.follow_up", json!({"run_id":id,"prompt":message}))["delivery"],
+        "queued"
+    );
+    let queued = d.call("run.queued", json!({"run_id":id}));
+    assert_eq!(queued["queued"][0]["text"], message);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let count = || {
+        db.query_row(
+            "SELECT COUNT(*) FROM turn_mods WHERE run_id=?1",
+            [&id],
+            |row| row.get::<_, i64>(0),
+        )
+        .unwrap()
+    };
+    assert_eq!(count(), 1, "Enqueue is not turn admission");
+    assert_eq!(
+        d.call("run.turns", json!({"run_id":id}))
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(d.call("mods.why", json!({"run_id":id}))["last_turn"], first);
+    // Change the binding after enqueue. Resume must resolve these desired bytes.
+    bind(&d, &version, "all_agents", Some(&binding["id"]), true);
+    d.kill9();
+    d.spawn();
+    assert_eq!(
+        d.call("run.queued", json!({"run_id":id})),
+        queued,
+        "Restart retains exact pause and queued message"
+    );
+    assert_eq!(count(), 1);
+    assert_eq!(captures(&path, 1).len(), 1);
+    d.call("run.resume_queue", json!({"run_id":id}));
+    let input = captures(&path, 2);
+    done(&d, &id);
+    assert_eq!(count(), 2);
+    let last = d.call("mods.why", json!({"run_id":id}));
+    assert_ne!(last["last_turn"]["turn_id"], first["turn_id"]);
+    assert_eq!(
+        last["last_turn"]["plan"]["versions"][0]["fingerprint"],
+        version["fingerprint"]
+    );
+    assert_eq!(last["last_turn"]["binding_snapshot"][0]["enabled"], true);
+    assert_eq!(last["last_turn"]["outcome"], "transport_accepted");
+    assert_eq!(last["pending"], false);
+    assert!(input[1]["text"].as_str().unwrap().contains(&rules()));
+    assert!(input[1]["text"].as_str().unwrap().contains(message));
+    assert_eq!(
+        input[1]["text"]
+            .as_str()
+            .unwrap()
+            .matches("[Optional Overseer Mods: text guidance]")
+            .count(),
+        1
+    );
+    assert_eq!(
+        d.call("mods.why", json!({"run_id":id}))["context"]["role"],
+        "agent"
+    );
+}
