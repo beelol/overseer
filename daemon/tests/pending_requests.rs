@@ -184,6 +184,11 @@ fn two_native_requests_preserve_order_and_tagged_ids() {
         pending,
         "collection order is stable across reads"
     );
+    assert_eq!(
+        s.daemon.run(&s.run())["pending_requests"],
+        json!(pending),
+        "state and collection expose the same ordered identities"
+    );
     s.no_protected_action();
 }
 
