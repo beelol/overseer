@@ -70,7 +70,7 @@
           "allow_ollama_install": false,
           "enabled": true,
           "show": false,
-          "shown_ms": 1790857418034
+          "shown_ms": 1790998533858
         }
       }
     },
@@ -183,7 +183,7 @@
       "detail": [
         "Local model qwen3-coder:30b at a 64k context · 23.7 GiB, already loaded.",
         "This agent continues the work of another.Open the first agent",
-        "Continued from \"Rename the helpers\" after the connection was lost at 05:23."
+        "Continued from \"Rename the helpers\" after the connection was lost at 20:35."
       ]
     },
     {
@@ -222,7 +222,7 @@
       "detail": {
         "title": "Waiting for a connection",
         "line": "The connection to OpenAI failed: stream disconnected before completion: could not reach it: client error (Connect): dns failed to lookup address information. Your message is kept.",
-        "foot": "Next check in 9 s · waiting 4 s · gives up after 36 hours",
+        "foot": "Next check in 7 s · waiting 5 s · gives up after 36 hours",
         "actions": [
           "Use a local model now",
           "Retry now",
@@ -269,12 +269,12 @@
       "ok": true,
       "detail": {
         "taken": {
-          "at_ms": 1790857443228,
+          "at_ms": 1790998558440,
           "offered_ms": null,
-          "predecessor": "r-ad95d46b3006",
+          "predecessor": "r-62cbf68baefc",
           "reason": "user",
           "stay": false,
-          "successor": "r-775eee355169"
+          "successor": "r-67494201db12"
         },
         "takenDone": "completed",
         "shownNext": true
@@ -304,11 +304,11 @@
       "ok": true,
       "detail": {
         "backDone": "completed",
-        "session": "fixture-thread-49975",
+        "session": "fixture-thread-21070",
         "args": [
           "exec",
           "resume",
-          "fixture-thread-49975"
+          "fixture-thread-21070"
         ]
       }
     },

@@ -187,6 +187,21 @@ impl Tui {
         self.app.tick(Instant::now());
     }
 
+    /// One receive batch, timer tick, and rendered frame, matching the binary's loop.
+    /// Snapshot queued messages before handling them: replies produced by those handlers
+    /// belong to the next frame, rather than postponing this frame indefinitely.
+    pub fn render_cycle(&mut self, wait: Duration) -> String {
+        let mut batch: Vec<Msg> = self.rx.recv_timeout(wait).into_iter().collect();
+        while let Ok(message) = self.rx.try_recv() {
+            batch.push(message);
+        }
+        for message in batch {
+            self.app.handle_msg(message);
+        }
+        self.app.tick(Instant::now());
+        self.screen()
+    }
+
     /// Pumps until `cond` holds (panics after `secs`).
     pub fn until(&mut self, secs: u64, cond: impl Fn(&App) -> bool) {
         let end = Instant::now() + Duration::from_secs(secs);
