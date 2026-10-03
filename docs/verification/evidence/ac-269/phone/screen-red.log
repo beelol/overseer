@@ -1,0 +1,252 @@
+nice: setpriority: Operation not permitted
+
+> overseer-phone@0.1.0 test
+> jest --runInBand --cacheDirectory /private/tmp/overseer-mods-phone-jest src/screens/__tests__/ModsScreen.test.tsx
+
+FAIL src/screens/__tests__/ModsScreen.test.tsx
+  ✕ installed, desired and last recorded delivery are distinct for full (9 ms)
+  ✕ installed, desired and last recorded delivery are distinct for watch (1 ms)
+  ✕ last prepared outcome is not inferred from desired selection (1 ms)
+  ✕ last failed_before_effect outcome is not inferred from desired selection (1 ms)
+  ✕ last uncertain_after_effect outcome is not inferred from desired selection (1 ms)
+  ✕ last transport_accepted outcome is not inferred from desired selection (1 ms)
+  ✕ global and current-run news refresh reliably at fixed time; unrelated runs do not (657 ms)
+  ✕ offline retains stale facts, discards late replies and refreshes on reconnect (2 ms)
+  ✕ route change clears the previous run and drops its pending result (3 ms)
+  ✕ read failures are independent and retained data is labelled stale until fresh confirmation (2 ms)
+  ✕ missing route and initial offline never issue an invalid read (1 ms)
+  ✕ forgetting the Mac clears retained private inspection data (1 ms)
+
+  ● installed, desired and last recorded delivery are distinct for full
+
+    Unable to find an element with testID: mods.installed
+
+    [36m<RNCSafeAreaProvider />[39m
+
+      28 |   return app;
+      29 | }
+    > 30 | const words = (id: string): string => wordsOf(screen.getByTestId(id));
+         |                                                      ^
+      31 | const afterNews = async (app: TestApp): Promise<void> => {
+      32 |   await act(() => wait(650));
+      33 |   await app.settle();
+
+      at getByTestId (src/screens/__tests__/ModsScreen.test.tsx:30:54)
+      at words (src/screens/__tests__/ModsScreen.test.tsx:40:10)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● installed, desired and last recorded delivery are distinct for watch
+
+    Unable to find an element with testID: mods.installed
+
+    [36m<RNCSafeAreaProvider />[39m
+
+      28 |   return app;
+      29 | }
+    > 30 | const words = (id: string): string => wordsOf(screen.getByTestId(id));
+         |                                                      ^
+      31 | const afterNews = async (app: TestApp): Promise<void> => {
+      32 |   await act(() => wait(650));
+      33 |   await app.settle();
+
+      at getByTestId (src/screens/__tests__/ModsScreen.test.tsx:30:54)
+      at words (src/screens/__tests__/ModsScreen.test.tsx:40:10)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● last prepared outcome is not inferred from desired selection
+
+    Unable to find an element with testID: mods.last
+
+    [36m<RNCSafeAreaProvider />[39m
+
+      28 |   return app;
+      29 | }
+    > 30 | const words = (id: string): string => wordsOf(screen.getByTestId(id));
+         |                                                      ^
+      31 | const afterNews = async (app: TestApp): Promise<void> => {
+      32 |   await act(() => wait(650));
+      33 |   await app.settle();
+
+      at getByTestId (src/screens/__tests__/ModsScreen.test.tsx:30:54)
+      at words (src/screens/__tests__/ModsScreen.test.tsx:62:10)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● last failed_before_effect outcome is not inferred from desired selection
+
+    Unable to find an element with testID: mods.last
+
+    [36m<RNCSafeAreaProvider />[39m
+
+      28 |   return app;
+      29 | }
+    > 30 | const words = (id: string): string => wordsOf(screen.getByTestId(id));
+         |                                                      ^
+      31 | const afterNews = async (app: TestApp): Promise<void> => {
+      32 |   await act(() => wait(650));
+      33 |   await app.settle();
+
+      at getByTestId (src/screens/__tests__/ModsScreen.test.tsx:30:54)
+      at words (src/screens/__tests__/ModsScreen.test.tsx:62:10)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● last uncertain_after_effect outcome is not inferred from desired selection
+
+    Unable to find an element with testID: mods.last
+
+    [36m<RNCSafeAreaProvider />[39m
+
+      28 |   return app;
+      29 | }
+    > 30 | const words = (id: string): string => wordsOf(screen.getByTestId(id));
+         |                                                      ^
+      31 | const afterNews = async (app: TestApp): Promise<void> => {
+      32 |   await act(() => wait(650));
+      33 |   await app.settle();
+
+      at getByTestId (src/screens/__tests__/ModsScreen.test.tsx:30:54)
+      at words (src/screens/__tests__/ModsScreen.test.tsx:62:10)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● last transport_accepted outcome is not inferred from desired selection
+
+    Unable to find an element with testID: mods.last
+
+    [36m<RNCSafeAreaProvider />[39m
+
+      28 |   return app;
+      29 | }
+    > 30 | const words = (id: string): string => wordsOf(screen.getByTestId(id));
+         |                                                      ^
+      31 | const afterNews = async (app: TestApp): Promise<void> => {
+      32 |   await act(() => wait(650));
+      33 |   await app.settle();
+
+      at getByTestId (src/screens/__tests__/ModsScreen.test.tsx:30:54)
+      at words (src/screens/__tests__/ModsScreen.test.tsx:62:10)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● global and current-run news refresh reliably at fixed time; unrelated runs do not
+
+    expect(received).toHaveLength(expected)
+
+    Expected length: 2
+    Received length: 0
+    Received array:  []
+
+      74 |   await app.events(makeEvent('mods_changed', { revision: 5 }));
+      75 |   await afterNews(app);
+    > 76 |   expect(app.connection.calls('mods.list')).toHaveLength(2);
+         |                                             ^
+      77 |   await app.events(makeEvent('mods_applied', { snapshot: {} }, { run_id: 'other' }));
+      78 |   await afterNews(app);
+      79 |   expect(app.connection.calls('mods.why')).toHaveLength(2);
+
+      at Object.toHaveLength (src/screens/__tests__/ModsScreen.test.tsx:76:45)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● offline retains stale facts, discards late replies and refreshes on reconnect
+
+    Unable to find an element with accessibility label: Refresh Mods
+
+    [36m<RNCSafeAreaProvider />[39m
+
+      90 |   const delayed = later<AppliedMods>();
+      91 |   app.connection.answers['mods.why'] = () => delayed.promise;
+    > 92 |   await fireEvent.press(screen.getByLabelText('Refresh Mods'));
+         |                                ^
+      93 |   await act(async () => app.connection.go('unreachable'));
+      94 |   await act(async () => delayed.resolve({ ...applied, notice: 'LATE INVALID RESPONSE' }));
+      95 |   await app.settle();
+
+      at Object.getByLabelText (src/screens/__tests__/ModsScreen.test.tsx:92:32)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● route change clears the previous run and drops its pending result
+
+    Unable to find an element with testID: mods.notice
+
+    [36m<RNCSafeAreaProvider />[39m
+
+      28 |   return app;
+      29 | }
+    > 30 | const words = (id: string): string => wordsOf(screen.getByTestId(id));
+         |                                                      ^
+      31 | const afterNews = async (app: TestApp): Promise<void> => {
+      32 |   await act(() => wait(650));
+      33 |   await app.settle();
+
+      at getByTestId (src/screens/__tests__/ModsScreen.test.tsx:30:54)
+      at Object.words (src/screens/__tests__/ModsScreen.test.tsx:122:10)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● read failures are independent and retained data is labelled stale until fresh confirmation
+
+    Unable to find an element with testID: mods.library.error
+
+    [36m<RNCSafeAreaProvider />[39m
+
+      28 |   return app;
+      29 | }
+    > 30 | const words = (id: string): string => wordsOf(screen.getByTestId(id));
+         |                                                      ^
+      31 | const afterNews = async (app: TestApp): Promise<void> => {
+      32 |   await act(() => wait(650));
+      33 |   await app.settle();
+
+      at getByTestId (src/screens/__tests__/ModsScreen.test.tsx:30:54)
+      at Object.words (src/screens/__tests__/ModsScreen.test.tsx:130:10)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● missing route and initial offline never issue an invalid read
+
+    Unable to find an element with testID: mods.empty
+
+    [36m<RNCSafeAreaProvider />[39m
+
+      28 |   return app;
+      29 | }
+    > 30 | const words = (id: string): string => wordsOf(screen.getByTestId(id));
+         |                                                      ^
+      31 | const afterNews = async (app: TestApp): Promise<void> => {
+      32 |   await act(() => wait(650));
+      33 |   await app.settle();
+
+      at getByTestId (src/screens/__tests__/ModsScreen.test.tsx:30:54)
+      at Object.words (src/screens/__tests__/ModsScreen.test.tsx:145:10)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● forgetting the Mac clears retained private inspection data
+
+    Unable to find an element with testID: mods.installed
+
+    [36m<RNCSafeAreaProvider />[39m
+
+      28 |   return app;
+      29 | }
+    > 30 | const words = (id: string): string => wordsOf(screen.getByTestId(id));
+         |                                                      ^
+      31 | const afterNews = async (app: TestApp): Promise<void> => {
+      32 |   await act(() => wait(650));
+      33 |   await app.settle();
+
+      at getByTestId (src/screens/__tests__/ModsScreen.test.tsx:30:54)
+      at Object.words (src/screens/__tests__/ModsScreen.test.tsx:156:10)
+      at asyncGeneratorStep (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../overseer-closeout-next-20261003/phone/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+Test Suites: 1 failed, 1 total
+Tests:       12 failed, 12 total
+Snapshots:   0 total
+Time:        1.759 s
+Ran all test suites matching /src\/screens\/__tests__\/ModsScreen.test.tsx/i.

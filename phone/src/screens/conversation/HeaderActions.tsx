@@ -77,6 +77,8 @@ export const HeaderActions = memo(function HeaderActions({ runId, header, taskId
 
   const items = useMemo(() => {
     const list: MenuItem[] = [];
+    // Inspection needs only the route target, including while its header is loading.
+    if (runId) list.push({ id: 'mods', label: 'Mods', icon: 'list-unordered', onPress: () => router.push(routes.mods(runId)) });
     if (!header) return list;
     const idle = !header.active && !header.child;
     const worktree = workspace?.kind === 'worktree' && !workspace.removed_ms;
