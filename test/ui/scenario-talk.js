@@ -2,7 +2,8 @@
 // AC-227 it is home, the one view for talking to Overseer (nothing docks below); it runs on the
 // Claude harness as a task Overseer keeps for itself (hidden from the side bar). "What is everyone doing?" gets a summary that matches the daemon's state; "tell API
 // tests to add tests" gets a proposal, and on Yes that agent's chat shows the follow-up as coming from
-// Overseer; a declined proposal changes nothing. (The one live run on the Claude account waits for
+// Overseer; a declined proposal changes nothing; an agent's waiting permission comes up by itself
+// as a yes/no that a click answers (AC-230). (The one live run on the Claude account waits for
 // the owner's Claude sign-in.)
 const fs = require('fs');
 const path = require('path');
@@ -81,6 +82,26 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await delay(2000);
     await s.screenshot('declined');
     check('a declined proposal changes nothing', turns(front.run.id).length === before.front, { turns: turns(front.run.id).length });
+
+    // AC-230: an agent's waiting permission comes up by itself as a yes/no in the view, with
+    // nothing asked of Overseer, and a click on Yes answers it.
+    fs.writeFileSync(modeFile, 'permission');
+    const asks = s.ctl('task.create', { repo, harness: 'claude', prompt: 'write perm.txt', title: 'Sessions' });
+    for (let i = 0; i < 60 && s.ctl('state').runs.find(r => r.id === asks.run.id).status !== 'waiting_for_user'; i++) await delay(300);
+    fs.writeFileSync(modeFile, 'overseer');
+    const ownerTurns = () => s.ctl('run.turns', { run_id: s.ctl('overseer.session').run_id }).length;
+    const turnsBefore = ownerTurns();
+    await cdp.command('Overseer: Talk to Overseer'); await delay(1200);
+    await chat.waitFor(`[...document.querySelectorAll('.home-card.card-needs')].some(e => /Sessions wants to change perm\.txt\. Allow it\?/.test(e.textContent)) && [...document.querySelectorAll('.proposal:not(.answered)')].some(e => /Allow Sessions to change perm\.txt/.test(e.textContent))`, 20000);
+    await chat.eval(`document.querySelector('.proposal:not(.answered)').scrollIntoView({ block: 'center' })`); await delay(400);
+    const asked = await chat.eval(`(() => { const p = [...document.querySelectorAll('.proposal:not(.answered)')].pop(); return { card: [...document.querySelectorAll('.home-card.card-needs')].pop().innerText, proposal: p.innerText, yes: !!p.querySelector('[data-proposal="yes"]'), no: !!p.querySelector('[data-proposal="no"]') }; })()`);
+    await s.screenshot('permission-comes-up');
+    check('a waiting permission comes up by itself as a yes/no, with no request id and no turn of Overseer\'s', asked.yes && asked.no && !/toolu_|req-/.test(asked.card + asked.proposal) && ownerTurns() === turnsBefore, { ...asked, turns: ownerTurns(), before: turnsBefore });
+    { const p = await s.webviewPoint(chat, '.proposal:not(.answered) [data-proposal="yes"]'); await cdp.click(p.x, p.y); }
+    let done = ''; for (let i = 0; i < 60 && done !== 'completed'; i++) { await delay(300); done = s.ctl('state').runs.find(r => r.id === asks.run.id).status; }
+    await chat.waitFor(`document.querySelectorAll('.proposal:not(.answered)').length === 0`, 20000);
+    await s.screenshot('permission-answered');
+    check('a click on Yes answers it: the agent goes on and finishes', done === 'completed', { status: done });
     s.ctl('run.interrupt', { run_id: watch.run.id });
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;

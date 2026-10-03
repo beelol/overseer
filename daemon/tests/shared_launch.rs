@@ -64,6 +64,27 @@ fn refresh(d: &Daemon, profile: &str) -> i64 {
         .unwrap()
 }
 
+/// A real structured after-reading, observed after the run and its turns passed the fixture's
+/// reporting-settlement boundary. Scheduling cannot turn an early reading into a sample.
+fn refresh_after_settlement(d: &Daemon, profile: &str, run: &str, settle_ms: i64) -> i64 {
+    let conn = db(d);
+    let ended: i64 = conn.query_row("SELECT MAX(ended_ms) FROM (
+        SELECT ended_ms FROM runs WHERE id=?1 UNION ALL
+        SELECT ended_ms FROM turns WHERE run_id=?1)", [run], |row| row.get(0)).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let seq = refresh(d, profile);
+        let observed: i64 = conn.query_row(
+            "SELECT observed_ms FROM auto_quota_observations WHERE event_seq=?1", [seq],
+            |row| row.get(0)).unwrap();
+        if observed >= ended + settle_ms {
+            return seq;
+        }
+        assert!(Instant::now() < deadline, "no settled reading for {run}: ended={ended}, observed={observed}");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
 fn db(d: &Daemon) -> rusqlite::Connection {
     let conn = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
     conn.busy_timeout(Duration::from_secs(5)).unwrap();
@@ -776,14 +797,16 @@ fn qualified_draw_prices_a_booked_start_after_five_isolated_runs() {
     std::fs::create_dir_all(&accounts).unwrap();
     std::fs::create_dir_all(&meters).unwrap();
     let codex = fixture("fake-harness/codex-app-fixture.js");
+    let parent_gate = r.path().join("parent.gate");
     let d = Daemon::start(&[
         ("OVERSEER_CODEX_PATH", codex.as_str()),
         ("OVERSEER_HARNESS_ENV_PASSTHROUGH",
-            "FIXTURE_MODE,FIXTURE_ACCOUNT_IDS_DIR,FIXTURE_QUOTA_MODES_DIR,FIXTURE_TURN_DELAY_MS"),
+            "FIXTURE_MODE,FIXTURE_ACCOUNT_IDS_DIR,FIXTURE_QUOTA_MODES_DIR,FIXTURE_TURN_DELAY_MS,FIXTURE_HOLD_PARENT_GATE"),
         ("FIXTURE_MODE", "managed-models"),
         ("FIXTURE_ACCOUNT_IDS_DIR", accounts.to_str().unwrap()),
         ("FIXTURE_QUOTA_MODES_DIR", meters.to_str().unwrap()),
         ("FIXTURE_TURN_DELAY_MS", "3000"),
+        ("FIXTURE_HOLD_PARENT_GATE", parent_gate.to_str().unwrap()),
         ("OVERSEER_TEST_DRAW_SETTLE_MS", "300"),
     ]);
     let profile = d.call("profile.create", json!({"name":"solo","harness":"codex"}))["id"]
@@ -814,8 +837,7 @@ fn qualified_draw_prices_a_booked_start_after_five_isolated_runs() {
         d.wait_status(&run, |status| !HOLDING.contains(&status), 30);
         used += 1.0;
         meter(used);
-        std::thread::sleep(Duration::from_millis(400));
-        refresh(&d, &profile);
+        refresh_after_settlement(&d, &profile, &run, 300);
         runs.push(run);
     };
     for n in 0..4 {
@@ -843,9 +865,13 @@ fn qualified_draw_prices_a_booked_start_after_five_isolated_runs() {
     d.wait_status(&run, |status| !HOLDING.contains(&status), 30);
     assert_eq!(intent(&d, "priced-start").4.as_deref(), Some("settled"));
 
+    // The priced start is a sixth completed isolated run. Its fixture meter intentionally
+    // stays at 35: zero visible movement still has a 2000 upper draw (two readings' error).
+    // Wait for an actual settled reading, so this sample is present on every machine.
+    let zero_after_seq = refresh_after_settlement(&d, &profile, &run, 300);
+
     // Step 4: an ordinary start that asks for no booking books the qualified
     // draw by itself when one exists, and otherwise starts unbooked as before.
-    refresh(&d, &profile);
     let bound = |d: &Daemon, run: &str| -> Option<(String, String, String)> {
         use rusqlite::OptionalExtension;
         db(d).query_row("SELECT work_unit_id,caller,draw_source FROM shared_booking_intents WHERE run_id=?1",
@@ -861,20 +887,50 @@ fn qualified_draw_prices_a_booked_start_after_five_isolated_runs() {
     // is refused (account busy) and the start proceeds unbooked.
     let beside = plain(&d, "medium", "beside");
     assert_eq!(bound(&d, &beside), None, "a refused automatic booking falls back");
-    d.wait_status(&holding, |status| !HOLDING.contains(&status), 30);
     d.wait_status(&beside, |status| !HOLDING.contains(&status), 30);
-    refresh(&d, &profile);
+    assert!(HOLDING.contains(&d.run(&holding)["status"].as_str().unwrap()), "the unbooked parent really overlapped the medium run");
+    std::fs::write(&parent_gate, "").unwrap();
+    d.wait_status(&holding, |status| !HOLDING.contains(&status), 30);
+    // Both overlapping runs ended: observe their settlement too. They cannot supply
+    // isolated samples, regardless of how quickly the fixture or scheduler finished.
+    refresh_after_settlement(&d, &profile, &holding, 300);
+    refresh_after_settlement(&d, &profile, &beside, 300);
+    std::fs::remove_file(&parent_gate).unwrap();
     let automatic = plain(&d, "medium", "hold parent");
     let (work_unit, caller, source) = bound(&d, &automatic).expect("booked on the qualified draw");
     assert!(work_unit.starts_with("ordinary/"), "{work_unit}");
     assert_eq!((caller.as_str(), source.as_str()), ("ordinary", "qualified"));
     let (_, provenance, amounts) = booking_draw(&d, &work_unit);
-    assert_eq!(amounts, vec![3_000]);
+    assert_eq!(provenance["sample_count"], 6, "the five moved meters and the sixth zero meter: {provenance}");
+    let samples = provenance["samples"].as_array().unwrap();
+    let mut actual_ids: Vec<String> = samples.iter().map(|s| s["run_id"].as_str().unwrap().to_string()).collect();
+    let mut expected_ids = runs.clone();
+    expected_ids.push(run.clone());
+    actual_ids.sort();
+    expected_ids.sort();
+    assert_eq!(actual_ids, expected_ids, "the overlapping runs are not attributable samples");
+    let zero = samples.iter().find(|sample| sample["run_id"] == run).unwrap();
+    assert_eq!(zero["after_seq"], zero_after_seq, "the first settled after-reading was used");
+    let reading = |seq: i64| -> Value {
+        let encoded: String = db(&d).query_row("SELECT snapshot FROM auto_quota_observations WHERE event_seq=?1",
+            [seq], |row| row.get(0)).unwrap();
+        serde_json::from_str(&encoded).unwrap()
+    };
+    assert_eq!(reading(zero["before_seq"].as_i64().unwrap())["windows"][0]["used_percent"], 35.0);
+    assert_eq!(reading(zero_after_seq)["windows"][0]["used_percent"], 35.0);
+    let window = &provenance["windows"][0];
+    assert_eq!(window["max_milli"], 3_000);
+    assert!((window["mean_milli"].as_f64().unwrap() - 2_833.3333333333335).abs() < 0.000001);
+    assert!((window["sd_milli"].as_f64().unwrap() - 408.248290463863).abs() < 0.000001);
+    assert_eq!(window["upper_milli"], 4_059, "ceil(mean + 3 sample standard deviations), above the maximum");
+    assert_eq!(amounts, vec![4_059], "zero visible movement remains conservative, not free work");
     assert_eq!(provenance["bucket"]["task_class"], "agent");
     assert_eq!(active_slots(&d), 1, "its slot is the start's own, not a second one");
     // Two booked ordinary starts share the account while it has headroom.
     let second = plain(&d, "medium", "alongside");
     let (second_unit, _, _) = bound(&d, &second).expect("a second start books beside the first");
+    assert!(HOLDING.contains(&d.run(&automatic)["status"].as_str().unwrap()), "the second booking was made beside an active first booking");
+    std::fs::write(&parent_gate, "").unwrap();
     d.wait_status(&automatic, |status| !HOLDING.contains(&status), 30);
     d.wait_status(&second, |status| !HOLDING.contains(&status), 30);
     assert_eq!(intent(&d, &work_unit).4.as_deref(), Some("settled"));
