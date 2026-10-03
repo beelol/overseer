@@ -69,6 +69,7 @@ fn read(d: &Daemon, run: &str, token: &str, path: &str) -> Result<Value, String>
 fn assert_safe(result: Result<Value, String>) {
     match result {
         Ok(value) => {
+            assert_eq!(value["is_error"], false, "successful pinned read");
             assert!(
                 !value.to_string().contains(OUTSIDE),
                 "outside bytes escaped the checked worktree"
@@ -81,7 +82,19 @@ fn assert_safe(result: Result<Value, String>) {
                 "only a pinned original inode may succeed: {value}"
             );
         }
-        Err(error) => assert!(!error.contains(OUTSIDE)),
+        Err(error) => {
+            assert!(!error.contains(OUTSIDE));
+            assert!(
+                !error.contains("fixture hold expired") && !error.contains("timed out"),
+                "a test timeout is not containment evidence: {error}"
+            );
+            assert!(
+                error.contains("worktree")
+                    || error.to_lowercase().contains("symlink")
+                    || error.to_lowercase().contains("symbolic"),
+                "race refusal must identify the path boundary: {error}"
+            );
+        }
     }
 }
 fn swap_case(parent: bool) {
@@ -114,6 +127,7 @@ fn swap_case(parent: bool) {
     std::fs::write(ws.join("control.txt"), "in-worktree control\n").unwrap();
     let control =
         read(&d, &run, &token, "control.txt").expect("valid in-worktree read remains usable");
+    assert_eq!(control["is_error"], false);
     assert_eq!(control["text"], "in-worktree control\n");
 }
 #[test]
