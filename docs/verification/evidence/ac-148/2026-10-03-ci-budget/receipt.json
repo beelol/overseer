@@ -1,0 +1,41 @@
+{
+  "run_id": 37132940231,
+  "job_id": 111231573766,
+  "pr_head": "f3c79729a239b5315fa1c180d59c26d94f680cff",
+  "actual_checkout": "33dc49c3e4df2390e6dbc3cc5992df625f5e075e",
+  "checkout_parents": [
+    "a8914d0067a0a28698bbbd0f2e3631a0b8a9f91a",
+    "f3c79729a239b5315fa1c180d59c26d94f680cff"
+  ],
+  "workflow_blob": {
+    "file": ".github/workflows/checks.yml",
+    "ci_blob": "4e4f037a948ce4cc367652e59d24dd27ccb7557a",
+    "ci_sha256": "2d86f7384c09317318754d8fa18f8bbd544cfcc67ad069889c2040fa9dc54596",
+    "sources": {
+      "pr81": {
+        "sha256": "2d86f7384c09317318754d8fa18f8bbd544cfcc67ad069889c2040fa9dc54596",
+        "identical": true
+      },
+      "local": {
+        "sha256": "2d86f7384c09317318754d8fa18f8bbd544cfcc67ad069889c2040fa9dc54596",
+        "identical": true
+      }
+    }
+  },
+  "job_started": "2026-10-03T15:21:43Z",
+  "job_completed": "2026-10-03T16:02:01Z",
+  "job_seconds": 2418,
+  "rust_started": "2026-10-03T15:22:26Z",
+  "rust_cancelled": "2026-10-03T16:01:56Z",
+  "rust_seconds": 2370,
+  "reported_build_seconds": 261,
+  "completed_test_target_seconds": 2032.76,
+  "daemon_voice_started": "2026-10-03T16:00:43.459389Z",
+  "voice_seconds_before_cancel": 72.655,
+  "voice_test_count": 57,
+  "voice_reported_passed_before_cancel": 14,
+  "annotation": "The job has exceeded the maximum execution time of 40m0s",
+  "extension_unit_step": "skipped",
+  "extension_source_step": "skipped",
+  "limits": "Logs confirm job-budget exhaustion, not a Voice hang or resolved synthesis failure; this receipt contains only public source provenance and CI phase metadata."
+}
