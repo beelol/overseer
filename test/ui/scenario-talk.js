@@ -8,6 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
+const { initialSettings, runSettings } = require('./settings-qualification');
 
 (async () => {
   const s = new Session('talk');
@@ -23,10 +24,13 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
       CLAUDE_FIXTURE_MODE_FILE: modeFile, OVERSEER_HARNESS_ENV_PASSTHROUGH: 'CLAUDE_FIXTURE_MODE_FILE' });
     const cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
+    initialSettings(s, result);
     const api = s.ctl('task.create', { repo, harness: 'claude', prompt: 'write the API', title: 'API tests' });
     const front = s.ctl('task.create', { repo, harness: 'claude', prompt: 'fix the header', title: 'Frontend fixer' });
     const watch = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'echo watching; sleep 600'], prompt: '', title: 'Build watcher' });
     for (let i = 0; i < 40 && [api, front].some(t => s.ctl('state').runs.find(r => r.id === t.run.id).status !== 'completed'); i++) await delay(300);
+    runSettings(s, result, api.run.id);
+    runSettings(s, result, front.run.id);
     fs.writeFileSync(modeFile, 'overseer');
     const turns = id => s.ctl('run.turns', { run_id: id });
 

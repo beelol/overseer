@@ -1322,6 +1322,24 @@ fn wait_check_ins(d: &Daemon, run: &str, n: usize, secs: u64) -> Vec<Value> {
     }
 }
 
+/// AC-201: receipt of the actual persisted startup settings, before an owner override.
+/// Reads only the disposable fixture database; expectations come from the requested profile.
+fn inherited_settings(d: &Daemon, test: &str) -> (String, String) {
+    use rusqlite::OptionalExtension;
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.busy_timeout(Duration::from_secs(5)).unwrap();
+    let read = |key: &str, default: &str| -> String {
+        db.query_row("SELECT value FROM meta WHERE key=?1", [key], |row| row.get::<_, String>(0))
+            .optional().unwrap().unwrap_or_else(|| default.into())
+    };
+    let channel = read("overseer.channel", "auto");
+    let checks = read("overseer.check_ins", "every:3");
+    assert_eq!(channel, std::env::var("OVERSEER_CHANNEL_DEFAULT").unwrap_or_else(|_| "auto".into()), "{test}: channel profile did not reach the daemon");
+    assert_eq!(checks, std::env::var("OVERSEER_CHECK_INS").unwrap_or_else(|_| "every:3".into()), "{test}: check-in profile did not reach the daemon");
+    println!("AC201 initial settings {}", json!({"test":test,"channel":channel,"check_ins":checks,"effective_cadence":d.call("agent.cadence",json!({}))["cadence"]}));
+    (channel, checks)
+}
+
 /// AC-189: an agent on task gets check-ins after turns 3 and 6 and when it finishes, and never a
 /// message; the owner's direction changes the cadence; an agent that writes outside its area is
 /// found by the free check and by the check-in that follows, which acts at the level; an agent
@@ -1340,12 +1358,35 @@ fn ac189_overseer_keeps_agents_on_task() {
     git(&repo, &["commit", "-qm", "base"]);
     let mode_file = r.path().join("mode");
     let d = overseer_daemon(&mode_file);
+    let (_, inherited_checks) = inherited_settings(&d, "ac189");
     d.call("overseer.session", json!({}));
     // An agent is finished when it stays idle for the grace period; one second here.
     sql(&d, "INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.grace_ms', '1000');");
     // Overseer's run must exist before check-ins, so the first turn is the owner's.
     d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
     wait_overseer_idle(&d, 30);
+    if inherited_checks == "off" {
+        // Seven completed turns and a real free check exercise inherited off, before any setting change.
+        let quiet = claude_task(&d, &repo, &mode_file, "echo", "Inherited cadence off", "keep the docs tidy");
+        d.wait_done(&quiet, 30);
+        assert_eq!(d.call("agent.cadence", json!({"run_id":quiet}))["cadence"], "off");
+        for i in 2..=7 {
+            d.call("run.follow_up", json!({"run_id":quiet,"prompt":format!("quiet turn {i}")}));
+            d.wait_done(&quiet, 30);
+        }
+        std::fs::write(&mode_file, "circles").unwrap();
+        d.call("run.follow_up", json!({"run_id":quiet,"prompt":"fix the tests"}));
+        d.wait_done(&quiet, 30);
+        wait_event(&d, &quiet, |e| e["kind"] == "going_in_circles", 60);
+        // Existing negative-check window: longer than the one-second grace and five-second batch.
+        std::thread::sleep(Duration::from_secs(6));
+        wait_overseer_idle(&d, 60);
+        assert!(check_ins(&d, &quiet).is_empty(), "inherited off made check-in results");
+        assert!(!d.events(&quiet).iter().any(|e| e["kind"] == "check_in_started"), "inherited off started a check-in");
+        println!("AC201 inherited cadence off: seven turns and going_in_circles, no check-in; explicit owner enable follows");
+        d.call("agent.cadence", json!({"cadence":"every:3","by":"owner"}));
+        assert_eq!(d.call("agent.cadence", json!({}))["cadence"], "every:3");
+    }
     // On task through seven turns: check-ins after turns 3 and 6 and at the end; no message.
     let steady = claude_task(&d, &repo, &mode_file, "echo", "Steady", "keep the docs tidy");
     d.wait_done(&steady, 30);
@@ -1542,6 +1583,7 @@ fn ac190_briefing_and_channel() {
     let repo = repo(&r.path().join("repo"));
     let mode_file = r.path().join("mode");
     let d = overseer_daemon(&mode_file);
+    let (inherited_channel, _) = inherited_settings(&d, "ac190");
     d.call("overseer.session", json!({}));
     d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
     d.call("overseer.level", json!({"level": "steer"}));
@@ -1558,6 +1600,34 @@ fn ac190_briefing_and_channel() {
         assert!(!echo.contains("--mcp-config"), "a lone agent has no channel: {echo}");
         assert!(!d.events(&lone).iter().any(|e| e["kind"] == "briefing"));
         assert_eq!(d.call("agent.channel", json!({"run_id": lone}))["channel"], false);
+    }
+    if inherited_channel == "on" {
+        assert!(echo.contains("--mcp-config"), "inherited on must configure the actual lone fixture channel: {echo}");
+        let actual = d.call("agent.channel", json!({"run_id":lone}));
+        assert_eq!(actual["briefing"], true); assert_eq!(actual["channel"], true);
+    }
+    if inherited_channel == "off" {
+        // Keep a genuine companion working so off cannot accidentally pass as auto/no companion.
+        let busy = claude_task(&d, &repo, &mode_file, "gated-briefing", "Inherited off busy", "stay at the fixture gate");
+        d.wait_status(&busy, |s| s == "running", 20);
+        wait_event(&d, &busy, |e| e["kind"] == "output" && e["payload"]["text"] == "waiting at initial fixture gate", 20);
+        let prompt = "claim: web/off; report: testing inherited off; ask: what is the endpoint?; write: web/off/page.ts";
+        let quiet = claude_task(&d, &repo, &mode_file, "channel", "Inherited channel off", prompt);
+        d.wait_done(&quiet, 30);
+        assert_eq!(turns(&d, &quiet)[0]["prompt"], prompt, "off must preserve the owner's exact task");
+        assert!(d.events(&quiet).iter().any(|e| e["kind"] == "output" && e["payload"]["text"] == "no channel"), "the actual channel fixture must see no MCP server");
+        for run in [&busy, &quiet] {
+            let actual = d.call("agent.channel", json!({"run_id":run}));
+            assert_eq!(actual["briefing"], false); assert_eq!(actual["channel"], false);
+            assert!(!d.events(run).iter().any(|e| ["briefing","report","ask","claim"].contains(&e["kind"].as_str().unwrap_or(""))), "inherited off emitted channel/briefing effects");
+            assert!(d.call("channel.messages", json!({"run_id":run}))["messages"].as_array().unwrap().is_empty());
+        }
+        assert_eq!(d.run(&busy)["status"], "running", "the companion must stay active throughout the off assertions");
+        std::fs::write(format!("{}.gate",mode_file.display()), "release").unwrap();
+        d.wait_done(&busy, 30);
+        assert_eq!(turns(&d, &busy).len(), 1, "off must not queue a companion briefing");
+        println!("AC201 inherited channel off: overlapping agents, exact task, no MCP/channel/briefing effects; explicit owner enable for new agents follows");
+        d.call("agent.channel", json!({"default":"on","by":"owner"}));
     }
     // A second agent while the first works: both get a briefing, the first as a queued message.
     let first = claude_task(&d, &repo, &mode_file, "slow", "Login API", "build the login API");
