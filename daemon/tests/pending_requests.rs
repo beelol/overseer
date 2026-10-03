@@ -766,6 +766,125 @@ mod slice2 {
         assert_eq!(wait_replies(&s, 1), vec![expected]);
     }
 
+    struct LostAckProxy {
+        socket: PathBuf,
+        backing: PathBuf,
+        stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+        thread: Option<std::thread::JoinHandle<()>>,
+        receipt: std::sync::mpsc::Receiver<Value>,
+    }
+    impl LostAckProxy {
+        fn start(s: &Script) -> Self {
+            use std::os::unix::net::UnixListener;
+            let db = rusqlite::Connection::open(s.daemon.home.path().join("overseer.sqlite")).unwrap();
+            let dir: String = db.query_row("SELECT run_dir FROM runs WHERE id=?1",[s.run()],|r|r.get(0)).unwrap();
+            let launch: Value = serde_json::from_slice(&std::fs::read(Path::new(&dir).join("launch.json")).unwrap()).unwrap();
+            let socket = PathBuf::from(launch["control_socket"].as_str().unwrap());
+            let backing = socket.with_file_name("native-backing.sock");
+            std::fs::rename(&socket,&backing).unwrap();
+            let listener = UnixListener::bind(&socket).unwrap(); listener.set_nonblocking(true).unwrap();
+            let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let stopped = stop.clone(); let target = backing.clone();
+            let (tx,receipt) = std::sync::mpsc::channel();
+            let thread = std::thread::spawn(move || {
+                let deadline = Instant::now()+Duration::from_secs(25); let mut lost = false;
+                while !stopped.load(std::sync::atomic::Ordering::SeqCst) && Instant::now()<deadline {
+                    let mut client = match listener.accept() {
+                        Ok((client,_)) => client,
+                        Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {std::thread::sleep(Duration::from_millis(5));continue;},
+                        Err(_) => break,
+                    };
+                    client.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+                    client.set_write_timeout(Some(Duration::from_secs(5))).unwrap();
+                    let mut line = String::new();
+                    if BufReader::new(client.try_clone().unwrap()).read_line(&mut line).is_err() {break;}
+                    let request: Value = serde_json::from_str(&line).unwrap();
+                    let reply = response(&target,request.clone());
+                    if request["op"] == "request_reply" && !lost {
+                        lost = true; let _=tx.send(reply); // Actual backend response is discarded, not fabricated.
+                    } else { let _=writeln!(client,"{reply}"); }
+                }
+            });
+            Self {socket,backing,stop,thread:Some(thread),receipt}
+        }
+        fn written(&self) -> Value {
+            let receipt = self.receipt.recv_timeout(Duration::from_secs(10)).expect("proxy observed actual private backend receipt");
+            assert_eq!(receipt["state"],"written", "{receipt}"); receipt
+        }
+    }
+    impl Drop for LostAckProxy {
+        fn drop(&mut self) {
+            self.stop.store(true,std::sync::atomic::Ordering::SeqCst);
+            if let Some(thread)=self.thread.take() {let _=thread.join();}
+            let _=std::fs::remove_file(&self.socket); let _=std::fs::rename(&self.backing,&self.socket);
+        }
+    }
+    fn denied_count(s: &Script) -> i64 {
+        rusqlite::Connection::open(s.daemon.home.path().join("overseer.sqlite")).unwrap()
+            .query_row("SELECT COUNT(*) FROM denied_permissions WHERE run_id=?1",[s.run()],|r|r.get(0)).unwrap()
+    }
+
+    #[test]
+    fn active_claim_collection_reader_cannot_tombstone_held_owner_answer() {
+        let hold=AnswerGate::new(); let s=hold.start(vec![emit(command(json!(7),"active-held-claim")),mark(ONE)]);
+        s.marker(ONE,1); let item=s.requests()[0].clone(); hold.arm("claimed_before_send",&item);
+        let mut worker=HeldAnswer::start(&s,&hold,&item,frozen("command_command_decline")["answer"].clone());
+        worker.wait_reached(&hold,"claimed_before_send",&item); let token=assert_claim(&s,&item);
+        let collection=s.collection(); assert_eq!(collection["requests"][0]["lifecycle"],"claimed");
+        assert_eq!(s.collection(),collection,"a reader cannot settle an active owner's held claim");
+        let db=rusqlite::Connection::open(s.daemon.home.path().join("overseer.sqlite")).unwrap();
+        let dir:String=db.query_row("SELECT run_dir FROM runs WHERE id=?1",[s.run()],|r|r.get(0)).unwrap();
+        assert!(!Path::new(&dir).join("native-receipts").join(format!("{token}.json")).exists(),"active claim read must not create a not-written tombstone");
+        assert!(native_replies(&s).is_empty()); assert_eq!(denied_count(&s),0);
+        hold.release(); let reply=worker.finish(); assert_eq!(reply["result"]["delivery"],"written","{reply}");
+        assert_eq!(wait_replies(&s,1),vec![frozen("command_command_decline")["response"].clone()]);
+        assert_eq!(denied_count(&s),1); s.no_protected_action();
+    }
+
+    #[test]
+    fn lost_ack_reconciles_written_without_resend_or_rewriting_first_receipt() {
+        let s = Script::start("codex-app","codex-cli 0.158.0",vec![emit(command(json!(7),"lost-ack-denial")),mark(ONE)]);
+        s.marker(ONE,1); let item = s.requests()[0].clone(); let proxy = LostAckProxy::start(&s);
+        let first = s.daemon.call("run.request.answer",answer_params(&s,&item,frozen("command_command_decline")["answer"].clone()));
+        assert_eq!(first["delivery"],"uncertain","client lost acknowledgement despite an actual native write");
+        let receipt = proxy.written(); assert_eq!(wait_replies(&s,1),vec![frozen("command_command_decline")["response"].clone()]);
+        assert_eq!(denied_count(&s),0,"uncertain delivery alone is not a written owner denial");
+        let db = rusqlite::Connection::open(s.daemon.home.path().join("overseer.sqlite")).unwrap();
+        let original: String = db.query_row("SELECT result FROM native_answer_attempts WHERE delivery_token=?1",
+            [receipt["delivery_token"].as_str().unwrap()],|r|r.get(0)).unwrap();
+        assert_eq!(serde_json::from_str::<Value>(&original).unwrap(),first);
+        let current = s.requests()[0].clone(); assert_eq!(current["lifecycle"],"answered_awaiting_native",
+            "collection queries the real receipt without resending answer data");
+        assert_eq!(denied_count(&s),1,"recovery-confirmed written denial is remembered exactly once");
+        assert_eq!(s.requests()[0],current,"reconciliation is idempotent"); assert_eq!(denied_count(&s),1);
+        let saved: String = db.query_row("SELECT result FROM native_answer_attempts WHERE delivery_token=?1",
+            [receipt["delivery_token"].as_str().unwrap()],|r|r.get(0)).unwrap(); assert_eq!(saved,original,"first attempt result is immutable");
+        assert_eq!(native_replies(&s).len(),1); drop(proxy); s.no_protected_action();
+    }
+
+    #[test]
+    fn daemon_crash_after_claim_queries_tombstone_before_new_explicit_answer() {
+        let hold = AnswerGate::new(); let mut s = hold.start(vec![emit(command(json!(7),"crashed-claim")),mark(ONE)]);
+        s.marker(ONE,1); let item=s.requests()[0].clone(); let generation=s.daemon.run(&s.run())["process_generation"].clone();
+        hold.arm("claimed_before_send",&item);
+        let mut worker = HeldAnswer::start(&s,&hold,&item,frozen("command_command_decline")["answer"].clone());
+        worker.wait_reached(&hold,"claimed_before_send",&item); let token=assert_claim(&s,&item);
+        assert!(native_replies(&s).is_empty()); assert_eq!(denied_count(&s),0);
+        s.daemon.kill9(); assert_eq!(worker.finish()["disconnected"],true); hold.release(); s.daemon.spawn();
+        assert_eq!(s.daemon.run(&s.run())["process_generation"],generation,"surviving owned shim is reattached, not replayed");
+        let current=s.requests()[0].clone(); assert_eq!(current["lifecycle"],"pending");
+        assert_eq!(current["reason_code"],"definitely_unsent","authoritative missing receipt creates terminal not-written tombstone");
+        assert_ne!(current["revision"],item["revision"]); assert_eq!(denied_count(&s),0);
+        assert!(native_replies(&s).is_empty(),"recovery cannot reconstruct/replay private answer bytes");
+        let db=rusqlite::Connection::open(s.daemon.home.path().join("overseer.sqlite")).unwrap();
+        let dir:String=db.query_row("SELECT run_dir FROM runs WHERE id=?1",[s.run()],|r|r.get(0)).unwrap();
+        let tombstone:Value=serde_json::from_slice(&std::fs::read(Path::new(&dir).join("native-receipts").join(format!("{token}.json"))).unwrap()).unwrap();
+        assert_eq!(tombstone["state"],"not_written");
+        let result=s.daemon.call("run.request.answer",answer_params(&s,&current,frozen("command_command_decline")["answer"].clone()));
+        assert_eq!(result["delivery"],"written"); assert_eq!(wait_replies(&s,1),vec![frozen("command_command_decline")["response"].clone()]);
+        assert_eq!(denied_count(&s),1); s.no_protected_action();
+    }
+
     fn captured_needs_cannot_rebind(words: &str) {
         let hold = AnswerGate::new(); let native = tmp(); let native_release = native.path().join("replace-ask");
         let mut resolved = vector("resolved_integer"); resolved["params"]["threadId"] = json!("$THREAD");
