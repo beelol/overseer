@@ -1,0 +1,73 @@
+{
+  "source": "3bbd089f11d6c4074bbeb1a0626734338d993be9",
+  "base": "abf572ef53705db0e8f8b32e72a46057661057fc",
+  "command": "nice -n 20 env CARGO_BUILD_JOBS=1 CARGO_TARGET_DIR=/private/tmp/overseer-closeout-verify-target cargo check -p overseer-listener --tests --message-format=json",
+  "allocation": "compiler-only; listener package-only invalidated before check",
+  "exit_code": 0,
+  "elapsed_seconds": 33.55,
+  "actual_priority": {
+    "cargo_nice": 20,
+    "whisper_build_parallel": 1,
+    "private_observation": "coordinator-allocated compile observed cargo PID98834 at NI20; numeric result retained, full process command dump not published"
+  },
+  "errors": [],
+  "build_finished": [
+    {
+      "reason": "build-finished",
+      "success": true
+    }
+  ],
+  "artifacts": [
+    {
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "overseer_listener",
+        "src_path": "/private/tmp/overseer-native-speech-diagnostic-20261003/voice/src/lib.rs",
+        "edition": "2021",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "3",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "/private/tmp/overseer-closeout-verify-target/debug/deps/liboverseer_listener-30781cc318f4abe0.rmeta"
+      ],
+      "artifacts": [
+        {
+          "path": "/private/tmp/overseer-closeout-verify-target/debug/deps/liboverseer_listener-30781cc318f4abe0.rmeta",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    }
+  ],
+  "dependency_source_proof": [
+    {
+      "path": "/private/tmp/overseer-closeout-verify-target/debug/deps/overseer_listener-30781cc318f4abe0.d",
+      "sha256": "88d09674ac94d88dc86ad654a0ba95b4b16f428308f04a0e8f08484444326648",
+      "diagnostic_source_present": true,
+      "relative_source": "voice/src/memspeech_diagnostic.rs",
+      "manifest_source_proven_by_fresh_false_artifact": "/private/tmp/overseer-native-speech-diagnostic-20261003/voice/src/lib.rs"
+    }
+  ],
+  "source_files": {
+    "voice/src/memspeech.rs": "ef9be75185baf03a4a6dd289aa4e571f3d3277d212659cc40015c42544a1b4bc",
+    "voice/src/memspeech_diagnostic.rs": "94c5f6d833fcaf1959b4d1e48a8a1ace090a6d57ae74d290151b15e49ed18529"
+  },
+  "proof_script_note": "Initial proof selector assumed absolute paths in .d and stopped; .d uses relative source paths. Corrected source receipt combines .d diagnostic path with actual fresh:false compiler artifact absolute src_path. No extra compile/test ran.",
+  "runtime": "No test body/native speech/helper/UI/provider run; ignored diagnostic and pure callback case remain unrun. No executable produced by cargo check.",
+  "claim": "Compiler acceptance only, not native85 diagnosis or behavioral qualification.",
+  "private_raw_log_retention": "Full Cargo JSON and priority observation remain local; published subset contains relevant test-library metadata/source/hash proof only."
+}
