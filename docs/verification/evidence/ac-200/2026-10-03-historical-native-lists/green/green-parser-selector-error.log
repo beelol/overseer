@@ -1,0 +1,1 @@
+usage: overseerd serve | overseerd ctl <method> [json-params] | overseerd shim <run-dir> | overseerd auto-mcp <run-id> <capability-file> <socket> | overseerd mcp [--socket <path>] | overseerd version

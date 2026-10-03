@@ -1,0 +1,47 @@
+[
+  {
+    "kind": "daemon",
+    "name": "overseerd",
+    "manifest_path": "/private/tmp/overseer-native-legacy-lists-20261003/daemon/Cargo.toml",
+    "source": "/private/tmp/overseer-native-legacy-lists-20261003/daemon/src/main.rs",
+    "fresh": false,
+    "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+    "sha256": "d3a7ca7d10e97228b34b3d0d25025d3c6ad35916f76041ac783faf9ae83859f7"
+  },
+  {
+    "kind": "test",
+    "name": "overseerd",
+    "manifest_path": "/private/tmp/overseer-native-legacy-lists-20261003/daemon/Cargo.toml",
+    "source": "/private/tmp/overseer-native-legacy-lists-20261003/daemon/src/main.rs",
+    "fresh": false,
+    "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/overseerd-e1f16db50435eb72",
+    "sha256": "df63dfbb83c55021dfcfac29269b83a3f4505448bdd6d84908ca4418bc8af4c5"
+  },
+  {
+    "kind": "test",
+    "name": "overseer_native_legacy_lists",
+    "manifest_path": "/private/tmp/overseer-native-legacy-lists-20261003/daemon/Cargo.toml",
+    "source": "/private/tmp/overseer-native-legacy-lists-20261003/daemon/tests/overseer_native_legacy_lists.rs",
+    "fresh": false,
+    "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/overseer_native_legacy_lists-4b9bbd993d6c2f6c",
+    "sha256": "71ebea13dd1fec4f8b47ea6e97938f18508f22fdfe5a13ac4bde50643244b968"
+  },
+  {
+    "kind": "test",
+    "name": "overseer_native_capabilities",
+    "manifest_path": "/private/tmp/overseer-native-legacy-lists-20261003/daemon/Cargo.toml",
+    "source": "/private/tmp/overseer-native-legacy-lists-20261003/daemon/tests/overseer_native_capabilities.rs",
+    "fresh": false,
+    "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/overseer_native_capabilities-1efef19e4cbd1329",
+    "sha256": "0c6199a73f7b3fa355ca061dce265be53e675b46419e3cf73ddcfbaad954202b"
+  },
+  {
+    "kind": "test",
+    "name": "overseerd",
+    "manifest_path": "/private/tmp/overseer-native-legacy-lists-20261003/daemon/Cargo.toml",
+    "source": "/private/tmp/overseer-native-legacy-lists-20261003/daemon/src/main.rs",
+    "fresh": false,
+    "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+    "sha256": "d3a7ca7d10e97228b34b3d0d25025d3c6ad35916f76041ac783faf9ae83859f7"
+  }
+]
