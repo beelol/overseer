@@ -1580,3 +1580,78 @@ mod always_allow_tests {
         assert!(permission_reply("codex-app", "7", true, &json!({}), "").unwrap().contains("\"accept\""));
     }
 }
+
+// Baseline behavioral probes use the pre-Task1 adapter boundary. After recorded RED,
+// retain the same frozen native inputs/responses when moving these to the typed codec.
+#[cfg(test)]
+mod ac274_native_vectors {
+    use super::*;
+
+    fn vector(name: &str) -> Value {
+        let all: Vec<Value> = serde_json::from_str(include_str!("../../fixtures/transcripts/ac274/native-vectors.json")).unwrap();
+        all.into_iter().find(|case| case["name"] == name).unwrap()
+    }
+
+    fn current_reply(case: &Value, allow: bool, session: bool) -> Value {
+        let request = &case["request"];
+        let norms = parse_codex_app(request);
+        let Some(Norm::Permission { request_id, input, always, .. }) = norms.first() else {
+            panic!("native fixture did not reach the current adapter: {norms:?}");
+        };
+        serde_json::from_str(permission_reply_always("codex-app", request_id, allow, input,
+            "Owner declined", if session { always.as_ref() } else { None }).unwrap().trim()).unwrap()
+    }
+
+    #[test]
+    fn ac274_legacy_decisions_match_the_installed_method_schema() {
+        // Aliasing legacy methods to v2 accept/decline silently emits the wrong protocol.
+        for method in ["execCommandApproval", "applyPatchApproval"] {
+            for (choice, allow, session) in [("allow", true, false), ("deny", false, false)] {
+                let case = vector(&format!("legacy_{method}_{choice}"));
+                assert_eq!(current_reply(&case, allow, session), case["response"], "{}", case["name"]);
+            }
+        }
+    }
+
+    #[test]
+    fn ac274_permission_grant_has_required_profile_and_explicit_scope() {
+        // A generic decision object is never a granted-permissions response.
+        let case = vector("permissions_turn");
+        let response = current_reply(&case, true, false);
+        assert_eq!(response, case["response"], "required permissions/scope were lost");
+    }
+
+    #[test]
+    fn ac274_invalid_native_ids_never_become_pending_permissions() {
+        // Fractional, bool, aggregate and unsigned-over-int64 IDs cannot acquire authority.
+        let all: Vec<Value> = serde_json::from_str(include_str!("../../fixtures/transcripts/ac274/native-vectors.json")).unwrap();
+        for case in all.iter().filter(|case| case["reject"] == "invalid_native_id") {
+            let norms = parse_codex_app(&case["request"]);
+            assert!(!norms.iter().any(|norm| matches!(norm, Norm::Permission { .. })),
+                "malformed native id became an answerable permission: {} {norms:?}", case["name"]);
+            assert!(!norms.iter().any(|norm| matches!(norm, Norm::Send(line) if
+                serde_json::from_str::<Value>(line).ok().is_some_and(|reply| reply.get("result").is_some()))),
+                "malformed id emitted success: {}", case["name"]);
+        }
+    }
+
+    #[test]
+    fn ac274_command_offer_does_not_invent_session_authority() {
+        // Only native offered choices can authorize session policy; a display label is not an offer.
+        let case = vector("unoffered_acceptForSession");
+        let norms = parse_codex_app(&case["request"]);
+        assert!(matches!(norms.first(), Some(Norm::Permission { always: None, .. })),
+            "native decline-only request was given a persistent approval: {norms:?}");
+    }
+
+    #[test]
+    fn ac274_integer_and_string_ids_round_trip_without_conflation() {
+        let integer = vector("raw_id_integer_7");
+        let string = vector("raw_id_string_7");
+        assert_ne!(integer["request"]["id"], string["request"]["id"]);
+        for name in ["raw_id_integer_7", "raw_id_string_7", "raw_id_-9223372036854775808", "raw_id_9223372036854775807"] {
+            let case = vector(name);
+            assert_eq!(current_reply(&case, true, false)["id"], case["request"]["id"]);
+        }
+    }
+}
