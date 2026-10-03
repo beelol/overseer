@@ -21,3 +21,5 @@ The case sets only `OVERSEER_VOICE_SIMULATE=1`. Production `voice::set` still re
 ## Provenance and cleanup
 
 This evidence-only source reused the coordinator's exact ca012 test artifact and unchanged9040 daemon: executable hashes and source `.d` are preserved, and no fresh build atbe0807 is claimed. The original fresh:false records remain in [core qualification](../core-qualified/qualification.md). Each command matched one test. Actual cleanup JSON is `{"ours":[],"others":[]}` (ours0/others0). Baseline process-ID inventories are omitted. Prior core/context phases retain their original setup and helper failures separately. No AC274 closure, full-suite, real-native, real Voice audio or packaged surface qualification is claimed.
+
+Subsequent separate [Voice qualification](../voice-qualified/qualification.md): corrected test-only source3fe passed the exact case with fresh listener/test proof and unchanged assertions. The original setup failure above remains unchanged historical evidence.

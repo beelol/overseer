@@ -1,0 +1,108 @@
+{
+  "source": "3fe336f3ce3e904b2a6b5475006dd930d87fcf15",
+  "stages": {
+    "process-baseline": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.109
+    },
+    "listener-clean": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.517
+    },
+    "listener-build": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 8.441
+    },
+    "no-run": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 1.487
+    },
+    "case-00-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.288
+    },
+    "case-00": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 2.914
+    },
+    "cleanup": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.463
+    }
+  },
+  "artifacts": [
+    {
+      "name": "overseerd",
+      "source": "/private/tmp/overseer-native-pending-20261003/daemon/src/main.rs",
+      "source_sha256": "d169c87cc369a86300b182125c31b445c12cddfa7d3ccf53ed3973f0aba05250",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+      "sha256": "1c542a4dbc9adf765da1c540526bd2d70909a295f3bbff521b296e82c7b205f8",
+      "fresh": false,
+      "dependency_sha256": "0edd62a061f62db3f6662df627f3d1cf6a41781421b496f16c1b34d480fb6f26",
+      "reused_unchanged_runtime": true,
+      "prior_tested_source": "9040eb52bc58baaf24685e1b08744e955c145982"
+    },
+    {
+      "name": "overseer-listener",
+      "source": "/private/tmp/overseer-native-pending-20261003/voice/src/main.rs",
+      "source_sha256": "30b2b82825f57605a8127b813d5699ef2b5eeedaf1cfdb67a3e8509d2c9658dd",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseer-listener",
+      "sha256": "95c0ef697640d1782416f1842507c17ee4576aec39580edaab997e16decd6003",
+      "fresh": false,
+      "dependency_sha256": "854bf0afc7d4078a85e694b9209867775bd9b53f448e00f22050adc616959591"
+    },
+    {
+      "name": "pending_requests",
+      "source": "/private/tmp/overseer-native-pending-20261003/daemon/tests/pending_requests.rs",
+      "source_sha256": "b6c0efd22661f3acac5bdb0558b14e16caeac765c96fa9f2bbdefaf6d833463c",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/pending_requests-3634fd170cfd2bc6",
+      "sha256": "7a65b746c797abc4973a490ae7cd31cb201d8f03611a66217a13eddf0db64f11",
+      "fresh": false,
+      "dependency_sha256": "5afefc5acdc6cbac5ab3d850b1b9c6588599202aa64d34c5e5095d0ad45c05e4"
+    }
+  ],
+  "tests": [
+    {
+      "target": "pending_requests",
+      "name": "slice2::voice_checked_readback_keeps_typed_revision_and_exact_native_decline",
+      "code": 0
+    }
+  ],
+  "allocation": "separate_target_one_worker_during_ui",
+  "runtime_reuse": "Same clone, unchanged production/fixtures/manifests; exact standalone hash retained from fresh9040 qualification. Only changed test target recompiled.",
+  "cleanup_counts": {
+    "ours": 0,
+    "others": 0
+  },
+  "priority_proof": {
+    "coordinator_report": "NI20 assertion passed before child launch; later ps found command already terminal. No observed live PID receipt is claimed."
+  }
+}
