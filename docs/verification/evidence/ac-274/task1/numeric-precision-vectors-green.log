@@ -1,0 +1,117 @@
+   Compiling overseerd v0.1.0 (/private/tmp/overseer-typed-native-20261003/daemon)
+warning: unused import: `revision`
+ --> daemon/src/mods/bindings.rs:5:5
+  |
+5 |     revision,
+  |     ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: value assigned to `note` is never read
+   --> daemon/src/background.rs:377:17
+    |
+377 |         let mut note = String::new();
+    |                 ^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` on by default
+
+warning: methods `workspace_diff` and `state` are never used
+    --> daemon/src/daemon.rs:3738:12
+     |
+433  | impl Daemon {
+     | ----------- methods in this implementation
+...
+3738 |     pub fn workspace_diff(&self, workspace_id: &str, base: &str) -> Result<Value> {
+     |            ^^^^^^^^^^^^^^
+...
+3793 |     pub fn state(&self) -> Result<Value> {
+     |            ^^^^^
+     |
+     = note: `#[warn(dead_code)]` on by default
+
+warning: field `device_name` is never read
+  --> daemon/src/gateway/mod.rs:86:9
+   |
+84 | pub struct Session {
+   |            ------- field in this struct
+85 |     pub device_id: String,
+86 |     pub device_name: String,
+   |         ^^^^^^^^^^^
+
+warning: function `decorate` is never used
+    --> daemon/src/voice/request.rs:2158:8
+     |
+2158 | pub fn decorate(d: &Daemon, actions: &mut [Value]) -> Result<bool> {
+     |        ^^^^^^^^
+
+warning: method `is_clean` is never used
+   --> daemon/src/git.rs:299:12
+    |
+298 | impl Status {
+    | ----------- method in this implementation
+299 |     pub fn is_clean(&self) -> bool {
+    |            ^^^^^^^^
+
+warning: function `tree_has` is never used
+   --> daemon/src/git.rs:356:8
+    |
+356 | pub fn tree_has(workspace: &Path, tree_ish: &str, path: &str) -> bool {
+    |        ^^^^^^^^
+
+warning: function `show_blob` is never used
+   --> daemon/src/git.rs:360:8
+    |
+360 | pub fn show_blob(workspace: &Path, tree_ish: &str, path: &str) -> Result<Vec<u8>> {
+    |        ^^^^^^^^^
+
+warning: function `worktree_list` is never used
+   --> daemon/src/git.rs:368:8
+    |
+368 | pub fn worktree_list(repo: &Path) -> Vec<PathBuf> {
+    |        ^^^^^^^^^^^^^
+
+warning: field `model` is never read
+   --> daemon/src/opencode_bridge.rs:260:9
+    |
+243 | pub struct Turn {
+    |            ---- field in this struct
+...
+260 |     pub model: String,
+    |         ^^^^^
+
+warning: function `is_session_event` is never used
+    --> daemon/src/overseer/session.rs:2161:8
+     |
+2161 | pub fn is_session_event(kind: &str) -> bool {
+     |        ^^^^^^^^^^^^^^^^
+
+warning: method `child_by_native` is never used
+    --> daemon/src/store.rs:1122:12
+     |
+189  | impl Store {
+     | ---------- method in this implementation
+...
+1122 |     pub fn child_by_native(&self, parent: &str, native: &str) -> Result<Option<Run>> {
+     |            ^^^^^^^^^^^^^^^
+
+warning: `overseerd` (bin "overseerd" test) generated 12 warnings (run `cargo fix --bin "overseerd" --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.39s
+     Running unittests src/main.rs (/private/tmp/overseer-closeout-verify-target/debug/deps/overseerd-e1f16db50435eb72)
+
+running 12 tests
+test adapters::ac274_native_vectors::ac274_command_offer_does_not_invent_session_authority ... ok
+test adapters::ac274_native_vectors::ac274_every_frozen_vector_has_exact_native_response_or_no_success ... ok
+test adapters::ac274_native_vectors::ac274_integer_and_string_ids_round_trip_without_conflation ... ok
+test adapters::ac274_native_vectors::ac274_invalid_native_ids_never_become_pending_permissions ... ok
+test adapters::ac274_native_vectors::ac274_legacy_decisions_match_the_installed_method_schema ... ok
+test adapters::ac274_native_vectors::ac274_claude_form_rejects_malformed_integer_limits_without_ignoring_them ... ok
+test adapters::ac274_native_vectors::ac274_native_families_and_machine_requests_remain_distinct ... ok
+test adapters::ac274_native_vectors::ac274_numeric_form_bounds_reject_unsafe_float_conversion ... ok
+test adapters::ac274_native_vectors::ac274_permission_grant_has_required_profile_and_explicit_scope ... ok
+test adapters::ac274_native_vectors::ac274_numeric_form_bounds_compare_integral_limits_exactly ... ok
+test adapters::ac274_native_vectors::ac274_unqualified_form_schema_can_decline_but_cannot_accept ... ok
+test adapters::ac274_native_vectors::ac274_private_envelopes_preserve_context_without_debugging_secrets ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 318 filtered out; finished in 0.12s
+
