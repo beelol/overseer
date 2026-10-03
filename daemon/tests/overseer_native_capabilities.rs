@@ -177,18 +177,26 @@ fn ac200_failed_native_successor_launch_never_revives_predecessor_capability() {
         .unwrap()
         .1 = "/nonexistent/synthetic-native-launch-failure".into();
     d.spawn();
-    // One real new launch attempt, with its real durable turn and adapter failure.
-    let attempted = d.try_call(
-        "overseer.send",
-        json!({"text":"Summarize current work again.","surface":"ctl"}),
-    );
-    let failed = wait_idle(&d);
-    assert_eq!(failed["run_id"], run);
-    assert_eq!(
-        failed["run_status"], "failed",
-        "actual successor must fail: {attempted:?}; {failed}"
+    // One actual launch-boundary attempt avoids the conversation retry queue.
+    // A pre-effect adapter failure fails the durable new Turn, while the old
+    // run keeps its previous terminal status; that status is not this outcome.
+    let refused = d
+        .try_call(
+            "run.follow_up",
+            json!({"run_id":run,"prompt":"Summarize current work again."}),
+        )
+        .unwrap_err();
+    assert!(
+        refused.contains("claude executable not found"),
+        "actual adapter refusal: {refused}"
     );
     let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let failed: (i64,String,bool) = db.query_row("SELECT n,status,ended_ms IS NOT NULL FROM turns WHERE run_id=?1 ORDER BY n DESC LIMIT 1",[&run],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap();
+    assert_eq!(
+        failed,
+        (2, "failed".into(), true),
+        "actual durable successor failed before external effect"
+    );
     let bound: (i64,i64) = db.query_row("SELECT COUNT(*),SUM(revoked_ms IS NOT NULL) FROM overseer_tokens WHERE run_id=?1 AND native_turn_id IS NOT NULL", [&run], |r|Ok((r.get(0)?,r.get(1)?))).unwrap();
     assert_eq!(
         bound,
