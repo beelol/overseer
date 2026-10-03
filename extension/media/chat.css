@@ -220,7 +220,7 @@ pre.code.error { color: var(--ov-failed); }
 .mention-item[aria-selected="true"], .mention-item:hover { background: var(--ov-selected); }
 .mention-name { flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mention-dir { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ov-muted); font-size: var(--ov-font-sm); direction: rtl; text-align: left; }
-.queued { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 12px; border-radius: var(--ov-radius-card); border: 1px dashed var(--ov-border-strong); font-size: var(--ov-font-sm); }
+.queued { display: flex; flex-direction: column; align-items: stretch; gap: var(--ov-space-1); min-height: 30px; padding: 0 12px; border-radius: var(--ov-radius-card); border: 1px dashed var(--ov-border-strong); font-size: var(--ov-font-sm); }
 .queued-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .composer-note.warn { color: var(--ov-waiting); }
 
@@ -257,3 +257,10 @@ pre.code.error { color: var(--ov-failed); }
 .card-row-state.state-delivered, .card-row-state.state-picked_up, .card-row-state.state-answered { color: var(--ov-done); }
 .card-row-state.state-failed, .card-row-state.state-not_sent { color: var(--ov-failed); }
 .card-row-time { flex: none; color: var(--ov-muted); font-size: var(--ov-font-xs); font-variant-numeric: tabular-nums; }
+
+/* The shared queue in a chat or grid tile (AC-265). */
+.queued-head, .queued-row { display: flex; align-items: center; gap: var(--ov-space-2); min-height: 28px; }
+.queued[data-paused="true"] { border-color: var(--ov-waiting); }
+.queued-row .link { flex: none; }
+.tile-queue { flex: none; margin: var(--ov-space-1); max-height: 30%; overflow: auto; }
+.tile-queue .queued-row { font-size: var(--ov-font-sm); }

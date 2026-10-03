@@ -76,7 +76,7 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     // Not from the conversation.
     ("profile.create", NEVER), ("profile.rename", NEVER), ("profile.login_command", NEVER), ("profile.logout", NEVER),
     ("account.create", NEVER), ("account.remove", NEVER), ("workspace.cleanup", NEVER), ("audio.set", NEVER), ("audio.preview", NEVER),
-    ("audio.import_commander", NEVER), ("daemon.shutdown", NEVER), ("daemon.stop_all", NEVER), ("daemon.test_notice", NEVER), ("notices.set", NEVER),
+    ("audio.import_commander", NEVER), ("run.resume_queue", NEVER), ("run.clear_queue", NEVER), ("daemon.shutdown", NEVER), ("daemon.stop_all", NEVER), ("daemon.test_notice", NEVER), ("notices.set", NEVER),
     // Voice Mode (Gate R): the owner's own, never from the conversation.
     ("voice.get", "read"), ("voice.requests", "read"), ("voice.subscribe", "read"), ("voice.set", NEVER), ("voice.say", NEVER), ("voice.simulate", NEVER),
     ("voice.speak", NEVER), ("voice.focus", NEVER), ("voice.download", NEVER), ("voice.cancel", NEVER), ("voice.read_back", NEVER), ("voice.answer", NEVER),
@@ -158,7 +158,7 @@ impl Daemon {
         }
         let mut stopped = false;
         if now && ACTIVE.contains(&run.status.as_str()) {
-            self.interrupt(run_id)?;
+            self.interrupt_turn(run_id)?;
             stopped = true;
         }
         self.emit(Some(&run.task_id), Some(run_id), "hold", by, "exact", json!({"reason": reason, "by": by, "now": now, "stopped": stopped, "release_on": release, "card": card}))?;
@@ -360,7 +360,10 @@ impl Daemon {
     /// Stop the turn (where the harness can be stopped), keep a snapshot, and give the agent a
     /// new direction as its next turn.
     pub fn agent_redirect(self: &Arc<Self>, run_id: &str, text: &str, source: &str, detail: Value) -> Result<Value> {
+        let owner = self.queue_owner(run_id);
+        let run_id = owner.as_str();
         let run = self.run(run_id)?;
+        self.validate_follow_up_target(&run)?;
         if run.parent_run_id.is_some() {
             bail!("{} is a native child; it is steered through its parent", run.title);
         }
@@ -370,11 +373,24 @@ impl Daemon {
         }
         let ws = self.workspace(&run.workspace_id)?;
         let snap = self.take_snapshot(&ws, "redirect")?;
+        let gate = self.work_unit_gate(&format!("queue:{run_id}"));
+        let _guard = gate.lock().unwrap();
+        if self.queue_owner(run_id) != owner { drop(_guard); return self.agent_redirect(run_id, text, source, detail); }
+        let run = self.run(run_id)?;
         let active = ACTIVE.contains(&run.status.as_str());
         let mut detail = detail;
         detail["redirect"] = json!(true);
         detail["snapshot"] = json!(snap.id);
         let prompt = if source == "overseer" { format!("{}{text}", super::session::FROM_OVERSEER) } else { text.to_string() };
+        if self.queued_messages(run_id)?["paused"] == true {
+            let store = self.store.lock().unwrap();
+            let current: String = store.conn.query_row("SELECT owner_id FROM queue_owners WHERE run_id=?1", [run_id], |r| r.get(0)).unwrap_or_else(|_| run_id.to_string());
+            if current != owner { drop(store); drop(_guard); return self.agent_redirect(&current, text, source, detail); }
+            store.conn.execute("INSERT INTO queued_messages(run_id, ts, source, text, detail) VALUES(?1, ?2, ?3, ?4, ?5)", rusqlite::params![run_id, crate::daemon::now(), source, prompt, detail.to_string()])?;
+            drop(store);
+            self.emit(Some(&run.task_id), Some(run_id), "queued", source, "exact", json!({"text":text,"detail":detail,"paused":true}))?;
+            return Ok(json!({"run_id":run_id,"snapshot":snap.id,"delivery":"paused"}));
+        }
         let waits = run.status == crate::handoff::WAITING_FOR_CONNECTION || run.status == crate::handoff::WAITING_FOR_MEMORY;
         self.emit(Some(&run.task_id), Some(run_id), "redirect", source, "exact", json!({"text": text, "snapshot": snap.id, "stopped": active && !waits, "waiting": waits, "detail": detail}))?;
         if waits {
@@ -388,9 +404,13 @@ impl Daemon {
         }
         if active {
             // Queued first, so the turn that starts when the stop lands carries the direction.
-            self.store.lock().unwrap().conn.execute("INSERT INTO queued_messages(run_id, ts, source, text, detail) VALUES(?1, ?2, ?3, ?4, ?5)", rusqlite::params![run_id, crate::daemon::now(), source, prompt, detail.to_string()])?;
+            let store = self.store.lock().unwrap();
+            let current: String = store.conn.query_row("SELECT owner_id FROM queue_owners WHERE run_id=?1", [run_id], |r| r.get(0)).unwrap_or_else(|_| run_id.to_string());
+            if current != owner { drop(store); drop(_guard); return self.agent_redirect(&current, text, source, detail); }
+            store.conn.execute("INSERT INTO queued_messages(run_id, ts, source, text, detail) VALUES(?1, ?2, ?3, ?4, ?5)", rusqlite::params![run_id, crate::daemon::now(), source, prompt, detail.to_string()])?;
+            drop(store);
             let waits = matches!(crate::adapters::interrupt_plan(&run.harness), crate::adapters::InterruptPlan::Signal) && run.harness == "generic";
-            self.interrupt(run_id)?;
+            self.interrupt_turn(run_id)?;
             return Ok(json!({"run_id": run_id, "snapshot": snap.id, "delivery": if waits { "queued until the turn ends" } else { "stopping, then the direction" }}));
         }
         let turn = self.start_turn(run_id, &prompt, true, &TurnOpts { model: None, effort: None, mode: None, images: Vec::new(), ..Default::default() })?;
