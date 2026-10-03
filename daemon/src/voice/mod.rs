@@ -197,6 +197,25 @@ impl Voice {
             .unwrap_or_default()
     }
 
+    /// What the recognizer is told to expect besides its own vocabulary (AC-229): the agents'
+    /// titles and the repositories' names, so "the site repo" is heard as said.
+    pub fn recognizer_hint(&self) -> String {
+        // The names only, from the store: no git per repository (voice.get is asked often).
+        let agents = self.agent_names();
+        let repos: Vec<String> = {
+            let store = self.d.store.lock().unwrap();
+            let rows: Vec<String> = store
+                .conn
+                .prepare("SELECT repo_root FROM tasks GROUP BY repo_root ORDER BY MAX(created_ms) DESC LIMIT 50")
+                .and_then(|mut stmt| stmt.query_map([], |r| r.get::<_, String>(0)).map(|it| it.flatten().collect()))
+                .unwrap_or_default();
+            rows.iter()
+                .filter_map(|r| std::path::Path::new(r).file_name().map(|n| n.to_string_lossy().to_string()))
+                .collect()
+        };
+        hint_words(&agents, &repos)
+    }
+
     /// The state the mark shows (AC-177).
     pub fn state(&self, s: &Settings) -> (&'static str, Option<String>) {
         let st = self.st.lock().unwrap();
@@ -301,7 +320,7 @@ impl Voice {
                 model.display().to_string(),
             ]);
         }
-        let names = self.agent_names().join(", ");
+        let names = self.recognizer_hint();
         if !names.is_empty() {
             args.extend(["--hint".into(), names]);
         }
@@ -551,7 +570,7 @@ pub fn start(d: Arc<Daemon>) {
         crate::log(&format!("voice: not started: {e}"));
         v.st.lock().unwrap().failed = Some(e.to_string());
     }
-    // Keep the recognizer's hint to the agents that run.
+    // Keep the recognizer's hint to the agents that run and the repositories used (AC-229).
     let h = v.clone();
     std::thread::spawn(move || {
         let mut last = String::new();
@@ -560,7 +579,7 @@ pub fn start(d: Arc<Daemon>) {
             if !h.running() {
                 continue;
             }
-            let names = h.agent_names().join(", ");
+            let names = h.recognizer_hint();
             if names != last {
                 h.send(json!({"cmd": "hint", "text": names}));
                 last = names;
@@ -568,6 +587,19 @@ pub fn start(d: Arc<Daemon>) {
         }
     });
     request::start(&v);
+}
+
+/// The recognizer's hint from the agents' titles and the repositories' names: each once, in that
+/// order (AC-229).
+pub fn hint_words(agents: &[String], repos: &[String]) -> String {
+    let mut out: Vec<&str> = Vec::new();
+    for n in agents.iter().chain(repos) {
+        let n = n.trim();
+        if !n.is_empty() && !out.iter().any(|x| x.eq_ignore_ascii_case(n)) {
+            out.push(n);
+        }
+    }
+    out.join(", ")
 }
 
 fn get_voice() -> Result<&'static Arc<Voice>> {
@@ -581,6 +613,8 @@ pub fn get(d: &Arc<Daemon>) -> Result<Value> {
     let (state, reason) = v.state(&s);
     // Before the state's lock: the targets read the request list and the cards.
     let targeted = request::targeted(d);
+    // Also before it: the hint reads the store and the roster (AC-229).
+    let hint = v.recognizer_hint();
     let st = v.st.lock().unwrap();
     let model_path = model::path(&s.model);
     Ok(json!({
@@ -600,6 +634,8 @@ pub fn get(d: &Arc<Daemon>) -> Result<Value> {
         },
         "model": {"name": s.model, "downloaded": model_path.exists() || simulated(), "bytes": model::size(&s.model), "download": st.download},
         "targeted": targeted,
+        // What the recognizer is told to expect besides its vocabulary (AC-229).
+        "hint": hint,
         "listener": {"running": st.pid.is_some(), "pid": st.pid, "restarts": st.restarts.len(),
             "last_error": st.last_error.as_ref().map(|(m, at)| json!({"message": m, "at": at}))},
     }))
@@ -930,4 +966,15 @@ fn app_name(id: &str) -> String {
                 id.to_string()
             }
         })
+}
+
+#[cfg(test)]
+mod hint_tests {
+    /// AC-229: the hint names the agents and the repositories, each once.
+    #[test]
+    fn the_hint_names_agents_and_repositories() {
+        let h = super::hint_words(&["Phone".into(), "Site draft".into()], &["site".into(), "notes".into(), "Phone".into()]);
+        assert_eq!(h, "Phone, Site draft, site, notes");
+        assert_eq!(super::hint_words(&[], &[]), "");
+    }
 }
