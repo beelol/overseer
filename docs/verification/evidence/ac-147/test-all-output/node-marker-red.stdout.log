@@ -1,0 +1,35 @@
+✖ Node observed cross marker retains the failed test identity before assertion frames (3.561542ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 35.067416
+
+✖ failing tests:
+
+test at test/scripts/test-all-output.test.js:125:1
+✖ Node observed cross marker retains the failed test identity before assertion frames (3.561542ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /✖ node_actual_boundary_failure \(2ms\)/. Input:
+  
+  '▶ Synthetic Rust … \n' +
+    'FAILED (0s)\n' +
+    '      AssertionError [ERR_ASSERTION]: synthetic boundary failed\n' +
+    '          at TestContext.<anonymous> (test.js:42:10)\n' +
+    '          at Test.run (node:internal/test_runner/test:1397:25)\n' +
+    '    raw logs: /var/folders/mk/vz_j1tqn0rz6w6f4ztwfv0gr0000gn/T/test-all-output-eIYWCI/.test-all-logs/ta-synthetic/001-synthetic-rust'
+  
+      at TestContext.<anonymous> (/private/tmp/overseer-test-all-failure-evidence-20261003/test/scripts/test-all-output.test.js:129:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '▶ Synthetic Rust … \nFAILED (0s)\n      AssertionError [ERR_ASSERTION]: synthetic boundary failed\n          at TestContext.<anonymous> (test.js:42:10)\n          at Test.run (node:internal/test_runner/test:1397:25)\n    raw logs: /var/folders/mk/vz_j1tqn0rz6w6f4ztwfv0gr0000gn/T/test-all-output-eIYWCI/.test-all-logs/ta-synthetic/001-synthetic-rust',
+    expected: /✖ node_actual_boundary_failure \(2ms\)/,
+    operator: 'match',
+    diff: 'simple'
+  }

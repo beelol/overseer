@@ -1,0 +1,15 @@
+✔ failing test and panic context survive many successful error-named cases (3.024541ms)
+✔ failed stage preserves separate complete raw streams in a recoverable directory (1.457666ms)
+✔ spawn refusal is actionable even without stdout or stderr (1.252458ms)
+✔ buffer termination records partial streams and signal instead of implying complete evidence (1.316792ms)
+✔ raw evidence preserves binary bytes rather than UTF8 replacement characters (1.838667ms)
+✔ unsafe evidence destination fails stage without writing outside its private directory (0.878917ms)
+✔ parallel capture enforces one aggregate byte ceiling and keeps each stream separate (0.073917ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 39.98575

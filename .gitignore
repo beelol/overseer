@@ -6,3 +6,6 @@ extension/dist/
 extension/branch-diff/dist/
 extension/bin/
 extension/tooling/vsce/node_modules
+
+# Local private raw test-all receipts; review before publishing scoped evidence.
+/.test-all-logs/

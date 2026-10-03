@@ -1,0 +1,18 @@
+{
+  "source": "af8c3296c31898079d96307bb572c95923b280d3",
+  "command": [
+    "nice",
+    "-n",
+    "20",
+    "node",
+    "--test",
+    "test/scripts/test-all-output.test.js"
+  ],
+  "exit": 0,
+  "seconds": 0.104,
+  "sha256": {
+    "scripts/test-all": "72926e3c71716898b29f6fbd84c8b63199aeff5ff1830339661c03ff1cdc1631",
+    "scripts/test-output.js": "ac9cba4514fef8a6816f29e564445a5a7a58de2250762805f577ad29784068e5",
+    "test/scripts/test-all-output.test.js": "bc53baccea5746c765a054d2a200e7a48a2586ac12e6cb69a2ee6d2a35850722"
+  }
+}
