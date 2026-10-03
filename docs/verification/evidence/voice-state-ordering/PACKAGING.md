@@ -16,9 +16,16 @@ The intermittent original packaged failures remain unexplained.
 - Copied only ignored tooling dependencies from the frozen fe643 checkout:
   `extension/tooling/vsce/node_modules` and
   `extension/branch-diff/tooling/review/node_modules`. Their package and lockfiles
-  match both checkouts exactly; hashes are recorded in the setup inspection.
+  match both checkouts exactly; hashes are recorded below.
   Locked vsce is 3.9.2. No install, test, source check, build or UI was executed
   while making these copies.
+
+| Locked file (same in both checkouts) | SHA-256 |
+| --- | --- |
+| `extension/tooling/vsce/package.json` | `ae67d83aca1c0a1e3a412ed954ee840be27a17b04fe1c4590c5b108471beaea1` |
+| `extension/tooling/vsce/package-lock.json` | `adae283b64343ead7e297fc035d043e9e8fe6e3777ab98f8f5234eb8381347a1` |
+| `extension/branch-diff/tooling/review/package.json` | `baac6c3280fc8718927e31db30a69c67ea447670e42609e62bb3a1de4eb1bdae` |
+| `extension/branch-diff/tooling/review/package-lock.json` | `1fe2ae63770ee56e6e4b0dfb3c0913967ffde6f6f31bc87df4e282c55fc01a23` |
 
 Exact preparation commands already executed:
 
