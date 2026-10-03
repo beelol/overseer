@@ -910,6 +910,33 @@ mod slice2 {
     fn captured_needs_handle_does_not_propose_a_new_native_request() { captured_needs_cannot_rebind("handle what needs me"); }
 
     #[test]
+    fn needs_handle_reports_stale_preparation_after_initial_capture_recheck() {
+        let hold=AnswerGate::new(); let native=tmp(); let release_native=native.path().join("replace-after-check");
+        let mut resolved=vector("resolved_integer"); resolved["params"]["threadId"]=json!("$THREAD");
+        let s=hold.start(vec![emit(command(json!(7),"handle-captured-A")),mark(ONE),gate(&release_native),
+            emit(resolved),emit(command(json!(8),"handle-replacement-B")),mark(TWO)]);
+        s.marker(ONE,1); let old=s.requests()[0].clone();
+        // Cancel only existing host proposals, leaving native A waiting so
+        // Handle must prepare its checked proposal after the capture recheck.
+        let session=s.daemon.call("overseer.session",json!({}));
+        for proposal in session["proposals"].as_array().into_iter().flatten().filter(|p|p["state"] == "open") {
+            s.daemon.call("overseer.cancel",json!({"id":proposal["id"],"by":"owner"}));
+        }
+        assert!(native_replies(&s).is_empty()); hold.arm("needs_preparing",&old);
+        let mut worker=HeldAnswer::start_call(&s,&hold,"overseer.send",json!({"text":"handle what needs me","surface":"vscode"}));
+        worker.wait_reached(&hold,"needs_preparing",&old);
+        std::fs::write(release_native,"release").unwrap(); s.marker(TWO,1); hold.release();
+        let reply=worker.finish(); assert!(serde_json::to_string(&reply).unwrap().contains("stale_request"),
+            "preparation failure is visible, not old A Allow-it text with proposal:null: {reply}");
+        assert!(native_replies(&s).is_empty(),"Handle is a question, not an approval");
+        let current=s.requests().into_iter().find(|r|r["lifecycle"] == "pending").unwrap();
+        assert_eq!(s.daemon.call("run.request.answer",answer_params(&s,&current,
+            frozen("command_command_decline")["answer"].clone()))["delivery"],"written");
+        let mut expected=frozen("command_command_decline")["response"].clone();expected["id"]=json!(8);
+        assert_eq!(wait_replies(&s,1),vec![expected]);s.no_protected_action();
+    }
+
+    #[test]
     fn written_typed_native_declines_preserve_once_only_no_workaround_ledger() {
         for compatibility in [false,true] {
             let s = Script::start("codex-app","codex-cli 0.158.0",vec![emit(command(json!(7),"owner-denied-command")),mark(ONE)]);

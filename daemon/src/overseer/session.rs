@@ -740,6 +740,7 @@ impl Daemon {
     /// Only a captured daemon Waiting enters here. Model JSON selectors still
     /// use normal preparation, which replaces them rather than trusting them.
     pub(super) fn overseer_propose_expected_permission(self: &Arc<Self>, expected: &super::needs::Waiting, allow: bool) -> Result<Value> {
+        crate::pending_requests::answers::hold("needs_preparing", &expected.request)?;
         self.overseer_propose_checked(&json!([{"action":"permission","agent":expected.run,
             "allow_request":allow,"why":"the owner answered the captured Needs question"}]),"needs",Some("needs"),None,Some(expected))
     }
