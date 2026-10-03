@@ -1,0 +1,136 @@
+   Compiling overseerd v0.1.0 (/private/tmp/overseer-typed-native-20261003/daemon)
+warning: unused import: `revision`
+ --> daemon/src/mods/bindings.rs:5:5
+  |
+5 |     revision,
+  |     ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: value assigned to `note` is never read
+   --> daemon/src/background.rs:377:17
+    |
+377 |         let mut note = String::new();
+    |                 ^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` on by default
+
+warning: methods `workspace_diff` and `state` are never used
+    --> daemon/src/daemon.rs:3738:12
+     |
+433  | impl Daemon {
+     | ----------- methods in this implementation
+...
+3738 |     pub fn workspace_diff(&self, workspace_id: &str, base: &str) -> Result<Value> {
+     |            ^^^^^^^^^^^^^^
+...
+3793 |     pub fn state(&self) -> Result<Value> {
+     |            ^^^^^
+     |
+     = note: `#[warn(dead_code)]` on by default
+
+warning: field `device_name` is never read
+  --> daemon/src/gateway/mod.rs:86:9
+   |
+84 | pub struct Session {
+   |            ------- field in this struct
+85 |     pub device_id: String,
+86 |     pub device_name: String,
+   |         ^^^^^^^^^^^
+
+warning: function `decorate` is never used
+    --> daemon/src/voice/request.rs:2158:8
+     |
+2158 | pub fn decorate(d: &Daemon, actions: &mut [Value]) -> Result<bool> {
+     |        ^^^^^^^^
+
+warning: method `is_clean` is never used
+   --> daemon/src/git.rs:299:12
+    |
+298 | impl Status {
+    | ----------- method in this implementation
+299 |     pub fn is_clean(&self) -> bool {
+    |            ^^^^^^^^
+
+warning: function `tree_has` is never used
+   --> daemon/src/git.rs:356:8
+    |
+356 | pub fn tree_has(workspace: &Path, tree_ish: &str, path: &str) -> bool {
+    |        ^^^^^^^^
+
+warning: function `show_blob` is never used
+   --> daemon/src/git.rs:360:8
+    |
+360 | pub fn show_blob(workspace: &Path, tree_ish: &str, path: &str) -> Result<Vec<u8>> {
+    |        ^^^^^^^^^
+
+warning: function `worktree_list` is never used
+   --> daemon/src/git.rs:368:8
+    |
+368 | pub fn worktree_list(repo: &Path) -> Vec<PathBuf> {
+    |        ^^^^^^^^^^^^^
+
+warning: field `model` is never read
+   --> daemon/src/opencode_bridge.rs:260:9
+    |
+243 | pub struct Turn {
+    |            ---- field in this struct
+...
+260 |     pub model: String,
+    |         ^^^^^
+
+warning: function `is_session_event` is never used
+    --> daemon/src/overseer/session.rs:2161:8
+     |
+2161 | pub fn is_session_event(kind: &str) -> bool {
+     |        ^^^^^^^^^^^^^^^^
+
+warning: method `child_by_native` is never used
+    --> daemon/src/store.rs:1122:12
+     |
+189  | impl Store {
+     | ---------- method in this implementation
+...
+1122 |     pub fn child_by_native(&self, parent: &str, native: &str) -> Result<Option<Run>> {
+     |            ^^^^^^^^^^^^^^^
+
+warning: `overseerd` (bin "overseerd" test) generated 12 warnings (run `cargo fix --bin "overseerd" --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 12.39s
+     Running unittests src/main.rs (/private/tmp/overseer-closeout-verify-target/debug/deps/overseerd-e1f16db50435eb72)
+
+running 5 tests
+
+thread 'adapters::ac274_native_vectors::ac274_command_offer_does_not_invent_session_authority' panicked at daemon/src/adapters.rs:1643:9:
+native decline-only request was given a persistent approval: [Permission { request_id: "7", tool: "command: printf fixture", input: Object {"availableDecisions": Array [String("decline")], "command": String("printf fixture"), "itemId": String("item-fixture"), "startedAtMs": Number(1000), "threadId": String("thread-fixture"), "turnId": String("turn-fixture")}, always: Some(Object {"label": String("this command for the rest of the session")}) }]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::ac274_native_vectors::ac274_command_offer_does_not_invent_session_authority ... FAILED
+
+thread 'adapters::ac274_native_vectors::ac274_invalid_native_ids_never_become_pending_permissions' panicked at daemon/src/adapters.rs:1630:13:
+malformed native id became an answerable permission: "invalid_raw_id_7.5" [Permission { request_id: "7.5", tool: "command: printf fixture", input: Object {"command": String("printf fixture"), "itemId": String("item-fixture"), "startedAtMs": Number(1000), "threadId": String("thread-fixture"), "turnId": String("turn-fixture")}, always: Some(Object {"label": String("this command for the rest of the session")}) }]
+test adapters::ac274_native_vectors::ac274_invalid_native_ids_never_become_pending_permissions ... FAILED
+
+thread 'adapters::ac274_native_vectors::ac274_legacy_decisions_match_the_installed_method_schema' panicked at daemon/src/adapters.rs:1611:17:
+assertion `left == right` failed: "legacy_execCommandApproval_allow"
+  left: Object {"id": Number(7), "result": Object {"decision": String("accept")}}
+ right: Object {"id": Number(7), "result": Object {"decision": String("approved")}}
+test adapters::ac274_native_vectors::ac274_legacy_decisions_match_the_installed_method_schema ... FAILED
+
+thread 'adapters::ac274_native_vectors::ac274_permission_grant_has_required_profile_and_explicit_scope' panicked at daemon/src/adapters.rs:1621:9:
+assertion `left == right` failed: required permissions/scope were lost
+  left: Object {"id": Number(7), "result": Object {"decision": String("accept")}}
+ right: Object {"id": Number(7), "result": Object {"permissions": Object {"fileSystem": Object {"entries": Array [Object {"access": String("write"), "path": Object {"path": String("/fixture/work"), "type": String("path")}}, Object {"access": String("deny"), "path": Object {"path": String("/fixture/work/private"), "type": String("path")}}, Object {"access": String("read"), "path": Object {"pattern": String("/fixture/work/*.txt"), "type": String("glob_pattern")}}, Object {"access": String("read"), "path": Object {"type": String("special"), "value": Object {"kind": String("project_roots"), "subpath": String("assets")}}}], "globScanMaxDepth": Number(3), "read": Array [String("/fixture/read")], "write": Array [String("/fixture/work")]}, "network": Object {"enabled": Bool(true)}}, "scope": String("turn"), "strictAutoReview": Bool(true)}}
+test adapters::ac274_native_vectors::ac274_permission_grant_has_required_profile_and_explicit_scope ... FAILED
+test adapters::ac274_native_vectors::ac274_integer_and_string_ids_round_trip_without_conflation ... ok
+
+failures:
+
+failures:
+    adapters::ac274_native_vectors::ac274_command_offer_does_not_invent_session_authority
+    adapters::ac274_native_vectors::ac274_invalid_native_ids_never_become_pending_permissions
+    adapters::ac274_native_vectors::ac274_legacy_decisions_match_the_installed_method_schema
+    adapters::ac274_native_vectors::ac274_permission_grant_has_required_profile_and_explicit_scope
+
+test result: FAILED. 1 passed; 4 failed; 0 ignored; 0 measured; 318 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `-p overseerd --bin overseerd`

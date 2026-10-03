@@ -1,0 +1,11 @@
+{
+  "source": "263c83631b0087bfa4a16132ac0baeb777f17105",
+  "command": "nice -n 20 node --test test/scripts/test-all-output.test.js",
+  "exit": 0,
+  "seconds": 0.077,
+  "files": {
+    "scripts/test-all": "72926e3c71716898b29f6fbd84c8b63199aeff5ff1830339661c03ff1cdc1631",
+    "scripts/test-output.js": "73a2c12ef6c72b829789b06be23d49fe19478ffe9976778eb3bc272c357498dc",
+    "test/scripts/test-all-output.test.js": "b8ded8402e49372652d9075152c75e3ceb90dc4e9b5586172acd3e8141c64891"
+  }
+}

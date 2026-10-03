@@ -1,0 +1,109 @@
+✖ failing test and panic context survive many successful error-named cases (1.753375ms)
+✖ failed stage preserves separate complete raw streams in a recoverable directory (1.103875ms)
+✖ spawn refusal is actionable even without stdout or stderr (0.689ms)
+✖ buffer termination records partial streams and signal instead of implying complete evidence (0.666542ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 0
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 35.214042
+
+✖ failing tests:
+
+test at test/scripts/test-all-output.test.js:39:1
+✖ failing test and panic context survive many successful error-named cases (1.753375ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /test actual_delayed_origin_boundary \.\.\. FAILED/. Input:
+  
+  '▶ Synthetic Rust … \n' +
+    'FAILED (0s)\n' +
+    '    test credential_error_case_0 ... ok\n' +
+    '    test credential_error_case_1 ... ok\n' +
+    '    test credential_error_case_2 ... ok\n' +
+    '    test credential_error_case_3 ... ok\n' +
+    '    test credential_error_case_4 ... ok\n' +
+    '    test credential_error_case_5 ... ok\n' +
+    '    test credential_error_case_6 ... ok\n' +
+    '    test credential_error_case_7 ... ok\n' +
+    '    test credential_error_case_8 ... ok\n' +
+    '    test credential_error_case_9 ... ok\n' +
+    '    test credential_error_case_10 ... ok\n' +
+    '    test credential_error_case_11 ... ok'
+  
+      at TestContext.<anonymous> (/private/tmp/overseer-test-all-output-baseline-20261003/test/scripts/test-all-output.test.js:42:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '▶ Synthetic Rust … \nFAILED (0s)\n    test credential_error_case_0 ... ok\n    test credential_error_case_1 ... ok\n    test credential_error_case_2 ... ok\n    test credential_error_case_3 ... ok\n    test credential_error_case_4 ... ok\n    test credential_error_case_5 ... ok\n    test credential_error_case_6 ... ok\n    test credential_error_case_7 ... ok\n    test credential_error_case_8 ... ok\n    test credential_error_case_9 ... ok\n    test credential_error_case_10 ... ok\n    test credential_error_case_11 ... ok',
+    expected: /test actual_delayed_origin_boundary \.\.\. FAILED/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test/scripts/test-all-output.test.js:48:1
+✖ failed stage preserves separate complete raw streams in a recoverable directory (1.103875ms)
+  AssertionError [ERR_ASSERTION]: exact stage evidence directory
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (/private/tmp/overseer-test-all-output-baseline-20261003/test/scripts/test-all-output.test.js:52:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/scripts/test-all-output.test.js:64:1
+✖ spawn refusal is actionable even without stdout or stderr (0.689ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /ENOENT/. Input:
+  
+  '▶ Synthetic Rust … \nFAILED (0s)\n'
+  
+      at TestContext.<anonymous> (/private/tmp/overseer-test-all-output-baseline-20261003/test/scripts/test-all-output.test.js:68:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '▶ Synthetic Rust … \nFAILED (0s)\n',
+    expected: /ENOENT/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test/scripts/test-all-output.test.js:77:1
+✖ buffer termination records partial streams and signal instead of implying complete evidence (0.666542ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /ENOBUFS/. Input:
+  
+  '▶ Synthetic Rust … \nFAILED (0s)\n'
+  
+      at TestContext.<anonymous> (/private/tmp/overseer-test-all-output-baseline-20261003/test/scripts/test-all-output.test.js:81:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '▶ Synthetic Rust … \nFAILED (0s)\n',
+    expected: /ENOBUFS/,
+    operator: 'match',
+    diff: 'simple'
+  }

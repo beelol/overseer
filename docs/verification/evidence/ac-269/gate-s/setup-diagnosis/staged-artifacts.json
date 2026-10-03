@@ -1,0 +1,11 @@
+{
+  "head": "116c9cb8c5ebfe02dfdcd05c7003e69a6ded1f7b",
+  "uncommitted_delta": "test-only staged session counts",
+  "source": "/private/tmp/overseer-mods-gate-s-20261003",
+  "sha256": {
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/tests/mods_gate_s.rs": "28d15a044a98ad6a391d232273c9da64d71feacda3ab28c9040ce0faa0cc97f9",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/mods/read.rs": "2d4f934c14cf13fb792f51c1fa23f317fdb8b66e3596f98731cea88faf37b66a",
+    "/private/tmp/overseer-closeout-verify-target/debug/overseerd": "6387bac94e3078d556aa934babd8fe33f1f0f8e0b7ad51cdb8d3e3d13066e54f",
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_gate_s-00b0d44fe604f213": "fd75a5b9bbc6c6b207ee3eed3ff15d29132bce95d25ed3e3face8be78161f3c6"
+  }
+}

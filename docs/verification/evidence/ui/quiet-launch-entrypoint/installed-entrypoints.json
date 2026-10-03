@@ -1,0 +1,26 @@
+{
+  "version": "1.140.0",
+  "source_baseline": "9dc165d0",
+  "sources": [
+    {
+      "file": "main.js",
+      "bytes": 100062,
+      "sha256": "9c53537921441d64c089b9ab38bd9c17052648e58e0972f053e82c2f341b5968",
+      "constructor_matches": 0
+    },
+    {
+      "file": "mainImpl.js",
+      "bytes": 1316282,
+      "sha256": "8ca138202adb8b6db6d2c956c83ccbdc6e484428da79b1152cf678a86d887350",
+      "constructor_matches": 1
+    }
+  ],
+  "constructor_source": "new Jn.BrowserWindow(et)",
+  "breakpoint": {
+    "file": "mainImpl.js",
+    "lineNumber": 96,
+    "columnNumber": 60051
+  },
+  "source_read_only": true,
+  "ui_run": false
+}

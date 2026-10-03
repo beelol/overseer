@@ -1,0 +1,22 @@
+[
+  {
+    "token": "subtype:\"can_use_tool\"",
+    "offset": 205216758,
+    "excerpt": "\"))||ie:ie,De=GQ(Qf(r)),ce=Y(T5(r.name),m.storageV5,m.credentials),K=e.request({subtype:\"can_use_tool\",tool_name:r.name,...r.mcpInfo&&{mcp_server:M6n(r.mcpInfo)},display_name:T5(r.name),input:b,...le&&{description:le},...De&&{tool_kind:\"browser\"},permission_suggestions:v,blocked_path:g.blockedPath,decision_reason:ae,decision_reason_type:M?.type,decision_reason_code:Sme(M),...g.matchedAskRule&&{matched_ask_rule:{source:g.matchedAskRule.source,tool_name:g.matchedAskRule.ruleValue.toolName,...g.matchedAskRule.ruleValue.ruleContent!==void 0&&{rule_content:g.matchedAskRule.ruleValue.ruleContent}}},cl"
+  },
+  {
+    "token": "subtype:\"elicitation\"",
+    "offset": 205255553,
+    "excerpt": "ires_action\",b),this.onUserDialogParked?.(b);try{return await this.sendRequest({subtype:\"elicitation\",mcp_server_name:s,message:e,mode:p,url:m,elicitation_id:h,requested_schema:n,title:y?.title,display_name:y?.displayName,description:y?.description},nYr(),r,{requestId:g})}catch{return{action:\"cancel\"}}finally{this.settlePublishedPrompt(g,!r?.aborted)}}async requestUserDialog(s,e,n){if(Hr()){if(n?.signal?.aborted)return{behavior:\"cancelled\"};return fS()}let r=x(),p=Fgn(s,e,r,n?.toolUseId);if(this.publishedPendingActionDetails.set(r,p),this.sessionState.notifyStateChanged(\"requires_action\",p),thi"
+  },
+  {
+    "token": "subtype:\"request_user_dialog\"",
+    "offset": 205256577,
+    "excerpt": "ind:on(w),timeout_ms:g})},m,r,s,m),h.unref();try{return await this.sendRequest({subtype:\"request_user_dialog\",dialog_kind:s,payload:e,tool_use_id:n?.toolUseId},Lzt(),n?.signal,{requestId:r})}catch{return{behavior:\"cancelled\"}}finally{if(h!==void 0)clearTimeout(h);this.unansweredSettleHandlers.delete(r),this.settlePublishedPrompt(r,!this.timedOutUserDialogs.has(r))}}createSandboxAskCallback(s,e,n,r){let p=new Map,m=async(h)=>{if(zG(h))return t(`[StructuredIO] Refusing a sandbox network ask for a host srt would re-spell: ${S(h)}`,{level:\"warn\"}),!1;try{let y={type:\"addRules\",rules:[{toolName:_r,ruleConte"
+  },
+  {
+    "token": "subtype:\"hook_callback\"",
+    "offset": 205251285,
+    "excerpt": "okAnswer)return this.retiredHostHookAnswer(r);try{let h=await this.sendRequest({subtype:\"hook_callback\",callback_id:s,input:r,tool_use_id:p||void 0},KJ(),m);return acr(),h}catch(h){if(rt(h))throw h;return acr(),console.error(`Error in hook callback ${s}:`,h),{}}}}}async sendUiHostRequest(s,e,n){if(!q5t(this.uiSurfaceChannel()))return;try{return await this.sendRequest(s,e,AbortSignal.timeout(n))}catch{return}}sendDeviceHookCallback(s){let e=x(),n=this.trackDeviceRequest(e,\"hook\",(h)=>ve(h)!==null),r=new AbortController,p=s.signal?AbortSignal.any([s.signal,r.signal]):r.signal,m=this.sendRequest({su"
+  }
+]

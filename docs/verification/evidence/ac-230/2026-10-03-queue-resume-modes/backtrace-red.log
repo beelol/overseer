@@ -1,0 +1,30 @@
+
+running 1 test
+test ac230_typed_conversations_set_each_mode_and_start_one_in_auto ... 
+thread 'ac230_typed_conversations_set_each_mode_and_start_one_in_auto' panicked at daemon/tests/overseer_modes.rs:90:9:
+no echo from r-55aaf6b22461
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/panicking.rs:75:14
+   2: overseer_modes::echoed_argv
+             at ./daemon/tests/overseer_modes.rs:90:9
+   3: overseer_modes::ac230_typed_conversations_set_each_mode_and_start_one_in_auto
+             at ./daemon/tests/overseer_modes.rs:134:16
+   4: overseer_modes::ac230_typed_conversations_set_each_mode_and_start_one_in_auto::{{closure}}
+             at ./daemon/tests/overseer_modes.rs:98:67
+   5: core::ops::function::FnOnce::call_once
+             at /Users/bilal/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    ac230_typed_conversations_set_each_mode_and_start_one_in_auto
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 32.92s
+

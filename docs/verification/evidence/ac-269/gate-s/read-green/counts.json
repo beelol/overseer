@@ -1,0 +1,78 @@
+{
+  "read": {
+    "passed": 11,
+    "failed": 0,
+    "filtered": 0,
+    "actual_names": [
+      "common::base32::tests::base32_round_trips_and_matches_rfc_vectors",
+      "common::noise::tests::a_wrong_pairing_secret_fails_in_the_first_message",
+      "common::noise::tests::large_messages_are_chunked_and_joined",
+      "common::noise::tests::noise_vectors_match_the_shared_file",
+      "daemon_created_watcher_reads_only_its_actual_subject",
+      "existing_agent_watch_membership_changes_native_read_target_then_restores_self",
+      "native_mods_read_rejects_authority_fields_and_every_mutation_operation",
+      "native_overseer_reads_list_and_delivery_without_private_text_or_mutation",
+      "ordinary_native_reads_project_self_and_hide_unrelated_library",
+      "unknown_native_token_cannot_read_even_when_arguments_claim_owner",
+      "watcher_without_active_subject_has_no_native_mods_read_fallback"
+    ]
+  },
+  "bindings": {
+    "passed": 14,
+    "failed": 0,
+    "filtered": 0,
+    "actual_names": [
+      "all_agents_excludes_watchers_and_overseer_with_separate_overrides",
+      "binding_revisions_metadata_locks_and_targets_fail_without_mutation",
+      "common::base32::tests::base32_round_trips_and_matches_rfc_vectors",
+      "common::noise::tests::a_wrong_pairing_secret_fails_in_the_first_message",
+      "common::noise::tests::large_messages_are_chunked_and_joined",
+      "common::noise::tests::noise_vectors_match_the_shared_file",
+      "concurrent_clients_cannot_overwrite_each_others_revision",
+      "existing_agent_enters_and_leaves_watcher_scope_with_actual_watch_membership",
+      "filters_match_exact_harness_model_and_shared_account_not_profile_name",
+      "group_precedence_disjoint_styles_and_locked_off_parent_are_explicit",
+      "locked_style_holds_when_watch_end_changes_applicable_scope",
+      "overlapping_styles_are_rejected_before_any_run_and_rules_order_is_stable",
+      "repository_identity_is_shared_by_linked_worktrees_and_override_is_narrow",
+      "same_named_version_update_keeps_binding_pinned_after_restart"
+    ]
+  },
+  "delivery": {
+    "passed": 21,
+    "failed": 0,
+    "filtered": 0,
+    "actual_names": [
+      "actual_paused_queue_admits_mods_only_on_owner_release_after_restart",
+      "common::base32::tests::base32_round_trips_and_matches_rfc_vectors",
+      "common::noise::tests::a_wrong_pairing_secret_fails_in_the_first_message",
+      "common::noise::tests::large_messages_are_chunked_and_joined",
+      "common::noise::tests::noise_vectors_match_the_shared_file",
+      "credential_text_keeps_private_delivery_bytes_but_public_views_and_replay_are_redacted",
+      "dynamic_local_model_selection_is_explicitly_unsupported_before_local_effects",
+      "failed_live_stdin_attempt_is_reported_uncertain_and_preserves_open_occupancy",
+      "future_local_candidate_bound_refuses_required_uncertainty_actionably",
+      "live_stdin_changes_next_turn_only_and_removal_keeps_saved_history",
+      "malformed_manifest_error_redacts_source_without_losing_error_code",
+      "native_child_controls_precede_mods_and_missing_proof_stays_unknown",
+      "no_mod_transport_is_unchanged_and_first_follow_up_snapshots_capture_full_text",
+      "oversize_optional_text_is_bypassed_whole_and_required_text_refuses_before_spawn",
+      "pre_effect_failure_records_unknown_consumption_and_legacy_latest_turn_is_unknown",
+      "prepared_snapshot_without_transport_acceptance_is_pending_after_restart",
+      "required_future_local_model_is_unqualified_without_inventory_or_admission",
+      "retry_after_restart_and_removal_reuses_original_snapshot_without_duplicate_text",
+      "shared_overseer_session_delivers_separate_binding_on_first_and_subsequent_turns",
+      "snapshot_admission_is_atomic_and_held_turn_uses_settings_at_release",
+      "unknown_future_local_model_preserves_required_and_owner_off_precedence"
+    ]
+  },
+  "native-incumbent": {
+    "passed": 2,
+    "failed": 0,
+    "filtered": 35,
+    "actual_names": [
+      "ac180_mcp_shim_serves_overseers_tools_from_the_daemon",
+      "ac180_tokens_decide_who_may_call_what"
+    ]
+  }
+}

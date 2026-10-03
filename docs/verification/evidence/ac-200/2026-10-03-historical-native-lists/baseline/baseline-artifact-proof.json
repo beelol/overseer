@@ -1,0 +1,18 @@
+[
+  {
+    "kind": "daemon",
+    "manifest_path": "/private/tmp/overseer-native-legacy-lists-20261003/daemon/Cargo.toml",
+    "source": "/private/tmp/overseer-native-legacy-lists-20261003/daemon/src/main.rs",
+    "fresh": false,
+    "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+    "sha256": "a36cb58955ba0a4a3993cdba0680751461d40d7576ceadbea7ed4bb2f567f53a"
+  },
+  {
+    "kind": "test",
+    "manifest_path": "/private/tmp/overseer-native-legacy-lists-20261003/daemon/Cargo.toml",
+    "source": "/private/tmp/overseer-native-legacy-lists-20261003/daemon/tests/overseer_native_legacy_lists.rs",
+    "fresh": false,
+    "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/overseer_native_legacy_lists-4b9bbd993d6c2f6c",
+    "sha256": "d7ea6826b38634fc2bb7057aab54dfa76287b5b45b2a066c972e7cbb82fa565f"
+  }
+]

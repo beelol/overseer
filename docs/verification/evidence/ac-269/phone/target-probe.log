@@ -1,0 +1,29 @@
+nice: setpriority: Operation not permitted
+
+> overseer-phone@0.1.0 test
+> jest --runInBand --cacheDirectory /private/tmp/overseer-mods-phone-jest src/screens/__tests__/ModsScreen.test.tsx -t old reply resolved
+
+PASS src/screens/__tests__/ModsScreen.test.tsx
+  ✓ an old reply resolved during the new target commit never supplies its view (40 ms)
+  ○ skipped installed, desired and last recorded delivery are distinct for full
+  ○ skipped installed, desired and last recorded delivery are distinct for watch
+  ○ skipped last prepared outcome is not inferred from desired selection
+  ○ skipped last failed_before_effect outcome is not inferred from desired selection
+  ○ skipped last uncertain_after_effect outcome is not inferred from desired selection
+  ○ skipped last transport_accepted outcome is not inferred from desired selection
+  ○ skipped global and current-run news refresh reliably at fixed time; unrelated runs do not
+  ○ skipped offline retains stale facts, discards late replies and refreshes on reconnect
+  ○ skipped route change clears the previous run and drops its pending result
+  ○ skipped read failures are independent and retained data is labelled stale until fresh confirmation
+  ○ skipped missing route and initial offline never issue an invalid read
+  ○ skipped forgetting the Mac clears retained private inspection data
+  ○ skipped own scopes and unsupported desired facts remain inspection, including explicit off
+  ○ skipped initial offline with a valid agent does not read and a later manual refresh does
+  ○ skipped closing the screen unsubscribes and cancels a queued refresh without polling
+  ○ skipped unknown library entries and literal markup do not become actions
+
+Test Suites: 1 passed, 1 total
+Tests:       16 skipped, 1 passed, 17 total
+Snapshots:   0 total
+Time:        0.696 s, estimated 5 s
+Ran all test suites matching /src\/screens\/__tests__\/ModsScreen.test.tsx/i with tests matching "old reply resolved".

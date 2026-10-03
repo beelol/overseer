@@ -1,0 +1,104 @@
+
+ RUN  v5.0.2 /private/tmp/overseer-mods-quiet-transcript-20261003/phone/model
+
+ ❯ test/mods-conversation.test.ts (9 tests | 9 failed) 102ms
+   ❯ Mods bookkeeping stays outside the conversation transcript (9)
+     × keeps no-mod prepared out of both transcripts 40ms
+     × keeps no-mod transport_accepted out of both transcripts 14ms
+     × keeps no-mod failed_before_effect out of both transcripts 6ms
+     × keeps no-mod uncertain_after_effect out of both transcripts 6ms
+     × keeps enabled prepared out of both transcripts 5ms
+     × keeps enabled transport_accepted out of both transcripts 6ms
+     × keeps enabled failed_before_effect out of both transcripts 7ms
+     × keeps enabled uncertain_after_effect out of both transcripts 12ms
+     × keeps library changes quiet while unknown events remain visible 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/mods-conversation.test.ts > Mods bookkeeping stays outside the conversation transcript > keeps no-mod prepared out of both transcripts
+ FAIL  test/mods-conversation.test.ts > Mods bookkeeping stays outside the conversation transcript > keeps no-mod transport_accepted out of both transcripts
+ FAIL  test/mods-conversation.test.ts > Mods bookkeeping stays outside the conversation transcript > keeps no-mod failed_before_effect out of both transcripts
+ FAIL  test/mods-conversation.test.ts > Mods bookkeeping stays outside the conversation transcript > keeps no-mod uncertain_after_effect out of both transcripts
+ FAIL  test/mods-conversation.test.ts > Mods bookkeeping stays outside the conversation transcript > keeps enabled prepared out of both transcripts
+ FAIL  test/mods-conversation.test.ts > Mods bookkeeping stays outside the conversation transcript > keeps enabled transport_accepted out of both transcripts
+ FAIL  test/mods-conversation.test.ts > Mods bookkeeping stays outside the conversation transcript > keeps enabled failed_before_effect out of both transcripts
+ FAIL  test/mods-conversation.test.ts > Mods bookkeeping stays outside the conversation transcript > keeps enabled uncertain_after_effect out of both transcripts
+AssertionError: expected { banner: null, …(2) } to deeply equal { banner: null, …(2) }
+
+- Expected
++ Received
+
+@@ -6,8 +6,19 @@
+        "kind": "user",
+        "label": "You",
+        "text": "Check the change.",
+        "turn": "1",
+      },
++     {
++       "depth": 0,
++       "detail": null,
++       "icon": null,
++       "kind": "note",
++       "link": null,
++       "status": null,
++       "text": "mods applied",
++       "tooltip": null,
++       "turn": "1",
++     },
+    ],
+    "working": "Working…",
+  }
+
+ ❯ test/mods-conversation.test.ts:28:44
+     26|         const next = append(phone, delivered).conversation;
+     27|         expect(web.read()).toEqual(beforeWeb);
+     28|         expect(describeConversation(next)).toEqual(beforePhone);
+       |                                            ^
+     29|         // The view must not rewrite the observable event or invent su…
+     30|         expect((delivered.payload as { snapshot: { outcome: string } }…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+
+ FAIL  test/mods-conversation.test.ts > Mods bookkeeping stays outside the conversation transcript > keeps library changes quiet while unknown events remain visible
+AssertionError: expected { banner: null, …(2) } to deeply equal { banner: null, …(2) }
+
+- Expected
++ Received
+
+@@ -6,8 +6,19 @@
+        "kind": "user",
+        "label": "You",
+        "text": "Check the change.",
+        "turn": "1",
+      },
++     {
++       "depth": 0,
++       "detail": null,
++       "icon": null,
++       "kind": "note",
++       "link": null,
++       "status": null,
++       "text": "mods changed",
++       "tooltip": null,
++       "turn": "1",
++     },
+    ],
+    "working": "Working…",
+  }
+
+ ❯ test/mods-conversation.test.ts:41:40
+     39|     const next = append(phone, changed).conversation;
+     40|     expect(web.read()).toEqual(beforeWeb);
+     41|     expect(describeConversation(next)).toEqual(beforePhone);
+       |                                        ^
+     42|     const unknown = event(3, 'fixture_unknown_notice', {});
+     43|     web.add(unknown);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  9 failed (9)
+   Start at  04:10:52
+   Duration  528ms (import 60%, tests 22%, transform 17%)
+

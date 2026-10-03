@@ -1,0 +1,22 @@
+   Compiling overseer-tui v0.1.0 (/private/tmp/overseer-mods-tui-20261003/tui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running tests/mods.rs (/private/tmp/overseer-closeout-verify-target/debug/deps/mods-e138392e91c00e69)
+
+running 1 test
+test switching_away_from_pending_overseer_read_does_not_poison_later_selection ... FAILED
+
+failures:
+
+---- switching_away_from_pending_overseer_read_does_not_poison_later_selection stdout ----
+
+thread 'switching_away_from_pending_overseer_read_does_not_poison_later_selection' panicked at tui/tests/mods.rs:42:32:
+missing state request: [(2, "gateway.status", Object {}), (3, "audio.get", Object {}), (4, "voice.subscribe", Object {}), (5, "events.list", Object {"after": Number(0), "limit": Number(5000), "run_id": String("agent-a")})]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    switching_away_from_pending_overseer_read_does_not_poison_later_selection
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p overseer-tui --test mods`

@@ -1,0 +1,22 @@
+{
+  "production_base": "2a1bd2a12a5fe35dfb7d91e1fa27053ff6d203c2",
+  "test_only_regression_before_fix": true,
+  "exact_test": "ac200_native_finding_cannot_borrow_unrelated_owner_needs_cause",
+  "exact_list_count": 1,
+  "artifacts": [
+    {
+      "reason": "compiler-artifact",
+      "manifest_path": "/private/tmp/overseer-ac200-native-turn-20261003/daemon/Cargo.toml",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+      "fresh": true,
+      "target_name": "overseerd"
+    },
+    {
+      "reason": "compiler-artifact",
+      "manifest_path": "/private/tmp/overseer-ac200-native-turn-20261003/daemon/Cargo.toml",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/overseer_native_cause-ea35bced78fabde2",
+      "fresh": false,
+      "target_name": "overseer_native_cause"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+/* Operate surface: existing tokens, native controls and readable disclosure. */
+#mods { max-width: 900px; margin: 0 auto; padding: var(--ov-space-6); }
+#mods h1 { font-size: var(--ov-font-xxl); margin: 0 0 var(--ov-space-3); }
+#mods h2 { font-size: var(--ov-font-xl); margin: 0 0 var(--ov-space-3); }
+#mods h3 { font-size: var(--ov-font-lg); margin: 0 0 var(--ov-space-2); }
+.mod-section { margin-top: var(--ov-space-8); }
+.mod-row { padding: var(--ov-space-4) 0; border-bottom: 1px solid var(--ov-border); }
+.mod-note { color: var(--ov-muted); max-width: 72ch; margin: var(--ov-space-2) 0; overflow-wrap: anywhere; }
+.mod-state { font-weight: var(--ov-weight-medium); margin: var(--ov-space-2) 0; overflow-wrap: anywhere; }
+.mod-actions { display: flex; flex-wrap: wrap; gap: var(--ov-space-2); margin: var(--ov-space-3) 0; }
+.mod-facts { display: grid; grid-template-columns: minmax(100px, 160px) minmax(0, 1fr); gap: var(--ov-space-2) var(--ov-space-3); margin: var(--ov-space-3) 0; }
+.mod-facts dt { color: var(--ov-muted); }
+.mod-facts dd { margin: 0; overflow-wrap: anywhere; }
+#mods details { margin: var(--ov-space-3) 0; }
+#mods summary { cursor: pointer; color: var(--ov-link); padding: var(--ov-space-1) 0; }
+.mod-code { white-space: pre-wrap; overflow-wrap: anywhere; padding: var(--ov-space-3); background: var(--ov-raised); border: 1px solid var(--ov-border); border-radius: var(--ov-radius-control); font-family: var(--vscode-editor-font-family); }
+.mod-field { display: flex; flex-direction: column; gap: var(--ov-space-1); margin: var(--ov-space-3) 0; max-width: 600px; }
+.mod-field input, .mod-field select { padding: var(--ov-space-1) var(--ov-space-2); min-width: 0; max-width: 100%; }
+.mod-check { flex-direction: row-reverse; justify-content: flex-end; align-items: center; gap: var(--ov-space-2); }
+.mod-binding { margin: var(--ov-space-4) 0; padding-top: var(--ov-space-2); border-top: 1px solid var(--ov-border); }
+.mod-error { color: var(--ov-failed); overflow-wrap: anywhere; }
+#mods [hidden] { display: none; }
+@media (max-width: 480px) { #mods { padding: var(--ov-space-4); } .mod-facts { grid-template-columns: minmax(0, 1fr); } .mod-facts dd { margin-bottom: var(--ov-space-2); } }
