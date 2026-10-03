@@ -70,6 +70,12 @@ int main(int argc, char **argv) {
             if (fwrite(buffer, 1, n, stdout) != n) return 74;
         return ferror(stdin) ? 74 : 0;
     }
+    if (!strcmp(argv[1], "paths")) {
+        char cwd[4096];
+        if (!getcwd(cwd, sizeof cwd)) return 74;
+        printf("%s\n%s\n", argv[0], cwd);
+        return 0;
+    }
     if (!strcmp(argv[1], "hang")) {
         FILE *pid = fopen("started.pid", "w");
         if (!pid) return 74;

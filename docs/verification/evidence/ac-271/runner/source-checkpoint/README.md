@@ -1,0 +1,13 @@
+# Internal runner source checkpoint — runtime unrun
+
+This checkpoint implements the reviewed internal design on the expanded missing-boundary baseline `fa8f50f`. It is deliberately not registered in `daemon/src/mods/mod.rs`; no RPC, native hook, install transaction or owner route gains a program-execution API. The combined `abf572ef` full run is a separate frozen tree and contains none of this implementation.
+
+The source walks absolute paths through no-follow descriptors, validates descriptor ownership/type, copies the opened program into exclusive private staging, hashes the actual staged bytes, closes writable handles and revalidates the pinned staged inode/digest before execution. Root-owned ancestors and root-owned sticky `/private/tmp` are legitimate; private scratch/stage leaves must be this UID's restricted directories. Staging is separate from writable scratch and the original source path is never executed.
+
+The macOS path uses an explicit deny-default OS profile, exact staged executable allowlist, only native-library reads and exact ancestor metadata, no inherited environment, a held scratch descriptor for cwd, an owned process group, and nonblocking stdin/stdout/stderr driven under one cutoff/cancellation clock. Output retention is bounded; failures expose static reasons, with group kill/reap before stage removal. No permissive fallback is provided. Actual native-runtime policy adequacy and enforcement remain UNRUN.
+
+The original ten behavioral assertions are retained. Five newly authored fixtures cover original-parent path replacement after descriptor open, altered staged bytes before digest, a different staged inode with matching bytes, actual stage argv0/private modes/scratch cwd plus removal, and refusing a FIFO without blocking before metadata validation. Observation callbacks exist only in the standalone test crate, do not alter production authority, and are inert absent the test callback. These five fixtures are UNRUN. There are now fifteen named runner cases; later subcases from the initial ten baseline failures also remain unqualified.
+
+Only Rust source formatting and `git diff --check` were performed for this checkpoint. No Cargo, helper compiler, helper/runtime, UI, paid turn, owner profile or production daemon was used. The earlier expanded baseline remains the only runtime evidence in this branch.
+
+Limits remain explicit: no system-wide privileged/same-UID attacker protection claim, no installed-harness qualification, no typed recipe/governance/confirmed install/reference/restart support, no original native tool-result retrieval contract, and no closure of AC271–273. Public integration remains unavailable until those separate gates are designed and qualified.

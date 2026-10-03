@@ -521,3 +521,154 @@ fn runner_refuses_symlinked_program_and_scratch_ancestors() {
         Outcome::Bypass("unsafe_path")
     );
 }
+
+#[test]
+fn runner_executes_opened_source_after_parent_path_replacement() {
+    if isolated_worker("runner_executes_opened_source_after_parent_path_replacement") {
+        return;
+    }
+    let (home, request) = fixture("echo");
+    let mut observed = false;
+    let mut observer = |point, path: &std::path::Path| {
+        if point == runner::Point::SourceOpened {
+            let parent = path.parent().unwrap();
+            std::fs::rename(parent, home.path().join("opened-program")).unwrap();
+            std::fs::create_dir(parent).unwrap();
+            std::fs::write(path, b"unapproved replacement, never execute").unwrap();
+            observed = true;
+        }
+    };
+    let input = b"opened inode, original bytes\n";
+    let result = runner::run_observed(&request, input, &AtomicBool::new(false), &mut observer);
+    assert!(
+        observed,
+        "fixture must replace path after actual descriptor open"
+    );
+    assert_eq!(
+        std::fs::read(&request.program.path).unwrap(),
+        b"unapproved replacement, never execute"
+    );
+    assert_eq!(result, Outcome::Output(input.to_vec()));
+}
+
+#[test]
+fn runner_refuses_changed_copied_bytes_before_execution() {
+    if isolated_worker("runner_refuses_changed_copied_bytes_before_execution") {
+        return;
+    }
+    let (_home, request) = fixture("hang");
+    let mut observed = false;
+    let mut observer = |point, path: &std::path::Path| {
+        if point == runner::Point::Copied {
+            std::fs::write(path, b"unapproved copied bytes").unwrap();
+            observed = true;
+        }
+    };
+    let result = runner::run_observed(&request, b"", &AtomicBool::new(false), &mut observer);
+    assert!(
+        observed,
+        "fixture must change actual copied bytes before digest"
+    );
+    assert_eq!(result, Outcome::Bypass("program_changed"));
+    assert!(
+        !request.scratch.join("started.pid").exists(),
+        "refusal precedes helper execution"
+    );
+}
+
+#[test]
+fn runner_refuses_replaced_staged_inode_even_with_matching_digest() {
+    if isolated_worker("runner_refuses_replaced_staged_inode_even_with_matching_digest") {
+        return;
+    }
+    let (_home, request) = fixture("hang");
+    let mut observed = false;
+    let mut observer = |point, path: &std::path::Path| {
+        if point == runner::Point::Ready {
+            // A synthetic parent-side actor replaces our private named inode.
+            // This proves descriptor/named-entry validation, not same-UID isolation.
+            let bytes = std::fs::read(path).unwrap();
+            let parent = path.parent().unwrap();
+            std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700)).unwrap();
+            std::fs::remove_file(path).unwrap();
+            std::fs::write(path, bytes).unwrap();
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o500)).unwrap();
+            std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o500)).unwrap();
+            observed = true;
+        }
+    };
+    let result = runner::run_observed(&request, b"", &AtomicBool::new(false), &mut observer);
+    assert!(
+        observed,
+        "fixture must replace actual staged inode after pinning"
+    );
+    assert_eq!(result, Outcome::Bypass("program_changed"));
+    assert!(
+        !request.scratch.join("started.pid").exists(),
+        "refusal precedes helper execution"
+    );
+}
+
+#[test]
+fn runner_executes_private_readonly_stage_distinct_from_scratch() {
+    if isolated_worker("runner_executes_private_readonly_stage_distinct_from_scratch") {
+        return;
+    }
+    let (_home, request) = fixture("paths");
+    let mut staged = None;
+    let mut observer = |point, path: &std::path::Path| {
+        if point == runner::Point::Ready {
+            let parent = path.parent().unwrap();
+            assert!(!parent.starts_with(&request.scratch) && !request.scratch.starts_with(parent));
+            assert_ne!(path, request.program.path);
+            assert_eq!(
+                std::fs::metadata(path).unwrap().permissions().mode() & 0o777,
+                0o500
+            );
+            assert_eq!(
+                std::fs::metadata(parent).unwrap().permissions().mode() & 0o777,
+                0o500
+            );
+            staged = Some(path.to_path_buf());
+        }
+    };
+    let result = runner::run_observed(&request, b"", &AtomicBool::new(false), &mut observer);
+    let staged = staged.expect("actual private-stage observation");
+    let expected = format!("{}\n{}\n", staged.display(), request.scratch.display()).into_bytes();
+    assert_eq!(
+        result,
+        Outcome::Output(expected),
+        "actual helper argv0/cwd witness"
+    );
+    assert!(
+        !staged.parent().unwrap().exists(),
+        "stage removed only after helper returns"
+    );
+    assert!(
+        request.scratch.is_dir(),
+        "caller scratch remains caller-owned"
+    );
+}
+
+#[test]
+fn runner_refuses_nonregular_source_without_blocking_before_metadata() {
+    if isolated_worker("runner_refuses_nonregular_source_without_blocking_before_metadata") {
+        return;
+    }
+    use std::os::unix::ffi::OsStrExt;
+    let (home, mut request) = fixture("hang");
+    let fifo = home.path().join("program/fifo");
+    let name = std::ffi::CString::new(fifo.as_os_str().as_bytes()).unwrap();
+    assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+    request.program.path = fifo;
+    let start = Instant::now();
+    assert_eq!(
+        runner::run(&request, b"", &AtomicBool::new(false)),
+        Outcome::Bypass("unsafe_path")
+    );
+    assert!(
+        start.elapsed() < Duration::from_secs(1),
+        "no blocking open before actual type validation"
+    );
+    assert!(!request.scratch.join("started.pid").exists());
+}
