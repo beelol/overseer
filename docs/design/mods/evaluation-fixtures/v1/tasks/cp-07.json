@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "set_version": "1",
+  "id": "CP-07",
+  "category": "one_fact",
+  "title": "Answer one size-limit question",
+  "synthetic": true,
+  "prompt": "The reader has no earlier conversation.\nWhat maximum text-file size does this fixture importer accept? Answer the question in a complete sentence with the exact number and unit; no extra setup explanation is needed.\n\nFixed synthetic input (not a report about real Overseer behavior):\n- The importer accepts a text file of at most 32 KiB.\n- A 33 KiB text file is rejected.",
+  "prompt_sha256_utf8": "82a3c97737bbcd0aea86b1974e808e2901f61d61e8bee6c2e4752702c0b461ec",
+  "input_facts": [
+    "The importer accepts a text file of at most 32 KiB.",
+    "A 33 KiB text file is rejected."
+  ],
+  "required_facts_for_human_review": [
+    {
+      "id": "F1",
+      "description": "The answer identifies the maximum accepted text-file size as 32 KiB."
+    }
+  ],
+  "literal_checks": [
+    {
+      "id": "L1",
+      "kind": "contains_exact",
+      "literal": "32 KiB",
+      "required_fact_id": "F1",
+      "advisory_only": true
+    }
+  ],
+  "literal_check_notice": "Advisory exact-evidence diagnostics only. A literal flag cannot decide acceptance or fact preservation. Numeric substring matches can be misleading; a human may mark the semantic fact preserved despite a missing numeric literal (for example, a correctly spelled-out number). Verbatim paths, errors, commands and citations matter where the prompt requests them. All semantic facts and quality ratings require a human."
+}

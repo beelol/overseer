@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "set_version": "1",
+  "id": "CP-10",
+  "category": "pr_description",
+  "title": "Write a standalone PR description",
+  "synthetic": true,
+  "prompt": "The reader has no earlier conversation.\nWrite a concise pull-request description for a reviewer who has not seen the chat. Include the trigger, changed behavior and validation limits. Preserve the supplied file path, command and count.\n\nFixed synthetic input (not a report about real Overseer behavior):\n- Problem: an imported mod’s summary could be inserted into the webview as active HTML.\n- Change: extension/media/mods-panel.js renders summaries and preview content as text nodes.\n- A regression supplies <img onerror=bad> and checks that it remains literal text with no image element.\n- Validation: node test/unit/mods-panel.js passed; 14 focused host checks also passed.\n- A packaged UI scenario is prepared but has not run.",
+  "prompt_sha256_utf8": "9e19855fae45389570e39074190ab2ccb807d8d7b8c01690fbc23ddadb75d455",
+  "input_facts": [
+    "Problem: an imported mod’s summary could be inserted into the webview as active HTML.",
+    "Change: extension/media/mods-panel.js renders summaries and preview content as text nodes.",
+    "A regression supplies <img onerror=bad> and checks that it remains literal text with no image element.",
+    "Validation: node test/unit/mods-panel.js passed; 14 focused host checks also passed.",
+    "A packaged UI scenario is prepared but has not run."
+  ],
+  "required_facts_for_human_review": [
+    {
+      "id": "F1",
+      "description": "An imported mod’s summary was the active-HTML trigger."
+    },
+    {
+      "id": "F2",
+      "description": "The affected path and the text-node rendering change are stated."
+    },
+    {
+      "id": "F3",
+      "description": "Hostile markup remains literal and does not create an image element."
+    },
+    {
+      "id": "F4",
+      "description": "The named Node command and 14 focused host checks passed."
+    },
+    {
+      "id": "F5",
+      "description": "Prepared packaged scenario source does not establish rendered UI verification."
+    }
+  ],
+  "literal_checks": [
+    {
+      "id": "L1",
+      "kind": "contains_exact",
+      "literal": "extension/media/mods-panel.js",
+      "required_fact_id": "F2",
+      "advisory_only": true
+    },
+    {
+      "id": "L2",
+      "kind": "contains_exact",
+      "literal": "<img onerror=bad>",
+      "required_fact_id": "F3",
+      "advisory_only": true
+    },
+    {
+      "id": "L3",
+      "kind": "contains_exact",
+      "literal": "node test/unit/mods-panel.js",
+      "required_fact_id": "F4",
+      "advisory_only": true
+    },
+    {
+      "id": "L4",
+      "kind": "contains_exact",
+      "literal": "14",
+      "required_fact_id": "F4",
+      "advisory_only": true
+    }
+  ],
+  "literal_check_notice": "Advisory exact-evidence diagnostics only. A literal flag cannot decide acceptance or fact preservation. Numeric substring matches can be misleading; a human may mark the semantic fact preserved despite a missing numeric literal (for example, a correctly spelled-out number). Verbatim paths, errors, commands and citations matter where the prompt requests them. All semantic facts and quality ratings require a human."
+}
