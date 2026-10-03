@@ -62,7 +62,7 @@ pub fn run(args: &[String]) -> Result<()> {
                 match daemon_call(&socket, "overseer.tool", json!({"token": token, "name": name, "arguments": arguments})) {
                     Ok(r) => Ok(json!({"content": [{"type": "text", "text": r["text"].as_str().unwrap_or_default()}], "isError": r["is_error"].as_bool().unwrap_or(false)})),
                     // A refused call is a tool error the model can read, not a protocol failure.
-                    Err(e) => Ok(json!({"content": [{"type": "text", "text": format!("refused: {e}")}], "isError": true})),
+                    Err(e) => Ok(json!({"content": [{"type": "text", "text": super::tool_text(&format!("refused: {e}"))}], "isError": true})),
                 }
             }
             m if m.starts_with("notifications/") => continue,
