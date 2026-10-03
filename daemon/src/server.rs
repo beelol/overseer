@@ -3167,6 +3167,7 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "overseer.propose" => d.overseer_propose(&p["actions"], p["source"].as_str().unwrap_or("api"))?,
         "overseer.answer" => d.overseer_answer(s(p, "id")?, p["yes"].as_bool().unwrap_or(false), p["surface"].as_str().unwrap_or("vscode"), p["by"].as_str().unwrap_or("owner"))?,
         "overseer.level" => d.overseer_level(p["level"].as_str())?,
+        "overseer.auto_repos" => d.overseer_auto_repos(p.get("repos"))?,
         "overseer.cancel" => d.overseer_cancel(s(p, "id")?, p["by"].as_str().unwrap_or("owner"))?,
         "overseer.fresh" => d.overseer_fresh()?,
         "run.queue" => json!({"delivery": d.queue_message(s(p, "run_id")?, s(p, "text")?, p["source"].as_str().unwrap_or("owner"), json!({}))?}),

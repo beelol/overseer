@@ -180,7 +180,9 @@ fn ac134_the_daemon_sends_what_the_description_says() {
     }
     // What the app does not read is allowed to be there, and is named here so it is a choice.
     // overseer_message is Overseer's own conversation (Gate S): the phone reads it with Talk to Overseer (AC-128).
-    let quiet: std::collections::BTreeSet<String> = ["daemon_started", "interrupt_requested", "reattached", "daemon_stopping", "background_notice", "workspace_removed", "daemon_error", "merge_back", "overseer_message"].iter().map(|s| s.to_string()).collect();
+    // proposal and proposal_answered are that conversation's yes/no: a waiting permission comes up
+    // in it by itself (AC-230).
+    let quiet: std::collections::BTreeSet<String> = ["daemon_started", "interrupt_requested", "reattached", "daemon_stopping", "background_notice", "workspace_removed", "daemon_error", "merge_back", "overseer_message", "proposal", "proposal_answered"].iter().map(|s| s.to_string()).collect();
     let surprising: Vec<&String> = not_described.difference(&quiet).collect();
     assert!(surprising.is_empty(), "event kinds with no description: {surprising:?}");
     println!("{} methods and {} events of {} kinds match the description", checked.len(), events.len(), kinds.len());

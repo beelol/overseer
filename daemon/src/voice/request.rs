@@ -54,6 +54,10 @@ pub struct Open {
     pub replaces_sent: Option<String>,
     /// Only probably meant for Overseer: nothing was said, and Overseer judges (AC-228).
     pub weak: bool,
+    /// It names Overseer and gives an instruction: Overseer's "not for me" never drops it; it is
+    /// asked again, once, as surely its (AC-229).
+    pub named: bool,
+    pub asked_again: bool,
 }
 
 /// A permission read back and waiting for the owner's yes or no.
@@ -128,6 +132,13 @@ const CANCEL: &[&str] = &[
     "no stop",
 ];
 const YES: &[&str] = &[
+    // A permission read out by itself (AC-230) is answered as naturally as any question.
+    "yes do that",
+    "yes go ahead",
+    "yes please do that",
+    "ok do that",
+    "okay do that",
+    "sure go ahead",
     "yes",
     "yes allow",
     "yes allow it",
@@ -876,6 +887,8 @@ impl Voice {
             direct,
             replaces_sent,
             weak,
+            named: floor::names_overseer_with_instruction(words),
+            asked_again: false,
         });
         self.st.lock().unwrap().thinking += 1;
         self.refresh();
@@ -1517,6 +1530,24 @@ fn tick(v: &Arc<Voice>) {
     }
 }
 
+/// An agent's permission request began to wait (AC-230): with Voice Mode listening it is read out
+/// by itself, without the owner asking, and "allow it" answers it. One at a time: while another is
+/// read back or answered, it waits, and is read after that one (as in `tick`).
+pub fn permission_waiting(d: &Arc<Daemon>, _run: &str) {
+    let Some(v) = voice_or_none() else { return };
+    if !v.running() || settings(d).map(|s| !s.enabled || s.muted).unwrap_or(true) {
+        return;
+    }
+    let busy = {
+        let r = req().lock().unwrap();
+        r.read_back.is_some() || r.answering.is_some()
+    };
+    if !busy {
+        let _in_runtime = v.rt.as_ref().map(|h| h.enter());
+        v.read_back();
+    }
+}
+
 fn another_permission_waiting(d: &Arc<Daemon>, answered: &str) -> bool {
     d.roster().unwrap_or_default().into_iter().any(|l| {
         l.id != answered
@@ -1656,6 +1687,12 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
             // Only the exact reply counts: a reply that quotes the instruction is still an answer.
             // The daemon stores it in plain words, as an aside card (AC-228).
             if m["card"]["kind"] == "aside" || text.trim_matches(|c: char| !c.is_alphanumeric() && c != '_') == crate::overseer::session::NOT_FOR_OVERSEER {
+                // It names Overseer and instructs it: never dropped. Asked again, once, as surely
+                // Overseer's (AC-229).
+                if o.named && !o.asked_again && o.proposal.is_none() {
+                    ask_again(v, &o);
+                    return;
+                }
                 if o.weak {
                     v.close(&o.id, "not_for_overseer", None);
                 } else {
@@ -1692,12 +1729,14 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
             }
             // Only the requests the ended turn was about: others wait for their own turn.
             let about = turn_requests(&v.d, true);
+            // A request asked again (AC-229) waits for the turn that asks again, not the first.
+            let again = ended_turn_asks_again(&v.d);
             let done: Vec<Open> = req()
                 .lock()
                 .unwrap()
                 .open
                 .iter()
-                .filter(|o| o.proposal.is_none() && about.contains(&o.id))
+                .filter(|o| o.proposal.is_none() && about.contains(&o.id) && (!o.asked_again || again))
                 .cloned()
                 .collect();
             for o in done {
@@ -1738,6 +1777,38 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
     }
 }
 
+/// A request that names Overseer and gives it an instruction came back "not for me": it goes to
+/// Overseer again, once, saying it is surely Overseer's (AC-229). If that fails, it is not sent and
+/// said so, as any request Overseer cannot take (AC-175).
+/// The words that mark the turn asking a request again.
+const ASKED_AGAIN: &str = "(This spoken request names you and gives you an instruction";
+
+/// Whether Overseer's last ended turn was one asking a request again.
+fn ended_turn_asks_again(d: &Daemon) -> bool {
+    let Some(run) = d.overseer_session().ok().and_then(|s| s["run_id"].as_str().map(str::to_string)) else { return false };
+    let turns = d.store.lock().unwrap().turns(&run).unwrap_or_default();
+    turns.iter().rev().find(|t| t.ended_ms.is_some()).is_some_and(|t| t.prompt.contains(ASKED_AGAIN))
+}
+
+fn ask_again(v: &Arc<Voice>, o: &Open) {
+    if let Some(x) = req().lock().unwrap().open.iter_mut().find(|x| x.id == o.id) {
+        x.asked_again = true;
+        x.turn_seen = None;
+        x.at = Instant::now();
+        x.holding_said = true;
+    }
+    update(&v.d, &o.id, "state", "thinking");
+    announce(v, &o.id);
+    let message = format!(
+        "{ASKED_AGAIN}, so it is yours: act on it; do not answer NOT_FOR_OVERSEER.)\n{VOICE_NOTE_TAKEN}\nRequest {}: {}",
+        o.id, o.words
+    );
+    if let Err(e) = v.d.overseer_send(&message, "voice", None, None) {
+        v.close(&o.id, "not_sent", Some(&format!("Not sent: {e}")));
+        speak_when_free(v, "I can't reach Overseer right now, so nothing was sent.");
+    }
+}
+
 /// The agent the owner was talking to finished or was archived: back to Overseer, said once.
 fn target_gone(v: &Arc<Voice>, kind: &str, run: Option<&str>, p: &Value) {
     let Ok(s) = settings(&v.d) else { return };
@@ -1770,8 +1841,81 @@ fn target_gone(v: &Arc<Voice>, kind: &str, run: Option<&str>, p: &Value) {
     speak_when_free(v, &format!("Back to Overseer: {title} finished."));
 }
 
-/// What the plan does, said in one line (the daemon's words, from the checked actions).
+/// The part of a decorated message Overseer wrote for the agent (after "For you:"), or the
+/// owner's words when they went as they are (AC-169's message shape).
+fn own_part(text: &str) -> String {
+    let body = match text.split_once("\nFor you: ") {
+        Some((_, rest)) => rest.to_string(),
+        None => match (text.find('“'), text.rfind('”')) {
+            (Some(a), Some(b)) if b > a => text[a + '“'.len_utf8()..b].to_string(),
+            _ => text.to_string(),
+        },
+    };
+    body.split("\nAlso told:").next().unwrap_or("").trim().to_string()
+}
+
+/// A task said back as the end of a question: "Please draft the page's sections." becomes "draft
+/// the page's sections".
+fn task_words(text: &str) -> String {
+    let t = own_part(text);
+    let t = t.trim().trim_end_matches(['.', '!', '?']).trim();
+    let t = t.strip_prefix("Please ").or_else(|| t.strip_prefix("please ")).unwrap_or(t);
+    let mut c = t.chars();
+    match c.next() {
+        Some(f) if !t.starts_with("I ") => f.to_lowercase().collect::<String>() + c.as_str(),
+        Some(_) => t.to_string(),
+        None => String::new(),
+    }
+}
+
+/// What a plan that starts or redirects an agent will send, read back as a question before it
+/// goes (AC-229): "Start an agent in the site repo to draft the page's sections?". None for a
+/// plan with neither.
+pub fn read_back_line(d: &Daemon, actions: &[Value]) -> Option<String> {
+    let starts: Vec<&Value> = actions.iter().filter(|a| a["action"] == "start").collect();
+    let redirects: Vec<&Value> = actions.iter().filter(|a| a["action"] == "redirect").collect();
+    if starts.is_empty() && redirects.is_empty() {
+        return None;
+    }
+    let repo_name = |a: &Value| {
+        let r = a["repo"].as_str().unwrap_or("").trim_end_matches('/');
+        r.rsplit('/').next().unwrap_or(r).to_string()
+    };
+    let mut parts: Vec<String> = Vec::new();
+    match starts.as_slice() {
+        [] => {}
+        [a] => parts.push(format!("start an agent in the {} repo to {}", repo_name(a), task_words(a["prompt"].as_str().unwrap_or("")))),
+        many => {
+            let mut repos: Vec<String> = many.iter().map(|a| repo_name(a)).collect();
+            repos.dedup();
+            parts.push(format!("start {} agents in the {} repo", many.len(), repos.join(" and ")));
+        }
+    }
+    for a in redirects {
+        let who = a["title"].as_str().map(String::from).or_else(|| a["agent"].as_str().and_then(|id| d.run(id).ok().map(|r| r.title))).unwrap_or_else(|| "the agent".into());
+        parts.push(format!("redirect {who} to {}", task_words(a["text"].as_str().unwrap_or(""))));
+    }
+    let others = actions.iter().filter(|a| !matches!(a["action"].as_str(), Some("start" | "redirect"))).count();
+    let mut line = parts.join(", and ");
+    if others > 0 {
+        line.push_str(&format!(", and {others} more"));
+    }
+    let mut c = line.chars();
+    let line = match c.next() {
+        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+        None => line,
+    };
+    Some(format!("{line}?"))
+}
+
+/// What the plan does, said in one line (the daemon's words, from the checked actions). A plan
+/// that starts or redirects an agent is read back as a question (AC-229).
 fn plan_line(d: &Daemon, p: &Value) -> String {
+    if p["confirm"] != true {
+        if let Some(line) = read_back_line(d, p["actions"].as_array().map(Vec::as_slice).unwrap_or(&[])) {
+            return line;
+        }
+    }
     let mut by_verb: Vec<(&str, Vec<String>)> = Vec::new();
     let mut new_agents = 0;
     for a in p["actions"].as_array().cloned().unwrap_or_default() {
@@ -2044,14 +2188,22 @@ pub fn start_fix(error: &str) -> &'static str {
     }
 }
 
-/// Medium confidence waits longer, with every target named (AC-166).
+/// Medium confidence waits longer, with every target named (AC-166). A start or a redirect is
+/// read back first (AC-229): the window is that long besides, so the owner hears all of it and
+/// still has the whole window to correct it (about 150 words a minute, 8 s at most).
 pub fn settle_ms(d: &Daemon, actions: &[Value]) -> i64 {
     let base = settings(d).map(|s| s.settle_seconds).unwrap_or(2) as i64 * 1000;
-    if actions.iter().any(|a| a["confidence"] == "medium") {
+    let base = if actions.iter().any(|a| a["confidence"] == "medium") {
         base.max(4000)
     } else {
         base
-    }
+    };
+    base + read_back_ms(read_back_line(d, actions).as_deref())
+}
+
+/// How long a read-back takes to say.
+fn read_back_ms(line: Option<&str>) -> i64 {
+    line.map(|l| (l.split_whitespace().count() as i64 * 400).min(8000)).unwrap_or(0)
 }
 
 /// Overseer's voice ended a line: nothing to do yet (kept for the done line's order).

@@ -142,7 +142,12 @@ impl Daemon {
             (Ask::Handle, [w]) => {
                 // The one question it needs: allow it? A proposal waits for the owner's yes.
                 let _ = self.overseer_set_cause(if surface == "voice" { "voice" } else { "owner" });
-                let proposal = if answer {
+                // The question that came up by itself (AC-230) is the same one: asked again, not
+                // proposed twice.
+                let already = open.iter().find(|x| x["actions"].as_array().is_some_and(|a| a.iter().any(|y| y["action"] == "permission" && y["agent"] == w.run.as_str() && y["request"] == w.request.as_str()))).and_then(|x| x["id"].as_str().map(str::to_string));
+                let proposal = if already.is_some() {
+                    already
+                } else if answer {
                     self.overseer_propose(&json!([{"action": "permission", "agent": w.run, "request": w.request, "allow_request": true, "why": "the owner asked to handle what needs them"}]), "needs").ok().and_then(|r| r["proposal"].as_str().map(str::to_string))
                 } else {
                     None
@@ -182,6 +187,35 @@ impl Daemon {
         };
         let reply = self.append_session_message(&sid, "overseer", None, &text, Some(&card))?;
         Ok(Some(json!({"message": owner, "handled": true, "reply": reply["text"], "card": card, "queued": false})))
+    }
+}
+
+impl Daemon {
+    /// An agent's permission request comes up by itself (AC-230): the moment it waits, the
+    /// conversation asks the owner the one question it needs ("Sessions wants to change perm.txt.
+    /// Allow it?") with a yes/no proposal, without the owner having to ask; Voice Mode reads it out.
+    /// Once per request; answered anywhere, the proposal closes as not needed (AC-228).
+    pub fn needs_prompt(self: &Arc<Self>, run_id: &str) -> Result<()> {
+        let Ok(run) = self.run(run_id) else { return Ok(()) };
+        if run.parent_run_id.is_some() || self.run_role(run_id) == "overseer" || run.status != "waiting_for_user" {
+            return Ok(());
+        }
+        let Some(att) = run.attention.clone().filter(|a| a["kind"] == "permission") else { return Ok(()) };
+        let request = att["request_id"].as_str().unwrap_or("").to_string();
+        let session = self.overseer_session()?;
+        let sid = session["id"].as_str().unwrap_or_default().to_string();
+        // Once per request: the owner may already have been asked (by "handle what needs me").
+        let asked = session["messages"].as_array().is_some_and(|m| m.iter().any(|x| x["card"]["kind"] == "needs" && x["card"]["agent"] == run_id && x["card"]["request"] == request.as_str()))
+            || session["proposals"].as_array().is_some_and(|ps| ps.iter().any(|x| x["state"] == "open" && x["actions"].as_array().is_some_and(|a| a.iter().any(|y| y["action"] == "permission" && y["agent"] == run_id && y["request"] == request.as_str()))));
+        if asked {
+            return Ok(());
+        }
+        let action = json!([{"action": "permission", "agent": run_id, "request": request, "allow_request": true, "why": "it is waiting for your permission"}]);
+        let proposal = self.overseer_propose_as(&action, "needs", Some("needs"))?["proposal"].as_str().map(str::to_string);
+        let text = format!("{} wants to {}. Allow it?", run.title, summarize(&att));
+        self.append_session_message(&sid, "overseer", None, &text, Some(&json!({"kind": "needs", "state": "asked", "agent": run_id, "request": request, "proposal": proposal, "by_itself": true})))?;
+        crate::voice::request::permission_waiting(self, run_id);
+        Ok(())
     }
 }
 

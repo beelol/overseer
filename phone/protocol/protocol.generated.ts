@@ -990,6 +990,8 @@ export interface Methods {
   "overseer.card": { class: 'mac_only'; params: unknown; result: unknown };
   /** Set how much Overseer does on its own. */
   "overseer.level": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Choose the repositories where Overseer may set Auto by itself. */
+  "overseer.auto_repos": { class: 'mac_only'; params: unknown; result: unknown };
   /** Set Overseer's spending cap. */
   "overseer.cap": { class: 'mac_only'; params: unknown; result: unknown };
   /** Start a fresh Overseer conversation. */
@@ -1392,6 +1394,7 @@ export const METHOD_CLASS = {
   "overseer.cancel": 'mac_only',
   "overseer.card": 'mac_only',
   "overseer.level": 'mac_only',
+  "overseer.auto_repos": 'mac_only',
   "overseer.cap": 'mac_only',
   "overseer.fresh": 'mac_only',
   "overseer.rally": 'mac_only',
