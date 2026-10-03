@@ -1,0 +1,40 @@
+{
+  "head": "56351ec39a35413526f8cb835a9d44689b1dd712",
+  "test_artifact": {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/overseer-swarm-matrix-fixture-20261003/daemon#overseerd@0.1.0",
+    "manifest_path": "/private/tmp/overseer-swarm-matrix-fixture-20261003/daemon/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "swarm_native",
+      "src_path": "/private/tmp/overseer-swarm-matrix-fixture-20261003/daemon/tests/swarm_native.rs",
+      "edition": "2021",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/overseer-closeout-verify-target/debug/deps/swarm_native-5533b1b1699b1aae"
+    ],
+    "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/swarm_native-5533b1b1699b1aae",
+    "fresh": false
+  },
+  "daemon_bin": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+  "daemon_sha256": "906bea264b5a71b9d4d8676a0726f386129815094f32beb8490074c502e0b177",
+  "daemon_dep_info_sha256": "5af198799d66d907ba1aff7738ae8f5ab7ae7d5d2d1a7c01ee7be5a3e17e5043",
+  "test_bin_sha256": "a8fa79288ce1b4b45d7b2e88958c256c3c52d449f0601a4948476c4da503f572",
+  "source_guard": true
+}

@@ -1,0 +1,15 @@
+{
+  "head": "56351ec39a35413526f8cb835a9d44689b1dd712",
+  "source_unchanged": true,
+  "counts": {
+    "matrix-exact": {
+      "passed": 1,
+      "failed": 0
+    },
+    "swarm-native-file": {
+      "passed": 19,
+      "failed": 0
+    }
+  },
+  "utc": "2026-10-03T17:26:04.977956+00:00"
+}

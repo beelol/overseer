@@ -1,0 +1,8 @@
+{
+  "source_head": "abf572ef53705db0e8f8b32e72a46057661057fc",
+  "required_helper": "Unchanged daemon_binary helper ran cargo build -q -p overseerd. This was an actual rebuild, not a no-op.",
+  "dep_info_sha256": "90a99f4120972a7ae76b1334a99aa3fcc949bffac0d8c762375c2e57dc5e25f8",
+  "dep_info_source_guard": true,
+  "source_main": "/private/tmp/overseer-closeout-corrected-20261003/daemon/src/main.rs",
+  "production_source_changed": false
+}
