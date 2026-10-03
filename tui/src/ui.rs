@@ -108,6 +108,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         deny_note(f, app, run, comp);
     } else if let Mode::Confirm(c) = &app.mode {
         let text = match c {
+            Confirm::Mods { text } => format!(" {} y / n", crate::app::mods_display(text)),
             Confirm::Interrupt(id) => format!(" Interrupt {}? y / n", short(&app.state.run(id).map(|r| r.title.clone()).unwrap_or_default(), 50)),
             Confirm::Quit => " Unsent drafts will be lost. Quit? y / n".to_string(),
             Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::MergeCancel { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::Archive { text, .. } | Confirm::OpenPr { text, .. } | Confirm::Reject { text, .. } => format!(" {text} y / n"),
@@ -120,9 +121,11 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     // A phone question keeps its panel in view above it.
     let shown = match (&app.mode, &app.confirm_back) {
         (Mode::Confirm(Confirm::PhoneOff { .. } | Confirm::PhoneOnAndPair | Confirm::Revoke { .. } | Confirm::Pair { .. }), Some(back)) => back.clone(),
+        (Mode::Confirm(Confirm::Mods { .. }), _) => Mode::Mods { run_id: app.mods.target.clone() },
         (mode, _) => mode.clone(),
     };
     match shown {
+        Mode::Mods { .. } => mods_view(f, app, Rect { height: head.height + body.height, ..area }),
         Mode::Help => help(f, area),
         Mode::NewAgent => new_agent(f, &app.form, &app.state, area),
         Mode::Accounts => accounts(f, app, area),
@@ -422,6 +425,13 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         return;
     }
     let keys: &[(&str, &str)] = match app.mode {
+        Mode::Confirm(Confirm::Mods { .. }) => &[("y", "confirm"), ("n / esc", "cancel")],
+        Mode::Mods { .. } if matches!(app.mods.form, Some(crate::app::ModsForm::Source { .. })) => &[("type", "source"), ("enter", "preview"), ("ctrl+u", "clear"), ("esc", "cancel")],
+        Mode::Mods { .. } if matches!(app.mods.form, Some(crate::app::ModsForm::Binding { .. })) => &[("tab", "field"), ("arrows", "choose"), ("space", "toggle"), ("enter", "review"), ("esc", "cancel")],
+        Mode::Mods { .. } if matches!(app.mods.form, Some(crate::app::ModsForm::Filter { .. })) => &[("a", "add identifier"), ("x", "remove"), ("enter", "add"), ("esc", "back")],
+        Mode::Mods { .. } if matches!(app.mods.form, Some(crate::app::ModsForm::Target { .. })) => &[("j/k", "agent"), ("enter", "inspect"), ("esc", "cancel")],
+        Mode::Mods { .. } if app.mods.preview.is_some() => &[("enter", "review install"), ("pgup/pgdn", "scroll"), ("esc", "close preview")],
+        Mode::Mods { .. } => &[("tab", "Applied/Library"), ("r", "refresh"), ("?", "help"), ("esc", "back")],
         Mode::Queue => &[("s", "Send queued"), ("c", "Clear"), ("d", "Remove"), ("j/k", "select"), ("esc", "close")],
         Mode::DenyNote { .. } => &[("type", "a note for the agent"), ("enter", "deny"), ("esc", "cancel")],
         Mode::Compose if app.focused().is_some_and(|r| r.permission_request().is_some()) => &[("enter", "deny with this note"), ("alt+enter", "new line"), ("esc", "close (keeps draft)"), ("ctrl+u", "clear")],
@@ -956,7 +966,7 @@ fn composer_height(app: &App, width: u16) -> u16 {
 /// A question's lines: a long one (every file a merge commits, T-33) wraps instead of being cut.
 fn confirm_height(app: &App, width: u16) -> u16 {
     let text = match &app.mode {
-        Mode::Confirm(Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::MergeCancel { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::Archive { text, .. } | Confirm::OpenPr { text, .. } | Confirm::Reject { text, .. }) => text.as_str(),
+        Mode::Confirm(Confirm::Mods { text } | Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::MergeCancel { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::Archive { text, .. } | Confirm::OpenPr { text, .. } | Confirm::Reject { text, .. }) => text.as_str(),
         _ => "",
     };
     ((text.width() + 8).div_ceil(width.max(20) as usize) as u16).clamp(2, 8)
@@ -993,6 +1003,7 @@ fn composer(f: &mut Frame, app: &App, area: Rect) {
 
 /// Every key `?` lists (T-36: the parity table's keys are all here).
 pub const HELP: &[(&str, &str)] = &[
+    ("m", "Mods: library and applied guidance (Grid / Zoom)"),
     ("←↓↑→  h j k l", "move between agents"),
     ("1 – 9", "focus agent n on this page"),
     ("tab / shift+tab", "next / previous agent"),
@@ -1717,4 +1728,31 @@ mod tests {
         assert_eq!(fit("hello world", 8), "hello w…");
         assert_eq!(fit("short", 8), "short");
     }
+}
+
+/// Mods stays in the incumbent terminal shell; only public daemon projections are drawn.
+fn mods_view(f: &mut Frame, app: &App, area: Rect) {
+    let r = Rect { x: area.x+1, y: area.y, width: area.width.saturating_sub(2), height: area.height };
+    let block=Block::bordered().border_style(Style::new().fg(accent())).title(" Mods ")
+        .title_bottom(" Tab Applied/Library · ? help · Esc back ");
+    let mut lines=app.mods.lines();
+    if let Some(crate::app::ModsForm::Target { cursor })=&app.mods.form {
+        for (i,run) in app.state.runs.iter().enumerate() {
+            lines.push(format!("{} {}", if i==*cursor {">"} else {" "},if run.title.trim().is_empty(){"Untitled agent"}else{&run.title}));
+        }
+    }
+    // Use the incumbent word wrapper before scrolling, so a selected field stays visible
+    // even when preceding identifiers occupy multiple physical terminal lines.
+    let inner=block.inner(r);
+    let auto_focus=app.mods.form.is_some() || app.mods.library && app.mods.preview.is_none() && !app.mods.help;
+    let mut wrapped=Vec::new(); let mut focus_line=None;
+    for s in lines {
+        let s=crate::app::mods_display(&s);
+        if auto_focus && s.starts_with("> ") {focus_line=Some(wrapped.len());}
+        for line in s.split('\n') {wrap(vec![], &[(line.to_string(),Style::new())],inner.width.max(1) as usize,&mut wrapped);}
+    }
+    let mut scroll=app.mods.scroll as usize;
+    if let Some(at)=focus_line {if at<scroll {scroll=at;} else if at>=scroll+inner.height as usize {scroll=at.saturating_add(1).saturating_sub(inner.height as usize);}}
+    f.render_widget(Clear,r);
+    f.render_widget(Paragraph::new(wrapped).block(block).scroll((scroll.min(u16::MAX as usize) as u16,0)),r);
 }

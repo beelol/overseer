@@ -1,0 +1,35 @@
+   Compiling overseer-tui v0.1.0 (/private/tmp/overseer-mods-tui-20261003/tui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.38s
+     Running unittests src/lib.rs (/private/tmp/overseer-closeout-verify-target/debug/deps/overseer_tui-e5eb645efc2428aa)
+
+running 27 tests
+test app::phone::tests::the_question_names_the_phone_its_address_and_its_key ... ok
+test app::phone::tests::relative_times_and_groups ... ok
+test app::phone::tests::the_status_line_says_off_on_and_how_many_phones ... ok
+test client::tests::ac212_a_dev_tui_and_a_standard_daemon_connect ... ok
+test feed::tests::claude_tool_input_becomes_a_short_target ... ok
+test feed::tests::codex_command_summary_carries_its_status ... ok
+test feed::tests::events_merge_without_duplicates_and_tools_update_in_place ... ok
+test feed::tests::permissions_are_pending_until_answered ... ok
+test locate::tests::ac212_production_drops_leaked_variables_and_keeps_an_explicit_home ... ok
+test locate::tests::ac212_production_refuses_a_daemon_binary_marked_dev ... ok
+test model::landing::merged_conflicts_and_pull_request_read_as_everywhere ... ok
+test model::needs_you::counts_as_the_extension_does ... ok
+test model::needs_you::the_nine_agents_recording_counts_as_everywhere ... ok
+test model::rollup::the_five_counts_are_the_extensions ... ok
+test qr::tests::format_information_matches_the_standard ... ok
+test qr::tests::half_blocks_draw_two_rows_per_line ... ok
+test qr::tests::reed_solomon_matches_a_known_block ... ok
+test qr::tests::sizes_and_capacities_follow_the_standard ... ok
+test ui::tests::fit_is_width_aware ... ok
+test ui::tests::long_words_break_instead_of_overflowing ... ok
+test ui::tests::markdown_is_light ... ok
+test ui::tests::truecolor_and_256_color_accents ... ok
+test ui::tests::wraps_to_width_and_indents_continuations ... ok
+test words::tests::markdown_as_a_terminal_draws_it ... ok
+test words::tests::no_voice_request_ids ... ok
+test words::tests::raw_reasons_in_plain_words ... ok
+test client::tests::ac212_the_installed_tui_refuses_a_dev_daemon_and_does_not_retry ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.20s
+
