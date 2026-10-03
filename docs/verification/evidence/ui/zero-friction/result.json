@@ -1,7 +1,7 @@
 {
   "checks": [
     {
-      "name": "typed: open Overseer — ⌥⌘⇧O: 1 action, 1756 ms",
+      "name": "typed: open Overseer — ⌥⌘⇧O: 1 action, 1762 ms",
       "ok": true,
       "detail": {
         "actions": {
@@ -14,7 +14,7 @@
         },
         "home": {
           "mode": "composer",
-          "selected": "r-b918df28b1b3",
+          "selected": "r-b0b308d7abb2",
           "title": "Docs",
           "said": [],
           "voice": "",
@@ -28,7 +28,7 @@
       }
     },
     {
-      "name": "typed: tell it to do something — ⌥⌘O, \"Someone should draft the page\", Enter; Yes on the proposal: 1 action and one yes, 1541 ms",
+      "name": "typed: tell it to do something — ⌥⌘O, \"Someone should draft the page\", Enter; Yes on the proposal: 1 action and one yes, 1558 ms",
       "ok": true,
       "detail": {
         "actions": {
@@ -41,13 +41,13 @@
         },
         "composerFocusedByTheKey": true,
         "started": {
-          "id": "r-907e17c0eb96",
+          "id": "r-da9c17820fe2",
           "title": "draft the page"
         }
       }
     },
     {
-      "name": "typed: follow an agent — ⌥⌘A, \"draft\", Enter: 1 action, 929 ms",
+      "name": "typed: follow an agent — ⌥⌘A, \"draft\", Enter: 1 action, 928 ms",
       "ok": true,
       "detail": {
         "actions": {
@@ -65,7 +65,14 @@
           "visible": "visible",
           "seen": [
             {
-              "ms": 367,
+              "ms": 24,
+              "view": "follow",
+              "path": "",
+              "source": "",
+              "visible": "visible"
+            },
+            {
+              "ms": 351,
               "view": "follow",
               "path": "draft.md",
               "source": "agent",
@@ -76,7 +83,7 @@
       }
     },
     {
-      "name": "typed: Follow → Manual edit — ⌥⌘E: 1 action, 70 ms",
+      "name": "typed: Follow → Manual edit — ⌥⌘E: 1 action, 71 ms",
       "ok": true,
       "detail": {
         "actions": {
@@ -100,12 +107,12 @@
       "name": "Manual edit is the agent's real file: the owner's line, saved, is in its worktree",
       "ok": true,
       "detail": {
-        "file": "/private/tmp/ovs-ui-76q4M4/overseer-home/worktrees/zf-repo-8449bcb4/draft-the-page/draft.md",
+        "file": "/private/tmp/ovs-ui-VirZPg/overseer-home/worktrees/zf-repo-84b25b34/draft-the-page/draft.md",
         "text": "Owner: keep it short.\n# Draft\n\nThe sections.\n"
       }
     },
     {
-      "name": "typed: Manual edit → Follow — ⌥⌘E: 1 action, 416 ms",
+      "name": "typed: Manual edit → Follow — ⌥⌘E: 1 action, 417 ms",
       "ok": true,
       "detail": {
         "actions": {
@@ -123,14 +130,14 @@
           "visible": "visible",
           "seen": [
             {
-              "ms": 27,
+              "ms": 28,
               "view": "follow",
               "path": "",
               "source": "",
               "visible": "visible"
             },
             {
-              "ms": 355,
+              "ms": 353,
               "view": "follow",
               "path": "draft.md",
               "source": "agent",
@@ -148,7 +155,7 @@
       }
     },
     {
-      "name": "typed: change course (stop the agent) — ⌥⌘.: 1 action, 181 ms",
+      "name": "typed: change course (stop the agent) — ⌥⌘.: 1 action, 179 ms",
       "ok": true,
       "detail": {
         "actions": {
@@ -165,7 +172,7 @@
       }
     },
     {
-      "name": "voice: open Overseer — \"Open Overseer.\": 1 action, 1796 ms",
+      "name": "voice: open Overseer — \"Open Overseer.\": 1 action, 1824 ms",
       "ok": true,
       "detail": {
         "actions": {
@@ -184,19 +191,19 @@
         },
         "home": {
           "mode": "composer",
-          "selected": "r-907e17c0eb96",
+          "selected": "r-da9c17820fe2",
           "title": "draft the page",
           "said": [
             "YouSomeone should draft the pagedraft the page was stoppedStart as an agent"
           ],
           "voice": "listening",
           "back": true,
-          "width": 1562
+          "width": 1031
         }
       }
     },
     {
-      "name": "voice: tell it to do something — \"Overseer, someone should write the notes.\": 1 action, 2983 ms",
+      "name": "voice: tell it to do something — \"Overseer, someone should write the notes.\": 1 action, 2966 ms",
       "ok": true,
       "detail": {
         "actions": {
@@ -213,17 +220,17 @@
           "taken": true
         },
         "request": {
-          "state": "sent",
-          "done": "Done: started write the notes."
+          "state": "settling",
+          "done": null
         },
         "started": {
-          "id": "r-026a06fe5e7c",
+          "id": "r-2c94830b8c02",
           "title": "write the notes"
         }
       }
     },
     {
-      "name": "voice: follow an agent — \"Follow the notes agent.\": 1 action, 217 ms",
+      "name": "voice: follow an agent — \"Follow the notes agent.\": 1 action, 215 ms",
       "ok": true,
       "detail": {
         "actions": {
@@ -237,7 +244,7 @@
         "said": {
           "built_in": "open",
           "place": "follow",
-          "run": "r-026a06fe5e7c",
+          "run": "r-2c94830b8c02",
           "taken": true
         },
         "follow": {
@@ -247,7 +254,7 @@
           "visible": "visible",
           "seen": [
             {
-              "ms": 327,
+              "ms": 340,
               "view": "follow",
               "path": "draft.md",
               "source": "agent",
@@ -285,7 +292,7 @@
       }
     },
     {
-      "name": "voice: Manual edit → Follow — \"Back to follow.\": 1 action, 334 ms",
+      "name": "voice: Manual edit → Follow — \"Back to follow.\": 1 action, 337 ms",
       "ok": true,
       "detail": {
         "actions": {
@@ -309,7 +316,7 @@
           "visible": "visible",
           "seen": [
             {
-              "ms": 329,
+              "ms": 332,
               "view": "follow",
               "path": "draft.md",
               "source": "agent",
@@ -327,7 +334,7 @@
       }
     },
     {
-      "name": "voice: change course (redirect the agent) — \"Tell the notes agent to keep it short.\": 1 action, 2622 ms",
+      "name": "voice: change course (redirect the agent) — \"Tell the notes agent to keep it short.\": 1 action, 2638 ms",
       "ok": true,
       "detail": {
         "actions": {
@@ -351,7 +358,7 @@
       }
     },
     {
-      "name": "voice: change course (stop the agent) — \"Stop the notes agent.\": 1 action, 220 ms",
+      "name": "voice: change course (stop the agent) — \"Stop the notes agent.\": 1 action, 219 ms",
       "ok": true,
       "detail": {
         "actions": {
@@ -459,7 +466,7 @@
         "words": 0,
         "yes": 0
       },
-      "ms": 1756,
+      "ms": 1762,
       "ok": true
     },
     {
@@ -474,7 +481,7 @@
         "words": 1,
         "yes": 1
       },
-      "ms": 1541,
+      "ms": 1558,
       "ok": true
     },
     {
@@ -489,7 +496,7 @@
         "words": 0,
         "yes": 0
       },
-      "ms": 929,
+      "ms": 928,
       "ok": true
     },
     {
@@ -504,7 +511,7 @@
         "words": 0,
         "yes": 0
       },
-      "ms": 70,
+      "ms": 71,
       "ok": true
     },
     {
@@ -519,7 +526,7 @@
         "words": 0,
         "yes": 0
       },
-      "ms": 416,
+      "ms": 417,
       "ok": true
     },
     {
@@ -534,7 +541,7 @@
         "words": 0,
         "yes": 0
       },
-      "ms": 181,
+      "ms": 179,
       "ok": true
     },
     {
@@ -549,7 +556,7 @@
         "words": 0,
         "yes": 0
       },
-      "ms": 1796,
+      "ms": 1824,
       "ok": true
     },
     {
@@ -564,7 +571,7 @@
         "words": 0,
         "yes": 0
       },
-      "ms": 2983,
+      "ms": 2966,
       "ok": true
     },
     {
@@ -579,7 +586,7 @@
         "words": 0,
         "yes": 0
       },
-      "ms": 217,
+      "ms": 215,
       "ok": true
     },
     {
@@ -609,7 +616,7 @@
         "words": 0,
         "yes": 0
       },
-      "ms": 334,
+      "ms": 337,
       "ok": true
     },
     {
@@ -624,7 +631,7 @@
         "words": 0,
         "yes": 0
       },
-      "ms": 2622,
+      "ms": 2638,
       "ok": true
     },
     {
@@ -639,7 +646,7 @@
         "words": 0,
         "yes": 0
       },
-      "ms": 220,
+      "ms": 219,
       "ok": true
     }
   ]

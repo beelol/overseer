@@ -149,7 +149,10 @@ const L = require('./overseer-window-helpers');
       return { ok: ed.editor && ed.focused && /^draft\.md\b/.test(ed.title) && ed.status === 'Manual edit', detail: { editor: ed } };
     });
     // Manual edit is the real file: a save lands in the agent's worktree.
-    await c.key('Home', { meta: true }); await c.type('Owner: keep it short.\n'); await c.key('s', { meta: true }); await delay(800);
+    // The editor opened at Follow's line (line 1 here): typed there, then saved. No ⌘Home: in the
+    // background test window a CDP ⌘Home sometimes opened VS Code's About dialog over the editor,
+    // which then took every key that followed.
+    await c.type('Owner: keep it short.\n'); await c.key('s', { meta: true }); await delay(800);
     const saved = fs.readFileSync(draftFile, 'utf8');
     check('Manual edit is the agent\'s real file: the owner\'s line, saved, is in its worktree', /^Owner: keep it short\.\n# Draft/.test(saved), { file: draftFile, text: saved.slice(0, 80) });
 
