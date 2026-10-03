@@ -577,6 +577,80 @@ fn runner_refuses_changed_copied_bytes_before_execution() {
 }
 
 #[test]
+fn runner_refuses_fifo_replacement_of_copied_stage_without_blocking() {
+    if isolated_worker("runner_refuses_fifo_replacement_of_copied_stage_without_blocking") {
+        return;
+    }
+    use std::os::unix::{ffi::OsStrExt, fs::OpenOptionsExt};
+    use std::sync::{atomic::Ordering, mpsc, Arc};
+    let (_home, request) = fixture("hang");
+    let escaped = Arc::new(AtomicBool::new(false));
+    let mut staged = None;
+    let mut escape = None;
+    let mut done = None;
+    let mut observer = |point, path: &std::path::Path| {
+        if point == runner::Point::Copied {
+            // The copied regular inode remains held by the runner. Replace only
+            // its named entry before the intermediate read-only reopen.
+            std::fs::remove_file(path).unwrap();
+            let name = std::ffi::CString::new(path.as_os_str().as_bytes()).unwrap();
+            assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+            staged = Some(path.to_path_buf());
+            let (tx, rx) = mpsc::channel();
+            done = Some(tx);
+            let path = path.to_path_buf();
+            let escaped = escaped.clone();
+            escape = Some(std::thread::spawn(move || {
+                // An uncorrected blocking open cannot check its clock. Release
+                // it after the deadline so the worker can fail an assertion and
+                // run normal Stage cleanup instead of leaving a stranded stage.
+                if matches!(
+                    rx.recv_timeout(Duration::from_secs(5)),
+                    Err(mpsc::RecvTimeoutError::Timeout)
+                ) {
+                    escaped.store(true, Ordering::SeqCst);
+                    let _writer = std::fs::OpenOptions::new()
+                        .read(true)
+                        .write(true)
+                        .custom_flags(libc::O_NONBLOCK | libc::O_NOFOLLOW)
+                        .open(path)
+                        .unwrap();
+                    let _ = rx.recv_timeout(Duration::from_secs(5));
+                }
+            }));
+        }
+    };
+    let started = Instant::now();
+    let outcome = runner::run_observed(&request, b"", &AtomicBool::new(false), &mut observer);
+    let elapsed = started.elapsed();
+    drop(observer);
+    if let Some(done) = done {
+        let _ = done.send(());
+    }
+    if let Some(escape) = escape {
+        escape.join().unwrap();
+    }
+    let staged = staged.expect("actual Copied-point FIFO replacement");
+    assert_eq!(outcome, Outcome::Bypass("program_changed"));
+    assert!(
+        !escaped.load(Ordering::SeqCst),
+        "staged reopen blocked until the fixture escape writer arrived"
+    );
+    assert!(
+        elapsed < Duration::from_secs(4),
+        "the whole operation must remain bounded: {elapsed:?}"
+    );
+    assert!(
+        !request.scratch.join("started.pid").exists(),
+        "refusal precedes helper execution"
+    );
+    assert!(
+        !staged.parent().unwrap().exists(),
+        "refused stage is removed"
+    );
+}
+
+#[test]
 fn runner_refuses_replaced_staged_inode_even_with_matching_digest() {
     if isolated_worker("runner_refuses_replaced_staged_inode_even_with_matching_digest") {
         return;
