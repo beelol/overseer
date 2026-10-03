@@ -852,7 +852,9 @@ fn a_closing_audio_runtime_refuses_new_source_admission_before_daemon_exit() {
     std::fs::create_dir(&gate).unwrap();
     let release = AudioGate(gate.clone());
     let mut d = Daemon::start(&[("OVERSEER_TEST_AUDIO_SHUTDOWN_HOLD", gate.to_str().unwrap())]);
-    let before = d.call("audio.get", json!({}));
+    // Prove the native validator setup first; a codec error must not count as
+    // closing refusal. Both post-close calls require the explicit closing reason.
+    let before = select(&d, &folder);
     d.call("daemon.shutdown", json!({}));
     let held = gate_ready(&gate);
     assert_eq!(
@@ -863,15 +865,21 @@ fn a_closing_audio_runtime_refuses_new_source_admission_before_daemon_exit() {
         "audio.source.set",
         json!({"source":"folder","path":folder,"expected_revision":before["revision"]}),
     );
+    let builtin_result = d.try_call(
+        "audio.source.set",
+        json!({"source":"builtin","expected_revision":revision(&d)}),
+    );
     let during = d.call("audio.get", json!({}));
     drop(release);
     if let Some(mut child) = d.child.take() {
         child.wait().unwrap();
     }
-    assert!(
-        result.is_err(),
-        "closing must refuse a new decoder/selection admission: {result:?}"
-    );
+    for result in [result, builtin_result] {
+        let error =
+            result.expect_err("closing must refuse both decoder and decoder-free source admission");
+        assert!(error.to_ascii_lowercase().contains("shutting down") || error.to_ascii_lowercase().contains("closing"),
+            "only a closing refusal proves this boundary, not codec/revision/setup failure: {error}");
+    }
     assert_eq!(
         during["revision"], before["revision"],
         "closing request cannot commit new selection"
