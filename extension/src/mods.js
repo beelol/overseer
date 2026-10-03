@@ -69,7 +69,7 @@ class ModsPanel {
       const op = p.operation === 'update' ? 'update' : 'install';
       if (!await this.confirm(`${op === 'update' ? 'Update' : 'Install'} ${p.version.manifest.name}?`, `Pinned fingerprint: ${p.fingerprint || p.version.fingerprint}.\nInstallation never enables a mod. Existing bindings stay pinned to their current version.`, op === 'update' ? 'Update' : 'Install')) return this.push();
       if (!vscode.workspace.isTrusted || !this.client.connected || this.preview !== p) throw new Error('Trust, connection or preview changed. Review a fresh preview.');
-      await this.client.request('mods.' + op, { preview_id: p.id, confirm: true }); this.preview = undefined;
+      await this.client.request('mods.install', { preview_id: p.id, confirm: true }); this.preview = undefined;
     } else if (m.action === 'bind') {
       const revision = this.revision(m), v = this.version(m.fingerprint);
       const existing = m.bindingId ? this.data.bindings.find(b => b.id === m.bindingId && b.fingerprint === v.fingerprint) : undefined;

@@ -15,7 +15,7 @@ function host() {
   const load = Module._load; Module._load = function (name, ...rest) { return name === 'vscode' ? vscode : load.call(this, name, ...rest); };
   let ModsPanel; try { ({ ModsPanel } = require('../../extension/src/mods')); } finally { Module._load = load; }
   const client = new EventEmitter(); client.connected = true; client.calls = [];
-  client.request = async (method, params) => { client.calls.push({ method, params }); if (method === 'mods.list') return list(); if (method === 'mods.preview') return { id: 'preview1', version, contents: { 'style.md': '<img onerror=bad>' }, previous: [] }; return { revision: 8 }; };
+  client.request = async (method, params) => { client.calls.push({ method, params }); if (method === 'mods.list') return list(); if (method === 'mods.preview') return { id: 'preview1', operation: params.operation, version, contents: { 'style.md': '<img onerror=bad>' }, previous: [] }; return { revision: 8 }; };
   const h = new ModsPanel({ context: { subscriptions: [], extensionUri: {} }, client, model: { all: { runs: [], workspaces: [] } }, log() {} });
   h.data = list(); return { h, client };
 }
@@ -42,6 +42,21 @@ test('preview installs only after confirmation and never binds', async () => {
   const { h, client } = host(); await h.handle({ action: 'preview', source: 'bundled:clear-prose', operation: 'install' }); assert.strictEqual(client.calls[0].method, 'mods.preview');
   choice = false; await h.handle({ action: 'install', previewId: 'preview1' }); assert.ok(!client.calls.some(c => c.method === 'mods.install'));
   choice = true; await h.handle({ action: 'install', previewId: 'preview1' }); assert.deepStrictEqual(client.calls.find(c => c.method === 'mods.install').params, { preview_id: 'preview1', confirm: true }); assert.ok(!client.calls.some(c => c.method === 'mods.bind'));
+});
+test('update commits the confirmed preview through the declared install method', async () => {
+  const { h, client } = host();
+  await h.handle({ action: 'preview', source: 'bundled:clear-prose', operation: 'update' });
+  assert.strictEqual(h.preview.operation, 'update');
+  choice = false;
+  await h.handle({ action: 'install', previewId: 'preview1' });
+  assert.deepStrictEqual(client.calls.map(c => c.method), ['mods.preview']);
+  choice = true;
+  await h.handle({ action: 'install', previewId: 'preview1' });
+  assert.deepStrictEqual(client.calls.filter(c => !['mods.list', 'mods.why', 'events.list'].includes(c.method)), [
+    { method: 'mods.preview', params: { source: 'bundled:clear-prose', operation: 'update' } },
+    { method: 'mods.install', params: { preview_id: 'preview1', confirm: true } },
+  ]);
+  assert.strictEqual(h.preview, undefined);
 });
 test('stale UI revision is refused rather than silently rebased', async () => {
   const { h, client } = host(); await assert.rejects(h.handle({ action: 'bind', revision: 6, fingerprint: 'fp', scope: { kind: 'overseer' }, enabled: true }), /changed|refresh/i); assert.strictEqual(client.calls.length, 0);
