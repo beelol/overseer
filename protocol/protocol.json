@@ -1779,7 +1779,7 @@
     },
     "overseer.auto_repos": {
       "class": "mac_only",
-      "summary": "Choose the repositories where Overseer may set Auto by itself",
+      "summary": "Choose the repositories where Overseer may suggest Auto",
       "phone": "not_yet",
       "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
       "params": "json",

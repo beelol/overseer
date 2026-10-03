@@ -990,7 +990,7 @@ export interface Methods {
   "overseer.card": { class: 'mac_only'; params: unknown; result: unknown };
   /** Set how much Overseer does on its own. */
   "overseer.level": { class: 'mac_only'; params: unknown; result: unknown };
-  /** Choose the repositories where Overseer may set Auto by itself. */
+  /** Choose the repositories where Overseer may suggest Auto. */
   "overseer.auto_repos": { class: 'mac_only'; params: unknown; result: unknown };
   /** Set Overseer's spending cap. */
   "overseer.cap": { class: 'mac_only'; params: unknown; result: unknown };

@@ -413,7 +413,7 @@ The daemon enforces the tiers, whatever the plan says.
 | --- | --- | --- |
 | Look | Questions about the agents; select or track an agent; open the grid; mute | At once |
 | Steer | Add, redirect, stop an agent or every agent; up to three new agents | Answer, settle window, send. Stop skips the window |
-| Confirm | Answer a permission request; merge back; open a pull request; archive; more than three new agents | Read back in one sentence, then a yes by voice or click within 20 s. Silence or anything unclear is a no. A permission answer then plays its cue, shows its toast and waits out the settle window, where it can be cancelled (below) |
+| Confirm | Set an agent to Auto or start one in Auto; answer a permission request; merge back; open a pull request; archive; more than three new agents | Read back in one sentence, then a yes by voice or click within 20 s. Silence or anything unclear is a no. A permission answer then plays its cue, shows its toast and waits out the settle window, where it can be cancelled (below) |
 | Not by voice | Accounts and sign-in; phone access and pairing; Continuity's download and install settings; workspace cleanup; stopping the daemon; changing these rules | Overseer opens the place in the UI and says so |
 
 Permission requests are answered one at a time. "Allow everything" is refused.

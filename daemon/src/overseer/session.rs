@@ -560,7 +560,7 @@ impl Daemon {
 
     /// An action as the owner reads it; one for an agent still blocked on the owner's permission
     /// says so (AC-241).
-    fn describe(&self, a: &Value) -> String {
+    pub(crate) fn describe(&self, a: &Value) -> String {
         let line = self.describe_action(a);
         let blocked = a["blocked_on"].as_str().is_some() && a["agent"].as_str().and_then(|id| self.run(id).ok()).as_ref().and_then(blocked_on_permission).is_some();
         match a["blocked_on"].as_str().filter(|_| blocked) {
@@ -1083,11 +1083,11 @@ impl Daemon {
     /// The owner's (or the level's) answer. Once: a second answer gets the first one's outcome.
     pub fn overseer_answer(self: &Arc<Self>, id: &str, yes: bool, surface: &str, by: &str) -> Result<Value> {
         let now = crate::daemon::now();
-        let (actions, session, run_id) = {
+        let (actions, session, run_id, needs_card) = {
             let store = self.store.lock().unwrap();
-            let row: (String, String, String, Option<String>, Option<String>) = store
+            let row: (String, String, String, Option<String>, Option<String>, bool) = store
                 .conn
-                .query_row("SELECT actions, state, session_id, result, answered_by FROM overseer_proposals WHERE id=?1", [id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)))
+                .query_row("SELECT actions, state, session_id, result, answered_by, COALESCE(source, '')='needs' AND COALESCE(cause, '')='needs' FROM overseer_proposals WHERE id=?1", [id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)))
                 .map_err(|_| anyhow!("unknown proposal {id}"))?;
             if row.1 != "open" && row.1 != "settling" {
                 let (mut state, mut who, mut result) = (row.1.clone(), row.4.clone().unwrap_or_default(), row.3.clone().unwrap_or_default());
@@ -1114,14 +1114,17 @@ impl Daemon {
                 bail!("already_answered");
             }
             let run_id: Option<String> = store.conn.query_row("SELECT run_id FROM overseer_sessions WHERE id=?1", [&row.2], |r| r.get(0)).ok().flatten();
-            (serde_json::from_str::<Vec<Value>>(&row.0)?, row.2, run_id)
+            (serde_json::from_str::<Vec<Value>>(&row.0)?, row.2, run_id, row.5)
         };
         let finish = |state: &str, result: &str| -> Result<Value> {
             self.store.lock().unwrap().conn.execute("UPDATE overseer_proposals SET state=?2, result=?3 WHERE id=?1", rusqlite::params![id, state, result])?;
             self.emit(None, run_id.as_deref(), "proposal_answered", by, "exact", json!({"id": id, "state": state, "result": result, "by": by, "surface": surface}))?;
             Ok(json!({"id": id, "state": state, "result": result}))
         };
-        if !yes {
+        // The unsolicited Needs you card asks the native permission's yes/no question. Its No
+        // denies that exact request; declining any ordinary action proposal still does nothing.
+        let deny_permission = !yes && needs_card && actions.len() == 1 && actions[0]["action"] == "permission";
+        if !yes && !deny_permission {
             return finish("no", "Declined: nothing was done.");
         }
         // An agent that changed state since the proposal was made: made again, not carried out.
@@ -1133,6 +1136,16 @@ impl Daemon {
                     return finish("stale", &format!("Not done: {} is now {now_status}, not {then} as when this was proposed. Ask again.", a["title"].as_str().unwrap_or(agent)));
                 }
             }
+        }
+        if deny_permission {
+            let mut denial = actions[0].clone();
+            denial["allow_request"] = json!(false);
+            denial["allow"] = json!(false);
+            // perform checks the request identity, and answer_permission claims it atomically.
+            return match self.perform(&denial, id, by) {
+                Ok(text) => finish("no", &format!("{text}.")),
+                Err(e) => finish("stale", &format!("Not done: {e}.")),
+            };
         }
         let mut done = Vec::new();
         for a in &actions {

@@ -810,6 +810,14 @@ fn ac248_a_proposal_after_its_spoken_request_closed_is_withdrawn() {
     let live = listening(&env);
     let said = env.d.call("voice.say", json!({"text": "Tell Phone to wait for the review."}));
     let id = said["request"].as_str().unwrap().to_string();
+    // An unrelated native permission arrives while Overseer's reply is delayed.
+    // Its unsolicited card must never become the answer to this spoken request.
+    let permission_repo = common::repo(&r.path().join("permission"));
+    let asks = permission_agent(&env, &permission_repo, "Sessions");
+    let messages = env.d.call("overseer.session", json!({}))["messages"].clone();
+    assert!(messages.as_array().unwrap().iter().any(|m| m["card"]["kind"] == "needs" && m["card"]["agent"] == asks.as_str()), "permission surfaced: {messages}");
+    assert!(request(&env.d, &id)["answer"].as_str().unwrap_or("").is_empty(), "a permission notice is not this request's answer: {}", request(&env.d, &id));
+    std::fs::write(env.mode_file(), "overseer").unwrap();
     wait_state(&live, &id, "not_sent");
     // Overseer's slow turn ends with a proposal for Phone after the request closed.
     let deadline = Instant::now() + Duration::from_secs(40);
@@ -3076,6 +3084,39 @@ fn ac229_a_start_is_read_back_and_a_correction_inside_the_window_changes_it() {
     assert_eq!(started.len(), 1, "only the corrected start: {started:?}");
 }
 
+/// Every task in a confirmed bundle is audible before the owner agrees.
+#[test]
+fn ac229_confirmed_multiple_starts_and_redirect_read_back_each_task() {
+    let env = voice_daemon(&[
+        ("FIXTURE_OVERSEER_DELAY_MS", "120000"),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE,FIXTURE_OVERSEER_DELAY_MS"),
+    ]);
+    let r = tmp();
+    let site = repo(&r.path().join("site"));
+    let phone = agent(&env.d, &site, "Phone");
+    let live = listening(&env);
+    let id = say(&env, "Tell Phone to wait for the review.");
+    voice_cause(&env);
+    let before = run_ids(&env);
+    let p = env.d.call("overseer.propose", json!({"source": "test", "actions": [
+        {"action": "start", "repo": site, "harness": "claude", "prompt": "Draft the changelog.", "title": "Changelog", "permission_mode": "Auto"},
+        {"action": "start", "repo": site, "harness": "claude", "prompt": "Check the links.", "title": "Links"},
+        {"action": "redirect", "agent": phone, "text": "Review the screenshots."},
+        {"action": "archive", "agent": phone}
+    ]}));
+    assert_eq!(p["state"], "open", "{p}");
+    wait_state(&live, &id, "waiting");
+    let line = live.wait("all task contents before confirmation", 10, |v| v["kind"] == "say" && v["text"].as_str().unwrap_or("").contains("Say yes to go ahead"));
+    let text = line["text"].as_str().unwrap();
+    for task in ["draft the changelog", "check the links", "review the screenshots", "Archive Phone"] {
+        assert!(text.contains(task), "missing {task}: {text}");
+    }
+    assert_eq!(run_ids(&env), before, "confirmation must precede every start");
+    env.d.call("voice.answer", json!({"yes": false}));
+    wait_state(&live, &id, "not_sent");
+    assert!(received(&env, &phone).is_empty(), "no redirect on decline");
+}
+
 /// AC-229: a request that names Overseer and gives it an instruction is taken, even as the
 /// recognizer wrote it ("-overseer. Start…") and even when Overseer first judges it not for itself.
 #[test]
@@ -3115,6 +3156,11 @@ fn ac230_by_voice_modes_a_start_in_auto_and_a_permission_read_out_unasked() {
     let live = listening(&env);
     for (words, mode) in [("Set Site to Accept edits.", "acceptEdits"), ("Put Site in Ask first.", "manual"), ("Switch Site to Auto.", "auto")] {
         let id = say(&env, words);
+        if mode == "auto" {
+            wait_state(&live, &id, "waiting");
+            live.wait("the permission change named before yes", 10, |v| v["kind"] == "say" && v["text"].as_str().unwrap_or("").contains("Site to Auto"));
+            env.d.call("voice.answer", json!({"yes": true}));
+        }
         wait_state(&live, &id, "sent");
         let set: Vec<Value> = env.d.events(&busy).into_iter().filter(|e| e["kind"] == "overseer_action" && e["payload"]["action"] == "mode").collect();
         let last = &set.last().unwrap()["payload"];
@@ -3125,6 +3171,10 @@ fn ac230_by_voice_modes_a_start_in_auto_and_a_permission_read_out_unasked() {
     // Started in Auto.
     let before = run_ids(&env);
     let id = say(&env, "Start an agent in the site repo in Auto to write the release notes.");
+    wait_state(&live, &id, "waiting");
+    live.wait("the exact task and mode read back before Auto starts", 10, |v| v["kind"] == "say" && v["text"].as_str().unwrap_or("").contains("in Auto to write the release notes"));
+    assert_eq!(run_ids(&env), before, "no start before explicit yes");
+    env.d.call("voice.answer", json!({"yes": true}));
     wait_state(&live, &id, "sent");
     let run = new_run(&env, &before);
     let run_id = run["id"].as_str().unwrap().to_string();

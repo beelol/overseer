@@ -475,7 +475,7 @@ What a phone can do, method by method:
 | `conflict.resolve` | Resolve a conflict between agents | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
 | `conflicts.list` | Conflicts between agents | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
 | `overseer.answer` | Answer one of Overseer's proposals | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
-| `overseer.auto_repos` | Choose the repositories where Overseer may set Auto by itself | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
+| `overseer.auto_repos` | Choose the repositories where Overseer may suggest Auto | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
 | `overseer.cancel` | Cancel one of Overseer's proposals | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
 | `overseer.cap` | Set Overseer's spending cap | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |
 | `overseer.card` | One of Overseer's cards | Not yet: overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs | — |

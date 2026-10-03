@@ -126,8 +126,7 @@ impl Daemon {
                 let owner = self.append_session_message(&sid, "owner", Some(surface), owner_text.unwrap_or(words), None)?;
                 let r = self.overseer_answer(&proposal, yes, surface, "owner");
                 let text = match &r {
-                    Ok(r) if yes => format!("{}", r["result"].as_str().unwrap_or("Done.")),
-                    Ok(_) => "Declined: nothing was done.".to_string(),
+                    Ok(r) => r["result"].as_str().unwrap_or("Done.").to_string(),
                     Err(e) => format!("That could not be done: {e}"),
                 };
                 let reply = self.append_session_message(&sid, "overseer", None, &text, Some(&json!({"kind": "needs", "state": if yes { "allowed" } else { "denied" }, "proposal": proposal})))?;
@@ -173,7 +172,7 @@ impl Daemon {
                     _ => {
                         let yes = ask == Ask::Yes;
                         let r = self.overseer_answer(&id, yes, surface, "owner");
-                        let text = match &r { Ok(r) if yes => r["result"].as_str().unwrap_or("Done.").to_string(), Ok(_) => "Declined: nothing was done.".into(), Err(e) => format!("That could not be done: {e}") };
+                        let text = match &r { Ok(r) => r["result"].as_str().unwrap_or("Done.").to_string(), Err(e) => format!("That could not be done: {e}") };
                         (text, json!({"kind": "needs", "state": if yes { "allowed" } else { "denied" }, "proposal": id}))
                     }
                 }
