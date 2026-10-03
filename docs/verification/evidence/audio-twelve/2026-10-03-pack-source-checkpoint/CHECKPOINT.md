@@ -18,3 +18,9 @@ Integration boundaries are explicit:
 - Metadata identity detects changes; it is not immutable-byte proof against in-place modification. Changed selected files remain selected but unavailable and require reselection at this checkpoint. Automatic revalidation of changed/migrated folders remains pending.
 - Built-in assets are unavailable pending the owner's content clarification and approved distributable twelve-line files. No private audio was read, copied, generated, cached or bundled.
 - Local VS Code/TUI controls, gateway tests, cancellation/shutdown integration, rendered/terminal checks, guided audition and full combined suite remain pending.
+
+## Source review follow-up (unrun)
+
+Two concrete source ordering findings were identified in `9e3489a`: an older enable could apply its runtime flag after a newer disable, and a decoded old-pack descriptor could be admitted after a new source committed. Baseline observation/test checkpoint `3e409e0` adds bounded postcommit and afterdecode gates; the next test-only checkpoint adds cancellation and actual permission-resolution negatives. None has run: no RED/GREEN claim is made, and canonical queue integration is required for the afterdecode cases to reach their intended assertions.
+
+The source correction uses one short admission/settings guard. Folder decoding/metadata inspection remain outside it; source commit and runtime callback are serialized after Store release; final player admission checks committed revision and semantic freshness under the same guard. A live cue may re-resolve once against the latest source after discarding its old FD outside the lock. Repeated churn logs an explicit skipped-cue error; cancellation/resolved need returns unplayed false. Source changes after actual admission may let the in-flight clip finish. The native player, decoder budgets/limits and runtime cleanup remain unqualified.

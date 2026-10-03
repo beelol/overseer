@@ -184,16 +184,13 @@ pub fn get(d: &Arc<Daemon>) -> Result<Value> { source::get(d) }
 pub fn source_set(d: &Arc<Daemon>, p: &Value) -> Result<Value> { source::select(d, p) }
 
 pub fn set(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
-    let (state, transition) = source::set_enabled(d, p)?;
-    if let Some(enabled) = transition {
-        test_hold("TRANSITION", &json!({"revision": state["revision"], "enabled": enabled}))?;
-        // Interim enablement bridge until the canonical semantic runtime dependency
-        // lands: that runtime owns epoch/drain/cancel, not the source resolver.
+    source::set_enabled(d, p, |enabled, revision| {
+        // Interim bridge: canonical runtime integration replaces only this hook
+        // with enablement_changed(enabled). Source owns commit/runtime ordering.
         if let Some(runtime) = RUNTIME.get() { runtime.enabled.store(enabled, Ordering::SeqCst); }
         if !enabled { player::cancel(d); }
-        test_transition_applied(state["revision"].as_i64().unwrap_or(-1));
-    }
-    Ok(state)
+        test_transition_applied(revision);
+    })
 }
 
 // Environment-only synthetic observation gates; never expose an RPC or authority.
