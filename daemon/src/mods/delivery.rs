@@ -50,7 +50,10 @@ fn prepare_inner(
     } else {
         None
     };
-    let reason = if c.local_model_selection && selected {
+    let unqualified = plan.decisions.iter().find(|d| d.status == "unqualified");
+    let reason = if let Some(d) = unqualified {
+        Some(d.reason)
+    } else if c.local_model_selection && selected {
         Some("Mods admission precedes local model selection; this route is unqualified and optional text is bypassed whole")
     } else if !supported && selected {
         Some("Text delivery to this transport or observed native child is unsupported")
@@ -64,7 +67,7 @@ fn prepare_inner(
             && plan
                 .decisions
                 .iter()
-                .any(|d| d.status == "selected" && d.required)
+                .any(|d| matches!(d.status, "selected" | "unqualified") && d.required)
         {
             return Err(error(
                 "unsupported_mod",
@@ -96,7 +99,7 @@ impl PreparedMods {
     pub fn snapshot(&self, turn_id: &str, run_id: &str, harness: &str) -> Value {
         let text = self.message_preface.as_deref().unwrap_or("");
         json!({"turn_id":turn_id,"run_id":run_id,"plan":self.plan,"context":self.context, "binding_snapshot":[],
-            "delivery":if text.is_empty() { if self.plan.versions.is_empty() { "none" } else { "unsupported" } } else { "message_text" },
+            "delivery":if text.is_empty() { if self.plan.versions.is_empty() && !self.plan.decisions.iter().any(|d| d.status == "unqualified") { "none" } else { "unsupported" } } else { "message_text" },
             "transport":harness,"activation":"next_turn","children":"unknown","text":text,
             "digest":self.digest,"added_bytes":text.len(),"outcome":"prepared","outcome_ms":now(),
             "applied_fingerprints":[],
@@ -166,7 +169,14 @@ pub fn applied(d: &Daemon, run_id: &str) -> Result<Value> {
             effective(s) != effective(&desired_snapshot)
                 || (s["delivery"] == "message_text" && s["outcome"] != "transport_accepted")
         })
-        .unwrap_or(!prepared.plan.versions.is_empty());
+        .unwrap_or(
+            !prepared.plan.versions.is_empty()
+                || prepared
+                    .plan
+                    .decisions
+                    .iter()
+                    .any(|d| d.status == "unqualified"),
+        );
     let visible_last = last_turn.as_ref().map(public_snapshot);
     Ok(crate::daemon::redact_value(
         json!({"context":context,"desired":prepared.plan,"last_turn":visible_last,"pending":pending,

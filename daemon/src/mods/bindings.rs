@@ -13,7 +13,11 @@ use anyhow::Result;
 use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::{collections::BTreeMap, path::Path, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+    sync::Arc,
+};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -74,13 +78,16 @@ impl ModFilters {
         }
         Ok(())
     }
-    fn matches(&self, c: &ModContext) -> bool {
+    fn matches_route(&self, c: &ModContext) -> bool {
         fn matches(values: &[String], actual: Option<&str>) -> bool {
             values.is_empty() || actual.is_some_and(|a| values.iter().any(|v| v == a))
         }
         matches(&self.harnesses, Some(&c.harness))
             && matches(&self.accounts, c.account_id.as_deref())
-            && matches(&self.models, c.model.as_deref())
+    }
+    fn matches(&self, c: &ModContext) -> bool {
+        self.matches_route(c)
+            && (self.models.is_empty() || c.model.as_ref().is_some_and(|m| self.models.contains(m)))
     }
     fn overlaps(&self, other: &Self) -> bool {
         fn overlaps(a: &[String], b: &[String]) -> bool {
@@ -239,6 +246,99 @@ fn version<'a>(versions: &'a [Bundle], binding: &ModBinding) -> Result<&'a Bundl
 }
 
 pub fn resolve(
+    versions: &[Bundle],
+    bindings: &[ModBinding],
+    c: &ModContext,
+    revision: i64,
+) -> Result<ModPlan> {
+    let mut plan = resolve_inner(versions, bindings, c, revision)?;
+    if !c.local_model_selection {
+        return Ok(plan);
+    }
+    // This is qualification only, never model discovery or a changed security role.
+    // Exact filters partition possible future models into declared ids plus one
+    // unknown-model class. Reuse the same owner off/locked/style precedence.
+    let known = |b: &&ModBinding| b.scope.matches(c) && b.filters.matches_route(c);
+    let order = |a: &ModBinding, b: &ModBinding| {
+        a.scope
+            .priority()
+            .cmp(&b.scope.priority())
+            .then(a.id.cmp(&b.id))
+    };
+    let possible: Vec<_> = bindings
+        .iter()
+        .filter(known)
+        .filter(|b| b.enabled && b.required)
+        .filter(|b| {
+            !bindings.iter().filter(known).any(|off| {
+                off.mod_id == b.mod_id
+                    && !off.enabled
+                    && off.filters.models.is_empty()
+                    && if off.locked {
+                        !b.locked || order(off, b).is_le()
+                    } else {
+                        !b.locked && order(off, b).is_ge()
+                    }
+            })
+        })
+        .collect();
+    if possible.is_empty() {
+        return Ok(plan);
+    }
+    const MAX_DECLARED_MODELS: usize = 64;
+    let mut models = BTreeSet::new();
+    'scan: for b in bindings.iter().filter(known) {
+        for m in &b.filters.models {
+            models.insert(m.clone());
+            if models.len() > MAX_DECLARED_MODELS {
+                break 'scan;
+            }
+        }
+    }
+    let mut uncertain = BTreeSet::new();
+    let mut reason = "Required applicability may change after local model selection; local text delivery is unqualified";
+    if models.len() > MAX_DECLARED_MODELS {
+        uncertain.extend(possible.iter().map(|b| b.id.as_str()));
+        reason = "Local applicability exceeds 64 declared model candidates; narrow the model filters or disable required local bindings";
+    } else {
+        for model in std::iter::once(None).chain(models.into_iter().map(Some)) {
+            let mut candidate = c.clone();
+            candidate.model = model;
+            candidate.local_model_selection = false;
+            match resolve_inner(versions, bindings, &candidate, revision) {
+                Ok(future) => {
+                    for d in future
+                        .decisions
+                        .iter()
+                        .filter(|d| d.required && d.status == "selected")
+                    {
+                        if let Some(b) = possible.iter().find(|b| b.id == d.binding_id) {
+                            if !plan.decisions.iter().any(|now| {
+                                now.binding_id == d.binding_id && now.status == "selected"
+                            }) {
+                                uncertain.insert(b.id.as_str());
+                            }
+                        }
+                    }
+                }
+                Err(_) => {
+                    // A future style conflict is not proof of non-applicability.
+                    uncertain.extend(possible.iter().map(|b| b.id.as_str()));
+                }
+            }
+        }
+    }
+    for d in &mut plan.decisions {
+        if uncertain.contains(d.binding_id.as_str()) {
+            d.status = "unqualified";
+            d.reason = reason;
+            d.delivery = "unsupported";
+        }
+    }
+    Ok(plan)
+}
+
+fn resolve_inner(
     versions: &[Bundle],
     bindings: &[ModBinding],
     c: &ModContext,

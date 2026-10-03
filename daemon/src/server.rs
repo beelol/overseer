@@ -1416,7 +1416,18 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     }
     // Mods keep copied original bytes privately; every protocol presentation
     // uses the existing decoded-value redaction boundary, including previews.
-    if method.starts_with("mods.") { return result.map(crate::daemon::redact_value); }
+    if method.starts_with("mods.") {
+        return result.map(crate::daemon::redact_value).map_err(|e| {
+            // TOML diagnostics can quote private source lines. Preserve the
+            // protocol code/data shape while sanitizing decoded presentation.
+            if let Some(p) = e.downcast_ref::<ProtoError>() {
+                ProtoError::new(p.code, crate::redact::redact(&p.message))
+                    .with_data(crate::daemon::redact_value(p.data.clone())).into()
+            } else {
+                anyhow!(crate::redact::redact(&e.to_string()))
+            }
+        });
+    }
     result
 }
 

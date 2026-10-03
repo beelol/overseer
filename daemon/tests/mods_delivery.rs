@@ -819,81 +819,234 @@ fn credential_text_keeps_private_delivery_bytes_but_public_views_and_replay_are_
     assert_eq!(replayed, applied.len());
 }
 
-
 #[test]
 fn required_future_local_model_is_unqualified_without_inventory_or_admission() {
     let d = Daemon::start(&[("OVERSEER_TEST_AUTO_DISABLED", "1")]);
     let t = tmp();
     let repo = repo(&t.path().join("repo"));
     let path = t.path().join("future-local.jsonl");
-    let id = create(&d, &repo, &path, "Stored model does not prove the future selection.");
+    let id = create(
+        &d,
+        &repo,
+        &path,
+        "Stored model does not prove the future selection.",
+    );
     done(&d, &id);
     let version = install(&d);
     let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
     db.execute("UPDATE runs SET harness='opencode-serve',model='ollama/previous',native_id='local-fixture',harness_version=NULL WHERE id=?1",[&id]).unwrap();
     let mut input = json!({"mod_id":version["id"],"version":version["version"],"fingerprint":version["fingerprint"],
-        "scope":{"kind":"all_agents"},"enabled":true,"required":true,
+        "scope":{"kind":"all_agents"},"enabled":true,"required":true,"locked":true,
         "filters":{"harnesses":["opencode-serve"],"models":["ollama/future"],"accounts":[]}});
-    let b=d.call("mods.bind",json!({"expected_revision":d.call("mods.list",json!({}))["revision"],"binding":input}))["binding"].clone();
+    let b = d.call(
+        "mods.bind",
+        json!({"expected_revision":d.call("mods.list",json!({}))["revision"],"binding":input}),
+    )["binding"]
+        .clone();
     let why = d.call("mods.why", json!({"run_id":id}));
-    let decision = why["desired"]["decisions"].as_array().unwrap().iter().find(|v|v["binding_id"]==b["id"]).unwrap();
-    assert_eq!(decision["status"], "unqualified", "A different stored model cannot rule out future required applicability");
+    let decision = why["desired"]["decisions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|v| v["binding_id"] == b["id"])
+        .unwrap();
+    assert_eq!(
+        decision["status"], "unqualified",
+        "A different stored model cannot rule out future required applicability"
+    );
     assert_eq!(decision["delivery"], "unsupported");
     let before = d.call("run.turns", json!({"run_id":id}));
-    let refusal=d.try_call("run.follow_up",json!({"run_id":id,"prompt":"Refuse before local effects."})).unwrap_err();
-    assert!(refusal.contains("Required mod text cannot be delivered"), "{refusal}");
-    assert_eq!(d.call("run.turns", json!({"run_id":id})),before);
-    assert_eq!(captures(&path,1).len(),1);
+    let refusal = d
+        .try_call(
+            "run.follow_up",
+            json!({"run_id":id,"prompt":"Refuse before local effects."}),
+        )
+        .unwrap_err();
+    assert!(
+        refusal.contains("Required mod text cannot be delivered"),
+        "{refusal}"
+    );
+    assert_eq!(d.call("run.turns", json!({"run_id":id})), before);
+    assert_eq!(captures(&path, 1).len(), 1);
     // Exact harness/account mismatches are already known, unlike the future model.
-    input["id"]=b["id"].clone();
-    for filters in [json!({"harnesses":["claude"],"models":["ollama/future"]}),
-        json!({"accounts":["unrelated-account"],"models":["ollama/future"]})] {
-        input["filters"]=filters;
-        d.call("mods.bind",json!({"expected_revision":d.call("mods.list",json!({}))["revision"],"binding":input}));
-        let why=d.call("mods.why",json!({"run_id":id}));
-        assert_eq!(why["desired"]["decisions"][0]["status"],"filtered");
+    input["id"] = b["id"].clone();
+    for filters in [
+        json!({"harnesses":["claude"],"models":["ollama/future"]}),
+        json!({"accounts":["unrelated-account"],"models":["ollama/future"]}),
+    ] {
+        input["filters"] = filters;
+        d.call(
+            "mods.bind",
+            json!({"expected_revision":d.call("mods.list",json!({}))["revision"],"binding":input}),
+        );
+        let why = d.call("mods.why", json!({"run_id":id}));
+        assert_eq!(why["desired"]["decisions"][0]["status"], "filtered");
     }
 }
 
 #[test]
 fn unknown_future_local_model_preserves_required_and_owner_off_precedence() {
-    let d=Daemon::start(&[("OVERSEER_TEST_AUTO_DISABLED","1")]);
-    let t=tmp();
-    let repo=repo(&t.path().join("repo"));
-    let path=t.path().join("unknown-local.jsonl");
-    let id=create(&d,&repo,&path,"Model-independent owner choices hold.");
-    done(&d,&id);
-    let version=install(&d);
-    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let d = Daemon::start(&[("OVERSEER_TEST_AUTO_DISABLED", "1")]);
+    let t = tmp();
+    let repo = repo(&t.path().join("repo"));
+    let path = t.path().join("unknown-local.jsonl");
+    let id = create(&d, &repo, &path, "Model-independent owner choices hold.");
+    done(&d, &id);
+    let version = install(&d);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
     db.execute("UPDATE runs SET harness='opencode-serve',model='ollama/previous',native_id='local-fixture' WHERE id=?1",[&id]).unwrap();
-    let parent=json!({"mod_id":version["id"],"version":version["version"],"fingerprint":version["fingerprint"],"scope":{"kind":"all_agents"},"enabled":true,"required":true});
-    d.call("mods.bind",json!({"expected_revision":d.call("mods.list",json!({}))["revision"],"binding":parent}));
-    let mut off=json!({"mod_id":version["id"],"version":version["version"],"fingerprint":version["fingerprint"],"scope":{"kind":"agent","run_id":id},"enabled":false,"filters":{"models":["ollama/previous"]}});
-    let bound=d.call("mods.bind",json!({"expected_revision":d.call("mods.list",json!({}))["revision"],"binding":off}))["binding"].clone();
-    let why=d.call("mods.why",json!({"run_id":id}));
-    assert!(why["desired"]["decisions"].as_array().unwrap().iter().any(|v|v["required"]==true && v["status"]=="unqualified"),
-        "An unlisted future model can select the unfiltered required parent: {why}");
-    off["id"]=bound["id"].clone();
-    off["filters"]=json!({});
-    off["locked"]=json!(true);
-    d.call("mods.bind",json!({"expected_revision":d.call("mods.list",json!({}))["revision"],"binding":off}));
-    db.execute("UPDATE runs SET model=NULL WHERE id=?1",[&id]).unwrap();
-    let why=d.call("mods.why",json!({"run_id":id}));
-    assert!(!why["desired"]["decisions"].as_array().unwrap().iter().any(|v|v["status"]=="selected" || v["status"]=="unqualified"),
-        "The owner's unconditional locked off binding still wins for an unknown model: {why}");
+    let parent = json!({"mod_id":version["id"],"version":version["version"],"fingerprint":version["fingerprint"],"scope":{"kind":"all_agents"},"enabled":true,"required":true});
+    d.call(
+        "mods.bind",
+        json!({"expected_revision":d.call("mods.list",json!({}))["revision"],"binding":parent}),
+    );
+    let mut off = json!({"mod_id":version["id"],"version":version["version"],"fingerprint":version["fingerprint"],"scope":{"kind":"agent","run_id":id},"enabled":false,"filters":{"models":["ollama/previous"]}});
+    let bound = d.call(
+        "mods.bind",
+        json!({"expected_revision":d.call("mods.list",json!({}))["revision"],"binding":off}),
+    )["binding"]
+        .clone();
+    let why = d.call("mods.why", json!({"run_id":id}));
+    assert!(
+        why["desired"]["decisions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v["required"] == true && v["status"] == "unqualified"),
+        "An unlisted future model can select the unfiltered required parent: {why}"
+    );
+    off["id"] = bound["id"].clone();
+    off["filters"] = json!({});
+    off["locked"] = json!(true);
+    d.call(
+        "mods.bind",
+        json!({"expected_revision":d.call("mods.list",json!({}))["revision"],"binding":off}),
+    );
+    db.execute("UPDATE runs SET model=NULL WHERE id=?1", [&id])
+        .unwrap();
+    let why = d.call("mods.why", json!({"run_id":id}));
+    assert!(
+        !why["desired"]["decisions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v["status"] == "selected" || v["status"] == "unqualified"),
+        "The owner's unconditional locked off binding still wins for an unknown model: {why}"
+    );
 }
 
 #[test]
 fn malformed_manifest_error_redacts_source_without_losing_error_code() {
-    let d=Daemon::start(&[("OVERSEER_TEST_AUTO_DISABLED","1")]);
-    let t=tmp();
-    let source=t.path().join("malformed-private-mod");
+    let d = Daemon::start(&[("OVERSEER_TEST_AUTO_DISABLED", "1")]);
+    let t = tmp();
+    let source = t.path().join("malformed-private-mod");
     std::fs::create_dir(&source).unwrap();
-    let marker="sk-abcdefghijklmnopqrstuv";
-    std::fs::write(source.join("mod.toml"),format!("summary='{marker}' invalid_tail\n")).unwrap();
-    let request=format!("{}\n",json!({"id":1,"method":"mods.preview","params":{"source":source,"operation":"install"}}));
-    let response:Value=serde_json::from_str(&d.raw(request.as_bytes())).unwrap();
-    assert_eq!(response["error"]["code"],"invalid_mod", "{response}");
-    assert!(response["error"]["message"].as_str().unwrap().contains("invalid mod manifest"));
-    assert!(!response.to_string().contains(marker),"Public parser error leaked private manifest source: {response}");
+    let marker = "sk-abcdefghijklmnopqrstuv";
+    std::fs::write(
+        source.join("mod.toml"),
+        format!("summary='{marker}' invalid_tail\n"),
+    )
+    .unwrap();
+    let request = format!(
+        "{}\n",
+        json!({"id":1,"method":"mods.preview","params":{"source":source,"operation":"install"}})
+    );
+    let response: Value = serde_json::from_str(&d.raw(request.as_bytes())).unwrap();
+    assert_eq!(response["error"]["code"], "invalid_mod", "{response}");
+    assert!(response["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("invalid mod manifest"));
+    assert!(
+        !response.to_string().contains(marker),
+        "Public parser error leaked private manifest source: {response}"
+    );
+}
+
+#[test]
+fn future_local_candidate_bound_refuses_required_uncertainty_actionably() {
+    let d = Daemon::start(&[("OVERSEER_TEST_AUTO_DISABLED", "1")]);
+    let t = tmp();
+    let repo = repo(&t.path().join("repo"));
+    let path = t.path().join("bounded-local.jsonl");
+    let id = create(
+        &d,
+        &repo,
+        &path,
+        "Bound local qualification without loading models.",
+    );
+    done(&d, &id);
+    let version = install(&d);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute("UPDATE runs SET harness='opencode-serve',model='ollama/previous',native_id='local-fixture' WHERE id=?1",[&id]).unwrap();
+    let repo_key = d.call("mods.why", json!({"run_id":id}))["context"]["repo_key"].clone();
+    for (scope, enabled, required, models) in [
+        (
+            json!({"kind":"all_agents"}),
+            true,
+            true,
+            vec!["ollama/future".to_string()],
+        ),
+        (
+            json!({"kind":"repository","repo_key":repo_key}),
+            false,
+            false,
+            (0..64).map(|i| format!("ollama/off-{i}")).collect(),
+        ),
+        (
+            json!({"kind":"agent","run_id":id}),
+            false,
+            false,
+            vec!["ollama/another".to_string()],
+        ),
+    ] {
+        d.call("mods.bind",json!({"expected_revision":d.call("mods.list",json!({}))["revision"],"binding":{
+            "mod_id":version["id"],"version":version["version"],"fingerprint":version["fingerprint"],
+            "scope":scope,"enabled":enabled,"required":required,"filters":{"models":models}}}));
+    }
+    let why = d.call("mods.why", json!({"run_id":id}));
+    let decision = why["desired"]["decisions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|v| v["required"] == true)
+        .unwrap();
+    assert_eq!(decision["status"], "unqualified");
+    assert!(
+        decision["reason"].as_str().unwrap().contains("64"),
+        "{decision}"
+    );
+    let turns = d.call("run.turns", json!({"run_id":id}));
+    let error = d
+        .try_call(
+            "run.follow_up",
+            json!({"run_id":id,"prompt":"Do not probe an unbounded model set."}),
+        )
+        .unwrap_err();
+    assert!(
+        error.contains("64") && error.contains("Required mod text cannot be delivered"),
+        "{error}"
+    );
+    assert_eq!(d.call("run.turns", json!({"run_id":id})), turns);
+    // A model-independent locked off choice is proof even when declarations
+    // exceed the probe bound. It must not be defeated by conservative refusal.
+    let off = d.call("mods.list", json!({}))["bindings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|b| b["scope"]["kind"] == "agent")
+        .unwrap()
+        .clone();
+    d.call("mods.bind",json!({"expected_revision":d.call("mods.list",json!({}))["revision"],"binding":{
+        "id":off["id"],"mod_id":version["id"],"version":version["version"],"fingerprint":version["fingerprint"],
+        "scope":{"kind":"agent","run_id":id},"enabled":false,"locked":true}}));
+    let why = d.call("mods.why", json!({"run_id":id}));
+    assert!(
+        !why["desired"]["decisions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|b| b["status"] == "unqualified" || b["status"] == "selected"),
+        "{why}"
+    );
 }

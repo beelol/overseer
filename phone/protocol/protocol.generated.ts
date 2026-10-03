@@ -275,7 +275,7 @@ export interface ModDecision {
   binding_id: string;
   mod_id: string;
   fingerprint: string;
-  status: 'selected' | 'disabled' | 'overridden' | 'filtered' | 'not_in_scope';
+  status: 'selected' | 'disabled' | 'overridden' | 'filtered' | 'not_in_scope' | 'unqualified';
   reason: string;
   required: boolean;
   delivery: 'unsupported' | 'message_text' | 'native_instructions';
