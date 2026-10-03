@@ -23,6 +23,55 @@ pub const FROM_OVERSEER: &str = "From Overseer: ";
 /// owner's message, a check-in and the queued messages at a turn's end come from different
 /// threads; Voice Mode's requests make that common).
 pub(crate) static TURN_START: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Protected native calls wait for run binding and durable turn publication.
+/// The caller must acquire this before taking Store, and release it before effects.
+pub(super) fn native_turn_start_guard() -> Result<std::sync::MutexGuard<'static, ()>> {
+    match TURN_START.try_lock() {
+        Ok(guard) => Ok(guard),
+        Err(std::sync::TryLockError::Poisoned(error)) => Ok(error.into_inner()),
+        Err(std::sync::TryLockError::WouldBlock) => {
+            // Observe the actual contested mutex in an isolated fixture; never
+            // replace its production synchronization with a fixture gate.
+            if std::env::var_os("OVERSEER_TEST_NET").is_some() {
+                if let Some(dir) = std::env::var_os("OVERSEER_TEST_NATIVE_PUBLICATION_GATE") {
+                    std::fs::write(PathBuf::from(dir).join("native-waiting"), "TURN_START is held")?;
+                }
+            }
+            Ok(TURN_START.lock().unwrap_or_else(|error| error.into_inner()))
+        }
+    }
+}
+
+pub(super) struct NativeOrigin {
+    caller_run: String,
+    session: Value,
+    cause: String,
+    turn: Value,
+}
+
+/// Inert scheduling observation for genuine native-wire fixtures. The existing
+/// turn-start mutex remains held by the caller, with no Store guard held here.
+fn fixture_native_publication(stage: &str) -> Result<()> {
+    if std::env::var_os("OVERSEER_TEST_NET").is_none()
+        || std::env::var("OVERSEER_TEST_NATIVE_PUBLICATION_STAGE").as_deref() != Ok(stage)
+    {
+        return Ok(());
+    }
+    let Some(dir) = std::env::var_os("OVERSEER_TEST_NATIVE_PUBLICATION_GATE") else {
+        return Ok(());
+    };
+    let dir = PathBuf::from(dir);
+    std::fs::write(dir.join("reached"), stage)?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    while !dir.join("release").exists() {
+        if std::time::Instant::now() >= deadline {
+            bail!("fixture native publication gate {stage} was not released");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    Ok(())
+}
 pub const OPEN: &str = "<overseer-state>";
 /// What Overseer replies to a spoken request it judges was not meant for it (Voice Mode).
 pub const NOT_FOR_OVERSEER: &str = "NOT_FOR_OVERSEER";
@@ -304,6 +353,7 @@ impl Daemon {
         let created = self.create_task(&params)?;
         let run_id = created["run"]["id"].as_str().unwrap().to_string();
         let task_id = created["run"]["task_id"].as_str().unwrap_or_default().to_string();
+        fixture_native_publication("before_bind")?;
         {
             let store = self.store.lock().unwrap();
             store.conn.execute("INSERT OR REPLACE INTO run_roles(run_id, role) VALUES(?1, 'overseer')", [&run_id])?;
@@ -487,6 +537,7 @@ impl Daemon {
         };
         let cursor = self.store.lock().unwrap().max_seq()?;
         let turn = self.store.lock().unwrap().turns(&run_id)?.last().map(|t| t.id.clone());
+        fixture_native_publication("before_origin")?;
         {
             let store = self.store.lock().unwrap();
             store.conn.execute("UPDATE overseer_sessions SET last_seq=?2, last_turn_ms=?3, last_cause=?4 WHERE id=?1", rusqlite::params![sid, cursor, crate::daemon::now(), cause])?;
@@ -512,6 +563,7 @@ impl Daemon {
         let cursor = self.store.lock().unwrap().max_seq()?;
         let turns = self.store.lock().unwrap().turns(&run_id)?;
         let turn = turns.last().map(|t| t.id.clone());
+        fixture_native_publication("before_origin")?;
         {
             let store = self.store.lock().unwrap();
             store.conn.execute("UPDATE overseer_sessions SET last_seq=?2, last_turn_ms=?3, last_cause=?4 WHERE id=?1", rusqlite::params![sid, cursor, crate::daemon::now(), cause])?;
@@ -736,7 +788,7 @@ impl Daemon {
     /// Native action tools belong to their authenticated run's active conversation.
     /// Read and bind the session and cause together, then pass that snapshot through
     /// proposal handling: an archived run never borrows a replacement's authority.
-    pub(crate) fn overseer_propose_native(self: &Arc<Self>, actions: &Value, caller_run: &str) -> Result<Value> {
+    pub(super) fn capture_native_origin(&self, caller_run: &str) -> Result<NativeOrigin> {
         use rusqlite::OptionalExtension;
         let (session, cause, turn) = {
             let store = self.store.lock().unwrap();
@@ -749,8 +801,8 @@ impl Daemon {
             }
             // Owner shortcuts propose directly while this native turn may still
             // be working. Their mutable last_cause is not this turn's authority.
-            // Require the exact durable turn origin; initial publication may not
-            // yet have happened, which must refuse rather than assume owner.
+            // Publication has completed under TURN_START. Missing exact durable
+            // provenance still refuses rather than assuming owner authority.
             let origin: Option<(String, String, String)> = store.conn.query_row(
                 "SELECT t.id,t.prompt,o.cause FROM turns t JOIN overseer_turns o ON o.turn_id=t.id AND o.session_id=?1
                  WHERE t.run_id=?2 AND t.id=(SELECT id FROM turns WHERE run_id=?2 ORDER BY n DESC LIMIT 1)
@@ -761,7 +813,11 @@ impl Daemon {
             turn["cause"] = json!(cause);
             (json!({"id": id, "run_id": run, "level": level}), cause, turn)
         };
-        self.overseer_propose_in_session(actions, "tool", &cause, Some(&turn), &session, Some(caller_run))
+        Ok(NativeOrigin { caller_run: caller_run.to_string(), session, cause, turn })
+    }
+
+    pub(super) fn overseer_propose_native(self: &Arc<Self>, actions: &Value, origin: &NativeOrigin) -> Result<Value> {
+        self.overseer_propose_in_session(actions, "tool", &origin.cause, Some(&origin.turn), &origin.session, Some(&origin.caller_run))
     }
 
     fn overseer_propose_for_turn(self: &Arc<Self>, actions: &Value, source: &str, cause_now: Option<&str>, turn: Option<&Value>) -> Result<Value> {
