@@ -6,7 +6,7 @@ The handoff has the active branches, agents, tests and owner decisions. Old bloc
 
 | Criteria | Remaining work | Owner | Current action |
 | --- | --- | --- | --- |
-| AC-229, AC-230 | Voice read-back and permission modes | goal | #52 takes over #49; fresh merge verification and always-ask Auto correction pending. |
+| AC-229, AC-230 | Voice read-back and permission modes | goal | #52 takes over #49; red/green fixes for Auto confirmation, native permission answers/queue and complete task read-back; full regression pending. |
 | AC-265 | Stop pauses queued messages | agent: queue_pause | codex/queue-pause; daemon, voice, chat/grid and TUI evidence required. |
 | AC-224, AC-225 | Per-agent and global goals | goal | Approved choices in handoff: 20 tries or 4 hours, native harness goals where supported, Overseer monitors each stop; design in orchestrator RFC. Implement and verify. |
 | AC-128, AC-246 | Phone Overseer conversation and shared Needs you count | goal | Phone gateway/client integration and parity verification; Gate S and phone are already on main. |
@@ -34,7 +34,7 @@ The handoff has the active branches, agents, tests and owner decisions. Old bloc
 | AUTO-AC-01 to AUTO-AC-40 | goal | Reconcile docs/verification/auto-mode/README.md with each Verify clause; previous summary says 23/40 fixture-verified. Live/account and packaged-UI gaps remain; keep experimental routing gated. |
 | SWARM-01 to SWARM-64; S0 to S5 | goal | Reconcile docs/verification/swarm/coverage.json; previous summary says 46/64 fixture-verified. SWARM-24 adapter, UI, real communication paths and scenario closure remain; owner starts Swarm. |
 | TUI T-01 to T-41 | goal watches regressions | T-29/T-35 merged with #51; all checked in RFC. Reopen only against evidence or changed requirements. |
-| Mods and two bundled options | agent: mods_design (planning) | Existing chosen design in docs/rfcs/mods.md; now explicitly requested: clear complete prose and token-reduction transformer. No implementation yet. Establish verifiable criteria and first build slice; separate library install from enablement and all agents from Overseer. |
+| Mods and two bundled options | goal (design recorded) | First release design, Clear prose rules and evaluation rubric recorded in docs/rfcs/mods-first-release.md and docs/design/mods/. No implementation yet. Next builder slice: library/bindings and Clear prose; then qualified result transformers. |
 | Cactus Whistle comparison | goal | Existing eval independently audited; keep Whisper. Human-voice/current-hint follow-up waits for supplied recordings or a requested guided recording session. |
 | Model selection and usage telemetry | goal, queued | docs/rfcs/model-priority-brief.md and after-current-work.md. Current Luna low-only rule controls live calls despite older broader proposals. |
 | Site, later mods expansion, usability, undo/rewind | goal, queued | after-current-work.md; user now explicitly pulled Mods planning forward. Undo/rewind remains later. |
