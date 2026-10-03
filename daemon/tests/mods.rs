@@ -439,3 +439,104 @@ fn failed_remove_cleanup_is_retried_without_resurrecting_the_version() {
     d.call("mods.remove", p);
     assert!(!root.exists());
 }
+
+#[test]
+fn outstanding_preview_survives_crash_before_confirmation_with_original_bytes() {
+    let mut d = Daemon::start(&[("OVERSEER_TEST_AUTO_DISABLED", "1")]);
+    let t = tmp();
+    let source = t.path().join("unconfirmed-source");
+    local_mod(&source, "pending-preview", b"Retain this exact staged warning.");
+    let preview = d.call("mods.preview", json!({"source":source,"operation":"install"}));
+    let id = preview["id"].as_str().unwrap();
+    let fingerprint = preview["fingerprint"].as_str().unwrap();
+    let stage = d.home.path().join("mods/previews").join(id);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let stored: (String, Option<String>) = db.query_row(
+        "SELECT content,result FROM mod_previews WHERE id=?1", [id],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    ).unwrap();
+    assert!(stored.1.is_none(), "This must be an outstanding, unconfirmed preview");
+    assert!(d.call("mods.list", json!({}))["installed"].as_array().unwrap().is_empty());
+    // Remove the original source entirely: restart/confirmation must use saved private bytes.
+    std::fs::remove_dir_all(&source).unwrap();
+    d.kill9();
+    d.spawn();
+    assert_eq!(std::fs::read_to_string(stage.join("rule.md")).unwrap(),
+        "Retain this exact staged warning.");
+    let reopened: (String, Option<String>) = db.query_row(
+        "SELECT content,result FROM mod_previews WHERE id=?1", [id],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    ).unwrap();
+    assert_eq!(reopened, stored, "Restart retains exact preview identity and unconfirmed state");
+    assert!(d.try_call("mods.install", json!({"preview_id":id})).unwrap_err().contains("confirm"));
+    assert!(d.call("mods.list", json!({}))["installed"].as_array().unwrap().is_empty());
+    let confirmed = d.call("mods.install", json!({"preview_id":id,"confirm":true}));
+    assert_eq!(confirmed["version"]["fingerprint"], fingerprint);
+    let installed = d.home.path().join("mods/versions/pending-preview").join(fingerprint);
+    assert_eq!(std::fs::read_to_string(installed.join("rule.md")).unwrap(),
+        "Retain this exact staged warning.");
+    assert!(!stage.exists(), "Confirmation cleans its staging folder");
+    assert!(d.call("mods.list", json!({}))["bindings"].as_array().unwrap().is_empty());
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("mods.install", json!({"preview_id":id,"confirm":true})), confirmed,
+        "Confirmation history survives restart and does not install twice");
+}
+
+fn real_ctl(d: &Daemon, method: &str, params: Value) -> Value {
+    let out = std::process::Command::new(BIN)
+        .args(["ctl", method, &params.to_string()])
+        .env("OVERSEER_HOME", d.home.path())
+        .output().unwrap();
+    assert!(out.status.success(), "ctl {method} failed: {}", String::from_utf8_lossy(&out.stderr));
+    let response: Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(response["id"], 1, "{response}");
+    response
+}
+
+#[test]
+fn real_ctl_preview_install_update_and_remove_round_trip_with_confirmation() {
+    let d = Daemon::start(&[("OVERSEER_TEST_AUTO_DISABLED", "1")]);
+    let t = tmp();
+    let source = t.path().join("ctl-source");
+    local_mod(&source, "ctl-fixture", b"The first saved rule.");
+    let preview = real_ctl(&d, "mods.preview", json!({"source":source,"operation":"install"}));
+    assert!(preview.get("error").is_none(), "{preview}");
+    let id = &preview["result"]["id"];
+    let refused = real_ctl(&d, "mods.install", json!({"preview_id":id}));
+    assert_eq!(refused["error"]["code"], "confirmation_required");
+    let installed = real_ctl(&d, "mods.install", json!({"preview_id":id,"confirm":true}));
+    assert!(installed.get("error").is_none(), "{installed}");
+    assert_eq!(installed["result"]["version"]["fingerprint"], preview["result"]["fingerprint"]);
+    assert_eq!(installed["result"]["version"]["version"], "1");
+    assert_eq!(real_ctl(&d, "mods.install", json!({"preview_id":id,"confirm":true})), installed);
+    let list = real_ctl(&d, "mods.list", json!({}));
+    assert_eq!(list["result"]["installed"].as_array().unwrap().len(), 1);
+    assert!(list["result"]["bindings"].as_array().unwrap().is_empty());
+    // Real ctl update has the same explicit confirmation boundary; source version remains 1.
+    std::fs::write(source.join("rule.md"), "The second saved rule.").unwrap();
+    let update = real_ctl(&d, "mods.preview", json!({"source":source,"operation":"update"}));
+    assert!(update.get("error").is_none(), "{update}");
+    assert_ne!(update["result"]["fingerprint"], preview["result"]["fingerprint"]);
+    assert_eq!(real_ctl(&d, "mods.install", json!({"preview_id":update["result"]["id"]}))["error"]["code"],
+        "confirmation_required");
+    assert_eq!(d.call("mods.list", json!({}))["installed"].as_array().unwrap().len(), 1);
+    let updated = real_ctl(&d, "mods.install", json!({"preview_id":update["result"]["id"],"confirm":true}));
+    assert!(updated.get("error").is_none(), "{updated}");
+    assert_eq!(updated["result"]["version"]["fingerprint"], update["result"]["fingerprint"]);
+    assert_eq!(updated["result"]["version"]["version"], "1");
+    assert_eq!(d.call("mods.list", json!({}))["installed"].as_array().unwrap().len(), 2);
+    for fingerprint in [&preview["result"]["fingerprint"], &update["result"]["fingerprint"]] {
+        let request = json!({"mod_id":"ctl-fixture","fingerprint":fingerprint,
+            "expected_revision":d.call("mods.list",json!({}))["revision"]});
+        assert_eq!(real_ctl(&d, "mods.remove", request.clone())["error"]["code"], "confirmation_required");
+        let mut confirmed = request; confirmed["confirm"] = json!(true);
+        let removed = real_ctl(&d, "mods.remove", confirmed.clone());
+        assert!(removed.get("error").is_none(), "{removed}");
+        assert_eq!(removed["result"]["removed"], true);
+        assert_eq!(real_ctl(&d, "mods.remove", confirmed)["result"]["removed"], false);
+    }
+    let list = real_ctl(&d, "mods.list", json!({}));
+    assert!(list["result"]["installed"].as_array().unwrap().is_empty());
+    assert!(list["result"]["bindings"].as_array().unwrap().is_empty());
+}
