@@ -59,6 +59,9 @@ pub struct Run {
     /// A swarm worker or director: not one of the agents the rollup counts.
     #[serde(default)]
     pub swarm_membership: Option<Value>,
+    /// Shared durable message queue, including the pause set by Stop (AC-265).
+    #[serde(default)]
+    pub queue: Value,
 }
 
 impl Run {

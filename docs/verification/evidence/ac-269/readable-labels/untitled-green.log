@@ -1,0 +1,18 @@
+nice: setpriority: Operation not permitted
+PASS desired differs from last accepted turn without claiming application
+PASS unsupported decisions and next-thread changes stay explicit
+PASS library copy distinguishes installed from enabled and makes no savings claim
+PASS HTML and links reject active content
+PASS preview installs only after confirmation and never binds
+PASS update commits the confirmed preview through the declared install method
+PASS stale UI revision is refused rather than silently rebased
+PASS untrusted workspace refuses forged mutation messages before RPC
+PASS disconnect invalidates preview and reconnect reads authoritative state
+PASS cancelled confirmation releases the webview loading state
+PASS removal confirmation carries displayed revision and preserves scope until accepted
+PASS binding edits preserve owner filters and locks; unbind removes override
+PASS unsafe external links never reach VS Code opener
+PASS a run without a snapshot never claims matching delivery
+PASS prepared and uncertain snapshots never read as accepted delivery
+PASS untitled runs retain their selector with a readable display name
+16/16 Mods checks passed

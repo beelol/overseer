@@ -1,0 +1,12 @@
+
+running 2 tests
+AC201 initial settings {"channel":"off","check_ins":"off","effective_cadence":"off","test":"ac190"}
+AC201 inherited channel off: overlapping agents, exact task, no MCP/channel/briefing effects; explicit owner enable for new agents follows
+test ac190_briefing_and_channel ... ok
+AC201 initial settings {"channel":"off","check_ins":"off","effective_cadence":"off","test":"ac189"}
+AC201 inherited cadence off: seven turns and going_in_circles, no check-in; explicit owner enable follows
+test ac189_overseer_keeps_agents_on_task has been running for over 60 seconds
+test ac189_overseer_keeps_agents_on_task ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 35 filtered out; finished in 105.35s
+

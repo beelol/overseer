@@ -514,6 +514,9 @@ fn n05_the_real_binary_switches_phone_access_in_a_terminal() {
         .arg(&d.bin)
         .arg("--home")
         .arg(d.home.path())
+        // This test verifies ANSI QR colours, independent of the invoking terminal's
+        // preference for plain output (Codex exports NO_COLOR by default).
+        .env_remove("NO_COLOR")
         .env("TERM", "xterm-256color")
         .stdin(Stdio::null())
         .output()

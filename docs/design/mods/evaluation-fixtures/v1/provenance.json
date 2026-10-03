@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "set_version": "1",
+  "status": "frozen_inputs_not_evaluated",
+  "authoring_base_commit": "2a1bd2a12a5fe35dfb7d91e1fa27053ff6d203c2",
+  "created_utc": "2026-10-03 10:39:44 UTC",
+  "synthetic_inputs_only": true,
+  "source_sha256": {
+    "docs/design/mods/evaluation.md": "f3111b5374624e73db552671b648712af258aea10c3cd03487e343a41ef2f1ef",
+    "docs/design/mods/clear-prose-rules.md": "ed7218d7d22358d55b994bdb17a43e614849304afae9c8e0f4f767301d4431f8",
+    "docs/superpowers/plans/2026-10-03-mods-phase1.md": "c1eb3621487014369661edaf74b20addd02fc74919d313800ac5c7d2a91b4bdf",
+    "docs/overseer-rfc.md": "80c55f35237eba003dcdb7d341ecc105e9d816651185b3f9abe2bb0a155e8ff4",
+    "AGENTS.md": "4c720690fbe8bd9087da5e4f5ce43f39e719ea6185ca135eb04aedecead845d7"
+  },
+  "mod": {
+    "id": "clear-prose",
+    "version": "1",
+    "manifest_path": "mods/clear-prose/mod.toml",
+    "style_path": "mods/clear-prose/style.md",
+    "file_sha256": {
+      "mod.toml": "7aabce2470c17b76da88b28cf5a8931617de250fe66d198d743b22094c4be7d0",
+      "style.md": "ed7218d7d22358d55b994bdb17a43e614849304afae9c8e0f4f767301d4431f8"
+    },
+    "daemon_bundle_fingerprint": "86911aa28dbf2da86311b9f9fb289db4cb049c761b7c5de41254b3ce2f09e64a",
+    "fingerprint_method": "SHA-256 of sorted UTF-8 relative-path length (u64 big endian), path bytes, content length (u64 big endian), content bytes; includes mod.toml."
+  },
+  "tasks": [
+    {
+      "id": "CP-01",
+      "file": "tasks/cp-01.json",
+      "prompt_sha256_utf8": "e646d6a270e03bd80f405a4a50ac854b85d6e6f968270f9ea7d8e70f40c33e20"
+    },
+    {
+      "id": "CP-02",
+      "file": "tasks/cp-02.json",
+      "prompt_sha256_utf8": "f2cb2f83c3762caa1823b84ab0810c2090fe6e4fc24be55a410361ee1fb74b99"
+    },
+    {
+      "id": "CP-03",
+      "file": "tasks/cp-03.json",
+      "prompt_sha256_utf8": "9d2575ebcdb5cddf147fa4099bae09f6233fb00291b1cda9ecd0b1b97aac8ffe"
+    },
+    {
+      "id": "CP-04",
+      "file": "tasks/cp-04.json",
+      "prompt_sha256_utf8": "3dae1dd59deb1682aed1d7d30182ddfab3f005c3a2a0419e7ad07c34882efa44"
+    },
+    {
+      "id": "CP-05",
+      "file": "tasks/cp-05.json",
+      "prompt_sha256_utf8": "ee4a602fce1447b5c49b1971476435ab1376178378d9bbc57e34af9a53ab9226"
+    },
+    {
+      "id": "CP-06",
+      "file": "tasks/cp-06.json",
+      "prompt_sha256_utf8": "9a002d52a703750bfa2fac66fb4c75b4e0a48319217b3f18fff99d09e95eaa92"
+    },
+    {
+      "id": "CP-07",
+      "file": "tasks/cp-07.json",
+      "prompt_sha256_utf8": "82a3c97737bbcd0aea86b1974e808e2901f61d61e8bee6c2e4752702c0b461ec"
+    },
+    {
+      "id": "CP-08",
+      "file": "tasks/cp-08.json",
+      "prompt_sha256_utf8": "d3fde7f6905d8a31e31db7118362f66f314175ee4f5689903d83c7f0d4d7908d"
+    },
+    {
+      "id": "CP-09",
+      "file": "tasks/cp-09.json",
+      "prompt_sha256_utf8": "769535f86bf9ffa376d815e1adaf43fcc2bbbaf6308a2c96979559a410710a3f"
+    },
+    {
+      "id": "CP-10",
+      "file": "tasks/cp-10.json",
+      "prompt_sha256_utf8": "9e19855fae45389570e39074190ab2ccb807d8d7b8c01690fbc23ddadb75d455"
+    },
+    {
+      "id": "CP-11",
+      "file": "tasks/cp-11.json",
+      "prompt_sha256_utf8": "3b6043d309926c732d979942000a12a50d40ccecdfa9feb097aa67611123cfc9"
+    },
+    {
+      "id": "CP-12",
+      "file": "tasks/cp-12.json",
+      "prompt_sha256_utf8": "6b15e36a4148792531b5e007ccbe512e813f281a14cd254608705e93af7e5cfa"
+    }
+  ]
+}

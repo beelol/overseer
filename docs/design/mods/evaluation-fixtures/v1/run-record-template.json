@@ -1,0 +1,2445 @@
+{
+  "schema_version": 1,
+  "set_version": "1",
+  "evaluation_status": "not_run",
+  "evaluation_commit": null,
+  "fixture_manifest_sha256": null,
+  "mod_fingerprint_expected": "86911aa28dbf2da86311b9f9fb289db4cb049c761b7c5de41254b3ce2f09e64a",
+  "comparison_policy": {
+    "model": "gpt-5.6-luna",
+    "reasoning_effort": "low",
+    "attempts_per_task_per_condition": 1,
+    "paid_judge_calls": 0,
+    "identical_prompt_and_initial_state_required": true,
+    "human_rating_required": true
+  },
+  "task_records": [
+    {
+      "id": "CP-01",
+      "off": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "e646d6a270e03bd80f405a4a50ac854b85d6e6f968270f9ea7d8e70f40c33e20",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [
+          {
+            "check_id": "L1",
+            "present": null,
+            "reason": null
+          }
+        ],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "on": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "e646d6a270e03bd80f405a4a50ac854b85d6e6f968270f9ea7d8e70f40c33e20",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [
+          {
+            "check_id": "L1",
+            "present": null,
+            "reason": null
+          }
+        ],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "paired_human_comparison": {
+        "plain_wording_improved_when_baseline_has_headroom": null,
+        "standalone_context_improved_when_baseline_has_headroom": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "CP-02",
+      "off": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "f2cb2f83c3762caa1823b84ab0810c2090fe6e4fc24be55a410361ee1fb74b99",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [
+          {
+            "check_id": "L1",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L2",
+            "present": null,
+            "reason": null
+          }
+        ],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F5",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "on": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "f2cb2f83c3762caa1823b84ab0810c2090fe6e4fc24be55a410361ee1fb74b99",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [
+          {
+            "check_id": "L1",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L2",
+            "present": null,
+            "reason": null
+          }
+        ],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F5",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "paired_human_comparison": {
+        "plain_wording_improved_when_baseline_has_headroom": null,
+        "standalone_context_improved_when_baseline_has_headroom": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "CP-03",
+      "off": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "9d2575ebcdb5cddf147fa4099bae09f6233fb00291b1cda9ecd0b1b97aac8ffe",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [
+          {
+            "check_id": "L1",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L2",
+            "present": null,
+            "reason": null
+          }
+        ],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F5",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "on": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "9d2575ebcdb5cddf147fa4099bae09f6233fb00291b1cda9ecd0b1b97aac8ffe",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [
+          {
+            "check_id": "L1",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L2",
+            "present": null,
+            "reason": null
+          }
+        ],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F5",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "paired_human_comparison": {
+        "plain_wording_improved_when_baseline_has_headroom": null,
+        "standalone_context_improved_when_baseline_has_headroom": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "CP-04",
+      "off": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "3dae1dd59deb1682aed1d7d30182ddfab3f005c3a2a0419e7ad07c34882efa44",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [
+          {
+            "check_id": "L1",
+            "present": null,
+            "reason": null
+          }
+        ],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F5",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "on": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "3dae1dd59deb1682aed1d7d30182ddfab3f005c3a2a0419e7ad07c34882efa44",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [
+          {
+            "check_id": "L1",
+            "present": null,
+            "reason": null
+          }
+        ],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F5",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "paired_human_comparison": {
+        "plain_wording_improved_when_baseline_has_headroom": null,
+        "standalone_context_improved_when_baseline_has_headroom": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "CP-05",
+      "off": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "ee4a602fce1447b5c49b1971476435ab1376178378d9bbc57e34af9a53ab9226",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F5",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F6",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "on": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "ee4a602fce1447b5c49b1971476435ab1376178378d9bbc57e34af9a53ab9226",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F5",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F6",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "paired_human_comparison": {
+        "plain_wording_improved_when_baseline_has_headroom": null,
+        "standalone_context_improved_when_baseline_has_headroom": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "CP-06",
+      "off": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "9a002d52a703750bfa2fac66fb4c75b4e0a48319217b3f18fff99d09e95eaa92",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [
+          {
+            "check_id": "L1",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L2",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L3",
+            "present": null,
+            "reason": null
+          }
+        ],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F5",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "on": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "9a002d52a703750bfa2fac66fb4c75b4e0a48319217b3f18fff99d09e95eaa92",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [
+          {
+            "check_id": "L1",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L2",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L3",
+            "present": null,
+            "reason": null
+          }
+        ],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F5",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "paired_human_comparison": {
+        "plain_wording_improved_when_baseline_has_headroom": null,
+        "standalone_context_improved_when_baseline_has_headroom": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "CP-07",
+      "off": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "82a3c97737bbcd0aea86b1974e808e2901f61d61e8bee6c2e4752702c0b461ec",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [
+          {
+            "check_id": "L1",
+            "present": null,
+            "reason": null
+          }
+        ],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "on": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "82a3c97737bbcd0aea86b1974e808e2901f61d61e8bee6c2e4752702c0b461ec",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [
+          {
+            "check_id": "L1",
+            "present": null,
+            "reason": null
+          }
+        ],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "paired_human_comparison": {
+        "plain_wording_improved_when_baseline_has_headroom": null,
+        "standalone_context_improved_when_baseline_has_headroom": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "CP-08",
+      "off": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "d3fde7f6905d8a31e31db7118362f66f314175ee4f5689903d83c7f0d4d7908d",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [
+          {
+            "check_id": "L1",
+            "present": null,
+            "reason": null
+          }
+        ],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F5",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "on": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "d3fde7f6905d8a31e31db7118362f66f314175ee4f5689903d83c7f0d4d7908d",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [
+          {
+            "check_id": "L1",
+            "present": null,
+            "reason": null
+          }
+        ],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F5",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "paired_human_comparison": {
+        "plain_wording_improved_when_baseline_has_headroom": null,
+        "standalone_context_improved_when_baseline_has_headroom": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "CP-09",
+      "off": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "769535f86bf9ffa376d815e1adaf43fcc2bbbaf6308a2c96979559a410710a3f",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F5",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "on": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "769535f86bf9ffa376d815e1adaf43fcc2bbbaf6308a2c96979559a410710a3f",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F5",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "paired_human_comparison": {
+        "plain_wording_improved_when_baseline_has_headroom": null,
+        "standalone_context_improved_when_baseline_has_headroom": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "CP-10",
+      "off": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "9e19855fae45389570e39074190ab2ccb807d8d7b8c01690fbc23ddadb75d455",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [
+          {
+            "check_id": "L1",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L2",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L3",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L4",
+            "present": null,
+            "reason": null
+          }
+        ],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F5",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "on": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "9e19855fae45389570e39074190ab2ccb807d8d7b8c01690fbc23ddadb75d455",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [
+          {
+            "check_id": "L1",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L2",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L3",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L4",
+            "present": null,
+            "reason": null
+          }
+        ],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F5",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "paired_human_comparison": {
+        "plain_wording_improved_when_baseline_has_headroom": null,
+        "standalone_context_improved_when_baseline_has_headroom": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "CP-11",
+      "off": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "3b6043d309926c732d979942000a12a50d40ccecdfa9feb097aa67611123cfc9",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "on": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "3b6043d309926c732d979942000a12a50d40ccecdfa9feb097aa67611123cfc9",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "paired_human_comparison": {
+        "plain_wording_improved_when_baseline_has_headroom": null,
+        "standalone_context_improved_when_baseline_has_headroom": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "CP-12",
+      "off": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "6b15e36a4148792531b5e007ccbe512e813f281a14cd254608705e93af7e5cfa",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [
+          {
+            "check_id": "L1",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L2",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L3",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L4",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L5",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L6",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L7",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L8",
+            "present": null,
+            "reason": null
+          }
+        ],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F5",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F6",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F7",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F8",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F9",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F10",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F11",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "on": {
+        "status": "not_run",
+        "attempt_count": null,
+        "started_utc": null,
+        "completed_utc": null,
+        "harness": null,
+        "harness_version": null,
+        "model": null,
+        "reasoning_effort": null,
+        "scope": null,
+        "prompt_sha256_utf8": "6b15e36a4148792531b5e007ccbe512e813f281a14cd254608705e93af7e5cfa",
+        "submitted_prompt_sha256_utf8": null,
+        "environment_snapshot_ref": null,
+        "effective_mod_fingerprints": null,
+        "delivery_snapshot_ref": null,
+        "output_file": null,
+        "output_sha256": null,
+        "reported_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "reported_cost": null,
+          "currency": null,
+          "source": null,
+          "raw_usage_record_ref": null
+        },
+        "task_outcome": null,
+        "literal_results": [
+          {
+            "check_id": "L1",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L2",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L3",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L4",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L5",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L6",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L7",
+            "present": null,
+            "reason": null
+          },
+          {
+            "check_id": "L8",
+            "present": null,
+            "reason": null
+          }
+        ],
+        "human_review": {
+          "rater": null,
+          "rated_utc": null,
+          "fact_preservation": [
+            {
+              "fact_id": "F1",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F2",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F3",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F4",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F5",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F6",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F7",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F8",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F9",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F10",
+              "preserved": null,
+              "reason": null
+            },
+            {
+              "fact_id": "F11",
+              "preserved": null,
+              "reason": null
+            }
+          ],
+          "rubric": {
+            "standalone_context": {
+              "score": null,
+              "reason": null
+            },
+            "complete_sentences": {
+              "score": null,
+              "reason": null
+            },
+            "plain_wording": {
+              "score": null,
+              "reason": null
+            },
+            "concision": {
+              "score": null,
+              "reason": null
+            },
+            "evidence_and_accuracy": {
+              "score": null,
+              "reason": null
+            }
+          },
+          "total_score": null,
+          "acceptance_decision": null,
+          "acceptance_reason": null
+        }
+      },
+      "paired_human_comparison": {
+        "plain_wording_improved_when_baseline_has_headroom": null,
+        "standalone_context_improved_when_baseline_has_headroom": null,
+        "reason": null
+      }
+    }
+  ],
+  "aggregate_human_review": {
+    "rater": null,
+    "completed_utc": null,
+    "required_facts_preserved_in_all_on_outputs": null,
+    "each_on_at_least_8_of_10": null,
+    "no_zero_in_context_sentences_or_evidence": null,
+    "baseline_headroom_and_score_comparison": null,
+    "scope_limit": "Twelve fixed synthetic tasks only; no general quality or token-saving conclusion."
+  }
+}

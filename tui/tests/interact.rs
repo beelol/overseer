@@ -146,7 +146,7 @@ fn t04_keyboard_navigation_help_and_mouse() {
     // Help lists every key; any key closes it.
     tui.key(KeyCode::Char('?'));
     let s = tui.screen();
-    for k in ["move between agents", "next / previous page", "message the focused agent", "zoom", "allow / deny", "next agent waiting", "interrupt", "start a new agent", "filter", "quit"] {
+    for k in ["move between agents", "next / previous page", "message the focused agent", "zoom", "allow / deny", "next agent waiting", "stop the focused agent and pause its queue", "start a new agent", "filter", "quit"] {
         assert!(s.contains(k), "help lacks {k}:\n{s}");
     }
     tui.snapshot("t04-help");

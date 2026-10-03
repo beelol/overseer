@@ -12,6 +12,7 @@ pub mod control;
 pub mod digest;
 pub mod finished;
 pub mod mcp;
+pub mod modes;
 pub mod needs;
 pub mod session;
 pub mod trouble;
@@ -118,9 +119,26 @@ pub(crate) fn tool_list(role: &str) -> Vec<Value> {
         fields["profile"] = json!({"type": "string"});
         fields["effort"] = json!({"type": "string", "enum": ["low", "medium", "high", "xhigh"]});
         fields["permission_mode"] = json!({"type": "string"});
+        // A permission mode by conversation (AC-230): mode (agent, mode: Ask first, Accept edits or
+        // Auto, why); Auto set without the owner asking only in the repositories the owner allows.
+        fields["mode"] = json!({"type": "string", "enum": ["Ask first", "Accept edits", "Auto"]});
+        if let Some(kinds) = fields["action"]["enum"].as_array_mut() {
+            kinds.push(json!("mode"));
+        }
+        if let Some(d) = propose["description"].as_str() {
+            propose["description"] = json!(d.replacen("retry (agent: send the turn that did not finish again).", "retry (agent: send the turn that did not finish again), mode (agent, mode: Ask first, Accept edits or Auto, why: its permission mode; when you set Auto without the owner asking, the reason is required and it is allowed only in the repositories the owner allows).", 1));
+        }
         tools.push(propose);
     }
     tools
+}
+
+struct TokenHolder {
+    sha: String,
+    run_id: String,
+    role: String,
+    native_turn_id: Option<String>,
+    revoked_ms: Option<i64>,
 }
 
 impl Daemon {
@@ -136,15 +154,43 @@ impl Daemon {
         Ok(json!({"token": token, "run_id": run_id, "role": role}))
     }
 
-    fn token_holder(&self, token: &str) -> Result<(String, String)> {
+    fn token_binding(&self, token: &str) -> Result<TokenHolder> {
         use rusqlite::OptionalExtension;
         let sha = format!("{:x}", sha2::Sha256::digest(token.as_bytes()));
         let store = self.store.lock().unwrap();
-        store
-            .conn
-            .query_row("SELECT run_id, role FROM overseer_tokens WHERE sha=?1", [sha], |r| Ok((r.get(0)?, r.get(1)?)))
-            .optional()?
-            .ok_or_else(|| anyhow::anyhow!("unknown token"))
+        store.conn.query_row(
+            "SELECT run_id,role,native_turn_id,revoked_ms FROM overseer_tokens WHERE sha=?1",
+            [&sha], |r| Ok(TokenHolder { sha: sha.clone(), run_id: r.get(0)?, role: r.get(1)?,
+                native_turn_id: r.get(2)?, revoked_ms: r.get(3)? }))
+            .optional()?.ok_or_else(|| anyhow::anyhow!("unknown token"))
+    }
+
+    fn token_holder(&self, token: &str) -> Result<(String, String)> {
+        let holder = self.token_binding(token)?;
+        if holder.revoked_ms.is_some() { bail!("native capability was revoked"); }
+        Ok((holder.run_id, holder.role))
+    }
+
+    /// Native launch capabilities are minted only for an actual durable turn.
+    /// Supersession and insertion share one transaction, including retries of
+    /// the same turn; a failed launch never restores its predecessor's authority.
+    pub(crate) fn native_launch_token(&self, run_id: &str, turn_id: &str) -> Result<String> {
+        let token = uuid::Uuid::new_v4().simple().to_string();
+        let sha = format!("{:x}", sha2::Sha256::digest(token.as_bytes()));
+        let store = self.store.lock().unwrap();
+        let valid = store.conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM turns t JOIN run_roles r ON r.run_id=t.run_id
+             WHERE t.id=?1 AND t.run_id=?2 AND r.role='overseer'
+             AND t.id=(SELECT id FROM turns WHERE run_id=?2 ORDER BY n DESC LIMIT 1))",
+            rusqlite::params![turn_id, run_id], |r| r.get::<_, bool>(0))?;
+        if !valid { bail!("native launch has no actual Overseer turn"); }
+        let tx = store.conn.unchecked_transaction()?;
+        tx.execute("UPDATE overseer_tokens SET revoked_ms=?2 WHERE run_id=?1 AND role='overseer' AND native_turn_id IS NOT NULL AND revoked_ms IS NULL",
+            rusqlite::params![run_id, crate::daemon::now()])?;
+        tx.execute("INSERT INTO overseer_tokens(sha,run_id,role,created_ms,native_turn_id) VALUES(?1,?2,'overseer',?3,?4)",
+            rusqlite::params![sha, run_id, crate::daemon::now(), turn_id])?;
+        tx.commit()?;
+        Ok(token)
     }
 
     /// The tools a run has: its role's, and a watcher's while an agent the owner named watches.
@@ -173,14 +219,93 @@ impl Daemon {
 
     /// One tool call from a run. Every answer is bounded and redacted.
     pub fn overseer_tool(self: &std::sync::Arc<Self>, token: &str, name: &str, arguments: &Value) -> Result<Value> {
+        let observation = self.fixture_late_native_request(token, name, arguments)?;
+        // Refusals are model-visible traffic too, including early returns and propagated
+        // errors. Keep their result/error distinction while sanitizing at one boundary.
+        let result = self.overseer_tool_inner(token, name, arguments)
+            .map(|mut result| {
+                if let Some(text) = result["text"].as_str() {
+                    result["text"] = json!(tool_text(text));
+                }
+                result
+            })
+            .map_err(|e| anyhow::anyhow!("{}", tool_text(&e.to_string())));
+        if let Some(dir) = observation {
+            // Observe the actual sanitized result even if interruption closed
+            // the original native peer. This does not replace normal dispatch.
+            let completed = match &result {
+                Ok(value) => json!({"result": value}),
+                Err(error) => json!({"error": error.to_string()}),
+            };
+            std::fs::write(dir.join("completed.json.part"), completed.to_string())?;
+            std::fs::rename(dir.join("completed.json.part"), dir.join("completed.json"))?;
+        }
+        result
+    }
+
+    /// NET-only scheduling observer for one exact synthetic predecessor request.
+    /// Snapshot receipt identity before waiting; hold neither Store nor TURN_START.
+    fn fixture_late_native_request(&self, token: &str, name: &str, arguments: &Value) -> Result<Option<std::path::PathBuf>> {
+        if std::env::var_os("OVERSEER_TEST_NET").is_none() || name != "propose" {
+            return Ok(None);
+        }
+        let Some(dir) = std::env::var_os("OVERSEER_TEST_LATE_NATIVE_GATE") else { return Ok(None) };
+        let dir = std::path::PathBuf::from(dir);
+        let Ok(scope) = std::fs::read(dir.join("scope.json")) else { return Ok(None) };
+        let scope: Value = serde_json::from_slice(&scope)?;
+        let (Some(target), Some(marker)) = (scope["target"].as_str(), scope["marker"].as_str()) else {
+            bail!("fixture late native scope needs a target and marker");
+        };
+        let Some(actions) = arguments["actions"].as_array() else { return Ok(None) };
+        if actions.len() != 1 || actions[0]["action"] != "archive"
+            || actions[0]["agent"].as_str() != Some(target)
+            || actions[0]["why"].as_str() != Some(marker) {
+            return Ok(None);
+        }
+        let (run, role) = self.token_holder(token)?;
+        if role != "overseer" { return Ok(None); }
+        match std::fs::OpenOptions::new().write(true).create_new(true).open(dir.join("claimed")) {
+            Ok(_) => {},
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => return Ok(None),
+            Err(error) => return Err(error.into()),
+        }
+        std::fs::write(dir.join("received.json.part"), json!({"run": run, "role": role, "name": name, "marker": marker}).to_string())?;
+        std::fs::rename(dir.join("received.json.part"), dir.join("received.json"))?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+        while !dir.join("release").exists() {
+            if std::time::Instant::now() >= deadline { bail!("fixture late native request was not released"); }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        Ok(Some(dir))
+    }
+
+    fn overseer_tool_inner(self: &std::sync::Arc<Self>, token: &str, name: &str, arguments: &Value) -> Result<Value> {
         let swarm = crate::swarm::native::holder(&self.store.lock().unwrap(), token)?;
         if let Some(holder) = swarm {
             return crate::swarm::native::call(self, &holder, name, arguments);
         }
-        let (run_id, role) = self.token_holder(token)?;
+        let (run_id, role, native_origin) = if matches!(name, "propose" | "answer") {
+            // No Store guard is held while waiting for initial run binding and
+            // durable turn origin publication. Resolve the token only afterward,
+            // so permissions and telemetry also use the actual run, not pending.
+            let _publication = session::native_turn_start_guard()?;
+            let holder = self.token_binding(token)?;
+            let origin = (holder.role == "overseer").then(|| self.capture_native_origin(&holder));
+            (holder.run_id, holder.role, origin)
+        } else {
+            let (run_id, role) = self.token_holder(token)?;
+            (run_id, role, None)
+        };
         if !self.tools_of_run(&run_id, &role).iter().any(|t| t["name"] == name) {
             bail!("{role} runs have no tool {name}");
         }
+        // The publication guard has been released before any action checks or
+        // effects. Keep origin refusals on the existing per-tool error path.
+        let native_propose = |actions: &Value| -> Result<Value> {
+            let origin = native_origin.as_ref().ok_or_else(|| anyhow::anyhow!("native action has no authenticated origin"))?
+                .as_ref().map_err(|error| anyhow::anyhow!("{error}"))?;
+            self.overseer_propose_native(actions, origin)
+        };
         // A watcher reads only its subject.
         if role != "overseer" && watch::SUBJECT_READS.contains(&name) {
             let subject = self.watch_of_watcher(&run_id).map(|w| w.subject);
@@ -220,11 +345,11 @@ impl Daemon {
                 let agents = arguments["agents"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect::<Vec<_>>());
                 serde_json::to_string_pretty(&self.rally(arguments["repo"].as_str(), agents)?)?
             }
-            "answer" => match self.overseer_propose(&json!([{"action": "answer", "ask": arguments["ask"], "text": arguments["text"]}]), "tool") {
+            "answer" => match native_propose(&json!([{"action": "answer", "ask": arguments["ask"], "text": arguments["text"]}])) {
                 Ok(r) => format!("{} (proposal {})", r["result"].as_str().unwrap_or(""), r["proposal"].as_str().unwrap_or("")),
                 Err(e) => return Ok(json!({"text": format!("refused: {e}"), "is_error": true})),
             },
-            "propose" => match self.overseer_propose(&arguments["actions"], "tool") {
+            "propose" => match native_propose(&arguments["actions"]) {
                 // A start says where it runs and why (AC-237), for the reply's one line.
                 Ok(r) => format!("{} (proposal {}){}", r["result"].as_str().unwrap_or(""), r["proposal"].as_str().unwrap_or(""), r["starts"].as_array().filter(|s| !s.is_empty()).map(|s| format!(" {}", s.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(" "))).unwrap_or_default()),
                 Err(e) => {
@@ -267,8 +392,13 @@ impl Daemon {
             _ => bail!("no tool {name}"),
         };
         self.emit(None, Some(&run_id), "overseer_tool_call", "daemon", "exact", json!({"role": role, "name": name, "bytes": text.len()}))?;
-        Ok(json!({"text": bound(&crate::redact::redact(&text), 32 * 1024), "is_error": false}))
+        Ok(json!({"text": text, "is_error": false}))
     }
+}
+
+/// Text returned to a model, whether a tool succeeded or refused the request.
+fn tool_text(text: &str) -> String {
+    bound(&crate::redact::redact(text), 32 * 1024)
 }
 
 pub(crate) fn bound(s: &str, max: usize) -> String {

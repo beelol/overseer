@@ -30,6 +30,33 @@ function wanted(code) {
   return process.platform === 'darwin' && process.env.OVERSEER_UI_FOREGROUND !== '1' && !!appBundle(code) && fs.existsSync(appBundle(code));
 }
 
+/** Find constructor sites without executing installed code. Only these two packaged entrypoints
+ * are supported: older VS Code puts the window in main.js; newer versions import mainImpl.js.
+ * By-URL breakpoints can be registered while main.js is paused, before an import is parsed. */
+function quietWindowBreakpoints(app) {
+  const found = [];
+  const escaped = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const entry of ['main.js', 'mainImpl.js']) {
+    const file = path.join(app, 'Contents', 'Resources', 'app', 'out', entry);
+    let size;
+    try { size = fs.statSync(file).size; } catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+    if (size > 16 * 1024 * 1024) throw new Error('background launch entrypoint is too large: ' + entry);
+    const source = fs.readFileSync(file, 'utf8');
+    const m = /new ([\w$]+)\.BrowserWindow\(([\w$]+)\)/.exec(source);
+    if (!m) continue;
+    const before = source.slice(0, m.index), options = m[2];
+    const urls = [file, 'file://' + file, require('url').pathToFileURL(file).href];
+    found.push({
+      urlRegex: '^(?:' + [...new Set(urls)].map(escaped).join('|') + ')$',
+      lineNumber: before.split('\n').length - 1,
+      columnNumber: m.index - before.lastIndexOf('\n') - 1,
+      condition: `(${options} && typeof ${options} === 'object' && ${options}.show !== false && (${options}.show = false, globalThis.__overseerQuietShow++), false)`,
+    });
+  }
+  if (!found.length) throw new Error('background launch window constructor not found in supported entrypoints');
+  return found;
+}
+
 // Runs in VS Code's main process while it is paused on its first line.
 const PATCH = `(() => {
   const { app, BrowserWindow } = require('electron');
@@ -85,6 +112,8 @@ const PATCH = `(() => {
  */
 function launchQuiet({ code, args, env, root, note }) {
   const app = appBundle(code);
+  // Refuse an unknown layout before starting a window that could take the owner's focus.
+  const breakpoints = quietWindowBreakpoints(app);
   const stamp = Date.now();
   const out = path.join(root, `code-${stamp}.log`), err = path.join(root, `code-err-${stamp}.log`);
   fs.writeFileSync(out, ''); fs.writeFileSync(err, '');
@@ -106,12 +135,11 @@ function launchQuiet({ code, args, env, root, note }) {
     if (!url) { note('background launch: no main-process inspector; the window may come to the front'); return; }
     socket = new WebSocket(url);
     await new Promise((resolve, reject) => { socket.addEventListener('open', resolve, { once: true }); socket.addEventListener('error', () => reject(new Error('inspector socket error')), { once: true }); });
-    let next = 0; const pending = new Map(), scripts = [];
+    let next = 0; const pending = new Map();
     let onPaused; const paused = new Promise(resolve => { onPaused = resolve; });
     socket.addEventListener('message', event => {
       const m = JSON.parse(event.data);
       if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
-      else if (m.method === 'Debugger.scriptParsed') scripts.push(m.params);
       else if (m.method === 'Debugger.paused') onPaused(m.params);
     });
     call = (method, params = {}) => new Promise((resolve, reject) => {
@@ -125,15 +153,7 @@ function launchQuiet({ code, args, env, root, note }) {
       if (!(await Promise.race([paused, delay(30000).then(() => false)]))) throw new Error('main process never paused');
       const patched = await call('Runtime.evaluate', { expression: PATCH, includeCommandLineAPI: true, returnByValue: true });
       if (patched.exceptionDetails) throw new Error(patched.exceptionDetails.exception?.description || patched.exceptionDetails.text);
-      const main = scripts.find(s => /\/Resources\/app\/out\/main\.js$/.test(s.url));
-      const source = main && (await call('Debugger.getScriptSource', { scriptId: main.scriptId })).scriptSource;
-      const m = source && /new ([\w$]+)\.BrowserWindow\(([\w$]+)\)/.exec(source);
-      if (!m) note('background launch: VS Code window constructor not found; the first window may come to the front');
-      else {
-        const before = source.slice(0, m.index), lineNumber = before.split('\n').length - 1, columnNumber = m.index - before.lastIndexOf('\n') - 1, o = m[2];
-        await call('Debugger.setBreakpoint', { location: { scriptId: main.scriptId, lineNumber, columnNumber },
-          condition: `(${o} && typeof ${o} === 'object' && ${o}.show !== false && (${o}.show = false, globalThis.__overseerQuietShow++), false)` });
-      }
+      for (const breakpoint of breakpoints) await call('Debugger.setBreakpointByUrl', breakpoint);
     } catch (error) {
       note('background launch: ' + error.message);
     } finally {
@@ -177,4 +197,4 @@ function launchQuiet({ code, args, env, root, note }) {
   };
 }
 
-module.exports = { launchQuiet, wanted };
+module.exports = { launchQuiet, wanted, quietWindowBreakpoints };

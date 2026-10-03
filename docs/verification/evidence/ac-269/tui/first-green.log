@@ -1,0 +1,18 @@
+   Compiling overseer-tui v0.1.0 (/private/tmp/overseer-mods-tui-20261003/tui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.94s
+     Running tests/mods.rs (/private/tmp/overseer-closeout-verify-target/debug/deps/mods-e138392e91c00e69)
+
+running 10 tests
+test actual_overseer_target_is_read_from_state_without_creating_a_session ... ok
+test absent_turn_and_planned_bundle_remain_truthful_at_narrow_width ... ok
+test compose_input_keeps_literal_m_and_does_not_open_mods ... ok
+test control_events_refresh_only_global_or_current_envelope_target ... ok
+test disconnect_invalidates_pending_reads_and_reconnect_refreshes ... ok
+test mixed_read_revisions_require_refresh_before_any_binding_write ... ok
+test grid_zoom_and_dashboard_entry_restore_the_original_view ... ok
+test no_focus_opens_library_without_requesting_an_empty_target ... ok
+test scoped_enable_and_explicit_disable_pin_exact_daemon_identifiers ... ok
+test preview_confirmation_is_explicit_immutable_and_never_enables ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

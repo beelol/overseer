@@ -11,7 +11,7 @@
       "name": "Enter at home starts an agent exactly as before, with no Overseer turn in the event log",
       "ok": true,
       "detail": {
-        "started": "r-e2fc2c5966ad",
+        "started": "r-eae637ee6174",
         "overseerTurns": 0
       }
     },
@@ -65,14 +65,14 @@
       "name": "a named agent reaches Overseer as that agent's id",
       "ok": true,
       "detail": {
-        "sent": "Tell @tidy the docs (r-e2fc2c5966ad) to add a changelog"
+        "sent": "Tell @tidy the docs (r-eae637ee6174) to add a changelog"
       }
     },
     {
       "name": "*Start as an agent* starts one from a message sent to Overseer",
       "ok": true,
       "detail": {
-        "corrected": "r-3377113563fa"
+        "corrected": "r-d9902c678b2f"
       }
     },
     {
@@ -96,8 +96,8 @@
       "name": "what Overseer did is a card with one row per agent: why, the delivery, the state and its time, the whole text in the tooltip",
       "ok": true,
       "detail": {
-        "text": "Tell @tidy the docs (r-e2fc2c5966ad) to add a changelog\nyou named it · added to its work\ndelivered\n03:00:31 PM",
-        "title": "Please add the release date too.\n\nWhy: you named it · added to its work\nheld 03:00:31 PM · sent 03:00:31 PM · delivered 03:00:31 PM",
+        "text": "Tell @tidy the docs (r-eae637ee6174) to add a changelog\nyou named it · added to its work\ndelivered\n08:38:14 PM",
+        "title": "Please add the release date too.\n\nWhy: you named it · added to its work\nheld 08:38:14 PM · sent 08:38:14 PM · delivered 08:38:14 PM",
         "state": "delivered"
       }
     },
@@ -123,8 +123,8 @@
             "release_on": {
               "kind": "release"
             },
-            "run_id": "r-e2fc2c5966ad",
-            "set_ms": 1790805630385,
+            "run_id": "r-eae637ee6174",
+            "set_ms": 1790998693547,
             "title": "tidy the docs"
           }
         ]

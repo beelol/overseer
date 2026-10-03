@@ -1,0 +1,72 @@
+{
+  "checks": [
+    {
+      "name": "a focused window tells the daemon so",
+      "ok": true,
+      "detail": {
+        "all": [
+          "permission",
+          "question",
+          "failure",
+          "finished"
+        ],
+        "kinds": [
+          "permission",
+          "question",
+          "failure",
+          "finished"
+        ],
+        "vscode_focused": true
+      }
+    },
+    {
+      "name": "a focused window writes no notification",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "the window, behind the owner's apps, tells the daemon it is not focused",
+      "ok": true,
+      "detail": {
+        "all": [
+          "permission",
+          "question",
+          "failure",
+          "finished"
+        ],
+        "kinds": [
+          "permission",
+          "question",
+          "failure",
+          "finished"
+        ],
+        "vscode_focused": false
+      }
+    },
+    {
+      "name": "with the window unfocused, a fixture permission, finish and failure each write one notification naming the agent, with its click URL",
+      "ok": true,
+      "detail": [
+        "Write the changelog|Needs your permission to use Write · site|vscode://beelol.overseer/open-agent?run=r-075d29a4cc8f",
+        "Summarise the notes|Finished · site|vscode://beelol.overseer/open-agent?run=r-f4e4d4987960",
+        "Broken build|Stopped with an error · site|vscode://beelol.overseer/open-agent?run=r-964929e99031"
+      ]
+    },
+    {
+      "name": "opening the notification's URL focuses that agent (its chat in the Overseer view)",
+      "ok": true,
+      "detail": {
+        "opened": true,
+        "selected": "r-964929e99031"
+      }
+    },
+    {
+      "name": "the in-VS Code permission toast names the agent and shows while the Overseer view is open on another agent",
+      "ok": true,
+      "detail": {
+        "toast": "Source: Overseer\nShow\n“Add the release notes” is waiting for permission to use Write.",
+        "showing": "r-964929e99031"
+      }
+    }
+  ]
+}

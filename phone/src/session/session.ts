@@ -98,6 +98,7 @@ interface OpenConversation {
  */
 export class Session {
   private snapshot: SessionSnapshot;
+  private readonly modsListeners = new Set<{ runId: string; listener: Listener }>();
   private readonly listeners = new Set<Listener>();
   private readonly open = new Map<string, OpenConversation>();
   private pending: DaemonEvent[] = [];
@@ -142,6 +143,17 @@ export class Session {
     this.listeners.add(listener);
     return () => void this.listeners.delete(listener);
   };
+
+  /**
+   * Invalidates a read-only Mods view once per event batch: every library/binding change,
+   * or a recorded outcome for this run. No event body or private mod text is forwarded or
+   * retained, and no timestamp/model/role is used to infer applicability.
+   */
+  subscribeMods(runId: string, listener: Listener): () => void {
+    const entry = { runId, listener };
+    this.modsListeners.add(entry);
+    return () => void this.modsListeners.delete(entry);
+  }
 
   /** Reads what the phone stored and connects. Resolves when the stored pairing has been read. */
   async start(): Promise<void> {
@@ -539,6 +551,11 @@ export class Session {
     if (next !== this.snapshot.state || batch.length > 0) {
       this.update({ state: next, stateAt: batch.length > 0 && !this.snapshot.fromCache ? this.deps.now() : this.snapshot.stateAt, lastContact: this.deps.connection.lastContact });
       this.writeCache(false);
+    }
+    const globalMods = batch.some((event) => event.kind === 'mods_changed');
+    const appliedRuns = new Set(batch.filter((event) => event.kind === 'mods_applied').map((event) => event.run_id));
+    for (const entry of [...this.modsListeners]) {
+      if (globalMods || appliedRuns.has(entry.runId)) entry.listener();
     }
   }
 
