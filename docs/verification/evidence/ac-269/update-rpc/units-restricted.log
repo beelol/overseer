@@ -1,0 +1,77 @@
+nice: setpriority: Operation not permitted
+ok     account-shown.js
+ok     auto-usage.js
+ok     continuity.js
+FAILED dev-pin.js
+    at Object.<anonymous> (/private/tmp/overseer-mods-update-rpc-20261003/test/unit/dev-pin.js:105:3)
+    at Module._compile (node:internal/modules/cjs/loader:1929:14)
+    at Object..js (node:internal/modules/cjs/loader:2060:10)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:2412:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '/private/tmp/ovs-pin-SzlMol/std.sock',
+  port: -1
+}
+
+Node.js v24.20.0
+
+ok     landing-text.js
+ok     layout.js
+ok     line-diff.js
+ok     looking.js
+ok     mods-panel.js
+ok     mods.js
+ok     notices.js
+FAILED notifier-click.js
+    at Module._compile (node:internal/modules/cjs/loader:1929:14)
+    at Object..js (node:internal/modules/cjs/loader:2060:10)
+    at Module.load (node:internal/modules/cjs/loader:1651:32)
+    at Module._load (node:internal/modules/cjs/loader:1443:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19) {
+  status: 1,
+  signal: null,
+  output: [ null, null, null ],
+  pid: 65197,
+  stdout: null,
+  stderr: null
+}
+
+Node.js v24.20.0
+
+ok     on-screen.js
+ok     one-name.js
+ok     phone-access.js
+ok     plain-words.js
+FAILED production-guard.js
+    at Object.<anonymous> (/private/tmp/overseer-mods-update-rpc-20261003/test/unit/production-guard.js:122:3)
+    at Module._compile (node:internal/modules/cjs/loader:1929:14)
+    at Object..js (node:internal/modules/cjs/loader:2060:10)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:2412:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '/private/tmp/ovs-pg-i6YPoP/std.sock',
+  port: -1
+}
+
+Node.js v24.20.0
+
+ok     queue-pause.js
+ok     quiet-launch.js
+ok     ref-phone.js
+ok     repo-picker.js
+ok     rollup.js
+ok     swarm-controls.js
+ok     swarm-start.js
+ok     swarm-view.js
+ok     task-launcher-auto.js
+ok     theme-contrast.js
+ok     unfinished-features.js
+ok     voice-mark.js
+ok     webview-scripts.js
+27 of 30 passed
