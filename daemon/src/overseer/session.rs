@@ -738,18 +738,30 @@ impl Daemon {
     /// proposal handling: an archived run never borrows a replacement's authority.
     pub(crate) fn overseer_propose_native(self: &Arc<Self>, actions: &Value, caller_run: &str) -> Result<Value> {
         use rusqlite::OptionalExtension;
-        let (session, cause) = {
+        let (session, cause, turn) = {
             let store = self.store.lock().unwrap();
-            let row: Option<(String, Option<String>, String, String)> = store.conn.query_row(
-                "SELECT id, run_id, level, COALESCE(last_cause, 'owner') FROM overseer_sessions WHERE archived_ms IS NULL ORDER BY started_ms DESC LIMIT 1",
-                [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))).optional()?;
-            let (id, run, level, cause) = row.ok_or_else(|| anyhow!("native action has no active Overseer conversation"))?;
+            let row: Option<(String, Option<String>, String)> = store.conn.query_row(
+                "SELECT id, run_id, level FROM overseer_sessions WHERE archived_ms IS NULL ORDER BY started_ms DESC LIMIT 1",
+                [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).optional()?;
+            let (id, run, level) = row.ok_or_else(|| anyhow!("native action has no active Overseer conversation"))?;
             if run.as_deref() != Some(caller_run) || store.run(caller_run)?.is_none() {
                 bail!("native action is not from the active Overseer conversation");
             }
-            (json!({"id": id, "run_id": run, "level": level}), cause)
+            // Owner shortcuts propose directly while this native turn may still
+            // be working. Their mutable last_cause is not this turn's authority.
+            // Require the exact durable turn origin; initial publication may not
+            // yet have happened, which must refuse rather than assume owner.
+            let origin: Option<(String, String, String)> = store.conn.query_row(
+                "SELECT t.id,t.prompt,o.cause FROM turns t JOIN overseer_turns o ON o.turn_id=t.id AND o.session_id=?1
+                 WHERE t.run_id=?2 AND t.id=(SELECT id FROM turns WHERE run_id=?2 ORDER BY n DESC LIMIT 1)
+                 ORDER BY o.rowid LIMIT 1",
+                rusqlite::params![id, caller_run], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).optional()?;
+            let (turn_id, prompt, cause) = origin.ok_or_else(|| anyhow!("native action has no recorded origin for its turn"))?;
+            let mut turn = crate::voice::request::captured_turn(&turn_id, &prompt);
+            turn["cause"] = json!(cause);
+            (json!({"id": id, "run_id": run, "level": level}), cause, turn)
         };
-        self.overseer_propose_in_session(actions, "tool", &cause, None, &session, Some(caller_run))
+        self.overseer_propose_in_session(actions, "tool", &cause, Some(&turn), &session, Some(caller_run))
     }
 
     fn overseer_propose_for_turn(self: &Arc<Self>, actions: &Value, source: &str, cause_now: Option<&str>, turn: Option<&Value>) -> Result<Value> {
@@ -992,6 +1004,18 @@ impl Daemon {
                     rusqlite::params![sid, caller_run], |r| r.get(0))?;
                 if !still_bound {
                     bail!("native action's Overseer conversation was archived or replaced");
+                }
+                // A successor may have started during the action checks. Keep
+                // the snapshotted turn and cause; never substitute its context.
+                let turn_id = turn.and_then(|t| t["id"].as_str())
+                    .ok_or_else(|| anyhow!("native action has no frozen turn origin"))?;
+                let same_origin: bool = store.conn.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM turns t JOIN overseer_turns o ON o.turn_id=t.id
+                     WHERE t.id=?1 AND t.run_id=?2 AND o.session_id=?3 AND o.cause=?4
+                     AND t.id=(SELECT id FROM turns WHERE run_id=?2 ORDER BY n DESC LIMIT 1))",
+                    rusqlite::params![turn_id, caller_run, sid, cause], |r| r.get(0))?;
+                if !same_origin {
+                    bail!("native action's originating turn changed or lost its provenance");
                 }
             }
             let last_message: Option<String> = store.conn.query_row("SELECT id FROM overseer_messages WHERE session_id=?1 AND source='overseer' ORDER BY seq DESC LIMIT 1", [&sid], |r| r.get(0)).ok();
