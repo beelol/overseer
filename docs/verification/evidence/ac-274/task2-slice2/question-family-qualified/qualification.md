@@ -1,0 +1,12 @@
+# Exact wrong-family refusal and valid question translation
+
+Tested source **e84fd7ee06c030cc0c835fb1f04f43a3aeb522d6**; narrow three-line Family::Questions guard source-reviewed by coordinator before execution. Prior genuine failure at79ca remains unchanged in ../recovery-qualified/current-79cae03/green-6.log (expected invalid_answer, actual native_unqualified). No manufactured additional RED or relaxed expected category.
+
+Exact allocated checks:
+
+- `slice2::wrong_family_revision_and_caller_authority_emit_no_response`: **1 passed,0 failed**,2.38s. Reaches wrong-family invalid_answer, stale_request, six invalid_params caller authority fields (actor, surface, process_generation, native_id, protocol, offer_digest), unchanged request/revision and exact same-request healthy native decline. Each refusal asserts no native response/protected action. This is malformed selector/authority-input qualification, not arbitrary same-UID process isolation or authenticated native-tool inheritance proof.
+- `slice2::frozen_typed_family_answers_reach_exact_native_transport`: **1 passed,0 failed**,9.63s. Seven exact independent response vectors captured through native mocks: file_decline, permissions_empty_deny, codex_question_id, codex_form_accept, claude_deny, claude_question_text, claude_form_accept. Valid question field translation remains correct; full written response stays answered_awaiting_native, not native operation completion.
+
+Total **2/2**, exactly1 test per selection. Package-only overseerd clean followed by standalone daemon and integration --no-run build used exclusive retired `/private/tmp/overseer-closeout-verify-target`, jobs1/testthreads1, actual ps NI20. Proof includes fresh:false standalone/test artifacts, correct current-clone `.d` paths, source hash and executable SHA256/mtime, nonzero listing, commands/exit. Source remained clean/frozen. Terminal wrapper79891 ended0; owned-process scan empty and no owned ovs-t marker remained. Runtime slot released before evidence publication; no other test launched.
+
+No UI/browser/provider/owner/profile/audio calls. Earlier two recovery RED→GREEN remain79ca evidence; this batch does not requalify recovery changes at a different source or run broader authority/receipt/context/Needs/Voice/device controls. Those frozen witnesses, storage unit checks, partial-write/dead-shim and exact file identity, structured shared-surface/browser/external flows and full integration remain explicit AC274 gaps. No ready/merge/criterion completion claim.

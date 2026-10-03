@@ -1,0 +1,10 @@
+{
+  "source": "e84fd7ee06c030cc0c835fb1f04f43a3aeb522d6",
+  "exact_test_count": 2,
+  "pass": 2,
+  "fail": 0,
+  "matrix_exact_native_captures": 7,
+  "wrong_family_control": "all intended malformed family/stale revision/forged authority fields refused; unchanged request and same-request exact native healthy control reached",
+  "owned_temp_daemon_directories_remaining": [],
+  "owned_process_scan": "empty scan saved"
+}

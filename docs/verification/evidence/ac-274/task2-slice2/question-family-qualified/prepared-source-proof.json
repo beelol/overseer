@@ -1,0 +1,19 @@
+{
+  "status": "prepared only; no Cargo/runtime invoked; explicit T30 release required",
+  "source": "e84fd7ee06c030cc0c835fb1f04f43a3aeb522d6",
+  "cwd": "/private/tmp/overseer-native-pending-20261003",
+  "target": "/private/tmp/overseer-closeout-verify-target",
+  "answers_sha256": "d145861820fc30420c7e47cf7ea7d0c1fefe6be842ed8bcd8adcb32e8493d739",
+  "planned_launch": [
+    "nice",
+    "-n",
+    "20",
+    "python3",
+    "/private/tmp/native-question-family-qualification-20261003/run.py"
+  ],
+  "exact_tests": [
+    "slice2::wrong_family_revision_and_caller_authority_emit_no_response",
+    "slice2::frozen_typed_family_answers_reach_exact_native_transport"
+  ],
+  "scope": "package-only clean; standalone/test fresh artifact+path/hash proof; exact two tests then stop/cleanup"
+}
