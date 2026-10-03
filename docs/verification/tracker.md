@@ -1,13 +1,15 @@
 # Tracker: every open criterion, who owns it, where the work is
 
-Refreshed 2026-10-02 from main at `cd0068ca`, the generated AC records, current PRs and worktrees. **207 of 265 ACs verified; 58 open.** Every open AC appears once below. Auto, Swarm and TUI use their own evidence indexes; do not infer their status from the AC total. A row leaves only after the full Verify clause is evidenced in the ledger. Re-read criteria every goal pass, including owner edits.
+Refreshed 2026-10-03 from main at `ed29e246` plus the published Mods design/criteria, the generated AC records, current PRs and worktrees. **207 of 273 ACs verified; 66 open.** Every open AC appears once below. Auto, Swarm and TUI use their own evidence indexes; do not infer their status from the AC total. A row leaves only after the full Verify clause is evidenced in the ledger. Re-read criteria every goal pass, including owner edits.
 
 The handoff has the active branches, agents, tests and owner decisions. Old blockers such as “wait for Swarm/phone on main” are recorded gaps to recheck, not reasons to wait on already-merged PRs.
 
 | Criteria | Remaining work | Owner | Current action |
 | --- | --- | --- | --- |
 | AC-229, AC-230 | Voice read-back and permission modes | goal | #52 takes over #49; red/green fixes for Auto confirmation, native permission answers/queue and complete task read-back; full regression pending. |
-| AC-265 | Stop pauses queued messages | agent: queue_pause | codex/queue-pause; daemon, voice, chat/grid and TUI evidence required. |
+| AC-266–AC-270 | Text library/bindings, Clear prose and shared surfaces | agent: mods_design | Authorized implementation on `codex/mods-bundles`; reviewed Phase 1 plan published. Not started; native/global/child qualification and live prose quality remain explicit Verify gaps. |
+| AC-271–AC-273 | Less tool noise isolation, native result adapters and measured reduction | goal + mods_design | Second requested bundle retained as required later scope. Not started; runtime isolation and each native boundary must be qualified before availability or savings claims. |
+| AC-265 | Stop pauses queued messages | agent: queue_pause | Draft #53 at a8edd4d8; exact fixture and reviewed handoff fix pass. Parent owes final full suite and fresh packaged validation. |
 | AC-224, AC-225 | Per-agent and global goals | goal | Approved choices in handoff: 20 tries or 4 hours, native harness goals where supported, Overseer monitors each stop; design in orchestrator RFC. Implement and verify. |
 | AC-128, AC-246 | Phone Overseer conversation and shared Needs you count | goal | Phone gateway/client integration and parity verification; Gate S and phone are already on main. |
 | AC-210, AC-213 | Phone development isolation and production pairing guard | goal | Build and verify against merged phone/dev-daemon code; old waiting-for-#10 blocker is stale. |
@@ -34,9 +36,8 @@ The handoff has the active branches, agents, tests and owner decisions. Old bloc
 | AUTO-AC-01 to AUTO-AC-40 | goal | Reconcile docs/verification/auto-mode/README.md with each Verify clause; previous summary says 23/40 fixture-verified. Live/account and packaged-UI gaps remain; keep experimental routing gated. |
 | SWARM-01 to SWARM-64; S0 to S5 | goal | Reconcile docs/verification/swarm/coverage.json; previous summary says 46/64 fixture-verified. SWARM-24 adapter, UI, real communication paths and scenario closure remain; owner starts Swarm. |
 | TUI T-01 to T-41 | goal watches regressions | T-29/T-35 merged with #51; all checked in RFC. Reopen only against evidence or changed requirements. |
-| Mods and two bundled options | goal (design recorded) | First release design, Clear prose rules and evaluation rubric recorded in docs/rfcs/mods-first-release.md and docs/design/mods/. No implementation yet. Next builder slice: library/bindings and Clear prose; then qualified result transformers. |
 | Cactus Whistle comparison | goal | Existing eval independently audited; keep Whisper. Human-voice/current-hint follow-up waits for supplied recordings or a requested guided recording session. |
 | Model selection and usage telemetry | goal, queued | docs/rfcs/model-priority-brief.md and after-current-work.md. Current Luna low-only rule controls live calls despite older broader proposals. |
-| Site, later mods expansion, usability, undo/rewind | goal, queued | after-current-work.md; user now explicitly pulled Mods planning forward. Undo/rewind remains later. |
+| Site, later mods expansion, usability, undo/rewind | goal, queued | after-current-work.md; Mods implementation is authorized and tracked in AC-266–273. Undo/rewind remains later. |
 
-New criteria and user requests get a row during the same pass. Do not promote draft Mods labels to verified acceptance criteria.
+New criteria and user requests get a row during the same pass. Mods AC-266–273 remain not started until implementation/evidence is recorded; historical PLUG/MOD labels are not additional ledger IDs.

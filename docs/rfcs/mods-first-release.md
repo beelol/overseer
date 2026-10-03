@@ -1,6 +1,6 @@
 # Overseer Mods: first release and two optional bundles
 
-Draft for owner review, 2026-10-02. This is design and research, not implementation or verified acceptance criteria. No Mods settings, installs, logins, daemons, builds, tests, or paid model turns were changed or run. Proposed bundle content: [Clear prose rules](../design/mods/clear-prose-rules.md); [examples and evaluation](../design/mods/evaluation.md).
+Design recorded 2026-10-02; implementation authorized by the owner. AC-266–273 and the [Phase 1 plan](../superpowers/plans/2026-10-03-mods-phase1.md) now define the tracked scope. This is design and research, not implementation or verification. No Mods settings, installs, logins, daemons, builds, tests, or paid model turns were changed or run. Proposed bundle content: [Clear prose rules](../design/mods/clear-prose-rules.md); [examples and evaluation](../design/mods/evaluation.md).
 
 ## Intended outcome
 
@@ -79,23 +79,23 @@ For eventual task comparisons, keep model/harness versions, effort, account id, 
 
 Metadata remains local and excludes prompts, output bodies, code, credentials, and account login identifiers. Use the existing usage/event storage contract and coordinate with queued telemetry work rather than creating a second account ledger or outbound analytics system.
 
-## Proposed criteria for agreement
+## Historical draft criteria
 
-These identifiers are draft MOD labels. The coordinator assigns actual unused AC numbers on main only after owner agreement and adds explicit-commit ledger records criterion by criterion.
+These MOD labels are the original design checklist. AC-266–273 in the primary RFC now define the tracked scope, with explicit-commit ledger records; the owner authorized implementation without a new planning approval.
 
 | Draft criterion | Verify |
 | --- | --- |
 | MOD-01: Install and enable are separate, pinned, auditable operations. | Install bundled and local-folder fixtures, reject unsafe paths/symlink escapes, record all file hashes/source/time/recipe, and prove the next launch changes only after enabling. |
 | MOD-02: Binding resolution is deterministic across scopes and filters. | Matrix across repositories/worktrees, agent/group/all-agents/Overseer, harness/account/model; test narrower off/on, style conflicts, locks, and all-agents exclusion of Overseer. |
 | MOD-03: Delivery is per turn and per harness, with honest gaps. | Capture native args/environment/files and resume requests; byte-compare global folders/repo/worktree before and after; test mid-turn toggle, persistent transport pending state, generic preface, required incompatibility, child yes/no/unknown, and frozen mod snapshot. Global rules/skills absent by default and present only after opt-in, without weakening project policy or changing authentication. |
-| MOD-04: Clear prose is ordinary optional bundle content. | Fixture shows correct style digest/precedence and both separate scopes; approved frozen live comparisons score every rubric dimension and preserve all required facts. Until the live comparison occurs, delivery is verified and prose quality remains partial. |
+| MOD-04: Clear prose is ordinary optional bundle content. | Fixture shows correct style digest/precedence and both separate scopes; frozen live comparisons retain every rubric rating against AC-270 and preserve all required facts. Until the live comparison occurs, delivery is verified and prose quality remains partial. |
 | MOD-05: Mods and Applied views use shared daemon methods. | CLI/daemon round trips, packaged VS Code scenario, TUI test, phone protocol/view test; show source, fingerprint, installed files, permission enforcement, scope reason, pending/unsupported pieces, children, story, and disable/remove behavior. Phone mutation calls are refused. |
 | MOD-06: Programs install privately and enforce runtime access. | Pinned artifact/source fixtures, interrupted install rollback, update reapproval, hostile build/filter fixtures attempting owner config/credential/socket/network/other-run access, private scratch and bounded process output, descendant cleanup, deferred remove; prove no global install writes or production contact. |
 | MOD-07: Less tool noise changes model input at a qualified boundary. | Native result-hook fixtures and installed-runtime/mock-provider capture show transformed result in the next model request with no duplicate raw body. Unsupported Codex/generic and read-only roles are explicit; permissions and original command stay unchanged; changed program invalidates approval. |
 | MOD-08: Compression preserves evidence and safe failure behavior. | Golden fixtures for success/failure/warnings/skips/unicode/multiline/small/unknown/binary/timeout/oversize/interruption; protected facts, raw byte-hash recovery, exit status, one execution, no retries, larger-output bypass, and same-output-hook conflict. |
-| MOD-09: Observations do not overclaim savings. | Synthetic usage events prove separate estimated payload versus reported usage/cost, unknown fields, cache and task comparability, and added overhead. Frozen offline replay report plus owner-approved same-task off/on dev comparison; live gap stays explicit. |
+| MOD-09: Observations do not overclaim savings. | Synthetic usage events prove separate estimated payload versus reported usage/cost, unknown fields, cache and task comparability, and added overhead. Frozen offline replay report plus same-task off/on dev comparison within the current development authorization and paid-turn rules; live gap stays explicit. |
 | MOD-10: Governance and regression coverage survive the full suite. | Look/Steer/Confirm and permission-injection tests; no mod can alter role/sandbox/approval/credential/tool ownership; scripts/test-all includes the new fixtures and existing default/no-mod behavior. Respect the machine lock, nice priority, one UI scenario at a time outside full runs, cleanup, and paid-turn constraints. |
 
-## Decisions needed
+## Implementation authorization and qualification gaps
 
-No new architecture decision is needed to finish this design. The owner reviews the proposed first-release scope and prose rules before criteria are added. The open technical gates are adapter qualification and enforceable runtime isolation; unsupported capabilities can be stated clearly without asking the owner to choose implementation details. If they require automatic compression on Codex in the first release, that requirement needs a dedicated compatibility spike before claiming the second bundle can ship there.
+The owner authorized autonomous implementation of both requested optional bundles; no further planning approval is required. AC-266–273 track the scope, with the text release first and qualified transformers later. Product confirmations for installs, updates, removals and code changes remain unchanged. The open technical gates are adapter qualification and enforceable runtime isolation; unsupported capabilities can be stated clearly without asking the owner to choose implementation details. If they require automatic compression on Codex in the first release, that requirement needs a dedicated compatibility spike before claiming the second bundle can ship there.

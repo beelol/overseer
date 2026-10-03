@@ -1,0 +1,314 @@
+warning: value assigned to `note` is never read
+   --> daemon/src/background.rs:377:17
+    |
+377 |         let mut note = String::new();
+    |                 ^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` on by default
+
+warning: methods `book_shared_account`, `shared_booking_draw`, and `mark_shared_booking_uncertain` are never used
+    --> daemon/src/account_booking.rs:1203:12
+     |
+1171 | impl Store {
+     | ---------- methods in this implementation
+...
+1203 |     pub fn book_shared_account(&self, req: &AccountBookingRequest<'_>) -> Result<BookingDecision> {
+     |            ^^^^^^^^^^^^^^^^^^^
+...
+1255 |     pub fn shared_booking_draw(
+     |            ^^^^^^^^^^^^^^^^^^^
+...
+1387 |     pub fn mark_shared_booking_uncertain(&self, id: &str) -> Result<()> {
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` on by default
+
+warning: methods `blocking_window` and `allowance_unknown` are never used
+   --> daemon/src/auto_quota.rs:139:12
+    |
+60  | impl QuotaSnapshot {
+    | ------------------ methods in this implementation
+...
+139 |     pub fn blocking_window(&self, model: &str) -> Option<&QuotaWindow> {
+    |            ^^^^^^^^^^^^^^^
+...
+145 |     pub fn allowance_unknown(&self, model: &str) -> bool {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: function `auto_local_execution_guard` is never used
+   --> daemon/src/auto_opencode.rs:177:8
+    |
+177 | pub fn auto_local_execution_guard(profile: &crate::store::Profile, project: &Path,
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: fields `resolved_model_version` and `task_signature` are never read
+   --> daemon/src/auto_consumption.rs:169:9
+    |
+166 | pub struct DeltaContext<'a> {
+    |            ------------ fields in this struct
+...
+169 |     pub resolved_model_version: Option<&'a str>,
+    |         ^^^^^^^^^^^^^^^^^^^^^^
+170 |     pub task_signature: Option<&'a crate::auto_select::TaskSignature>,
+    |         ^^^^^^^^^^^^^^
+    |
+    = note: `DeltaContext` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: function `estimate_from_actual_window_delta` is never used
+   --> daemon/src/auto_consumption.rs:291:8
+    |
+291 | pub fn estimate_from_actual_window_delta(
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `apply_scoped_fit` is never used
+   --> daemon/src/auto_fit.rs:204:8
+    |
+204 | pub fn apply_scoped_fit(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: variant `Provider` is never constructed
+  --> daemon/src/auto_health.rs:10:5
+   |
+9  | pub enum Scope {
+   |          ----- variant in this enum
+10 |     Provider(String),
+   |     ^^^^^^^^
+   |
+   = note: `Scope` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: methods `workspace_diff` and `state` are never used
+    --> daemon/src/daemon.rs:3652:12
+     |
+433  | impl Daemon {
+     | ----------- methods in this implementation
+...
+3652 |     pub fn workspace_diff(&self, workspace_id: &str, base: &str) -> Result<Value> {
+     |            ^^^^^^^^^^^^^^
+...
+3707 |     pub fn state(&self) -> Result<Value> {
+     |            ^^^^^
+
+warning: field `device_name` is never read
+  --> daemon/src/gateway/mod.rs:86:9
+   |
+84 | pub struct Session {
+   |            ------- field in this struct
+85 |     pub device_id: String,
+86 |     pub device_name: String,
+   |         ^^^^^^^^^^^
+
+warning: field `public` is never read
+  --> daemon/src/gateway/noise.rs:40:9
+   |
+38 | pub struct Keypair {
+   |            ------- field in this struct
+39 |     pub private: Vec<u8>,
+40 |     pub public: Vec<u8>,
+   |         ^^^^^^
+
+warning: constant `ALLOWED_FIELDS` is never used
+  --> daemon/src/gateway/push.rs:16:11
+   |
+16 | pub const ALLOWED_FIELDS: &[&str] = &[
+   |           ^^^^^^^^^^^^^^
+
+warning: method `is_clean` is never used
+   --> daemon/src/git.rs:299:12
+    |
+298 | impl Status {
+    | ----------- method in this implementation
+299 |     pub fn is_clean(&self) -> bool {
+    |            ^^^^^^^^
+
+warning: function `tree_has` is never used
+   --> daemon/src/git.rs:356:8
+    |
+356 | pub fn tree_has(workspace: &Path, tree_ish: &str, path: &str) -> bool {
+    |        ^^^^^^^^
+
+warning: function `show_blob` is never used
+   --> daemon/src/git.rs:360:8
+    |
+360 | pub fn show_blob(workspace: &Path, tree_ish: &str, path: &str) -> Result<Vec<u8>> {
+    |        ^^^^^^^^^
+
+warning: function `worktree_list` is never used
+   --> daemon/src/git.rs:368:8
+    |
+368 | pub fn worktree_list(repo: &Path) -> Vec<PathBuf> {
+    |        ^^^^^^^^^^^^^
+
+warning: struct `Reading` is never constructed
+  --> daemon/src/net.rs:79:12
+   |
+79 | pub struct Reading {
+   |            ^^^^^^^
+
+warning: function `read` is never used
+  --> daemon/src/net.rs:97:8
+   |
+97 | pub fn read(probes: bool) -> Reading {
+   |        ^^^^
+
+warning: field `model` is never read
+   --> daemon/src/opencode_bridge.rs:260:9
+    |
+243 | pub struct Turn {
+    |            ---- field in this struct
+...
+260 |     pub model: String,
+    |         ^^^^^
+
+warning: constant `METHOD_CLASSES` is never used
+  --> daemon/src/overseer/control.rs:60:11
+   |
+60 | pub const METHOD_CLASSES: &[(&str, &str)] = &[
+   |           ^^^^^^^^^^^^^^
+
+warning: function `method_class` is never used
+   --> daemon/src/overseer/control.rs:133:8
+    |
+133 | pub fn method_class(method: &str) -> Option<&'static str> {
+    |        ^^^^^^^^^^^^
+
+warning: function `is_session_event` is never used
+    --> daemon/src/overseer/session.rs:1985:8
+     |
+1985 | pub fn is_session_event(kind: &str) -> bool {
+     |        ^^^^^^^^^^^^^^^^
+
+warning: methods `insert_task_and_run`, `insert_task_and_run_bound`, `child_by_native`, and `put_auto_allowance_estimate` are never used
+    --> daemon/src/store.rs:960:12
+     |
+189  | impl Store {
+     | ---------- methods in this implementation
+...
+960  |     pub fn insert_task_and_run(&self, t: &Task, r: &Run, attempt_id: Option<&str>,
+     |            ^^^^^^^^^^^^^^^^^^^
+...
+967  |     pub fn insert_task_and_run_bound(&self, t: &Task, r: &Run, attempt_id: Option<&str>,
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1115 |     pub fn child_by_native(&self, parent: &str, native: &str) -> Result<Option<Run>> {
+     |            ^^^^^^^^^^^^^^^
+...
+2507 |     pub fn put_auto_allowance_estimate(&self, profile_id: &str, generation: i64,
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `parse_meminfo` is never used
+   --> daemon/src/sys.rs:114:8
+    |
+114 | pub fn parse_meminfo(text: &str) -> Result<(u64, u64)> {
+    |        ^^^^^^^^^^^^^
+
+warning: function `parse_psi` is never used
+   --> daemon/src/sys.rs:127:8
+    |
+127 | pub fn parse_psi(text: &str) -> Pressure {
+    |        ^^^^^^^^^
+
+warning: `overseerd` (bin "overseerd") generated 25 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running tests/overseer_modes.rs (/private/tmp/overseer-closeout-pr49-target/debug/deps/overseer_modes-588ec4964f572ea9)
+
+running 7 tests
+test ac230_a_waiting_permission_comes_up_by_itself_and_a_click_answers_it ... ok
+test ac230_overseer_sets_auto_by_itself_only_where_allowed_and_says_why ... ok
+test common::base32::tests::base32_round_trips_and_matches_rfc_vectors ... ok
+test common::noise::tests::a_wrong_pairing_secret_fails_in_the_first_message ... ok
+test common::noise::tests::large_messages_are_chunked_and_joined ... ok
+test common::noise::tests::noise_vectors_match_the_shared_file ... ok
+test ac230_typed_conversations_set_each_mode_and_start_one_in_auto ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.48s
+
+     Running tests/permission_card_answers.rs (/private/tmp/overseer-closeout-pr49-target/debug/deps/permission_card_answers-9d8e8c63e96564ae)
+
+running 11 tests
+test a_typed_no_reports_the_native_denial_in_the_conversation ... ok
+test a_mismatched_surfaced_card_cannot_deny_the_pending_request ... ok
+test clicking_after_the_spoken_answer_window_expires_advances_the_queue ... ok
+test common::base32::tests::base32_round_trips_and_matches_rfc_vectors ... ok
+test common::noise::tests::a_wrong_pairing_secret_fails_in_the_first_message ... ok
+test common::noise::tests::large_messages_are_chunked_and_joined ... ok
+test common::noise::tests::noise_vectors_match_the_shared_file ... ok
+test declining_an_ordinary_proposal_keeps_the_native_request_waiting ... ok
+test no_on_a_surfaced_permission_denies_the_native_request_once ... ok
+test no_on_an_already_answered_card_leaves_another_request_waiting ... ok
+test answering_from_a_click_or_native_surface_reads_the_next_permission_once ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.13s
+
+     Running tests/voice.rs (/private/tmp/overseer-closeout-pr49-target/debug/deps/voice-c0eb2c4a1d543a03)
+
+running 51 tests
+test ac163_off_by_default_kept_across_a_kill_and_muted_means_no_listener ... ok
+test a_check_in_turn_is_not_the_answer_to_a_spoken_request ... ok
+test ac163_one_utterance_one_request_and_a_second_listener_is_refused ... ok
+test ac164_lines_wait_for_the_owner_and_side_talk_makes_no_request ... ok
+test ac164_side_talk_over_overseer_lets_it_finish_and_addressed_words_stop_it ... ok
+test ac165_a_spoken_request_is_taken_at_once_planned_and_sent_with_the_owner_s_words ... ok
+test ac164_noise_never_moves_the_mark_and_speech_does ... ok
+test ac165_the_holding_line_once_and_a_failed_dispatch_is_spoken ... ok
+test ac166_talking_to_one_chosen_agent ... ok
+test ac166_the_right_agents_with_the_fixture_orchestrator ... ok
+test ac167_ac168_delivery_setting_and_new_agent_limits ... ok
+test ac165_the_three_answers_over_fifty_requests has been running for over 60 seconds
+test ac167_additions_wait_and_arrive_as_one_message_a_redirect_stops_the_turn ... ok
+test ac167_stop_by_voice_interrupts_within_a_second ... ok
+test ac168_new_agents_from_a_request ... ok
+test ac169_the_card_holds_the_exact_text_the_agent_got ... ok
+test ac169_two_agents_in_flight_and_a_new_one_get_the_card_s_text_byte_for_byte ... ok
+test ac170_a_correction_changes_the_targets_and_after_the_send_supersedes ... ok
+test ac170_cancel_or_correct_inside_the_window ... ok
+test ac171_a_command_during_a_read_back_is_still_taken ... ok
+test ac171_a_confirm_plan_waits_for_a_clear_yes_by_voice ... ok
+test ac171_a_permission_answered_by_voice_with_a_cue_a_toast_and_a_window ... ok
+test ac171_an_agent_s_words_add_no_target ... ok
+test ac171_each_action_by_its_tier_whatever_the_plan_claims ... ok
+test ac165_the_three_answers_over_fifty_requests ... ok
+test ac171_permissions_one_at_a_time_with_silence_maybe_and_the_toast_s_cancel ... ok
+test ac172_cues_wait_for_overseer_s_phrase_and_give_way_to_the_owner ... ok
+test ac173_a_call_pauses_voice_mode_and_it_resumes ... ok
+test ac173_a_model_above_the_memory_budget_is_refused ... ok
+test ac173_each_bound_holds ... ok
+test ac173_levels_and_side_talk_are_never_stored ... ok
+test ac172_an_attention_cue_waits_for_the_thought_and_nothing_overlaps has been running for over 60 seconds
+test ac172_an_attention_cue_waits_for_the_thought_and_nothing_overlaps ... ok
+test ac175_a_dying_listener_never_touches_an_agent_and_four_deaths_turn_voice_off ... ok
+test ac175_built_in_phrases_work_with_no_model ... ok
+test ac175_orchestrator_and_recognizer_failures_send_nothing_and_touch_no_agent ... ok
+test ac177_two_windows_see_the_same_levels_from_one_listener ... ok
+test ac220_a_restarted_listener_is_not_paused_by_the_old_one ... ok
+test ac226_show_me_the_agent_by_voice ... ok
+test ac227_handle_what_needs_me_by_voice ... ok
+test ac228_a_request_not_for_overseer_never_says_on_it ... ok
+test ac229_a_request_naming_overseer_with_an_instruction_is_never_dropped ... ok
+test ac173_twenty_requests_with_the_listener_writing_nothing_and_connecting_nowhere has been running for over 60 seconds
+test ac229_a_start_is_read_back_and_a_correction_inside_the_window_changes_it ... ok
+test ac229_confirmed_multiple_starts_and_redirect_read_back_each_task ... ok
+test ac229_the_recognizer_expects_the_agents_and_the_repositories ... ok
+test ac173_twenty_requests_with_the_listener_writing_nothing_and_connecting_nowhere ... ok
+test ac230_by_voice_modes_a_start_in_auto_and_a_permission_read_out_unasked ... ok
+test ac252_the_loop_by_voice_one_sentence_each ... ok
+test common::base32::tests::base32_round_trips_and_matches_rfc_vectors ... ok
+test common::noise::tests::a_wrong_pairing_secret_fails_in_the_first_message ... ok
+test common::noise::tests::large_messages_are_chunked_and_joined ... ok
+test common::noise::tests::noise_vectors_match_the_shared_file ... ok
+test ac248_a_proposal_after_its_spoken_request_closed_is_withdrawn ... ok
+
+test result: ok. 51 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 350.59s
+
+     Running tests/voice_confirm_targets.rs (/private/tmp/overseer-closeout-pr49-target/debug/deps/voice_confirm_targets-5a5282f58922f353)
+
+running 6 tests
+test a_yes_answers_only_the_latest_confirm_and_never_revives_an_older_card ... ok
+test common::base32::tests::base32_round_trips_and_matches_rfc_vectors ... ok
+test common::noise::tests::a_wrong_pairing_secret_fails_in_the_first_message ... ok
+test common::noise::tests::large_messages_are_chunked_and_joined ... ok
+test common::noise::tests::noise_vectors_match_the_shared_file ... ok
+test asking_which_permission_clears_the_previous_spoken_answer_target ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.90s
+

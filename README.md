@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **207 / 265** · **33** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-128, AC-129, AC-133, AC-135, AC-136, AC-137, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-183, AC-185, AC-186, AC-188, AC-189, AC-190, AC-192, AC-195, AC-196, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-210, AC-213, AC-216, AC-218, AC-220, AC-222, AC-223, AC-224, AC-225, AC-229, AC-230, AC-234, AC-240, AC-244, AC-246, AC-265. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+criteria: **207 / 273** · **34** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-114, AC-115, AC-117, AC-120, AC-128, AC-129, AC-133, AC-135, AC-136, AC-137, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-176, AC-177, AC-178, AC-179, AC-183, AC-185, AC-186, AC-188, AC-189, AC-190, AC-192, AC-195, AC-196, AC-199, AC-200, AC-201, AC-202, AC-204, AC-205, AC-210, AC-213, AC-216, AC-218, AC-220, AC-222, AC-223, AC-224, AC-225, AC-229, AC-230, AC-234, AC-240, AC-244, AC-246, AC-265, AC-266, AC-267, AC-268, AC-269, AC-270, AC-271, AC-272, AC-273. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), Voice Mode (Gate R, AC-162 to AC-177, added by the owner on 2026-09-27: a voice to talk to constantly that redirects every agent from context, answers quickly and shows every word it sent, with audio collected on the Rust side and the animated mark in the middle moving with the voice; [design](docs/rfcs/voice-mode.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -269,8 +269,8 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-226** Overseer moves you around VS Code — [evidence](docs/verification/AC-226.md)
 - [x] **AC-227** One view for talking to Overseer; Needs you as a small notification — [evidence](docs/verification/AC-227.md)
 - [x] **AC-228** You can always tell it is working — [evidence](docs/verification/AC-228.md)
-- [ ] **AC-229** Heard right before it acts — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-229.md)
-- [ ] **AC-230** Permission modes by conversation — not started (added by the owner on 2026-09-28) — [evidence](docs/verification/AC-230.md)
+- [ ] **AC-229** Heard right before it acts — 75 affected fixtures pass; vocabulary/full/UI verification pending in #52 — [evidence](docs/verification/AC-229.md)
+- [ ] **AC-230** Permission modes by conversation — 75 affected fixtures pass; full/UI verification pending in #52 — [evidence](docs/verification/AC-230.md)
 - [x] **AC-231** Agents start with what Overseer knows — [evidence](docs/verification/AC-231.md)
 - [x] **AC-232** The review says what it shows — [evidence](docs/verification/AC-232.md)
 - [x] **AC-233** Clicking an agent puts you in its head — [evidence](docs/verification/AC-233.md)
@@ -305,7 +305,15 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-262** Overseer in the Mac's menu bar — [evidence](docs/verification/AC-262.md)
 - [x] **AC-263** The review opens on "Since task start", with the other comparisons one click away — [evidence](docs/verification/AC-263.md)
 - [x] **AC-264** One Overseer layout, and it looks like Focus Mode without its side effects — [evidence](docs/verification/AC-264.md)
-- [ ] **AC-265** Stop pauses an agent's queue — not started (the owner, 2026-10-02) — [evidence](docs/verification/AC-265.md)
+- [ ] **AC-265** Stop pauses an agent's queue — ◐ partial: Exact paused queue flow in chat/grid/TUI, FIFO resume, clear/remove, durable pause, owner-only resume, predecessor controls, normal batching, and the handoff/Stop regression. / deferred: Coordinated full scripts/test-all and fresh packaged validation of final a8edd4d8; UI/parity screenshots are from 80c38620 before the last daemon race fix. — [evidence](docs/verification/AC-265.md)
+- [ ] **AC-266** Text Mods have a pinned library and usable local controls — not started — [evidence](docs/verification/AC-266.md)
+- [ ] **AC-267** Mod scopes resolve separately for agents and Overseer — not started — [evidence](docs/verification/AC-267.md)
+- [ ] **AC-268** Each turn states exactly how mod text was delivered — not started — [evidence](docs/verification/AC-268.md)
+- [ ] **AC-269** Mods can be managed and inspected from Overseer's surfaces — not started — [evidence](docs/verification/AC-269.md)
+- [ ] **AC-270** Clear prose remains concise, complete and self-contained — not started — [evidence](docs/verification/AC-270.md)
+- [ ] **AC-271** Less tool noise installs privately and runs in isolation — not started — [evidence](docs/verification/AC-271.md)
+- [ ] **AC-272** Compression happens before the model and preserves evidence — not started — [evidence](docs/verification/AC-272.md)
+- [ ] **AC-273** Reduction measurements show their actual scope and cost — not started — [evidence](docs/verification/AC-273.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -844,13 +852,21 @@ the owner action or decision each one needs.
 - [ ] [AC-223](docs/verification/AC-223.md) (Other audio keeps its volume): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-224](docs/verification/AC-224.md) (Goals for an agent, at the harness level): To be built by its own agent after the Auto/Swarm merge.
 - [ ] [AC-225](docs/verification/AC-225.md) (Goals for Overseer, at the global level): To be built by its own agent after the Auto/Swarm merge.
-- [ ] [AC-229](docs/verification/AC-229.md) (Heard right before it acts): To be built by its own agent after the Auto/Swarm merge.
-- [ ] [AC-230](docs/verification/AC-230.md) (Permission modes by conversation): To be built by its own agent after the Auto/Swarm merge.
+- [ ] [AC-229](docs/verification/AC-229.md) (Heard right before it acts): Finish the full workspace/vocabulary and packaged UI verification, review its evidence, then merge through AC-146. No verified checkbox yet.
+- [ ] [AC-230](docs/verification/AC-230.md) (Permission modes by conversation): Finish full verification and fresh packaged voice/talk checks, then merge through AC-146. No verified checkbox yet.
 - [ ] [AC-234](docs/verification/AC-234.md) (Deploys follow merges by themselves): Its own agent; CI's required checks must be green first (the TUI t10 timing test on hosted runners is the owner's decision).
 - [ ] [AC-240](docs/verification/AC-240.md) (You hear about it outside VS Code): Owner checks only: the real banner, its grouping by agent and a real click on the owner's Mac (including the first time Terminal opens the TUI's .command file), in a guided dev-daemon check.
 - [ ] [AC-244](docs/verification/AC-244.md) (Opening an agent leaves your layout alone): The owner chooses what the dashboard does with its settings in a window opened on a folder (see deferred).
 - [ ] [AC-246](docs/verification/AC-246.md) (One name for each thing): not blocked
-- [ ] [AC-265](docs/verification/AC-265.md) (Stop pauses an agent's queue): A builder, after the current pull requests.
+- [ ] [AC-265](docs/verification/AC-265.md) (Stop pauses an agent's queue): Builder finished with a clean worktree and no owned test processes. Keep PR #53 draft until the parent finishes integration/full/fresh-package verification.
+- [ ] [AC-266](docs/verification/AC-266.md) (Text Mods have a pinned library and usable local controls): Implement on codex/mods-bundles, then cover every Verify clause before changing this status. Native/global/child qualification and live prose quality remain unproved.
+- [ ] [AC-267](docs/verification/AC-267.md) (Mod scopes resolve separately for agents and Overseer): Implement on codex/mods-bundles, then cover every Verify clause before changing this status. Native/global/child qualification and live prose quality remain unproved.
+- [ ] [AC-268](docs/verification/AC-268.md) (Each turn states exactly how mod text was delivered): Implement on codex/mods-bundles, then cover every Verify clause before changing this status. Native/global/child qualification and live prose quality remain unproved.
+- [ ] [AC-269](docs/verification/AC-269.md) (Mods can be managed and inspected from Overseer's surfaces): Implement on codex/mods-bundles, then cover every Verify clause before changing this status. Native/global/child qualification and live prose quality remain unproved.
+- [ ] [AC-270](docs/verification/AC-270.md) (Clear prose remains concise, complete and self-contained): Implement on codex/mods-bundles, then cover every Verify clause before changing this status. Native/global/child qualification and live prose quality remain unproved.
+- [ ] [AC-271](docs/verification/AC-271.md) (Less tool noise installs privately and runs in isolation): Required second bundle remains later implementation work after the text release. Qualify isolated execution and each adapter; preserve missing runtime/live evidence explicitly.
+- [ ] [AC-272](docs/verification/AC-272.md) (Compression happens before the model and preserves evidence): Required second bundle remains later implementation work after the text release. Qualify isolated execution and each adapter; preserve missing runtime/live evidence explicitly.
+- [ ] [AC-273](docs/verification/AC-273.md) (Reduction measurements show their actual scope and cost): Required second bundle remains later implementation work after the text release. Qualify isolated execution and each adapter; preserve missing runtime/live evidence explicitly.
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.
