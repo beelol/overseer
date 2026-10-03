@@ -158,7 +158,7 @@ impl Daemon {
                 let _ = self.overseer_set_cause(if surface == "voice" { "voice" } else { "owner" });
                 // The question that came up by itself (AC-230) is the same one: asked again, not
                 // proposed twice.
-                let already = open.iter().find(|x| x["actions"].as_array().is_some_and(|a| a.iter().any(|y| y["action"] == "permission" && y["agent"] == w.run.as_str() && y["request"] == w.request.as_str() && (w.revision.is_none() || y["revision"].as_i64() == w.revision))))).and_then(|x| x["id"].as_str().map(str::to_string));
+                let already = open.iter().find(|x| x["actions"].as_array().is_some_and(|a| a.iter().any(|y| y["action"] == "permission" && y["agent"] == w.run.as_str() && y["request"] == w.request.as_str() && (w.revision.is_none() || y["revision"].as_i64() == w.revision)))).and_then(|x| x["id"].as_str().map(str::to_string));
                 let proposal = if already.is_some() {
                     already
                 } else if answer {
