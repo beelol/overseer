@@ -130,7 +130,18 @@ fn ac230_typed_conversations_set_each_mode_and_start_one_in_auto() {
     d.call("run.interrupt", json!({"run_id": agent}));
     d.wait_status(&agent, |s| s == "interrupted", 30);
     std::fs::write(&mode_file, "echo").unwrap();
-    d.call("run.follow_up", json!({"run_id": agent, "prompt": "go on"}));
+    let turns_before = d.call("run.turns", json!({"run_id": agent}));
+    assert_eq!(d.call("run.queued", json!({"run_id": agent}))["paused"], true,
+        "Stop pauses the queue; a new message cannot resume it (AC-265)");
+    let follow_up = d.call("run.follow_up", json!({"run_id": agent, "prompt": "go on"}));
+    assert_eq!(follow_up["delivery"], "queued", "{follow_up}");
+    let queued = d.call("run.queued", json!({"run_id": agent}));
+    assert_eq!(queued["paused"], true, "{queued}");
+    assert_eq!(queued["queued"].as_array().unwrap().len(), 1, "{queued}");
+    assert_eq!(queued["queued"][0]["text"], "go on", "{queued}");
+    assert_eq!(d.call("run.turns", json!({"run_id": agent})), turns_before,
+        "the follow-up stays queued until the owner resumes");
+    d.call("run.resume_queue", json!({"run_id": agent}));
     let argv = echoed_argv(&d, &agent);
     assert!(argv.contains("\"--permission-mode\",\"auto\""), "{argv}");
     // A mode its harness does not take is refused, with the reason.
