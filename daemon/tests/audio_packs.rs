@@ -796,6 +796,42 @@ impl Drop for HeldDecoder {
     }
 }
 
+#[cfg(target_os = "macos")]
+#[test]
+fn successful_decoder_exit_between_wait_and_memory_check_keeps_valid_selection() {
+    let root = tmp();
+    let folder = root.path().join("valid-exit-pack");
+    pack(&folder, "fixture-valid-exit");
+    let gate = root.path().join("exit-gate");
+    std::fs::create_dir(&gate).unwrap();
+    std::fs::write(gate.join("armed"), b"armed").unwrap();
+    let release = AudioGate(gate.clone());
+    let log = root.path().join("audio.log");
+    let d = Daemon::start(&[
+        ("OVERSEER_TEST_AUDIO_WORKER_HOLD", gate.to_str().unwrap()),
+        ("OVERSEER_TEST_AUDIO_EXIT_BEFORE_MEMORY", gate.to_str().unwrap()),
+        ("OVERSEER_TEST_AUDIO_LOG", log.to_str().unwrap()),
+    ]);
+    let before = d.call("audio.get", json!({}));
+    let result = d.try_call("audio.source.set", json!({"source":"folder","path":folder,
+        "expected_revision":before["revision"]}));
+    let observed: Value = serde_json::from_slice(&std::fs::read(gate.join("exit-observed.json"))
+        .expect("SETUP: actual owned decoder must exit at the injected boundary")).unwrap();
+    let worker: Value = serde_json::from_slice(&std::fs::read(gate.join("ready.json"))
+        .expect("SETUP: actual worker must reach its synthetic hold")).unwrap();
+    assert_eq!(observed["pid"], worker["pid"], "SETUP: only the owned worker may be observed");
+    assert_eq!(observed["wait_code"], libc::CLD_EXITED, "SETUP: normal worker exit, not timeout/kill");
+    assert_eq!(observed["exit_status"], 0, "SETUP: valid media worker must exit successfully");
+    assert_eq!(observed["observed_without_reap"], true);
+    assert_eq!(observed["kill_zero"], 0, "SETUP: actual zombie must still answer kill-zero");
+    drop(release);
+    let selected = result.expect("valid decoder output/exit must survive the exit-before-RSS race");
+    assert_eq!(selected["source"]["kind"], "folder");
+    assert_eq!(selected["source"]["available"], true);
+    assert_eq!(selected["enabled"], false);
+    assert_eq!(selected["revision"].as_i64(), Some(before["revision"].as_i64().unwrap() + 1));
+}
+
 #[test]
 fn daemon_shutdown_reaps_a_decoder_held_during_source_validation_before_exit() {
     let root = tmp();

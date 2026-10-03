@@ -113,6 +113,9 @@ pub(super) fn validate(file: &File, outer_deadline: Instant) -> Result<u64> {
         if Instant::now() >= deadline {
             bail!("Audio validation exceeded its time limit.");
         }
+        if status.is_none() {
+            test_exit_before_memory(&child.0)?;
+        }
         if status.is_none() && resident_bytes(child.0.id())? > 96 * 1024 * 1024 {
             bail!("Audio validation exceeded its memory budget.");
         }
@@ -127,6 +130,113 @@ pub(super) fn validate(file: &File, outer_deadline: Instant) -> Result<u64> {
         .filter(|ms| (1..=15_000).contains(ms))
         .ok_or_else(|| anyhow!("Audio is malformed or exceeds 15 seconds."))?;
     Ok(duration)
+}
+
+// Test-only observation: release this owned synthetic worker after try_wait
+// reported None, then observe its exit without reaping before the unchanged RSS
+// check. No RPC, media substitution, timeout extension or error override.
+#[cfg(target_os = "macos")]
+fn test_exit_before_memory(child: &Child) -> Result<()> {
+    use std::os::fd::{FromRawFd, OwnedFd};
+    let Some(gate) = std::env::var_os("OVERSEER_TEST_AUDIO_EXIT_BEFORE_MEMORY") else {
+        return Ok(());
+    };
+    if std::env::var_os("OVERSEER_TEST_AUDIO_WORKER_HOLD").as_ref() != Some(&gate) {
+        bail!("Synthetic decoder exit gate needs its matching worker gate.");
+    }
+    let gate = std::path::PathBuf::from(gate);
+    match std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(gate.join("parent-claimed"))
+    {
+        Ok(_) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => return Ok(()),
+        Err(_) => bail!("Cannot claim the synthetic decoder exit gate."),
+    }
+    let fd = unsafe { libc::kqueue() };
+    if fd < 0 {
+        bail!("Cannot observe the owned decoder exit.");
+    }
+    let queue = unsafe { OwnedFd::from_raw_fd(fd) };
+    let mut change: libc::kevent = unsafe { std::mem::zeroed() };
+    change.ident = child.id() as usize;
+    change.filter = libc::EVFILT_PROC;
+    change.flags = libc::EV_ADD | libc::EV_ENABLE | libc::EV_ONESHOT;
+    change.fflags = libc::NOTE_EXIT;
+    if unsafe {
+        libc::kevent(
+            queue.as_raw_fd(),
+            &change,
+            1,
+            std::ptr::null_mut(),
+            0,
+            std::ptr::null(),
+        )
+    } != 0
+    {
+        bail!("Cannot register the owned decoder exit.");
+    }
+    std::fs::write(gate.join("release"), b"release")
+        .map_err(|_| anyhow!("Cannot release the synthetic decoder."))?;
+    let mut event: libc::kevent = unsafe { std::mem::zeroed() };
+    let timeout = libc::timespec {
+        tv_sec: 1,
+        tv_nsec: 0,
+    };
+    let received = unsafe {
+        libc::kevent(
+            queue.as_raw_fd(),
+            std::ptr::null(),
+            0,
+            &mut event,
+            1,
+            &timeout,
+        )
+    };
+    if received != 1
+        || event.ident != child.id() as usize
+        || event.filter != libc::EVFILT_PROC
+        || event.fflags & libc::NOTE_EXIT == 0
+        || event.flags & libc::EV_ERROR != 0
+    {
+        bail!("Owned decoder exit was not observed within the synthetic bound.");
+    }
+    // NOTE_EXIT can precede publication of waitable status. WNOWAIT preserves
+    // the owned zombie; readiness checks are bounded, not an arbitrary sleep.
+    let deadline = Instant::now() + Duration::from_millis(100);
+    loop {
+        let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+        if unsafe {
+            libc::waitid(
+                libc::P_PID,
+                child.id(),
+                &mut info,
+                libc::WEXITED | libc::WNOWAIT | libc::WNOHANG,
+            )
+        } != 0
+        {
+            bail!("Cannot inspect the owned decoder without reaping.");
+        }
+        if info.si_signo == libc::SIGCHLD {
+            if info.si_pid != child.id() as i32 {
+                bail!("Synthetic exit did not match the owned decoder.");
+            }
+            std::fs::write(gate.join("exit-observed.json"), serde_json::json!({
+                "pid":child.id(),"wait_code":info.si_code,"exit_status":info.si_status,"observed_without_reap":true,
+                "kill_zero":unsafe {libc::kill(child.id() as i32,0)}}).to_string())
+                .map_err(|_|anyhow!("Cannot record the synthetic decoder exit."))?;
+            return Ok(());
+        }
+        if Instant::now() >= deadline {
+            bail!("Owned decoder did not become waitable.");
+        }
+        std::thread::yield_now();
+    }
+}
+#[cfg(not(target_os = "macos"))]
+fn test_exit_before_memory(_child: &Child) -> Result<()> {
+    Ok(())
 }
 
 #[cfg(target_os = "macos")]
