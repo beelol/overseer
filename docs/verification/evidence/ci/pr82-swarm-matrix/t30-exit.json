@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "/private/tmp/overseer-closeout-integration-target/debug/deps/parity-bc42d0ed69cd56c7",
+    "--exact",
+    "t30_follow_in_the_review",
+    "--nocapture",
+    "--test-threads=1"
+  ],
+  "started_utc": "2026-10-03T17:28:20.149579+00:00",
+  "finished_utc": "2026-10-03T17:28:28.845471+00:00",
+  "exit_code": 0,
+  "nice": 20,
+  "isolated": true
+}

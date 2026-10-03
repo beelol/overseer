@@ -1,0 +1,21 @@
+{
+  "head": "abf572ef53705db0e8f8b32e72a46057661057fc",
+  "source_unchanged": true,
+  "artifacts_after": {
+    "/private/tmp/overseer-closeout-integration-target/debug/deps/parity-bc42d0ed69cd56c7": {
+      "sha256": "ba57d97444556378a8975042f6c7d17f80e165a66e7c02032c19c94d20a2e214",
+      "mtime_ns": 1791040522946826937
+    },
+    "/private/tmp/overseer-closeout-integration-target/debug/overseerd": {
+      "sha256": "de279cfca3664411d7cb6397f2c0a00e318ab5901ab5d1c88213fb37bc629d1a",
+      "mtime_ns": 1791048503637710587
+    },
+    "/private/tmp/overseer-closeout-integration-target/debug/overseer-tui": {
+      "sha256": "9f1ab0bc9e69ea71d10fe34722c6d5951b5c73ce2477670e2239e5f54efbbc03",
+      "mtime_ns": 1791042532329995820
+    }
+  },
+  "artifact_hashes_unchanged": false,
+  "artifact_mtimes_unchanged": false,
+  "required_helper": "Unchanged support invoked cargo build -q -p overseerd; no stub/patch."
+}

@@ -1,0 +1,7 @@
+
+running 1 test
+test t30_follow_in_the_review ... T-30 Follow latencies: [("a.txt", 107.886708ms), ("b.txt", 134.267416ms), ("c.txt", 148.598417ms)]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 8.57s
+
