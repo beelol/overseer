@@ -663,7 +663,7 @@ async fn ac269_mods_phone_reads_and_all_local_management_refused() {
     phone::enable(&d);
     let dir = tmp();
     let source_repo = repo(&dir.path().join("repo"));
-    let created = d.generic(&source_repo, "folder", "/usr/bin/true", &[]);
+    let created = d.generic(&source_repo, "worktree", "/usr/bin/true", &[]);
     let run = run_id(&created);
     d.wait_done(&run, 15);
     let preview = d.call("mods.preview", json!({"source":"bundled:clear-prose","operation":"install"}));
