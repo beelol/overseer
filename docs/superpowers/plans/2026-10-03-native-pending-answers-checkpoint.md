@@ -1,0 +1,44 @@
+# AC274 Task2 Slice2: baseline/implementation checkpoint design
+
+Source base: accepted Slice1 6376f7e (runtime correction7fde880), own codex/native-pending-lifecycle. Slice1 remains independently unshippable; this is the required typed answer boundary, not a bool-only workaround. No Cargo or runtime wiring in this checkpoint.
+
+Public proposed run.request.answer accepts only run_id, opaque request_key, current revision and a bounded tagged RequestAnswer. Native protocol/session/generation/IDs/offer/actor/surface are never authority fields. The Answer variants cover frozen decision, permission-profile+scope, questions with field-N selectors translated through the stored private question, Claude tool choices/native veto and bounded MCP form content/action. External accept stays unqualified; decline/cancel remains possible where the codec explicitly offers it. Machine/unknown/dialog frames remain private unavailable classifications. No answer bytes/native IDs/descriptors enter public results/events/device once cache.
+
+Receipt result reports written/definitely_unsent/uncertain, with lifecycle answered_awaiting_native/pending/uncertain. A successful write is not native resolution or protected operation success. First accepted claim owns the item; later callers receive its immutable disposition. Only definitely-unsent proof can restore the same still-live claim, and only a new explicit owner action sends again. No auto replay/reconstruction from digests.
+
+Trusted server RequestContext must distinguish authenticated local owner, authenticated gateway device ID and owner-confirmed GateS execution. Display ACTOR remains compatible but never validates device scope. Gateway passes the actual device identity from its authenticated Ctx; under the same Store lock as claim, recheck unrevoked current full scope. Watch/revoked device cannot borrow arbitrary params.by/surface. Confirm remains the new GateS method class; autonomous model attempts never confer confirmation. Existing voice yes/no may answer only exact bool-compatible opaque key+revision captured by its readback, never question/form/profile. Other permission/tool/voice classifications remain unchanged.
+
+Under process gate then Store transaction, load immutable private native_pending_requests row; validate run association, revision, fresh process generation, lifecycle and codec against full stored offer before atomically saving claim provenance, answer digest and random delivery token. No raw answer persisted. Generation native session comes from owning process row, never submitted metadata. Resolve a native child to its stored process owner; freeze that generation's private run dir/control socket, not today's control_socket reload.
+
+Lock audit before runtime: existing start_turn profile/workspace guards and Queue/Continuity task gate precede the proposed process gate; tails/answers take only process gate then Store; no Store→gate acquisition. spawn_process/reconciliation identity changes and observed settlement must honor the same process serialization boundary without reentrant acquisition. apply_lines must release process gate before post-transaction callbacks/learning/queue transitions. A received but unapplied cancellation cannot be called observed; tests gate actual application before answer or hold claim/send explicitly.
+
+Private shim request_reply adds expected generation to LaunchFile with compatible default for old files, but old generationless shims are explicitly unavailable for typed delivery. Per-token receipt state is persisted prepared before any pipe write and written after complete write/flush; one token+digest writes once, a changed digest refuses. Partial write/crash/lost ack leaves prepared/uncertain, never a replayable pending row. request_reply_status queries the receipt without data/resend. Use a bounded private receipt journal with no response bytes/public segment logging; never prune live/uncertain tokens. Errors and receipt query output are static allowlists. Legacy stdin remains its established transport path.
+
+Baseline fixture checkpoint starts with actual daemon socket + frozen installed-shape playback, not calls to claim helpers. Matrix expected responses come from committed native-vectors.json, not runtime encoder output. Questions replace native identities with field-0 in public submitted answers; expected native output retains the exact frozen native identity. New direct receipt fixture uses a real owned shim and recorded launch generation/control socket. Missing new API versus missing receipt op will be reported separately; no coverage inferred from test names or a first missing method failure.
+
+First authoring group: concurrent claims; seven-family frozen response matrix; wrong-family/revision/extra-authority no-write; permission scope widening/deny-entry removal; native suppression veto; structured request rejection by legacy bool; already-resolved no-send; authenticated full/watch/revoked device + forged actor; one exact receipt duplicate/digest/generation boundary. Source-ready tests remain UNEXECUTED until coordinator grants Cargo.
+
+Required follow-up gated fixtures before implementation acceptance: hold validated preclaim while device scope/revocation changes; hold claimed presend while native resolution/generation changes; authoritative not_written then explicit owner retry; partial-write then lost ack; daemon crash after durable claim and written/prepared receipt restart query proving no replay; competing full phone/local owner; secret question/form answer isolation through public events/raw RPC/error/device once-cache. These need explicit fixture-only bounded hooks/proxy, no store lock held while waiting. They must reach their actual assertions after the API is implemented; baseline missing API is not claimed as proof of these races. After baseline root review, author necessary hooks as tests first, then minimal product implementation. Slice3 still owns broader turn/child/process-loss cleanup; none of its obligations is removed.
+
+Future qualification: one exclusive target nice20 jobs1/threads1 unless coordinator changes allocation; exact filters/names/source freshness and nonzero count. Affected pending full file, protocol_shapes, gateway arbitration, answer_waiting, permission card, GateS/voice provenance and shim controls only. Full/UI/browser/native provider checks remain separately scheduled, no paid Claude.
+
+## Authored first baseline group (unexecuted)
+
+All12 cases are in daemon/tests/pending_requests.rs::slice2; no production answer/provenance/receipt code changed. Seven-family matrix uses frozen native-vectors responses and maps public question field-0 selectors to the exact expected native question identity. Direct shim case checks recorded generation/socket, one write per token, changed digest/wrong generation refusal and status query. The Claude synthetic protected-action witness now requires the Write updatedInput.file_path, so a legitimate AskUserQuestion answer cannot be misreported as a protected Write effect.
+
+1. competing_answer_claims_emit_one_exact_native_response
+2. frozen_typed_family_answers_reach_exact_native_transport
+3. wrong_family_revision_and_caller_authority_emit_no_response
+4. permission_profile_widening_and_deny_removal_cannot_claim
+5. persistent_native_veto_refuses_stale_always_but_allows_once
+6. structured_questions_and_forms_refuse_legacy_bool
+7. native_resolution_before_owner_answer_emits_no_response
+8. authenticated_full_watch_and_revoked_devices_do_not_borrow_actor_text
+9. secret_typed_answer_is_private_in_results_history_and_device_once_cache
+10. old_request_key_cannot_send_to_replacement_generation
+11. native_child_typed_answer_uses_parent_pipe_and_exact_native_id
+12. exact_receipt_token_writes_once_and_refuses_changed_digest_or_generation
+
+The device test currently proves authenticated full/watch route distinction, forged actor rejection, actual full-device attribution and revocation disconnect; the held-before-claim revocation/scope race remains in the required gated follow-up group. Resolution/generation cases currently apply the actual native event/replacement before owner submission; held-after-claim races likewise remain required. This is not a complete Slice2 baseline/final qualification and cannot be interpreted as finished provenance/ambiguous receipt coverage.
+
+Static checks only: rustfmt parser output to a private temporary file, node --check of the fixture, and git diff --check. No Cargo, no RED claim. Future baseline filter is cargo test -p overseerd --test pending_requests slice2:: -- --nocapture, expected12 tests, after explicit coordinator allocation/source freshness. Missing API/receipt operation failures must be classified separately from actual race/authority assertions.

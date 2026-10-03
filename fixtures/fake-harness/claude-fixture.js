@@ -100,7 +100,7 @@ let waiting;
 // FIXTURE_STDIN_LOG_DIR: every line Overseer sends is appended to <dir>/<worktree name>.log, so a
 // test can count what really reached the harness (one answer per permission request).
 const stdinLog = process.env.FIXTURE_STDIN_LOG_DIR && path.join(process.env.FIXTURE_STDIN_LOG_DIR, path.basename(process.cwd()) + '.log');
-rl.on('line', l => { if (mode === 'native-pending') { try { const response = JSON.parse(l); if (response.type === 'control_response' && response.response?.response?.behavior === 'allow') fs.writeFileSync(path.join(process.cwd(), 'protected-action.txt'), 'native approval received\n'); } catch {} } if (stdinLog) { try { fs.appendFileSync(stdinLog, l + '\n'); } catch {} } let m; try { m = JSON.parse(l); } catch { return; } lines.push(m); if (waiting) waiting(); });
+rl.on('line', l => { if (mode === 'native-pending') { try { const response = JSON.parse(l); if (response.type === 'control_response' && response.response?.response?.behavior === 'allow' && response.response?.response?.updatedInput?.file_path) fs.writeFileSync(path.join(process.cwd(), 'protected-action.txt'), 'native approval received\n'); } catch {} } if (stdinLog) { try { fs.appendFileSync(stdinLog, l + '\n'); } catch {} } let m; try { m = JSON.parse(l); } catch { return; } lines.push(m); if (waiting) waiting(); });
 const next = pred => new Promise(resolve => { const check = () => { const i = lines.findIndex(pred); if (i >= 0) { const [m] = lines.splice(i, 1); waiting = undefined; resolve(m); } }; waiting = check; check(); });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
