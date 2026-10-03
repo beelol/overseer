@@ -398,8 +398,8 @@ export interface PendingQuestionField {
   key: string;
   header: string;
   question: string;
-  secret: boolean;
   options: Array<PendingQuestionOption>;
+  secret_input: boolean;
 }
 
 export interface PendingQuestionRequest {

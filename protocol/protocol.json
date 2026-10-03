@@ -364,8 +364,8 @@
       "key": "string",
       "header": "string",
       "question": "string",
-      "secret": "boolean",
-      "options": "PendingQuestionOption[]"
+      "options": "PendingQuestionOption[]",
+      "secret_input": "boolean"
     },
     "PendingQuestionRequest": {
       "key": "string",

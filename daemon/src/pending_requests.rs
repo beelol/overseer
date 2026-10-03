@@ -507,7 +507,7 @@ fn projection(request: &NativeRequest, run: &Run, display: &str, key: &str) -> V
             let options: Vec<Value> = q["options"].as_array().into_iter().flatten().map(|o|
                 json!({"label":o["label"].as_str().unwrap_or(""),"description":o["description"].as_str().unwrap_or("")})).collect();
             json!({"key":format!("field-{n}"),"header":q["header"].as_str().unwrap_or(""),
-                "question":q["question"].as_str().unwrap_or(""),"secret":secret,"options":options})
+                "question":q["question"].as_str().unwrap_or(""),"secret_input":secret,"options":options})
         }).collect();
         public["questions"] = json!(questions);
     }

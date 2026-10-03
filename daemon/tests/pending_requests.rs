@@ -537,3 +537,41 @@ fn unknown_dialog_does_not_fabricate_cancel() {
     );
     s.no_protected_action();
 }
+
+/// A private copy of the daemon executable supplies a real exec failure after
+/// generation 1 is durably recorded. Never rename a shared Cargo/owner binary.
+#[test]
+fn failed_recorded_supervisor_launch_settles_child_and_releases_claim() {
+    let scratch = tmp();
+    let checkout = repo(&scratch.path().join("source"));
+    let fixture = repo_root().join("fixtures/fake-harness/codex-app-fixture.js");
+    let mut d = Daemon::start(&[
+        ("OVERSEER_CODEX_PATH", fixture.to_str().unwrap()),
+        ("FIXTURE_MODE", "managed-models"),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+    ]);
+    let parent = run_id(&d.call("task.create", json!({"repo":checkout,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"synthetic discovery"})));
+    assert_eq!(d.wait_done(&parent,15)["status"],"completed");
+    d.kill9();
+    let executable = scratch.path().join("private-daemon-copy");
+    std::fs::copy(BIN,&executable).unwrap();
+    d.spawn_from(&executable);
+    std::fs::rename(&executable,scratch.path().join("retired-private-daemon-copy")).unwrap();
+    assert!(!executable.exists());
+    let result = d.call("auto.dispatch",json!({"work_unit_id":"native-collection-launch-failure",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],"prompt":"synthetic failed launch"}));
+    assert_eq!(result["state"],"paused","launch failure is returned honestly: {result}");
+    let child = d.runs().into_iter().find(|r|r["parent_run_id"] == parent).unwrap();
+    assert_eq!(child["process_generation"],1,"the pre-spawn identity was durably advanced");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let run_id = child["id"].as_str().unwrap();
+    let dir: Option<String> = db.query_row("SELECT run_dir FROM runs WHERE id=?1",[run_id],|r|r.get(0)).unwrap();
+    assert!(dir.is_none(),"failed exec has no recorded supervisor");
+    assert!(!d.home.path().join("runs").join(run_id).join("p1/shim.json").exists());
+    assert_eq!(child["status"],"failed","trusted launch failure must settle the advanced generation");
+    assert!(child["ended_ms"].is_number());
+    let claim: String = db.query_row("SELECT state FROM auto_pool_claims WHERE work_unit_id='native-collection-launch-failure'",[],|r|r.get(0)).unwrap();
+    assert_eq!(claim,"released","no supervisor consumed the reserved allowance");
+    assert!(d.events(run_id).iter().any(|e|e["kind"] == "status" && e["payload"]["status"] == "failed"));
+}

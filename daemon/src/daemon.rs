@@ -1579,7 +1579,7 @@ impl Daemon {
                         current.process_generation, PathBuf::from(dir));
                 }
             } else {
-                self.mark_ended(&run, "failed", &format!("delegated launch failed: {error}"))?;
+                self.mark_failed_unstarted(&run, &format!("delegated launch failed: {error}"))?;
             }
             return Ok(json!({"work_unit_id":work_unit_id,"run":self.run(&run.id)?,"workspace":ws,"launch_error":error.to_string()}));
         }
@@ -1759,7 +1759,12 @@ impl Daemon {
             json!({"source_run_id":source.id,"checkpoint_snapshot_id":snapshot.id,
                 "context_loss":"native session and tool messages not transferred"}))?;
         if let Err(error) = self.start_turn(&run.id, &prompt, false, &TurnOpts::default()) {
-            self.mark_ended(&run, "failed", &format!("handoff launch failed: {error}"))?;
+            if self.store.lock().unwrap().run_process(&run.id)?.is_some() {
+                // An error after spawn is not proof the supervisor failed.
+                self.spawn_tail(&run.id);
+            } else {
+                self.mark_failed_unstarted(&run, &format!("handoff launch failed: {error}"))?;
+            }
             return Ok(json!({"run":self.run(&run.id)?,"workspace":workspace,
                 "snapshot_id":snapshot.id,"launch_error":error.to_string()}));
         }
@@ -3370,20 +3375,40 @@ impl Daemon {
     }
 
     pub(crate) fn mark_ended(&self, run: &Run, status: &str, reason: &str) -> Result<()> {
+        self.mark_ended_checked(run, status, reason, false)
+    }
+
+    /// Only trusted start_turn failure callers use this entry. A pre-recorded
+    /// generation may have advanced before exec failed, leaving no supervisor.
+    /// This does not let a stale observed tail rebind itself to a newer process.
+    fn mark_failed_unstarted(&self, run: &Run, reason: &str) -> Result<()> {
+        self.mark_ended_checked(run, "failed", reason, true)
+    }
+
+    fn mark_ended_checked(&self, run: &Run, status: &str, reason: &str, failed_unstarted: bool) -> Result<()> {
         let mut emitted = Vec::new();
         // Every other end status comes after an exit record or before any
         // supervisor; a lost supervisor may leave its harness running.
         let process_gone = status != "disconnected" || self.run_processes_gone(&run.id);
         {
             let store = self.store.lock().unwrap();
-            if !store.run(&run.id)?.is_some_and(|r| r.process_generation == run.process_generation) {
+            let Some(current) = store.run(&run.id)? else { return Ok(()) };
+            let no_process = store.run_process(&run.id)?.is_none();
+            let failed_launch = failed_unstarted && status == "failed" && no_process
+                && (current.process_generation == run.process_generation
+                    || run.process_generation.checked_add(1) == Some(current.process_generation));
+            if (failed_unstarted && !failed_launch)
+                || (!failed_launch && current.process_generation != run.process_generation) {
                 return Ok(());
             }
+            // This fresh row is used only after the trusted failed-launch proof.
+            // Every ordinary observation still requires its exact generation.
+            let settled_run = if failed_launch { &current } else { run };
             store.conn.execute_batch("SAVEPOINT settle_run")?;
             let settled = (|| -> Result<()> {
                 let ended = now();
                 store.update_run_status(&run.id, status, Some(reason), Some(ended))?;
-                crate::pending_requests::retire(&store, run, process_gone, &mut emitted)?;
+                crate::pending_requests::retire(&store, settled_run, process_gone, &mut emitted)?;
                 store.set_run_attention(&run.id, None)?;
                 let turn_status = if status == "completed" { "completed" } else { status };
                 store.finish_open_turns(&run.id, turn_status, ended)?;
@@ -4121,4 +4146,168 @@ pub fn codex_identity(auth: &Path) -> Option<Value> {
         "auth_mode": data["auth_mode"].clone(),
         "has_api_key": data["OPENAI_API_KEY"].as_str().map(|k| !k.is_empty()).unwrap_or(false),
     }))
+}
+
+#[cfg(test)]
+mod native_pending_generation_tests {
+    use super::*;
+    struct LiveFixtureCleanup { daemon:Arc<Daemon>, run_id:String, directory:PathBuf }
+    impl Drop for LiveFixtureCleanup {
+        fn drop(&mut self) {
+            let _ = self.daemon.interrupt(&self.run_id);
+            let deadline = std::time::Instant::now()+std::time::Duration::from_secs(5);
+            while self.daemon.tails.lock().unwrap().contains(&self.run_id) && std::time::Instant::now()<deadline {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            if let Ok(bytes) = std::fs::read(self.directory.join("shim.json")) {
+                if let Ok(info) = serde_json::from_slice::<ShimInfo>(&bytes) {
+                    // These IDs came only from this test's private p3 shim.
+                    if info.child_pid > 1 && pid_alive(info.child_pid) { unsafe { libc::kill(-(info.child_pid as i32),libc::SIGKILL); } }
+                    if info.shim_pid > 1 && pid_alive(info.shim_pid) { unsafe { libc::kill(info.shim_pid as i32,libc::SIGKILL); } }
+                }
+            }
+            let deadline = std::time::Instant::now()+std::time::Duration::from_secs(5);
+            while self.daemon.tails.lock().unwrap().contains(&self.run_id) && std::time::Instant::now()<deadline {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+        }
+    }
+
+    /// Invoke the actual settlement boundary with an old observation. Even when
+    /// generation 2 has no pipe, only its trusted failed-launch entry may settle
+    /// it; old exit/loss/failed observations cannot clear its turn or attention.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    async fn stale_observed_generation_cannot_settle_or_clear_successor() {
+        const NAME: &str = "daemon::native_pending_generation_tests::stale_observed_generation_cannot_settle_or_clear_successor";
+        if let Some(dir) = std::env::var_os("OVERSEER_NATIVE_PENDING_TEST_SHIM_DIR") {
+            shim::run(PathBuf::from(dir)).unwrap();
+            return;
+        }
+        let scratch = tempfile::tempdir().unwrap();
+        if std::env::var("OVERSEER_NATIVE_PENDING_TEST_CHILD").as_deref() != Ok("1") {
+            use std::os::unix::process::CommandExt;
+            let mut child = std::process::Command::new(std::env::current_exe().unwrap());
+            child.args(["--exact",NAME,"--nocapture"]).env_clear()
+                .env("PATH","/usr/bin:/bin:/usr/sbin:/sbin")
+                .env("OVERSEER_NATIVE_PENDING_TEST_CHILD","1")
+                .env("RUST_TEST_THREADS","1").process_group(0);
+            for key in ["HOME","OVERSEER_HOME","OVERSEER_TEST_SYSTEM_HOME","CODEX_HOME","CLAUDE_CONFIG_DIR"] {
+                child.env(key,scratch.path());
+            }
+            for key in ["OVERSEER_CODEX_PATH","OVERSEER_CLAUDE_PATH","OVERSEER_OPENCODE_PATH"] {
+                child.env(key,"/nonexistent/native-fixture-harness");
+            }
+            let output_path = scratch.path().join("isolated-fixture-output.log");
+            let output = std::fs::File::create(&output_path).unwrap();
+            child.stdout(std::process::Stdio::from(output.try_clone().unwrap()))
+                .stderr(std::process::Stdio::from(output));
+            let mut child = child.spawn().unwrap();
+            let deadline = std::time::Instant::now()+std::time::Duration::from_secs(45);
+            loop {
+                if let Some(status) = child.try_wait().unwrap() {
+                    if !status.success() {
+                        use std::io::Read;
+                        let mut detail = String::new();
+                        std::fs::File::open(&output_path).unwrap().take(65_536).read_to_string(&mut detail).unwrap();
+                        panic!("isolated stale-observer fixture failed: {status}\n{detail}");
+                    }
+                    return;
+                }
+                if std::time::Instant::now() >= deadline {
+                    unsafe { libc::kill(-(child.id() as i32),libc::SIGKILL); }
+                    let _ = child.wait();
+                    panic!("isolated stale-observer fixture exceeded 45 seconds");
+                }
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+        }
+        let mut daemon = Daemon::open().unwrap();
+        // Run the compiled production shim entry through this unit binary in a
+        // separate process. No standalone executable or hidden env is required.
+        let wrapper = scratch.path().join("private-shim");
+        let executable = std::env::current_exe().unwrap().display().to_string().replace("'","'\"'\"'");
+        std::fs::write(&wrapper,format!("#!/bin/sh\nOVERSEER_NATIVE_PENDING_TEST_SHIM_DIR=\"$2\" exec '{executable}' --exact '{NAME}' --nocapture\n")).unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&wrapper,std::fs::Permissions::from_mode(0o700)).unwrap();
+        Arc::get_mut(&mut daemon).unwrap().exe = wrapper;
+        let workspace = Workspace { id:"native-w".into(),path:scratch.path().join("worktree").display().to_string(),
+            repo_root:scratch.path().display().to_string(),common_dir:scratch.path().join(".git").display().to_string(),
+            kind:"worktree".into(),branch:None,owner_run_id:Some("native-r".into()),initial_dirty:json!({"clean":true}),created_ms:1,removed_ms:None };
+        let task = Task { id:"native-t".into(),title:"Fixture".into(),prompt:"Fixture".into(),repo_root:workspace.repo_root.clone(),
+            target_ref:None,workspace_id:workspace.id.clone(),start_snapshot:None,fork_commit:None,fork_provenance:None,created_ms:1,archived_ms:None };
+        let run = Run { id:"native-r".into(),task_id:task.id.clone(),parent_run_id:None,harness:"generic".into(),harness_version:None,
+            profile_id:None,model:None,effort:None,workspace_id:workspace.id.clone(),native_id:None,status:"waiting_for_user".into(),
+            exit_reason:None,created_ms:1,ended_ms:None,title:task.title.clone(),relation_source:None,relation_confidence:None,capabilities:json!({}),
+            process_generation:2,attention:Some(json!({"kind":"permission","request_id":"req-current","typed_native":true,"input":{}})) };
+        let turn = Turn { id:"native-turn-2".into(),run_id:run.id.clone(),n:2,prompt:"Current turn".into(),snapshot_id:None,
+            started_ms:2,ended_ms:None,status:"running".into() };
+        let cursor = {
+            let store = daemon.store.lock().unwrap();
+            store.insert_workspace(&workspace).unwrap(); store.insert_task(&task).unwrap();
+            store.insert_run(&run).unwrap(); store.set_run_attention(&run.id,run.attention.as_ref()).unwrap();
+            store.insert_turn(&turn).unwrap(); store.max_seq().unwrap()
+        };
+        let mut old = run.clone(); old.process_generation = 1;
+        for status in ["completed","failed","disconnected"] {
+            daemon.mark_ended(&old,status,"stale observed exit").unwrap();
+        }
+        let mut unrelated = old.clone(); unrelated.process_generation = 0;
+        daemon.mark_failed_unstarted(&unrelated,"not the immediately attempted generation").unwrap();
+        {
+            let store = daemon.store.lock().unwrap();
+            let current = store.run(&run.id).unwrap().unwrap();
+            assert_eq!(current.status,run.status); assert_eq!(current.attention,run.attention);
+            assert_eq!(current.process_generation,2); assert!(current.ended_ms.is_none());
+            assert_eq!(store.turns(&run.id).unwrap()[0].status,"running");
+            assert_eq!(store.workspace(&workspace.id).unwrap().unwrap().owner_run_id,workspace.owner_run_id);
+            assert_eq!(store.max_seq().unwrap(),cursor,"stale observation must emit no settlement");
+        }
+        // The trusted exception also refuses an actually recorded successor pipe.
+        {
+            let store = daemon.store.lock().unwrap();
+            store.conn.execute("UPDATE runs SET run_dir=?2 WHERE id=?1",rusqlite::params![run.id,scratch.path().join("p2").display().to_string()]).unwrap();
+        }
+        daemon.mark_failed_unstarted(&old,"a newer supervisor may exist").unwrap();
+        assert_eq!(daemon.run(&run.id).unwrap().status,"waiting_for_user");
+
+        // Now prove the same boundary against a real, live replacement shim
+        // and credential-free generic process, not just a recorded pipe value.
+        std::fs::create_dir_all(&workspace.path).unwrap();
+        let current = daemon.run(&run.id).unwrap();
+        let launch = adapters::Launch { program:"/bin/sleep".into(),args:vec!["30".into()],
+            env:BTreeMap::new(),initial_stdin:None,close_stdin:true };
+        daemon.spawn_process(&current,&workspace,launch,json!({})).unwrap();
+        let cleanup = LiveFixtureCleanup { daemon:daemon.clone(), run_id:run.id.clone(),
+            directory:paths::runs_dir().join(&run.id).join("p3") };
+        let deadline = std::time::Instant::now()+std::time::Duration::from_secs(10);
+        loop {
+            let alive = std::fs::read(cleanup.directory.join("shim.json")).ok()
+                .and_then(|s|serde_json::from_slice::<ShimInfo>(&s).ok())
+                .is_some_and(|info|pid_alive(info.shim_pid) && pid_alive(info.child_pid));
+            if alive && daemon.run(&run.id).unwrap().status == "running" { break; }
+            assert!(std::time::Instant::now()<deadline,"replacement fixture did not become live");
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        {
+            let store = daemon.store.lock().unwrap();
+            store.set_run_attention(&run.id,run.attention.as_ref()).unwrap();
+            store.update_run_status(&run.id,"waiting_for_user",None,None).unwrap();
+        }
+        let live = daemon.run(&run.id).unwrap();
+        assert_eq!(live.process_generation,3);
+        for status in ["completed","failed","disconnected"] {
+            daemon.mark_ended(&current,status,"old observation while replacement lives").unwrap();
+        }
+        daemon.mark_failed_unstarted(&current,"not unstarted; replacement is live").unwrap();
+        let after = daemon.run(&run.id).unwrap();
+        assert_eq!(after.status,live.status); assert_eq!(after.attention,live.attention);
+        assert!(after.ended_ms.is_none());
+        assert_eq!(daemon.store.lock().unwrap().turns(&run.id).unwrap()[0].status,"running");
+        let info: ShimInfo = serde_json::from_slice(&std::fs::read(cleanup.directory.join("shim.json")).unwrap()).unwrap();
+        assert!(pid_alive(info.shim_pid) && pid_alive(info.child_pid),"stale observation leaves replacement live");
+        drop(cleanup); // Stops this exact fixture group and waits for its tail.
+        assert!(!pid_alive(info.shim_pid) && !pid_alive(info.child_pid));
+        assert!(!daemon.tails.lock().unwrap().contains(&run.id));
+        drop(daemon);
+    }
 }
