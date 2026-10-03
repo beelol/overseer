@@ -1,0 +1,35 @@
+{
+  "raw_receipt_sha256": "7a0b0d73c89ddd093e8588120b6d4ffd2aabaaefba1f8db5c916b28075e9708d",
+  "receipt_omissions": [
+    "baseline_pids"
+  ],
+  "file_omissions": [
+    "process-baseline.stdout.log",
+    "process-baseline.stderr.log"
+  ],
+  "files": {
+    "audio_packs-09.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "audio_packs-09.stdout.log": "64d149f21b2089165d8717a02c9c5dad82c391e07374a9a8abcd126e02e0a532",
+    "audio_packs-16.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "audio_packs-16.stdout.log": "2b9cd6ad126a372eacb71b3874fdb22d44194f01b10ed5e6343dc0beb37388a5",
+    "audio_packs-17.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "audio_packs-17.stdout.log": "29b82e148a37e453f313e26eb71f5cc437254735f21e18bc2faded1bb088d831",
+    "audio_packs-18.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "audio_packs-18.stdout.log": "8cf2cf17e56cef0eed8d4af5b007529a0d177633a9d9ba311335c54472bd40c9",
+    "audio_packs-19.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "audio_packs-19.stdout.log": "28ba8e5d25422706a4a0c84c0d6945a0028f5421f915350474cdeadb706238cd",
+    "audio_packs-inventory.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "audio_packs-inventory.stdout.log": "0eb46dc1a87f8f22e9f129d4e382fda850e7c9c7aeba89907c0d074880156481",
+    "audio_packs.d": "5d53d305066d81e9ce1c633950deac572f4137247eea88d5077252aa94467420",
+    "build.stderr.log": "0993304658221bb44903940ceb1e99cec6be83b73fecfe8f5d793183d12e11f6",
+    "build.stdout.log": "bb2993d33af759a802ed6c4a7e2c278e74361ab21b59912df076e095782b2bc2",
+    "cleanup.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cleanup.stdout.log": "78a258d915a1a2717750541aca372b6fabbe1d5d5359802144fbd6429811f52e",
+    "no-run.stderr.log": "f2fa448d51b6db0bbd0b1bf978c7dd5b461d2d0f5ba901509b43aadb214a8dc6",
+    "no-run.stdout.log": "5238cbafb45a5faa07202810e2074fc039d490cdd7f6ef9f476c8f9efa9529e9",
+    "overseerd.d": "77313fc5788b07fd4e1821b1ebc9f41450c76813e4539f3faa0e15d4526b5f29",
+    "package-clean.stderr.log": "0e29d6b245d512d5d28df7f3b209317e5a617b608345aa86427ff99a77478ee8",
+    "package-clean.stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "receipt.json": "abde94079ef502b2d0058531354ee3474a085486740a284127a390f113083a88"
+  }
+}

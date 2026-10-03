@@ -1,0 +1,146 @@
+{
+  "source": "247e5052150e63d6011c2f8b802c655e52187a30",
+  "stages": {
+    "process-baseline": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.073
+    },
+    "package-clean": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 5.54
+    },
+    "build": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 21.195
+    },
+    "no-run": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 22.349
+    },
+    "audio_packs-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.28
+    },
+    "audio_packs-09": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.657
+    },
+    "audio_packs-16": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.42
+    },
+    "audio_packs-17": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.146
+    },
+    "audio_packs-18": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.135
+    },
+    "audio_packs-19": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.126
+    },
+    "cleanup": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.392
+    }
+  },
+  "artifacts": [
+    {
+      "name": "overseerd",
+      "source": "/private/tmp/overseer-audio-decode-exit-20261003/daemon/src/main.rs",
+      "source_sha256": "bae529078887e73338dc261d043bd76c030586f9f837916e4101a80c0232296e",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+      "sha256": "7edf5c42c0ffc4c092ad48252c6fa23eae42834934a1f20a8d7790eed3d60df8",
+      "fresh": false,
+      "dependency_sha256": "77313fc5788b07fd4e1821b1ebc9f41450c76813e4539f3faa0e15d4526b5f29"
+    },
+    {
+      "name": "audio_packs",
+      "source": "/private/tmp/overseer-audio-decode-exit-20261003/daemon/tests/audio_packs.rs",
+      "source_sha256": "ae4fb94f4adaf833e5ea19accba6e2d5d4a09434ca963df77b3a0e133df5723f",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/audio_packs-9d3e5ea0364da7b5",
+      "sha256": "06d98e747e0d1aea53efac1b0b207b95e12a594b4a69b8e44018014e9af4de9c",
+      "fresh": false,
+      "dependency_sha256": "5d53d305066d81e9ce1c633950deac572f4137247eea88d5077252aa94467420"
+    }
+  ],
+  "tests": [
+    {
+      "target": "audio_packs",
+      "name": "truncated_wav_and_non_decodable_mp3_refuse_without_committing_selection",
+      "code": 0
+    },
+    {
+      "target": "audio_packs",
+      "name": "successful_decoder_exit_between_wait_and_memory_check_keeps_valid_selection",
+      "code": 0
+    },
+    {
+      "target": "audio_packs",
+      "name": "exited_decoder_with_malformed_stdout_still_refuses_unchanged_source",
+      "code": 0
+    },
+    {
+      "target": "audio_packs",
+      "name": "genuinely_failed_decoder_exit_still_refuses_unchanged_source",
+      "code": 0
+    },
+    {
+      "target": "audio_packs",
+      "name": "live_held_decoder_with_injected_unreadable_memory_still_refuses",
+      "code": 0
+    }
+  ],
+  "allocation": "after_full_cleanup",
+  "since_ms": 1791058676900,
+  "cleanup_counts": {
+    "ours": 0,
+    "others": 0
+  }
+}
