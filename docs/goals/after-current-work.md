@@ -15,7 +15,7 @@ A very good-looking public page for Overseer, built by its own agent.
 
 ## 2. Mods
 
-Build the mods feature (`docs/rfcs/mods.md`, "The chosen approach") with its own agent: turn the draft into agreed criteria on main first, then build it criterion by criterion.
+The owner pulled Mods development forward on 2026-10-02 and authorized autonomous implementation. Build AC-266–273 from the chosen approach and the reviewed Phase 1 plan, criterion by criterion on `codex/mods-bundles`: Clear prose/library first, then qualified Less tool noise adapters. No new planning approval is required; product install/code confirmations still apply.
 
 ## Usage telemetry (queued by the owner, 2026-09-28)
 
