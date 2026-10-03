@@ -7,6 +7,10 @@ use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+// AC274 Task1 codec is deliberately not connected to the legacy attention path.
+#[allow(dead_code)]
+pub mod native_requests;
+
 pub const PARSER_VERSION: &str = "2026-09-24.1";
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1581,8 +1585,8 @@ mod always_allow_tests {
     }
 }
 
-// Baseline behavioral probes use the pre-Task1 adapter boundary. After recorded RED,
-// retain the same frozen native inputs/responses when moving these to the typed codec.
+// Baseline RED used the legacy boundary (four failures, one control). These same
+// frozen inputs/expected responses now exercise the deliberately unconnected codec.
 #[cfg(test)]
 mod ac274_native_vectors {
     use super::*;
@@ -1592,23 +1596,30 @@ mod ac274_native_vectors {
         all.into_iter().find(|case| case["name"] == name).unwrap()
     }
 
-    fn current_reply(case: &Value, allow: bool, session: bool) -> Value {
-        let request = &case["request"];
-        let norms = parse_codex_app(request);
-        let Some(Norm::Permission { request_id, input, always, .. }) = norms.first() else {
-            panic!("native fixture did not reach the current adapter: {norms:?}");
+    fn typed_reply(case: &Value) -> Result<Value, native_requests::CodecError> {
+        use native_requests::*;
+        let protocol = match case["harness"].as_str().unwrap() {
+            "codex-app" => Protocol::Codex0158, "claude" => Protocol::Claude21288, _ => return Err(CodecError::Unsupported),
         };
-        serde_json::from_str(permission_reply_always("codex-app", request_id, allow, input,
-            "Owner declined", if session { always.as_ref() } else { None }).unwrap().trim()).unwrap()
+        let message = decode(protocol, &case["request"])?;
+        match message {
+            NativeMessage::Owner(request) => {
+                let answer: Answer = serde_json::from_value(case["answer"].clone()).map_err(|_|CodecError::WrongAnswer)?;
+                encode(&request, request.context(), &answer)
+            }
+            NativeMessage::Machine { .. } => Err(CodecError::Machine),
+            NativeMessage::Unsupported(_) => Err(CodecError::Unsupported),
+            NativeMessage::Resolved { .. } => Err(CodecError::WrongAnswer),
+        }
     }
 
     #[test]
     fn ac274_legacy_decisions_match_the_installed_method_schema() {
         // Aliasing legacy methods to v2 accept/decline silently emits the wrong protocol.
         for method in ["execCommandApproval", "applyPatchApproval"] {
-            for (choice, allow, session) in [("allow", true, false), ("deny", false, false)] {
+            for choice in ["allow", "deny"] {
                 let case = vector(&format!("legacy_{method}_{choice}"));
-                assert_eq!(current_reply(&case, allow, session), case["response"], "{}", case["name"]);
+                assert_eq!(typed_reply(&case).unwrap(), case["response"], "{}", case["name"]);
             }
         }
     }
@@ -1617,7 +1628,7 @@ mod ac274_native_vectors {
     fn ac274_permission_grant_has_required_profile_and_explicit_scope() {
         // A generic decision object is never a granted-permissions response.
         let case = vector("permissions_turn");
-        let response = current_reply(&case, true, false);
+        let response = typed_reply(&case).unwrap();
         assert_eq!(response, case["response"], "required permissions/scope were lost");
     }
 
@@ -1626,12 +1637,8 @@ mod ac274_native_vectors {
         // Fractional, bool, aggregate and unsigned-over-int64 IDs cannot acquire authority.
         let all: Vec<Value> = serde_json::from_str(include_str!("../../fixtures/transcripts/ac274/native-vectors.json")).unwrap();
         for case in all.iter().filter(|case| case["reject"] == "invalid_native_id") {
-            let norms = parse_codex_app(&case["request"]);
-            assert!(!norms.iter().any(|norm| matches!(norm, Norm::Permission { .. })),
-                "malformed native id became an answerable permission: {} {norms:?}", case["name"]);
-            assert!(!norms.iter().any(|norm| matches!(norm, Norm::Send(line) if
-                serde_json::from_str::<Value>(line).ok().is_some_and(|reply| reply.get("result").is_some()))),
-                "malformed id emitted success: {}", case["name"]);
+            assert!(matches!(native_requests::decode(native_requests::Protocol::Codex0158, &case["request"]),
+                Err(native_requests::CodecError::InvalidId)), "invalid native identity: {}", case["name"]);
         }
     }
 
@@ -1639,9 +1646,7 @@ mod ac274_native_vectors {
     fn ac274_command_offer_does_not_invent_session_authority() {
         // Only native offered choices can authorize session policy; a display label is not an offer.
         let case = vector("unoffered_acceptForSession");
-        let norms = parse_codex_app(&case["request"]);
-        assert!(matches!(norms.first(), Some(Norm::Permission { always: None, .. })),
-            "native decline-only request was given a persistent approval: {norms:?}");
+        assert_eq!(typed_reply(&case), Err(native_requests::CodecError::Unoffered));
     }
 
     #[test]
@@ -1651,7 +1656,122 @@ mod ac274_native_vectors {
         assert_ne!(integer["request"]["id"], string["request"]["id"]);
         for name in ["raw_id_integer_7", "raw_id_string_7", "raw_id_-9223372036854775808", "raw_id_9223372036854775807"] {
             let case = vector(name);
-            assert_eq!(current_reply(&case, true, false)["id"], case["request"]["id"]);
+            assert_eq!(typed_reply(&case).unwrap()["id"], case["request"]["id"]);
         }
     }
+    #[test]
+    fn ac274_every_frozen_vector_has_exact_native_response_or_no_success() {
+        use native_requests::*;
+        let cases: Vec<Value> = serde_json::from_str(include_str!("../../fixtures/transcripts/ac274/native-vectors.json")).unwrap();
+        assert_eq!(cases.len(), 102);
+        let mut responses = 0;
+        for case in cases {
+            if case.get("answer").is_none() {
+                let protocol = if case["harness"] == "claude" {Protocol::Claude21288} else {Protocol::Codex0158};
+                assert!(matches!(decode(protocol, &case["request"]),Ok(NativeMessage::Resolved { .. })),"{}",case["name"]);
+            } else if case.get("reject").is_some() {
+                assert!(typed_reply(&case).is_err(),"refused vector emitted success: {}",case["name"]);
+            } else {
+                assert_eq!(typed_reply(&case).unwrap_or_else(|e|panic!("{}: {e:?}",case["name"])),case["response"],"{}",case["name"]);
+                responses += 1;
+            }
+        }
+        assert_eq!(responses, 59);
+    }
+
+    #[test]
+    fn ac274_private_envelopes_preserve_context_without_debugging_secrets() {
+        use native_requests::*;
+        let mut case = vector("claude_allow_once");
+        case["request"]["request"]["input"]["content"] = json!("opaque-secret-fixture");
+        let message = decode(Protocol::Claude21288,&case["request"]).unwrap();
+        assert!(!format!("{message:?}").contains("opaque-secret-fixture"));
+        let NativeMessage::Owner(request) = message else {panic!("not owner request")};
+        assert_eq!(request.envelope(), &case["request"]);
+        assert!(request.default_to_no());
+        assert_eq!(request.context().tool_use.as_deref(),Some("tool-fixture"));
+        let mut other=request.context().clone();other.turn=Some("other-turn".into());
+        let answer:Answer=serde_json::from_value(case["answer"].clone()).unwrap();
+        assert_eq!(encode(&request,&other,&answer),Err(CodecError::StaleContext));
+        let command=vector("command_network_accept");
+        let NativeMessage::Owner(command)=decode(Protocol::Codex0158,&command["request"]).unwrap() else {panic!("not command")};
+        assert_eq!(command.context().approval.as_deref(),Some("approval-network"));
+        assert_eq!(command.context().environment.as_deref(),Some("environment-fixture"));
+    }
+
+    #[test]
+    fn ac274_native_families_and_machine_requests_remain_distinct() {
+        use native_requests::*;
+        let cases:Vec<Value>=serde_json::from_str(include_str!("../../fixtures/transcripts/ac274/native-vectors.json")).unwrap();
+        for case in cases.iter().filter(|case|case.get("request_schema").is_some() || case["harness"]=="claude") {
+            let protocol=if case["harness"]=="claude" {Protocol::Claude21288} else {Protocol::Codex0158};
+            let message=decode(protocol,&case["request"]).unwrap_or_else(|e|panic!("{}: {e:?}",case["name"]));
+            match message {
+                NativeMessage::Owner(request)=>{
+                    let family=match case["family"].as_str().unwrap() {
+                        "legacy_command"=>Family::LegacyCommand,"legacy_file"=>Family::LegacyFile,"command"=>Family::Command,
+                        "file"=>Family::File,"permissions"=>Family::Permissions,"questions"=>Family::Questions,"tool"=>Family::Tool,
+                        "elicitation"=>{
+                            let p=if protocol==Protocol::Codex0158 {&case["request"]["params"]} else {&case["request"]["request"]};
+                            match p["mode"].as_str().unwrap(){"form"=>Family::Form,"url"=>Family::Url,"openai/userVerification"=>Family::Verification,
+                                "openai/form"|"openaiForm"=>Family::ExternalForm,other=>panic!("unknown {other}")}
+                        },other=>panic!("wrong owner family {other}")
+                    };
+                    assert_eq!(request.family(),family,"{}",case["name"]);
+                    assert_eq!(request.envelope(),&case["request"]);
+                }
+                NativeMessage::Machine {request,..}=>{
+                    assert_eq!(case["family"],"machine");assert_eq!(request.value(),&case["request"]);
+                }
+                NativeMessage::Unsupported(request)=>{
+                    assert_eq!(case["family"],"unsupported");assert_eq!(request.value(),&case["request"]);
+                }
+                NativeMessage::Resolved {..}=>assert_eq!(case["family"],"resolved"),
+            }
+        }
+        let unknown=vector("elicitation_unknown_mode");
+        assert!(matches!(decode(Protocol::Codex0158,&unknown["request"]),Ok(NativeMessage::Unsupported(_))));
+    }
+
+    #[test]
+    fn ac274_unqualified_form_schema_can_decline_but_cannot_accept() {
+        use native_requests::*;
+        let mut case=vector("claude_elicitation_form_decline");
+        case["request"]["request"]["requested_schema"]["properties"]["label"]["format"]=json!("email");
+        assert_eq!(typed_reply(&case).unwrap(),case["response"]);
+        case["answer"]=json!({"kind":"elicitation","action":"accept","content":{"label":"fixture@example.test","confirmed":true}});
+        assert_eq!(typed_reply(&case),Err(CodecError::Unqualified));
+    }
+
+    #[test]
+    fn ac274_claude_form_rejects_malformed_integer_limits_without_ignoring_them() {
+        use native_requests::*;
+        let overflow:Value=serde_json::from_str("18446744073709551616").unwrap();
+        let invalid=[json!(-1),json!(1.5),overflow,json!("1"),Value::Null,json!(false)];
+        for field in ["minLength","maxLength","minItems","maxItems"] {
+            for limit in &invalid {
+                let mut case=vector("claude_form_accept");
+                let array=field.ends_with("Items");
+                let property=if array {"labels"} else {"label"};
+                let mut schema=if array {json!({"type":"array","items":{"type":"string"}})} else {json!({"type":"string"})};
+                schema[field]=limit.clone();
+                case["request"]["request"]["requested_schema"]["properties"][property]=schema;
+                if array {case["answer"]["content"]["labels"]=json!(["fixture"]);}
+                assert_eq!(typed_reply(&case),Err(CodecError::Unqualified),"{field}={limit} was ignored");
+            }
+        }
+        // Preserve the exact finite valid constraints: rejecting every limit is not a fix.
+        for (field,limit) in [("minLength",0u64),("minLength",3),("maxLength",8),("maxLength",u64::MAX),
+            ("minItems",0),("minItems",1),("maxItems",2),("maxItems",u64::MAX)] {
+            let mut case=vector("claude_form_accept");
+            let array=field.ends_with("Items");
+            let property=if array {"labels"} else {"label"};
+            let mut schema=if array {json!({"type":"array","items":{"type":"string"}})} else {json!({"type":"string"})};
+            schema[field]=json!(limit);
+            case["request"]["request"]["requested_schema"]["properties"][property]=schema;
+            if array {case["answer"]["content"]["labels"]=json!(["fixture"]);}
+            assert_eq!(typed_reply(&case).unwrap_or_else(|e|panic!("valid {field}={limit}: {e:?}"))["response"]["response"]["content"],case["answer"]["content"]);
+        }
+    }
+
 }
