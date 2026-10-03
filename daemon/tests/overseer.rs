@@ -2762,7 +2762,7 @@ fn ac185_confirm_actions_permission_merge_back_and_pull_request() {
     assert_eq!(p["state"], "open", "{p}");
     std::thread::sleep(Duration::from_secs(3));
     let lines = session(&d)["proposals"].as_array().unwrap().iter().find(|x| x["id"] == p["proposal"]).cloned().unwrap()["lines"].clone();
-    assert_eq!(lines, json!(["Allow Asker's request", format!("Merge {} back into its target branch", d.run(&writer_id)["title"].as_str().unwrap()), format!("Open a pull request for {} (VS Code pushes with your GitHub sign-in)", d.run(&proposer)["title"].as_str().unwrap())]));
+    assert_eq!(lines, json!(["Allow Asker to change perm.txt", format!("Merge {} back into its target branch", d.run(&writer_id)["title"].as_str().unwrap()), format!("Open a pull request for {} (VS Code pushes with your GitHub sign-in)", d.run(&proposer)["title"].as_str().unwrap())]));
     assert_eq!(d.run(&asker)["status"], "waiting_for_user", "nothing before the yes");
     assert!(git(&repo, &["ls-tree", "--name-only", "HEAD"]).lines().all(|l| l != "landed.txt"));
     let answered = d.call("overseer.answer", json!({"id": p["proposal"], "yes": true, "surface": "ctl", "by": "owner"}));

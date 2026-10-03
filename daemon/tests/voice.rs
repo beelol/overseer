@@ -810,6 +810,14 @@ fn ac248_a_proposal_after_its_spoken_request_closed_is_withdrawn() {
     let live = listening(&env);
     let said = env.d.call("voice.say", json!({"text": "Tell Phone to wait for the review."}));
     let id = said["request"].as_str().unwrap().to_string();
+    // An unrelated native permission arrives while Overseer's reply is delayed.
+    // Its unsolicited card must never become the answer to this spoken request.
+    let permission_repo = common::repo(&r.path().join("permission"));
+    let asks = permission_agent(&env, &permission_repo, "Sessions");
+    let messages = env.d.call("overseer.session", json!({}))["messages"].clone();
+    assert!(messages.as_array().unwrap().iter().any(|m| m["card"]["kind"] == "needs" && m["card"]["agent"] == asks.as_str()), "permission surfaced: {messages}");
+    assert!(request(&env.d, &id)["answer"].as_str().unwrap_or("").is_empty(), "a permission notice is not this request's answer: {}", request(&env.d, &id));
+    std::fs::write(env.mode_file(), "overseer").unwrap();
     wait_state(&live, &id, "not_sent");
     // Overseer's slow turn ends with a proposal for Phone after the request closed.
     let deadline = Instant::now() + Duration::from_secs(40);
@@ -2435,12 +2443,14 @@ fn ac166_the_right_agents_with_the_fixture_orchestrator() {
             .all(|r| r["why"] == "previous"),
         "{card}"
     );
-    // "Yes, do that": the agent that asked.
+    // "Yes, do that": the agent that asked. Its permission request is read out by itself
+    // (AC-230), so the yes is the answer to it.
     let asks = permission_agent(&env, &repo, "Asks");
     std::fs::write(env.mode_file(), "overseer").unwrap();
-    let e = say(&env, "yes, do that");
-    wait_state(&live, &e, "sent");
-    assert_eq!(received(&env, &asks).len(), 1, "the agent that asked");
+    live.wait("the request read out", 10, |v| v["kind"] == "say" && v["text"].as_str().unwrap_or("").starts_with("Asks wants to"));
+    let e = env.d.call("voice.say", json!({"text": "yes, do that"}));
+    assert_eq!(e["allow"], true, "the agent that asked: {e}");
+    env.d.wait_status(&asks, |s| s != "waiting_for_user", 10);
     assert_eq!(counts(), [3, 3, 1], "nobody else");
     // Switching by voice, then ten sentences to the chosen agent only, each with its card.
     let t = env
@@ -2994,6 +3004,209 @@ fn ac227_handle_what_needs_me_by_voice() {
     assert_eq!(env.d.run(&asks)["status"], "completed");
 }
 
+// ---------------------------------------------------------------------- AC-229, AC-230
+
+/// A new agent started after `before`, waited for.
+fn new_run(env: &Env, before: &[String]) -> Value {
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        if let Some(r) = env.d.runs().into_iter().find(|r| !before.contains(&r["id"].as_str().unwrap().to_string()) && env.d.call("overseer.session", json!({}))["run_id"] != r["id"]) {
+            return r;
+        }
+        assert!(Instant::now() < deadline, "no new agent");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+fn run_ids(env: &Env) -> Vec<String> {
+    env.d.runs().iter().map(|r| r["id"].as_str().unwrap().to_string()).collect()
+}
+
+fn first_prompt(env: &Env, run: &str) -> String {
+    env.d.call("run.turns", json!({"run_id": run}))[0]["prompt"].as_str().unwrap_or("").to_string()
+}
+
+/// AC-229: the recognizer is told to expect the agents' titles and the repositories' names (the
+/// listener adds Overseer's vocabulary, unit-tested in `recognize.rs`).
+#[test]
+fn ac229_the_recognizer_expects_the_agents_and_the_repositories() {
+    let env = voice_daemon(&[]);
+    let r = tmp();
+    let site = repo(&r.path().join("site"));
+    let notes = repo(&r.path().join("notes"));
+    agent(&env.d, &site, "Phone");
+    agent(&env.d, &notes, "Docs writer");
+    let _live = listening(&env);
+    let hint = env.d.call("voice.get", json!({}))["hint"].as_str().unwrap().to_string();
+    for name in ["Phone", "Docs writer", "site", "notes"] {
+        assert!(hint.split(", ").any(|x| x == name), "{name} in {hint}");
+    }
+}
+
+/// AC-229: a start is read back before it goes ("Start an agent in the site repo to …?") and the
+/// window is long enough to hear it and correct it; a spoken correction inside the window changes
+/// it, and only the corrected start happens.
+#[test]
+fn ac229_a_start_is_read_back_and_a_correction_inside_the_window_changes_it() {
+    let env = voice_daemon(&[]);
+    env.d.call("voice.set", json!({"settle_seconds": 2, "start_defaults": {"harness": "claude", "workspace_mode": "worktree"}}));
+    let r = tmp();
+    let site = repo(&r.path().join("site"));
+    let notes = repo(&r.path().join("notes"));
+    agent(&env.d, &site, "Phone");
+    agent(&env.d, &notes, "Docs");
+    let live = listening(&env);
+    let before = run_ids(&env);
+    let first = say(&env, "Start an agent in the site repo to write the changelog.");
+    let settling = wait_state(&live, &first, "settling");
+    let line = live.wait("the read-back", 20, |v| v["kind"] == "say" && v["text"].as_str().unwrap_or("").starts_with("Start an agent"));
+    assert_eq!(line["text"], "Start an agent in the site repo to write the changelog?");
+    // The window covers the read-back: 2 s, and the time it takes to say it.
+    let proposal = settling["request"]["proposal"].as_str().unwrap().to_string();
+    let out = std::process::Command::new("sqlite3").args(["-cmd", ".timeout 5000"]).arg(env.d.home.path().join("overseer.sqlite"))
+        .arg(format!("SELECT settle_until - ts FROM overseer_proposals WHERE id='{proposal}'")).output().unwrap();
+    let window: i64 = String::from_utf8_lossy(&out.stdout).trim().parse().unwrap();
+    assert!(window >= 4500, "the window is {window} ms");
+    // The correction, inside the window.
+    std::thread::sleep(Duration::from_millis(1500));
+    let fix = env.d.call("voice.say", json!({"text": "I meant the notes repo."}));
+    let second = fix["request"].as_str().expect("a corrected request").to_string();
+    assert_eq!(request(&env.d, &first)["state"], "corrected");
+    live.wait("the new read-back", 60, |v| v["kind"] == "say" && v["text"] == "Start an agent in the notes repo to write the changelog?");
+    wait_state(&live, &second, "sent");
+    let run = new_run(&env, &before);
+    let ws = env.d.call("state", json!({}))["workspaces"].as_array().unwrap().iter().find(|w| w["id"] == run["workspace_id"]).cloned().unwrap();
+    assert!(ws["repo_root"].as_str().unwrap_or(ws["path"].as_str().unwrap()).contains("notes"), "started in notes: {ws}");
+    assert!(first_prompt(&env, run["id"].as_str().unwrap()).contains("For you: Please write the changelog."));
+    std::thread::sleep(Duration::from_millis(500));
+    let overseer = env.d.call("overseer.session", json!({}))["run_id"].clone();
+    let started: Vec<Value> = env.d.runs().into_iter().filter(|r| !before.contains(&r["id"].as_str().unwrap().to_string()) && r["id"] != overseer).collect();
+    assert_eq!(started.len(), 1, "only the corrected start: {started:?}");
+}
+
+/// Every task in a confirmed bundle is audible before the owner agrees.
+#[test]
+fn ac229_confirmed_multiple_starts_and_redirect_read_back_each_task() {
+    let env = voice_daemon(&[
+        ("FIXTURE_OVERSEER_DELAY_MS", "120000"),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE,FIXTURE_OVERSEER_DELAY_MS"),
+    ]);
+    let r = tmp();
+    let site = repo(&r.path().join("site"));
+    let phone = agent(&env.d, &site, "Phone");
+    let live = listening(&env);
+    let id = say(&env, "Tell Phone to wait for the review.");
+    voice_cause(&env);
+    let before = run_ids(&env);
+    let p = env.d.call("overseer.propose", json!({"source": "test", "actions": [
+        {"action": "start", "repo": site, "harness": "claude", "prompt": "Draft the changelog.", "title": "Changelog", "permission_mode": "Auto"},
+        {"action": "start", "repo": site, "harness": "claude", "prompt": "Check the links.", "title": "Links"},
+        {"action": "redirect", "agent": phone, "text": "Review the screenshots."},
+        {"action": "archive", "agent": phone}
+    ]}));
+    assert_eq!(p["state"], "open", "{p}");
+    wait_state(&live, &id, "waiting");
+    let line = live.wait("all task contents before confirmation", 10, |v| v["kind"] == "say" && v["text"].as_str().unwrap_or("").contains("Say yes to go ahead"));
+    let text = line["text"].as_str().unwrap();
+    for task in ["draft the changelog", "check the links", "review the screenshots", "Archive Phone"] {
+        assert!(text.contains(task), "missing {task}: {text}");
+    }
+    assert_eq!(run_ids(&env), before, "confirmation must precede every start");
+    env.d.call("voice.answer", json!({"yes": false}));
+    wait_state(&live, &id, "not_sent");
+    assert!(received(&env, &phone).is_empty(), "no redirect on decline");
+}
+
+/// AC-229: a request that names Overseer and gives it an instruction is taken, even as the
+/// recognizer wrote it ("-overseer. Start…") and even when Overseer first judges it not for itself.
+#[test]
+fn ac229_a_request_naming_overseer_with_an_instruction_is_never_dropped() {
+    let env = voice_daemon(&[]);
+    env.d.call("voice.set", json!({"settle_seconds": 1, "start_defaults": {"harness": "claude", "workspace_mode": "worktree"}}));
+    let r = tmp();
+    let site = repo(&r.path().join("site"));
+    agent(&env.d, &site, "Phone");
+    let live = listening(&env);
+    let before = run_ids(&env);
+    let id = say(&env, "-overseer. Start an agent in the site repo to draft the page's sections.");
+    live.wait("On it.", 5, |v| v["kind"] == "say" && v["text"] == "On it.");
+    live.wait("the read-back", 90, |v| v["kind"] == "say" && v["text"] == "Start an agent in the site repo to draft the page's sections?");
+    wait_state(&live, &id, "sent");
+    let run = new_run(&env, &before);
+    assert!(first_prompt(&env, run["id"].as_str().unwrap()).contains("For you: Please draft the page's sections."));
+    // Overseer said "not for me" first; the daemon asked it again, once, saying it was its.
+    let messages = env.d.call("overseer.session", json!({}))["messages"].clone();
+    let texts: Vec<&str> = messages.as_array().unwrap().iter().map(|m| m["text"].as_str().unwrap_or("")).collect();
+    assert!(texts.iter().any(|t| t.contains("names you and gives you an instruction") && t.contains(&format!("Request {id}"))), "{texts:?}");
+    assert!(!live.kind("request").iter().any(|v| v["request"]["id"] == id.as_str() && ["answered", "not_for_overseer"].contains(&v["request"]["state"].as_str().unwrap_or(""))), "never dropped");
+}
+
+/// AC-230, by voice: each mode set on a running agent, one started in Auto, and a waiting
+/// permission read out without being asked for, answered with "allow it".
+#[test]
+fn ac230_by_voice_modes_a_start_in_auto_and_a_permission_read_out_unasked() {
+    let env = voice_daemon(&[("FIXTURE_SLOW_MS", "120000"), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE,FIXTURE_SLOW_MS")]);
+    env.d.call("voice.set", json!({"settle_seconds": 1, "start_defaults": {"harness": "claude", "workspace_mode": "worktree"}}));
+    let r = tmp();
+    let site = repo(&r.path().join("site"));
+    std::fs::write(env.mode_file(), "slow").unwrap();
+    let busy = env.d.call("task.create", json!({"repo": site, "harness": "claude", "prompt": "work on the site", "title": "Site"}))["run"]["id"].as_str().unwrap().to_string();
+    env.d.wait_status(&busy, |s| s == "running", 30);
+    std::fs::write(env.mode_file(), "echo").unwrap();
+    let live = listening(&env);
+    for (words, mode) in [("Set Site to Accept edits.", "acceptEdits"), ("Put Site in Ask first.", "manual"), ("Switch Site to Auto.", "auto")] {
+        let id = say(&env, words);
+        if mode == "auto" {
+            wait_state(&live, &id, "waiting");
+            live.wait("the permission change named before yes", 10, |v| v["kind"] == "say" && v["text"].as_str().unwrap_or("").contains("Site to Auto"));
+            env.d.call("voice.answer", json!({"yes": true}));
+        }
+        wait_state(&live, &id, "sent");
+        let set: Vec<Value> = env.d.events(&busy).into_iter().filter(|e| e["kind"] == "overseer_action" && e["payload"]["action"] == "mode").collect();
+        let last = &set.last().unwrap()["payload"];
+        assert_eq!(last["mode"], mode, "{words}: {last}");
+        assert_eq!(last["cause"], "voice");
+        assert_eq!(last["live"], true);
+    }
+    // Started in Auto.
+    let before = run_ids(&env);
+    let id = say(&env, "Start an agent in the site repo in Auto to write the release notes.");
+    wait_state(&live, &id, "waiting");
+    live.wait("the exact task and mode read back before Auto starts", 10, |v| v["kind"] == "say" && v["text"].as_str().unwrap_or("").contains("in Auto to write the release notes"));
+    assert_eq!(run_ids(&env), before, "no start before explicit yes");
+    env.d.call("voice.answer", json!({"yes": true}));
+    wait_state(&live, &id, "sent");
+    let run = new_run(&env, &before);
+    let run_id = run["id"].as_str().unwrap().to_string();
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let echo = loop {
+        if let Some(t) = env.d.events(&run_id).iter().find_map(|e| e["payload"]["text"].as_str().filter(|t| t.starts_with("ECHO ")).map(str::to_string)) {
+            break t;
+        }
+        assert!(Instant::now() < deadline, "no echo");
+        std::thread::sleep(Duration::from_millis(100));
+    };
+    assert!(echo.contains("\"--permission-mode\",\"auto\""), "{echo}");
+    let _ = env.d.try_call("run.interrupt", json!({"run_id": busy}));
+    // Its briefing about the new agent (queued for the end of its turn) runs next; then it is done.
+    env.d.wait_status(&busy, |s| !["queued", "starting", "running", "waiting_for_user"].contains(&s), 30);
+    std::thread::sleep(Duration::from_millis(1000));
+    env.d.wait_status(&busy, |s| !["queued", "starting", "running", "waiting_for_user"].contains(&s), 30);
+    // A permission that starts to wait is read out with nobody asking, and "allow it" answers it.
+    live.clear();
+    let other = repo(&r.path().join("perm"));
+    let asks = permission_agent(&env, &other, "Sessions");
+    std::fs::write(env.mode_file(), "overseer").unwrap();
+    live.wait("the permission read out", 10, |v| v["kind"] == "say" && v["text"] == "Sessions wants to change perm.txt. Allow?");
+    assert!(live.kind("read_back").iter().any(|v| v["agent"] == asks.as_str()), "the strip asks too");
+    let messages = env.d.call("overseer.session", json!({}))["messages"].clone();
+    assert!(messages.as_array().unwrap().iter().any(|m| m["card"]["kind"] == "needs" && m["card"]["agent"] == asks.as_str() && m["card"]["state"] == "asked"), "the yes/no in the view: {messages}");
+    let a = env.d.call("voice.say", json!({"text": "allow it"}));
+    assert_eq!(a["allow"], true, "{a}");
+    env.d.wait_done(&asks, 30);
+    assert_eq!(env.d.run(&asks)["status"], "completed");
+}
+
 /// AC-252: the zero-friction loop by voice, one sentence each and no yes: "open Overseer", "follow
 /// <agent>", "manual edit" and "back to follow" each tell the owner's window what to show (the live
 /// channel's "open"), with no model and no request recorded; "stop <agent>" stops it. A name that
@@ -3035,4 +3248,173 @@ fn ac252_the_loop_by_voice_one_sentence_each() {
     let stop = env.d.call("voice.say", json!({"text": "Stop write the notes."}));
     assert_eq!(stop["built_in"], "stop", "{stop}");
     env.d.wait_status(&notes, |s| s == "interrupted", 10);
+}
+
+// Completion must wait for the ordered session consumer to capture this exact reply.
+fn captured_reply_case(words: &str, state: &str, answer: &str) {
+    let gate = tmp();
+    let gate_s = gate.path().display().to_string();
+    let env = voice_daemon(&[("OVERSEER_TEST_NET", "1"), ("OVERSEER_CONTINUITY_PROBES", "off"), ("OVERSEER_TEST_SESSION_CAPTURE_GATE", &gate_s)]);
+    let live = listening(&env);
+    let id = say(&env, words);
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while !gate.path().join("reached").exists() {
+        assert!(Instant::now() < deadline, "reply did not reach capture gate");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let completed = Instant::now() + Duration::from_secs(20);
+    while env.d.call("overseer.session", json!({}))["run_status"] != "completed" {
+        assert!(Instant::now() < completed, "fixture run did not complete");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(request(&env.d, &id)["state"], "thinking", "raw completion must not discard an uncaptured reply");
+    std::fs::write(gate.path().join("release"), "").unwrap();
+    wait_state(&live, &id, state);
+    assert_eq!(request(&env.d, &id)["answer"], answer);
+    if state == "not_for_overseer" {
+        assert!(!live.kind("say").iter().any(|v| v["text"] == "On it."));
+        assert!(!live.kind("say").iter().any(|v| v["text"].as_str().is_some_and(|s| s.contains("NOT_FOR_OVERSEER"))));
+    } else {
+        live.wait("question spoken", 5, |v| v["kind"] == "say" && v["text"] == answer);
+    }
+    let terminal: Vec<_> = live.kind("request").into_iter().filter(|v| v["request"]["id"] == id && v["request"]["state"] == state).collect();
+    assert_eq!(terminal.len(), 1, "terminal disposition announced once");
+}
+
+#[test]
+fn ac_capture_question_before_voice_completion() {
+    captured_reply_case("please add tests", "answered", "Who should I tell?");
+}
+
+#[test]
+fn ac_capture_aside_before_voice_completion() {
+    captured_reply_case("Are you done with the dishes?", "not_for_overseer", "Not meant for Overseer: kept as context.");
+}
+
+#[test]
+fn ac_capture_empty_and_failed_turns_close_without_assistant_output() {
+    for (mode, expected) in [("silent-result", "answered"), ("silent-error", "not_sent")] {
+        let modes = tmp();
+        let mode_path = modes.path().join("mode");
+        std::fs::write(&mode_path, mode).unwrap();
+        let mode_s = mode_path.display().to_string();
+        let env = voice_daemon(&[("CLAUDE_FIXTURE_OVERSEER_MODE_FILE", &mode_s), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE,CLAUDE_FIXTURE_OVERSEER_MODE_FILE")]);
+        let live = listening(&env);
+        let id = say(&env, "please add tests");
+        wait_state(&live, &id, expected);
+        assert!(request(&env.d, &id)["answer"].is_null(), "{mode}: {}", request(&env.d, &id));
+        let terminal: Vec<_> = live.kind("request").into_iter().filter(|v| v["request"]["id"] == id && v["request"]["state"] == expected).collect();
+        assert_eq!(terminal.len(), 1, "empty/error turn closes exactly once");
+    }
+}
+
+#[test]
+fn ac_capture_replies_keep_their_turn_after_successor_completion() {
+    let gate = tmp(); let gate_s = gate.path().display().to_string();
+    let env = voice_daemon(&[("OVERSEER_TEST_NET", "1"), ("OVERSEER_CONTINUITY_PROBES", "off"), ("OVERSEER_TEST_SESSION_CAPTURE_GATE", &gate_s)]);
+    let live = listening(&env);
+    let first = say(&env, "please add tests");
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while !gate.path().join("reached").exists() || env.d.call("overseer.session", json!({}))["run_status"] != "completed" {
+        assert!(Instant::now() < deadline, "first turn did not reach capture gate and finish");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let run = env.d.call("overseer.session", json!({}))["run_id"].as_str().unwrap().to_string();
+    let first_turn = env.d.call("run.turns", json!({"run_id":run})).as_array().unwrap().len();
+    let second = say(&env, "Are you done with the dishes?");
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        let s = env.d.call("overseer.session", json!({}));
+        if s["run_status"] == "completed" && env.d.call("run.turns", json!({"run_id":run})).as_array().unwrap().len() > first_turn { break; }
+        assert!(Instant::now() < deadline, "successor did not complete: {s}");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    std::fs::write(gate.path().join("release"), "").unwrap();
+    wait_state(&live, &first, "answered"); wait_state(&live, &second, "not_for_overseer");
+    assert_eq!(request(&env.d, &first)["answer"], "Who should I tell?");
+    assert_eq!(request(&env.d, &second)["answer"], "Not meant for Overseer: kept as context.");
+}
+
+#[test]
+fn ac_capture_fenced_actions_keep_predecessor_authorship_after_owner_successor() {
+    let gate = tmp(); let gate_s = gate.path().display().to_string();
+    let r = tmp(); let repo = repo(&r.path().join("repo"));
+    let actions = json!([{"action":"start","repo":repo,"title":"Forbidden capture","prompt":"write a synthetic note","permission_mode":"auto"}]).to_string();
+    let mode_path = gate.path().join("mode");
+    std::fs::write(&mode_path, "captured-actions").unwrap();
+    let mode_s = mode_path.display().to_string();
+    let env = voice_daemon(&[("OVERSEER_TEST_NET", "1"), ("OVERSEER_CONTINUITY_PROBES", "off"), ("OVERSEER_TEST_SESSION_CAPTURE_GATE", &gate_s), ("CLAUDE_FIXTURE_CAPTURE_ACTIONS", &actions), ("CLAUDE_FIXTURE_OVERSEER_MODE_FILE", &mode_s), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE,CLAUDE_FIXTURE_CAPTURE_ACTIONS,CLAUDE_FIXTURE_OVERSEER_MODE_FILE")]);
+    let live = listening(&env);
+    let id = say(&env, "please add tests");
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while !gate.path().join("reached").exists() || env.d.call("overseer.session", json!({}))["run_status"] != "completed" {
+        assert!(Instant::now() < deadline, "predecessor did not reach capture gate and finish");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let run = env.d.call("overseer.session", json!({}))["run_id"].as_str().unwrap().to_string();
+    let turns = env.d.call("run.turns", json!({"run_id":run}));
+    let old = turns.as_array().unwrap().last().unwrap()["id"].as_str().unwrap();
+    // Seed the persisted predecessor's self-initiated origin; the successor really is typed
+    // by the owner. This isolates the trust boundary without a scheduler or a paid model.
+    let db = rusqlite::Connection::open(env.d.home.path().join("overseer.sqlite")).unwrap();
+    assert_eq!(db.execute("UPDATE overseer_turns SET cause='check_in' WHERE turn_id=?1", [old]).unwrap(), 1);
+    std::fs::write(&mode_path, "silent-result").unwrap();
+    env.d.call("overseer.send", json!({"text":"what is everyone doing?","surface":"ctl"}));
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        let s = env.d.call("overseer.session", json!({}));
+        if s["run_status"] == "completed" && env.d.call("run.turns", json!({"run_id":run})).as_array().unwrap().len() > turns.as_array().unwrap().len() { break; }
+        assert!(Instant::now() < deadline, "owner successor did not finish: {s}");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    std::fs::write(gate.path().join("release"), "").unwrap();
+    wait_state(&live, &id, "answered");
+    let s = env.d.call("overseer.session", json!({}));
+    assert!(s["proposals"].as_array().unwrap().is_empty(), "self-initiated predecessor must not borrow successor owner authority: {s}");
+    assert!(request(&env.d, &id)["answer"].as_str().unwrap().contains("started by check_in"));
+    assert!(env.d.runs().iter().all(|r| r["title"] != "Forbidden capture"));
+}
+
+#[test]
+fn ac_capture_withdrawn_predecessor_cannot_cancel_open_successor() {
+    let gate = tmp(); let gate_s = gate.path().display().to_string();
+    let r = tmp(); let repo = repo(&r.path().join("repo"));
+    let actions = json!([{"action":"start","repo":repo,"title":"Withdrawn capture","prompt":"write a synthetic note"}]).to_string();
+    let mode_path = gate.path().join("mode");
+    std::fs::write(&mode_path, "captured-actions").unwrap();
+    let mode_s = mode_path.display().to_string();
+    let env = voice_daemon(&[("OVERSEER_TEST_NET", "1"), ("OVERSEER_CONTINUITY_PROBES", "off"), ("OVERSEER_TEST_SESSION_CAPTURE_GATE", &gate_s), ("CLAUDE_FIXTURE_CAPTURE_ACTIONS", &actions), ("CLAUDE_FIXTURE_OVERSEER_MODE_FILE", &mode_s), ("FIXTURE_SLOW_MS", "120000"), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE,CLAUDE_FIXTURE_CAPTURE_ACTIONS,CLAUDE_FIXTURE_OVERSEER_MODE_FILE,FIXTURE_SLOW_MS")]);
+    let live = listening(&env);
+    let first = say(&env, "please add tests");
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while !gate.path().join("reached").exists() || env.d.call("overseer.session", json!({}))["run_status"] != "completed" {
+        assert!(Instant::now() < deadline, "predecessor did not reach capture gate and finish");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    env.d.call("voice.cancel", json!({"id":first}));
+    std::fs::write(&mode_path, "slow").unwrap();
+    let second = say(&env, "please write the changelog");
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while env.d.call("overseer.session", json!({}))["run_status"] != "running" {
+        assert!(Instant::now() < deadline, "successor did not start");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(request(&env.d, &second)["state"], "thinking");
+    std::fs::write(gate.path().join("release"), "").unwrap();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let s = env.d.call("overseer.session", json!({}));
+        if s["cards"].as_array().unwrap().iter().any(|p| p["state"] == "cancelled") { break; }
+        assert!(Instant::now() < deadline, "withdrawal was not recorded: {s}");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    // Wait until the ordered voice subscriber has consumed the predecessor acknowledgement,
+    // so this asserts the aftermath of both proposal events rather than racing their handling.
+    live.wait("successor reply captured", 10, |v| v["kind"] == "request" && v["request"]["id"] == second && v["request"]["answer"].as_str().is_some_and(|s| s.contains("working on:")));
+    assert_eq!(request(&env.d, &first)["state"], "cancelled");
+    assert_eq!(request(&env.d, &second)["state"], "thinking");
+    assert!(request(&env.d, &second)["proposal"].is_null());
+    assert!(env.d.runs().iter().all(|r| r["title"] != "Withdrawn capture"));
+    let run = env.d.call("overseer.session", json!({}))["run_id"].as_str().unwrap().to_string();
+    env.d.call("run.interrupt", json!({"run_id":run}));
 }

@@ -220,6 +220,14 @@ export interface KnownRepo {
   default_branch?: string | null;
 }
 
+export interface VoiceCapturedTurn {
+  id: string;
+  requests: Array<string>;
+  asked_again: boolean;
+  started_seq: number;
+  cause: string;
+}
+
 /** The payload of every kind of event the app reads. Other kinds arrive as `unknown`. */
 export interface EventPayloads {
   task_created: {
@@ -357,6 +365,16 @@ export interface EventPayloads {
   trouble: {
     kind: string;
     reason: string;
+  };
+  overseer_turn_processed: {
+    turn: VoiceCapturedTurn;
+    status: string;
+    source_seq: number;
+  };
+  overseer_message: {
+    session: string;
+    message: unknown;
+    turn?: VoiceCapturedTurn | null;
   };
 }
 
@@ -990,6 +1008,8 @@ export interface Methods {
   "overseer.card": { class: 'mac_only'; params: unknown; result: unknown };
   /** Set how much Overseer does on its own. */
   "overseer.level": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Choose the repositories where Overseer may suggest Auto. */
+  "overseer.auto_repos": { class: 'mac_only'; params: unknown; result: unknown };
   /** Set Overseer's spending cap. */
   "overseer.cap": { class: 'mac_only'; params: unknown; result: unknown };
   /** Start a fresh Overseer conversation. */
@@ -1392,6 +1412,7 @@ export const METHOD_CLASS = {
   "overseer.cancel": 'mac_only',
   "overseer.card": 'mac_only',
   "overseer.level": 'mac_only',
+  "overseer.auto_repos": 'mac_only',
   "overseer.cap": 'mac_only',
   "overseer.fresh": 'mac_only',
   "overseer.rally": 'mac_only',

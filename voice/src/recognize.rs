@@ -5,8 +5,20 @@
 
 use anyhow::Result;
 
-/// Words Overseer always expects, whatever agents are running.
-pub const VOCABULARY: &str = "Overseer, Continuity, Codex, Claude, OpenCode, worktree, redirect, merge back, pull request, swarm, grid, hold, release, allow, deny, cancel.";
+/// Words Overseer always expects, whatever agents are running. "Repo" and "agent" lead (AC-229):
+/// without them the owner's "the site repo" was heard as "the site rebuild".
+pub const VOCABULARY: &str = "Overseer, repo, repository, agent, agents, merge, merge back, worktree, branch, main, Continuity, Codex, Claude, OpenCode, redirect, pull request, swarm, grid, hold, release, allow, deny, cancel, Ask first, Accept edits, Auto.";
+
+/// The most of the daemon's hint (agent titles, repository names) that goes into the prompt:
+/// whisper reads about 224 tokens of initial prompt, and the vocabulary comes first.
+const HINT_CHARS: usize = 600;
+
+/// The recognizer's initial prompt: the vocabulary, then the words the daemon says to expect (the
+/// agents' titles and the repositories' names, AC-229).
+pub fn prompt(hint: &str) -> String {
+    let hint: String = hint.trim().chars().take(HINT_CHARS).collect();
+    format!("{VOCABULARY} {hint}").trim().to_string()
+}
 
 pub trait Recognizer: Send {
     /// The words in `samples` (16 kHz mono), which begin `start_ms` into the stream. `hint` lists
@@ -161,6 +173,18 @@ impl Recognizer for Scripted {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// AC-229: the prompt carries Overseer's vocabulary and the names the daemon sends.
+    #[test]
+    fn the_prompt_includes_the_vocabulary_and_the_names() {
+        let p = prompt("Phone, Site draft, site, notes");
+        for w in ["repo", "agent", "merge", "worktree", "Overseer"] {
+            assert!(p.split(|c: char| !c.is_alphanumeric()).any(|x| x == w), "{w} in {p}");
+        }
+        assert!(p.ends_with("Phone, Site draft, site, notes"), "{p}");
+        assert_eq!(prompt(""), VOCABULARY);
+        assert!(prompt(&"x".repeat(5000)).len() <= VOCABULARY.len() + 1 + HINT_CHARS);
+    }
 
     #[test]
     fn marks_of_sound_are_not_words() {

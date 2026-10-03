@@ -204,6 +204,13 @@
       "exists": "boolean",
       "branch": "string?",
       "default_branch": "string?"
+    },
+    "VoiceCapturedTurn": {
+      "id": "string",
+      "requests": "string[]",
+      "asked_again": "boolean",
+      "started_seq": "number",
+      "cause": "string"
     }
   },
   "events": {
@@ -342,6 +349,16 @@
     "trouble": {
       "kind": "string",
       "reason": "string"
+    },
+    "overseer_turn_processed": {
+      "turn": "VoiceCapturedTurn",
+      "status": "string",
+      "source_seq": "number"
+    },
+    "overseer_message": {
+      "session": "string",
+      "message": "json",
+      "turn": "VoiceCapturedTurn?"
     }
   },
   "methods": {
@@ -1772,6 +1789,14 @@
     "overseer.level": {
       "class": "mac_only",
       "summary": "Set how much Overseer does on its own",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "overseer.auto_repos": {
+      "class": "mac_only",
+      "summary": "Choose the repositories where Overseer may suggest Auto",
       "phone": "not_yet",
       "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
       "params": "json",
