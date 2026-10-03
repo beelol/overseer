@@ -1,7 +1,7 @@
 //! Permission modes by conversation (AC-230): Overseer sets an agent's permission mode (Ask first,
 //! Accept edits, Auto), typed or spoken, and starts agents in a stated mode. The owner decided
-//! (2026-09-28) that Overseer may set Auto on its own, within its level and only in the
-//! repositories the owner allows (`overseer.auto_repos`); each time it does, the reason is recorded.
+//! (2026-10-02) that Overseer may suggest Auto only in the repositories the owner allows
+//! (`overseer.auto_repos`), but always waits for their explicit yes and records its reason.
 //!
 //! A mode is the run's: it is stored with the run's turn options, so every later turn starts in
 //! it, and a Claude turn that is running gets it at once (its `set_permission_mode` control
@@ -15,7 +15,7 @@ use std::sync::Arc;
 /// The modes Overseer sets, as the harnesses name them, with the owner's words for them.
 pub const MODES: &[(&str, &str)] = &[("manual", "Ask first"), ("acceptEdits", "Accept edits"), ("auto", "Auto")];
 
-/// The meta key holding the repositories where Overseer may set Auto by itself.
+/// The meta key holding the repositories where Overseer may suggest Auto.
 const AUTO_REPOS: &str = "overseer.auto_repos";
 
 /// A mode from the owner's or the model's words: "Ask first", "accept edits", "acceptEdits",
@@ -41,7 +41,7 @@ fn repo_root(path: &str) -> String {
 }
 
 impl Daemon {
-    /// `overseer.auto_repos`: the repositories where Overseer may set Auto by itself (the owner's,
+    /// `overseer.auto_repos`: the repositories where Overseer may suggest Auto (the owner's,
     /// from the Mac only). With `repos`, sets the list.
     pub fn overseer_auto_repos(&self, repos: Option<&Value>) -> Result<Value> {
         if let Some(list) = repos {
@@ -66,7 +66,7 @@ impl Daemon {
 
     /// Checks a `mode` action before it is proposed (Overseer's actions are checked by the daemon,
     /// whatever the model claims): a mode the agent's harness takes; Auto set by Overseer itself
-    /// only in a repository the owner allows, and with its reason.
+    /// only suggested in a repository the owner allows, with a reason and explicit confirmation.
     pub fn check_mode_action(&self, a: &mut Value, owner_asked: bool, cause: &str) -> Result<()> {
         let agent = a["agent"].as_str().unwrap_or("").to_string();
         let run = self.run(&agent)?;
@@ -90,7 +90,7 @@ impl Daemon {
         self.check_auto_by_itself(mode, &repo, owner_asked, cause, a)
     }
 
-    fn check_auto_by_itself(&self, mode: &str, repo: &str, owner_asked: bool, cause: &str, a: &Value) -> Result<()> {
+    fn check_auto_by_itself(&self, mode: &str, repo: &str, owner_asked: bool, cause: &str, a: &mut Value) -> Result<()> {
         if mode != "auto" || owner_asked {
             return Ok(());
         }
@@ -102,6 +102,9 @@ impl Daemon {
         if a["why"].as_str().map(str::trim).unwrap_or("").is_empty() {
             bail!("say why: Overseer setting Auto by itself is recorded with its reason");
         }
+        // Permission to suggest Auto is not permission to switch without the owner.
+        // The daemon sets the class after validation, for both mode changes and starts.
+        a["class"] = json!(super::control::CONFIRM);
         Ok(())
     }
 

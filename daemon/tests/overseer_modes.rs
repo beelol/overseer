@@ -191,9 +191,16 @@ fn ac230_overseer_sets_auto_by_itself_only_where_allowed_and_says_why() {
     // In another repository: still refused.
     let refused = auto(&in_notes, "it asks for every edit").unwrap_err();
     assert!(refused.contains("notes is not one"), "{refused}");
-    // Allowed, with its reason, at the Auto level: done at once and recorded with why and cause.
+    // Even an allowed repository at Auto waits for the owner's explicit yes.
     let done = auto(&in_site, "it has asked for 12 edits inside its own area").unwrap();
-    assert_eq!(done["done"], true, "{done}");
+    assert_eq!(done["done"], false, "{done}");
+    assert_eq!(done["state"], "open", "{done}");
+    assert!(mode_events(&d, &in_site).is_empty(), "no mode change before a yes");
+    std::thread::sleep(Duration::from_millis(2300));
+    assert!(mode_events(&d, &in_site).is_empty(), "Auto must not send after the settle window");
+    let proposal = session(&d)["proposals"].as_array().unwrap().iter()
+        .find(|p| p["id"] == done["proposal"]).unwrap().clone();
+    yes(&d, &proposal);
     let ev = mode_events(&d, &in_site);
     let last = ev.last().unwrap();
     assert_eq!(last["mode"], "auto");
@@ -201,14 +208,30 @@ fn ac230_overseer_sets_auto_by_itself_only_where_allowed_and_says_why() {
     assert_eq!(last["cause"], "check_in");
     let card = d.call("overseer.card", json!({"id": done["proposal"]}));
     assert_eq!(card["rows"][0]["why"], "it has asked for 12 edits inside its own area", "{card}");
-    // Within its level: at Steer and Ask first it is a proposal that waits for the owner.
-    for level in ["steer", "ask_first"] {
+    // Refusing the suggestion leaves the mode unchanged at every level.
+    for level in ["auto", "steer", "ask_first"] {
         d.call("overseer.level", json!({"level": level}));
         let p = auto(&in_site, "it keeps asking for edits").unwrap();
         assert_eq!(p["state"], "open", "{level}: {p}");
         assert_eq!(p["done"], false, "{level}: {p}");
+        let before = mode_events(&d, &in_site).len();
+        d.call("overseer.answer", json!({"id": p["proposal"], "yes": false, "surface": "ctl", "by": "owner"}));
+        assert_eq!(mode_events(&d, &in_site).len(), before, "{level}: no change after no");
     }
+    // Starting a new agent in Auto has the same confirmation boundary.
+    d.call("overseer.level", json!({"level": "auto"}));
+    let before = d.runs().len();
+    let start = d.call("overseer.propose", json!({"actions": [{
+        "action": "start", "repo": site, "prompt": "write the notes", "title": "New notes",
+        "harness": "claude", "permission_mode": "Auto", "why": "the work stays in its area"
+    }], "source": "check_in"}));
+    assert_eq!(start["state"], "open", "{start}");
+    assert_eq!(start["done"], false, "{start}");
+    assert_eq!(d.runs().len(), before, "no new Auto agent before a yes");
+    d.call("overseer.answer", json!({"id": start["proposal"], "yes": false, "surface": "ctl", "by": "owner"}));
+    assert_eq!(d.runs().len(), before, "no new Auto agent after no");
     // The owner asked: no repository rule (it is the owner's own choice).
+    d.call("overseer.level", json!({"level": "ask_first"}));
     sql(&d, "UPDATE overseer_sessions SET last_cause='owner';");
     let p = d.call("overseer.propose", json!({"actions": [{"action": "mode", "agent": in_notes, "mode": "Auto"}], "source": "ctl"}));
     assert_eq!(p["state"], "open", "{p}");
