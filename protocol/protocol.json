@@ -63,7 +63,8 @@
       "relation_confidence": "string?",
       "capabilities": "json",
       "process_generation": "number",
-      "attention": "Attention?"
+      "attention": "Attention?",
+      "queue": "QueueSnapshot?"
     },
     "Turn": {
       "id": "string",
@@ -211,7 +212,22 @@
       "asked_again": "boolean",
       "started_seq": "number",
       "cause": "string"
-    }
+    },
+    "QueuedMessage": {
+      "id": "number",
+      "ts": "number",
+      "source": "string",
+      "text": "string",
+      "redirect": "boolean"
+    },
+    "QueueSnapshot": {
+      "paused": "boolean",
+      "messages": "QueuedMessage[]"
+    },
+    "QueuedDelivery": {
+      "delivery": "'queued'"
+    },
+    "FollowUpResult": "Turn|QueuedDelivery"
   },
   "events": {
     "task_created": {
@@ -359,6 +375,17 @@
       "session": "string",
       "message": "json",
       "turn": "VoiceCapturedTurn?"
+    },
+    "queue_changed": {
+      "paused": "boolean?",
+      "removed": "number?",
+      "id": "number?",
+      "delivered": "number?"
+    },
+    "queued": {
+      "text": "string",
+      "detail": "json",
+      "paused": "boolean?"
     }
   },
   "methods": {
@@ -806,7 +833,7 @@
         "permission_mode": "string?",
         "images": "json[]?"
       },
-      "result": "Turn"
+      "result": "FollowUpResult"
     },
     "run.interrupt": {
       "class": "control",
@@ -2782,6 +2809,22 @@
         "ok": "boolean",
         "kept": "number"
       }
+    },
+    "run.resume_queue": {
+      "class": "mac_only",
+      "summary": "Send an agent\u2019s paused queue",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "run.clear_queue": {
+      "class": "mac_only",
+      "summary": "Clear an agent\u2019s queue",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
     }
   }
 }

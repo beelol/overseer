@@ -865,13 +865,31 @@ fn ac185_actions_have_classes_and_cards() {
     assert!(card["rows"].as_array().unwrap().iter().all(|r| r["action"] == "stop" && r["delivery"] == "stop"));
     assert_eq!(card["actions"].as_array().unwrap().len(), 4);
     // A message's card row holds the text that was sent, byte for byte.
+    let before_turns = d.call("run.turns", json!({"run_id": agents[1]}));
     let msg = d.call("overseer.propose", json!({"actions": [{"action": "message", "agent": agents[1], "text": "Please add tests — carefully."}], "source": "test"}));
     let mid = msg["proposal"].as_str().unwrap().to_string();
     d.call("overseer.answer", json!({"id": mid, "yes": true, "surface": "ctl", "by": "owner"}));
     let card = d.call("overseer.card", json!({"id": mid}));
     let row = &card["rows"][0];
     assert_eq!(row["message"], "Please add tests — carefully.");
-    let turns = d.call("run.turns", json!({"run_id": agents[1]}));
+    assert_eq!(row["state"], "held", "Stop keeps the message card pending until explicit resume");
+    let queue = d.call("run.queued", json!({"run_id":agents[1]}));
+    assert_eq!(queue["paused"], true);
+    assert_eq!(queue["queued"][0]["text"], "From Overseer: Please add tests — carefully.");
+    assert_eq!(d.call("run.turns", json!({"run_id":agents[1]})), before_turns, "approval must not resume a stopped agent");
+    d.call("run.resume_queue", json!({"run_id":agents[1]}));
+    let deadline = std::time::Instant::now() + Duration::from_secs(20);
+    let (turns, card) = loop {
+        let turns = d.call("run.turns", json!({"run_id":agents[1]}));
+        let card = d.call("overseer.card", json!({"id":mid}));
+        if turns.as_array().unwrap().len() == before_turns.as_array().unwrap().len() + 1 &&
+            ["delivered", "answered", "picked_up"].contains(&card["rows"][0]["state"].as_str().unwrap()) { break (turns, card); }
+        assert!(std::time::Instant::now() < deadline, "resumed message not delivered: {card}");
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    assert_eq!(card["rows"][0]["message"], "Please add tests — carefully.");
+    assert!(d.call("run.queued", json!({"run_id":agents[1]}))["queued"].as_array().unwrap().is_empty());
+    let row = &card["rows"][0];
     let last = turns.as_array().unwrap().last().unwrap();
     assert_eq!(last["prompt"], "From Overseer: Please add tests — carefully.");
     assert!(["delivered", "answered", "picked_up"].contains(&row["state"].as_str().unwrap()), "{row}");

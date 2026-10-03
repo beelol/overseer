@@ -81,6 +81,15 @@ fn check(doc: &Value, shape: &Value, value: &Value, at: &str, wrong: &mut Vec<St
         }
         return;
     }
+    if text.contains('|') && !text.contains('\'') {
+        for variant in text.split('|') {
+            let mut variant_wrong = Vec::new();
+            check(doc, &json!(variant.trim()), value, at, &mut variant_wrong);
+            if variant_wrong.is_empty() { return; }
+        }
+        wrong.push(format!("{at}: expected one of {text}, got {value}"));
+        return;
+    }
     if text.contains('\'') {
         let allowed: Vec<&str> = text.split('|').map(|s| s.trim().trim_matches('\'')).collect();
         if !value.as_str().is_some_and(|v| allowed.contains(&v)) {
@@ -148,7 +157,12 @@ fn ac134_the_daemon_sends_what_the_description_says() {
     let base = option(&d, &run, "task_start", None)["base"].as_str().unwrap().to_string();
     call("run.follow_up", json!({"run_id": run, "prompt": "again"}));
     d.wait_done(&run, 20);
+    call("run.interrupt", json!({"run_id":run}));
+    let paused = call("run.follow_up", json!({"run_id":run,"prompt":"wait for explicit resume"}));
+    assert_eq!(paused, json!({"delivery":"queued"}));
     call("state", json!({}));
+    d.call("run.resume_queue", json!({"run_id":run}));
+    d.wait_done(&run, 20);
     for (method, params) in [
         ("harness.list", json!({})), ("profile.list", json!({})), ("profile.status", json!({"id": "system-claude"})), ("repo.inspect", json!({"path": repo})), ("repo.known", json!({})),
         ("repo.files", json!({"workspace_id": ws, "query": "read"})), ("run.turns", json!({"run_id": run})), ("run.raw_output", json!({"run_id": run, "max_bytes": 2000})),
@@ -236,5 +250,15 @@ fn ac134_the_apps_types_are_generated_from_the_description() {
             continue;
         }
         assert!(generated.contains(&format!("  \"{name}\": '{}',", m["class"].as_str().unwrap())), "{name} is in the generated types with its class");
+    }
+}
+
+#[test]
+fn ac265_follow_up_description_rejects_false_queued_and_turn_acknowledgements() {
+    let doc = description();
+    for value in [json!({"delivery":"sent"}), json!({"delivery":"queued","started_ms":1}), json!({"id":"not-a-turn"})] {
+        let mut wrong = Vec::new();
+        check(&doc, &doc["methods"]["run.follow_up"]["result"], &value, "run.follow_up", &mut wrong);
+        assert!(!wrong.is_empty(), "invalid result passed validation: {value}");
     }
 }

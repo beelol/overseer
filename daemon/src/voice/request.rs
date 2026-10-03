@@ -1040,6 +1040,37 @@ impl Voice {
     /// mute, what's running.
     fn built_in(self: &Arc<Self>, p: &str, text: &str, via: &str) -> Option<Value> {
         let d = self.d.clone();
+        // AC-265: these exact owner phrases bypass the model. No proposal/check-in may resume.
+        let queue_command = [("send queued", "resume_queue"), ("resume queue", "resume_queue"), ("clear queued", "clear_queue"), ("clear queue", "clear_queue")]
+            .into_iter().find_map(|(phrase, action)| {
+                if p == phrase { Some((action, "")) }
+                else { p.strip_prefix(&format!("{phrase} ")).map(|name| (action, name.trim_start_matches("for ").trim_start_matches("the ").trim_end_matches(" agent"))) }
+            });
+        if let Some((action, name)) = queue_command {
+            let selected = super::settings(&d).map(|s| s.target).unwrap_or_default();
+            let targets: Vec<_> = d.roster().unwrap_or_default().into_iter()
+                .filter(|l| l.role != "overseer" && if name.is_empty() { l.id == selected } else { plain(&l.title).contains(name) }).collect();
+            heard_signal(self);
+            let [target] = targets.as_slice() else {
+                let why = if targets.is_empty() { "Name the agent whose queue you want." } else { "More than one agent matches; say its full name." };
+                speak_when_free(self, why);
+                return Some(json!({"taken":false,"built_in":action,"why":why}));
+            };
+            let id = next_id(&d);
+            let _ = record(&d, &id, text, via, &target.id, "taken", "request");
+            let result = if action == "resume_queue" { d.resume_queue(&target.id) } else { d.clear_queue(&target.id) };
+            return Some(match result {
+                Ok(result) => {
+                    let said = if action == "resume_queue" { format!("Sending queued messages to {}.", target.title) } else { format!("Cleared {}'s queue.", target.title) };
+                    self.close(&id, "done", Some(&said)); speak_when_free(self, &said);
+                    json!({"taken":true,"built_in":action,"request":id,"run":target.id,"result":result})
+                }
+                Err(e) => {
+                    self.close(&id, "not_sent", Some(&e.to_string()));
+                    json!({"taken":false,"built_in":action,"error":e.to_string()})
+                }
+            });
+        }
         // The zero-friction loop by voice (AC-252): open Overseer, follow an agent, and switch it
         // between Follow and Manual edit, each one sentence with no yes. The owner's VS Code window
         // does it (the live channel's "open"). Before "switch to …", which picks who is spoken to.

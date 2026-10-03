@@ -330,7 +330,11 @@ async function mcpClient() {
     assistant([{ type: 'text', text: 'working on: ' + text }]);
     const stop = next(m => m.type === 'control_request' && m.request?.subtype === 'interrupt').then(() => 'interrupt');
     const done = sleep(Number(process.env.FIXTURE_SLOW_MS || 5000)).then(() => 'done');
-    if ((await Promise.race([stop, done])) === 'interrupt') { result(true, 'interrupted'); await sleep(50); process.exit(130); }
+    if ((await Promise.race([stop, done])) === 'interrupt') {
+      // Synthetic interrupt latency lets queue tests observe a real pending redirect before Stop.
+      await sleep(Number(process.env.FIXTURE_INTERRUPT_DELAY_MS || 0));
+      result(true, 'interrupted'); await sleep(50); process.exit(130);
+    }
     assistant([{ type: 'text', text: 'finished: ' + text }]);
     result(false, 'finished');
   } else if (mode === 'limits' || mode === 'limits-low') {
