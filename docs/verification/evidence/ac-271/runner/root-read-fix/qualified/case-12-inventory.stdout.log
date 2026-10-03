@@ -1,0 +1,3 @@
+runner_refuses_fifo_replacement_of_copied_stage_without_blocking: test
+
+1 test, 0 benchmarks

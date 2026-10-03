@@ -1,0 +1,82 @@
+{
+  "source": "1ab71459b5b27292e8deb1b628ca35f44818bd90",
+  "stages": {
+    "process-baseline": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.075
+    },
+    "package-clean": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 5.514
+    },
+    "no-run": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 22.063
+    },
+    "case-00-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.261
+    },
+    "case-00": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.257
+    },
+    "cleanup": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.416
+    }
+  },
+  "artifacts": [
+    {
+      "name": "mods_runner",
+      "source": "/private/tmp/overseer-mods-runner-20261003/daemon/tests/mods_runner.rs",
+      "source_sha256": "675e5908db8075a738a44958711f011c286d3563a87d6f2538c2db1a5b56d77c",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_runner-75eabce2761fc28f",
+      "sha256": "70f0dcdd3a4d3a39045beb5419cbd0e6d02d9cb1514bf3e2504e45b427e7216c",
+      "fresh": false,
+      "dependency_sha256": "2f306c386686cb175abaae33fe6b18cb593d0d4af0cf62e79f1d6060fc40811e"
+    }
+  ],
+  "tests": [
+    {
+      "target": "mods_runner",
+      "name": "runner_preserves_exact_utf8_and_multiline_bytes",
+      "code": 0
+    }
+  ],
+  "allocation": "separate_target_one_worker_during_ui",
+  "since_ms": 1791055531049,
+  "dependency_sources": {
+    "daemon/tests/mods_runner.rs": "675e5908db8075a738a44958711f011c286d3563a87d6f2538c2db1a5b56d77c",
+    "daemon/tests/../src/mods/runner.rs": "b1e87ff99a429c4a77c7355037970cdac8e5aafa11f37873e022ab27c5399f71",
+    "daemon/tests/../../fixtures/mods/runner-helper.c": "382281ae4a51db4e266cee785313cbcc85b8473bc9d73e87030ed8551f353eb6"
+  },
+  "cleanup_counts": {
+    "ours": 0,
+    "others": 0
+  }
+}

@@ -1,0 +1,6 @@
+
+running 1 test
+test runner_blocked_stdin_and_separate_floods_are_bounded ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 2.28s
+
