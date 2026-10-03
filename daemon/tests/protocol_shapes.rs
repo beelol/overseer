@@ -37,6 +37,39 @@ fn captured_overseer_reply_and_completion_match_the_protocol() {
     assert!(reply["seq"].as_i64().unwrap() < completion["seq"].as_i64().unwrap());
 }
 
+#[test]
+fn ac274_native_session_grant_event_matches_the_typed_protocol() {
+    let r = tmp(); let site = repo(&r.path().join("repo"));
+    let fixture = repo_root().join("fixtures/fake-harness/claude-fixture.js").display().to_string();
+    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture),
+        ("FIXTURE_MODE", "permission-twice"), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE")]);
+    let run = run_id(&d.call("task.create", json!({"repo":site,"harness":"claude","prompt":"two writes"})));
+    let pending = d.wait_status(&run, |s| s == "waiting_for_user", 20);
+    d.call("run.permission", json!({"run_id":run,"request_id":pending["attention"]["request_id"],"allow":true,"always":true}));
+    d.wait_done(&run,20);
+    let events = d.events(&run);
+    let answered = events.iter().find(|event| event["kind"] == "permission_answered").unwrap();
+    let doc = description(); let mut wrong = Vec::new();
+    check(&doc,&doc["events"]["permission_answered"],&answered["payload"],"native grant event",&mut wrong);
+    assert!(wrong.is_empty(),"{}",wrong.join("\n"));
+    let grant = &answered["payload"]["grant"];
+    assert_eq!(grant["v"],1);
+    assert_eq!(grant["harness"],"claude");
+    assert_eq!(grant["family"],"can_use_tool");
+    assert_eq!(grant["scope"],"session");
+    assert_eq!(grant["host_replay_qualified"],true);
+    assert_eq!(grant["digest"].as_str().unwrap().len(),64);
+    // Public projection cannot be used to supply or recover the daemon's private ownership.
+    assert!(grant.get("native_id").is_none() && grant.get("run_id").is_none());
+    assert!(grant.get("suggestions").is_none() && grant.get("input").is_none());
+    for (field,value) in [("digest",Value::Null),("host_replay_qualified",json!("true")),("scope",json!("project"))] {
+        let mut invalid = answered["payload"].clone(); invalid["grant"][field] = value;
+        let mut rejected = Vec::new();
+        check(&doc,&doc["events"]["permission_answered"],&invalid,"invalid grant event",&mut rejected);
+        assert!(!rejected.is_empty(),"invalid typed grant was accepted: {invalid}");
+    }
+}
+
 /// Checks `value` against `shape`. Every field of an object must be described, every field that
 /// is not marked `?` must be there, and every type must match. Returns what is wrong, with its path.
 fn check(doc: &Value, shape: &Value, value: &Value, at: &str, wrong: &mut Vec<String>) {

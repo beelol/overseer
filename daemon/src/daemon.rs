@@ -2484,19 +2484,22 @@ impl Daemon {
     /// `always`: allow, and take the request's Always allow offer (the harness's session rule,
     /// AC-262). Refused when the request offers none.
     pub fn answer_permission_with(&self, run_id: &str, request_id: &str, allow: bool, message: &str, always: bool) -> Result<Value> {
-        let run = self.run(run_id)?;
-        if always {
-            let offered = run.attention.as_ref().filter(|a| a["request_id"].as_str() == Some(request_id)).map(|a| !a["always"].is_null());
-            if offered == Some(false) {
-                return Err(crate::server::ProtoError::new("no_always_allow", format!("{} offers no Always allow for this request", run.harness)).into());
-            }
-        }
         let allow = allow || always;
-        // Several surfaces can answer the same request (VS Code, the terminal, a phone). The
-        // request is claimed under the store's lock, so exactly one answer reaches the harness;
-        // a later one is told what the first one was.
+        // Several surfaces can answer the same request. Validate the fresh native offer and
+        // claim attention under one store lock, so a stale Always choice cannot bypass a veto.
         let by = crate::server::actor().unwrap_or_else(|| "the Mac".to_string());
-        let claimed = self.store.lock().unwrap().claim_run_attention(run_id, request_id, allow, &by, now())?;
+        let (run, claimed) = {
+            let store = self.store.lock().unwrap();
+            let run = store.run(run_id)?.ok_or_else(|| anyhow!("unknown run {run_id}"))?;
+            if always {
+                let offered = run.attention.as_ref().filter(|a| a["request_id"].as_str() == Some(request_id)).map(|a| !a["always"].is_null());
+                if offered == Some(false) {
+                    return Err(crate::server::ProtoError::new("no_always_allow", format!("{} offers no Always allow for this request", run.harness)).into());
+                }
+            }
+            let claimed = store.claim_run_attention(run_id, request_id, allow, &by, now())?;
+            (run, claimed)
+        };
         let Some(attention) = claimed else {
             if let Some(first) = self.store.lock().unwrap().permission_answer(run_id, request_id)? {
                 let by = first["by"].as_str().unwrap_or("someone").to_string();
@@ -2509,6 +2512,12 @@ impl Daemon {
             bail!("permission request {request_id} is not pending");
         };
         let offer = attention.get("always").filter(|o| always && !o.is_null());
+        // Hash the private native descriptor before event redaction, with ownership read
+        // atomically alongside the claimed request. No caller can supply this authority.
+        let grant = offer.and_then(|offer| adapters::native_session_grant(
+            &adapters::NativeGrantContext { harness:&run.harness, run_id:&run.id,
+                native_id:run.native_id.as_deref(), process_generation:run.process_generation },
+            attention["tool"].as_str().unwrap_or(""), &attention["input"], offer));
         let sent = adapters::permission_reply_always(&run.harness, request_id, allow, &attention["input"], if message.is_empty() { "Denied by user in Overseer" } else { message }, offer)
             .ok_or_else(|| anyhow!("{} does not support permission replies", run.harness))
             .and_then(|reply| self.send_stdin(&run, &reply));
@@ -2520,6 +2529,7 @@ impl Daemon {
         self.store.lock().unwrap().update_run_status(run_id, "running", None, None)?;
         let mut answered = json!({"request_id": request_id, "allow": allow, "by": by});
         if let Some(o) = offer { answered["always"] = o["label"].clone(); }
+        if let Some(grant) = grant { answered["grant"] = serde_json::to_value(grant)?; }
         self.emit(Some(&run.task_id), Some(run_id), "permission_answered", "user", "exact", answered)?;
         self.emit(Some(&run.task_id), Some(run_id), "status", "daemon", "exact", json!({"status": "running"}))?;
         if !allow {
@@ -2949,9 +2959,16 @@ impl Daemon {
                     ev("permission", "daemon", "exact", json!({"kind": "permission", "request_id": request_id, "tool": tool, "auto_allowed": "Overseer's own tool"}), None)?;
                     return Ok(());
                 }
-                // Allowed for this session already (AC-241): the same offer is answered by the
-                // daemon, so the owner is not asked again even if the harness asks.
-                if let Some(offer) = always.as_ref().filter(|o| o["label"].as_str().is_some_and(|l| store.allowed_for_session(&run.id, l).unwrap_or(false))) {
+                // AC-241 reuses the harness's actual qualified grant, never its display label.
+                // A Session event in this batch may have set native_id since tail_loop read Run.
+                let current = store.run(&run.id)?.ok_or_else(|| anyhow!("unknown run {}", run.id))?;
+                let grant = always.as_ref().and_then(|offer| adapters::native_session_grant(
+                    &adapters::NativeGrantContext { harness:&current.harness, run_id:&current.id,
+                        native_id:current.native_id.as_deref(), process_generation:current.process_generation },
+                    &tool, &input, offer));
+                let replay = grant.as_ref().map(|grant| store.allowed_for_session(&run.id, grant))
+                    .transpose()?.unwrap_or(false);
+                if let Some(offer) = always.as_ref().filter(|_| replay) {
                     if let Some(reply) = adapters::permission_reply_always(&run.harness, &request_id, true, &input, "", Some(offer)) {
                         state.sends.push(reply);
                         ev("permission", "daemon", "exact", json!({"kind": "permission", "request_id": request_id, "tool": tool, "input": input, "auto_allowed": "allowed for this session", "always": offer["label"]}), None)?;

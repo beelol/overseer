@@ -211,6 +211,14 @@
       "asked_again": "boolean",
       "started_seq": "number",
       "cause": "string"
+    },
+    "NativeSessionGrant": {
+      "v": "number",
+      "harness": "'claude'|'codex-app'",
+      "family": "'can_use_tool'|'item/commandExecution/requestApproval'",
+      "scope": "'session'",
+      "digest": "string",
+      "host_replay_qualified": "boolean"
     }
   },
   "events": {
@@ -266,7 +274,9 @@
     "permission_answered": {
       "request_id": "string",
       "allow": "boolean",
-      "by": "string?"
+      "by": "string?",
+      "always": "string?",
+      "grant": "NativeSessionGrant?"
     },
     "usage": "json",
     "error": {

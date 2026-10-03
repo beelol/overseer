@@ -160,14 +160,27 @@ async function mcpClient() {
     const decision = reply.response.response;
     if (decision.behavior === 'allow') { fs.writeFileSync(file, decision.updatedInput.content); user([{ type: 'tool_result', tool_use_id: 'toolu_write', content: 'File created successfully at: ' + file }]); assistant([{ type: 'text', text: 'wrote perm.txt' }]); result(false, 'wrote'); }
     else { user([{ type: 'tool_result', tool_use_id: 'toolu_write', content: 'Permission denied: ' + decision.message, is_error: true }]); assistant([{ type: 'text', text: 'permission denied: ' + decision.message }]); result(false, 'denied'); }
-  } else if (mode === 'permission-twice') {
+  } else if (['permission-twice', 'permission-changed-rule-behavior', 'permission-changed-rule-type', 'permission-changed-rule-destination', 'permission-suppress-always', 'permission-suppress-second'].includes(mode)) {
     const suggestions = [{ type: 'addRules', rules: [{ toolName: 'Write' }], behavior: 'allow', destination: 'session' }];
     let denied = false;
     for (const [n, name] of [[1, 'one.txt'], [2, 'two.txt']]) {
       const file = path.join(process.cwd(), name);
       const input = { file_path: file, content: `${name}\n` };
       assistant([{ type: 'tool_use', id: `toolu_write${n}`, name: 'Write', input }]);
-      out({ type: 'control_request', request_id: `req-${n}`, request: { subtype: 'can_use_tool', tool_name: 'Write', input, permission_suggestions: suggestions } });
+      if (n === 2) {
+        // Explicit test-only boundary: lets a test seed an old durable grant before the next ask.
+        if (process.env.FIXTURE_PERMISSION_SECOND_GATE) {
+          const deadline = Date.now() + 30000;
+          while (!fs.existsSync(process.env.FIXTURE_PERMISSION_SECOND_GATE) && Date.now() < deadline) await sleep(10);
+          if (!fs.existsSync(process.env.FIXTURE_PERMISSION_SECOND_GATE)) { result(true, 'second permission gate timed out'); return; }
+        }
+        if (mode === 'permission-changed-rule-behavior') suggestions[0].behavior = 'deny';
+        if (mode === 'permission-changed-rule-type') suggestions[0].type = 'replaceRules';
+        // Invalid native destination that deliberately produces the same presentation label.
+        if (mode === 'permission-changed-rule-destination') suggestions[0].destination = 'this session';
+      }
+      const suppressed = mode === 'permission-suppress-always' || (mode === 'permission-suppress-second' && n === 2);
+      out({ type: 'control_request', request_id: `req-${n}`, request: { subtype: 'can_use_tool', tool_name: 'Write', input, permission_suggestions: suggestions, ...(suppressed ? { suppress_always_allow_rule: true } : {}) } });
       const reply = await next(m => m.type === 'control_response' || (m.type === 'control_request' && m.request?.subtype === 'interrupt'));
       if (reply.type === 'control_request') { result(true, 'interrupted'); await sleep(50); process.exit(130); }
       const decision = reply.response.response;
