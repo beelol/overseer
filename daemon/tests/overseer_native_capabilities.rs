@@ -454,3 +454,121 @@ fn ac200_modified_legacy_config_refuses_without_discarding_added_policy() {
         "saved policy is not dropped"
     );
 }
+
+#[test]
+fn ac200_legacy_migration_refuses_neighboring_duplicate_tool_policy() {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let d = fixture();
+    let session = wait_idle(&d);
+    let run = session["run_id"].as_str().unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let before: (i64, String) = db
+        .query_row(
+            "SELECT process_generation,run_dir FROM runs WHERE id=?1",
+            [run],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    let actual: Value =
+        serde_json::from_slice(&std::fs::read(Path::new(&before.1).join("launch.json")).unwrap())
+            .unwrap();
+    let launch_args: Vec<String> = actual["args"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|arg| arg.as_str().unwrap().to_string())
+        .collect();
+    let at = launch_args
+        .iter()
+        .position(|arg| arg == "--mcp-config")
+        .unwrap();
+    let mut body: Value =
+        serde_json::from_slice(&std::fs::read(&launch_args[at + 1]).unwrap()).unwrap();
+    let old = d.call("overseer.token", json!({"run_id":run,"role":"overseer"}))["token"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    body["mcpServers"]["overseer"]["args"] = json!(["mcp", "--socket", d.socket()]);
+    body["mcpServers"]["overseer"]["env"] = json!({"OVERSEER_MCP_TOKEN":old});
+    let config = d.home.path().join("overseer/scratch/mcp.json");
+    let original = serde_json::to_vec(&body).unwrap();
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&config)
+        .unwrap();
+    file.write_all(&original).unwrap();
+    drop(file);
+    // Inject the exact generated legacy group plus a later synthetic owner
+    // policy. Appending new generated flags could reorder its precedence;
+    // migration must refuse this ambiguity rather than claim preservation.
+    let mut args = launch_args[at..at + 7].to_vec();
+    args[1] = config.display().to_string();
+    args.extend([
+        "--disallowedTools".into(),
+        "synthetic-added-tool-policy".into(),
+    ]);
+    let raw: String = db
+        .query_row("SELECT launch FROM runs WHERE id=?1", [run], |r| r.get(0))
+        .unwrap();
+    let mut meta: Value = serde_json::from_str(&raw).unwrap();
+    meta["generic"]["extra_args"] = json!(args);
+    db.execute(
+        "UPDATE runs SET launch=?2 WHERE id=?1",
+        rusqlite::params![run, meta.to_string()],
+    )
+    .unwrap();
+    let attempted = d.try_call(
+        "run.follow_up",
+        json!({"run_id":run,"prompt":"Summarize current work again."}),
+    );
+    // Finish any baseline process before the intended refusal assertion. This
+    // fixture tests the daemon's admission boundary, not installed flag parsing.
+    if attempted.is_ok() {
+        wait_idle(&d);
+    }
+    let error = attempted.expect_err(
+        "migration must refuse neighboring duplicate tool policy instead of reordering it",
+    );
+    assert!(
+        error.contains("ambiguous remaining legacy Overseer tool policy"),
+        "{error}"
+    );
+    let after: (i64, String) = db
+        .query_row(
+            "SELECT process_generation,run_dir FROM runs WHERE id=?1",
+            [run],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(
+        after, before,
+        "ambiguous saved policy never launches a replacement process"
+    );
+    assert_eq!(
+        std::fs::read(&config).unwrap(),
+        original,
+        "old config remains intact"
+    );
+    let capabilities: i64 = db
+        .query_row(
+            "SELECT COUNT(*) FROM overseer_tokens WHERE run_id=?1 AND native_turn_id IS NOT NULL",
+            [run],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        capabilities, 1,
+        "no replacement capability minted for ambiguous policy"
+    );
+    let persisted: String = db
+        .query_row("SELECT launch FROM runs WHERE id=?1", [run], |r| r.get(0))
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&persisted).unwrap()["generic"]["extra_args"],
+        json!(args),
+        "saved policy remains recorded"
+    );
+}
