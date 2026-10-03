@@ -325,8 +325,20 @@ mod mac {
         chmod(&stage.dir, 0o500)?;
         // Retain a read-only descriptor to the exact copied inode. Named-entry
         // validation below also refuses replacement of our private staging path.
-        let readonly = open_at(stage.dir.as_raw_fd(), &name, libc::O_RDONLY, 0)?;
-        if !same_object(&output, &readonly)? {
+        // A replaced FIFO must not block before type/identity validation can
+        // refuse it, just as with the source and final named-entry opens.
+        let readonly = open_at(
+            stage.dir.as_raw_fd(),
+            &name,
+            libc::O_RDONLY | libc::O_NONBLOCK,
+            0,
+        )?;
+        if !readonly
+            .metadata()
+            .map_err(|_| "program_changed")?
+            .is_file()
+            || !same_object(&output, &readonly)?
+        {
             return Err("program_changed");
         }
         stage.program = Some(readonly);
