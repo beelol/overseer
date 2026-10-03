@@ -1,0 +1,11 @@
+FAIL late_starting_snapshot_cannot_replace_live_listening
+AssertionError [ERR_ASSERTION]: older snapshot cannot regress the host
++ actual - expected
+
++ 'starting'
+- 'listening'
+
+    at /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:45:10
+    at async /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:65:11
+PASS off_state_then_toggle_explicitly_reenables
+1/2 Voice state ordering tests passed

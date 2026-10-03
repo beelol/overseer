@@ -1,0 +1,7 @@
+[2026-10-03T19:35:45.398Z] ERROR Error: Timed out in webview waiting for ['listening', 'thinking'].includes(document.getElementById('voice-state').dataset.state) (last: false)
+    at Frame.waitFor (/private/tmp/overseer-closeout-observed-20261003/test/ui/cdp.js:278:11)
+    at async /private/tmp/overseer-closeout-observed-20261003/test/ui/scenario-voice.js:434:5
+[2026-10-03T19:35:45.638Z] screenshot docs/verification/evidence/ui/voice/52-error.png
+[2026-10-03T19:35:46.039Z] background window: main-process events [{"ms":183,"what":"window created","show":true},{"ms":236,"what":"window shown"}]
+1 check(s) failed
+SCENARIO FAILED /private/tmp/ovs-ui-I0a9sY
