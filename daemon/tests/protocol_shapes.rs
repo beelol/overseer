@@ -11,6 +11,32 @@ fn description() -> Value {
     serde_json::from_str(&std::fs::read_to_string(repo_root().join("protocol/protocol.json")).unwrap()).unwrap()
 }
 
+#[test]
+fn captured_overseer_reply_and_completion_match_the_protocol() {
+    let fixture = repo_root().join("fixtures/fake-harness/claude-fixture.js").display().to_string();
+    let d = Daemon::start(&[("OVERSEER_TEST_NET", "1"), ("OVERSEER_CONTINUITY_PROBES", "off"), ("OVERSEER_CLAUDE_PATH", &fixture)]);
+    d.call("overseer.send", json!({"text":"Request V-0210: please add tests", "surface":"ctl", "harness":"claude"}));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    let events = loop {
+        let events = d.call("events.list", json!({"limit":5000}))["events"].as_array().unwrap().clone();
+        if events.iter().any(|e| e["kind"] == "overseer_turn_processed") { break events; }
+        assert!(std::time::Instant::now() < deadline, "no processed completion: {events:?}");
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    };
+    let doc = description();
+    let mut wrong = Vec::new();
+    let completion = events.iter().find(|e| e["kind"] == "overseer_turn_processed").unwrap();
+    let reply = events.iter().find(|e| e["kind"] == "overseer_message" && e["payload"]["message"]["source"] == "overseer").unwrap();
+    for e in [reply, completion] {
+        check(&doc, &doc["events"][e["kind"].as_str().unwrap()], &e["payload"], "captured event", &mut wrong);
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+    assert_eq!(reply["payload"]["turn"], completion["payload"]["turn"]);
+    assert_eq!(completion["payload"]["turn"]["requests"], json!(["V-0210"]));
+    assert_eq!(completion["payload"]["turn"]["cause"], "owner");
+    assert!(reply["seq"].as_i64().unwrap() < completion["seq"].as_i64().unwrap());
+}
+
 /// Checks `value` against `shape`. Every field of an object must be described, every field that
 /// is not marked `?` must be there, and every type must match. Returns what is wrong, with its path.
 fn check(doc: &Value, shape: &Value, value: &Value, at: &str, wrong: &mut Vec<String>) {
@@ -53,6 +79,15 @@ fn check(doc: &Value, shape: &Value, value: &Value, at: &str, wrong: &mut Vec<St
             Some(map) => map.iter().for_each(|(k, v)| check(doc, &json!(inner), v, &format!("{at}.{k}"), wrong)),
             None => wrong.push(format!("{at}: expected an object, got {value}")),
         }
+        return;
+    }
+    if text.contains('|') && !text.contains('\'') {
+        for variant in text.split('|') {
+            let mut variant_wrong = Vec::new();
+            check(doc, &json!(variant.trim()), value, at, &mut variant_wrong);
+            if variant_wrong.is_empty() { return; }
+        }
+        wrong.push(format!("{at}: expected one of {text}, got {value}"));
         return;
     }
     if text.contains('\'') {
@@ -122,7 +157,12 @@ fn ac134_the_daemon_sends_what_the_description_says() {
     let base = option(&d, &run, "task_start", None)["base"].as_str().unwrap().to_string();
     call("run.follow_up", json!({"run_id": run, "prompt": "again"}));
     d.wait_done(&run, 20);
+    call("run.interrupt", json!({"run_id":run}));
+    let paused = call("run.follow_up", json!({"run_id":run,"prompt":"wait for explicit resume"}));
+    assert_eq!(paused, json!({"delivery":"queued"}));
     call("state", json!({}));
+    d.call("run.resume_queue", json!({"run_id":run}));
+    d.wait_done(&run, 20);
     for (method, params) in [
         ("harness.list", json!({})), ("profile.list", json!({})), ("profile.status", json!({"id": "system-claude"})), ("repo.inspect", json!({"path": repo})), ("repo.known", json!({})),
         ("repo.files", json!({"workspace_id": ws, "query": "read"})), ("run.turns", json!({"run_id": run})), ("run.raw_output", json!({"run_id": run, "max_bytes": 2000})),
@@ -180,7 +220,9 @@ fn ac134_the_daemon_sends_what_the_description_says() {
     }
     // What the app does not read is allowed to be there, and is named here so it is a choice.
     // overseer_message is Overseer's own conversation (Gate S): the phone reads it with Talk to Overseer (AC-128).
-    let quiet: std::collections::BTreeSet<String> = ["daemon_started", "interrupt_requested", "reattached", "daemon_stopping", "background_notice", "workspace_removed", "daemon_error", "merge_back", "overseer_message"].iter().map(|s| s.to_string()).collect();
+    // proposal and proposal_answered are that conversation's yes/no: a waiting permission comes up
+    // in it by itself (AC-230).
+    let quiet: std::collections::BTreeSet<String> = ["daemon_started", "interrupt_requested", "reattached", "daemon_stopping", "background_notice", "workspace_removed", "daemon_error", "merge_back", "overseer_message", "proposal", "proposal_answered"].iter().map(|s| s.to_string()).collect();
     let surprising: Vec<&String> = not_described.difference(&quiet).collect();
     assert!(surprising.is_empty(), "event kinds with no description: {surprising:?}");
     println!("{} methods and {} events of {} kinds match the description", checked.len(), events.len(), kinds.len());
@@ -208,5 +250,15 @@ fn ac134_the_apps_types_are_generated_from_the_description() {
             continue;
         }
         assert!(generated.contains(&format!("  \"{name}\": '{}',", m["class"].as_str().unwrap())), "{name} is in the generated types with its class");
+    }
+}
+
+#[test]
+fn ac265_follow_up_description_rejects_false_queued_and_turn_acknowledgements() {
+    let doc = description();
+    for value in [json!({"delivery":"sent"}), json!({"delivery":"queued","started_ms":1}), json!({"id":"not-a-turn"})] {
+        let mut wrong = Vec::new();
+        check(&doc, &doc["methods"]["run.follow_up"]["result"], &value, "run.follow_up", &mut wrong);
+        assert!(!wrong.is_empty(), "invalid result passed validation: {value}");
     }
 }

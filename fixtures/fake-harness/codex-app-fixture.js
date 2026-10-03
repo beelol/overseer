@@ -301,7 +301,23 @@ rl.on('line', line => {
       };
       const turnDelay = Number(process.env.FIXTURE_TURN_DELAY_MS ??
         (process.env.FIXTURE_MODE === 'managed-delay' ? 6000 : 0));
-      if (turnDelay > 0 && turnDelay <= 10000 &&
+      const parentGate = prompt === 'hold parent' && process.env.FIXTURE_HOLD_PARENT_GATE;
+      if (parentGate) {
+        // An explicit fixture barrier makes account overlap deterministic, even if metadata
+        // reads or the test thread are delayed. Other prompts retain their normal behavior.
+        const deadline = Date.now() + 30000;
+        const poll = () => {
+          if (fs.existsSync(parentGate)) { finish(); return; }
+          if (Date.now() >= deadline) {
+            pendingTurnTimer = null;
+            out({ method: 'turn/completed', params: { threadId: thread,
+              turn: { id: turn, status: 'failed', error: { message: 'fixture parent gate expired' } } } });
+            return;
+          }
+          pendingTurnTimer = setTimeout(poll, 10);
+        };
+        poll();
+      } else if (turnDelay > 0 && turnDelay <= 10000 &&
           (prompt === 'browser check' || prompt === 'hold parent' || prompt.startsWith('Continue the same task'))) {
         pendingTurnTimer = setTimeout(finish, turnDelay);
       } else finish();
