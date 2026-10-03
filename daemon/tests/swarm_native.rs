@@ -551,6 +551,46 @@ fn end_run(d: &Daemon, run: &str) {
     }
 }
 
+/// The real Codex fixture's parent gate has a 30-second deadline. Keep each
+/// matrix snapshot inside that window and release it even if an assertion fails.
+struct MatrixHold {
+    release: PathBuf,
+    trace: PathBuf,
+    started: Instant,
+}
+impl MatrixHold {
+    fn arm(release: &Path, trace: &Path) -> Self {
+        match std::fs::remove_file(release) {
+            Ok(()) => {},
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {},
+            Err(e) => panic!("reset matrix fixture release: {e}"),
+        }
+        std::fs::write(trace, "").unwrap();
+        Self { release: release.to_path_buf(), trace: trace.to_path_buf(), started: Instant::now() }
+    }
+    fn wait(&self, d: &Daemon, run: &str) {
+        loop {
+            assert!(self.started.elapsed() < Duration::from_secs(25), "matrix fixture did not start inside its bounded gate window");
+            if std::fs::read_to_string(&self.trace).unwrap_or_default().lines().any(|line| line.starts_with("turn_model:")) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        d.wait_status(run, |s| s == "running", 20);
+        self.assert_held(d, run);
+    }
+    fn assert_held(&self, d: &Daemon, run: &str) {
+        let observed = d.run(run);
+        assert!(self.started.elapsed() < Duration::from_secs(25), "matrix snapshot exceeded fixture hold window");
+        assert!(!self.release.exists(), "matrix fixture was released before its snapshot");
+        assert_eq!(observed["status"], "running", "matrix snapshot requires its actual run to remain held");
+    }
+    fn release(&self) { std::fs::write(&self.release, "open").unwrap(); }
+}
+impl Drop for MatrixHold {
+    fn drop(&mut self) { let _ = std::fs::write(&self.release, "open"); }
+}
+
 /// SWARM-01's four combinations on one daemon, with the Swarm fixture API
 /// off (the product path) and the native director on: Manual and Auto (Auto
 /// Mode's root) with Swarm off, and a normal Swarm start with Auto Mode off
@@ -563,12 +603,16 @@ fn end_run(d: &Daemon, run: &str) {
 fn four_way_launch_matrix_auto_manual_by_swarm_on_off() {
     let draws = tmp();
     let draw_file = draws.path().join("draws.json");
+    let dir = tmp();
+    let parent_gate = dir.path().join("matrix-parent-release");
+    let parent_trace = dir.path().join("matrix-parent-trace");
     let codex = repo_root().join("fixtures/fake-harness/codex-app-fixture.js").display().to_string();
-    let w = world(&[("OVERSEER_SWARM_FIXTURE_API", "0"), ("OVERSEER_SHARED_BOOKING_FIXTURE_API", "1"),
+    let w = world_in(dir, &[("OVERSEER_SWARM_FIXTURE_API", "0"), ("OVERSEER_SHARED_BOOKING_FIXTURE_API", "1"),
         ("OVERSEER_SWARM_FIXTURE_DRAW", draw_file.to_str().unwrap()),
-        ("OVERSEER_CODEX_PATH", codex.as_str()), ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "8000"),
+        ("OVERSEER_CODEX_PATH", codex.as_str()), ("FIXTURE_MODE", "managed-models"),
+        ("FIXTURE_HOLD_PARENT_GATE", parent_gate.to_str().unwrap()), ("FIXTURE_TRACE_FILE", parent_trace.to_str().unwrap()),
         ("OVERSEER_HARNESS_ENV_PASSTHROUGH",
-            "CLAUDE_FIXTURE_MODE,CLAUDE_FIXTURE_VERSION,CLAUDE_FIXTURE_HELP,CLAUDE_FIXTURE_SWARM_SCRIPT,CLAUDE_FIXTURE_SWARM_WORKERS,FIXTURE_MODE,FIXTURE_TURN_DELAY_MS")]);
+            "CLAUDE_FIXTURE_MODE,CLAUDE_FIXTURE_VERSION,CLAUDE_FIXTURE_HELP,CLAUDE_FIXTURE_SWARM_SCRIPT,CLAUDE_FIXTURE_SWARM_WORKERS,FIXTURE_MODE,FIXTURE_HOLD_PARENT_GATE,FIXTURE_TRACE_FILE")]);
     let d = &w.d;
     let workers_profile = d.call("profile.create", json!({"name":"workers","harness":"claude"}))["id"]
         .as_str().unwrap().to_string();
@@ -580,30 +624,38 @@ fn four_way_launch_matrix_auto_manual_by_swarm_on_off() {
     // Manual × Swarm off: an ordinary start. Its automatic booking attempt
     // finds no qualified draw for the account, so it runs unbooked.
     d.call("auto.mode.set", json!({"enabled":false}));
+    let manual_hold = MatrixHold::arm(&parent_gate, &parent_trace);
     let manual = run_id(&d.call("task.create", json!({"repo":w.checkout,"harness":"codex-app","model":"gpt-6-sol",
-        "effort":"medium","prompt":"hold","title":"manual"})));
-    d.wait_status(&manual, |s| s == "running", 20);
+        "effort":"medium","prompt":"hold parent","title":"manual"})));
+    manual_hold.wait(d, &manual);
     let (runs, workers) = swarm_totals(d);
     let manual_off = Cell { path: launch_path(d, &manual), bookings: bound_bookings(d, &manual), slots: active(d),
         swarm_runs: runs, swarm_workers: workers };
+    manual_hold.assert_held(d, &manual);
+    manual_hold.release();
     end_run(d, &manual);
+    drop(manual_hold);
 
     // Auto × Swarm off: an Auto root. Its route is Auto's choice and its
     // account is held by Auto's unknown-draw claim on the whole pool.
     d.call("auto.mode.set", json!({"enabled":true}));
+    let auto_hold = MatrixHold::arm(&parent_gate, &parent_trace);
     let root = d.call("auto.start", json!({"work_unit_id":"matrix-root","repo":w.checkout,"workspace_mode":"worktree",
         "prompt":"hold parent","title":"auto","allowed_profiles":["system-codex"],"min_tier":"general",
         "required_tools":[],"sandbox":"read_only"}));
     let root_run = run_id(&root);
-    d.wait_status(&root_run, |s| s == "running", 20);
+    auto_hold.wait(d, &root_run);
     let claim: String = db(d).query_row("SELECT state FROM auto_pool_claims WHERE work_unit_id='matrix-root'",
         [], |r| r.get(0)).unwrap();
     let mut bookings = bound_bookings(d, &root_run);
     bookings.push(format!("auto_pool_claim:{claim}"));
     let (runs, workers) = swarm_totals(d);
     let auto_off = Cell { path: launch_path(d, &root_run), bookings, slots: active(d), swarm_runs: runs, swarm_workers: workers };
+    auto_hold.assert_held(d, &root_run);
     assert_eq!(root["decision"]["selected"], "system-codex/gpt-6-sol/medium", "{root}");
+    auto_hold.release();
     end_run(d, &root_run);
+    drop(auto_hold);
 
     // Swarm on, with Auto Mode off and then on: the normal start; the Claude
     // director on the approved Claude account and two native workers booked

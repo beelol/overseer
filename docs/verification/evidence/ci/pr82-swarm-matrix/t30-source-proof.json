@@ -1,0 +1,30 @@
+{
+  "head": "abf572ef53705db0e8f8b32e72a46057661057fc",
+  "cwd": "/private/tmp/overseer-closeout-corrected-20261003",
+  "source_changes": [],
+  "source_sha256": {
+    "tui/tests/parity.rs": "9790df168ff4ccb3046ea47c0d3aff12dda2f2f2ec3a6de9ff5b02a4cde56f9d",
+    "tui/tests/support/mod.rs": "3418859fa06c4815151401c02a863e2233404f385889afbe0b6543f9158c8190",
+    "tui/tests/support/qr_read.rs": "7d885fe4e949ac242adea51f3dfef6b6ad590cf3b18f8364398db99f819bad66",
+    "fixtures/fake-harness/claude-fixture.js": "f27cf285eba5e4b084f2614075dc51a18ac0192894a9c324e83ae77e42600eb4",
+    "Cargo.toml": "0923b62b8d406b56592156632028192c8978f7da06678af8f6be1387f5314ed9",
+    "Cargo.lock": "da29c39c6583cf512a6517de1d1cb0edd71b12cf2f3bcba82da3dbb93ae15ea2"
+  },
+  "artifacts": {
+    "/private/tmp/overseer-closeout-integration-target/debug/deps/parity-bc42d0ed69cd56c7": {
+      "sha256": "ba57d97444556378a8975042f6c7d17f80e165a66e7c02032c19c94d20a2e214",
+      "mtime_ns": 1791040522946826937
+    },
+    "/private/tmp/overseer-closeout-integration-target/debug/overseerd": {
+      "sha256": "f53c035cc4f27a1553a2553e8fd08c19dac09a5ff86087496fa8790c91390183",
+      "mtime_ns": 1791042535459485059
+    },
+    "/private/tmp/overseer-closeout-integration-target/debug/overseer-tui": {
+      "sha256": "9f1ab0bc9e69ea71d10fe34722c6d5951b5c73ce2477670e2239e5f54efbbc03",
+      "mtime_ns": 1791042532329995820
+    }
+  },
+  "dep_info_sha256": "0005cc3966ec2878058e76dce6eba67b2cb5af7358491a68a8bfd512a2375222",
+  "dep_info": "/private/tmp/overseer-closeout-integration-target/debug/deps/parity-bc42d0ed69cd56c7.d: tui/tests/parity.rs tui/tests/support/mod.rs tui/tests/support/qr_read.rs\n\n/private/tmp/overseer-closeout-integration-target/debug/deps/parity-bc42d0ed69cd56c7: tui/tests/parity.rs tui/tests/support/mod.rs tui/tests/support/qr_read.rs\n\ntui/tests/parity.rs:\ntui/tests/support/mod.rs:\ntui/tests/support/qr_read.rs:\n\n# env-dep:CARGO=/Users/bilal/.rustup/toolchains/stable-aarch64-apple-darwin/bin/cargo\n# env-dep:CARGO_BIN_EXE_overseer-tui=/private/tmp/overseer-closeout-integration-target/debug/overseer-tui\n# env-dep:CARGO_MANIFEST_DIR=/private/tmp/overseer-closeout-corrected-20261003/tui\n",
+  "helper": "Unchanged daemon_binary invokes cargo build -q -p overseerd once; allowed original setup, no Cargo stub or source patch."
+}

@@ -1,0 +1,87 @@
+[
+  {
+    "file": "notify-agents/01-click-opens-the-agent.png",
+    "sha256": "5948c13ed7f7825ef83768798e7f6de31ae23141b36dfd537e7c12d354419874",
+    "bytes": 151712
+  },
+  {
+    "file": "notify-agents/02-toast-names-the-agent.png",
+    "sha256": "8a9eb0abe6e610eaac8d4e8945fbc3fefb981f5e7e9b09138a03ead0609cc029",
+    "bytes": 160357
+  },
+  {
+    "file": "notify-agents/install.log",
+    "sha256": "a1d7ffd29276f40e2262508244ffe34955cb942a7976d3b22571089d5aad4bea",
+    "bytes": 212
+  },
+  {
+    "file": "notify-agents/notifications.log",
+    "sha256": "ef9753d39d3c99773df9c1ffec695bb3e21530425bf083a8a84fd2fcf056f0fc",
+    "bytes": 308
+  },
+  {
+    "file": "notify-agents/plain-words.json",
+    "sha256": "ae703d882850e3ca4990a327d286426caa7d2040b3bfca8ed3362880e9f96316",
+    "bytes": 34
+  },
+  {
+    "file": "notify-agents/result.json",
+    "sha256": "9d40729073c9c584f914be58a66944a181d3b627e396707359e55434ccfbfebf",
+    "bytes": 2008
+  },
+  {
+    "file": "notify-agents/scenario.log",
+    "sha256": "991a75adad185bf1a61d6b31baf339bab0a5779daac8d5e54bb33c55866de4b5",
+    "bytes": 1769
+  },
+  {
+    "file": "popout/01-review-beside-chat.png",
+    "sha256": "5bf857678447dc987bbc1f85ae47dc07c104830d2c09cac2ef472b59472f32f8",
+    "bytes": 261512
+  },
+  {
+    "file": "popout/02-main-window-after-pop-out.png",
+    "sha256": "71fefee58ef5bf88b4567f532a3a571db2599c2734e6fa341d56e928ef525679",
+    "bytes": 185162
+  },
+  {
+    "file": "popout/03-separate-window-1.png",
+    "sha256": "2e6b8b1ae26ab049e880779666000e7e09f37d6daf565c4fcd883575ddef5243",
+    "bytes": 130605
+  },
+  {
+    "file": "popout/04-separate-window-2.png",
+    "sha256": "7310b16c69343b41fd72b7b5e3bdae03a12e2390821b98320cd61ec4a4e2decb",
+    "bytes": 140822
+  },
+  {
+    "file": "popout/05-returned.png",
+    "sha256": "dcd51065cec48830231dd3a17c670136f68e162bb09c8327e22d17193aec1907",
+    "bytes": 284426
+  },
+  {
+    "file": "popout/06-closed-window-returned.png",
+    "sha256": "3786bc9cf4845295e6f7f3d14865805c84b0355d9b8624a6d036a5a458b538fb",
+    "bytes": 293595
+  },
+  {
+    "file": "popout/install.log",
+    "sha256": "a1d7ffd29276f40e2262508244ffe34955cb942a7976d3b22571089d5aad4bea",
+    "bytes": 212
+  },
+  {
+    "file": "popout/plain-words.json",
+    "sha256": "d8122fa50ecf26db100ba0ff427d5186c2a483ae7bf399ad1994307d83dcf90d",
+    "bytes": 34
+  },
+  {
+    "file": "popout/result.json",
+    "sha256": "a7aded67600c7d4fe5f42e33e466bdb29790a7478f71eccdb4a543fec1a1e7f1",
+    "bytes": 4330
+  },
+  {
+    "file": "popout/scenario.log",
+    "sha256": "1133396af87c6b6add256c84c4d1c35992d42bfdf5dc9ddbbe4db446ca20b60d",
+    "bytes": 3068
+  }
+]

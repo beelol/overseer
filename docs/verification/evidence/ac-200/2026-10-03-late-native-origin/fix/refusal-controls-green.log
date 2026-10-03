@@ -1,0 +1,7 @@
+
+running 2 tests
+test ac200_daemon_and_mcp_refusals_redact_invalid_claim_action_and_file ... ok
+test ac200_mcp_fallback_redacts_daemon_transport_errors ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 1.48s
+

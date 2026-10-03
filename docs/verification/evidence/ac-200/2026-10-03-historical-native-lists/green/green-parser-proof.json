@@ -1,0 +1,8 @@
+{
+  "manifest_path": "/private/tmp/overseer-native-legacy-lists-20261003/daemon/Cargo.toml",
+  "source": "/private/tmp/overseer-native-legacy-lists-20261003/daemon/src/main.rs",
+  "profile_test": true,
+  "fresh": false,
+  "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/overseerd-e1f16db50435eb72",
+  "sha256": "df63dfbb83c55021dfcfac29269b83a3f4505448bdd6d84908ca4418bc8af4c5"
+}

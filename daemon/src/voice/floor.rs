@@ -31,6 +31,20 @@ pub fn is_command_verb(w: &str) -> bool {
     COMMAND_VERBS.contains(&w)
 }
 
+/// Whether the words name Overseer and give it an instruction ("-overseer. Start an agent in the
+/// site repo…"): such a request is Overseer's whatever its own judgement says (AC-229).
+pub fn names_overseer_with_instruction(text: &str) -> bool {
+    let words: Vec<String> = text
+        .to_lowercase()
+        .replace(['-', '’', '\''], " ")
+        .split_whitespace()
+        .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+        .filter(|w| !w.is_empty())
+        .collect();
+    words.iter().any(|w| w == "overseer")
+        && words.iter().any(|w| w != "overseer" && COMMAND_VERBS.contains(&w.as_str()))
+}
+
 /// Whether words are surely meant for Overseer, with no model (AC-228): they name Overseer, lead
 /// with a command or a stop word, or answer a question Overseer asked. Such a request is taken with
 /// "On it." at once and Overseer is not asked whether it was meant for it; words that are only
@@ -278,6 +292,17 @@ impl Voice {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// AC-229: a request that names Overseer and instructs it, as the recognizer wrote it.
+    #[test]
+    fn named_with_an_instruction() {
+        assert!(names_overseer_with_instruction("-overseer. Start an agent in the site repo to draft the page's sections."));
+        assert!(names_overseer_with_instruction("Overseer, tell Phone to rebase."));
+        assert!(addressed_strongly("-overseer. Start an agent in the site repo to draft the page's sections.", false));
+        assert!(!names_overseer_with_instruction("Overseer, what is everyone doing?"));
+        assert!(!names_overseer_with_instruction("Start an agent in the site repo."));
+        assert!(!names_overseer_with_instruction("Are you done with the dishes?"));
+    }
 
     #[test]
     fn meant_for_overseer() {

@@ -1,0 +1,22 @@
+checks	Rust (daemon and TUI)	2026-10-03T16:19:26.0946190Z thread 't30_follow_in_the_review' (110884) panicked at tui/tests/parity.rs:1042:9:
+checks	Rust (daemon and TUI)	2026-10-03T16:19:26.0946890Z a.txt: the review moved 325.687708ms after the edit
+checks	Rust (daemon and TUI)	2026-10-03T16:19:26.0947510Z note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+checks	Rust (daemon and TUI)	2026-10-03T16:19:26.0948130Z 
+checks	Rust (daemon and TUI)	2026-10-03T16:47:35.8908970Z Manual x Swarm off: Cell { path: "ordinary", bookings: [], slots: 0, swarm_runs: 0, swarm_workers: 0 }
+checks	Rust (daemon and TUI)	2026-10-03T16:47:35.8910050Z Auto x Swarm off: Cell { path: "auto_root", bookings: ["auto_pool_claim:active"], slots: 1, swarm_runs: 0, swarm_workers: 0 }
+checks	Rust (daemon and TUI)	2026-10-03T16:47:35.8911290Z Manual x Swarm on: Cell { path: "swarm_director+swarm_worker+swarm_worker", bookings: ["director:", "worker:swarm:slot", "worker:swarm:slot"], slots: 3, swarm_runs: 1, swarm_workers: 2 }
+checks	Rust (daemon and TUI)	2026-10-03T16:47:35.8912620Z Auto x Swarm on: Cell { path: "swarm_director+swarm_worker+swarm_worker", bookings: ["director:", "worker:swarm:slot", "worker:swarm:slot"], slots: 3, swarm_runs: 2, swarm_workers: 4 }
+checks	Rust (daemon and TUI)	2026-10-03T16:47:35.8913320Z 
+checks	Rust (daemon and TUI)	2026-10-03T16:47:35.8913910Z thread 'four_way_launch_matrix_auto_manual_by_swarm_on_off' (763064) panicked at daemon/tests/swarm_native.rs:675:5:
+checks	Rust (daemon and TUI)	2026-10-03T16:47:35.8915620Z assertion `left == right` failed: an ordinary start: one slot, unbooked while its draw is unknown, no Swarm
+checks	Rust (daemon and TUI)	2026-10-03T16:47:35.8916390Z   left: Cell { path: "ordinary", bookings: [], slots: 0, swarm_runs: 0, swarm_workers: 0 }
+checks	Rust (daemon and TUI)	2026-10-03T16:47:35.8917130Z  right: Cell { path: "ordinary", bookings: [], slots: 1, swarm_runs: 0, swarm_workers: 0 }
+checks	Rust (daemon and TUI)	2026-10-03T16:47:35.8918020Z note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+checks	Rust (daemon and TUI)	2026-10-03T16:47:35.8918340Z 
+checks	Rust (daemon and TUI)	2026-10-03T16:47:35.8918350Z 
+checks	Rust (daemon and TUI)	2026-10-03T16:47:35.8918460Z failures:
+checks	Rust (daemon and TUI)	2026-10-03T16:47:35.8918830Z     four_way_launch_matrix_auto_manual_by_swarm_on_off
+checks	Rust (daemon and TUI)	2026-10-03T16:47:35.8919180Z 
+checks	Rust (daemon and TUI)	2026-10-03T16:47:35.8919610Z test result: FAILED. 18 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 49.06s
+checks	Rust (daemon and TUI)	2026-10-03T16:47:35.8920080Z 
+checks	Rust (daemon and TUI)	2026-10-03T16:47:35.8926440Z [1m[91merror[0m: test failed, to rerun pass `-p overseerd --test swarm_native`

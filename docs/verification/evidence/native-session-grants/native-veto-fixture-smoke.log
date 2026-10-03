@@ -1,0 +1,2 @@
+PASS fixture-only permission-suppress-always (native veto preserved, deny acts on nothing)
+PASS fixture-only permission-suppress-second (native veto preserved, one-time allow has no rule update)

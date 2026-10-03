@@ -1,0 +1,381 @@
+{
+  "checks": [
+    {
+      "name": "the status bar shows the connection: online, quietly",
+      "ok": true,
+      "detail": {
+        "text": "",
+        "aria": "Connection: Online"
+      }
+    },
+    {
+      "name": "the side bar says nothing about the connection while online",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "the first time, one notice above the composer says what Continuity does and shows downloads and install as off",
+      "ok": true,
+      "detail": {
+        "title": "Continuity is on",
+        "switches": [
+          "allowModelDownloads:off",
+          "allowOllamaInstall:off"
+        ]
+      }
+    },
+    {
+      "name": "until opened it is one line, Continuity is on · Got it, within the composer's text budget",
+      "ok": true,
+      "detail": {
+        "open": false,
+        "text": "Continuity is on Got it"
+      }
+    },
+    {
+      "name": "opened, it says what may happen and its Allow is one click",
+      "ok": true,
+      "detail": {
+        "open": true,
+        "allowVisible": true,
+        "line": "If the connection drops, agents keep wor"
+      }
+    },
+    {
+      "name": "when downloads are first allowed, Overseer offers once to keep the best-fitting model ready, naming it and its size; Not now leaves prefetch off",
+      "ok": true,
+      "detail": {
+        "offerToast": "Source: Overseer\nKeep it ready\nNot now\nKeep qwen3-coder:30b ready for offline? (already installed)",
+        "afterOffer": {
+          "prefetch": false,
+          "again": false
+        }
+      }
+    },
+    {
+      "name": "Allow downloads flips the setting in the daemon, and the notice shows it",
+      "ok": true,
+      "detail": {
+        "allowed": true,
+        "switched": "allowed"
+      }
+    },
+    {
+      "name": "Got it dismisses the notice, and the daemon records it",
+      "ok": true,
+      "detail": {
+        "gone": true,
+        "notice": {
+          "allow_model_downloads": true,
+          "allow_ollama_install": false,
+          "enabled": true,
+          "show": false,
+          "shown_ms": 1791016882219
+        }
+      }
+    },
+    {
+      "name": "the Agent menu lists local models under Local with a fit badge each",
+      "ok": true,
+      "detail": [
+        {
+          "label": "Best fit · qwen3-coder:30b",
+          "hint": "64k",
+          "disabled": false,
+          "title": "Overseer picks the best verified model that fits the memory free now"
+        },
+        {
+          "label": "qwen3-coder:30b",
+          "hint": "fits at 64k",
+          "disabled": false,
+          "title": "qwen3-coder:30b fits at a 64k context: 24.3 GiB of 51.2 GiB."
+        },
+        {
+          "label": "qwen2.5-coder:14b",
+          "hint": "fits at 32k · failed its check",
+          "disabled": false,
+          "title": "qwen2.5-coder:14b fits at a 32k context: 15.4 GiB of 51.2 GiB. Failed its check with OpenCode: wrote its tool calls as text, or said done without calling a tool; nothing ran."
+        },
+        {
+          "label": "qwen3.5:122b",
+          "hint": "too big · 78.3 GiB of 51.2 GiB · unverified",
+          "disabled": true,
+          "title": "qwen3.5:122b is too big to load: 78.3 GiB at a 16k context is over the budget of 51.2 GiB (40% of 128 GiB is 51.2 GiB; 115 GiB available minus 12.8 GiB headroom is 102.2 GiB) Not in the catalogue, so not verified with OpenCode."
+        }
+      ]
+    },
+    {
+      "name": "the badges match the daemon's dry run",
+      "ok": true,
+      "detail": {
+        "dry": {
+          "bytes": 26072893529,
+          "context": 65536,
+          "installed": true,
+          "run_tag": "qwen3-coder:30b-64k",
+          "tag": "qwen3-coder:30b"
+        }
+      }
+    },
+    {
+      "name": "offline: the status bar says Offline with the reason",
+      "ok": true,
+      "detail": {
+        "text": "Offline",
+        "aria": "Connection: Offline"
+      }
+    },
+    {
+      "name": "offline: the side bar says so under Agents",
+      "ok": true,
+      "detail": "Overseer is offline: no network (system)."
+    },
+    {
+      "name": "offline: the composer says so and blocks an online agent with the reason and a one-click move to a local model",
+      "ok": true,
+      "detail": {
+        "banner": "Overseer is offline: no network (system). Continuity is on: agents continue on a local model (qwen3-coder:30b), or wait and retry.",
+        "note": {
+          "text": "Offline: no network (system). Codex cannot be reached.Use a local model (qwen3-coder:30b)",
+          "fix": "Use a local model (qwen3-coder:30b)",
+          "disabled": true
+        }
+      }
+    },
+    {
+      "name": "no view says online while offline",
+      "ok": true,
+      "detail": {
+        "texts": [
+          "Offline",
+          "Overseer is offline: no network (system).",
+          "Overseer is offline: no network (system). Continuity is on: agents continue on a local model (qwen3-coder:30b), or wait and retry.",
+          "Offline: no network (system). Codex cannot be reached.Use a local model (qwen3-coder:30b)"
+        ]
+      }
+    },
+    {
+      "name": "one click moves the composer to the best local model",
+      "ok": true,
+      "detail": {
+        "agent": "Agent: Local model",
+        "model": "Model: Best fit · qwen3-coder:30b"
+      }
+    },
+    {
+      "name": "a local agent started from the composer asks before it writes, then completes the write check with the network fixture off",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "asked": true,
+        "wrote": "hello from the composer\n",
+        "model": "ollama/qwen3-coder:30b-64k"
+      }
+    },
+    {
+      "name": "its chat names the local model, its context and its size",
+      "ok": true,
+      "detail": "Local model qwen3-coder:30b at a 64k context · 24.3 GiB."
+    },
+    {
+      "name": "the successor is the task's agent; its chat says where it continues from",
+      "ok": true,
+      "detail": [
+        "Local model qwen3-coder:30b at a 64k context · 23.7 GiB, already loaded.",
+        "This agent continues the work of another.Open the first agent",
+        "Continued from \"Rename the helpers\" after the connection was lost at 01:41."
+      ]
+    },
+    {
+      "name": "the side bar folds the handed-off Codex under the agent that took over, with the reason",
+      "ok": true,
+      "detail": {
+        "label": "Earlier: Codex",
+        "description": "handed off · the connection was lost",
+        "level": 3,
+        "expanded": null,
+        "selected": false,
+        "focused": false,
+        "aria": "Earlier agent, Codex, handed off, the connection was lost"
+      }
+    },
+    {
+      "name": "offline with agents: the side bar line stays",
+      "ok": true,
+      "detail": "Overseer is offline: no network (system)."
+    },
+    {
+      "name": "the predecessor's chat announces the transition in the owner's words, and reads handed off, not failed",
+      "ok": true,
+      "detail": {
+        "told": [
+          "The connection was lost; the agent keeps trying to reconnect. · 1 attempts",
+          "The work continues in another agent.Open it",
+          "Transitioning to qwen3-coder:30b (local, Ollama) because you've disconnected. Work continues in the same worktree."
+        ],
+        "status": "Handed off"
+      }
+    },
+    {
+      "name": "a waiting agent shows one quiet card: what is kept, the next check, Use a local model now, Retry now and Stop; its status is waiting, not failed",
+      "ok": true,
+      "detail": {
+        "title": "Waiting for a connection",
+        "line": "The connection to OpenAI failed: stream disconnected before completion: could not reach it: client error (Connect): dns failed to lookup address information. Your message is kept.",
+        "foot": "Next check in 9 s · waiting 4 s · gives up after 36 hours",
+        "actions": [
+          "Use a local model now",
+          "Retry now",
+          "Stop"
+        ],
+        "status": "Waiting for a connection",
+        "footer": [],
+        "errors": {
+          "red": 0,
+          "quiet": 1
+        }
+      }
+    },
+    {
+      "name": "one Needs-you item counts the waiting agents, and the status bar counts them too",
+      "ok": true,
+      "detail": {
+        "needs": {
+          "label": "1 agent waiting for a connection",
+          "description": "Waiting",
+          "level": 2,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Update the docs, Waiting: It retries on its own for up to 36 hours. Open one to use a local model or stop it."
+        },
+        "bar": {
+          "text": "Offline · 1 waiting",
+          "aria": "Connection: Offline, 1 agent waiting"
+        }
+      }
+    },
+    {
+      "name": "the grid keeps the waiting agent as a tile with a cloud, its card compact, and no failure",
+      "ok": true,
+      "detail": {
+        "status": "Waiting for a connection",
+        "card": true,
+        "needs": false
+      }
+    },
+    {
+      "name": "Use a local model now makes the handoff and shows the agent that took over",
+      "ok": true,
+      "detail": {
+        "taken": {
+          "at_ms": 1791016907613,
+          "offered_ms": null,
+          "predecessor": "r-4b415c2cece3",
+          "reason": "user",
+          "stay": false,
+          "successor": "r-b2ec7bc1c08f"
+        },
+        "takenDone": "completed",
+        "shownNext": true
+      }
+    },
+    {
+      "name": "back online, the local agent offers Switch back and Stay",
+      "ok": true,
+      "detail": {
+        "title": "Back online",
+        "line": "This agent can continue with Codex, in the same worktree.",
+        "actions": [
+          "Switch back to Codex",
+          "Stay here"
+        ]
+      }
+    },
+    {
+      "name": "the side bar and the status bar say nothing about being offline any more",
+      "ok": true,
+      "detail": {
+        "side": ""
+      }
+    },
+    {
+      "name": "Switch back continues in Codex, in the same worktree, in its own session",
+      "ok": true,
+      "detail": {
+        "backDone": "completed",
+        "session": "fixture-thread-30831",
+        "args": [
+          "exec",
+          "resume",
+          "fixture-thread-30831"
+        ]
+      }
+    },
+    {
+      "name": "back online, a new agent defaults to the online agent again, not the local one",
+      "ok": true,
+      "detail": "Agent: Codex · Mac's default login"
+    },
+    {
+      "name": "offline, no view overflows sideways, no unbroken run over 80 characters outside code, every icon-only control has a name",
+      "ok": true,
+      "detail": {
+        "chat": {
+          "chars": 555,
+          "longRuns": [],
+          "overflow": 0,
+          "unnamed": 0
+        },
+        "agents": {
+          "chars": 449,
+          "overflow": 0,
+          "offlineLine": 58,
+          "waitingRow": 32,
+          "rows": 10
+        }
+      }
+    },
+    {
+      "name": "the text budget: the chat with a waiting card stays under Gate J's chat budget (1050 characters); what Continuity adds to the side bar is one line under 80 characters and one row under 40",
+      "ok": true,
+      "detail": {
+        "chat": {
+          "chars": 555,
+          "longRuns": [],
+          "overflow": 0,
+          "unnamed": 0
+        },
+        "agents": {
+          "chars": 449,
+          "overflow": 0,
+          "offlineLine": 58,
+          "waitingRow": 32,
+          "rows": 10
+        }
+      }
+    },
+    {
+      "name": "after a reload the notice is not shown again",
+      "ok": true,
+      "detail": {
+        "again": false
+      }
+    }
+  ],
+  "textBudget": {
+    "chat": {
+      "chars": 555,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": 0
+    },
+    "agents": {
+      "chars": 449,
+      "overflow": 0,
+      "offlineLine": 58,
+      "waitingRow": 32,
+      "rows": 10
+    }
+  }
+}

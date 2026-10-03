@@ -330,6 +330,8 @@ Each command in `extension/package.json` has a row: the TUI's key (every key her
 | `overseer.resetGridLayout` | Reset Grid Layout | | The terminal's grid has no layout to reset: it sizes itself to the count (T-37) |
 | `overseer.whereAmI` | Where Am I | | The header, the thick border of the focused tile and the picked row always say where you are |
 | `overseer.talk` | Talk to Overseer | `o` | |
+| `overseer.mods` | Mods | `m` | Opens Mods from Grid or Zoom; Tab switches between Applied and Library. |
+| `overseer.appliedMods` | Applied Mods | `m` | Opens Applied for the focused agent; without an agent, opens Library. |
 | `overseer.switchAgent` | Switch Agent… | `tab`, `J / K` | |
 | `overseer.nextNeedsYou` | Go to Next Agent That Needs You | `w` | |
 | `overseer.allowPermission` | Allow Pending Request | `a`, `s` | |

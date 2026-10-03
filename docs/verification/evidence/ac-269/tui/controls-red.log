@@ -1,0 +1,45 @@
+   Compiling overseer-tui v0.1.0 (/private/tmp/overseer-mods-tui-20261003/tui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running tests/mods.rs (/private/tmp/overseer-closeout-verify-target/debug/deps/mods-e138392e91c00e69)
+
+running 16 tests
+test actual_overseer_target_is_read_from_state_without_creating_a_session ... ok
+test absent_turn_and_planned_bundle_remain_truthful_at_narrow_width ... ok
+test binding_edit_preserves_exact_filters_lock_id_and_disabled_override ... ok
+test compose_input_keeps_literal_m_and_does_not_open_mods ... ok
+test control_events_refresh_only_global_or_current_envelope_target ... ok
+test disconnect_invalidates_pending_reads_and_reconnect_refreshes ... ok
+test late_original_target_reply_cannot_replace_the_explicit_overseer_target ... ok
+test grid_zoom_and_dashboard_entry_restore_the_original_view ... ok
+test mixed_read_revisions_require_refresh_before_any_binding_write ... ok
+test narrow_binding_form_keeps_the_selected_field_visible ... FAILED
+test own_session_event_burst_coalesces_into_one_authoritative_state_read ... FAILED
+test no_focus_opens_library_without_requesting_an_empty_target ... ok
+test preview_confirmation_is_explicit_immutable_and_never_enables ... ok
+test removal_reviews_exact_pin_and_conflict_never_replays_the_write ... ok
+test update_uses_install_rpc_and_never_sends_a_new_binding ... ok
+test scoped_enable_and_explicit_disable_pin_exact_daemon_identifiers ... ok
+
+failures:
+
+---- narrow_binding_form_keeps_the_selected_field_visible stdout ----
+
+thread 'narrow_binding_form_keeps_the_selected_field_visible' panicked at tui/tests/mods.rs:351:5:
+keyboard focus must remain visible in a short terminal
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- own_session_event_burst_coalesces_into_one_authoritative_state_read stdout ----
+
+thread 'own_session_event_burst_coalesces_into_one_authoritative_state_read' panicked at tui/tests/mods.rs:335:5:
+assertion `left == right` failed: session event bursts need one fresh summary, not a request per event
+  left: 3
+ right: 1
+
+
+failures:
+    narrow_binding_form_keeps_the_selected_field_visible
+    own_session_event_burst_coalesces_into_one_authoritative_state_read
+
+test result: FAILED. 14 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+error: test failed, to rerun pass `-p overseer-tui --test mods`

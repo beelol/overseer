@@ -1,0 +1,16 @@
+
+running 1 test
+test ac200_interrupted_native_finding_cannot_borrow_successor_owner_turn ... same sid=os-824a9726ab93 run=r-301e8bff03d2; actual old finding turn=u-fe723f5bf272 generation=2; actual successor owner turn=u-1c294d7c3450 generation=3; predecessor MCP exit={"actual_interrupt":true,"mcp_exit":{"code":null,"signal":"SIGTERM"},"mcp_pid":95178}; shim exit={"code":130,"ended_ms":1791033517454,"signal":null,"spawn_error":null}; actual completed dispatch={"result":{"is_error":false,"text":"Read back to the owner; it needs their yes. (proposal p-1965284bdcb4)"}}; matching proposals=[Object {"actions": Array [Object {"action": String("archive"), "agent": String("r-26ef1dbe7016"), "status_then": String("completed"), "title": String("/bin/sh -c echo late-native-subject"), "why": String("synthetic-late-native-r-26ef1dbe7016")}], "answered_by": Null, "answered_ms": Null, "cause": String("owner"), "id": String("p-1965284bdcb4"), "lines": Array [String("Archive /bin/sh -c echo late-native-subject")], "message_id": String("m-861850da8dcc"), "result": Null, "settle_until": Null, "state": String("open"), "ts": Number(1791033517924), "via": String("tool")}]
+
+thread 'ac200_interrupted_native_finding_cannot_borrow_successor_owner_turn' panicked at daemon/tests/overseer_native_late_origin.rs:313:5:
+old finding archive must refuse instead of borrowing successor owner authority: {"result":{"is_error":false,"text":"Read back to the owner; it needs their yes. (proposal p-1965284bdcb4)"}}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    ac200_interrupted_native_finding_cannot_borrow_successor_owner_turn
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 8.49s
+

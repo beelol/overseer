@@ -10,6 +10,7 @@ export const routes = {
   pair: '/' as Href,
   agents: '/' as Href,
   agent: (run: string) => `/agent/${encodeURIComponent(run)}` as Href,
+  mods: (run: string) => `/agent/${encodeURIComponent(run)}/mods` as Href,
   changes: (run: string) => `/agent/${encodeURIComponent(run)}/changes` as Href,
   file: (run: string, path: string, options: { comparison?: string; hunk?: string } = {}) =>
     ({ pathname: `/agent/${encodeURIComponent(run)}/file`, params: { path, ...options } }) as unknown as Href,

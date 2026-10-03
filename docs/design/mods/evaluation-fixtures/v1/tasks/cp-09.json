@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "set_version": "1",
+  "id": "CP-09",
+  "category": "uncertain_finding",
+  "title": "State an uncertain duplicate-output finding",
+  "synthetic": true,
+  "prompt": "The reader has no earlier conversation.\nWrite a self-contained finding for a new reader. Explain what was observed, what it may mean, and the next check without reporting a confirmed cause.\n\nFixed synthetic input (not a report about real Overseer behavior):\n- A fixture transcript contains two copies of the same tool-result body.\n- Only this saved transcript has been examined; the next model request has not been captured.\n- Possible explanation: the transcript may include both raw output and a transformed view.\n- It is not yet known whether the model received both copies.\n- Next check: capture the next model request from the same isolated fixture and compare its tool-result body with the transcript.",
+  "prompt_sha256_utf8": "769535f86bf9ffa376d815e1adaf43fcc2bbbaf6308a2c96979559a410710a3f",
+  "input_facts": [
+    "A fixture transcript contains two copies of the same tool-result body.",
+    "Only this saved transcript has been examined; the next model request has not been captured.",
+    "Possible explanation: the transcript may include both raw output and a transformed view.",
+    "It is not yet known whether the model received both copies.",
+    "Next check: capture the next model request from the same isolated fixture and compare its tool-result body with the transcript."
+  ],
+  "required_facts_for_human_review": [
+    {
+      "id": "F1",
+      "description": "The observed artifact is a fixture transcript with duplicate tool-result bodies."
+    },
+    {
+      "id": "F2",
+      "description": "The next model request is unexamined."
+    },
+    {
+      "id": "F3",
+      "description": "Raw-plus-transformed display is a possible explanation, not a confirmed cause."
+    },
+    {
+      "id": "F4",
+      "description": "Duplicate model delivery is still unknown."
+    },
+    {
+      "id": "F5",
+      "description": "The next check captures and compares the actual model-facing request."
+    }
+  ],
+  "literal_checks": [],
+  "literal_check_notice": "Advisory exact-evidence diagnostics only. A literal flag cannot decide acceptance or fact preservation. Numeric substring matches can be misleading; a human may mark the semantic fact preserved despite a missing numeric literal (for example, a correctly spelled-out number). Verbatim paths, errors, commands and citations matter where the prompt requests them. All semantic facts and quality ratings require a human."
+}

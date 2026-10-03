@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "set_version": "1",
+  "id": "CP-12",
+  "category": "detailed_explanation",
+  "title": "Explain immutable turn plans in detail",
+  "synthetic": true,
+  "prompt": "The reader has no earlier conversation.\nGive the detailed technical explanation the owner requested. Use connected paragraphs to explain why each boundary exists, walk through the timeline, distinguish evidence from unknowns, and describe two useful follow-up checks. Do not shorten this into a terse status summary. Preserve the exact counters, path and supplied citation. Do not treat the synthetic source as real external evidence.\n\nFixed synthetic input (not a report about real Overseer behavior):\n- Synthetic source S1, \"Fixture turn contract v1\", supplied below; citation: https://example.invalid/synthetic-fixtures/turn-contract-v1. This reserved-domain reference is fictional and has no live page.\n- S1 says: resolve owner bindings before effects, store an immutable turn plan, and record transport acceptance separately. Replayed turns reuse the same saved plan.\n- A queued message is paused. Its enqueue time is not turn admission and creates no plan.\n- At enqueue the binding revision is 12 and Clear prose is off.\n- The owner enables a repository binding, advancing the binding revision to 13. The paused queue still sends nothing.\n- At explicit owner release, turn T7 resolves revision 13 and snapshots the selected Clear prose fingerprint before any process effects.\n- The copied text is stored privately at /fixture/turns/T7/mods/style.md; its message preface adds 620 bytes.\n- Mid-turn the owner disables the repository binding, advancing the desired revision to 14. T7 retains its revision-13 plan and copied text; the next eligible turn resolves revision 14.\n- A message-transport acceptance record proves the transport accepted the request, not that the model followed the writing rules or inherited them in child agents.\n- All-agent bindings exclude Overseer and watchers; an explicit Overseer binding is separate. Narrower owner disables and owner locks are respected by the resolver.\n- Native configuration is unverified; global text suppression is unsupported; child delivery is unknown.\n- The supplied fixture captured the queued-release prompt and found exactly 1 mod preface. It did not run a model-quality evaluation.\n- Follow-up checks: inspect a real next model request for the intended text, and separately evaluate outputs with the human prose rubric. Neither check has run in this synthetic input.",
+  "prompt_sha256_utf8": "6b15e36a4148792531b5e007ccbe512e813f281a14cd254608705e93af7e5cfa",
+  "input_facts": [
+    "Synthetic source S1, \"Fixture turn contract v1\", supplied below; citation: https://example.invalid/synthetic-fixtures/turn-contract-v1. This reserved-domain reference is fictional and has no live page.",
+    "S1 says: resolve owner bindings before effects, store an immutable turn plan, and record transport acceptance separately. Replayed turns reuse the same saved plan.",
+    "A queued message is paused. Its enqueue time is not turn admission and creates no plan.",
+    "At enqueue the binding revision is 12 and Clear prose is off.",
+    "The owner enables a repository binding, advancing the binding revision to 13. The paused queue still sends nothing.",
+    "At explicit owner release, turn T7 resolves revision 13 and snapshots the selected Clear prose fingerprint before any process effects.",
+    "The copied text is stored privately at /fixture/turns/T7/mods/style.md; its message preface adds 620 bytes.",
+    "Mid-turn the owner disables the repository binding, advancing the desired revision to 14. T7 retains its revision-13 plan and copied text; the next eligible turn resolves revision 14.",
+    "A message-transport acceptance record proves the transport accepted the request, not that the model followed the writing rules or inherited them in child agents.",
+    "All-agent bindings exclude Overseer and watchers; an explicit Overseer binding is separate. Narrower owner disables and owner locks are respected by the resolver.",
+    "Native configuration is unverified; global text suppression is unsupported; child delivery is unknown.",
+    "The supplied fixture captured the queued-release prompt and found exactly 1 mod preface. It did not run a model-quality evaluation.",
+    "Follow-up checks: inspect a real next model request for the intended text, and separately evaluate outputs with the human prose rubric. Neither check has run in this synthetic input."
+  ],
+  "required_facts_for_human_review": [
+    {
+      "id": "F1",
+      "description": "The cited synthetic contract separates resolution, immutable storage, effects and transport outcome; its citation is included and identified as fictional."
+    },
+    {
+      "id": "F2",
+      "description": "Paused enqueue at revision 12 is not admission; enabling at revision 13 does not release the queue."
+    },
+    {
+      "id": "F3",
+      "description": "Explicit release admits T7 and snapshots revision 13 before effects."
+    },
+    {
+      "id": "F4",
+      "description": "The private copied-text path and 620-byte overhead are preserved."
+    },
+    {
+      "id": "F5",
+      "description": "Disabling at revision 14 changes future desired state, not T7; replay reuses its saved plan."
+    },
+    {
+      "id": "F6",
+      "description": "Exactly one preface in a queued-release fixture is delivery evidence only, not prose-quality evidence."
+    },
+    {
+      "id": "F7",
+      "description": "All agents excludes Overseer/watchers; separate scopes, narrower disables and owner locks are explained."
+    },
+    {
+      "id": "F8",
+      "description": "Native configuration, global suppression and child coverage retain their distinct unknown/unsupported status."
+    },
+    {
+      "id": "F9",
+      "description": "Transport acceptance is not proof that the model follows rules or that children receive them."
+    },
+    {
+      "id": "F10",
+      "description": "The two unrun follow-up checks address actual model-facing delivery and separate human-rated writing quality."
+    },
+    {
+      "id": "F11",
+      "description": "The answer provides a connected causal explanation and the timeline, rather than only restating counters."
+    }
+  ],
+  "literal_checks": [
+    {
+      "id": "L1",
+      "kind": "contains_exact",
+      "literal": "https://example.invalid/synthetic-fixtures/turn-contract-v1",
+      "required_fact_id": "F1",
+      "advisory_only": true
+    },
+    {
+      "id": "L2",
+      "kind": "contains_exact",
+      "literal": "12",
+      "required_fact_id": "F2",
+      "advisory_only": true
+    },
+    {
+      "id": "L3",
+      "kind": "contains_exact",
+      "literal": "13",
+      "required_fact_id": "F3",
+      "advisory_only": true
+    },
+    {
+      "id": "L4",
+      "kind": "contains_exact",
+      "literal": "T7",
+      "required_fact_id": "F3",
+      "advisory_only": true
+    },
+    {
+      "id": "L5",
+      "kind": "contains_exact",
+      "literal": "/fixture/turns/T7/mods/style.md",
+      "required_fact_id": "F4",
+      "advisory_only": true
+    },
+    {
+      "id": "L6",
+      "kind": "contains_exact",
+      "literal": "620",
+      "required_fact_id": "F4",
+      "advisory_only": true
+    },
+    {
+      "id": "L7",
+      "kind": "contains_exact",
+      "literal": "14",
+      "required_fact_id": "F5",
+      "advisory_only": true
+    },
+    {
+      "id": "L8",
+      "kind": "contains_exact",
+      "literal": "1",
+      "required_fact_id": "F6",
+      "advisory_only": true
+    }
+  ],
+  "literal_check_notice": "Advisory exact-evidence diagnostics only. A literal flag cannot decide acceptance or fact preservation. Numeric substring matches can be misleading; a human may mark the semantic fact preserved despite a missing numeric literal (for example, a correctly spelled-out number). Verbatim paths, errors, commands and citations matter where the prompt requests them. All semantic facts and quality ratings require a human."
+}

@@ -1,0 +1,92 @@
+{
+  "run": {
+    "headSha": "5224411300c3096236eaf9f8172012667e9c2777",
+    "headBranch": "codex/test-all-failure-evidence",
+    "status": "completed",
+    "conclusion": "cancelled",
+    "createdAt": "2026-10-03T16:08:00Z",
+    "updatedAt": "2026-10-03T16:48:29Z",
+    "url": "https://github.com/beelol/overseer/actions/runs/37135720951"
+  },
+  "merge_sha": "faebefcd3db1455364cb5bc1ece69821b4027501",
+  "merge_parents": [
+    "36070dfca4074ac4bc15ce53ff71bc9298cceba8",
+    "5224411300c3096236eaf9f8172012667e9c2777"
+  ],
+  "source_blobs": {
+    "daemon/tests/swarm_native.rs": {
+      "blob_sha": "d11111743852df3bca39c4304df7a1dc0000d14d",
+      "sha256": "5e1ce453a8d4441deca35a0646397d3e266fee56243bae6ca5bfa6cecdcbd343",
+      "local_abf_blob": "d11111743852df3bca39c4304df7a1dc0000d14d",
+      "same_as_abf": true
+    },
+    "fixtures/fake-harness/codex-app-fixture.js": {
+      "blob_sha": "bda2d4541157e6eabe911d538ee8886b027da494",
+      "sha256": "343a01e1dbbf07540e76ac3947842809fd7f2a4a2edbc945e395eb39a1ea1855",
+      "local_abf_blob": "bda2d4541157e6eabe911d538ee8886b027da494",
+      "same_as_abf": true
+    },
+    ".github/workflows/checks.yml": {
+      "blob_sha": "4e4f037a948ce4cc367652e59d24dd27ccb7557a",
+      "sha256": "2d86f7384c09317318754d8fa18f8bbd544cfcc67ad069889c2040fa9dc54596",
+      "local_abf_blob": "4e4f037a948ce4cc367652e59d24dd27ccb7557a",
+      "same_as_abf": true
+    }
+  },
+  "annotations": [
+    {
+      "path": ".github",
+      "blob_href": "https://github.com/beelol/overseer/blob/5224411300c3096236eaf9f8172012667e9c2777/.github",
+      "start_line": 1,
+      "start_column": null,
+      "end_line": 1,
+      "end_column": null,
+      "annotation_level": "failure",
+      "title": "",
+      "message": "The job has exceeded the maximum execution time of 40m0s",
+      "raw_details": ""
+    },
+    {
+      "path": ".github",
+      "blob_href": "https://github.com/beelol/overseer/blob/5224411300c3096236eaf9f8172012667e9c2777/.github",
+      "start_line": 6,
+      "start_column": null,
+      "end_line": 6,
+      "end_column": null,
+      "annotation_level": "warning",
+      "title": "",
+      "message": "Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/",
+      "raw_details": ""
+    },
+    {
+      "path": ".github",
+      "blob_href": "https://github.com/beelol/overseer/blob/5224411300c3096236eaf9f8172012667e9c2777/.github",
+      "start_line": 3058,
+      "start_column": null,
+      "end_line": 3058,
+      "end_column": null,
+      "annotation_level": "failure",
+      "title": "",
+      "message": "The operation was canceled.",
+      "raw_details": ""
+    },
+    {
+      "path": ".github",
+      "blob_href": "https://github.com/beelol/overseer/blob/5224411300c3096236eaf9f8172012667e9c2777/.github",
+      "start_line": 1,
+      "start_column": null,
+      "end_line": 1,
+      "end_column": null,
+      "annotation_level": "notice",
+      "title": "",
+      "message": "Due to capacity constraints, jobs targeting macOS arm64 runners may experience longer queue times.",
+      "raw_details": ""
+    }
+  ],
+  "runner": {
+    "image": "macos-26-arm64",
+    "image_version": "20260907.0351.1",
+    "rustc": "1.99.0 (b940084d7 2026-09-28)"
+  },
+  "scope": "Public GitHub read-only receipt. Raw credentials not persisted. No local test execution."
+}
