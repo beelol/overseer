@@ -21,6 +21,8 @@ This checkout has no Mods subsystem: a search of daemon, extension, TUI, criteri
 
 The local Codex CLI reports 0.158.0. Its `exec --help` confirms `--ignore-user-config` omits config.toml while retaining authentication from CODEX_HOME. `--ignore-rules` omits execpolicy files; it is not a switch for AGENTS.md. The implemented adapter may select a different bundled executable, so qualify that resolved executable, not just PATH. Global instruction and skill suppression, resume behavior, and native-child inheritance need their own probes.
 
+Current follow-up research: [pinned transformer candidate and implementation gates](../audits/2026-10-03-transformer-readiness.md). This records a candidate only; code pieces remain unavailable.
+
 ## Recommended delivery
 
 Keep the agreed bundle architecture. Ship the smallest reusable slice in two phases, each with its own criteria and review. Text delivery can be released before a transformer is qualified; the transformer must not be represented as active merely because its card exists.
