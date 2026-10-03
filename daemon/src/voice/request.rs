@@ -337,8 +337,7 @@ pub fn start(v: &Arc<Voice>) {
                     })
                     .await;
                 }
-                "proposal" | "proposal_answered" | "overseer_message" | "turn_completed"
-                | "turn_failed" => {
+                "proposal" | "proposal_answered" | "overseer_message" | "overseer_turn_processed" => {
                     let _ = tokio::task::spawn_blocking(move || {
                         on_session_event(&v, &e.kind, &e.payload, e.run_id.as_deref())
                     })
@@ -1682,7 +1681,8 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
         "proposal" if p["cause"] == "voice" || p["via"] == "voice" => {
             let id = p["id"].as_str().unwrap_or("").to_string();
             let settle_until = p["settle_until"].as_i64();
-            let about = turn_requests_known(&v.d, false);
+            let captured = p["turn"].is_object();
+            let about = if captured { Some(captured_request_ids(&p["turn"])) } else { turn_requests_known(&v.d, false) };
             let open = {
                 let mut r = req().lock().unwrap();
                 // The request Overseer's turn is about; with several in flight, not just the first.
@@ -1690,7 +1690,7 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
                 let at = r
                     .open
                     .iter()
-                    .position(|o| o.proposal.is_none() && o.direct)
+                    .position(|o| o.proposal.is_none() && o.direct && (!captured || about.as_ref().is_some_and(|ids| ids.contains(&o.id))))
                     .or_else(|| match &about {
                         Some(ids) => r
                             .open
@@ -1799,7 +1799,9 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
                 return;
             }
             let text = m["text"].as_str().unwrap_or("").trim().to_string();
-            let about = turn_requests_known(&v.d, false);
+            let about = if p["turn"].is_object() {
+                Some(p["turn"]["requests"].as_array().map(|ids| ids.iter().filter_map(|id| id.as_str().map(str::to_string)).collect()).unwrap_or_default())
+            } else { turn_requests_known(&v.d, false) };
             let o = {
                 let r = req().lock().unwrap();
                 match &about {
@@ -1838,24 +1840,14 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
             }
             announce(v, &o.id);
         }
-        "turn_completed" | "turn_failed" | "status" => {
+        "overseer_turn_processed" => {
             // When Overseer's turn ends, a request with no plan is answered.
             let Some(run) = run_id else { return };
             if v.d.run_role(run) != "overseer" {
                 return;
             }
-            if kind == "status"
-                && !matches!(
-                    p["status"].as_str(),
-                    Some("completed" | "failed" | "interrupted")
-                )
-            {
-                return;
-            }
-            // Only the requests the ended turn was about: others wait for their own turn.
-            let about = turn_requests(&v.d, true);
-            // A request asked again (AC-229) waits for the turn that asks again, not the first.
-            let again = ended_turn_asks_again(&v.d);
+            let about: Vec<String> = p["turn"]["requests"].as_array().map(|ids| ids.iter().filter_map(|id| id.as_str().map(str::to_string)).collect()).unwrap_or_default();
+            let again = p["turn"]["asked_again"] == true;
             let done: Vec<Open> = req()
                 .lock()
                 .unwrap()
@@ -1867,7 +1859,7 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
             for o in done {
                 let answered =
                     row(&v.d, &o.id).and_then(|r| r["answer"].as_str().map(String::from));
-                let failed = kind == "turn_failed" || (kind == "status" && p["status"] == "failed");
+                let failed = p["status"] == "failed";
                 if failed {
                     // Rate-limited, signed out, offline: not sent, never sent later by itself, and
                     // said once (AC-175).
@@ -1908,12 +1900,6 @@ fn on_session_event(v: &Arc<Voice>, kind: &str, p: &Value, run_id: Option<&str>)
 /// The words that mark the turn asking a request again.
 const ASKED_AGAIN: &str = "(This spoken request names you and gives you an instruction";
 
-/// Whether Overseer's last ended turn was one asking a request again.
-fn ended_turn_asks_again(d: &Daemon) -> bool {
-    let Some(run) = d.overseer_session().ok().and_then(|s| s["run_id"].as_str().map(str::to_string)) else { return false };
-    let turns = d.store.lock().unwrap().turns(&run).unwrap_or_default();
-    turns.iter().rev().find(|t| t.ended_ms.is_some()).is_some_and(|t| t.prompt.contains(ASKED_AGAIN))
-}
 
 fn ask_again(v: &Arc<Voice>, o: &Open) {
     if let Some(x) = req().lock().unwrap().open.iter_mut().find(|x| x.id == o.id) {
@@ -2139,13 +2125,17 @@ fn first_sentences(text: &str, n: usize) -> String {
 /// (AC-169); more new agents than the owner's limit need a yes; the owner's delivery setting wins
 /// over the model's choice of add or redirect (AC-167, AC-168).
 pub fn decorate(d: &Daemon, actions: &mut [Value]) -> Result<bool> {
+    decorate_for_turn(d, actions, None)
+}
+
+pub(crate) fn decorate_for_turn(d: &Daemon, actions: &mut [Value], turn: Option<&Value>) -> Result<bool> {
     let s = settings(d)?;
-    let about = turn_requests_known(d, false);
+    let about = turn.map(captured_request_ids).or_else(|| turn_requests_known(d, false));
     let open = {
         let r = req().lock().unwrap();
         r.open
             .iter()
-            .find(|o| o.proposal.is_none() && o.direct)
+            .find(|o| o.proposal.is_none() && o.direct && (turn.is_none() || about.as_ref().is_some_and(|ids| ids.contains(&o.id))))
             .or_else(|| match &about {
                 Some(ids) => r
                     .open
@@ -2470,6 +2460,16 @@ pub fn turn_requests_not_sent(d: &Daemon) -> Option<Vec<String>> {
     closed.then_some(ids)
 }
 
+fn captured_request_ids(turn: &Value) -> Vec<String> {
+    turn["requests"].as_array().map(|ids| ids.iter().filter_map(|id| id.as_str().map(str::to_string)).collect()).unwrap_or_default()
+}
+
+pub(crate) fn captured_requests_not_sent(d: &Daemon, turn: &Value) -> Option<Vec<String>> {
+    let ids = captured_request_ids(turn);
+    let closed = !ids.is_empty() && ids.iter().all(|id| row(d,id).is_some_and(|r| matches!(r["state"].as_str(), Some("not_sent" | "cancelled" | "superseded"))));
+    closed.then_some(ids)
+}
+
 /// The same, or `None` when there is no Overseer turn to read (then the caller may fall back).
 fn turn_requests_known(d: &Daemon, ended: bool) -> Option<Vec<String>> {
     let session = d.overseer_session().ok()?;
@@ -2480,8 +2480,14 @@ fn turn_requests_known(d: &Daemon, ended: bool) -> Option<Vec<String>> {
     } else {
         turns.last()
     }?;
-    let prompt = turn.prompt.as_str();
-    Some(
+    Some(request_ids(&turn.prompt))
+}
+
+pub(crate) fn captured_turn(id: &str, prompt: &str) -> Value {
+    json!({"id":id,"requests":request_ids(prompt),"asked_again":prompt.contains(ASKED_AGAIN)})
+}
+
+fn request_ids(prompt: &str) -> Vec<String> {
         prompt
             .match_indices("Request V-")
             .map(|(i, _)| {
@@ -2490,8 +2496,7 @@ fn turn_requests_known(d: &Daemon, ended: bool) -> Option<Vec<String>> {
                     .take_while(|c| c.is_ascii_alphanumeric() || *c == '-')
                     .collect()
             })
-            .collect(),
-    )
+            .collect()
 }
 
 #[cfg(test)]

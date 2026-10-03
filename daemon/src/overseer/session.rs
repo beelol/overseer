@@ -154,6 +154,10 @@ impl Daemon {
     }
 
     fn append_message(&self, session: &str, source: &str, surface: Option<&str>, text: &str, card: Option<&Value>) -> Result<Value> {
+        self.append_message_for_turn(session, source, surface, text, card, None)
+    }
+
+    fn append_message_for_turn(&self, session: &str, source: &str, surface: Option<&str>, text: &str, card: Option<&Value>, turn: Option<&Value>) -> Result<Value> {
         let id = format!("m-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
         let now = crate::daemon::now();
         let text = crate::redact::redact(text);
@@ -171,7 +175,7 @@ impl Daemon {
             use rusqlite::OptionalExtension;
             self.store.lock().unwrap().conn.query_row("SELECT run_id FROM overseer_sessions WHERE id=?1", [session], |r| r.get::<_, Option<String>>(0)).optional()?.flatten()
         };
-        self.emit(None, run_id.as_deref(), "overseer_message", "daemon", "exact", json!({"session": session, "message": msg}))?;
+        self.emit(None, run_id.as_deref(), "overseer_message", "daemon", "exact", json!({"session": session, "message": msg, "turn": turn}))?;
         Ok(msg)
     }
 
@@ -726,6 +730,10 @@ impl Daemon {
     /// The same with what led to it given, not read from the session (a waiting permission that
     /// comes up by itself, AC-230, is "needs" without changing the cause of Overseer's own turn).
     pub fn overseer_propose_as(self: &Arc<Self>, actions: &Value, source: &str, cause_now: Option<&str>) -> Result<Value> {
+        self.overseer_propose_for_turn(actions, source, cause_now, None)
+    }
+
+    fn overseer_propose_for_turn(self: &Arc<Self>, actions: &Value, source: &str, cause_now: Option<&str>, turn: Option<&Value>) -> Result<Value> {
         let session = self.overseer_session()?;
         let sid = session["id"].as_str().unwrap().to_string();
         let level = session["level"].as_str().unwrap_or("ask_first").to_string();
@@ -876,8 +884,12 @@ impl Daemon {
         // A spoken request closed as not sent before its turn proposed anything: the owner was
         // told nothing will be sent later, so what the turn proposes now is withdrawn (AC-248).
         if voice {
-            if let Some(requests) = crate::voice::request::turn_requests_not_sent(self) {
-                return self.withdraw_proposal(&sid, &checked, source, &cause, &format!("Withdrawn: the spoken request {} was closed as not sent, so nothing was sent.", requests.join(", ")));
+            let withdrawn = match turn {
+                Some(turn) => crate::voice::request::captured_requests_not_sent(self, turn),
+                None => crate::voice::request::turn_requests_not_sent(self),
+            };
+            if let Some(requests) = withdrawn {
+                return self.withdraw_proposal(&sid, &checked, source, &cause, &format!("Withdrawn: the spoken request {} was closed as not sent, so nothing was sent.", requests.join(", ")), turn);
             }
         }
         // A spoken request (Gate R): the owner's words quoted in each message, the delivery setting,
@@ -885,7 +897,7 @@ impl Daemon {
         let mut needs_yes = false;
         let named_by_overseer: Vec<bool> = checked.iter().map(|a| ["harness", "model", "profile", "profile_id", "effort", "permission_mode"].iter().any(|k| a[*k].as_str().is_some_and(|v| !v.is_empty()))).collect();
         if voice {
-            needs_yes = crate::voice::request::decorate(self, &mut checked)?;
+            needs_yes = crate::voice::request::decorate_for_turn(self, &mut checked, turn)?;
         }
         // Where each new agent runs (AC-237), after a spoken request took the composer's
         // remembered harness, account and model (AC-168).
@@ -950,7 +962,7 @@ impl Daemon {
         let settle_ms = if voice { crate::voice::request::settle_ms(self, &checked) } else { SETTLE_MS };
         let settle_until = if settle { Some(now + settle_ms) } else { None };
         self.store.lock().unwrap().conn.execute("UPDATE overseer_proposals SET state=?2, settle_until=?3, cause=?4 WHERE id=?1", rusqlite::params![id, state, settle_until, cause])?;
-        let card = json!({"id": id, "actions": checked, "lines": lines, "state": state, "level": level, "via": source, "cause": cause, "settle_until": settle_until, "confirm": confirm,
+        let card = json!({"id": id, "actions": checked, "lines": lines, "state": state, "level": level, "via": source, "cause": cause, "settle_until": settle_until, "confirm": confirm, "turn": turn,
             "note": if source == "text" { "Proposed in text: this harness has no tools, so the state was sent with the message." } else { "" }});
         let run_id = session["run_id"].as_str().map(str::to_string);
         self.emit(None, run_id.as_deref(), "proposal", "overseer", "exact", card.clone())?;
@@ -1231,7 +1243,7 @@ impl Daemon {
 
     /// A proposal recorded as already withdrawn: shown on its card with the reason, never carried
     /// out and never waiting for a yes.
-    fn withdraw_proposal(&self, sid: &str, actions: &[Value], source: &str, cause: &str, why: &str) -> Result<Value> {
+    fn withdraw_proposal(&self, sid: &str, actions: &[Value], source: &str, cause: &str, why: &str, turn: Option<&Value>) -> Result<Value> {
         let actions: Vec<Value> = actions.iter().map(|a| serde_json::from_str(&crate::redact::redact(&a.to_string())).unwrap_or_else(|_| a.clone())).collect();
         let id = format!("p-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
         let now = crate::daemon::now();
@@ -1241,7 +1253,7 @@ impl Daemon {
             rusqlite::params![id, sid, now, serde_json::to_string(&actions)?, source, cause, why],
         )?;
         let run_id: Option<String> = self.overseer_session().ok().and_then(|s| s["run_id"].as_str().map(str::to_string));
-        self.emit(None, run_id.as_deref(), "proposal", "overseer", "exact", json!({"id": id, "actions": actions, "lines": lines, "state": "cancelled", "via": source, "cause": cause, "confirm": false, "note": why}))?;
+        self.emit(None, run_id.as_deref(), "proposal", "overseer", "exact", json!({"id": id, "actions": actions, "lines": lines, "state": "cancelled", "via": source, "cause": cause, "confirm": false, "note": why, "turn": turn}))?;
         self.emit(None, run_id.as_deref(), "proposal_answered", "daemon", "exact", json!({"id": id, "state": "cancelled", "result": why, "by": "the daemon"}))?;
         Ok(json!({"proposal": id, "state": "cancelled", "done": false, "result": why}))
     }
@@ -1715,7 +1727,7 @@ impl Daemon {
 
     /// Overseer's own words go into the conversation; a fenced overseer-actions block (a harness
     /// without tools) becomes a proposal.
-    fn overseer_said(self: &Arc<Self>, run_id: &str, text: &str) -> Result<()> {
+    fn overseer_said(self: &Arc<Self>, run_id: &str, text: &str, turn: &Value) -> Result<()> {
         let session = self.overseer_session()?;
         if session["run_id"].as_str() != Some(run_id) {
             return Ok(());
@@ -1734,21 +1746,21 @@ impl Daemon {
         // Overseer's "not for me" (a spoken request it was asked to judge) is said in plain words:
         // no surface ever shows the token (AC-228).
         if shown.trim_matches(|c: char| !c.is_alphanumeric() && c != '_') == NOT_FOR_OVERSEER {
-            self.append_message(&sid, "overseer", None, "Not meant for Overseer: kept as context.", Some(&json!({"kind": "aside"})))?;
+            self.append_message_for_turn(&sid, "overseer", None, "Not meant for Overseer: kept as context.", Some(&json!({"kind": "aside"})), Some(turn))?;
             return Ok(());
         }
         if !shown.is_empty() {
-            self.append_message(&sid, "overseer", None, &shown, None)?;
+            self.append_message_for_turn(&sid, "overseer", None, &shown, None, Some(turn))?;
         }
         if let Some(b) = block {
             match serde_json::from_str::<Value>(&b) {
                 Ok(actions) => {
-                    if let Err(e) = self.overseer_propose(&actions, "text") {
-                        self.append_message(&sid, "overseer", None, &format!("(The proposal could not be made: {e})"), None)?;
+                    if let Err(e) = self.overseer_propose_for_turn(&actions, "text", Some(turn["cause"].as_str().unwrap_or("unknown")), Some(turn)) {
+                        self.append_message_for_turn(&sid, "overseer", None, &format!("(The proposal could not be made: {e})"), None, Some(turn))?;
                     }
                 }
                 Err(_) => {
-                    self.append_message(&sid, "overseer", None, "(The proposal could not be read, so nothing will be done.)", None)?;
+                    self.append_message_for_turn(&sid, "overseer", None, "(The proposal could not be read, so nothing will be done.)", None, Some(turn))?;
                 }
             }
         }
@@ -1796,13 +1808,14 @@ pub fn start(daemon: Arc<Daemon>) {
         // than a bus behind, what the bus dropped is read back from the store (audit finding 59).
         let mut seen = Seen::new(daemon.store.lock().unwrap().max_seq().unwrap_or(0));
         let mut live = daemon.events.subscribe();
+        let captured = std::sync::Arc::new(std::sync::Mutex::new(Captured::default()));
         loop {
             match live.recv().await {
                 Ok(e) => {
                     if !loop_wants(&e) || !seen.first(e.seq) {
                         continue;
                     }
-                    handle_events(daemon.clone(), vec![e]).await;
+                    handle_events(daemon.clone(), vec![e], captured.clone()).await;
                 }
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
                     crate::log(&format!("overseer session: fell {n} events behind; catching up from the stored events"));
@@ -1823,7 +1836,7 @@ pub fn start(daemon: Arc<Daemon>) {
                         }
                         let fresh: Vec<crate::store::Event> = page.into_iter().filter(|e| seen.first(e.seq) && loop_wants(e)).collect();
                         if !fresh.is_empty() {
-                            handle_events(daemon.clone(), fresh).await;
+                            handle_events(daemon.clone(), fresh, captured.clone()).await;
                         }
                         if !full {
                             break;
@@ -1902,9 +1915,79 @@ impl Daemon {
     }
 }
 
-async fn handle_events(daemon: Arc<Daemon>, events: Vec<crate::store::Event>) {
+#[derive(Default)]
+struct Captured {
+    outputs: std::collections::BTreeSet<i64>,
+    failed: std::collections::BTreeSet<String>,
+    completed: std::collections::BTreeSet<String>,
+}
+
+impl Daemon {
+    /// Source event numbers identify the turn even after a queued successor has started.
+    fn captured_turn(&self, e: &crate::store::Event) -> Result<Value> {
+        use rusqlite::OptionalExtension;
+        let row: Option<(i64, String)> = self.store.lock().unwrap().conn.query_row(
+            "SELECT seq,payload FROM events WHERE run_id=?1 AND kind='turn_started' AND seq<?2 ORDER BY seq DESC LIMIT 1",
+            rusqlite::params![e.run_id, e.seq], |r| Ok((r.get(0)?, r.get(1)?))).optional()?;
+        let Some((seq, payload)) = row else { return Ok(Value::Null) };
+        let payload: Value = serde_json::from_str(&payload)?;
+        let turn = &payload["turn"];
+        let mut context = crate::voice::request::captured_turn(turn["id"].as_str().unwrap_or(""), turn["prompt"].as_str().unwrap_or(""));
+        context["started_seq"] = json!(seq);
+        let cause: String = self.store.lock().unwrap().conn.query_row("SELECT cause FROM overseer_turns WHERE turn_id=?1 ORDER BY ts LIMIT 1", [turn["id"].as_str()], |r| r.get(0)).unwrap_or_else(|_| "unknown".into());
+        context["cause"] = json!(cause);
+        Ok(context)
+    }
+}
+
+impl Captured {
+    fn output(&mut self, d: &Arc<Daemon>, e: &crate::store::Event) {
+        if !self.outputs.insert(e.seq) { return; }
+        if self.outputs.len() > SEEN_KEPT { self.outputs.pop_first(); }
+        if let Err(err) = handle_event(d, e) {
+            if let Ok(turn) = d.captured_turn(e) {
+                if let Some(id) = turn["id"].as_str() { self.failed.insert(id.to_string()); }
+            }
+            crate::log(&format!("overseer session: {err:#}"));
+        }
+    }
+
+    fn complete(&mut self, d: &Arc<Daemon>, e: &crate::store::Event) -> Result<()> {
+        let turn = d.captured_turn(e)?;
+        let Some(id) = turn["id"].as_str() else { return Ok(()) };
+        if self.completed.contains(id) { return Ok(()) }
+        // The event bus can publish committed batches out of order. Capture every earlier
+        // assistant output in the exact turn before acknowledging completion, once each.
+        let outputs = {
+            let store = d.store.lock().unwrap();
+            let mut stmt = store.conn.prepare("SELECT seq,ts,task_id,run_id,kind,source,confidence,payload FROM events WHERE run_id=?1 AND seq>?2 AND seq<?3 AND kind='output' AND json_extract(payload,'$.role')='assistant' ORDER BY seq")?;
+            let rows = stmt.query_map(rusqlite::params![e.run_id, turn["started_seq"].as_i64(), e.seq], |r| Ok(crate::store::Event {
+                seq:r.get(0)?,ts:r.get(1)?,task_id:r.get(2)?,run_id:r.get(3)?,kind:r.get(4)?,source:r.get(5)?,confidence:r.get(6)?,payload:serde_json::from_str(&r.get::<_,String>(7)?).unwrap_or(Value::Null),
+            }))?.collect::<rusqlite::Result<Vec<_>>>()?;
+            rows
+        };
+        for output in outputs { self.output(d, &output); }
+        let failed = self.failed.remove(id);
+        d.emit(e.task_id.as_deref(), e.run_id.as_deref(), "overseer_turn_processed", "daemon", "exact",
+            json!({"turn":turn,"status":if failed {"failed"} else {e.payload["status"].as_str().unwrap_or("failed")},"source_seq":e.seq}))?;
+        self.completed.insert(id.to_string());
+        if self.completed.len() > SEEN_KEPT { self.completed.pop_first(); }
+        Ok(())
+    }
+}
+
+async fn handle_events(daemon: Arc<Daemon>, events: Vec<crate::store::Event>, captured: Arc<std::sync::Mutex<Captured>>) {
     let _ = tokio::task::spawn_blocking(move || {
+        let mut captured = captured.lock().unwrap_or_else(|e| e.into_inner());
         for e in events {
+            let overseer = e.run_id.as_deref().is_some_and(|run| daemon.run_role(run) == "overseer");
+            if overseer && e.kind == "output" && e.payload["role"] == "assistant" {
+                captured.output(&daemon, &e);
+                continue;
+            }
+            if overseer && e.kind == "status" && matches!(e.payload["status"].as_str(), Some("completed" | "failed" | "interrupted")) {
+                if let Err(err) = captured.complete(&daemon, &e) { crate::log(&format!("overseer capture: {err:#}")); }
+            }
             if let Err(err) = handle_event(&daemon, &e) {
                 crate::log(&format!("overseer session: {err:#}"));
             }
@@ -1919,8 +2002,23 @@ fn handle_event(d: &Arc<Daemon>, e: &crate::store::Event) -> Result<()> {
     let Some(run) = e.run_id.as_deref() else { return Ok(()) };
     let payload = &e.payload;
     let role = d.run_role(run);
+    // Deterministically hold only fixture reply capture; the harness still completes normally.
+    if role == "overseer" && e.kind == "output" && payload["role"] == "assistant"
+        && std::env::var("OVERSEER_TEST_NET").as_deref() == Ok("1")
+        && std::env::var("OVERSEER_VOICE_SIMULATE").as_deref() == Ok("1")
+    {
+        if let Some(gate) = std::env::var_os("OVERSEER_TEST_SESSION_CAPTURE_GATE") {
+            let gate = std::path::PathBuf::from(gate);
+            std::fs::write(gate.join("reached"), e.seq.to_string())?;
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+            while !gate.join("release").exists() {
+                if std::time::Instant::now() >= deadline { anyhow::bail!("fixture reply capture gate expired"); }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+        }
+    }
     match (e.kind.as_str(), role.as_str()) {
-        ("output", "overseer") if payload["role"] == "assistant" => d.overseer_said(run, payload["text"].as_str().unwrap_or(""))?,
+        ("output", "overseer") if payload["role"] == "assistant" => d.overseer_said(run, payload["text"].as_str().unwrap_or(""), &d.captured_turn(e)?)?,
         ("status", "overseer") if payload["status"] == "failed" => {
             d.overseer_cannot_answer(run)?;
             d.overseer_turn_ended(run)?;

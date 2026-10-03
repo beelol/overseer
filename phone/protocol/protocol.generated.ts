@@ -220,6 +220,14 @@ export interface KnownRepo {
   default_branch?: string | null;
 }
 
+export interface VoiceCapturedTurn {
+  id: string;
+  requests: Array<string>;
+  asked_again: boolean;
+  started_seq: number;
+  cause: string;
+}
+
 /** The payload of every kind of event the app reads. Other kinds arrive as `unknown`. */
 export interface EventPayloads {
   task_created: {
@@ -357,6 +365,16 @@ export interface EventPayloads {
   trouble: {
     kind: string;
     reason: string;
+  };
+  overseer_turn_processed: {
+    turn: VoiceCapturedTurn;
+    status: string;
+    source_seq: number;
+  };
+  overseer_message: {
+    session: string;
+    message: unknown;
+    turn?: VoiceCapturedTurn | null;
   };
 }
 

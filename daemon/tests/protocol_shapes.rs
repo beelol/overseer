@@ -11,6 +11,32 @@ fn description() -> Value {
     serde_json::from_str(&std::fs::read_to_string(repo_root().join("protocol/protocol.json")).unwrap()).unwrap()
 }
 
+#[test]
+fn captured_overseer_reply_and_completion_match_the_protocol() {
+    let fixture = repo_root().join("fixtures/fake-harness/claude-fixture.js").display().to_string();
+    let d = Daemon::start(&[("OVERSEER_TEST_NET", "1"), ("OVERSEER_CONTINUITY_PROBES", "off"), ("OVERSEER_CLAUDE_PATH", &fixture)]);
+    d.call("overseer.send", json!({"text":"Request V-0210: please add tests", "surface":"ctl", "harness":"claude"}));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    let events = loop {
+        let events = d.call("events.list", json!({"limit":5000}))["events"].as_array().unwrap().clone();
+        if events.iter().any(|e| e["kind"] == "overseer_turn_processed") { break events; }
+        assert!(std::time::Instant::now() < deadline, "no processed completion: {events:?}");
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    };
+    let doc = description();
+    let mut wrong = Vec::new();
+    let completion = events.iter().find(|e| e["kind"] == "overseer_turn_processed").unwrap();
+    let reply = events.iter().find(|e| e["kind"] == "overseer_message" && e["payload"]["message"]["source"] == "overseer").unwrap();
+    for e in [reply, completion] {
+        check(&doc, &doc["events"][e["kind"].as_str().unwrap()], &e["payload"], "captured event", &mut wrong);
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+    assert_eq!(reply["payload"]["turn"], completion["payload"]["turn"]);
+    assert_eq!(completion["payload"]["turn"]["requests"], json!(["V-0210"]));
+    assert_eq!(completion["payload"]["turn"]["cause"], "owner");
+    assert!(reply["seq"].as_i64().unwrap() < completion["seq"].as_i64().unwrap());
+}
+
 /// Checks `value` against `shape`. Every field of an object must be described, every field that
 /// is not marked `?` must be there, and every type must match. Returns what is wrong, with its path.
 fn check(doc: &Value, shape: &Value, value: &Value, at: &str, wrong: &mut Vec<String>) {

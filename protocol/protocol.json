@@ -204,6 +204,13 @@
       "exists": "boolean",
       "branch": "string?",
       "default_branch": "string?"
+    },
+    "VoiceCapturedTurn": {
+      "id": "string",
+      "requests": "string[]",
+      "asked_again": "boolean",
+      "started_seq": "number",
+      "cause": "string"
     }
   },
   "events": {
@@ -342,6 +349,16 @@
     "trouble": {
       "kind": "string",
       "reason": "string"
+    },
+    "overseer_turn_processed": {
+      "turn": "VoiceCapturedTurn",
+      "status": "string",
+      "source_seq": "number"
+    },
+    "overseer_message": {
+      "session": "string",
+      "message": "json",
+      "turn": "VoiceCapturedTurn?"
     }
   },
   "methods": {

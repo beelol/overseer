@@ -318,6 +318,11 @@ async function mcpClient() {
     if (await step(total / 2)) { result(true, 'interrupted'); await sleep(50); process.exit(130); }
     assistant([{ type: 'text', text: 'Wrote draft.md.' }]);
     result(false, 'Wrote draft.md.');
+  } else if (mode === 'silent-result' || mode === 'silent-error') {
+    result(mode === 'silent-error', '');
+  } else if (mode === 'captured-actions') {
+    assistant([{ type: 'text', text: 'Proposed actions.\n\n```overseer-actions\n' + process.env.CLAUDE_FIXTURE_CAPTURE_ACTIONS + '\n```' }]);
+    result(false, 'fixture actions');
   } else if (mode === 'slow') {
     // Busy for a few seconds (steering tests); honours an interrupt; each turn echoes its prompt.
     const content = first.message.content;

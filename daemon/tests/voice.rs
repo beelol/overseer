@@ -3249,3 +3249,172 @@ fn ac252_the_loop_by_voice_one_sentence_each() {
     assert_eq!(stop["built_in"], "stop", "{stop}");
     env.d.wait_status(&notes, |s| s == "interrupted", 10);
 }
+
+// Completion must wait for the ordered session consumer to capture this exact reply.
+fn captured_reply_case(words: &str, state: &str, answer: &str) {
+    let gate = tmp();
+    let gate_s = gate.path().display().to_string();
+    let env = voice_daemon(&[("OVERSEER_TEST_NET", "1"), ("OVERSEER_CONTINUITY_PROBES", "off"), ("OVERSEER_TEST_SESSION_CAPTURE_GATE", &gate_s)]);
+    let live = listening(&env);
+    let id = say(&env, words);
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while !gate.path().join("reached").exists() {
+        assert!(Instant::now() < deadline, "reply did not reach capture gate");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let completed = Instant::now() + Duration::from_secs(20);
+    while env.d.call("overseer.session", json!({}))["run_status"] != "completed" {
+        assert!(Instant::now() < completed, "fixture run did not complete");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(request(&env.d, &id)["state"], "thinking", "raw completion must not discard an uncaptured reply");
+    std::fs::write(gate.path().join("release"), "").unwrap();
+    wait_state(&live, &id, state);
+    assert_eq!(request(&env.d, &id)["answer"], answer);
+    if state == "not_for_overseer" {
+        assert!(!live.kind("say").iter().any(|v| v["text"] == "On it."));
+        assert!(!live.kind("say").iter().any(|v| v["text"].as_str().is_some_and(|s| s.contains("NOT_FOR_OVERSEER"))));
+    } else {
+        live.wait("question spoken", 5, |v| v["kind"] == "say" && v["text"] == answer);
+    }
+    let terminal: Vec<_> = live.kind("request").into_iter().filter(|v| v["request"]["id"] == id && v["request"]["state"] == state).collect();
+    assert_eq!(terminal.len(), 1, "terminal disposition announced once");
+}
+
+#[test]
+fn ac_capture_question_before_voice_completion() {
+    captured_reply_case("please add tests", "answered", "Who should I tell?");
+}
+
+#[test]
+fn ac_capture_aside_before_voice_completion() {
+    captured_reply_case("Are you done with the dishes?", "not_for_overseer", "Not meant for Overseer: kept as context.");
+}
+
+#[test]
+fn ac_capture_empty_and_failed_turns_close_without_assistant_output() {
+    for (mode, expected) in [("silent-result", "answered"), ("silent-error", "not_sent")] {
+        let modes = tmp();
+        let mode_path = modes.path().join("mode");
+        std::fs::write(&mode_path, mode).unwrap();
+        let mode_s = mode_path.display().to_string();
+        let env = voice_daemon(&[("CLAUDE_FIXTURE_OVERSEER_MODE_FILE", &mode_s), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE,CLAUDE_FIXTURE_OVERSEER_MODE_FILE")]);
+        let live = listening(&env);
+        let id = say(&env, "please add tests");
+        wait_state(&live, &id, expected);
+        assert!(request(&env.d, &id)["answer"].is_null(), "{mode}: {}", request(&env.d, &id));
+        let terminal: Vec<_> = live.kind("request").into_iter().filter(|v| v["request"]["id"] == id && v["request"]["state"] == expected).collect();
+        assert_eq!(terminal.len(), 1, "empty/error turn closes exactly once");
+    }
+}
+
+#[test]
+fn ac_capture_replies_keep_their_turn_after_successor_completion() {
+    let gate = tmp(); let gate_s = gate.path().display().to_string();
+    let env = voice_daemon(&[("OVERSEER_TEST_NET", "1"), ("OVERSEER_CONTINUITY_PROBES", "off"), ("OVERSEER_TEST_SESSION_CAPTURE_GATE", &gate_s)]);
+    let live = listening(&env);
+    let first = say(&env, "please add tests");
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while !gate.path().join("reached").exists() || env.d.call("overseer.session", json!({}))["run_status"] != "completed" {
+        assert!(Instant::now() < deadline, "first turn did not reach capture gate and finish");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let run = env.d.call("overseer.session", json!({}))["run_id"].as_str().unwrap().to_string();
+    let first_turn = env.d.call("run.turns", json!({"run_id":run})).as_array().unwrap().len();
+    let second = say(&env, "Are you done with the dishes?");
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        let s = env.d.call("overseer.session", json!({}));
+        if s["run_status"] == "completed" && env.d.call("run.turns", json!({"run_id":run})).as_array().unwrap().len() > first_turn { break; }
+        assert!(Instant::now() < deadline, "successor did not complete: {s}");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    std::fs::write(gate.path().join("release"), "").unwrap();
+    wait_state(&live, &first, "answered"); wait_state(&live, &second, "not_for_overseer");
+    assert_eq!(request(&env.d, &first)["answer"], "Who should I tell?");
+    assert_eq!(request(&env.d, &second)["answer"], "Not meant for Overseer: kept as context.");
+}
+
+#[test]
+fn ac_capture_fenced_actions_keep_predecessor_authorship_after_owner_successor() {
+    let gate = tmp(); let gate_s = gate.path().display().to_string();
+    let r = tmp(); let repo = repo(&r.path().join("repo"));
+    let actions = json!([{"action":"start","repo":repo,"title":"Forbidden capture","prompt":"write a synthetic note","permission_mode":"auto"}]).to_string();
+    let mode_path = gate.path().join("mode");
+    std::fs::write(&mode_path, "captured-actions").unwrap();
+    let mode_s = mode_path.display().to_string();
+    let env = voice_daemon(&[("OVERSEER_TEST_NET", "1"), ("OVERSEER_CONTINUITY_PROBES", "off"), ("OVERSEER_TEST_SESSION_CAPTURE_GATE", &gate_s), ("CLAUDE_FIXTURE_CAPTURE_ACTIONS", &actions), ("CLAUDE_FIXTURE_OVERSEER_MODE_FILE", &mode_s), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE,CLAUDE_FIXTURE_CAPTURE_ACTIONS,CLAUDE_FIXTURE_OVERSEER_MODE_FILE")]);
+    let live = listening(&env);
+    let id = say(&env, "please add tests");
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while !gate.path().join("reached").exists() || env.d.call("overseer.session", json!({}))["run_status"] != "completed" {
+        assert!(Instant::now() < deadline, "predecessor did not reach capture gate and finish");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let run = env.d.call("overseer.session", json!({}))["run_id"].as_str().unwrap().to_string();
+    let turns = env.d.call("run.turns", json!({"run_id":run}));
+    let old = turns.as_array().unwrap().last().unwrap()["id"].as_str().unwrap();
+    // Seed the persisted predecessor's self-initiated origin; the successor really is typed
+    // by the owner. This isolates the trust boundary without a scheduler or a paid model.
+    let db = rusqlite::Connection::open(env.d.home.path().join("overseer.sqlite")).unwrap();
+    assert_eq!(db.execute("UPDATE overseer_turns SET cause='check_in' WHERE turn_id=?1", [old]).unwrap(), 1);
+    std::fs::write(&mode_path, "silent-result").unwrap();
+    env.d.call("overseer.send", json!({"text":"what is everyone doing?","surface":"ctl"}));
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        let s = env.d.call("overseer.session", json!({}));
+        if s["run_status"] == "completed" && env.d.call("run.turns", json!({"run_id":run})).as_array().unwrap().len() > turns.as_array().unwrap().len() { break; }
+        assert!(Instant::now() < deadline, "owner successor did not finish: {s}");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    std::fs::write(gate.path().join("release"), "").unwrap();
+    wait_state(&live, &id, "answered");
+    let s = env.d.call("overseer.session", json!({}));
+    assert!(s["proposals"].as_array().unwrap().is_empty(), "self-initiated predecessor must not borrow successor owner authority: {s}");
+    assert!(request(&env.d, &id)["answer"].as_str().unwrap().contains("started by check_in"));
+    assert!(env.d.runs().iter().all(|r| r["title"] != "Forbidden capture"));
+}
+
+#[test]
+fn ac_capture_withdrawn_predecessor_cannot_cancel_open_successor() {
+    let gate = tmp(); let gate_s = gate.path().display().to_string();
+    let r = tmp(); let repo = repo(&r.path().join("repo"));
+    let actions = json!([{"action":"start","repo":repo,"title":"Withdrawn capture","prompt":"write a synthetic note"}]).to_string();
+    let mode_path = gate.path().join("mode");
+    std::fs::write(&mode_path, "captured-actions").unwrap();
+    let mode_s = mode_path.display().to_string();
+    let env = voice_daemon(&[("OVERSEER_TEST_NET", "1"), ("OVERSEER_CONTINUITY_PROBES", "off"), ("OVERSEER_TEST_SESSION_CAPTURE_GATE", &gate_s), ("CLAUDE_FIXTURE_CAPTURE_ACTIONS", &actions), ("CLAUDE_FIXTURE_OVERSEER_MODE_FILE", &mode_s), ("FIXTURE_SLOW_MS", "120000"), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE,CLAUDE_FIXTURE_CAPTURE_ACTIONS,CLAUDE_FIXTURE_OVERSEER_MODE_FILE,FIXTURE_SLOW_MS")]);
+    let live = listening(&env);
+    let first = say(&env, "please add tests");
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while !gate.path().join("reached").exists() || env.d.call("overseer.session", json!({}))["run_status"] != "completed" {
+        assert!(Instant::now() < deadline, "predecessor did not reach capture gate and finish");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    env.d.call("voice.cancel", json!({"id":first}));
+    std::fs::write(&mode_path, "slow").unwrap();
+    let second = say(&env, "please write the changelog");
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while env.d.call("overseer.session", json!({}))["run_status"] != "running" {
+        assert!(Instant::now() < deadline, "successor did not start");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(request(&env.d, &second)["state"], "thinking");
+    std::fs::write(gate.path().join("release"), "").unwrap();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let s = env.d.call("overseer.session", json!({}));
+        if s["cards"].as_array().unwrap().iter().any(|p| p["state"] == "cancelled") { break; }
+        assert!(Instant::now() < deadline, "withdrawal was not recorded: {s}");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    // Wait until the ordered voice subscriber has consumed the predecessor acknowledgement,
+    // so this asserts the aftermath of both proposal events rather than racing their handling.
+    live.wait("successor reply captured", 10, |v| v["kind"] == "request" && v["request"]["id"] == second && v["request"]["answer"].as_str().is_some_and(|s| s.contains("working on:")));
+    assert_eq!(request(&env.d, &first)["state"], "cancelled");
+    assert_eq!(request(&env.d, &second)["state"], "thinking");
+    assert!(request(&env.d, &second)["proposal"].is_null());
+    assert!(env.d.runs().iter().all(|r| r["title"] != "Withdrawn capture"));
+    let run = env.d.call("overseer.session", json!({}))["run_id"].as_str().unwrap().to_string();
+    env.d.call("run.interrupt", json!({"run_id":run}));
+}
