@@ -1,0 +1,73 @@
+   0: std::backtrace_rs::backtrace::libunwind::trace
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/std/src/../../backtrace/src/backtrace/libunwind.rs:117:9
+   1: std::backtrace_rs::backtrace::trace_unsynchronized
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/std/src/../../backtrace/src/backtrace/mod.rs:66:14
+   2: std::backtrace::Backtrace::create
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/std/src/backtrace.rs:331:13
+   3: overseerd::overseer::session::<impl overseerd::daemon::Daemon>::overseer_session
+             at ./daemon/src/overseer/session.rs:136:106
+   4: overseerd::overseer::session::<impl overseerd::daemon::Daemon>::started_card
+             at ./daemon/src/overseer/session.rs:704:28
+   5: overseerd::overseer::session::handle_event
+             at ./daemon/src/overseer/session.rs:2233:15
+   6: overseerd::overseer::session::handle_events::{{closure}}::{{closure}}
+             at ./daemon/src/overseer/session.rs:2187:31
+   7: <tokio::runtime::blocking::task::BlockingTask<T> as core::future::future::Future>::poll
+             at /Users/bilal/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/blocking/task.rs:42:21
+   8: tokio::runtime::task::core::Core<T,S>::poll::{{closure}}
+             at /Users/bilal/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/task/core.rs:380:24
+   9: tokio::loom::std::unsafe_cell::UnsafeCell<T>::with_mut
+             at /Users/bilal/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/loom/std/unsafe_cell.rs:16:9
+  10: tokio::runtime::task::core::Core<T,S>::poll
+             at /Users/bilal/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/task/core.rs:369:30
+  11: tokio::runtime::task::harness::poll_future::{{closure}}
+             at /Users/bilal/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/task/harness.rs:535:30
+  12: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+             at /Users/bilal/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272:9
+  13: std::panicking::catch_unwind::do_call
+             at /Users/bilal/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  14: ___rust_try
+  15: std::panicking::catch_unwind
+             at /Users/bilal/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  16: std::panic::catch_unwind
+             at /Users/bilal/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  17: tokio::runtime::task::harness::poll_future
+             at /Users/bilal/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/task/harness.rs:523:18
+  18: tokio::runtime::task::harness::Harness<T,S>::poll_inner
+             at /Users/bilal/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/task/harness.rs:210:27
+  19: tokio::runtime::task::harness::Harness<T,S>::poll
+             at /Users/bilal/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/task/harness.rs:155:20
+  20: tokio::runtime::task::raw::poll
+             at /Users/bilal/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/task/raw.rs:343:13
+  21: tokio::runtime::task::raw::RawTask::poll
+             at /Users/bilal/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/task/raw.rs:273:18
+  22: tokio::runtime::task::UnownedTask<S>::run
+             at /Users/bilal/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/task/mod.rs:565:13
+  23: tokio::runtime::blocking::pool::Task::run
+             at /Users/bilal/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/blocking/pool.rs:161:19
+  24: tokio::runtime::blocking::pool::Inner::run
+             at /Users/bilal/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/blocking/pool.rs:518:22
+  25: tokio::runtime::blocking::pool::Spawner::spawn_thread::{{closure}}
+             at /Users/bilal/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/blocking/pool.rs:474:47
+  26: std::sys::backtrace::__rust_begin_short_backtrace
+             at /Users/bilal/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/sys/backtrace.rs:152:18
+  27: std::thread::Builder::spawn_unchecked_::{{closure}}::{{closure}}
+             at /Users/bilal/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/mod.rs:559:17
+  28: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+             at /Users/bilal/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272:9
+  29: std::panicking::catch_unwind::do_call
+             at /Users/bilal/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  30: ___rust_try
+  31: std::panicking::catch_unwind
+             at /Users/bilal/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  32: std::panic::catch_unwind
+             at /Users/bilal/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  33: std::thread::Builder::spawn_unchecked_::{{closure}}
+             at /Users/bilal/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/thread/mod.rs:557:30
+  34: core::ops::function::FnOnce::call_once{{vtable.shim}}
+             at /Users/bilal/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+  35: <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/alloc/src/boxed.rs:1966:9
+  36: std::sys::pal::unix::thread::Thread::new::thread_start
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/std/src/sys/pal/unix/thread.rs:107:17
+  37: __pthread_cond_wait

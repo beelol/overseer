@@ -1,0 +1,28 @@
+ordinary token baseline
+serialized={"action":"start","prompt":"Write notes using sk-proj-syntheticSYNTHETICabcdefghijkl012345","repo":"/private/tmp/synthetic-repo"}
+redacted={"action":"start","prompt":"Write notes using [redacted]","repo":"/private/tmp/synthetic-repo"}
+parse_ok=true
+fallback_stored={"action":"start","prompt":"Write notes using [redacted]","repo":"/private/tmp/synthetic-repo"}
+
+escaped password poisons whole action
+serialized={"action":"start","password":"synthetic\"secret","prompt":"Write notes using sk-proj-syntheticSYNTHETICabcdefghijkl012345","repo":"/private/tmp/synthetic-repo"}
+redacted={"action":"start","password": "[redacted]"secret","prompt":"Write notes using [redacted]","repo":"/private/tmp/synthetic-repo"}
+parse_ok=false
+parse_error=expected `,` or `}` at line 1 column 43
+fallback_stored={"action":"start","password":"synthetic\"secret","prompt":"Write notes using sk-proj-syntheticSYNTHETICabcdefghijkl012345","repo":"/private/tmp/synthetic-repo"}
+
+backslash plus quote
+serialized={"action":"start","password":"synthetic\\\"secret","prompt":"Write notes","repo":"/private/tmp/synthetic-repo"}
+redacted={"action":"start","password": "[redacted]"secret","prompt":"Write notes","repo":"/private/tmp/synthetic-repo"}
+parse_ok=false
+parse_error=expected `,` or `}` at line 1 column 43
+fallback_stored={"action":"start","password":"synthetic\\\"secret","prompt":"Write notes","repo":"/private/tmp/synthetic-repo"}
+
+credential JSON in required prompt
+serialized={"action":"start","prompt":"Record {\"password\":\"synthetic-secret-value\"} accurately","repo":"/private/tmp/synthetic-repo"}
+redacted={"action":"start","prompt":"Record {\"password\":\"synthetic-secret-value\"} accurately","repo":"/private/tmp/synthetic-repo"}
+parse_ok=true
+fallback_stored={"action":"start","prompt":"Record {\"password\":\"synthetic-secret-value\"} accurately","repo":"/private/tmp/synthetic-repo"}
+
+plain_prompt_redaction=Record {"password": "[redacted]"} accurately
+plain_escaped_prompt_redaction=Record {"password": "[redacted]"secret"} accurately

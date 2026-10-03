@@ -1,0 +1,5 @@
+PASS fixture-only session-two-commands (two native asks, first allowed, second denied, no second action)
+PASS fixture-only session-repeat-command (two native asks, first allowed, second denied, no second action)
+PASS fixture-only permission-changed-rule-behavior (two native asks, first allowed, second denied, no second action)
+PASS fixture-only permission-changed-rule-type (two native asks, first allowed, second denied, no second action)
+PASS fixture-only permission-changed-rule-destination (two native asks, first allowed, second denied, no second action)

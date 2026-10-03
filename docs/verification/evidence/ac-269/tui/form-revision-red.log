@@ -1,0 +1,24 @@
+   Compiling overseer-tui v0.1.0 (/private/tmp/overseer-mods-tui-20261003/tui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running tests/mods.rs (/private/tmp/overseer-closeout-verify-target/debug/deps/mods-e138392e91c00e69)
+
+running 1 test
+test refreshed_revision_never_rebases_a_retained_binding_form_over_owner_edits ... FAILED
+
+failures:
+
+---- refreshed_revision_never_rebases_a_retained_binding_form_over_owner_edits stdout ----
+
+thread 'refreshed_revision_never_rebases_a_retained_binding_form_over_owner_edits' panicked at tui/tests/mods.rs:731:5:
+assertion `left == right` failed: old form fields must never be sent with newly adopted revision 8
+  left: 1
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    refreshed_revision_never_rebases_a_retained_binding_form_over_owner_edits
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p overseer-tui --test mods`

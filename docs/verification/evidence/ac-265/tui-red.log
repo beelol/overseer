@@ -1,0 +1,124 @@
+   Compiling syn v3.0.6
+   Compiling syn v2.0.119
+   Compiling unicode-segmentation v1.13.3
+   Compiling rustversion v1.0.23
+   Compiling equivalent v1.0.2
+   Compiling allocator-api2 v0.2.21
+   Compiling foldhash v0.2.0
+   Compiling strsim v0.11.1
+   Compiling ident_case v1.0.1
+   Compiling thiserror v2.0.21
+   Compiling darling_core v0.24.1
+   Compiling thiserror-impl v2.0.21
+   Compiling heck v0.5.0
+   Compiling either v1.18.0
+   Compiling itertools v0.14.0
+   Compiling darling_macro v0.24.1
+   Compiling strum_macros v0.28.0
+   Compiling castaway v0.2.4
+   Compiling hashbrown v0.16.1
+   Compiling hashbrown v0.17.1
+   Compiling static_assertions v1.1.0
+   Compiling rustix v1.1.5
+   Compiling signal-hook v0.3.18
+   Compiling parking_lot_core v0.9.12
+   Compiling unicode-width v0.2.2
+   Compiling ryu v1.0.23
+   Compiling compact_str v0.9.1
+   Compiling unicode-truncate v2.0.1
+   Compiling lru v0.18.5
+   Compiling kasuari v0.4.12
+   Compiling strum v0.28.0
+   Compiling darling v0.24.1
+   Compiling convert_case v0.10.0
+   Compiling smallvec v1.16.1
+   Compiling indoc v2.0.7
+   Compiling scopeguard v1.2.0
+   Compiling critical-section v1.2.0
+   Compiling ratatui-core v0.1.2
+   Compiling instability v0.3.14
+   Compiling lock_api v0.4.14
+   Compiling mio v1.2.3
+   Compiling derive_more-impl v2.1.1
+   Compiling num_threads v0.1.7
+   Compiling powerfmt v0.2.0
+   Compiling deranged v0.5.8
+   Compiling num-conv v0.2.2
+   Compiling time-core v0.1.9
+   Compiling litrs v1.0.0
+   Compiling time v0.3.55
+   Compiling document-features v0.2.12
+   Compiling derive_more v2.1.1
+   Compiling signal-hook-mio v0.2.5
+   Compiling parking_lot v0.12.5
+   Compiling line-clipping v0.3.8
+   Compiling crossterm v0.29.0
+   Compiling ratatui-widgets v0.3.2
+   Compiling ratatui-crossterm v0.1.2
+   Compiling serde_derive v1.0.229
+   Compiling ratatui-macros v0.7.2
+   Compiling getrandom v0.4.3
+   Compiling ratatui v0.30.2
+   Compiling once_cell v1.21.4
+   Compiling tempfile v3.27.0
+   Compiling serde v1.0.229
+   Compiling overseer-tui v0.1.0 (/Users/bilal/.codex/worktrees/queue-pause/overseer/tui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.70s
+     Running tests/queue_pause.rs (/private/tmp/overseer-queue-pause-target/debug/deps/queue_pause-9b30bae677ccee9d)
+
+running 1 test
+
+thread 'ac265_tui_shows_ordered_paused_queue_and_owner_keys_remove_clear_resume' panicked at tui/tests/support/mod.rs:207:13:
+timed out waiting for "Queue paused"; screen:
+ ◆ Overseer  page 1/1 · 1 agent · ✦ 1 to review                                                              phone access off · ● connected
+╭ agents ────────────────────╮┏ 1 ■ Queue demo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Claude Code · 0s ┓
+│ repo  1 to review          │┃ › original work                                                                                            ┃
+│›■ Queue de… Claude Fixt… ✦ │┃ working on: original work                                                                                  ┃
+│                            │┃ ✖ other: interrupted                                                                                       ┃
+│                            │┃ ■ failed: interrupted · 1 in / 1 out                                                                       ┃
+│                            │┃ · interrupted: interrupted by user (exit code 130)                                                         ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+╰─── ◆ you ✦ review ✓ merged ╯┗ interrupted · by user (exit code 130) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Claude Fixture · fix…@example.test ┛
+ ←↑↓→ move   J/K pick in the list   i message   g full view   v changes   a/s/d allow once/session/deny   w next waiting   ]/[ page   n new
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test ac265_tui_shows_ordered_paused_queue_and_owner_keys_remove_clear_resume ... FAILED
+
+failures:
+
+failures:
+    ac265_tui_shows_ordered_paused_queue_and_owner_keys_remove_clear_resume
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 41.00s
+
+error: test failed, to rerun pass `-p overseer-tui --test queue_pause`

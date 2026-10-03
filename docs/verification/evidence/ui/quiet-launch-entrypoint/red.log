@@ -1,0 +1,12 @@
+FAIL old main constructor is paused before its exact options are changed - quietWindowBreakpoints is not a function or its return value is not iterable
+FAIL imported mainImpl constructor is registered before it has been loaded - quietWindowBreakpoints is not a function or its return value is not iterable
+FAIL unknown layout fails before launching instead of following arbitrary imports - The input did not match the regular expression /window constructor not found/. Input:
+
+'TypeError: quietWindowBreakpoints is not a function'
+
+FAIL reading installed source never runs its top-level code - quietWindowBreakpoints is not a function
+FAIL source discovery has a bounded size - The input did not match the regular expression /too large/. Input:
+
+'TypeError: quietWindowBreakpoints is not a function'
+
+0 of 5 passed

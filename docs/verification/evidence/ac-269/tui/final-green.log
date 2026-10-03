@@ -1,0 +1,35 @@
+   Compiling overseer-tui v0.1.0 (/private/tmp/overseer-mods-tui-20261003/tui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.72s
+     Running tests/mods.rs (/private/tmp/overseer-closeout-verify-target/debug/deps/mods-e138392e91c00e69)
+
+running 27 tests
+test actual_overseer_target_is_read_from_state_without_creating_a_session ... ok
+test absent_turn_and_planned_bundle_remain_truthful_at_narrow_width ... ok
+test binding_edit_preserves_exact_filters_lock_id_and_disabled_override ... ok
+test compose_input_keeps_literal_m_and_does_not_open_mods ... ok
+test control_events_refresh_only_global_or_current_envelope_target ... ok
+test applied_uses_agent_title_and_readable_delivery_outcome_labels ... ok
+test exact_filter_editor_keeps_commas_and_spaces_inside_one_identifier ... ok
+test disconnect_invalidates_pending_reads_and_reconnect_refreshes ... ok
+test incumbent_audio_preview_review_previous_change_and_uppercase_controls_survive ... ok
+test late_original_target_reply_cannot_replace_the_explicit_overseer_target ... ok
+test mixed_read_revisions_require_refresh_before_any_binding_write ... ok
+test grid_zoom_and_dashboard_entry_restore_the_original_view ... ok
+test narrow_binding_form_keeps_the_selected_field_visible ... ok
+test mods_footer_describes_the_current_panel_instead_of_agent_mutations ... ok
+test no_focus_opens_library_without_requesting_an_empty_target ... ok
+test overseer_scope_binding_needs_no_agent_or_active_overseer_run ... ok
+test own_session_change_during_sent_preview_or_install_preserves_ack_and_refreshes ... ok
+test own_session_event_burst_coalesces_into_one_authoritative_state_read ... ok
+test preview_confirmation_is_explicit_immutable_and_never_enables ... ok
+test refreshed_revision_never_rebases_a_retained_binding_form_over_owner_edits ... ok
+test outcome_facts_never_turn_prepared_or_failed_text_into_accepted_delivery ... ok
+test scoped_enable_and_explicit_disable_pin_exact_daemon_identifiers ... ok
+test switching_away_from_pending_overseer_read_does_not_poison_later_selection ... ok
+test removal_reviews_exact_pin_and_conflict_never_replays_the_write ... ok
+test unbind_is_a_separate_confirmed_override_removal ... ok
+test update_uses_install_rpc_and_never_sends_a_new_binding ... ok
+test transport_disconnect_before_app_message_still_refuses_a_preview ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+

@@ -1,0 +1,3 @@
+e173850cc192da4e47dbe767530c8f4e1e39cadade5b558d0b5c973eacacf797  daemon/src/overseer/mod.rs
+f27cf285eba5e4b084f2614075dc51a18ac0192894a9c324e83ae77e42600eb4  fixtures/fake-harness/claude-fixture.js
+afe1985faa1e55901c63bf47ad66c55f73e5489d4829317456fe943b55f6cdd7  daemon/tests/overseer_native_late_origin.rs

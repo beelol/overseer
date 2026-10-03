@@ -818,8 +818,14 @@ impl Daemon {
         let role = self.run_role(predecessor);
         let Some(read_only) = self.own_read_only(predecessor) else { return Ok(None) };
         let dir = std::path::PathBuf::from(self.workspace(&successor.workspace_id)?.path);
-        let token = self.overseer_token(&successor.id, &role)?["token"].as_str().unwrap_or_default().to_string();
-        let (extra_args, mut mode) = self.tools_launch(harness, &dir, &token, &role, read_only)?;
+        let (extra_args, mut mode) = if role == "overseer" {
+            // Its actual successor turn owns the native capability/config;
+            // never persist a run-wide Overseer credential for later resumes.
+            (Vec::new(), (harness == "codex").then_some("read-only"))
+        } else {
+            let token = self.overseer_token(&successor.id, &role)?["token"].as_str().unwrap_or_default().to_string();
+            self.tools_launch(harness, &dir, &token, &role, read_only)?
+        };
         // OpenCode's local server has no tools of the daemon's; its plan agent reads and never edits.
         if read_only && !["claude", "codex", "opencode"].contains(&harness) {
             mode = Some("plan");
@@ -854,6 +860,14 @@ impl Daemon {
         let moved: Vec<(&str, usize)> = {
             let store = self.store.lock().unwrap();
             let mut moved = Vec::new();
+            let tx = store.conn.unchecked_transaction()?;
+            // Old Stop controls still address the current owner, including the interval before
+            // Continuity records its completed handoff. Rollback migration reverses these aliases.
+            tx.execute("UPDATE queue_owners SET owner_id=?2 WHERE owner_id=?1", rusqlite::params![predecessor, successor])?;
+            tx.execute("INSERT OR REPLACE INTO queue_owners(run_id, owner_id) VALUES(?1, ?2)", rusqlite::params![predecessor, successor])?;
+            tx.execute("DELETE FROM queue_owners WHERE run_id=owner_id", [])?;
+            store.conn.execute("INSERT INTO queue_states(run_id, paused, serial) SELECT ?2, paused, serial FROM queue_states WHERE run_id=?1 ON CONFLICT(run_id) DO UPDATE SET paused=MAX(queue_states.paused, excluded.paused), serial=MAX(queue_states.serial, excluded.serial)", rusqlite::params![predecessor, successor])?;
+            store.conn.execute("DELETE FROM queue_states WHERE run_id=?1", [predecessor])?;
             for (table, column) in [("holds", "run_id"), ("guardrails", "run_id"), ("areas", "run_id"), ("cadences", "run_id"), ("channels", "run_id"), ("queued_messages", "run_id"), ("share_denials", "run_id"), ("watches", "subject"), ("watches", "watcher"), ("conflicts", "run_a"), ("conflicts", "run_b"), ("dispatches", "run_id")] {
                 // Keys that would collide keep the successor's own row.
                 let n = store.conn.execute(&format!("UPDATE OR IGNORE {table} SET {column}=?2 WHERE {column}=?1"), rusqlite::params![predecessor, successor])?;
@@ -861,6 +875,7 @@ impl Daemon {
                     moved.push((table, n));
                 }
             }
+            tx.commit()?;
             moved
         };
         if moved.is_empty() {

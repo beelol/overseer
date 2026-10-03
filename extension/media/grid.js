@@ -107,7 +107,7 @@
       const recent = (a, b) => (b.ended_ms || b.created_ms) - (a.ended_ms || a.created_ms);
       const kept = roots.filter(r => pinned.has(r.id)).sort(recent);
       const rank = r => (r.status === 'waiting_for_user' ? 0 : 1);
-      const running = roots.filter(r => !pinned.has(r.id) && ACTIVE.has(r.status)).sort((a, b) => rank(a) - rank(b) || recent(a, b));
+      const running = roots.filter(r => !pinned.has(r.id) && (ACTIVE.has(r.status) || r.queue?.paused && r.queue?.messages?.length)).sort((a, b) => rank(a) - rank(b) || recent(a, b));
       const room = Math.max(0, Math.max(1, Math.min(MAX, state.gridMax || 6)) - kept.length);
       return [...kept, ...running.slice(0, room)].slice(0, MAX);
     }
@@ -132,8 +132,9 @@
       const input = el('input'); input.placeholder = 'Reply'; input.setAttribute('aria-label', `Reply to ${run.title}`);
       const send = ui.iconButton('arrow-up', 'Send', { cls: 'sm' }); send.type = 'submit';
       foot.append(input, send);
-      t.append(head, bodyEl, perm, foot);
-      const tile = { el: t, run, status, title, voice, who, pin, openBtn, bodyEl, convEl, perm, input, send, conv: new window.OverseerConversation(convEl, { post: m => post({ ...m, runId: m.runId || run.id, scope: 'tile' }), compact: true }) };
+      const queue = el('div', 'queued tile-queue'); queue.hidden = true;
+      t.append(head, bodyEl, queue, perm, foot);
+      const tile = { el: t, run, queue, status, title, voice, who, pin, openBtn, bodyEl, convEl, perm, input, send, conv: new window.OverseerConversation(convEl, { post: m => post({ ...m, runId: m.runId || run.id, scope: 'tile' }), compact: true }) };
       title.addEventListener('click', e => { e.stopPropagation(); post({ type: 'track', runId: run.id }); });
       // A click anywhere on the tile (not on its controls or reply) tracks the agent (AC-105).
       t.addEventListener('click', e => { if (!e.target.closest('button, input, a, form, summary, .tile-perm')) post({ type: 'track', runId: run.id }); });
@@ -182,6 +183,7 @@
 
     function update(tile, run, state) {
       tile.run = run;
+      window.OverseerChat.renderQueue(tile.queue, run.queue, m => post({ ...m, runId: run.id, scope: 'tile' }));
       tile.status.replaceChildren(ui.status(run.status, run.attention?.kind));
       tile.title.textContent = run.title; tile.title.title = `Open ${run.title}`;
       const p = run.profile_id && state.profiles.find(x => x.id === run.profile_id);

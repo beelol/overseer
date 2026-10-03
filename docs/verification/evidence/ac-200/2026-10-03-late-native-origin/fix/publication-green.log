@@ -1,0 +1,9 @@
+
+running 2 tests
+test ac200_first_native_call_waits_for_actual_run_binding ... stage=before_bind; observation=actual turn-start mutex wait; actual run=r-96e21b846b0d turn=u-0bb036a8e8de; actual native reply={"content":[{"text":"Read back to the owner; it needs their yes. (proposal p-5d6a2d7f8a84)","type":"text"}],"isError":false}; proposals=[{"actions":[{"action":"archive","agent":"r-f42cb3b3aa63","status_then":"completed","title":"/bin/sh -c echo subject"}],"answered_by":null,"answered_ms":null,"cause":"owner","id":"p-5d6a2d7f8a84","lines":["Archive /bin/sh -c echo subject"],"message_id":null,"result":null,"settle_until":null,"state":"open","ts":1791035663341,"via":"tool"}]
+ok
+test ac200_first_native_call_waits_for_durable_origin_publication ... stage=before_origin; observation=actual turn-start mutex wait; actual run=r-fc81eeb3b351 turn=u-11a2442bdecb; actual native reply={"content":[{"text":"Read back to the owner; it needs their yes. (proposal p-af8ddbc3f20f)","type":"text"}],"isError":false}; proposals=[{"actions":[{"action":"archive","agent":"r-5c4289ac2524","status_then":"completed","title":"/bin/sh -c echo subject"}],"answered_by":null,"answered_ms":null,"cause":"owner","id":"p-af8ddbc3f20f","lines":["Archive /bin/sh -c echo subject"],"message_id":null,"result":null,"settle_until":null,"state":"open","ts":1791035664659,"via":"tool"}]
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 2.72s
+

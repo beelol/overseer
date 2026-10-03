@@ -1,0 +1,7 @@
+
+running 2 tests
+test ac180_mcp_shim_serves_overseers_tools_from_the_daemon ... ok
+test ac180_tokens_decide_who_may_call_what ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 35 filtered out; finished in 0.79s
+

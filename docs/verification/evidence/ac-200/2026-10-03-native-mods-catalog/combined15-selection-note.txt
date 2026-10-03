@@ -1,0 +1,1 @@
+First pre-execution selector expected6 total but --list correctly included4 shared helper tests (10total). No test executed. Use ac200_ filter for the6 historical cases; all helpers remain in subsequent full suite.

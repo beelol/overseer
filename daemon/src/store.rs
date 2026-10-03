@@ -348,6 +348,11 @@ impl Store {
         self.conn.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
+            CREATE TABLE IF NOT EXISTS mod_versions(fingerprint TEXT PRIMARY KEY, mod_id TEXT NOT NULL, content TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS mod_previews(id TEXT PRIMARY KEY, content TEXT NOT NULL, result TEXT);
+            CREATE TABLE IF NOT EXISTS mod_bindings(id TEXT PRIMARY KEY, content TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS turn_mods(turn_id TEXT PRIMARY KEY REFERENCES turns(id), run_id TEXT NOT NULL, content TEXT NOT NULL);
+            INSERT OR IGNORE INTO meta(key,value) VALUES('mods_revision','0');
             CREATE TABLE IF NOT EXISTS workspaces(
               id TEXT PRIMARY KEY, path TEXT NOT NULL, repo_root TEXT NOT NULL, common_dir TEXT NOT NULL,
               kind TEXT NOT NULL, branch TEXT, owner_run_id TEXT, initial_dirty TEXT, created_ms INTEGER NOT NULL,
@@ -509,6 +514,8 @@ impl Store {
             CREATE TABLE IF NOT EXISTS queued_messages(
               run_id TEXT NOT NULL, ts INTEGER NOT NULL, source TEXT NOT NULL, text TEXT NOT NULL, detail TEXT,
               delivered_ms INTEGER, turn_id TEXT);
+            CREATE TABLE IF NOT EXISTS queue_states(run_id TEXT PRIMARY KEY, paused INTEGER NOT NULL DEFAULT 0, serial INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS queue_owners(run_id TEXT PRIMARY KEY, owner_id TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS channels(run_id TEXT PRIMARY KEY, briefing INTEGER NOT NULL, channel INTEGER NOT NULL, set_by TEXT NOT NULL, set_ms INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS briefings(run_id TEXT NOT NULL, ts INTEGER NOT NULL, text TEXT NOT NULL, how TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS agent_messages(
@@ -549,6 +556,12 @@ impl Store {
         let has_share_branch: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('shares') WHERE name='branch'")?.exists([])?;
         if !has_share_branch {
             self.conn.execute_batch("ALTER TABLE shares ADD COLUMN branch TEXT; ALTER TABLE shares ADD COLUMN commit_sha TEXT;")?;
+        }
+        for (column, definition) in [("native_turn_id", "TEXT"), ("revoked_ms", "INTEGER")] {
+            let present = self.conn.prepare("SELECT 1 FROM pragma_table_info('overseer_tokens') WHERE name=?1")?.exists([column])?;
+            if !present {
+                self.conn.execute_batch(&format!("ALTER TABLE overseer_tokens ADD COLUMN {column} {definition};"))?;
+            }
         }
         let has_archived: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('tasks') WHERE name='archived_ms'")?.exists([])?;
         if !has_archived {
@@ -1721,17 +1734,22 @@ impl Store {
         self.set_run_attention(id, Some(attention))
     }
 
-    /// The first answer given to a permission request: `{"allow", "by", "ts"}`.
-    /// Whether the owner already chose "Allow for this session" for this offer (its label, such
-    /// as "Write · this session") on this agent (AC-241).
-    pub fn allowed_for_session(&self, run: &str, label: &str) -> Result<bool> {
-        Ok(self.conn.query_row(
-            "SELECT EXISTS(SELECT 1 FROM events WHERE run_id=?1 AND kind='permission_answered' AND json_extract(payload, '$.allow')=1 AND json_extract(payload, '$.always')=?2)",
-            params![run, label],
-            |r| r.get::<_, bool>(0),
-        )?)
+    /// Only an exact qualified native grant in this run can authorize host replay.
+    /// Legacy display-label-only events and unqualified native caches confer no authority.
+    pub fn allowed_for_session(&self, run: &str, grant: &crate::adapters::NativeSessionGrant) -> Result<bool> {
+        if !grant.host_replay_qualified { return Ok(false) }
+        let mut statement = self.conn.prepare(
+            "SELECT json_extract(payload, '$.grant') FROM events WHERE run_id=?1 AND kind='permission_answered' AND json_extract(payload, '$.allow')=1 AND json_extract(payload, '$.grant.host_replay_qualified')=1 AND json_extract(payload, '$.grant.digest')=?2")?;
+        let rows = statement.query_map(params![run, grant.digest], |row| row.get::<_, String>(0))?;
+        for row in rows {
+            if serde_json::from_str::<crate::adapters::NativeSessionGrant>(&row?).ok().as_ref() == Some(grant) {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
+    /// The first answer given to a permission request: `{"allow", "by", "ts"}`.
     pub fn permission_answer(&self, run: &str, request_id: &str) -> Result<Option<Value>> {
         Ok(self
             .conn
@@ -1777,20 +1795,33 @@ impl Store {
     /// new open turn visible to Auto in one transaction; the old run status
     /// alone cannot reserve that pool during follow-up preparation.
     pub fn insert_turn_if_no_auto_claim(&self, t: &Turn, profile_id: &str) -> Result<bool> {
-        if t.status != "running" || t.ended_ms.is_some() {
-            return Err(anyhow!("manual turn admission requires an open turn"));
-        }
+        self.admit_turn(t, Some(profile_id), None)
+    }
+
+    /// Admit the copied Mods text in the turn's existing Auto claim transaction.
+    pub fn insert_turn_with_mods(&self, t: &Turn, profile: Option<&str>, snapshot: &Value) -> Result<bool> {
+        self.admit_turn(t, profile, Some(snapshot))
+    }
+
+    fn admit_turn(&self, t: &Turn, profile: Option<&str>, snapshot: Option<&Value>) -> Result<bool> {
         let tx = self.conn.unchecked_transaction()?;
-        let saved_profile: Option<String> = self.conn.query_row(
-            "SELECT profile_id FROM runs WHERE id=?1", [&t.run_id], |row| row.get(0))
-            .optional()?.flatten();
-        if saved_profile.as_deref() != Some(profile_id) {
-            return Err(anyhow!("manual turn profile changed before admission"));
-        }
-        if self.auto_claim_conflicts_with_run(profile_id, &t.run_id)? {
-            return Ok(false);
+        if let Some(profile_id) = profile {
+            if t.status != "running" || t.ended_ms.is_some() {
+                return Err(anyhow!("manual turn admission requires an open turn"));
+            }
+            let saved_profile: Option<String> = self.conn.query_row(
+                "SELECT profile_id FROM runs WHERE id=?1", [&t.run_id], |row| row.get(0))
+                .optional()?.flatten();
+            if saved_profile.as_deref() != Some(profile_id) {
+                return Err(anyhow!("manual turn profile changed before admission"));
+            }
+            if self.auto_claim_conflicts_with_run(profile_id, &t.run_id)? { return Ok(false); }
         }
         self.insert_turn(t)?;
+        if let Some(snapshot) = snapshot {
+            self.conn.execute("INSERT INTO turn_mods(turn_id,run_id,content) VALUES(?1,?2,?3)",
+                params![t.id, t.run_id, snapshot.to_string()])?;
+        }
         tx.commit()?;
         Ok(true)
     }

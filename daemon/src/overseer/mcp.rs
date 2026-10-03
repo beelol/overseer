@@ -2,7 +2,8 @@
 //! A harness starts it as an MCP server (Claude Code `--mcp-config`, Codex `-c mcp_servers.*`,
 //! OpenCode `mcp` in the run's own `opencode.json`); nothing is written into the user's own
 //! configuration. Every tool call becomes one request to the daemon (`overseer.tool`) carrying the
-//! run's token from `OVERSEER_MCP_TOKEN`; the shim holds no state and no credential of its own, so
+//! launch's private capability file (legacy agent/watchers use `OVERSEER_MCP_TOKEN`); it reads
+//! that credential once, so
 //! who is speaking is decided by the daemon from the token, never from the text.
 //!
 //! MCP over stdio is newline-delimited JSON-RPC 2.0 (no Content-Length framing).
@@ -18,6 +19,7 @@ const PROTOCOL: &str = "2025-06-18";
 
 pub fn run(args: &[String]) -> Result<()> {
     let mut socket: Option<PathBuf> = None;
+    let mut capability: Option<PathBuf> = None;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -25,11 +27,35 @@ pub fn run(args: &[String]) -> Result<()> {
                 socket = args.get(i + 1).map(PathBuf::from);
                 i += 2;
             }
+            "--capability-file" => {
+                capability = Some(PathBuf::from(args.get(i + 1).ok_or_else(|| anyhow!("missing capability file"))?));
+                i += 2;
+            }
             other => bail!("unknown argument {other}"),
         }
     }
     let socket = socket.unwrap_or_else(crate::paths::socket_path);
-    let token = std::env::var("OVERSEER_MCP_TOKEN").unwrap_or_default();
+    // Read this launch's immutable private capability once. A missing or
+    // invalid file never falls back to a run-wide environment credential.
+    let token = match capability {
+        Some(path) => {
+            use std::io::Read;
+            use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
+            let file = std::fs::OpenOptions::new().read(true).custom_flags(libc::O_NOFOLLOW).open(path)?;
+            let metadata = file.metadata()?;
+            if !metadata.is_file() || metadata.permissions().mode() & 0o077 != 0
+                || metadata.uid() != unsafe { libc::geteuid() } {
+                bail!("native capability file is not private");
+            }
+            let mut value = String::new();
+            file.take(33).read_to_string(&mut value)?;
+            if value.len() != 32 || !value.bytes().all(|b| b.is_ascii_hexdigit()) {
+                bail!("native capability file is invalid");
+            }
+            value
+        }
+        None => std::env::var("OVERSEER_MCP_TOKEN").unwrap_or_default(),
+    };
     let stdin = std::io::stdin();
     let mut out = std::io::stdout().lock();
     for line in stdin.lock().lines() {
@@ -62,7 +88,7 @@ pub fn run(args: &[String]) -> Result<()> {
                 match daemon_call(&socket, "overseer.tool", json!({"token": token, "name": name, "arguments": arguments})) {
                     Ok(r) => Ok(json!({"content": [{"type": "text", "text": r["text"].as_str().unwrap_or_default()}], "isError": r["is_error"].as_bool().unwrap_or(false)})),
                     // A refused call is a tool error the model can read, not a protocol failure.
-                    Err(e) => Ok(json!({"content": [{"type": "text", "text": format!("refused: {e}")}], "isError": true})),
+                    Err(e) => Ok(json!({"content": [{"type": "text", "text": super::tool_text(&format!("refused: {e}"))}], "isError": true})),
                 }
             }
             m if m.starts_with("notifications/") => continue,

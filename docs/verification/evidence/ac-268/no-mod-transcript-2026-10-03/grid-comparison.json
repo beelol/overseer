@@ -1,0 +1,166 @@
+{
+  "prior63": {
+    "grid": {
+      "Overseer Dark@1280": {
+        "chars": 993,
+        "dropped": 34,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read \u00b7 Searched \u00b7 Found files \u00b7 Created \u00b7 Edited \u00b7 Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go through a sing",
+        "width": 922
+      },
+      "Overseer Dark@900": {
+        "chars": 993,
+        "dropped": 34,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read \u00b7 Searched \u00b7 Found files \u00b7 Created \u00b7 Edited \u00b7 Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go through a sing",
+        "width": 542
+      },
+      "Overseer Light@1280": {
+        "chars": 993,
+        "dropped": 34,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read \u00b7 Searched \u00b7 Found files \u00b7 Created \u00b7 Edited \u00b7 Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go through a sing",
+        "width": 922
+      },
+      "Overseer Light@900": {
+        "chars": 993,
+        "dropped": 34,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read \u00b7 Searched \u00b7 Found files \u00b7 Created \u00b7 Edited \u00b7 Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go through a sing",
+        "width": 542
+      },
+      "Default Dark Modern@1280": {
+        "chars": 993,
+        "dropped": 34,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read \u00b7 Searched \u00b7 Found files \u00b7 Created \u00b7 Edited \u00b7 Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go through a sing",
+        "width": 922
+      },
+      "Default Dark Modern@900": {
+        "chars": 993,
+        "dropped": 34,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read \u00b7 Searched \u00b7 Found files \u00b7 Created \u00b7 Edited \u00b7 Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go through a sing",
+        "width": 542
+      },
+      "Overseer@1280": {
+        "chars": 993,
+        "dropped": 34,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read \u00b7 Searched \u00b7 Found files \u00b7 Created \u00b7 Edited \u00b7 Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go through a sing",
+        "width": 922
+      },
+      "Overseer@900": {
+        "chars": 993,
+        "dropped": 34,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read \u00b7 Searched \u00b7 Found files \u00b7 Created \u00b7 Edited \u00b7 Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go through a sing",
+        "width": 542
+      }
+    },
+    "summary": {
+      "chars": 993,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    }
+  },
+  "current2a": {
+    "grid": {
+      "Overseer Dark@1280": {
+        "chars": 1017,
+        "dropped": 34,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | mods applied | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read \u00b7 Searched \u00b7 Found files \u00b7 Created \u00b7 Edited \u00b7 Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go",
+        "width": 922
+      },
+      "Overseer Dark@900": {
+        "chars": 1017,
+        "dropped": 34,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | mods applied | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read \u00b7 Searched \u00b7 Found files \u00b7 Created \u00b7 Edited \u00b7 Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go",
+        "width": 542
+      },
+      "Overseer Light@1280": {
+        "chars": 1017,
+        "dropped": 34,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | mods applied | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read \u00b7 Searched \u00b7 Found files \u00b7 Created \u00b7 Edited \u00b7 Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go",
+        "width": 922
+      },
+      "Overseer Light@900": {
+        "chars": 1017,
+        "dropped": 34,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | mods applied | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read \u00b7 Searched \u00b7 Found files \u00b7 Created \u00b7 Edited \u00b7 Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go",
+        "width": 542
+      },
+      "Default Dark Modern@1280": {
+        "chars": 1017,
+        "dropped": 34,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | mods applied | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read \u00b7 Searched \u00b7 Found files \u00b7 Created \u00b7 Edited \u00b7 Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go",
+        "width": 922
+      },
+      "Default Dark Modern@900": {
+        "chars": 1017,
+        "dropped": 34,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | mods applied | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read \u00b7 Searched \u00b7 Found files \u00b7 Created \u00b7 Edited \u00b7 Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go",
+        "width": 542
+      },
+      "Overseer@1280": {
+        "chars": 1017,
+        "dropped": 34,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | mods applied | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read \u00b7 Searched \u00b7 Found files \u00b7 Created \u00b7 Edited \u00b7 Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go",
+        "width": 922
+      },
+      "Overseer@900": {
+        "chars": 1017,
+        "dropped": 34,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | mods applied | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read \u00b7 Searched \u00b7 Found files \u00b7 Created \u00b7 Edited \u00b7 Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go",
+        "width": 542
+      }
+    },
+    "summary": {
+      "chars": 1017,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    }
+  }
+}

@@ -1,0 +1,10 @@
+
+running 2 tests
+AC201 initial settings {"channel":"on","check_ins":"every:3","effective_cadence":"every:3","test":"ac190"}
+test ac190_briefing_and_channel ... ok
+AC201 initial settings {"channel":"on","check_ins":"every:3","effective_cadence":"every:3","test":"ac189"}
+test ac189_overseer_keeps_agents_on_task has been running for over 60 seconds
+test ac189_overseer_keeps_agents_on_task ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 35 filtered out; finished in 93.84s
+

@@ -1,0 +1,154 @@
+[
+  {
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "overseerd",
+      "src_path": "/private/tmp/overseer-late-native-origin-20261003/daemon/src/main.rs",
+      "edition": "2021",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+    "fresh": false,
+    "sha256": "6777d4b6b86da26ad66540a2c02063d6ec20622c96f7f8e70c088cfd2c28ad67"
+  },
+  {
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "overseerd",
+      "src_path": "/private/tmp/overseer-late-native-origin-20261003/daemon/src/main.rs",
+      "edition": "2021",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+    "fresh": false,
+    "sha256": "6777d4b6b86da26ad66540a2c02063d6ec20622c96f7f8e70c088cfd2c28ad67"
+  },
+  {
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "overseer_native_late_origin",
+      "src_path": "/private/tmp/overseer-late-native-origin-20261003/daemon/tests/overseer_native_late_origin.rs",
+      "edition": "2021",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/overseer_native_late_origin-c4d81ba8cc6cfad3",
+    "fresh": false,
+    "sha256": "3dee1962591f23ca5cc07c1ff83063f31425728945e678f69a450fab3367c25c"
+  },
+  {
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "overseer_native_publication",
+      "src_path": "/private/tmp/overseer-late-native-origin-20261003/daemon/tests/overseer_native_publication.rs",
+      "edition": "2021",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/overseer_native_publication-a2ba3717acf0f03e",
+    "fresh": false,
+    "sha256": "c57f9739bfd5d07e59aa65e394a4e792adae9fe31130f841d760083ce5534dfe"
+  },
+  {
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "overseer_continuity",
+      "src_path": "/private/tmp/overseer-late-native-origin-20261003/daemon/tests/overseer_continuity.rs",
+      "edition": "2021",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/overseer_continuity-a305ea9428f6b72b",
+    "fresh": false,
+    "sha256": "0c6fa7a0cefbd0764a053974bf9b24418dee2d210535c3f7b1e9a74981d3d79a"
+  },
+  {
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "tool_refusal_redaction",
+      "src_path": "/private/tmp/overseer-late-native-origin-20261003/daemon/tests/tool_refusal_redaction.rs",
+      "edition": "2021",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/tool_refusal_redaction-0cd3020009af041b",
+    "fresh": false,
+    "sha256": "4073b5ff85f735a1120b6a12dcb159fcd6f950149081aee759cc487bf794a65a"
+  },
+  {
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "overseer_native_cause",
+      "src_path": "/private/tmp/overseer-late-native-origin-20261003/daemon/tests/overseer_native_cause.rs",
+      "edition": "2021",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/overseer_native_cause-ea35bced78fabde2",
+    "fresh": false,
+    "sha256": "4ebb65143b7cb01bc47a1d673d817317db7c09907e72a79db0ba71c39b0234ab"
+  },
+  {
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "overseer_native_capabilities",
+      "src_path": "/private/tmp/overseer-late-native-origin-20261003/daemon/tests/overseer_native_capabilities.rs",
+      "edition": "2021",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/overseer_native_capabilities-1efef19e4cbd1329",
+    "fresh": false,
+    "sha256": "19e278780c98d436b4e6699cf355419b235ccea57e6c65f99551bd9af4674501"
+  }
+]

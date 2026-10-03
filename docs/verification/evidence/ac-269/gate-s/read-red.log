@@ -1,0 +1,49 @@
+
+running 11 tests
+test common::base32::tests::base32_round_trips_and_matches_rfc_vectors ... ok
+test common::noise::tests::a_wrong_pairing_secret_fails_in_the_first_message ... ok
+test common::noise::tests::large_messages_are_chunked_and_joined ... ok
+test common::noise::tests::noise_vectors_match_the_shared_file ... ok
+test daemon_created_watcher_reads_only_its_actual_subject ... 
+thread 'daemon_created_watcher_reads_only_its_actual_subject' panicked at daemon/tests/mods_gate_s.rs:538:9:
+daemon did not create an actual watcher: {"watches":[{"brief":"Inspect this subject only.","budget":60,"copy_path":null,"copy_workspace":null,"end_reason":null,"ended_ms":null,"harness":"claude","hold_on_stop":false,"id":"wt-4fdcee22aa8d","last_snapshot":null,"mode":"watch","open":true,"subject":"r-e8fd8f61a435","subject_title":"/bin/sh -c while [ ! -f \"$1\" ]; do sleep 0.05; done fixture /tmp/ovs-rwGv1r6/release-subject","wakes":0,"watcher":null,"watcher_title":null}]}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test existing_agent_watch_membership_changes_native_read_target_then_restores_self ... 
+thread 'existing_agent_watch_membership_changes_native_read_target_then_restores_self' panicked at daemon/tests/mods_gate_s.rs:93:5:
+authenticated Mods read was unavailable: Err("agent runs have no tool mods")
+FAILED
+test native_mods_read_rejects_authority_fields_and_every_mutation_operation ... 
+thread 'native_mods_read_rejects_authority_fields_and_every_mutation_operation' panicked at daemon/tests/mods_gate_s.rs:93:5:
+authenticated Mods read was unavailable: Err("agent runs have no tool mods")
+FAILED
+test native_overseer_reads_list_and_delivery_without_private_text_or_mutation ... 
+thread 'native_overseer_reads_list_and_delivery_without_private_text_or_mutation' panicked at daemon/tests/mods_gate_s.rs:93:5:
+authenticated Mods read was unavailable: Err("overseer runs have no tool mods")
+FAILED
+test ordinary_native_reads_project_self_and_hide_unrelated_library ... 
+thread 'ordinary_native_reads_project_self_and_hide_unrelated_library' panicked at daemon/tests/mods_gate_s.rs:93:5:
+authenticated Mods read was unavailable: Err("agent runs have no tool mods")
+FAILED
+test unknown_native_token_cannot_read_even_when_arguments_claim_owner ... 
+thread 'unknown_native_token_cannot_read_even_when_arguments_claim_owner' panicked at daemon/tests/mods_gate_s.rs:93:5:
+authenticated Mods read was unavailable: Err("agent runs have no tool mods")
+FAILED
+test watcher_without_active_subject_has_no_native_mods_read_fallback ... 
+thread 'watcher_without_active_subject_has_no_native_mods_read_fallback' panicked at daemon/tests/mods_gate_s.rs:448:5:
+watcher metadata tool missing: {"tools":[{"description":"Every agent Overseer runs, one line each: id, title, status, harness, repository, worktree, files changed.","inputSchema":{"additionalProperties":false,"properties":{},"type":"object"},"name":"roster"},{"description":"Your subject's digest: what was asked, status, changed files, last messages, what it waits for.","inputSchema":{"additionalProperties":false,"properties":{"id":{"type":"string"}},"required":["id"],"type":"object"},"name":"agent"},{"description":"A range of your subject's conversation: its messages and tool steps, oldest first, from an event sequence number (after) up to a limit.","inputSchema":{"additionalProperties":false,"properties":{"after":{"type":"integer"},"id":{"type":"string"},"limit":{"type":"integer"}},"required":["id"],"type":"object"},"name":"conversation"},{"description":"Your subject's changed files with added and removed line counts, against its task's base.","inputSchema":{"additionalProperties":false,"properties":{"id":{"type":"string"}},"required":["id"],"type":"object"},"name":"changes"},{"description":"One file's diff in your subject's worktree against its task's base.","inputSchema":{"additionalProperties":false,"properties":{"id":{"type":"string"},"path":{"type":"string"}},"required":["id","path"],"type":"object"},"name":"diff"},{"description":"One file's contents in your subject's worktree.","inputSchema":{"additionalProperties":false,"properties":{"id":{"type":"string"},"path":{"type":"string"}},"required":["id","path"],"type":"object"},"name":"file"},{"description":"Your finding on the subject after a wake: fine (nothing to report; stays silent), concern (say what and where) or stop (the subject must be stopped; say why, with the evidence). You only read; Overseer acts on it.","inputSchema":{"additionalProperties":false,"properties":{"result":{"enum":["fine","concern","stop"],"type":"string"},"text":{"type":"string"}},"required":["result"],"type":"object"},"name":"finding"}]}
+FAILED
+
+failures:
+
+failures:
+    daemon_created_watcher_reads_only_its_actual_subject
+    existing_agent_watch_membership_changes_native_read_target_then_restores_self
+    native_mods_read_rejects_authority_fields_and_every_mutation_operation
+    native_overseer_reads_list_and_delivery_without_private_text_or_mutation
+    ordinary_native_reads_project_self_and_hide_unrelated_library
+    unknown_native_token_cannot_read_even_when_arguments_claim_owner
+    watcher_without_active_subject_has_no_native_mods_read_fallback
+
+test result: FAILED. 4 passed; 7 failed; 0 ignored; 0 measured; 0 filtered out; finished in 37.57s
+

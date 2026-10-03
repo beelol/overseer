@@ -1,0 +1,23 @@
+{
+  "head": "abf572ef53705db0e8f8b32e72a46057661057fc",
+  "artifacts": [
+    {
+      "stage": "build",
+      "target": "overseerd",
+      "source": "/private/tmp/overseer-closeout-corrected-20261003/daemon/src/main.rs",
+      "fresh": false,
+      "test": false,
+      "executable": "/private/tmp/overseer-closeout-integration-target/debug/overseerd",
+      "sha256": "fdd4d442b5bae396698182f92749dc3f86344121ac1394ef4fa9fe9a914c3818"
+    },
+    {
+      "stage": "no-run",
+      "target": "overseer_native_legacy_lists",
+      "source": "/private/tmp/overseer-closeout-corrected-20261003/daemon/tests/overseer_native_legacy_lists.rs",
+      "fresh": false,
+      "test": true,
+      "executable": "/private/tmp/overseer-closeout-integration-target/debug/deps/overseer_native_legacy_lists-72fbb6f486bdd5c5",
+      "sha256": "dbb5cbdc6dd7654f68c946b402c0a1d4c9dea5150a0f7ee30e15c6622b936ecd"
+    }
+  ]
+}

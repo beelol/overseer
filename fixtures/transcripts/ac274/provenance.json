@@ -1,0 +1,30 @@
+{
+  "codex_version": "0.158.0",
+  "claude_version": "2.1.288",
+  "source": "installed codex app-server generate-json-schema --experimental; installed Claude source excerpts",
+  "qualification": "Schema-derived sanitized vectors only. No native transport/provider/browser qualification.",
+  "schema_sha256": {
+    "RequestId.json": "9c72d59a306d827113020c6d31a14c326d55210d9bd6954f825196a52009f1c7",
+    "JSONRPCResponse.json": "4796738c04c74288213a08fb8d820c7b4df19e0977cdcd35b65ffcb43cfc93ab",
+    "ExecCommandApprovalParams.json": "653116614df1aa5011c3cc399cf79bae6b9eb28c1d527df27275abf61ceb1365",
+    "ExecCommandApprovalResponse.json": "80dba6d9f28d19c57960db72340554c193624f014cd496714a0c7aabe1120046",
+    "ApplyPatchApprovalParams.json": "179d91081c3c84d0f79fc544a3d6d423f280c0f9d93512cdd0344c80e09b99a3",
+    "ApplyPatchApprovalResponse.json": "a5e145b4794ea91da6eb478626fac96bbbd4485c3399fabd1c9972d53d2d9010",
+    "CommandExecutionRequestApprovalParams.json": "c9728280b8f3204fd729d0fb3d1ca7bb05b1150de26b3653f7163e6a9bd941e7",
+    "CommandExecutionRequestApprovalResponse.json": "6d0767113e22f311381809b6b236b0dde2b99b01992879c26bf7b1ea0e003cb7",
+    "FileChangeRequestApprovalParams.json": "13848b26814c286ad6425a20d01c1691c86790e1f9e2529399677a8a22fe0d18",
+    "FileChangeRequestApprovalResponse.json": "b95b03ee6be674e25cee2e863cc135a28620e1070addd2f34685aadee27cde08",
+    "PermissionsRequestApprovalParams.json": "c11fbe632472ab0923aba5c0a53da3d6d86929bcd5c78e7c13c51c6b2db508ff",
+    "PermissionsRequestApprovalResponse.json": "23f3f24e9dbf35db3e0b85703f0d934da5a1cff3cbb611fba8bcd41f3b4a04b0",
+    "ToolRequestUserInputParams.json": "fda15b62e7446105b59c8ed85c908abed2a47db70653e57c92c47a2f204fa77a",
+    "ToolRequestUserInputResponse.json": "5073b245f741fa8ce62ec52e4dd1809b7831f9c4284c279a78abc9b171f8e3f2",
+    "McpServerElicitationRequestParams.json": "225e9e9198019a71e1680172484b0863817d550f7089834b848f011904670f47",
+    "McpServerElicitationRequestResponse.json": "792a012fdfe53ac211575a6c37ffbd492be848d15cb313d1bb4b534ade1f54ac",
+    "ServerRequestResolvedNotification.json": "4f03d586a5af04edd912cad08cc97eceb658e7e06744565e6d41a93e04a55966",
+    "DynamicToolCallParams.json": "401bba20cfbd95762bef0467d840430c46be53369093ad9f26425ba757e34efc",
+    "ChatgptAuthTokensRefreshParams.json": "03b7a734b8b3180d9cb477b33564385d29b22a2528165a614891f13849060503",
+    "AttestationGenerateParams.json": "b85df8f169cfbca98724df3a5f7550fc4649fa69b23f5160aafdb52e027133a8",
+    "CurrentTimeReadParams.json": "2e1a0e6b766f9a31fa937c957cf0b3c0505e8b01503d559b41022a4d523d4c95"
+  },
+  "claude_questions_primary_source": "https://code.claude.com/docs/en/agent-sdk/user-input (question text keys, original questions retained, multi-select comma-space joins allowed; read2026-10-03)"
+}
