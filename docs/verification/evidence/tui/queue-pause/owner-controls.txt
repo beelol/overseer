@@ -1,0 +1,40 @@
+ ◆ Overseer  page 1/1 · 1 agent · ● 1 working                                                                phone access off · ● connected
+╭ agents ────────────────────╮┏ 1 ● Queue demo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Claude Code · 1s ┓
+│ repo  1 working            │┃ › original work                                                                                            ┃
+│›● Queue de… Claude Fixt…   │┃ working on: original work                                                                                  ┃
+│                            │┃ Queue paused · Q controls                                                                                  ┃
+│                            │┃ 1. Paused typed direction                                                                                  ┃
+│                            │┃ 2. Paused spoken direction                                                                                 ┃
+│                            │┃                                                                                                            ┃
+│                   ┌ Queue demo · Queue paused ───────────────────────────────────────────────────────────────────────┐                   ┃
+│                   │s Send queued   c Clear   d Remove   j/k select   Esc close                                       │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   │› 1. Paused typed direction                                                                       │                   ┃
+│                   │  2. Paused spoken direction                                                                      │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   │                                                                                                  │                   ┃
+│                   └──────────────────────────────────────────────────────────────────────────────────────────────────┘                   ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+│                            │┃                                                                                                            ┃
+╰─── ◆ you ✦ review ✓ merged ╯┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Claude Fixture · fix…@example.test ┛
+ s Send queued   c Clear   d Remove   j/k select   esc close

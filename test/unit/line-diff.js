@@ -60,4 +60,4 @@ test('a rewrite past the edit budget is one replaced hunk that still rebuilds th
 });
 
 console.log(`${passed} passed, ${failures} failed`);
-process.exit(failures ? 1 : 0);
+process.exitCode = failures ? 1 : 0;

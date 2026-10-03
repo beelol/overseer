@@ -432,6 +432,10 @@ pub fn handoff(d: &Arc<Daemon>, predecessor: &Run, target: &Target, reason: &str
         process_generation: 0,
         attention: None,
     };
+    // Adoption and launch share Stop's stable task boundary. A Stop already waiting here
+    // resolves the successor after launch, interrupts it, and cannot acknowledge the old run.
+    let stop_gate = d.work_unit_gate(&format!("handoff-stop:{}", predecessor.task_id));
+    let _stop_guard = stop_gate.lock().unwrap();
     d.store.lock().unwrap().insert_run(&successor)?;
     // Overseer's view moves with the work before the successor's first turn (AC-197): the role of
     // a run of the daemon's own (Overseer, a watcher) with its tools and its read-only launch, and

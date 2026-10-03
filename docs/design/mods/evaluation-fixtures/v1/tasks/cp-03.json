@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "set_version": "1",
+  "id": "CP-03",
+  "category": "failure",
+  "title": "Explain a failed text import",
+  "synthetic": true,
+  "prompt": "The reader has no earlier conversation.\nExplain why the import failed and how the owner can recover. Preserve the exact file path and quoted error text.\n\nFixed synthetic input (not a report about real Overseer behavior):\n- A text mod was previewed from /fixture/mods/prose/style.md.\n- The importer returned: \"invalid_mod: invalid UTF-8 in style.md\".\n- No version was installed and no binding was enabled.\n- Recovery: save style.md as UTF-8 and preview the folder again.",
+  "prompt_sha256_utf8": "9d2575ebcdb5cddf147fa4099bae09f6233fb00291b1cda9ecd0b1b97aac8ffe",
+  "input_facts": [
+    "A text mod was previewed from /fixture/mods/prose/style.md.",
+    "The importer returned: \"invalid_mod: invalid UTF-8 in style.md\".",
+    "No version was installed and no binding was enabled.",
+    "Recovery: save style.md as UTF-8 and preview the folder again."
+  ],
+  "required_facts_for_human_review": [
+    {
+      "id": "F1",
+      "description": "The failed operation was a text-mod preview/import."
+    },
+    {
+      "id": "F2",
+      "description": "The exact path identifies the affected file."
+    },
+    {
+      "id": "F3",
+      "description": "The error says that style.md is not valid UTF-8."
+    },
+    {
+      "id": "F4",
+      "description": "The failure installed and enabled nothing."
+    },
+    {
+      "id": "F5",
+      "description": "Saving valid UTF-8 and previewing again is the recovery."
+    }
+  ],
+  "literal_checks": [
+    {
+      "id": "L1",
+      "kind": "contains_exact",
+      "literal": "/fixture/mods/prose/style.md",
+      "required_fact_id": "F2",
+      "advisory_only": true
+    },
+    {
+      "id": "L2",
+      "kind": "contains_exact",
+      "literal": "invalid_mod: invalid UTF-8 in style.md",
+      "required_fact_id": "F3",
+      "advisory_only": true
+    }
+  ],
+  "literal_check_notice": "Advisory exact-evidence diagnostics only. A literal flag cannot decide acceptance or fact preservation. Numeric substring matches can be misleading; a human may mark the semantic fact preserved despite a missing numeric literal (for example, a correctly spelled-out number). Verbatim paths, errors, commands and citations matter where the prompt requests them. All semantic facts and quality ratings require a human."
+}

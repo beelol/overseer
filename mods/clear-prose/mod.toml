@@ -1,0 +1,9 @@
+schema_version = 1
+id = "clear-prose"
+name = "Clear prose"
+version = "1"
+summary = "Concise, complete sentences with enough context to stand alone."
+source = "Overseer bundled"
+
+[style]
+file = "style.md"

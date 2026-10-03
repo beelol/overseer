@@ -7,6 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
+const { initialSettings, settingOverride, runSettings } = require('./settings-qualification');
 
 (async () => {
   const s = new Session('oversight');
@@ -23,6 +24,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
       CLAUDE_FIXTURE_MODE_FILE: modeFile, OVERSEER_HARNESS_ENV_PASSTHROUGH: 'CLAUDE_FIXTURE_MODE_FILE' });
     const cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
+    initialSettings(s, result);
     const run = id => s.ctl('state').runs.find(r => r.id === id);
     const done = async id => { for (let i = 0; i < 80 && !['completed', 'failed', 'interrupted'].includes(run(id).status); i++) await delay(250); };
     const overseerIdle = async () => { for (let i = 0; i < 160; i++) { const x = s.ctl('overseer.session'); if (x.run_id && !['queued', 'starting', 'running'].includes(x.run_status)) return x; await delay(250); } throw new Error('Overseer stayed busy'); };
@@ -30,6 +32,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     // Overseer's conversation exists (the marks show once it does), and nothing checks in by itself.
     fs.writeFileSync(modeFile, 'overseer');
     s.ctl('agent.cadence', { cadence: 'off', by: 'owner' });
+    settingOverride(s, result, 'check_ins', 'off', 'Oversight intentionally isolates holds, watches, shares and conflicts from cadence turns.');
     s.ctl('overseer.send', { text: 'What is everyone doing?', surface: 'ctl', harness: 'claude' });
     await overseerIdle();
     fs.writeFileSync(modeFile, 'echo');
@@ -41,6 +44,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const build = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'echo building the docs; echo hmm, not sure about the tests; sleep 900'], prompt: '', title: 'Docs build' }).run.id;
     const reviewer = s.ctl('task.create', { repo, harness: 'claude', prompt: 'hello', title: 'Reviewer' }).run.id;
     await done(reviewer);
+    runSettings(s, result, reviewer);
     const watch = s.ctl('watch.start', { subject: build, watcher: reviewer, brief: 'the tests stay in place', by: 'owner' });
     const token = s.ctl('overseer.token', { run_id: reviewer, role: 'agent' }).token;
     s.ctl('overseer.tool', { token, name: 'finding', arguments: { result: 'concern', text: 'it sounds unsure about the tests' } });

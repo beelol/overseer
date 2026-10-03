@@ -10,7 +10,7 @@
   "engines": { "vscode": "^1.136.0" },
   "categories": ["SCM Providers", "Other"],
   "main": "./src/extension.js",
-  "activationEvents": ["onStartupFinished", "onWebviewPanel:overseer.review", "onWebviewPanel:overseer.output", "onWebviewPanel:overseer.center", "onCustomEditor:overseer.chatEditor", "onFileSystem:overseer-chat", "onUri"],
+  "activationEvents": ["onStartupFinished", "onWebviewPanel:overseer.review", "onWebviewPanel:overseer.output", "onWebviewPanel:overseer.center", "onWebviewPanel:overseer.mods", "onCustomEditor:overseer.chatEditor", "onFileSystem:overseer-chat", "onUri"],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
@@ -128,6 +128,8 @@
       { "command": "overseer.voice.no", "title": "Voice Mode: No", "category": "Overseer", "enablement": "overseer.voiceOn" },
       { "command": "overseer.voice.simulate", "title": "Voice Mode: Simulate the Voice (development)", "category": "Overseer", "enablement": "overseer.voiceSimulated" },
       { "command": "overseer.testNotification", "title": "Test Notification", "category": "Overseer", "icon": "$(bell)" },
+      { "command": "overseer.mods", "title": "Mods", "category": "Overseer", "icon": "$(settings-gear)" },
+      { "command": "overseer.appliedMods", "title": "Applied Mods", "category": "Overseer", "icon": "$(list-selection)" },
       { "command": "overseer.showLog", "title": "Show Daemon Log", "category": "Overseer" },
       { "command": "overseer.restartDaemonConnection", "title": "Reconnect to Daemon", "category": "Overseer" },
       { "command": "overseer.phoneAccess", "title": "Phone Access…", "category": "Overseer", "icon": "$(device-mobile)" },
@@ -193,6 +195,7 @@
         { "command": "overseer.startSwarm", "when": "view == overseer.agents && config.overseer.experimental.swarm", "group": "2_new@2" },
         { "command": "overseer.cleanupArchived", "when": "view == overseer.agents", "group": "3_tidy@1" },
         { "command": "overseer.refresh", "when": "view == overseer.agents", "group": "3_tidy@2" },
+        { "command": "overseer.mods", "when": "view == overseer.agents", "group": "4_info@2" },
         { "command": "overseer.showCapabilities", "when": "view == overseer.agents", "group": "4_info@1" },
         { "command": "overseer.audioMode", "when": "view == overseer.agents", "group": "5_audio@1" },
         { "command": "overseer.stopAll", "when": "view == overseer.agents", "group": "9_stop@1" },
@@ -219,6 +222,7 @@
         { "command": "overseer.openAgentToSide", "when": "view == overseer.agents && viewItem =~ /^(agent|needs)/", "group": "1_open@1" },
         { "command": "overseer.openReview", "when": "view == overseer.agents && viewItem =~ /^(agent-(active|done)|needs)/", "group": "1_open@2" },
         { "command": "overseer.followUp", "when": "view == overseer.agents && viewItem =~ /^agent-(active|done)/", "group": "2_control@1" },
+        { "command": "overseer.appliedMods", "when": "view == overseer.agents && viewItem =~ /^(agent|needs)/", "group": "2_control@6" },
         { "command": "overseer.selectComparison", "when": "view == overseer.agents && viewItem =~ /^agent-(active|done)/", "group": "2_control@2" },
         { "command": "overseer.mergeBack", "when": "view == overseer.agents && viewItem =~ /^agent-(active|done)/", "group": "2_control@3" },
         { "command": "overseer.openPullRequest", "when": "view == overseer.agents && viewItem =~ /^agent-(active|done)/", "group": "2_control@4" },
@@ -243,6 +247,7 @@
         { "command": "overseer.revokeDevice", "when": "view == overseer.devices && viewItem =~ /^device-(full|watch)/", "group": "9_remove@1" }
       ],
       "editor/title": [
+        { "command": "overseer.appliedMods", "when": "overseer.headEditor || activeWebviewPanelId == 'overseer.review' || activeWebviewPanelId == 'overseer.output'", "group": "navigation@92" },
         { "command": "overseer.head.toggleManualEdit", "when": "overseer.headEditor", "group": "navigation@89" },
         { "command": "overseer.head.diffsOnly", "when": "overseer.headEditor", "group": "navigation@90" },
         { "command": "overseer.backToOverseer", "when": "overseer.headEditor", "group": "navigation@91" },
@@ -320,7 +325,7 @@
     }
   },
   "scripts": {
-    "check": "node --check src/extension.js && node --check src/daemon-client.js && node --check src/views.js && node --check src/swarm-controls.js && node --check src/review.js && node --check src/agent-head.js && node --check src/line-diff.js && node --check src/output-panel.js && node --check src/phone-access.js && node --check src/phone-text.js && node --check media/pairing.js && node --check branch-diff/review/panel.js && node --check src/arrangement.js && node --check src/layout.js && node --check src/vscode-chat.js && node --check src/overseer-window.js",
+    "check": "node --check src/extension.js && node --check src/daemon-client.js && node --check src/views.js && node --check src/mods.js && node --check src/mods-text.js && node --check media/mods-panel.js && node --check src/swarm-controls.js && node --check src/review.js && node --check src/agent-head.js && node --check src/line-diff.js && node --check src/output-panel.js && node --check src/phone-access.js && node --check src/phone-text.js && node --check media/pairing.js && node --check branch-diff/review/panel.js && node --check src/arrangement.js && node --check src/layout.js && node --check src/vscode-chat.js && node --check src/overseer-window.js",
     "build:review": "node branch-diff/scripts/build-review.js",
     "package": "node scripts/package.js",
     "test": "node ../test/unit/run.js"

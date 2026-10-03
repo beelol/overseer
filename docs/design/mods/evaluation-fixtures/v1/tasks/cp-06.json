@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "set_version": "1",
+  "id": "CP-06",
+  "category": "sequential_actions",
+  "title": "Give three setup actions in order",
+  "synthetic": true,
+  "prompt": "The reader has no earlier conversation.\nGive exactly three numbered actions for this fixture setup. Use the supplied commands verbatim and explain the role of each. This is a synthetic instruction-writing task; do not execute anything.\n\nFixed synthetic input (not a report about real Overseer behavior):\n- First command: fixturectl mods preview bundled:clear-prose. It displays immutable contents and returns preview ID preview-7.\n- Second command: fixturectl mods install preview-7 --confirm. It installs the preview and keeps it off.\n- Third command: fixturectl mods bind clear-prose --scope overseer --enable. It applies writing guidance to Overseer’s future turns only.\n- Approval policy and repository rules remain unchanged.",
+  "prompt_sha256_utf8": "9a002d52a703750bfa2fac66fb4c75b4e0a48319217b3f18fff99d09e95eaa92",
+  "input_facts": [
+    "First command: fixturectl mods preview bundled:clear-prose. It displays immutable contents and returns preview ID preview-7.",
+    "Second command: fixturectl mods install preview-7 --confirm. It installs the preview and keeps it off.",
+    "Third command: fixturectl mods bind clear-prose --scope overseer --enable. It applies writing guidance to Overseer’s future turns only.",
+    "Approval policy and repository rules remain unchanged."
+  ],
+  "required_facts_for_human_review": [
+    {
+      "id": "F1",
+      "description": "The three actions follow preview, confirmed install, then explicit enable."
+    },
+    {
+      "id": "F2",
+      "description": "All commands and the preview ID are preserved exactly."
+    },
+    {
+      "id": "F3",
+      "description": "Install keeps the mod off."
+    },
+    {
+      "id": "F4",
+      "description": "The final binding targets only future Overseer turns."
+    },
+    {
+      "id": "F5",
+      "description": "Approval policy and repository rules are preserved."
+    }
+  ],
+  "literal_checks": [
+    {
+      "id": "L1",
+      "kind": "contains_exact",
+      "literal": "fixturectl mods preview bundled:clear-prose",
+      "required_fact_id": "F1",
+      "advisory_only": true
+    },
+    {
+      "id": "L2",
+      "kind": "contains_exact",
+      "literal": "fixturectl mods install preview-7 --confirm",
+      "required_fact_id": "F2",
+      "advisory_only": true
+    },
+    {
+      "id": "L3",
+      "kind": "contains_exact",
+      "literal": "fixturectl mods bind clear-prose --scope overseer --enable",
+      "required_fact_id": "F2",
+      "advisory_only": true
+    }
+  ],
+  "literal_check_notice": "Advisory exact-evidence diagnostics only. A literal flag cannot decide acceptance or fact preservation. Numeric substring matches can be misleading; a human may mark the semantic fact preserved despite a missing numeric literal (for example, a correctly spelled-out number). Verbatim paths, errors, commands and citations matter where the prompt requests them. All semantic facts and quality ratings require a human."
+}

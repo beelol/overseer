@@ -895,6 +895,7 @@ function seenBefore(w: Work, seq: number): boolean {
 
 /** Kinds that say nothing in a chat, and kinds the chat has a picture for; any other is a quiet line (conversation.js QUIET and KNOWN). */
 const QUIET = new Set([
+  'mods_applied', 'mods_changed',
   'session', 'task_created', 'reattached', 'interrupt_requested', 'workspace_removed', 'background_notice', 'daemon_stopping', 'status', 'usage', 'overseer_tool_call', 'overseer_action', 'outside_area',
   'going_in_circles', 'check_in_started', 'watch_wake', 'watcher_started', 'watch_capped', 'watch_copy_removed', 'oversight_moved', 'dispatch', 'area', 'conflict', 'conflict_closed', 'push', 'trouble',
 ]);

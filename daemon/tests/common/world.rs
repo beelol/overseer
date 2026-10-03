@@ -30,6 +30,26 @@ impl World {
     pub fn memory(&self, total: f64, available: f64, pressure: &str) {
         write_whole(&self.file("memory.json"), &json!({"total": (total * GIB as f64) as u64, "available": (available * GIB as f64) as u64, "pressure": pressure}).to_string());
     }
+    /// Acknowledgements written only by the actual local-load sampler after reading memory.
+    pub fn load_samples(&self) -> Vec<Value> {
+        let text = std::fs::read_to_string(self.file("load-samples.jsonl")).unwrap_or_default();
+        // A writer may be appending its final line; only newline-terminated acknowledgements
+        // are observable, so an in-progress append is retried rather than parsed as a sample.
+        let complete = text.rfind('\n').map(|end| &text[..=end]).unwrap_or("");
+        complete.lines().map(|line| serde_json::from_str(line).expect("complete load sample acknowledgement")).collect()
+    }
+
+    pub fn wait_load_samples(&self, tag: &str, after: usize, count: usize) -> Vec<Value> {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            let samples: Vec<Value> = self.load_samples().into_iter().skip(after)
+                .filter(|sample| sample["tag"] == tag).collect();
+            if samples.len() >= count { return samples; }
+            assert!(Instant::now() < deadline, "load sampler did not acknowledge {count} reads for {tag}: {samples:?}");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
     pub fn replay(&self, transcript: &str) {
         std::fs::copy(repo_root().join("fixtures/continuity").join(transcript), self.file("replay.jsonl")).unwrap();
     }
