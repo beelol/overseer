@@ -1414,11 +1414,32 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     if method.starts_with("swarm.") && result.as_ref().is_err_and(storage_fault) {
         d.swarm_storage_blocked.store(true, Ordering::SeqCst);
     }
+    // Mods keep copied original bytes privately; every protocol presentation
+    // uses the existing decoded-value redaction boundary, including previews.
+    if method.starts_with("mods.") {
+        return result.map(crate::daemon::redact_value).map_err(|e| {
+            // TOML diagnostics can quote private source lines. Preserve the
+            // protocol code/data shape while sanitizing decoded presentation.
+            if let Some(p) = e.downcast_ref::<ProtoError>() {
+                ProtoError::new(p.code, crate::redact::redact(&p.message))
+                    .with_data(crate::daemon::redact_value(p.data.clone())).into()
+            } else {
+                anyhow!(crate::redact::redact(&e.to_string()))
+            }
+        });
+    }
     result
 }
 
 fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     Ok(match method {
+        "mods.list" => crate::mods::library::list(d)?,
+        "mods.preview" => crate::mods::library::preview(d, p)?,
+        "mods.install" => crate::mods::library::install(d, p)?,
+        "mods.remove" => crate::mods::library::remove(d, p)?,
+        "mods.bind" => crate::mods::bindings::set(d, p)?,
+        "mods.unbind" => crate::mods::bindings::unset(d, p)?,
+        "mods.why" => crate::mods::bindings::why(d, p)?,
         "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path(), "instance": paths::instance(), "build": BUILD}),
         "state" => d.state_for(p["include_hidden"].as_bool().unwrap_or(false))?,
         "audio.get" => crate::audio::get(d)?,
@@ -2745,8 +2766,13 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "run.result" => d.delegated_result(s(p, "run_id")?)?,
         "run.follow_up" => {
-            // A held agent takes no new turn: the owner's own message offers Release and send.
+            // A paused queue takes additions; sending a new message never resumes old ones.
             let run_id = s(p, "run_id")?;
+            if d.queued_messages(run_id)?["paused"] == true {
+                crate::daemon::TurnOpts::from_params(p)?;
+                return Ok(json!({"delivery":d.queue_message(run_id, s(p, "prompt")?, "owner", json!({"options":p}))?}));
+            }
+            // A held agent takes no new turn: the owner's own message offers Release and send.
             if let Some(hold) = d.hold_of(run_id) {
                 if p["release"].as_bool().unwrap_or(false) {
                     d.agent_release(run_id, "owner", "released to send a message")?;
@@ -3217,6 +3243,8 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             None => json!({"cap": d.cap_of(), "self_started_today": d.self_started_today()}),
         },
         "run.queued" => d.queued_messages(s(p, "run_id")?)?,
+        "run.resume_queue" => d.resume_queue(s(p, "run_id")?)?,
+        "run.clear_queue" => d.clear_queue(s(p, "run_id")?)?,
         "run.unqueue" => d.unqueue_message(s(p, "run_id")?, p["id"].as_i64().unwrap_or(0))?,
         "overseer.tools" => d.overseer_tools(s(p, "token")?)?,
         "overseer.tool" => d.overseer_tool(s(p, "token")?, s(p, "name")?, &p["arguments"])?,

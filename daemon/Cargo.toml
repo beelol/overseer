@@ -20,6 +20,7 @@ libc = "0.2"
 regex = "1"
 base64 = "0.22"
 sha2 = "0.10"
+toml = "0.8"
 # Swarm's integration scratch files and verification output capture.
 tempfile = "3"
 # Gate N, the phone gateway: Noise handshake and transport, WebSocket listener.

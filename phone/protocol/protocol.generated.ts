@@ -63,6 +63,7 @@ export interface Run {
   capabilities: unknown;
   process_generation: number;
   attention?: Attention | null;
+  queue?: QueueSnapshot | null;
 }
 
 export interface Turn {
@@ -211,6 +212,95 @@ export interface NotificationSettings {
   bundle?: string | null;
 }
 
+export interface ModScope {
+  kind: 'all_agents' | 'repository' | 'watchers' | 'agent' | 'overseer';
+  repo_key?: string | null;
+  run_id?: string | null;
+}
+
+export interface ModFilters {
+  harnesses: Array<string>;
+  accounts: Array<string>;
+  models: Array<string>;
+}
+
+export interface ModBindingInput {
+  id?: string | null;
+  mod_id: string;
+  version: string;
+  fingerprint: string;
+  scope: ModScope;
+  enabled: boolean;
+  required?: boolean | null;
+  locked?: boolean | null;
+  filters?: ModFilters | null;
+}
+
+export interface ModBinding {
+  id: string;
+  mod_id: string;
+  version: string;
+  fingerprint: string;
+  scope: ModScope;
+  enabled: boolean;
+  required: boolean;
+  locked: boolean;
+  filters: ModFilters;
+  changed_ms: number;
+  actor: string;
+}
+
+export interface ModVersion {
+  id: string;
+  version: string;
+  fingerprint: string;
+  manifest: unknown;
+  source: string;
+  installed_ms: number;
+  files: Array<unknown>;
+}
+
+export interface ModContext {
+  run_id: string;
+  role: string;
+  repo_key: string;
+  harness: string;
+  harness_version?: string | null;
+  account_id?: string | null;
+  model?: string | null;
+  native_thread_exists: boolean;
+  local_model_selection: boolean;
+}
+
+export interface ModDecision {
+  binding_id: string;
+  mod_id: string;
+  fingerprint: string;
+  status: 'selected' | 'disabled' | 'overridden' | 'filtered' | 'not_in_scope' | 'unqualified';
+  reason: string;
+  required: boolean;
+  delivery: 'unsupported' | 'message_text' | 'native_instructions';
+  activation: 'next_turn' | 'next_thread';
+  children: 'yes' | 'no' | 'unknown';
+}
+
+export interface ModPlan {
+  revision: number;
+  versions: Array<ModVersion>;
+  rules_text: string;
+  style_text: string;
+  decisions: Array<ModDecision>;
+}
+
+export interface AppliedMods {
+  context: ModContext;
+  desired: ModPlan;
+  last_turn?: TurnModSnapshot | null;
+  pending: boolean;
+  support: unknown;
+  notice: string;
+}
+
 export interface KnownRepo {
   root: string;
   name: string;
@@ -219,6 +309,46 @@ export interface KnownRepo {
   branch?: string | null;
   default_branch?: string | null;
 }
+
+export interface TurnModSnapshot {
+  turn_id: string;
+  run_id: string;
+  plan: ModPlan;
+  context: ModContext;
+  binding_snapshot: Array<ModBinding>;
+  delivery: 'none' | 'unsupported' | 'message_text';
+  transport: string;
+  activation: 'next_turn';
+  children: 'unknown';
+  text: string;
+  digest: string;
+  added_bytes: number;
+  applied_fingerprints: Array<string>;
+  outcome: 'prepared' | 'transport_accepted' | 'failed_before_effect' | 'uncertain_after_effect';
+  outcome_ms: number;
+  outcome_detail?: string | null;
+  planned_fingerprints: Array<string>;
+  text_redacted: boolean;
+}
+
+export interface QueuedMessage {
+  id: number;
+  ts: number;
+  source: string;
+  text: string;
+  redirect: boolean;
+}
+
+export interface QueueSnapshot {
+  paused: boolean;
+  messages: Array<QueuedMessage>;
+}
+
+export interface QueuedDelivery {
+  delivery: 'queued';
+}
+
+export type FollowUpResult = Turn | QueuedDelivery;
 
 /** The payload of every kind of event the app reads. Other kinds arrive as `unknown`. */
 export interface EventPayloads {
@@ -357,6 +487,29 @@ export interface EventPayloads {
   trouble: {
     kind: string;
     reason: string;
+  };
+  mods_changed: {
+    operation: string;
+    binding?: ModBinding | null;
+    binding_id?: string | null;
+    mod_id?: string | null;
+    fingerprint?: string | null;
+    revision: number;
+    ended_bindings?: Array<string> | null;
+  };
+  mods_applied: {
+    snapshot: TurnModSnapshot;
+  };
+  queue_changed: {
+    paused?: boolean | null;
+    removed?: number | null;
+    id?: number | null;
+    delivered?: number | null;
+  };
+  queued: {
+    text: string;
+    detail: unknown;
+    paused?: boolean | null;
   };
 }
 
@@ -644,7 +797,7 @@ export interface Methods {
     effort?: string | null;
     permission_mode?: string | null;
     images?: Array<unknown> | null;
-  }; result: Turn };
+  }; result: FollowUpResult };
   /** Stop an agent's turn. */
   "run.interrupt": { class: 'control'; params: {
     run_id: string;
@@ -1239,6 +1392,58 @@ export interface Methods {
     ok: boolean;
     kept: number;
   } };
+  /** Inspect optional text Mods. */
+  "mods.list": { class: 'read'; params: Record<string, never>; result: {
+    revision: number;
+    installed: Array<unknown>;
+    bindings: Array<ModBinding>;
+    available_bundled: Array<unknown>;
+    unavailable: Array<unknown>;
+    support: unknown;
+  } };
+  /** Manage owner-confirmed text Mods. The Mac only: Local owner control; phone inspection is read-only. */
+  "mods.preview": { class: 'mac_only'; params: {
+    source: string;
+    operation: 'install' | 'update';
+  }; result: unknown };
+  /** Manage owner-confirmed text Mods. The Mac only: Local owner control; phone inspection is read-only. */
+  "mods.install": { class: 'mac_only'; params: {
+    preview_id: string;
+    confirm: boolean;
+  }; result: {
+    version: unknown;
+    revision: number;
+  } };
+  /** Set a pinned text Mod binding. The Mac only: Local owner control; phone inspection is read-only. */
+  "mods.bind": { class: 'mac_only'; params: {
+    binding: ModBindingInput;
+    expected_revision: number;
+  }; result: {
+    binding: ModBinding;
+    revision: number;
+  } };
+  /** Remove a text Mod scope override. The Mac only: Local owner control; phone inspection is read-only. */
+  "mods.unbind": { class: 'mac_only'; params: {
+    binding_id: string;
+    expected_revision: number;
+  }; result: {
+    revision: number;
+  } };
+  /** Explain a run's desired and applied Mods. */
+  "mods.why": { class: 'read'; params: {
+    run_id: string;
+  }; result: AppliedMods };
+  /** Manage owner-confirmed text Mods. The Mac only: Local owner control; phone inspection is read-only. */
+  "mods.remove": { class: 'mac_only'; params: {
+    mod_id: string;
+    fingerprint: string;
+    confirm: boolean;
+    expected_revision: number;
+  }; result: unknown };
+  /** Send an agent’s paused queue. */
+  "run.resume_queue": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Clear an agent’s queue. */
+  "run.clear_queue": { class: 'mac_only'; params: unknown; result: unknown };
 }
 
 export type MethodName = keyof Methods;
@@ -1514,6 +1719,15 @@ export const METHOD_CLASS = {
   "swarm.worker.reconcile": 'mac_only',
   "menubar.snapshot": 'mac_only',
   "review.seen": 'mac_only',
+  "mods.list": 'read',
+  "mods.preview": 'mac_only',
+  "mods.install": 'mac_only',
+  "mods.bind": 'mac_only',
+  "mods.unbind": 'mac_only',
+  "mods.why": 'read',
+  "mods.remove": 'mac_only',
+  "run.resume_queue": 'mac_only',
+  "run.clear_queue": 'mac_only',
 } as const satisfies Record<MethodName, MethodClass>;
 
 export type PhoneMethod = { [K in MethodName]: Methods[K]['class'] extends 'mac_only' ? never : K }[MethodName];

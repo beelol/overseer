@@ -11,6 +11,37 @@ fn description() -> Value {
     serde_json::from_str(&std::fs::read_to_string(repo_root().join("protocol/protocol.json")).unwrap()).unwrap()
 }
 
+#[test]
+fn mods_binding_methods_and_events_follow_generated_shapes() {
+    let doc = description();
+    let d = Daemon::start(&[("OVERSEER_TEST_AUTO_DISABLED", "1")]);
+    let t = tmp();
+    let repo = repo(&t.path().join("repo"));
+    let created = d.generic(&repo, "worktree", "/usr/bin/true", &[]);
+    let run = run_id(&created);
+    d.wait_done(&run, 10);
+    let preview = d.call("mods.preview", json!({"source":"bundled:clear-prose","operation":"install"}));
+    let installed = d.call("mods.install", json!({"preview_id":preview["id"],"confirm":true}));
+    let bound = d.call("mods.bind", json!({"expected_revision":installed["revision"],"binding":{
+        "mod_id":"clear-prose","version":"1","fingerprint":installed["version"]["fingerprint"],
+        "scope":{"kind":"all_agents"},"enabled":true}}));
+    d.call("run.follow_up", json!({"run_id":run,"prompt":"Capture the applied text shape."}));
+    d.wait_done(&run,10);
+    let why = d.call("mods.why", json!({"run_id":run}));
+    let list = d.call("mods.list", json!({}));
+    let unbound = d.call("mods.unbind", json!({"binding_id":bound["binding"]["id"],"expected_revision":bound["revision"]}));
+    let mut wrong = Vec::new();
+    for (name,value) in [("mods.bind",bound),("mods.why",why),("mods.list",list),("mods.unbind",unbound)] {
+        check(&doc, &doc["methods"][name]["result"], &value, name, &mut wrong);
+    }
+    let events = d.call("events.list", json!({"limit":1000}));
+    for event in events["events"].as_array().unwrap().iter().filter(|e| e["kind"] == "mods_changed" || e["kind"] == "mods_applied") {
+        let kind = event["kind"].as_str().unwrap();
+        check(&doc, &doc["events"][kind], &event["payload"], kind, &mut wrong);
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
 /// Checks `value` against `shape`. Every field of an object must be described, every field that
 /// is not marked `?` must be there, and every type must match. Returns what is wrong, with its path.
 fn check(doc: &Value, shape: &Value, value: &Value, at: &str, wrong: &mut Vec<String>) {
@@ -53,6 +84,15 @@ fn check(doc: &Value, shape: &Value, value: &Value, at: &str, wrong: &mut Vec<St
             Some(map) => map.iter().for_each(|(k, v)| check(doc, &json!(inner), v, &format!("{at}.{k}"), wrong)),
             None => wrong.push(format!("{at}: expected an object, got {value}")),
         }
+        return;
+    }
+    if text.contains('|') && !text.contains('\'') {
+        for variant in text.split('|') {
+            let mut variant_wrong = Vec::new();
+            check(doc, &json!(variant.trim()), value, at, &mut variant_wrong);
+            if variant_wrong.is_empty() { return; }
+        }
+        wrong.push(format!("{at}: expected one of {text}, got {value}"));
         return;
     }
     if text.contains('\'') {
@@ -122,7 +162,12 @@ fn ac134_the_daemon_sends_what_the_description_says() {
     let base = option(&d, &run, "task_start", None)["base"].as_str().unwrap().to_string();
     call("run.follow_up", json!({"run_id": run, "prompt": "again"}));
     d.wait_done(&run, 20);
+    call("run.interrupt", json!({"run_id":run}));
+    let paused = call("run.follow_up", json!({"run_id":run,"prompt":"wait for explicit resume"}));
+    assert_eq!(paused, json!({"delivery":"queued"}));
     call("state", json!({}));
+    d.call("run.resume_queue", json!({"run_id":run}));
+    d.wait_done(&run, 20);
     for (method, params) in [
         ("harness.list", json!({})), ("profile.list", json!({})), ("profile.status", json!({"id": "system-claude"})), ("repo.inspect", json!({"path": repo})), ("repo.known", json!({})),
         ("repo.files", json!({"workspace_id": ws, "query": "read"})), ("run.turns", json!({"run_id": run})), ("run.raw_output", json!({"run_id": run, "max_bytes": 2000})),
@@ -208,5 +253,15 @@ fn ac134_the_apps_types_are_generated_from_the_description() {
             continue;
         }
         assert!(generated.contains(&format!("  \"{name}\": '{}',", m["class"].as_str().unwrap())), "{name} is in the generated types with its class");
+    }
+}
+
+#[test]
+fn ac265_follow_up_description_rejects_false_queued_and_turn_acknowledgements() {
+    let doc = description();
+    for value in [json!({"delivery":"sent"}), json!({"delivery":"queued","started_ms":1}), json!({"id":"not-a-turn"})] {
+        let mut wrong = Vec::new();
+        check(&doc, &doc["methods"]["run.follow_up"]["result"], &value, "run.follow_up", &mut wrong);
+        assert!(!wrong.is_empty(), "invalid result passed validation: {value}");
     }
 }

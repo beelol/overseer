@@ -63,7 +63,8 @@
       "relation_confidence": "string?",
       "capabilities": "json",
       "process_generation": "number",
-      "attention": "Attention?"
+      "attention": "Attention?",
+      "queue": "QueueSnapshot?"
     },
     "Turn": {
       "id": "string",
@@ -197,6 +198,86 @@
       "environment": "string",
       "bundle": "string?"
     },
+    "ModScope": {
+      "kind": "'all_agents'|'repository'|'watchers'|'agent'|'overseer'",
+      "repo_key": "string?",
+      "run_id": "string?"
+    },
+    "ModFilters": {
+      "harnesses": "string[]",
+      "accounts": "string[]",
+      "models": "string[]"
+    },
+    "ModBindingInput": {
+      "id": "string?",
+      "mod_id": "string",
+      "version": "string",
+      "fingerprint": "string",
+      "scope": "ModScope",
+      "enabled": "boolean",
+      "required": "boolean?",
+      "locked": "boolean?",
+      "filters": "ModFilters?"
+    },
+    "ModBinding": {
+      "id": "string",
+      "mod_id": "string",
+      "version": "string",
+      "fingerprint": "string",
+      "scope": "ModScope",
+      "enabled": "boolean",
+      "required": "boolean",
+      "locked": "boolean",
+      "filters": "ModFilters",
+      "changed_ms": "number",
+      "actor": "string"
+    },
+    "ModVersion": {
+      "id": "string",
+      "version": "string",
+      "fingerprint": "string",
+      "manifest": "json",
+      "source": "string",
+      "installed_ms": "number",
+      "files": "json[]"
+    },
+    "ModContext": {
+      "run_id": "string",
+      "role": "string",
+      "repo_key": "string",
+      "harness": "string",
+      "harness_version": "string?",
+      "account_id": "string?",
+      "model": "string?",
+      "native_thread_exists": "boolean",
+      "local_model_selection": "boolean"
+    },
+    "ModDecision": {
+      "binding_id": "string",
+      "mod_id": "string",
+      "fingerprint": "string",
+      "status": "'selected'|'disabled'|'overridden'|'filtered'|'not_in_scope'|'unqualified'",
+      "reason": "string",
+      "required": "boolean",
+      "delivery": "'unsupported'|'message_text'|'native_instructions'",
+      "activation": "'next_turn'|'next_thread'",
+      "children": "'yes'|'no'|'unknown'"
+    },
+    "ModPlan": {
+      "revision": "number",
+      "versions": "ModVersion[]",
+      "rules_text": "string",
+      "style_text": "string",
+      "decisions": "ModDecision[]"
+    },
+    "AppliedMods": {
+      "context": "ModContext",
+      "desired": "ModPlan",
+      "last_turn": "TurnModSnapshot?",
+      "pending": "boolean",
+      "support": "json",
+      "notice": "string"
+    },
     "KnownRepo": {
       "root": "string",
       "name": "string",
@@ -204,7 +285,42 @@
       "exists": "boolean",
       "branch": "string?",
       "default_branch": "string?"
-    }
+    },
+    "TurnModSnapshot": {
+      "turn_id": "string",
+      "run_id": "string",
+      "plan": "ModPlan",
+      "context": "ModContext",
+      "binding_snapshot": "ModBinding[]",
+      "delivery": "'none'|'unsupported'|'message_text'",
+      "transport": "string",
+      "activation": "'next_turn'",
+      "children": "'unknown'",
+      "text": "string",
+      "digest": "string",
+      "added_bytes": "number",
+      "applied_fingerprints": "string[]",
+      "outcome": "'prepared'|'transport_accepted'|'failed_before_effect'|'uncertain_after_effect'",
+      "outcome_ms": "number",
+      "outcome_detail": "string?",
+      "planned_fingerprints": "string[]",
+      "text_redacted": "boolean"
+    },
+    "QueuedMessage": {
+      "id": "number",
+      "ts": "number",
+      "source": "string",
+      "text": "string",
+      "redirect": "boolean"
+    },
+    "QueueSnapshot": {
+      "paused": "boolean",
+      "messages": "QueuedMessage[]"
+    },
+    "QueuedDelivery": {
+      "delivery": "'queued'"
+    },
+    "FollowUpResult": "Turn|QueuedDelivery"
   },
   "events": {
     "task_created": {
@@ -342,6 +458,29 @@
     "trouble": {
       "kind": "string",
       "reason": "string"
+    },
+    "mods_changed": {
+      "operation": "string",
+      "binding": "ModBinding?",
+      "binding_id": "string?",
+      "mod_id": "string?",
+      "fingerprint": "string?",
+      "revision": "number",
+      "ended_bindings": "string[]?"
+    },
+    "mods_applied": {
+      "snapshot": "TurnModSnapshot"
+    },
+    "queue_changed": {
+      "paused": "boolean?",
+      "removed": "number?",
+      "id": "number?",
+      "delivered": "number?"
+    },
+    "queued": {
+      "text": "string",
+      "detail": "json",
+      "paused": "boolean?"
     }
   },
   "methods": {
@@ -789,7 +928,7 @@
         "permission_mode": "string?",
         "images": "json[]?"
       },
-      "result": "Turn"
+      "result": "FollowUpResult"
     },
     "run.interrupt": {
       "class": "control",
@@ -2757,6 +2896,110 @@
         "ok": "boolean",
         "kept": "number"
       }
+    },
+    "mods.list": {
+      "summary": "Inspect optional text Mods",
+      "class": "read",
+      "phone": "available",
+      "params": {},
+      "result": {
+        "revision": "number",
+        "installed": "json[]",
+        "bindings": "ModBinding[]",
+        "available_bundled": "json[]",
+        "unavailable": "json[]",
+        "support": "json"
+      }
+    },
+    "mods.preview": {
+      "summary": "Manage owner-confirmed text Mods",
+      "class": "mac_only",
+      "phone": "mac_only",
+      "params": {
+        "source": "string",
+        "operation": "'install'|'update'"
+      },
+      "result": "json",
+      "reason": "Local owner control; phone inspection is read-only"
+    },
+    "mods.install": {
+      "summary": "Manage owner-confirmed text Mods",
+      "class": "mac_only",
+      "phone": "mac_only",
+      "params": {
+        "preview_id": "string",
+        "confirm": "boolean"
+      },
+      "result": {
+        "version": "json",
+        "revision": "number"
+      },
+      "reason": "Local owner control; phone inspection is read-only"
+    },
+    "mods.bind": {
+      "summary": "Set a pinned text Mod binding",
+      "class": "mac_only",
+      "phone": "mac_only",
+      "params": {
+        "binding": "ModBindingInput",
+        "expected_revision": "number"
+      },
+      "result": {
+        "binding": "ModBinding",
+        "revision": "number"
+      },
+      "reason": "Local owner control; phone inspection is read-only"
+    },
+    "mods.unbind": {
+      "summary": "Remove a text Mod scope override",
+      "class": "mac_only",
+      "phone": "mac_only",
+      "params": {
+        "binding_id": "string",
+        "expected_revision": "number"
+      },
+      "result": {
+        "revision": "number"
+      },
+      "reason": "Local owner control; phone inspection is read-only"
+    },
+    "mods.why": {
+      "summary": "Explain a run's desired and applied Mods",
+      "class": "read",
+      "phone": "available",
+      "params": {
+        "run_id": "string"
+      },
+      "result": "AppliedMods"
+    },
+    "mods.remove": {
+      "summary": "Manage owner-confirmed text Mods",
+      "class": "mac_only",
+      "phone": "mac_only",
+      "params": {
+        "mod_id": "string",
+        "fingerprint": "string",
+        "confirm": "boolean",
+        "expected_revision": "number"
+      },
+      "result": "json",
+      "reason": "Local owner control; phone inspection is read-only"
+    },
+    "run.resume_queue": {
+      "class": "mac_only",
+      "summary": "Send an agent\u2019s paused queue",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "run.clear_queue": {
+      "class": "mac_only",
+      "summary": "Clear an agent\u2019s queue",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
     }
   }
 }

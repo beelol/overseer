@@ -388,7 +388,7 @@ async function activate(context) {
     return (await vscode.window.showQuickPick(choices, { title: 'Choose a Swarm' }))?.id;
   }
 
-  const gridHasAgents = () => (model.state.runs || []).some(r => !r.parent_run_id && ACTIVE.has(r.status)) || pinned().length > 0;
+  const gridHasAgents = () => (model.state.runs || []).some(r => !r.parent_run_id && (ACTIVE.has(r.status) || r.queue?.paused && r.queue?.messages?.length)) || pinned().length > 0;
   /** The rollup (AC-255) for a one-line note where the grid would be: " Of the rest: 6 to review · 3 reviewed." */
   const rollupNote = () => { const t = Rollup.text({ ...rollup(), working: 0, needs: 0 }); return t ? ` Of the rest: ${t}.` : ''; };
   /** The home view: the composer alone in the middle, with an optional one-line note. In the Overseer
@@ -1177,7 +1177,7 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.resetGridLayout', guard(() => center.panel?.webview.postMessage({ type: 'gridReset' }))),
     vscode.commands.registerCommand('overseer.toggleGrid', guard(async () => {
       if (center.mode === 'grid') { center.setMode(selectedRun ? 'chat' : 'composer'); return; }
-      // The grid opens only with something to show (AC-113); otherwise home, with a one-line note.
+      // The grid opens with working/pinned agents or an ordered paused queue to review (AC-265).
       if (!gridHasAgents()) { await goHome(`No agent is working or pinned yet, so the grid has nothing to show.${rollupNote()} Start one here.`); return; }
       await arrangement.enterGrid(); center.setMode('grid');
     })),
