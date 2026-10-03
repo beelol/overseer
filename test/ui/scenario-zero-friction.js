@@ -144,7 +144,7 @@ const L = require('./overseer-window-helpers');
     const draftFile = path.join(worktreeOf(draft.id), 'draft.md');
     await step('typed', 'Follow → Manual edit', '⌥⌘E', async count => {
       await key('e', { meta: true, alt: true }); count('keys');
-      const ed = await until(editorOf, e => e.editor && e.focused && /^draft\.md\b/.test(e.title), 15000, 200);
+      const ed = await until(editorOf, e => e.editor && e.focused && /^draft\.md\b/.test(e.title) && e.status === 'Manual edit', 15000, 200);
       count('shown'); await s.screenshot('typed-4-manual-edit');
       return { ok: ed.editor && ed.focused && /^draft\.md\b/.test(ed.title) && ed.status === 'Manual edit', detail: { editor: ed } };
     });
@@ -227,7 +227,7 @@ const L = require('./overseer-window-helpers');
 
     await step('voice', 'Follow → Manual edit', '"Manual edit."', async count => {
       const r = say('Manual edit.'); count('said');
-      const ed = await until(editorOf, e => e.editor && /^draft\.md\b/.test(e.title), 15000, 200);
+      const ed = await until(editorOf, e => e.editor && /^draft\.md\b/.test(e.title) && e.status === 'Manual edit', 15000, 200);
       count('shown'); await s.screenshot('voice-4-manual-edit');
       return { ok: r.place === 'manual_edit' && ed.editor && /^draft\.md\b/.test(ed.title) && ed.status === 'Manual edit', detail: { said: r, editor: ed } };
     });
