@@ -17,7 +17,7 @@ class Node {
 }
 const root = new Node('main'); root.id = 'mods';
 const document = { activeElement: null, getElementById: id => [root, ...root.querySelectorAll('*')].find(n => n.id === id) };
-const messages = [], listeners = {}, ui = { el: (tag, cls, text) => new Node(tag, cls, text) };
+const messages = [], listeners = {}, ui = { HARNESS: { claude: 'Claude Code' }, el: (tag, cls, text) => new Node(tag, cls, text) };
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../extension/media/mods-panel.js'), 'utf8'), { document, window: { OverseerUI: ui, addEventListener: (k, cb) => { listeners[k] = cb; } }, acquireVsCodeApi: () => ({ postMessage: m => messages.push(m) }), Event: class { constructor(type) { this.type = type; } }, console });
 const v = { id: 'clear-prose', version: '1', fingerprint: 'fp', source: '<script>source</script>', manifest: { name: 'Clear prose', summary: '<img onerror=bad>', homepage: 'javascript:bad' }, files: [] };
 const T = require('../../extension/src/mods-text');
@@ -36,3 +36,16 @@ send({ ...state, trusted: false }); assert.ok(root.querySelectorAll('button[data
 const p = { id: 'p1', version: v, operation: 'install', contents: { 'style.md': '</pre><script>bad</script>' }, files: [], previous: [] };
 send({ ...state, preview: p }); assert.strictEqual(root.querySelectorAll('script').length, 0); assert.ok(root.textContent.includes('</pre><script>bad</script>'));
 console.log('PASS actual webview: literal hostile text, inactive planned option, scoped revision, trust restrictions, preserved draft/focus and preview content');
+
+const runId = 'r-123456abcdef';
+for (const [outcome, label] of Object.entries({ transport_accepted: 'Turn accepted by transport', prepared: 'Prepared; delivery not confirmed', failed_before_effect: 'Launch failed before delivery', uncertain_after_effect: 'Delivery outcome uncertain', future_state: 'Delivery outcome unknown' })) {
+  send({ ...state, runs: [{ id: runId, title: 'Writing assistant' }], applied: { ...T.applied(), snapshot: { transport: 'claude' } }, story: [{ kind: 'mods_applied', run_id: runId, payload: { snapshot: { outcome, run_id: 'r-deadbeef1234' } } }] });
+  assert.ok(root.textContent.includes('Claude Code'), 'transport uses its public name');
+  assert.ok(root.textContent.includes(label), 'story preserves the precise delivery outcome');
+  assert.ok(root.textContent.includes('Writing assistant'), 'story resolves the envelope target title');
+  assert.ok(!root.textContent.includes(runId) && !root.textContent.includes('r-deadbeef1234'), 'story never shows or trusts payload run IDs');
+  assert.ok(!root.textContent.includes(outcome), 'wire status stays out of display text');
+}
+send({ ...state, story: [{ kind: 'mods_applied', run_id: 'r-missing12345', payload: { snapshot: { outcome: 'prepared' } } }] });
+assert.ok(root.textContent.includes('An agent'), 'missing retained target has an honest readable fallback');
+console.log('PASS actual webview: public transport names and truthful named delivery history');

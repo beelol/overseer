@@ -42,7 +42,7 @@ class ModsPanel {
   push() {
     this.panel?.webview.postMessage({ type: 'mods', data: this.data, library: T.library(this.data), applied: T.applied(this.applied), preview: this.preview, error: this.error,
       connected: this.client.connected, trusted: vscode.workspace.isTrusted, runId: this.runId,
-      runs: (this.model.all?.runs || []).map(r => ({ id: r.id, title: r.title || r.id })),
+      runs: (this.model.all?.runs || []).map(r => ({ id: r.id, title: r.title || 'Untitled agent' })),
       repositories: [...new Set((this.model.all?.workspaces || []).map(w => w.common_dir).filter(Boolean))],
       repoKey: this.applied?.context?.repo_key, story: this.story, noise: T.NOISE, qualification: T.QUALIFICATION });
   }

@@ -90,4 +90,10 @@ test('a run without a snapshot never claims matching delivery', () => { const a 
 test('prepared and uncertain snapshots never read as accepted delivery', () => {
   for (const outcome of ['prepared', 'uncertain_after_effect']) { const a = words().applied({ pending: true, desired: { versions: [], decisions: [] }, last_turn: { outcome, delivery: 'message_text' } }); assert.doesNotMatch(a.last, /accepted by transport|text delivered/i); }
 });
+test('untitled runs retain their selector with a readable display name', () => {
+  const { h } = host(); const sent = [];
+  h.panel = { webview: { postMessage: m => sent.push(m) } };
+  h.model.all.runs = [{ id: 'r-123456abcdef', title: '' }]; h.push();
+  assert.deepStrictEqual(sent[0].runs, [{ id: 'r-123456abcdef', title: 'Untitled agent' }]);
+});
 (async () => { let failed = 0; for (const [name, fn] of tests) { try { await fn(); console.log('PASS', name); } catch (e) { failed++; console.error('FAIL', name, e.message); } } console.log(`${tests.length - failed}/${tests.length} Mods checks passed`); process.exitCode = failed ? 1 : 0; })();
