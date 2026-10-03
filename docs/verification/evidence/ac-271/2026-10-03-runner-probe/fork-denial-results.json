@@ -1,0 +1,14 @@
+[
+  {
+    "mode": "sandboxed",
+    "exit": 0,
+    "stdout": "{\"fork\": {\"errno\": 1}, \"subprocess\": {\"errno\": 1}}\n",
+    "stderr": ""
+  },
+  {
+    "mode": "control",
+    "exit": 0,
+    "stdout": "{\"fork\": {\"child_exit\": 0}, \"subprocess\": {\"child_exit\": 0}}\n",
+    "stderr": ""
+  }
+]

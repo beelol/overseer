@@ -11,3 +11,9 @@ The earlier deny-default profile aborted before even `/usr/bin/true` ran. Differ
 Saved sources and SHA256 receipts retain the exact experiment. These are evidence scripts, not an installed runner or portable tests. Paths in the profile refer to the original temporary tree. To repeat elsewhere, copy the layout, replace that one root path throughout the profile, create allowed/forbidden directories with a synthetic-credential file, and link allowed/escape to that synthetic file. The Python executable/system runtime policy must be qualified for that machine rather than silently widened.
 
 Limits: no RTK execution, installation rollback, pin replacement/confirmation, output/time limits, forced descendant termination, daemon lifecycle integration, other-platform qualification or native result-hook capture. Fork inheritance is not proof of descendant cleanup on timeout. AC271–273 remain unverified. Use these results to design the bounded runner; do not ship any permissive diagnostic control profile.
+
+## Child-process denial follow-up
+
+Alongside main `9dfa4359`, a separate `runner-no-fork.sb` removes only the process-fork allowance from v6. `nice -n 20 python3 run-fork-probe.py` exited0: both direct `os.fork()` and subprocess execution failed with EPERM inside the sandbox, while the unsandboxed positive controls each spawned and reaped a successful child. Parent processes exited and all successful control children were reaped. The saved driver was executed after creation; `fork-sha256.json` pins its inputs and results.
+
+This supports evaluating a no-child-process runner for a transformer that does not need subprocesses. It is not yet the selected production policy: RTK compatibility, native threads, exec replacement, timeout/output bounds and forced cleanup remain unqualified. No external executable was installed or run; AC271–273 remain unverified.
