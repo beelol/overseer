@@ -1,0 +1,5 @@
+{
+  "exit": 0,
+  "stdout": "{\"forbidden_read\": {\"denied_errno\": 1}, \"forbidden_write\": {\"denied_errno\": 1}, \"network_socket\": \"allowed\", \"scratch_write\": \"allowed\", \"unix_socket\": \"allowed\"}\n",
+  "stderr": ""
+}

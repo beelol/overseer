@@ -1,0 +1,9 @@
+{
+  "exit": 0,
+  "stdout": "{\"forbidden_read\": {\"denied_errno\": 1}, \"forbidden_write\": {\"denied_errno\": 1}, \"loopback_connect\": {\"denied_errno\": 1}, \"program_write\": {\"denied_errno\": 1}, \"scratch_write\": \"allowed\", \"symlink_escape\": {\"denied_errno\": 1}, \"unix_connect\": {\"denied_errno\": 1}}\n",
+  "stderr": "",
+  "listeners": {
+    "loopback": "no connection",
+    "unix": "no connection"
+  }
+}

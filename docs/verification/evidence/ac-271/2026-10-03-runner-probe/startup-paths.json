@@ -1,0 +1,32 @@
+[
+  {
+    "path": "/private",
+    "command": "/usr/bin/true",
+    "exit": -6,
+    "stderr": ""
+  },
+  {
+    "path": "/dev",
+    "command": "/usr/bin/true",
+    "exit": -6,
+    "stderr": ""
+  },
+  {
+    "path": "/usr",
+    "command": "/usr/bin/true",
+    "exit": -6,
+    "stderr": ""
+  },
+  {
+    "path": "/Library",
+    "command": "/usr/bin/true",
+    "exit": -6,
+    "stderr": ""
+  },
+  {
+    "path": "/",
+    "command": "/usr/bin/true",
+    "exit": 0,
+    "stderr": ""
+  }
+]

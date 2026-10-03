@@ -1,0 +1,529 @@
+STEP tokens:check
+
+> overseer-phone@0.1.0 tokens:check
+> node scripts/gen-tokens.mjs --check
+
+tokens: src/theme/tokens.generated.ts matches its source
+STEP icons:check
+
+> overseer-phone@0.1.0 icons:check
+> node scripts/gen-icons.mjs --check
+
+STEP assets:check
+
+> overseer-phone@0.1.0 assets:check
+> node scripts/gen-assets.mjs --check
+
+assets: 5 files match docs/design/brand/
+STEP lint
+
+> overseer-phone@0.1.0 lint
+> eslint . --max-warnings 0
+
+STEP typecheck
+
+> overseer-phone@0.1.0 typecheck
+> tsc --noEmit
+
+STEP test
+
+> overseer-phone@0.1.0 test
+> jest --runInBand
+
+PASS src/screens/__tests__/AgentsScreen.test.tsx (12.078 s)
+PASS src/screens/__tests__/ConversationScreen.test.tsx (7.542 s)
+PASS src/screens/__tests__/NewAgentScreen.test.tsx
+PASS src/screens/__tests__/AccountsScreen.test.tsx
+PASS src/platform/__tests__/fakes.test.tsx
+PASS src/screens/__tests__/ConversationComposer.test.tsx (7.837 s)
+PASS src/screens/__tests__/FileScreen.test.tsx
+PASS src/screens/__tests__/SettingsScreen.test.tsx
+PASS src/session/__tests__/session.test.ts
+PASS src/screens/__tests__/MergeScreen.test.tsx
+PASS src/screens/__tests__/ModsScreen.test.tsx
+PASS src/screens/__tests__/ChangesScreen.test.tsx
+PASS src/screens/__tests__/PairScreen.test.tsx
+PASS src/platform/__tests__/native.test.ts
+PASS src/screens/__tests__/ConversationMarkdown.test.tsx
+PASS src/screens/__tests__/PullRequestScreen.test.tsx
+PASS src/__tests__/accessibility.test.tsx
+  ● Console
+
+    console.error
+      An update to ForwardRef(FlashList) inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      at node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17864:19
+      at runWithFiberInDEV (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:2663:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17863:9)
+      at scheduleUpdateOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15445:11)
+      at dispatchSetStateInternal (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:7016:13)
+      at dispatchSetState (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:6973:7)
+      at node_modules/@shopify/flash-list/src/recyclerview/hooks/useOnLoad.ts:52:7
+      at node_modules/@shopify/flash-list/src/recyclerview/hooks/useUnmountAwareCallbacks.ts:61:9
+      at Timeout.callback [as _onTimeout] (node_modules/react-native-worklets/src/runLoop/uiRuntime/mockedRequestAnimationFrame.ts:10:27)
+
+    console.error
+      An update to ForwardRef(FlashList) inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      at node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17864:19
+      at runWithFiberInDEV (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:2663:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17863:9)
+      at scheduleUpdateOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15445:11)
+      at dispatchSetStateInternal (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:7016:13)
+      at dispatchSetState (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:6973:7)
+      at node_modules/@shopify/flash-list/src/recyclerview/RecyclerView.tsx:225:7
+      at Object.react_stack_bottom_frame (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:19289:20)
+      at runWithFiberInDEV (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:2663:13)
+      at commitHookEffectListMount (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:11240:29)
+      at commitHookLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:11204:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12484:13)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12564:11)
+      at flushLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17239:15)
+      at commitRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17104:36)
+      at completeRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17008:9)
+      at completeRootWhenReady (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15856:7)
+      at performWorkOnRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15764:15)
+      at performWorkOnRootViaSchedulerTask (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:3520:7)
+      at Immediate.performWorkUntilDeadline [as _onImmediate] (node_modules/test-renderer/node_modules/scheduler/cjs/scheduler.native.development.js:45:48)
+
+    console.error
+      An update to ForwardRef(FlashList) inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      at node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17864:19
+      at runWithFiberInDEV (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:2663:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17863:9)
+      at scheduleUpdateOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15445:11)
+      at dispatchSetStateInternal (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:7016:13)
+      at dispatchSetState (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:6973:7)
+      at node_modules/@shopify/flash-list/src/recyclerview/RecyclerView.tsx:225:7
+      at Object.react_stack_bottom_frame (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:19289:20)
+      at runWithFiberInDEV (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:2663:13)
+      at commitHookEffectListMount (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:11240:29)
+      at commitHookLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:11204:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12484:13)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12564:11)
+      at flushLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17239:15)
+      at commitRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17104:36)
+      at completeRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17008:9)
+      at completeRootWhenReady (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15856:7)
+      at performWorkOnRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15764:15)
+      at performSyncWorkOnRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:3535:7)
+      at flushSyncWorkAcrossRoots_impl (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:3377:21)
+      at flushSpawnedWork (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17429:9)
+      at commitRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17104:58)
+      at completeRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17008:9)
+      at completeRootWhenReady (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15856:7)
+      at performWorkOnRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15764:15)
+      at performWorkOnRootViaSchedulerTask (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:3520:7)
+      at Immediate.performWorkUntilDeadline [as _onImmediate] (node_modules/test-renderer/node_modules/scheduler/cjs/scheduler.native.development.js:45:48)
+
+    console.error
+      An update to ForwardRef(FlashList) inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      at node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17864:19
+      at runWithFiberInDEV (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:2663:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17863:9)
+      at scheduleUpdateOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15445:11)
+      at dispatchSetStateInternal (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:7016:13)
+      at dispatchSetState (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:6973:7)
+      at node_modules/@shopify/flash-list/src/recyclerview/RecyclerView.tsx:225:7
+      at Object.react_stack_bottom_frame (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:19289:20)
+      at runWithFiberInDEV (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:2663:13)
+      at commitHookEffectListMount (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:11240:29)
+      at commitHookLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:11204:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12484:13)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12564:11)
+      at flushLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17239:15)
+      at commitRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17104:36)
+      at completeRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17008:9)
+      at completeRootWhenReady (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15856:7)
+      at performWorkOnRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15764:15)
+      at performSyncWorkOnRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:3535:7)
+      at flushSyncWorkAcrossRoots_impl (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:3377:21)
+      at flushSpawnedWork (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17429:9)
+      at commitRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17104:58)
+      at completeRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17008:9)
+      at completeRootWhenReady (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15856:7)
+      at performWorkOnRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15764:15)
+      at performWorkOnRootViaSchedulerTask (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:3520:7)
+      at Immediate.performWorkUntilDeadline [as _onImmediate] (node_modules/test-renderer/node_modules/scheduler/cjs/scheduler.native.development.js:45:48)
+
+    console.error
+      An update to ViewHolderCollection inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      at node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17864:19
+      at runWithFiberInDEV (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:2663:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17863:9)
+      at scheduleUpdateOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15445:11)
+      at dispatchSetStateInternal (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:7016:13)
+      at dispatchSetState (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:6973:7)
+      at Object.commitLayout (node_modules/@shopify/flash-list/src/recyclerview/ViewHolderCollection.tsx:133:9)
+      at node_modules/@shopify/flash-list/src/recyclerview/RecyclerView.tsx:227:40
+      at Object.react_stack_bottom_frame (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:19289:20)
+      at runWithFiberInDEV (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:2663:13)
+      at commitHookEffectListMount (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:11240:29)
+      at commitHookLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:11204:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12484:13)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12709:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12599:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12487:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12482:11)
+      at recursivelyTraverseLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:13856:11)
+      at commitLayoutEffectOnFiber (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:12564:11)
+      at flushLayoutEffects (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17239:15)
+      at commitRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17104:36)
+      at completeRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17008:9)
+      at completeRootWhenReady (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15856:7)
+      at performWorkOnRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15764:15)
+      at performSyncWorkOnRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:3535:7)
+      at flushSyncWorkAcrossRoots_impl (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:3377:21)
+      at flushSpawnedWork (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17429:9)
+      at commitRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17104:58)
+      at completeRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:17008:9)
+      at completeRootWhenReady (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15856:7)
+      at performWorkOnRoot (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:15764:15)
+      at performWorkOnRootViaSchedulerTask (node_modules/test-renderer/node_modules/react-reconciler/cjs/react-reconciler.development.js:3520:7)
+      at Immediate.performWorkUntilDeadline [as _onImmediate] (node_modules/test-renderer/node_modules/scheduler/cjs/scheduler.native.development.js:45:48)
+
+PASS src/platform/__tests__/base.test.ts
+PASS src/screens/__tests__/ConversationList.test.tsx
+PASS src/screens/__tests__/ChangesMarks.test.tsx
+PASS src/screens/__tests__/FileSyntax.test.tsx
+PASS scripts/__tests__/gen-tokens.test.ts
+PASS src/lock/__tests__/AppLock.test.tsx
+PASS src/theme/__tests__/contrast.test.ts
+PASS src/theme/__tests__/useTheme.test.tsx
+PASS src/ui/__tests__/ui.test.tsx
+PASS src/session/__tests__/hold.test.ts
+PASS src/session/__tests__/mods.test.ts
+PASS src/screens/__tests__/ModsHeader.test.tsx
+PASS src/notifications/__tests__/Banners.test.tsx (6.614 s)
+PASS src/session/__tests__/learned.test.ts
+PASS src/motion/__tests__/reduceMotion.test.tsx
+PASS src/perf/__tests__/perf.test.ts
+PASS src/ui/__tests__/Menu.test.tsx
+PASS src/perf/__tests__/scroll.test.ts
+
+Test Suites: 35 passed, 35 total
+Tests:       503 passed, 503 total
+Snapshots:   0 total
+Time:        54.684 s
+Ran all test suites.
+STEP check:platform-rule
+
+> overseer-phone@0.1.0 check:platform-rule
+> node scripts/check-platform-rule.mjs
+
+  caught  src/__platform_rule_probe__/import-platform.ts  (no-restricted-imports: 'Platform' import from 'react-native' is restricted)
+  caught  src/__platform_rule_probe__/platform-os.ts  (no-restricted-syntax: Platform.OS)
+  caught  src/__platform_rule_probe__/platform-select.ts  (no-restricted-syntax: Platform.select)
+  caught  src/__platform_rule_probe__/import-ios-file.ts  (no-restricted-imports: A platform's file is chosen by the bundler)
+  caught  src/__platform_rule_probe__/import-android-file.ts  (no-restricted-imports: A platform's file is chosen by the bundler)
+  caught  src/__platform_rule_probe__/compare-platform-name.ts  (no-restricted-syntax: A comparison with a platform's name)
+  the same 6 files in a package beside the app were caught
+  the same 6 files inside src/platform/ were allowed
+  without the violations the lint passes
+platform rule: ok. 6 seeded violations failed the lint; the clean tree passes.
+STEP check:token-rule
+
+> overseer-phone@0.1.0 check:token-rule
+> node scripts/check-token-rule.mjs
+
+  caught  src/__token_rule_probe__/duration.ts  (A size, space, radius or duration written by hand)
+  caught  src/__token_rule_probe__/delay.ts  (A size, space, radius or duration written by hand)
+  caught  src/__token_rule_probe__/colour.ts  (A colour written by hand)
+  caught  src/__token_rule_probe__/colour-function.ts  (A colour written by hand)
+  caught  src/__token_rule_probe__/named-colour.ts  (A colour written by hand)
+  caught  src/__token_rule_probe__/font-size.ts  (A size, space, radius or duration written by hand)
+  caught  src/__token_rule_probe__/space.ts  (A size, space, radius or duration written by hand)
+  caught  src/__token_rule_probe__/negative-space.ts  (A size, space, radius or duration written by hand)
+  caught  src/__token_rule_probe__/radius.ts  (A size, space, radius or duration written by hand)
+  caught  src/__token_rule_probe__/weight.ts  (A font weight written by hand)
+  without the violations the lint passes
+
+The motion tokens (30), in milliseconds unless the name says otherwise:
+  motion.duration.fast                 120
+  motion.duration.base                 160
+  motion.duration.slow                 200
+  motion.ease                          [0.2, 0.8, 0.2, 1]
+  phone.motion.door.open               1000
+  phone.motion.door.fade               200
+  phone.motion.door.lightLoop          2400
+  phone.motion.door.angle              24
+  phone.motion.screen.push             320
+  phone.motion.screen.fade             160
+  phone.motion.message.arrive          220
+  phone.motion.status.change           200
+  phone.motion.pulse.loop              1600
+  phone.motion.pulse.low               0.35
+  phone.motion.sheet.open              280
+  phone.motion.press.in                80
+  phone.motion.press.out               160
+  phone.motion.press.scale             0.97
+  phone.motion.connection.show         200
+  phone.motion.spring.gentle.damping   22
+  phone.motion.spring.gentle.stiffness 220
+  phone.motion.spring.gentle.mass      1
+  phone.motion.spring.snappy.damping   26
+  phone.motion.spring.snappy.stiffness 360
+  phone.motion.spring.snappy.mass      1
+  phone.motion.distance.arrive         12
+  phone.motion.distance.screen         24
+  phone.motion.test.lead               200
+  phone.motion.test.busy               500
+  phone.motion.test.whole              900
+
+token rule: ok. 10 seeded violations failed the lint; the clean tree passes.
+All phone app checks passed

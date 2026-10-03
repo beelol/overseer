@@ -19,3 +19,7 @@ The coordinator read the literal main Verify clauses and assertions in frozen co
 ## Remaining gate
 
 Focused reviewed PR52/61 logs exist; prior source63 packaged Voice/Talk checks passed, but its Rust stage failed before every required target completed. Require the final combined workspace/vocabulary and fresh package results, preserve their exact source/evidence, then update records on main and integrate through the merge gate. No real-room, microphone, paid model, Whistle quality or production claim follows from these fixture-specific criteria.
+
+## Completed frozen-source run
+
+Session39632 at exact2a is terminal: workspace1601/1601 and fresh packaged Voice/Talk pass. [Aggregate evidence](../verification/evidence/2026-10-03-full-2a1bd2a/README.md) records86/88 overall, with only unit shutdown and UI audit failures. Their reviewed corrections are absent from2a. AC229/230 records now retain this current proof as partial pending the final corrected integration and merge gate; no microphone or paid claim is inferred.
