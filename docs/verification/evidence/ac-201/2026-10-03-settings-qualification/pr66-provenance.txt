@@ -1,0 +1,7 @@
+source=2566e833cb3a9f9d7e65ed3338e3751aa42d0fbb
+manifest=/private/tmp/overseer-settings-qualification-20261003/daemon/Cargo.toml
+fresh=False
+/private/tmp/overseer-closeout-verify-target/debug/deps/overseer-9ab135698735fa27: sha256=414c1ea9c8535c6f0253b876e49cdb086c41af514651e7c7c4a6107b0f97558d
+/private/tmp/overseer-closeout-verify-target/debug/overseerd: sha256=240e3e05193c2033c7a7e45923de1d92c691e3b51f9633403a2d48bac3d8fd79
+# env-dep:CARGO_BIN_EXE_overseerd=/private/tmp/overseer-closeout-verify-target/debug/overseerd
+# env-dep:CARGO_MANIFEST_DIR=/private/tmp/overseer-settings-qualification-20261003/daemon
