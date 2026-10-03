@@ -1,0 +1,3 @@
+# Isolated voice rerun
+
+Frozen source55ebf1d22760280ba750007c9d49cd315ddda919, same previously built VSIX. No rebuild or source edit. After full67668 and the focused native compiler/runtime slot ended, `nice -n20 node test/ui/scenario-voice.js` ran alone; handle67379 exited0. All32 checks passed with60 screenshots, including four-crash shutdown and subsequent re-enable before width captures. Original full-run failure is retained in the parent directory. The timeout did not reproduce alone; this is not a corrected full-suite pass. Synthetic voice/fixture harness only, no owner microphone or paid model.

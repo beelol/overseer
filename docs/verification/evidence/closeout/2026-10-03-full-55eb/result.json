@@ -1,0 +1,320 @@
+{
+  "checks": [
+    {
+      "name": "Voice Mode is off until the owner turns it on",
+      "ok": true
+    },
+    {
+      "name": "the voice view opens listening, and the status bar says so",
+      "ok": true
+    },
+    {
+      "name": "the mark is centred in the voice view (measured)",
+      "ok": true,
+      "detail": {
+        "cx": 541,
+        "w": 223.4375,
+        "vw": 1082
+      }
+    },
+    {
+      "name": "noise (typing, taps, a door, music) never moves the mark and never reads as hearing",
+      "ok": true,
+      "detail": {
+        "levels": 0,
+        "maxScale": 1
+      }
+    },
+    {
+      "name": "hearing: the star grows with the voice and swings with its syllables",
+      "ok": true,
+      "detail": {
+        "frames": 353,
+        "max": 1.7880202083420391,
+        "min": 1.1404529960809544
+      }
+    },
+    {
+      "name": "levels arrive at least every 100 ms while the owner speaks (25 a second)",
+      "ok": true,
+      "detail": {
+        "jumps": 76,
+        "spacing": 44
+      }
+    },
+    {
+      "name": "the star follows the level curve within 100 ms (best-aligned lag)",
+      "ok": true,
+      "detail": {
+        "lag": 40,
+        "r": 0.87,
+        "frames": 353,
+        "levels": 76
+      }
+    },
+    {
+      "name": "speaking: rings of light cross the core and the star stays under 1.3x",
+      "ok": true,
+      "detail": {
+        "scale": 1.208944920461546,
+        "glow": 0.4221844698288324,
+        "rings": 1,
+        "still": false,
+        "meter": null,
+        "state": "speaking"
+      }
+    },
+    {
+      "name": "thinking: the star turns, 12% larger",
+      "ok": true,
+      "detail": {
+        "scale": 1.2045477566155696,
+        "glow": 0.3769635659376424,
+        "rings": 0,
+        "still": false,
+        "meter": null,
+        "state": "thinking"
+      }
+    },
+    {
+      "name": "the request card shows the words, the state and the time, and its accessible name reads without the request id (AC-219)",
+      "ok": true,
+      "detail": {
+        "name": "You, by voice, at 6:52 AM: Tell Phone to use the new wire format.",
+        "role": "group",
+        "time": "6:52 AM",
+        "stage": "Phone is working · 0s",
+        "request": "V-0001",
+        "sentToAgent": "(by voice) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.\n\nWhy: you named it · added to its work\nheld 06:52:32 AM · sent 06:52:32 AM · delivered 06:52:32 AM"
+      }
+    },
+    {
+      "name": "the request card shows the owner's words and the text sent to the agent",
+      "ok": true,
+      "detail": {
+        "words": "Tell Phone to use the new wire format.",
+        "stage": "Phone is working · 0s",
+        "row": "Phoneyou named it · added to its workdelivered06:52:32 AM",
+        "full": "(by voice) The owner said: “Tell Phone to use the new wire format.”\nFor you: Please use the new wire format.\n\nWhy: you named it · added to its work\nheld 06:52:32 AM · sent 06:52:32 AM · delivered 06:52:32 AM"
+      }
+    },
+    {
+      "name": "muted: the mark is still with the mute sign, and no listener runs",
+      "ok": true,
+      "detail": {
+        "scale": 1.0003308866250284,
+        "glow": 0.1803858266511579,
+        "rings": 0,
+        "still": true,
+        "meter": null,
+        "state": "muted"
+      }
+    },
+    {
+      "name": "screenshots of each state in the three themes and in grayscale",
+      "ok": true
+    },
+    {
+      "name": "beside a streaming chat, the animation keeps up at 60 frames a second: work per frame p95 under 16 ms, and frames arrive at the display's rate",
+      "ok": true,
+      "detail": {
+        "n": 462,
+        "work_p95": 0.10000002384185791,
+        "interval_median": 8.30000000000291,
+        "interval_p95": 9.799999999988358,
+        "dropped": 0,
+        "groups": 2
+      }
+    },
+    {
+      "name": "no frame is drawn while the stage is not shown (the view shows an agent)",
+      "ok": true,
+      "detail": {
+        "visibility": "not shown",
+        "f1": 10914,
+        "f2": 10914
+      }
+    },
+    {
+      "name": "reduced motion: a still mark and a level meter",
+      "ok": true,
+      "detail": {
+        "scale": 1.6859521250023426,
+        "glow": 0.8265497028701022,
+        "rings": 0,
+        "still": true,
+        "meter": 0.807002500002756,
+        "state": "hearing"
+      }
+    },
+    {
+      "name": "the toast's Cancel withdraws the answer inside the window: the agent still waits",
+      "ok": true,
+      "detail": {
+        "clicked": true,
+        "still": "waiting_for_user"
+      }
+    },
+    {
+      "name": "the toast names what was answered with Cancel, then reads Sent, in the three themes",
+      "ok": true,
+      "detail": [
+        {
+          "tag": "overseer",
+          "before": true,
+          "after": true
+        },
+        {
+          "tag": "dark",
+          "before": true,
+          "after": true
+        },
+        {
+          "tag": "light",
+          "before": true,
+          "after": true
+        }
+      ]
+    },
+    {
+      "name": "paused for a call: shown with the app, and listening again after",
+      "ok": true,
+      "detail": {
+        "text": "Paused for a call",
+        "title": "Paused for a call: Paused while Zoom uses the microphone"
+      }
+    },
+    {
+      "name": "who is spoken to switches from the strip, by command and by voice, and the strip shows it",
+      "ok": true,
+      "detail": {
+        "byStrip": true,
+        "byCommand": true,
+        "byVoice": true,
+        "back": true
+      }
+    },
+    {
+      "name": "the voice mark is on the targeted agent in the side bar and the grid while the request is open, and goes when it closes",
+      "ok": true,
+      "detail": {
+        "settling": "settling",
+        "sideMarked": true,
+        "gridMarked": true,
+        "unmarked": true
+      }
+    },
+    {
+      "name": "mute, cancel and yes by keyboard only",
+      "ok": true,
+      "detail": {
+        "keyMuted": true,
+        "keyUnmuted": true,
+        "cancelled": "cancelled",
+        "waiting": "waiting",
+        "yesShown": true,
+        "yesDone": "sent"
+      }
+    },
+    {
+      "name": "home shows the voice strip, the spoken request marked as spoken, and Overseer’s plan for it",
+      "ok": true,
+      "detail": {
+        "mode": "composer",
+        "strip": true,
+        "state": "Speaking",
+        "words": "Tell Writer to add a changelog.",
+        "spokenMark": true,
+        "plan": true
+      }
+    },
+    {
+      "name": "a card fills in as its dispatches advance (held, then the next state on the daemon's events)",
+      "ok": true,
+      "detail": [
+        "held",
+        "answered"
+      ]
+    },
+    {
+      "name": "two agents in flight and a new one: the card has three rows and each chat shows the owner's words, in the three themes",
+      "ok": true,
+      "detail": {
+        "evState": "sent",
+        "rows": 3,
+        "chats": [
+          {
+            "tag": "overseer",
+            "id": "r-89ee8bd369c2",
+            "shows": true
+          },
+          {
+            "tag": "overseer",
+            "id": "r-f390e4b09f86",
+            "shows": true
+          },
+          {
+            "tag": "overseer",
+            "id": "r-6107430d4ec4",
+            "shows": true
+          },
+          {
+            "tag": "dark",
+            "id": "r-89ee8bd369c2",
+            "shows": true
+          },
+          {
+            "tag": "dark",
+            "id": "r-f390e4b09f86",
+            "shows": true
+          },
+          {
+            "tag": "dark",
+            "id": "r-6107430d4ec4",
+            "shows": true
+          },
+          {
+            "tag": "light",
+            "id": "r-89ee8bd369c2",
+            "shows": true
+          },
+          {
+            "tag": "light",
+            "id": "r-f390e4b09f86",
+            "shows": true
+          },
+          {
+            "tag": "light",
+            "id": "r-6107430d4ec4",
+            "shows": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "the new agent appears in the side bar with its prompt",
+      "ok": true,
+      "detail": {
+        "label": "write the migration",
+        "description": "now · Fixture · fix…@example.test",
+        "level": 2,
+        "expanded": null,
+        "selected": true,
+        "focused": false,
+        "aria": "write the migration, done, to review, Claude Code, Claude Fixture · fix…@example.test · Mac's default login"
+      }
+    },
+    {
+      "name": "four crashes turn Voice Mode off, and the view says why",
+      "ok": true,
+      "detail": {
+        "reason": "the listener stopped four times in ten minutes (last: killed by signal 9)"
+      }
+    },
+    {
+      "name": "scenario ran",
+      "ok": false,
+      "detail": "Timed out in webview waiting for ['listening', 'thinking'].includes(document.getElementById('voice-state').dataset.state) (last: false)"
+    }
+  ]
+}
