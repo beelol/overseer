@@ -3,12 +3,12 @@
 Paste the block below into `/goal`.
 
 ```
-Meet every acceptance criterion in Overseer (beelol/overseer), keep watching the other agents and merge their work when it is ready. Follow AGENTS.md.
+Meet every acceptance criterion on main in Overseer (beelol/overseer), keep watching the other agents and merge their work when it is ready. Follow AGENTS.md.
 
 "Everything" is docs/verification/tracker.md: every open criterion (AC-NN in docs/overseer-rfc.md, T-NN, AUTO-AC-NN, SWARM-NN), its owner (this goal, another agent, the owner) and where its work is.
 
 EACH PASS
-1. Refresh the tracker from the ledger, `gh pr list` and `git worktree list`. New criteria and agents get a row; verified rows leave.
+1. Fetch main and re-read its README acceptance list and docs/overseer-rfc.md Verify clauses, including owner edits and newly added criteria (AC-274 included). Main is authoritative; a worktree copy or the handoff cannot freeze or narrow this goal. Preserve local work while reconciling changes. Refresh the tracker from the ledger, `gh pr list` and `git worktree list`. New criteria and agents get a row; verified rows leave.
 2. Other agents: read each one's recent commits and pull request. Ask on the pull request, or message a local Claude session, when an agent does any of these: works outside its criteria, fails tests, leaves work unpushed for 3+ hours, loops (merging main and noting it, over and over), or polishes edge cases while its basic path is unproven (AC-157). Tell the owner when a decision is needed.
 3. Stalled or stopped agents: take their criteria over (AC-203). Branch from their pushed work, keep uncommitted work as a patch and use it only once it builds and passes. Never push to their branch. Hand the work back if the agent resumes.
 4. Merging (AC-146): once a pull request is marked ready, or its agent is quiet 3+ hours and says it is done:
