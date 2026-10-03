@@ -886,3 +886,34 @@ fn ac265_stop_on_predecessor_pauses_and_interrupts_the_migrated_queue() {
     assert_eq!(l.turns(next).len(), 2);
     assert_eq!(l.turns(next)[1]["prompt"], "send explicitly");
 }
+
+#[test]
+fn ac265_stop_resolves_ownership_that_changes_after_its_queue_pause() {
+    let t = tmp(); let gate = t.path().join("stop.gate");
+    let l = lab_in(vec![ollama::qwen3_coder_30b(), ollama::qwen3_coder_30b_64k(), ollama::qwen25_coder_14b()],
+        &[("OVERSEER_TEST_STOP_AFTER_PAUSE_GATE", gate.to_str().unwrap())]);
+    l.set(json!({"enabled":false})); l.degraded(OPENAI_DOWN, "OpenAI unreachable"); l.behave("network", "stall");
+    let c = l.start("codex", "say original work", None); let old = run_id(&c);
+    l.status(&old, "waiting_for_connection");
+    l.d.call("run.queue", json!({"run_id":old,"text":"first direction"}));
+    l.d.call("run.queue", json!({"run_id":old,"text":"second direction"}));
+    let next = std::thread::scope(|scope| {
+        let stopped = scope.spawn(|| l.d.try_call("run.interrupt", json!({"run_id":old})));
+        let end = Instant::now() + Duration::from_secs(10);
+        while !gate.with_extension("paused").exists() {
+            assert!(Instant::now() < end, "Stop never paused before the handoff");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let moved = l.d.call("run.handoff", json!({"run_id":old,"to":"anthropic"}));
+        let next = moved["successor"]["id"].as_str().unwrap().to_string();
+        assert_eq!(l.d.run(&old)["status"], "handed_off");
+        assert_eq!(l.d.call("run.queued", json!({"run_id":next}))["paused"], true);
+        std::fs::write(&gate, "release Stop").unwrap();
+        assert_eq!(stopped.join().unwrap().unwrap()["ok"], true);
+        next
+    });
+    l.status(&next, "interrupted");
+    std::thread::sleep(Duration::from_millis(700));
+    assert_eq!(l.turns(&next).len(), 1, "Stop cannot send the migrated queue");
+    assert_eq!(l.d.call("run.queued", json!({"run_id":next}))["queued"].as_array().unwrap().len(), 2);
+}

@@ -2378,14 +2378,31 @@ impl Daemon {
             bail!("native children are interrupted through their parent run");
         }
         let owner = self.pause_queue(run_id)?;
+        // Synthetic network fixture only: expose the otherwise brief ownership-change window.
+        if std::env::var_os("OVERSEER_TEST_NET").is_some() {
+            if let Some(gate) = std::env::var_os("OVERSEER_TEST_STOP_AFTER_PAUSE_GATE") {
+                let gate = PathBuf::from(gate);
+                std::fs::write(gate.with_extension("paused"), &owner)?;
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+                while !gate.exists() {
+                    if std::time::Instant::now() >= deadline { bail!("fixture Stop gate was not released"); }
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+            }
+        }
         let run_id = owner.as_str();
         let children = self.store.lock().unwrap().children(run_id)?;
         for child in children.iter().filter(|child| child.relation_source.as_deref() == Some("managed-delegation")) {
             self.pause_queue(&child.id)?;
         }
+        // Take this only after pause_queue released its delivery gate: delivering a queued
+        // follow-up can itself enter Continuity. Handoff uses the same stable task boundary.
+        let gate = self.work_unit_gate(&format!("handoff-stop:{}", run.task_id));
+        let _guard = gate.lock().unwrap();
+        let current = self.queue_owner(run_id);
         // Stop still pauses a queued message when the turn finished just before the click.
-        if !ACTIVE.contains(&self.run(run_id)?.status.as_str()) { return Ok(json!({"ok":true})); }
-        self.interrupt_turn(run_id)
+        if !ACTIVE.contains(&self.run(&current)?.status.as_str()) { return Ok(json!({"ok":true})); }
+        self.interrupt_turn(&current)
     }
 
     /// Redirects and holds stop a turn without implicitly pausing the owner's queue.
