@@ -50,6 +50,10 @@ in between. That is how simultaneous needs become one sound.
 
 One track is selected for the whole daemon.
 
+The owner-approved vocabulary for future detailed voice packs, its stable string keys, and the
+pack-to-file dictionary are recorded in [Audio Mode available lines](audio-lines.md). The current
+implementation still plays the three automatic keys described below.
+
 - **Reactor** (default). Twelve original synthesized MP3s bundled in the daemon binary:
   31,488 bytes together, each shorter than 0.5 s. They are the owner-approved selection;
   [`daemon/assets/reactor`](../../daemon/assets/reactor/README.md) lists each file's meaning,
