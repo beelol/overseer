@@ -55,6 +55,8 @@ pub const QUIET: &[&str] = &["message", "share", "report", "area", "hold", "rele
 /// `read` is a read; `look`, `steer` and `confirm` are reachable through the actions of that
 /// class; `never` is not from the conversation.
 pub const METHOD_CLASSES: &[(&str, &str)] = &[
+    ("mods.list", "read"),
+    ("mods.preview", NEVER), ("mods.install", NEVER), ("mods.remove", NEVER),
     ("hello", "read"), ("state", "read"), ("harness.list", "read"), ("profile.list", "read"), ("profile.status", "read"),
     ("repo.inspect", "read"), ("run.turns", "read"), ("run.active", "read"), ("run.raw_output", "read"), ("events.list", "read"),
     ("events.subscribe", "read"), ("comparison.options", "read"), ("workspace.diff", "read"), ("workspace.status", "read"),

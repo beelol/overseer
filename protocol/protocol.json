@@ -2768,7 +2768,7 @@
     "mods.list": {
       "summary": "Inspect optional text Mods",
       "class": "read",
-      "phone": "read",
+      "phone": "available",
       "params": {},
       "result": {
         "revision": "number",
