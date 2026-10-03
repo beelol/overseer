@@ -2931,7 +2931,7 @@ rec(268, 'Each turn states exactly how mod text was delivered', "partial",
 
 rec(269, "Mods can be managed and inspected from Overseer's surfaces", "partial",
     date='2026-10-03',
-    commit='2cf3026512caedbb58122d47093774309d1f4989 (PR64); f23c253992835d8f89eaae1cd93be48d0e364023 (PR70)',
+    commit='2cf3026512caedbb58122d47093774309d1f4989 (PR64); f23c253992835d8f89eaae1cd93be48d0e364023 (PR70); cc7ecce86c04abfd2a99bfa4522f46c9d3ec22cd (PR71)',
     verifier='Codex builders and independent source reviewer',
     harness='Node host/webview, phone Jest, and actual encrypted phone gateway fixtures',
     fixture='Isolated clones; synthetic local fixtures; no owner profile or paid turn',
@@ -2939,10 +2939,10 @@ rec(269, "Mods can be managed and inspected from Overseer's surfaces", "partial"
     deferred='Packaged three-theme/normal+narrow flows, actual dialog/keyboard/reconnect evidence, phone device rendering, TUI and Gate S governance remain unverified.',
     steps='PR64 Node host14/14 and extension files30/30; PR70 eight phone files104/104, typecheck/lint, exact gateway1/1 and complete phone_methods11/11. Prepared scenario-mods remains unrun.',
     expected='The complete AC-269 cross-surface and governance Verify clause.',
-    actual='Focused checks pass and independent source review accepted both slices. Phone initial daemon sandbox failure and invalid fixture mode were setup errors, corrected before semantic assertions; they are not product regressions. Commit-key guard has compatibility evidence, not a reproduced race RED.',
+    actual='Focused checks pass and independent source review accepted the surface slices. PR71 corrects nonexistent mods.update to mods.install for update previews: actual RED14/15, GREEN15/15, extension files30/30. Phone initial daemon sandbox failure and invalid fixture mode were setup errors, corrected before semantic assertions; they are not product regressions. Commit-key guard has compatibility evidence, not a reproduced race RED.',
     evidence='[PR64](https://github.com/beelol/overseer/pull/64); [PR70 evidence](https://github.com/beelol/overseer/blob/f23c253992835d8f89eaae1cd93be48d0e364023/docs/verification/evidence/ac-269/phone/README.md)',
     live='Actual encrypted fixture gateway only; no device or paid qualification.',
-    limits='Both PRs remain draft and excluded from active full2a1bd2a. Follow-up eeb1f3f includes them but has no combined full result. Phone management stays Mac-only; no TUI/Gate S or rendered usability claim.',
+    limits='All three PRs remain draft and excluded from active full2a1bd2a. Follow-up 0bb3e94 includes them but has no combined full result. Phone management stays Mac-only; no TUI/Gate S or rendered usability claim.',
     blocker='Qualify packaged/device surfaces and combined integration, then implement/test remaining TUI and governance. Keep AC269 partial.')
 
 rec(270, "Clear prose remains concise, complete and self-contained", "partial",
