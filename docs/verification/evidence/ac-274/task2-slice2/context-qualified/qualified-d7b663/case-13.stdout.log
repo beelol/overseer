@@ -1,0 +1,6 @@
+
+running 1 test
+test slice2::native_child_typed_answer_uses_parent_pipe_and_exact_native_id ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 0.77s
+

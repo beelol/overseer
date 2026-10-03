@@ -1,0 +1,132 @@
+{
+  "source": "d7b6630132cdc8f074df0f6f7f2101b774c0444e",
+  "stages": {
+    "process-baseline": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.025
+    },
+    "case-00-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-00": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 10.115
+    },
+    "case-01-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.006
+    },
+    "case-01": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 10.165
+    },
+    "case-02-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.006
+    },
+    "case-02": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 10.14
+    },
+    "case-03-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.006
+    },
+    "cleanup": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.391
+    }
+  },
+  "artifacts": [
+    {
+      "name": "overseerd",
+      "source": "/private/tmp/overseer-native-pending-20261003/daemon/src/main.rs",
+      "source_sha256": "d169c87cc369a86300b182125c31b445c12cddfa7d3ccf53ed3973f0aba05250",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+      "sha256": "1c542a4dbc9adf765da1c540526bd2d70909a295f3bbff521b296e82c7b205f8",
+      "fresh": false,
+      "dependency_sha256": "0edd62a061f62db3f6662df627f3d1cf6a41781421b496f16c1b34d480fb6f26",
+      "reused_unchanged_runtime": true,
+      "prior_tested_source": "9040eb52bc58baaf24685e1b08744e955c145982",
+      "prior_receipt_source": "ca012224f58a2f22b66ff6e0931e6dbceeb2e705"
+    },
+    {
+      "name": "pending_requests",
+      "source": "/private/tmp/overseer-native-pending-20261003/daemon/tests/pending_requests.rs",
+      "source_sha256": "85ab032b9fa43f5e6442f5d7c332b1e7f41c2192373b4f182caca459101a038e",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/pending_requests-3634fd170cfd2bc6",
+      "sha256": "83d6790072f2a3c12af0696da36aef08bd6b72ccddd8e34aaa7fc1be6cf6099c",
+      "fresh": false,
+      "dependency_sha256": "5afefc5acdc6cbac5ab3d850b1b9c6588599202aa64d34c5e5095d0ad45c05e4",
+      "reused_unchanged_runtime": true,
+      "prior_receipt_source": "ca012224f58a2f22b66ff6e0931e6dbceeb2e705"
+    }
+  ],
+  "tests": [
+    {
+      "target": "pending_requests",
+      "name": "slice2::native_resolution_after_claim_before_send_prevents_reply",
+      "code": 101
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::captured_needs_yes_does_not_approve_replacement_native_request",
+      "code": 101
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::captured_needs_handle_does_not_propose_a_new_native_request",
+      "code": 101
+    }
+  ],
+  "allocation": "separate_target_one_worker_during_ui",
+  "runtime_reuse": "Exact hash-verified same-clone daemon and pending_requests artifacts from ca012; only evidence documents changed. No rebuild claimed.",
+  "cleanup_counts": {
+    "ours": 0,
+    "others": 0
+  },
+  "classification": "Three daemon-startup setup failures; fourth case interrupted by coordinator; no authority assertion RED.",
+  "coordinator_terminal_report": {
+    "wrapper_handle": 99751,
+    "exit": 130,
+    "raw_wrapper_terminal_output_supplied": false
+  },
+  "cleanup_limit": "Raw cleanup reports empty but sandbox process enumeration/pkill also failed; this phase alone cannot establish successful process inspection."
+}

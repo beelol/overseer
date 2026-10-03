@@ -1,0 +1,3 @@
+slice2::typed_bool_bridge_requires_frozen_revision_and_keeps_exact_native_decline: test
+
+1 test, 0 benchmarks

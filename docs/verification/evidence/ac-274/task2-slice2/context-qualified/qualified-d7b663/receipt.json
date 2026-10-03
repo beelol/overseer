@@ -1,0 +1,369 @@
+{
+  "source": "d7b6630132cdc8f074df0f6f7f2101b774c0444e",
+  "stages": {
+    "process-baseline": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.074
+    },
+    "case-00-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-00": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 1.023
+    },
+    "case-01-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-01": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.844
+    },
+    "case-02-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-02": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.818
+    },
+    "case-03-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-03": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.862
+    },
+    "case-04-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-04": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.796
+    },
+    "case-05-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-05": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.793
+    },
+    "case-06-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-06": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.859
+    },
+    "case-07-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-07": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.784
+    },
+    "case-08-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-08": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 1.236
+    },
+    "case-09-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-09": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.823
+    },
+    "case-10-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-10": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 2.258
+    },
+    "case-11-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-11": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.81
+    },
+    "case-12-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-12": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 1.228
+    },
+    "case-13-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-13": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.776
+    },
+    "case-14-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-14": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.748
+    },
+    "cleanup": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.4
+    }
+  },
+  "artifacts": [
+    {
+      "name": "overseerd",
+      "source": "/private/tmp/overseer-native-pending-20261003/daemon/src/main.rs",
+      "source_sha256": "d169c87cc369a86300b182125c31b445c12cddfa7d3ccf53ed3973f0aba05250",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+      "sha256": "1c542a4dbc9adf765da1c540526bd2d70909a295f3bbff521b296e82c7b205f8",
+      "fresh": false,
+      "dependency_sha256": "0edd62a061f62db3f6662df627f3d1cf6a41781421b496f16c1b34d480fb6f26",
+      "reused_unchanged_runtime": true,
+      "prior_tested_source": "9040eb52bc58baaf24685e1b08744e955c145982",
+      "prior_receipt_source": "ca012224f58a2f22b66ff6e0931e6dbceeb2e705"
+    },
+    {
+      "name": "pending_requests",
+      "source": "/private/tmp/overseer-native-pending-20261003/daemon/tests/pending_requests.rs",
+      "source_sha256": "85ab032b9fa43f5e6442f5d7c332b1e7f41c2192373b4f182caca459101a038e",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/pending_requests-3634fd170cfd2bc6",
+      "sha256": "83d6790072f2a3c12af0696da36aef08bd6b72ccddd8e34aaa7fc1be6cf6099c",
+      "fresh": false,
+      "dependency_sha256": "5afefc5acdc6cbac5ab3d850b1b9c6588599202aa64d34c5e5095d0ad45c05e4",
+      "reused_unchanged_runtime": true,
+      "prior_receipt_source": "ca012224f58a2f22b66ff6e0931e6dbceeb2e705"
+    }
+  ],
+  "tests": [
+    {
+      "target": "pending_requests",
+      "name": "slice2::native_resolution_after_claim_before_send_prevents_reply",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::captured_needs_yes_does_not_approve_replacement_native_request",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::captured_needs_handle_does_not_propose_a_new_native_request",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::needs_handle_reports_stale_preparation_after_initial_capture_recheck",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::typed_bool_bridge_requires_frozen_revision_and_keeps_exact_native_decline",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::checked_overseer_confirmation_freezes_daemon_revision_and_exact_native_item",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::native_turn_rollover_same_generation_retires_held_answer_and_keeps_current_control",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::native_turn_completion_retires_held_answer_before_process_settlement",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::replacement_generation_after_claim_before_send_rejects_old_attempt",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::permission_profile_widening_and_deny_removal_cannot_claim",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::structured_questions_and_forms_refuse_legacy_bool",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::native_resolution_before_owner_answer_emits_no_response",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::old_request_key_cannot_send_to_replacement_generation",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::native_child_typed_answer_uses_parent_pipe_and_exact_native_id",
+      "code": 0
+    },
+    {
+      "target": "pending_requests",
+      "name": "slice2::exact_receipt_token_writes_once_and_refuses_changed_digest_or_generation",
+      "code": 0
+    }
+  ],
+  "allocation": "separate_target_one_worker_during_ui",
+  "runtime_reuse": "Exact hash-verified same-clone daemon and pending_requests artifacts from ca012; only evidence documents changed. No rebuild claimed.",
+  "cleanup_counts": {
+    "ours": 0,
+    "others": 0
+  }
+}

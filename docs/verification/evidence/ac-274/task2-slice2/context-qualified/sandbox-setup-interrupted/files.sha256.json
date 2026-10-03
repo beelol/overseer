@@ -1,0 +1,21 @@
+{
+  "case-00-inventory.stderr.log": "1ae2ce53f6c4a3265acd385e7e4a21d827a2b5594337d0d9ae68b92a856b30dc",
+  "case-00-inventory.stdout.log": "d73fd6140de6579bbb7980121142d99b023993906ea6ee5951b309a4baf00ff7",
+  "case-00.stderr.log": "be09869026cb6738176ea5e52c4d24693acf22a79b5d83a4e9fb39872064c81f",
+  "case-00.stdout.log": "df20cb3fc8bfdf0b18da20373b66211337b516501c5bf9c4727de056eea6fd67",
+  "case-01-inventory.stderr.log": "1ae2ce53f6c4a3265acd385e7e4a21d827a2b5594337d0d9ae68b92a856b30dc",
+  "case-01-inventory.stdout.log": "c080655020f6b58184e5c343e657fe4e0edfdffedc1d50b9b370784538608470",
+  "case-01.stderr.log": "c643953aacc9c6251fbb0a78125fc501d10a2e416b7cd5644b028cc6fa08e6a9",
+  "case-01.stdout.log": "7b69ec8e6e8c15ae7271965de37bb9191c742fb12257ced8d959909429084482",
+  "case-02-inventory.stderr.log": "1ae2ce53f6c4a3265acd385e7e4a21d827a2b5594337d0d9ae68b92a856b30dc",
+  "case-02-inventory.stdout.log": "a86cb07aa5c1a5f5ea5e4dc3dab1b6f321691aec5ef5f57412844c92f237c261",
+  "case-02.stderr.log": "65b654543df33b9eb4edf9231b0cfdc1859c2066cc348c01f1f75e5b20e272eb",
+  "case-02.stdout.log": "5e5cc98cfc1a070da7df560333f2f914b8cf36f8c946018f9aa178fe1417c728",
+  "case-03-inventory.stderr.log": "1ae2ce53f6c4a3265acd385e7e4a21d827a2b5594337d0d9ae68b92a856b30dc",
+  "case-03-inventory.stdout.log": "9b2cd59d38ff7a7cc530100bb980c80226251f7ced97e7990e6fcef1dd5e1888",
+  "cleanup.stderr.log": "1ae2ce53f6c4a3265acd385e7e4a21d827a2b5594337d0d9ae68b92a856b30dc",
+  "cleanup.stdout.log": "78a258d915a1a2717750541aca372b6fabbe1d5d5359802144fbd6429811f52e",
+  "overseerd.d": "0edd62a061f62db3f6662df627f3d1cf6a41781421b496f16c1b34d480fb6f26",
+  "pending_requests.d": "5afefc5acdc6cbac5ab3d850b1b9c6588599202aa64d34c5e5095d0ad45c05e4",
+  "receipt.json": "410f93d00a250bf8b8ea44e663250a2a2d5b6c2b62ccf69ea691def6e260c41b"
+}

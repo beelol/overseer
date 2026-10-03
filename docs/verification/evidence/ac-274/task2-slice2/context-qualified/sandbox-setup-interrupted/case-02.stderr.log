@@ -1,0 +1,7 @@
+nice: setpriority: Operation not permitted
+
+thread 'slice2::captured_needs_handle_does_not_propose_a_new_native_request' panicked at daemon/tests/common/mod.rs:116:9:
+daemon did not start
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+sysmon request failed with error: sysmond service not found
+pkill: Cannot get process list

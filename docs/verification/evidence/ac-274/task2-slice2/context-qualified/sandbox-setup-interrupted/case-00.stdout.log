@@ -1,0 +1,11 @@
+
+running 1 test
+test slice2::native_resolution_after_claim_before_send_prevents_reply ... FAILED
+
+failures:
+
+failures:
+    slice2::native_resolution_after_claim_before_send_prevents_reply
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 48 filtered out; finished in 10.11s
+

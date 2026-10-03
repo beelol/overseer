@@ -1,0 +1,6 @@
+
+running 1 test
+test slice2::exact_receipt_token_writes_once_and_refuses_changed_digest_or_generation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 0.74s
+
