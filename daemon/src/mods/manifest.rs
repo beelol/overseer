@@ -60,8 +60,23 @@ pub fn parse(bytes: &[u8]) -> Result<Manifest> {
     }
     let s =
         std::str::from_utf8(bytes).map_err(|_| error("invalid_mod", "manifest must be UTF-8"))?;
-    let m: Manifest = toml::from_str(s)
-        .map_err(|e| error("invalid_mod", format!("invalid mod manifest: {e}")))?;
+    let m: Manifest = toml::from_str(s).map_err(|e: toml::de::Error| {
+        // Display quotes source lines; message() can quote decoded field values.
+        // Neither belongs in a public RPC error. Keep only safe source location.
+        let location = e
+            .span()
+            .and_then(|span| s.get(..span.start))
+            .map(|prefix| {
+                let line = prefix.bytes().filter(|b| *b == b'\n').count() + 1;
+                let column = prefix.rsplit('\n').next().unwrap_or("").chars().count() + 1;
+                format!(" at line {line}, column {column}")
+            })
+            .unwrap_or_default();
+        error(
+            "invalid_mod",
+            format!("invalid mod manifest{location}; check TOML syntax and declared field types"),
+        )
+    })?;
     if m.schema_version != 1 {
         return Err(error("unsupported_mod", "unsupported mod schema version"));
     }

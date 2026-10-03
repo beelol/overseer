@@ -941,26 +941,33 @@ fn malformed_manifest_error_redacts_source_without_losing_error_code() {
     let t = tmp();
     let source = t.path().join("malformed-private-mod");
     std::fs::create_dir(&source).unwrap();
-    let marker = "sk-abcdefghijklmnopqrstuv";
-    std::fs::write(
-        source.join("mod.toml"),
-        format!("summary='{marker}' invalid_tail\n"),
-    )
-    .unwrap();
-    let request = format!(
-        "{}\n",
-        json!({"id":1,"method":"mods.preview","params":{"source":source,"operation":"install"}})
-    );
-    let response: Value = serde_json::from_str(&d.raw(request.as_bytes())).unwrap();
-    assert_eq!(response["error"]["code"], "invalid_mod", "{response}");
-    assert!(response["error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("invalid mod manifest"));
-    assert!(
-        !response.to_string().contains(marker),
-        "Public parser error leaked private manifest source: {response}"
-    );
+    for (marker, field) in [
+        ("sk-abcdefghijklmnopqrstuv", "summary"),
+        ("opaque-private-value", "api_key"),
+    ] {
+        std::fs::write(
+            source.join("mod.toml"),
+            format!("{field}='{marker}' invalid_tail\n"),
+        )
+        .unwrap();
+        let request = format!(
+            "{}\n",
+            json!({"id":1,"method":"mods.preview","params":{"source":source,"operation":"install"}})
+        );
+        let response: Value = serde_json::from_str(&d.raw(request.as_bytes())).unwrap();
+        assert_eq!(response["error"]["code"], "invalid_mod", "{response}");
+        let message = response["error"]["message"].as_str().unwrap();
+        assert!(
+            message.contains("invalid mod manifest")
+                && message.contains("line 1")
+                && message.contains("column "),
+            "{response}"
+        );
+        assert!(
+            !response.to_string().contains(marker),
+            "Public parser error leaked private manifest source: {response}"
+        );
+    }
 }
 
 #[test]
