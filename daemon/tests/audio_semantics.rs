@@ -28,6 +28,38 @@ fn settled_keys(path: &Path) -> Vec<String> {
     keys(path)
 }
 
+fn non_start_keys(path: &Path) -> Vec<String> {
+    keys(path).into_iter().filter(|key| key != "agent_started").collect()
+}
+
+fn wait_non_start_captures(path: &Path, count: usize) {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while non_start_keys(path).len() < count {
+        assert!(Instant::now() < deadline, "missing {count} non-start captures: {:?}", keys(path));
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+struct ReleaseGate(std::path::PathBuf);
+impl ReleaseGate {
+    fn release(&self) { std::fs::write(&self.0, b"release").unwrap(); }
+}
+impl Drop for ReleaseGate {
+    fn drop(&mut self) {
+        // On panic, release the owned process before Daemon's owned-process
+        // cleanup. The child also has a finite 30-second wait of its own.
+        let _ = std::fs::write(&self.0, b"cleanup release");
+    }
+}
+
+fn gated_run(d: &Daemon, checkout: &Path, gate: &Path, exit: &str) -> (String, ReleaseGate) {
+    let release = ReleaseGate(gate.to_owned());
+    let run = run_id(&d.generic(checkout, "worktree", "/bin/sh", &["-c",
+        "remaining=300; while [ ! -f \"$1\" ]; do [ \"$remaining\" -gt 0 ] || exit 97; remaining=$((remaining - 1)); sleep 0.1; done; exit \"$2\"",
+        "audio-semantic-gate", gate.to_str().unwrap(), exit]));
+    (run, release)
+}
+
 fn enable(d: &Daemon) {
     assert_eq!(d.call("audio.set", json!({"enabled":true}))["enabled"], true);
 }
@@ -40,7 +72,11 @@ fn terminal_task_failure_has_its_specific_line_without_generic_attention() {
     let d = Daemon::start(&[("OVERSEER_TEST_AUDIO_LOG", log.to_str().unwrap()),
         ("OVERSEER_TEST_AUTO_DISABLED", "1")]);
     enable(&d);
-    let run = run_id(&d.generic(&checkout, "worktree", "/bin/sh", &["-c", "exit 3"]));
+    let (run, release) = gated_run(&d, &checkout, &temp.path().join("finish"), "3");
+    d.wait_status(&run, |s| s == "running", 10);
+    wait_captures(&log, 1);
+    assert_eq!(keys(&log), ["agent_started"]);
+    release.release();
     assert_eq!(d.wait_done(&run, 10)["status"], "failed");
     wait_captures(&log, 2);
     assert_eq!(settled_keys(&log), ["agent_started", "agent_failed"]);
@@ -54,7 +90,11 @@ fn ordinary_success_has_one_start_and_one_logical_completion() {
     let d = Daemon::start(&[("OVERSEER_TEST_AUDIO_LOG", log.to_str().unwrap()),
         ("OVERSEER_TEST_AUTO_DISABLED", "1")]);
     enable(&d);
-    let run = run_id(&d.generic(&checkout, "worktree", "/bin/sh", &["-c", "exit 0"]));
+    let (run, release) = gated_run(&d, &checkout, &temp.path().join("finish"), "0");
+    d.wait_status(&run, |s| s == "running", 10);
+    wait_captures(&log, 1);
+    assert_eq!(keys(&log), ["agent_started"]);
+    release.release();
     assert_eq!(d.wait_done(&run, 10)["status"], "completed");
     wait_captures(&log, 2);
     assert_eq!(settled_keys(&log), ["agent_started", "agent_complete"]);
@@ -74,12 +114,16 @@ fn legacy_permission_and_waiting_projection_announce_the_same_specific_need_once
         "prompt":"write perm.txt","title":"one permission"})));
     let waiting = d.wait_status(&run, |s| s == "waiting_for_user", 15);
     assert_eq!(waiting["attention"]["request_id"], "req-1");
-    wait_captures(&log, 2);
-    assert_eq!(settled_keys(&log), ["agent_started", "agent_permission_required"]);
+    // The permission may supersede a still-queued start. Demand the live need
+    // independently, while retaining every other non-start key to catch leaks.
+    wait_non_start_captures(&log, 1);
+    settled_keys(&log);
+    assert_eq!(non_start_keys(&log), ["agent_permission_required"]);
     d.call("run.permission", json!({"run_id":run,"request_id":"req-1","allow":true}));
     assert_eq!(d.wait_done(&run, 15)["status"], "completed");
-    wait_captures(&log, 3);
-    assert_eq!(settled_keys(&log), ["agent_started", "agent_permission_required", "agent_complete"]);
+    wait_non_start_captures(&log, 2);
+    settled_keys(&log);
+    assert_eq!(non_start_keys(&log), ["agent_permission_required", "agent_complete"]);
 }
 
 #[test]
@@ -97,8 +141,11 @@ fn expired_auth_without_a_permitted_fallback_announces_sign_in_not_failure() {
     let run = run_id(&d.call("task.create", json!({"repo":checkout,"harness":"claude",
         "prompt":"try","title":"expired synthetic authentication"})));
     assert_eq!(d.wait_done(&run, 15)["status"], "failed");
-    wait_captures(&log, 2);
-    assert_eq!(settled_keys(&log), ["agent_started", "agent_sign_in_required"]);
+    // Auth can retire the initial work before its routine cue plays. Its live
+    // need must still be exact, with no generic failure/attention/completion.
+    wait_non_start_captures(&log, 1);
+    settled_keys(&log);
+    assert_eq!(non_start_keys(&log), ["agent_sign_in_required"]);
 }
 
 #[test]
@@ -237,6 +284,8 @@ fn whole_swarm_completion_replaces_director_and_worker_completions() {
     let w = swarm_world();
     let (swarm, director) = start_swarm(&w);
     wait_dispatched(&w);
+    wait_captures(&w.log, 1);
+    assert_eq!(keys(&w.log), ["swarm_initiated"]);
     std::fs::write(&w.gate, b"finish audited fixture objective").unwrap();
     assert_eq!(w.d.wait_done(&director, 60)["status"], "completed");
     assert_eq!(w.d.call("swarm.get", json!({"id":swarm}))["status"], "completed");
