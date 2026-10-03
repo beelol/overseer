@@ -58,6 +58,8 @@ pub enum Norm {
 pub struct LaunchReq<'a> {
     pub cwd: &'a Path,
     pub prompt: &'a str,
+    /// The immutable text snapshot; never native flags, environment or tools.
+    pub mods: Option<&'a crate::mods::delivery::TurnMods>,
     pub model: Option<&'a str>,
     /// Reasoning effort for this turn (AC-60), validated by `check_turn_options`.
     pub effort: Option<&'a str>,
@@ -294,6 +296,7 @@ pub fn validate_effort(harness: &str, effort: Option<&str>) -> Result<()> {
 }
 
 pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
+    if let Some(mods) = req.mods { mods.validate_prompt(req.prompt)?; }
     validate_effort(harness, req.effort)?;
     if req.swarm_worker {
         if !req.extra_args.is_empty() {
@@ -1286,7 +1289,7 @@ mod tests {
             ("opencode", "--variant"),
         ] {
             let launch = launch(harness, &LaunchReq {
-                cwd: Path::new("/tmp"), prompt: "work", model: Some("fixture-model"),
+                cwd: Path::new("/tmp"), prompt: "work", mods: None, model: Some("fixture-model"),
                 effort: Some("medium"), sandbox: Some("workspace-write"), profile_env: BTreeMap::new(),
                 resume_session: None, program_override: Some("/bin/true"),
                 args_override: None, extra_args: &[], permission_mode: None, images: &[], swarm_worker: false, swarm_tools: None,
@@ -1302,7 +1305,7 @@ mod tests {
     fn codex_cli_keeps_selected_read_only_sandbox_on_start_and_resume() {
         for resume in [None, Some("session-1")] {
             let launch = launch("codex", &LaunchReq {
-                cwd: Path::new("/tmp"), prompt: "inspect", model: Some("fixture-model"),
+                cwd: Path::new("/tmp"), prompt: "inspect", mods: None, model: Some("fixture-model"),
                 effort: Some("medium"), sandbox: Some("read-only"), profile_env: BTreeMap::new(),
                 resume_session: resume, program_override: Some("/bin/true"),
                 args_override: None, extra_args: &[], permission_mode: None, images: &[], swarm_worker: false, swarm_tools: None,
@@ -1322,8 +1325,39 @@ mod turn_option_tests {
     use super::*;
 
     fn req<'a>(resume: Option<&'a str>, images: &'a [(String, PathBuf)]) -> LaunchReq<'a> {
-        LaunchReq { cwd: Path::new("/tmp/w"), prompt: "do it", model: Some("gpt-5.6-luna"), sandbox: Some("workspace-write"), profile_env: BTreeMap::new(), resume_session: resume, program_override: Some("/bin/echo"),
+        LaunchReq { cwd: Path::new("/tmp/w"), prompt: "do it", mods: None, model: Some("gpt-5.6-luna"), sandbox: Some("workspace-write"), profile_env: BTreeMap::new(), resume_session: resume, program_override: Some("/bin/echo"),
             args_override: None, extra_args: &[], effort: Some("high"), permission_mode: Some("read-only"), images, swarm_worker: false, swarm_tools: None }
+    }
+
+    #[test]
+    fn mod_text_preserves_native_mcp_and_read_only_worker_controls() {
+        use sha2::{Digest, Sha256};
+        let config = PathBuf::from("/tmp/run/mcp-swarm.json");
+        let allowed = vec!["mcp__overseer__swarm_result".to_string()];
+        let guidance = "[Optional Overseer Mods: text guidance]\nUse complete sentences.\n";
+        let snapshot = crate::mods::delivery::TurnMods { saved: json!({"text":guidance,
+            "digest":format!("{:x}",Sha256::digest(guidance.as_bytes()))}) };
+        let composed = format!("{guidance}do it");
+        for session in [None, Some("session-1")] {
+            let mut request = req(session, &[]);
+            request.swarm_worker = true;
+            request.swarm_tools = Some(SwarmTools { config: &config, allowed: &allowed });
+            request.permission_mode = Some("plan");
+            let baseline = launch("claude", &request).unwrap();
+            request.prompt = &composed;
+            request.mods = Some(&snapshot);
+            let delivered = launch("claude", &request).unwrap();
+            assert_eq!(delivered.program, baseline.program);
+            assert_eq!(delivered.args, baseline.args);
+            assert_eq!(delivered.env, baseline.env);
+            assert_eq!(delivered.close_stdin, baseline.close_stdin);
+            let mut sent: Value = serde_json::from_str(delivered.initial_stdin.as_deref().unwrap().trim()).unwrap();
+            assert_eq!(sent["message"]["content"],composed);
+            sent["message"]["content"] = json!("do it");
+            assert_eq!(sent, serde_json::from_str::<Value>(baseline.initial_stdin.as_deref().unwrap().trim()).unwrap());
+            request.prompt = "do it";
+            assert!(launch("claude", &request).err().unwrap().to_string().contains("immutable turn prompt"));
+        }
     }
 
     #[test]

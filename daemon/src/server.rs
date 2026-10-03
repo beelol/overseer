@@ -1414,11 +1414,32 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     if method.starts_with("swarm.") && result.as_ref().is_err_and(storage_fault) {
         d.swarm_storage_blocked.store(true, Ordering::SeqCst);
     }
+    // Mods keep copied original bytes privately; every protocol presentation
+    // uses the existing decoded-value redaction boundary, including previews.
+    if method.starts_with("mods.") {
+        return result.map(crate::daemon::redact_value).map_err(|e| {
+            // TOML diagnostics can quote private source lines. Preserve the
+            // protocol code/data shape while sanitizing decoded presentation.
+            if let Some(p) = e.downcast_ref::<ProtoError>() {
+                ProtoError::new(p.code, crate::redact::redact(&p.message))
+                    .with_data(crate::daemon::redact_value(p.data.clone())).into()
+            } else {
+                anyhow!(crate::redact::redact(&e.to_string()))
+            }
+        });
+    }
     result
 }
 
 fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     Ok(match method {
+        "mods.list" => crate::mods::library::list(d)?,
+        "mods.preview" => crate::mods::library::preview(d, p)?,
+        "mods.install" => crate::mods::library::install(d, p)?,
+        "mods.remove" => crate::mods::library::remove(d, p)?,
+        "mods.bind" => crate::mods::bindings::set(d, p)?,
+        "mods.unbind" => crate::mods::bindings::unset(d, p)?,
+        "mods.why" => crate::mods::bindings::why(d, p)?,
         "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path(), "instance": paths::instance(), "build": BUILD}),
         "state" => d.state_for(p["include_hidden"].as_bool().unwrap_or(false))?,
         "audio.get" => crate::audio::get(d)?,

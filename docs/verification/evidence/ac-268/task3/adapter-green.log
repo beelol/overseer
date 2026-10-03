@@ -1,0 +1,107 @@
+   Compiling overseerd v0.1.0 (/Users/bilal/.codex/worktrees/mods-bundles/overseer/daemon)
+warning: unused import: `revision`
+ --> daemon/src/mods/bindings.rs:5:5
+  |
+5 |     revision,
+  |     ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: value assigned to `note` is never read
+   --> daemon/src/background.rs:377:17
+    |
+377 |         let mut note = String::new();
+    |                 ^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` on by default
+
+warning: methods `workspace_diff` and `state` are never used
+    --> daemon/src/daemon.rs:3674:12
+     |
+433  | impl Daemon {
+     | ----------- methods in this implementation
+...
+3674 |     pub fn workspace_diff(&self, workspace_id: &str, base: &str) -> Result<Value> {
+     |            ^^^^^^^^^^^^^^
+...
+3729 |     pub fn state(&self) -> Result<Value> {
+     |            ^^^^^
+     |
+     = note: `#[warn(dead_code)]` on by default
+
+warning: field `device_name` is never read
+  --> daemon/src/gateway/mod.rs:86:9
+   |
+84 | pub struct Session {
+   |            ------- field in this struct
+85 |     pub device_id: String,
+86 |     pub device_name: String,
+   |         ^^^^^^^^^^^
+
+warning: method `is_clean` is never used
+   --> daemon/src/git.rs:299:12
+    |
+298 | impl Status {
+    | ----------- method in this implementation
+299 |     pub fn is_clean(&self) -> bool {
+    |            ^^^^^^^^
+
+warning: function `tree_has` is never used
+   --> daemon/src/git.rs:356:8
+    |
+356 | pub fn tree_has(workspace: &Path, tree_ish: &str, path: &str) -> bool {
+    |        ^^^^^^^^
+
+warning: function `show_blob` is never used
+   --> daemon/src/git.rs:360:8
+    |
+360 | pub fn show_blob(workspace: &Path, tree_ish: &str, path: &str) -> Result<Vec<u8>> {
+    |        ^^^^^^^^^
+
+warning: function `worktree_list` is never used
+   --> daemon/src/git.rs:368:8
+    |
+368 | pub fn worktree_list(repo: &Path) -> Vec<PathBuf> {
+    |        ^^^^^^^^^^^^^
+
+warning: field `model` is never read
+   --> daemon/src/opencode_bridge.rs:260:9
+    |
+243 | pub struct Turn {
+    |            ---- field in this struct
+...
+260 |     pub model: String,
+    |         ^^^^^
+
+warning: function `is_session_event` is never used
+    --> daemon/src/overseer/session.rs:1933:8
+     |
+1933 | pub fn is_session_event(kind: &str) -> bool {
+     |        ^^^^^^^^^^^^^^^^
+
+warning: method `child_by_native` is never used
+    --> daemon/src/store.rs:1120:12
+     |
+189  | impl Store {
+     | ---------- method in this implementation
+...
+1120 |     pub fn child_by_native(&self, parent: &str, native: &str) -> Result<Option<Run>> {
+     |            ^^^^^^^^^^^^^^^
+
+warning: `overseerd` (bin "overseerd" test) generated 11 warnings (run `cargo fix --bin "overseerd" --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.52s
+     Running unittests src/main.rs (/private/tmp/overseer-mods-target/debug/deps/overseerd-e1f16db50435eb72)
+
+running 8 tests
+test adapters::turn_option_tests::codex_turn_options_become_cli_arguments ... ok
+test adapters::turn_option_tests::a_read_only_swarm_worker_has_its_write_tools_denied ... ok
+test adapters::turn_option_tests::swarm_tools_give_claude_its_mcp_tools_and_deny_native_delegation ... ok
+test adapters::turn_option_tests::swarm_worker_cannot_override_delegation_deny_with_extra_arguments ... ok
+test adapters::turn_option_tests::swarm_worker_disables_native_claude_delegation_on_initial_and_resumed_turns ... ok
+test adapters::turn_option_tests::swarm_worker_rejects_unqualified_native_delegation_transports ... ok
+test adapters::turn_option_tests::turn_options_are_checked_per_harness ... ok
+test adapters::turn_option_tests::mod_text_preserves_native_mcp_and_read_only_worker_controls ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 302 filtered out; finished in 0.00s
+
