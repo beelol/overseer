@@ -696,6 +696,7 @@ impl Store {
         crate::broker::migrate(&self.conn)?;
         // Who answered each permission request first (several surfaces can answer at once).
         self.conn.execute_batch("CREATE TABLE IF NOT EXISTS permission_answers(run_id TEXT NOT NULL, request_id TEXT NOT NULL, allow INTEGER NOT NULL, by TEXT NOT NULL, ts INTEGER NOT NULL, PRIMARY KEY(run_id, request_id));")?;
+        crate::pending_requests::migrate(&self.conn)?;
         crate::review::migrate(&self.conn)?;
         // Gate N: paired devices and the outcomes of their requests.
         crate::gateway::devices::migrate(&self.conn)?;
@@ -1753,12 +1754,20 @@ impl Store {
             .optional()?)
     }
 
-    pub fn set_run_process(&self, id: &str, run_dir: &str, generation: i64, launch: &Value) -> Result<()> {
+    pub fn set_run_process(&self, id: &str, run_dir: &str, generation: i64, launch: &Value) -> Result<Vec<Event>> {
+        let tx = self.conn.unchecked_transaction()?;
+        let mut changed = Vec::new();
+        if let Some(previous) = self.run(id)?.filter(|r| r.process_generation != generation) {
+            // A new generation is not proof the old protected operation ended.
+            // Its remaining private requests cannot address the replacement pipe.
+            crate::pending_requests::retire(self, &previous, false, &mut changed)?;
+        }
         self.conn.execute(
             "UPDATE runs SET run_dir=?2, process_generation=?3, segment=0, seg_offset=0, launch=?4 WHERE id=?1",
             params![id, run_dir, generation, launch.to_string()],
         )?;
-        Ok(())
+        tx.commit()?;
+        Ok(changed)
     }
 
     pub fn run_process(&self, id: &str) -> Result<Option<(String, i64, i64)>> {

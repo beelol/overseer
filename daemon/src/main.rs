@@ -36,6 +36,7 @@ mod ollama_install;
 mod opencode_bridge;
 mod overseer;
 mod paths;
+mod pending_requests;
 mod mods;
 mod pr;
 mod redact;

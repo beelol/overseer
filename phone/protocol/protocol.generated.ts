@@ -39,6 +39,9 @@ export interface Attention {
   request_id: string;
   tool?: string | null;
   input: unknown;
+  typed_native?: boolean | null;
+  revision?: number | null;
+  reason_code?: string | null;
 }
 
 export interface Run {
@@ -64,6 +67,8 @@ export interface Run {
   process_generation: number;
   attention?: Attention | null;
   queue?: QueueSnapshot | null;
+  pending_requests?: Array<PendingRequest> | null;
+  pending_count?: number | null;
 }
 
 export interface Turn {
@@ -367,6 +372,65 @@ export interface TurnModSnapshot {
   text_redacted: boolean;
 }
 
+export type PendingLifecycle = 'pending' | 'native_resolved' | 'cancelled' | 'process_ended' | 'process_unknown';
+
+export interface PendingPermissionRequest {
+  key: string;
+  revision: number;
+  run_id: string;
+  process_run_id: string;
+  lifecycle: PendingLifecycle;
+  default_to_no: boolean;
+  suppress_always: boolean;
+  reason_code: string;
+  bool_compatible: boolean;
+  family: 'command' | 'file' | 'tool';
+  target?: string | null;
+  choices?: Array<string> | null;
+}
+
+export interface PendingQuestionOption {
+  label: string;
+  description: string;
+}
+
+export interface PendingQuestionField {
+  key: string;
+  header: string;
+  question: string;
+  secret: boolean;
+  options: Array<PendingQuestionOption>;
+}
+
+export interface PendingQuestionRequest {
+  key: string;
+  revision: number;
+  run_id: string;
+  process_run_id: string;
+  lifecycle: PendingLifecycle;
+  default_to_no: boolean;
+  suppress_always: boolean;
+  reason_code: string;
+  bool_compatible: boolean;
+  family: 'questions';
+  questions: Array<PendingQuestionField>;
+}
+
+export interface PendingCapabilityRequest {
+  key: string;
+  revision: number;
+  run_id: string;
+  process_run_id: string;
+  lifecycle: PendingLifecycle;
+  default_to_no: boolean;
+  suppress_always: boolean;
+  reason_code: string;
+  bool_compatible: boolean;
+  family: 'permissions' | 'form' | 'external_form' | 'url' | 'verification';
+}
+
+export type PendingRequest = PendingPermissionRequest | PendingQuestionRequest | PendingCapabilityRequest;
+
 /** The payload of every kind of event the app reads. Other kinds arrive as `unknown`. */
 export interface EventPayloads {
   task_created: {
@@ -539,6 +603,13 @@ export interface EventPayloads {
   };
   mods_applied: {
     snapshot: TurnModSnapshot;
+  };
+  pending_request: PendingRequest;
+  pending_request_changed: PendingRequest;
+  native_request_diagnostic: {
+    reason_code: string;
+    capability: string;
+    action: string;
   };
 }
 
@@ -1475,6 +1546,13 @@ export interface Methods {
     confirm: boolean;
     expected_revision: number;
   }; result: unknown };
+  /** Ordered safe native pending requests and their durable collection cursor. */
+  "run.requests": { class: 'read'; params: {
+    run_id?: string | null;
+  }; result: {
+    requests: Array<PendingRequest>;
+    cursor: number;
+  } };
 }
 
 export type MethodName = keyof Methods;
@@ -1760,6 +1838,7 @@ export const METHOD_CLASS = {
   "mods.unbind": 'mac_only',
   "mods.why": 'read',
   "mods.remove": 'mac_only',
+  "run.requests": 'read',
 } as const satisfies Record<MethodName, MethodClass>;
 
 export type PhoneMethod = { [K in MethodName]: Methods[K]['class'] extends 'mac_only' ? never : K }[MethodName];

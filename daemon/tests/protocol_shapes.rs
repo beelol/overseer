@@ -326,3 +326,114 @@ fn ac265_follow_up_description_rejects_false_queued_and_turn_acknowledgements() 
         assert!(!wrong.is_empty(), "invalid result passed validation: {value}");
     }
 }
+
+
+#[test]
+fn native_pending_collection_and_projection_match_protocol() {
+    let scratch = tmp();
+    let repo = repo(&scratch.path().join("repo"));
+    let vectors: Vec<Value> = serde_json::from_str(include_str!(
+        "../../fixtures/transcripts/ac274/native-vectors.json"
+    ))
+    .unwrap();
+    let mut command = vectors
+        .iter()
+        .find(|v| v["name"] == "command_command_accept")
+        .unwrap()["request"]
+        .clone();
+    let mut question = vectors
+        .iter()
+        .find(|v| v["name"] == "codex_question_free_text")
+        .unwrap()["request"]
+        .clone();
+    for frame in [&mut command, &mut question] {
+        frame["params"]["threadId"] = json!("$THREAD");
+        frame["params"]["turnId"] = json!("$TURN");
+    }
+    command["id"] = json!(7);
+    command["params"]["cwd"] = json!("$CWD");
+    question["id"] = json!("opaque-private-native-selector");
+    let script = scratch.path().join("script.json");
+    let version = scratch.path().join("version");
+    std::fs::write(&version, "codex-cli 0.158.0").unwrap();
+    std::fs::write(
+        &script,
+        json!({"steps":[{"emit":command},{"emit":question},{"mark":"native-shape-ready"}]})
+            .to_string(),
+    )
+    .unwrap();
+    let fixture = repo_root().join("fixtures/fake-harness/codex-app-fixture.js");
+    let d = Daemon::start(&[
+        ("OVERSEER_CODEX_PATH", fixture.to_str().unwrap()),
+        ("FIXTURE_MODE", "native-pending"),
+        ("FIXTURE_VERSION_FILE", version.to_str().unwrap()),
+        ("FIXTURE_NATIVE_REQUESTS_FILE", script.to_str().unwrap()),
+        (
+            "OVERSEER_HARNESS_ENV_PASSTHROUGH",
+            "FIXTURE_MODE,FIXTURE_VERSION_FILE,FIXTURE_NATIVE_REQUESTS_FILE",
+        ),
+        ("OVERSEER_TEST_AUTO_DISABLED", "1"),
+    ]);
+    d.call("agent.cadence", json!({"cadence":"off","by":"owner"}));
+    let created = d.call(
+        "task.create",
+        json!({"repo":repo,"harness":"codex-app","prompt":"shape fixture"}),
+    );
+    let run = run_id(&created);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    while !d
+        .events(&run)
+        .iter()
+        .any(|e| e["payload"]["text"] == "native-shape-ready")
+    {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "native fixture output was not processed"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    let doc = description();
+    let result = d.call("run.requests", json!({"run_id":run}));
+    assert_eq!(result["requests"].as_array().unwrap().len(), 2);
+    let mut wrong = Vec::new();
+    check(
+        &doc,
+        &doc["methods"]["run.requests"]["result"],
+        &result,
+        "run.requests",
+        &mut wrong,
+    );
+    check(&doc, &doc["types"]["Run"], &d.run(&run), "Run", &mut wrong);
+    let pending: Vec<Value> = d
+        .events(&run)
+        .into_iter()
+        .filter(|e| e["kind"] == "pending_request")
+        .collect();
+    assert_eq!(pending.len(), 2);
+    for event in pending {
+        check(
+            &doc,
+            &doc["events"]["pending_request"],
+            &event["payload"],
+            "pending_request",
+            &mut wrong,
+        );
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+    let mut forged = result["requests"][0].clone();
+    forged["native_id"] = json!(7);
+    check(
+        &doc,
+        &doc["types"]["PendingRequest"],
+        &forged,
+        "forged native authority",
+        &mut wrong,
+    );
+    assert!(
+        !wrong.is_empty(),
+        "the public shape rejects raw native authority"
+    );
+    assert!(!result
+        .to_string()
+        .contains("opaque-private-native-selector"));
+}

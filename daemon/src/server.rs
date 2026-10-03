@@ -2784,6 +2784,7 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "run.interrupt" => d.interrupt(s(p, "run_id")?)?,
         "run.permission" => d.answer_permission_with(s(p, "run_id")?, s(p, "request_id")?, p["allow"].as_bool().unwrap_or(false), p["message"].as_str().unwrap_or(""), p["always"].as_bool().unwrap_or(false))?,
+        "run.requests" => crate::pending_requests::collection(&d.store.lock().unwrap(), p["run_id"].as_str(), false)?,
         "run.raw_output" => d.raw_output(s(p, "run_id")?, p["max_bytes"].as_u64().unwrap_or(256 * 1024).min(4 * 1024 * 1024) as usize)?,
         "run.turns" => json!(d.store.lock().unwrap().turns(s(p, "run_id")?)?),
         "run.active" => {

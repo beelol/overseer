@@ -40,7 +40,10 @@
       "kind": "string",
       "request_id": "string",
       "tool": "string?",
-      "input": "json"
+      "input": "json",
+      "typed_native": "boolean?",
+      "revision": "number?",
+      "reason_code": "string?"
     },
     "Run": {
       "id": "string",
@@ -64,7 +67,9 @@
       "capabilities": "json",
       "process_generation": "number",
       "attention": "Attention?",
-      "queue": "QueueSnapshot?"
+      "queue": "QueueSnapshot?",
+      "pending_requests": "PendingRequest[]?",
+      "pending_count": "number?"
     },
     "Turn": {
       "id": "string",
@@ -335,7 +340,59 @@
       "outcome_detail": "string?",
       "planned_fingerprints": "string[]",
       "text_redacted": "boolean"
-    }
+    },
+    "PendingLifecycle": "'pending'|'native_resolved'|'cancelled'|'process_ended'|'process_unknown'",
+    "PendingPermissionRequest": {
+      "key": "string",
+      "revision": "number",
+      "run_id": "string",
+      "process_run_id": "string",
+      "lifecycle": "PendingLifecycle",
+      "default_to_no": "boolean",
+      "suppress_always": "boolean",
+      "reason_code": "string",
+      "bool_compatible": "boolean",
+      "family": "'command'|'file'|'tool'",
+      "target": "string?",
+      "choices": "string[]?"
+    },
+    "PendingQuestionOption": {
+      "label": "string",
+      "description": "string"
+    },
+    "PendingQuestionField": {
+      "key": "string",
+      "header": "string",
+      "question": "string",
+      "secret": "boolean",
+      "options": "PendingQuestionOption[]"
+    },
+    "PendingQuestionRequest": {
+      "key": "string",
+      "revision": "number",
+      "run_id": "string",
+      "process_run_id": "string",
+      "lifecycle": "PendingLifecycle",
+      "default_to_no": "boolean",
+      "suppress_always": "boolean",
+      "reason_code": "string",
+      "bool_compatible": "boolean",
+      "family": "'questions'",
+      "questions": "PendingQuestionField[]"
+    },
+    "PendingCapabilityRequest": {
+      "key": "string",
+      "revision": "number",
+      "run_id": "string",
+      "process_run_id": "string",
+      "lifecycle": "PendingLifecycle",
+      "default_to_no": "boolean",
+      "suppress_always": "boolean",
+      "reason_code": "string",
+      "bool_compatible": "boolean",
+      "family": "'permissions'|'form'|'external_form'|'url'|'verification'"
+    },
+    "PendingRequest": "PendingPermissionRequest|PendingQuestionRequest|PendingCapabilityRequest"
   },
   "events": {
     "task_created": {
@@ -508,6 +565,13 @@
     },
     "mods_applied": {
       "snapshot": "TurnModSnapshot"
+    },
+    "pending_request": "PendingRequest",
+    "pending_request_changed": "PendingRequest",
+    "native_request_diagnostic": {
+      "reason_code": "string",
+      "capability": "string",
+      "action": "string"
     }
   },
   "methods": {
@@ -3035,6 +3099,18 @@
       },
       "result": "json",
       "reason": "Local owner control; phone inspection is read-only"
+    },
+    "run.requests": {
+      "class": "read",
+      "summary": "Ordered safe native pending requests and their durable collection cursor",
+      "phone": "available",
+      "params": {
+        "run_id": "string?"
+      },
+      "result": {
+        "requests": "PendingRequest[]",
+        "cursor": "number"
+      }
     }
   }
 }

@@ -63,7 +63,7 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     ("mods.bind", NEVER), ("mods.unbind", NEVER),
     ("mods.preview", NEVER), ("mods.install", NEVER), ("mods.remove", NEVER),
     ("hello", "read"), ("state", "read"), ("harness.list", "read"), ("profile.list", "read"), ("profile.status", "read"),
-    ("repo.inspect", "read"), ("run.turns", "read"), ("run.active", "read"), ("run.raw_output", "read"), ("events.list", "read"),
+    ("repo.inspect", "read"), ("run.turns", "read"), ("run.active", "read"), ("run.raw_output", "read"), ("run.requests", "read"), ("events.list", "read"),
     ("events.subscribe", "read"), ("comparison.options", "read"), ("workspace.diff", "read"), ("workspace.status", "read"),
     ("workspace.cleanup_plan", "read"), ("account.usage", "read"), ("search", "read"), ("repo.files", "read"), ("workspace.changes", "read"),
     ("workspace.tree", "read"), ("account.list", "read"), ("workspace.pr_plan", "read"), ("workspace.merge_plan", "read"),

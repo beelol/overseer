@@ -2308,6 +2308,8 @@ impl Daemon {
             });
         }
         let mut recorded_meta = meta;
+        recorded_meta["native_protocol"] = crate::pending_requests::launch_qualification(
+            Path::new(&launch.program), &launch.env, &run.harness);
         recorded_meta["program"] = json!(launch.program);
         recorded_meta["args"] = json!(launch.args.iter().map(|a| redact(a)).collect::<Vec<_>>());
         recorded_meta["env_keys"] = json!(launch.env.keys().collect::<Vec<_>>());
@@ -2317,8 +2319,9 @@ impl Daemon {
         if record_before_spawn {
             // A crash or write failure after cmd.spawn must not leave a live
             // Auto supervisor with no durable identity to reconcile.
-            self.store.lock().unwrap().set_run_process(&run.id,
+            let changes = self.store.lock().unwrap().set_run_process(&run.id,
                 &run_dir.display().to_string(), generation, &recorded_meta)?;
+            for event in changes { let _ = self.events.send(event); }
         }
         self.store.lock().unwrap().mark_director_spawn_requested(&run.id)?;
         self.store.lock().unwrap().mark_worker_spawn_requested(&run.id)?;
@@ -2340,8 +2343,9 @@ impl Daemon {
             let _ = child.wait();
         });
         if !record_before_spawn {
-            self.store.lock().unwrap().set_run_process(&run.id,
+            let changes = self.store.lock().unwrap().set_run_process(&run.id,
                 &run_dir.display().to_string(), generation, &recorded_meta)?;
+            for event in changes { let _ = self.events.send(event); }
         }
         self.store.lock().unwrap().update_run_status(&run.id, "starting", None, None)?;
         {
@@ -2560,6 +2564,11 @@ impl Daemon {
         let (run, claimed) = {
             let store = self.store.lock().unwrap();
             let run = store.run(run_id)?.ok_or_else(|| anyhow!("unknown run {run_id}"))?;
+            if run.attention.as_ref().is_some_and(|a| a["typed_native"] == true
+                && a["request_id"].as_str() == Some(request_id)) {
+                return Err(crate::server::ProtoError::new("typed_delivery_unavailable",
+                    "This native request requires generation-bound typed delivery, which is not available yet").into());
+            }
             if always {
                 let offered = run.attention.as_ref().filter(|a| a["request_id"].as_str() == Some(request_id)).map(|a| !a["always"].is_null());
                 if offered == Some(false) {
@@ -2766,11 +2775,18 @@ impl Daemon {
         let mut pending_learning = Vec::new();
         {
             let store = self.store.lock().unwrap();
+            // A tail may have read its Run just before a generation replacement.
+            // Discard that old batch before events, attention or cursor mutation.
+            if !store.run(&run.id)?.is_some_and(|r| r.process_generation == run.process_generation) {
+                return Ok(());
+            }
             let tx = store.conn.unchecked_transaction()?;
             let root_native = if run.harness == "codex-app" { store.run(&run.id)?.and_then(|r| r.native_id) } else { None };
             for rec in lines {
                 let stream = rec["s"].as_str().unwrap_or("o");
                 let data = rec["d"].as_str().unwrap_or_default();
+                if crate::pending_requests::intercept(&store, run, stream, data,
+                    &mut emitted, &mut state.sends)? { continue; }
                 let mut norms = adapters::parse(&run.harness, stream, data);
                 if run.harness == "codex-app" && stream == "o" {
                     let thread = serde_json::from_str::<Value>(data).ok().and_then(|v| v["params"]["threadId"].as_str().map(str::to_string));
@@ -2785,6 +2801,8 @@ impl Daemon {
                         &mut emitted, &mut pending_learning)?;
                 }
             }
+            // Later output cannot clear waiting while another typed item is pending.
+            crate::pending_requests::refresh_attention(&store, run)?;
             store.set_run_cursor(&run.id, seg, off)?;
             state.since_prune += emitted.len();
             if state.since_prune > 500 {
@@ -3358,10 +3376,14 @@ impl Daemon {
         let process_gone = status != "disconnected" || self.run_processes_gone(&run.id);
         {
             let store = self.store.lock().unwrap();
+            if !store.run(&run.id)?.is_some_and(|r| r.process_generation == run.process_generation) {
+                return Ok(());
+            }
             store.conn.execute_batch("SAVEPOINT settle_run")?;
             let settled = (|| -> Result<()> {
                 let ended = now();
                 store.update_run_status(&run.id, status, Some(reason), Some(ended))?;
+                crate::pending_requests::retire(&store, run, process_gone, &mut emitted)?;
                 store.set_run_attention(&run.id, None)?;
                 let turn_status = if status == "completed" { "completed" } else { status };
                 store.finish_open_turns(&run.id, turn_status, ended)?;
@@ -3474,10 +3496,13 @@ impl Daemon {
         let meta = json!({"generic":generic,"program":launch.program,
             "args":launch.args.iter().map(|arg|redact(arg)).collect::<Vec<_>>(),
             "env_keys":launch.env.keys().collect::<Vec<_>>(),"orphan_reconciled":true});
-        if let Err(error) = store.set_run_process(
+        match store.set_run_process(
             &run.id,&dir.display().to_string(),run.process_generation+1,&meta) {
-            crate::log(&format!("director orphan reattachment deferred: {}",redact(&error.to_string())));
-            return Ok(false);
+            Ok(changes) => { for event in changes { let _ = self.events.send(event); } }
+            Err(error) => {
+                crate::log(&format!("director orphan reattachment deferred: {}",redact(&error.to_string())));
+                return Ok(false);
+            }
         }
         store.set_run_attention(&run.id,None)?;
         if live && !exited {
@@ -3544,10 +3569,13 @@ impl Daemon {
         let meta = json!({"generic":generic,"program":launch.program,
             "args":launch.args.iter().map(|arg|redact(arg)).collect::<Vec<_>>(),
             "env_keys":launch.env.keys().collect::<Vec<_>>(),"orphan_reconciled":true});
-        if let Err(error) = store.set_run_process(
+        match store.set_run_process(
             &run.id,&dir.display().to_string(),run.process_generation+1,&meta) {
-            crate::log(&format!("worker orphan reattachment deferred: {}",redact(&error.to_string())));
-            return Ok(false);
+            Ok(changes) => { for event in changes { let _ = self.events.send(event); } }
+            Err(error) => {
+                crate::log(&format!("worker orphan reattachment deferred: {}",redact(&error.to_string())));
+                return Ok(false);
+            }
         }
         store.set_run_attention(&run.id,None)?;
         if live && !exited { store.update_run_status(&run.id,"running",None,None)?; }
@@ -3832,6 +3860,10 @@ impl Daemon {
             }
             if let Some(id) = run["id"].as_str().map(str::to_string) {
                 run["queue"] = crate::overseer::session::stored_queue(&store, &id)?;
+                let pending = crate::pending_requests::collection(&store, Some(&id), include_hidden)?;
+                run["pending_requests"] = pending["requests"].clone();
+                run["pending_count"] = json!(pending["requests"].as_array().map(|r|
+                    r.iter().filter(|p| p["lifecycle"] == "pending").count()).unwrap_or(0));
             }
             // Why a failed agent stopped, in plain words, for every surface (AC-239); exit_reason
             // keeps the daemon's own record.
@@ -3905,7 +3937,11 @@ impl Daemon {
     }
 
     pub fn raw_output(&self, run_id: &str, max_bytes: usize) -> Result<Value> {
-        let process = self.store.lock().unwrap().run_process(run_id)?;
+        let (process, harness) = {
+            let store = self.store.lock().unwrap();
+            let run = store.run(run_id)?.ok_or_else(|| anyhow!("unknown run"))?;
+            (store.run_process(run_id)?, run.harness)
+        };
         let Some((dir, _, _)) = process else { return Ok(json!({"lines": [], "truncated": false})) };
         let dir = PathBuf::from(dir);
         let mut segments: Vec<u64> = (0..10_000).filter(|n| shim::segment_path(&dir, *n).exists()).collect();
@@ -3924,7 +3960,8 @@ impl Daemon {
                 }
                 if let Ok(mut rec) = serde_json::from_str::<Value>(line) {
                     if let Some(d) = rec["d"].as_str() {
-                        rec["d"] = json!(redact(d));
+                        rec["d"] = json!(crate::pending_requests::public_raw(&harness,
+                            rec["s"].as_str().unwrap_or("o"), d));
                     }
                     lines.push(rec);
                 }

@@ -1,6 +1,6 @@
 //! AC274 Slice1 boundary qualification. Frozen native-shaped scripts pass through
 //! the actual fixture stdout, shim, daemon socket and public event/raw projections.
-//! These authored tests are unexecuted until the coordinator grants Cargo.
+//! Baseline e4d8c7b: all 11 authored boundaries fail; see committed RED evidence.
 mod common;
 
 use common::*;
