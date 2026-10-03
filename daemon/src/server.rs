@@ -81,6 +81,31 @@ pub fn actor() -> Option<String> {
     ACTOR.with(|a| a.borrow().clone())
 }
 
+/// Typed reply authority comes only from an authenticated entrance. This is
+/// separate from display ACTOR; internal/model dispatch has no default owner.
+#[derive(Clone)]
+pub(crate) enum NativeAuthority {
+    LocalOwner,
+    Device(String),
+    ConfirmedVoice { request_key: String, revision: i64 },
+    ConfirmedOverseer { request_key: String, revision: i64, proposal: String },
+}
+thread_local! {
+    static NATIVE_AUTHORITY: std::cell::RefCell<Option<NativeAuthority>> = const { std::cell::RefCell::new(None) };
+}
+pub(crate) fn native_authority() -> Option<NativeAuthority> {
+    NATIVE_AUTHORITY.with(|a| a.borrow().clone())
+}
+pub(crate) fn with_native_authority<T>(authority: NativeAuthority, f: impl FnOnce() -> T) -> T {
+    struct Restore(Option<NativeAuthority>);
+    impl Drop for Restore {
+        fn drop(&mut self) { NATIVE_AUTHORITY.with(|a| *a.borrow_mut() = self.0.take()); }
+    }
+    let previous = NATIVE_AUTHORITY.with(|a| a.borrow_mut().replace(authority));
+    let _restore = Restore(previous);
+    f()
+}
+
 pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
     crate::audio::start(daemon.clone())?;
     crate::overseer::conflicts::start(daemon.clone());
@@ -290,7 +315,8 @@ async fn connection_loop(
             let result = {
                 let daemon = daemon.clone();
                 let method = method.clone();
-                tokio::task::spawn_blocking(move || dispatch(&daemon, &method, &params)).await
+                tokio::task::spawn_blocking(move || with_native_authority(NativeAuthority::LocalOwner,
+                    || dispatch(&daemon, &method, &params))).await
             };
             let reply = match result {
                 Ok(Ok(v)) => json!({"id": id, "result": v}),

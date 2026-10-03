@@ -364,6 +364,7 @@ pub struct Daemon {
     profile_gates: Mutex<BTreeMap<String, Arc<Mutex<()>>>>,
     workspace_gates: Mutex<BTreeMap<String, Arc<Mutex<()>>>>,
     work_unit_gates: Mutex<BTreeMap<String, std::sync::Weak<Mutex<()>>>>,
+    native_gates: Mutex<BTreeMap<String, std::sync::Weak<Mutex<()>>>>,
     pub events: broadcast::Sender<Event>,
     tails: Mutex<HashSet<String>>,
     pub(crate) swarm_launch_lock: Mutex<()>,
@@ -451,7 +452,7 @@ impl Daemon {
         let bus = std::env::var("OVERSEER_TEST_EVENT_BUS").ok().and_then(|v| v.parse::<usize>().ok()).filter(|n| *n >= 16).unwrap_or(4096);
         let (tx, _) = broadcast::channel(bus);
         let exe = std::env::current_exe()?;
-        let daemon = Arc::new(Self { store: Mutex::new(store), profile_gates: Mutex::new(BTreeMap::new()), workspace_gates: Mutex::new(BTreeMap::new()), work_unit_gates: Mutex::new(BTreeMap::new()), events: tx, tails: Mutex::new(HashSet::new()), swarm_launch_lock: Mutex::new(()), swarm_integration_lock: Mutex::new(()), swarm_storage_blocked: std::sync::atomic::AtomicBool::new(false), exe, started_ms: now(), learning_paused: std::sync::atomic::AtomicBool::new(learning_paused),
+        let daemon = Arc::new(Self { store: Mutex::new(store), profile_gates: Mutex::new(BTreeMap::new()), workspace_gates: Mutex::new(BTreeMap::new()), work_unit_gates: Mutex::new(BTreeMap::new()), native_gates: Mutex::new(BTreeMap::new()), events: tx, tails: Mutex::new(HashSet::new()), swarm_launch_lock: Mutex::new(()), swarm_integration_lock: Mutex::new(()), swarm_storage_blocked: std::sync::atomic::AtomicBool::new(false), exe, started_ms: now(), learning_paused: std::sync::atomic::AtomicBool::new(learning_paused),
             learning_usage_paused: std::sync::atomic::AtomicBool::new(false), learning_work_paused: std::sync::atomic::AtomicBool::new(false),
             learning_thread_paused: std::sync::atomic::AtomicBool::new(false), learning_account_paused: std::sync::atomic::AtomicBool::new(false),
             learning_maintenance_paused: std::sync::atomic::AtomicBool::new(false),
@@ -630,6 +631,24 @@ impl Daemon {
         let gate = Arc::new(Mutex::new(()));
         gates.insert(id.to_string(), Arc::downgrade(&gate));
         gate
+    }
+
+    /// Native authority order is device -> actual process owner -> Store.
+    /// Registry mutex is dropped before any returned gate is acquired.
+    fn native_gate(&self, kind: &str, id: &str) -> Arc<Mutex<()>> {
+        let mut gates = self.native_gates.lock().unwrap();
+        gates.retain(|_, gate| gate.strong_count() > 0);
+        let key = format!("{kind}:{id}");
+        if let Some(gate) = gates.get(&key).and_then(std::sync::Weak::upgrade) { return gate; }
+        let gate = Arc::new(Mutex::new(()));
+        gates.insert(key, Arc::downgrade(&gate));
+        gate
+    }
+    pub(crate) fn native_process_gate(&self, owner: &str) -> Arc<Mutex<()>> {
+        self.native_gate("process", owner)
+    }
+    pub(crate) fn native_device_gate(&self, device: &str) -> Arc<Mutex<()>> {
+        self.native_gate("device", device)
     }
 
     fn workspace_gate(&self, id: &str) -> Arc<Mutex<()>> {
@@ -2084,6 +2103,8 @@ impl Daemon {
         if follow_up && !continuity && ACTIVE.contains(&run.status.as_str()) {
             if let Some(line) = adapters::follow_up_via_stdin(&run.harness, prompt) {
                 external_effect_attempted = true;
+                let gate = self.native_process_gate(&run.id);
+                let _process = gate.lock().unwrap();
                 self.send_stdin(&run, &line)?;
                 return Ok(());
             }
@@ -2271,6 +2292,11 @@ impl Daemon {
     }
 
     fn spawn_process(self: &Arc<Self>, run: &Run, ws: &Workspace, launch: adapters::Launch, meta: Value) -> Result<()> {
+        let gate = self.native_process_gate(&run.id);
+        let _process = gate.lock().unwrap();
+        if !self.store.lock().unwrap().run(&run.id)?.is_some_and(|r| r.process_generation == run.process_generation) {
+            bail!("run process changed before launch");
+        }
         let generation = run.process_generation + 1;
         let run_dir = paths::runs_dir().join(&run.id).join(format!("p{generation}"));
         paths::ensure_private_dir(&run_dir)?;
@@ -2284,6 +2310,8 @@ impl Daemon {
                 .ok_or_else(|| anyhow!("automatic child turn start is unavailable"))? as u64;
             Some(started.saturating_add(budget))
         } else { None };
+        let qualification = crate::pending_requests::launch_qualification(
+            Path::new(&launch.program), &launch.env, &run.harness);
         let file = LaunchFile {
             program: launch.program.clone(),
             args: launch.args.clone(),
@@ -2293,6 +2321,7 @@ impl Daemon {
             close_stdin: launch.close_stdin,
             control_socket: control.display().to_string(),
             auto_execution_deadline_ms,
+            native_reply_generation: (qualification["qualification"] == "codec").then_some(generation),
         };
         std::fs::write(run_dir.join("launch.json"), serde_json::to_vec_pretty(&file)?)?;
         if run.harness == "codex-app" && (run.relation_source.as_deref() == Some("managed-delegation")
@@ -2313,8 +2342,7 @@ impl Daemon {
             });
         }
         let mut recorded_meta = meta;
-        recorded_meta["native_protocol"] = crate::pending_requests::launch_qualification(
-            Path::new(&launch.program), &launch.env, &run.harness);
+        recorded_meta["native_protocol"] = qualification;
         recorded_meta["program"] = json!(launch.program);
         recorded_meta["args"] = json!(launch.args.iter().map(|a| redact(a)).collect::<Vec<_>>());
         recorded_meta["env_keys"] = json!(launch.env.keys().collect::<Vec<_>>());
@@ -2400,7 +2428,13 @@ impl Daemon {
     }
 
     pub(crate) fn control_socket(&self, run: &Run) -> Result<PathBuf> {
-        let (dir, _, _) = self.store.lock().unwrap().run_process(&run.id)?.ok_or_else(|| anyhow!("run has no process"))?;
+        let dir = {
+            let store = self.store.lock().unwrap();
+            if !store.run(&run.id)?.is_some_and(|r| r.process_generation == run.process_generation) {
+                bail!("run process changed");
+            }
+            store.run_process(&run.id)?.ok_or_else(|| anyhow!("run has no process"))?.0
+        };
         let launch: LaunchFile = serde_json::from_slice(&std::fs::read(Path::new(&dir).join("launch.json"))?)?;
         Ok(PathBuf::from(launch.control_socket))
     }
@@ -2473,6 +2507,10 @@ impl Daemon {
                 }
             }
         }
+        let gate = self.native_process_gate(run_id);
+        let _process = gate.lock().unwrap();
+        let run = self.run(run_id)?;
+        if !ACTIVE.contains(&run.status.as_str()) { bail!("run is not active"); }
         let (dir, _, _) = self.store.lock().unwrap().run_process(run_id)?.ok_or_else(|| anyhow!("run has no process"))?;
         let budget_marker = Path::new(&dir).join("auto-budget.requested");
         let first_budget_stop = auto_budget_ms.is_some() && !budget_marker.exists();
@@ -2776,6 +2814,8 @@ impl Daemon {
     }
 
     fn apply_lines(self: &Arc<Self>, run: &Run, lines: &[Value], seg: i64, off: i64, state: &mut TailState) -> Result<()> {
+        let process_gate = self.native_process_gate(&run.id);
+        let _process = process_gate.lock().unwrap();
         let mut emitted = Vec::new();
         let mut pending_learning = Vec::new();
         {
@@ -3333,6 +3373,11 @@ impl Daemon {
     }
 
     fn finalize(&self, run: &Run, dir: &Path, exit: &ExitInfo, state: &TailState) -> Result<()> {
+        let gate = self.native_process_gate(&run.id);
+        let _process = gate.lock().unwrap();
+        if !self.store.lock().unwrap().run(&run.id)?.is_some_and(|r| r.process_generation == run.process_generation) {
+            return Ok(());
+        }
         let interrupted = dir.join("interrupt.requested").exists();
         let auto_budget = dir.join("auto-budget.requested").exists();
         if auto_budget {
@@ -3371,10 +3416,12 @@ impl Daemon {
         if crate::handoff::park(self, run, status, state.last_error.as_ref(), dir)? {
             return Ok(());
         }
-        self.mark_ended(run, status, &reason)
+        self.mark_ended_checked(run, status, &reason, false)
     }
 
     pub(crate) fn mark_ended(&self, run: &Run, status: &str, reason: &str) -> Result<()> {
+        let gate = self.native_process_gate(&run.id);
+        let _process = gate.lock().unwrap();
         self.mark_ended_checked(run, status, reason, false)
     }
 
@@ -3382,6 +3429,8 @@ impl Daemon {
     /// generation may have advanced before exec failed, leaving no supervisor.
     /// This does not let a stale observed tail rebind itself to a newer process.
     fn mark_failed_unstarted(&self, run: &Run, reason: &str) -> Result<()> {
+        let gate = self.native_process_gate(&run.id);
+        let _process = gate.lock().unwrap();
         self.mark_ended_checked(run, "failed", reason, true)
     }
 
@@ -3514,7 +3563,12 @@ impl Daemon {
         if !exited && !live {
             return Ok(false);
         }
+        let gate = self.native_process_gate(&run.id);
+        let _process = gate.lock().unwrap();
         let store = self.store.lock().unwrap();
+        if !store.run(&run.id)?.is_some_and(|r| r.process_generation == run.process_generation) {
+            return Ok(false);
+        }
         let prior: Option<String> = store.conn.query_row(
             "SELECT launch FROM runs WHERE id=?1", [&run.id], |r| r.get(0))?;
         let generic: Value = prior.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(Value::Null);
@@ -3587,7 +3641,12 @@ impl Daemon {
             .and_then(|raw| serde_json::from_slice::<ShimInfo>(&raw).ok())
             .is_some_and(|info| pid_alive(info.shim_pid));
         if !exited && !live { return Ok(false) }
+        let gate = self.native_process_gate(&run.id);
+        let _process = gate.lock().unwrap();
         let store = self.store.lock().unwrap();
+        if !store.run(&run.id)?.is_some_and(|r| r.process_generation == run.process_generation) {
+            return Ok(false);
+        }
         let prior: Option<String> = store.conn.query_row(
             "SELECT launch FROM runs WHERE id=?1", [&run.id], |r| r.get(0))?;
         let generic: Value = prior.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(Value::Null);

@@ -48,3 +48,11 @@ Existing Voice `ReadBack` and `Answering` carry request ID but no revision; exis
 - device_revocation_after_claim_before_send_prevents_held_reply: real durable claim then acknowledged revocation; authoritative presend restoration requires a fresh revision/local action, old phone first result immutable.
 
 Other approved held fixtures (partial pipe, lost ack/query, crash, full-phone vs local arbitration, compatible voice, external refusal) remain required before Slice2 acceptance. These tests and later source are neither shippable nor a full/native/browser/three-surface claim. Compiler remains held by coordinator; no tests in this checkpoint were run.
+
+Source-authoring clarification: `Store::run_process` returns `(run_dir, segment, seg_offset)`, not process generation. All exact-generation checks read `Store::run` under the same Store guard; no tuple cursor is treated as authority. LaunchFile typed generation is daemon-issued and separately validated.
+
+## First grounded runtime source checkpoint (uncompiled)
+
+Implements private shim receipt ops, qualified LaunchFile generation, typed aggregate nonblocking control helper, process/device gate call sites from the table and separate RAII trusted entrance context. `native_reply.rs` stores only token/generation/digest/static state, flushes prepared file + directory before touching stdin, and never records typed stdin bytes in segments. Same token returns its existing receipt without reacquiring stdin; old LaunchFiles refuse native_unqualified. Receipt/state errors are static allowlists. The known baseline unknown private operation grounds this implementation; new held tests remain unexecuted and no race outcome is claimed.
+
+The typed answer endpoint, claim/attempt migration, held hooks, confirmation revision capture and receipt reconciliation are not wired yet. Thus trusted context has no new answer behavior and typed permissions remain unanswerable. Gate call-site changes and receipt source require independent review + exact compiler freshness/qualification once coordinator grants the slot; Rust parsing alone does not qualify them. No full/ship/browser/native model claim.

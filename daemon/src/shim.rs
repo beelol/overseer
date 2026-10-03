@@ -15,6 +15,8 @@ use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{self, Sender};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+pub(crate) mod native_reply;
+
 pub const SEGMENT_BYTES: u64 = 8 * 1024 * 1024;
 pub const MAX_LINE_BYTES: usize = 256 * 1024;
 
@@ -35,6 +37,10 @@ pub struct LaunchFile {
     /// even when its owning daemon is unavailable.
     #[serde(default)]
     pub auto_execution_deadline_ms: Option<u64>,
+    /// Present only for a daemon-qualified native codec launch. Old files cannot
+    /// acquire typed reply authority merely by naming a control operation.
+    #[serde(default)]
+    pub native_reply_generation: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -307,6 +313,7 @@ pub fn run(dir: PathBuf) -> anyhow::Result<()> {
         let _ = std::fs::set_permissions(&sock_path, std::fs::Permissions::from_mode(0o600));
     }
     let uid = unsafe { libc::getuid() };
+    let native_replies = Arc::new(native_reply::Replies::new(&dir, launch.native_reply_generation));
     {
         let stdin = stdin.clone();
         let out = out.clone();
@@ -319,7 +326,8 @@ pub fn run(dir: PathBuf) -> anyhow::Result<()> {
                 let stdin = stdin.clone();
                 let out = out.clone();
                 let metadata_replies = metadata_replies.clone();
-                std::thread::spawn(move || handle_control(conn, stdin, out, metadata_replies, child_pid));
+                let native_replies = native_replies.clone();
+                std::thread::spawn(move || handle_control(conn, stdin, out, metadata_replies, native_replies, child_pid));
             }
         });
     }
@@ -366,7 +374,8 @@ pub fn peer_uid_fd(fd: i32) -> Option<u32> {
 }
 
 fn handle_control(conn: UnixStream, stdin: Arc<Mutex<Option<std::process::ChildStdin>>>,
-    out: Arc<Mutex<SegmentWriter>>, pending: MetadataReplies, child_pid: u32) {
+    out: Arc<Mutex<SegmentWriter>>, pending: MetadataReplies,
+    native_replies: Arc<native_reply::Replies>, child_pid: u32) {
     let mut writer = match conn.try_clone() {
         Ok(w) => w,
         Err(_) => return,
@@ -430,6 +439,7 @@ fn handle_control(conn: UnixStream, stdin: Arc<Mutex<Option<std::process::ChildS
                         }
                     }
                 }
+                Some("request_reply" | "request_reply_status") => native_replies.handle(&msg, &stdin),
                 Some("stdin") => {
                     let data = msg["data"].as_str().unwrap_or_default();
                     let mut guard = stdin.lock().unwrap();

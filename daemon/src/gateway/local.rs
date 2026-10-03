@@ -70,8 +70,11 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "gateway.devices" => json!({"devices": devices(d)?}),
         "gateway.device_revoke" => {
             let id = text(p, "id")?;
+            let authority = d.native_device_gate(id);
+            let guard = authority.lock().unwrap();
             let device = d.store.lock().unwrap().device(id)?.ok_or_else(|| anyhow!("no such device"))?;
             let changed = d.store.lock().unwrap().device_revoke(id, super::now_ms())?;
+            drop(guard); // Durable authority changes precede session closure.
             let closed = super::end_sessions(d, |s| s.device_id == id, "revoked");
             if changed {
                 d.emit(None, None, "device_revoked", "gateway", "exact", json!({"device": id, "name": device.name, "closed": closed}))?;
@@ -81,9 +84,12 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "gateway.device_scope" => {
             let id = text(p, "id")?;
             let scope = Scope::parse(text(p, "scope")?).ok_or_else(|| anyhow!("scope is full or watch"))?;
+            let authority = d.native_device_gate(id);
+            let guard = authority.lock().unwrap();
             if !d.store.lock().unwrap().device_set_scope(id, scope.as_str())? {
                 bail!("no such device, or it was revoked");
             }
+            drop(guard);
             d.emit(None, None, "device_scope", "gateway", "exact", json!({"device": id, "scope": scope.as_str()}))?;
             json!({"device": id, "scope": scope.as_str()})
         }
