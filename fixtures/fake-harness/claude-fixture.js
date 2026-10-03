@@ -131,7 +131,8 @@ async function mcpClient(requestTimeoutMs = 0) {
   child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
   const tools = (await request('tools/list', {})).tools.map(t => t.name);
   out({ type: 'system', subtype: 'mcp_ready', mcp_servers: [{ name, status: 'connected' }], tools: tools.map(t => `mcp__${name}__${t}`) });
-  return { tools, call: (tool, args) => request('tools/call', { name: tool, arguments: args }), close: () => child.kill() };
+  const closed = new Promise(resolve => child.once('exit', (code, signal) => resolve({ code, signal })));
+  return { tools, call: (tool, args) => request('tools/call', { name: tool, arguments: args }), close: () => child.kill(), closed, pid: child.pid };
 }
 
 (async () => {
@@ -458,6 +459,43 @@ async function mcpClient(requestTimeoutMs = 0) {
     // A failed turn whose reason arrives once, as the result text.
     assistant([{ type: 'text', text: 'Trying the migration…' }]);
     result(true, 'Migration failed: relation users_v2 does not exist');
+  } else if (mode === 'overseer-cancel-pending-propose') {
+    // One real MCP request can remain daemon-received after its native caller
+    // is canceled. Do not preserve the transport or forge a completed turn.
+    const dir = process.env.CLAUDE_FIXTURE_PROPOSE_GATE_DIR;
+    if (!dir) throw new Error('missing interrupted native fixture directory');
+    const mcp = await mcpClient(30000);
+    if (!mcp) throw new Error('interrupted native fixture needs actual launch MCP config');
+    try {
+      const actions = JSON.parse(fs.readFileSync(path.join(dir, 'actions.json'), 'utf8'));
+      const tool = 'mcp__overseer__propose';
+      assistant([{ type: 'tool_use', id: 'toolu_interrupted_native', name: tool, input: { actions } }]);
+      out({ type: 'control_request', request_id: 'req-interrupted-native', request: { subtype: 'can_use_tool', tool_name: tool, input: { actions } } });
+      const permission = await Promise.race([
+        next(m => m.type === 'control_response' && m.response?.request_id === 'req-interrupted-native'),
+        sleep(15000).then(() => { throw new Error('interrupted native permission timed out'); })
+      ]);
+      if (permission.response.response.behavior !== 'allow') throw new Error('interrupted native permission refused');
+      const call = mcp.call('propose', { actions }).then(reply => ({ reply }), error => ({ error: error.message }));
+      const outcome = await Promise.race([
+        call,
+        next(m => m.type === 'control_request' && m.request?.subtype === 'interrupt').then(() => ({ interrupted: true })),
+        sleep(25000).then(() => { throw new Error('interrupted native call received no cancellation'); })
+      ]);
+      if (!outcome.interrupted) throw new Error('native request returned before actual interrupt: ' + JSON.stringify(outcome));
+      mcp.close();
+      const exit = await Promise.race([
+        mcp.closed,
+        sleep(5000).then(() => { throw new Error('interrupted MCP child did not exit'); })
+      ]);
+      fs.writeFileSync(path.join(dir, 'canceled.json.part'), JSON.stringify({ actual_interrupt: true, mcp_pid: mcp.pid, mcp_exit: exit }));
+      fs.renameSync(path.join(dir, 'canceled.json.part'), path.join(dir, 'canceled.json'));
+      result(true, 'interrupted');
+      await sleep(50);
+      process.exit(130);
+    } finally {
+      mcp.close();
+    }
   } else if (mode === 'overseer-gated-propose') {
     // AC-200: load this turn's actual native MCP config before a new conversation can
     // replace it, then hold one call until the test establishes that later owner cause.
