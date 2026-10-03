@@ -1597,69 +1597,146 @@ impl Daemon {
 
     // ------------------------------------------------------------------ the queue (AC-188's first half)
 
+    pub(crate) fn queue_owner(&self, run_id: &str) -> String {
+        self.store.lock().unwrap().conn.query_row("SELECT owner_id FROM queue_owners WHERE run_id=?1", [run_id], |r| r.get(0)).unwrap_or_else(|_| run_id.to_string())
+    }
+
     /// A message for an agent: delivered now when it is idle, else when its turn ends. Returns
     /// "sent" or "queued".
     pub fn queue_message(self: &Arc<Self>, run_id: &str, text: &str, source: &str, detail: Value) -> Result<String> {
+        let owner = self.queue_owner(run_id);
+        let run_id = owner.as_str();
+        let gate = self.work_unit_gate(&format!("queue:{run_id}"));
+        let _guard = gate.lock().unwrap();
+        if self.queue_owner(run_id) != owner { drop(_guard); return self.queue_message(run_id, text, source, detail); }
         let run = self.run(run_id)?;
         if run.parent_run_id.is_some() {
             bail!("{} is a native child; it is steered through its parent", run.title);
         }
         let prompt = if source == "overseer" { format!("{FROM_OVERSEER}{text}") } else { text.to_string() };
+        let queue = self.queued_messages(run_id)?;
         let held = self.hold_of(run_id).is_some();
-        let idle = !held && (!ACTIVE.contains(&run.status.as_str()) || crate::adapters::follow_up_via_stdin(&run.harness, text).is_some());
+        let idle = queue["paused"] != true && queue["queued"].as_array().is_some_and(Vec::is_empty) && !held && (!ACTIVE.contains(&run.status.as_str()) || crate::adapters::follow_up_via_stdin(&run.harness, text).is_some());
         if idle {
             let turn = self.start_turn(run_id, &prompt, true, &TurnOpts { model: None, effort: None, mode: None, images: Vec::new(), ..Default::default() })?;
             self.store.lock().unwrap().conn.execute("INSERT OR REPLACE INTO turn_sources(turn_id, source, detail) VALUES(?1, ?2, ?3)", rusqlite::params![turn.id, source, detail.to_string()])?;
             return Ok("sent".into());
         }
         let store = self.store.lock().unwrap();
+        let current: String = store.conn.query_row("SELECT owner_id FROM queue_owners WHERE run_id=?1", [run_id], |r| r.get(0)).unwrap_or_else(|_| run_id.to_string());
+        if current != owner { drop(store); drop(_guard); return self.queue_message(&current, text, source, detail); }
         store.conn.execute("INSERT INTO queued_messages(run_id, ts, source, text, detail) VALUES(?1, ?2, ?3, ?4, ?5)", rusqlite::params![run_id, crate::daemon::now(), source, prompt, detail.to_string()])?;
         drop(store);
         self.emit(Some(&run.task_id), Some(run_id), "queued", source, "exact", json!({"text": text, "detail": detail}))?;
         Ok("queued".into())
     }
 
-    /// When an agent's turn ends, the messages queued for it become its next turn.
+    /// Explicit Stop persists the pause before the interruption can finish the current turn.
+    pub(crate) fn pause_queue(&self, run_id: &str) -> Result<String> {
+        // Continuity publishes queue ownership in the same transaction as the messages. Resolve
+        // again after taking the delivery gate: migration may have happened while we waited.
+        loop {
+            let owner: String = self.store.lock().unwrap().conn.query_row("SELECT owner_id FROM queue_owners WHERE run_id=?1", [run_id], |r| r.get(0)).unwrap_or_else(|_| run_id.to_string());
+            let gate = self.work_unit_gate(&format!("queue:{owner}"));
+            let _guard = gate.lock().unwrap();
+            {
+                let store = self.store.lock().unwrap();
+                let current: String = store.conn.query_row("SELECT owner_id FROM queue_owners WHERE run_id=?1", [run_id], |r| r.get(0)).unwrap_or_else(|_| run_id.to_string());
+                if current != owner { continue; }
+                store.conn.execute("INSERT INTO queue_states(run_id, paused, serial) VALUES(?1, 1, 1) ON CONFLICT(run_id) DO UPDATE SET paused=1, serial=1", [&owner])?;
+            }
+            let run = self.run(&owner)?;
+            self.emit(Some(&run.task_id), Some(&owner), "queue_changed", "owner", "exact", json!({"paused":true}))?;
+            return Ok(owner);
+        }
+    }
+
+    /// Owner surfaces alone call this. It is deliberately unavailable as an Overseer action/tool.
+    pub fn resume_queue(self: &Arc<Self>, run_id: &str) -> Result<Value> {
+        let owner = self.queue_owner(run_id);
+        let run_id = owner.as_str();
+        let run = self.run(run_id)?;
+        if run.parent_run_id.is_some() { bail!("native children take messages through their parent"); }
+        {
+            let gate = self.work_unit_gate(&format!("queue:{run_id}"));
+            let _guard = gate.lock().unwrap();
+            if self.queue_owner(run_id) != owner { drop(_guard); return self.resume_queue(run_id); }
+            self.store.lock().unwrap().conn.execute("UPDATE queue_states SET paused=0 WHERE run_id=COALESCE((SELECT owner_id FROM queue_owners WHERE run_id=?1), ?1)", [run_id])?;
+            self.emit(Some(&run.task_id), Some(run_id), "queue_changed", "owner", "exact", json!({"paused":false}))?;
+        }
+        self.deliver_queued(run_id)?;
+        self.queued_messages(run_id)
+    }
+
+    /// A clear/remove never resumes the queue; even an empty paused queue stays paused.
+    pub fn clear_queue(&self, run_id: &str) -> Result<Value> {
+        let owner = self.queue_owner(run_id);
+        let run_id = owner.as_str();
+        let run = self.run(run_id)?;
+        let gate = self.work_unit_gate(&format!("queue:{run_id}"));
+        let _guard = gate.lock().unwrap();
+        if self.queue_owner(run_id) != owner { drop(_guard); return self.clear_queue(run_id); }
+        let removed = self.store.lock().unwrap().conn.execute("DELETE FROM queued_messages WHERE run_id=COALESCE((SELECT owner_id FROM queue_owners WHERE run_id=?1), ?1) AND delivered_ms IS NULL", [run_id])?;
+        self.emit(Some(&run.task_id), Some(run_id), "queue_changed", "owner", "exact", json!({"removed":removed}))?;
+        Ok(json!({"removed":removed}))
+    }
+
+    /// Normal additions keep their batching. A stopped/resumed queue sends one FIFO item per turn.
     pub(crate) fn deliver_queued(self: &Arc<Self>, run_id: &str) -> Result<()> {
+        let owner = self.queue_owner(run_id);
+        let run_id = owner.as_str();
+        let gate = self.work_unit_gate(&format!("queue:{run_id}"));
+        let _guard = gate.lock().unwrap();
+        if self.queue_owner(run_id) != owner { drop(_guard); return self.deliver_queued(run_id); }
         let pending: Vec<(i64, String, String, String)> = {
             let store = self.store.lock().unwrap();
-            let mut stmt = store.conn.prepare("SELECT rowid, source, text, detail FROM queued_messages WHERE run_id=?1 AND delivered_ms IS NULL ORDER BY rowid")?;
-            let rows = stmt.query_map([run_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?.collect::<rusqlite::Result<_>>()?;
+            let current: String = store.conn.query_row("SELECT owner_id FROM queue_owners WHERE run_id=?1", [run_id], |r| r.get(0)).unwrap_or_else(|_| run_id.to_string());
+            if current != owner { drop(store); drop(_guard); return self.deliver_queued(&current); }
+            let state: (bool, bool) = store.conn.query_row("SELECT paused, serial FROM queue_states WHERE run_id=?1", [run_id], |r| Ok((r.get(0)?, r.get(1)?))).unwrap_or((false, false));
+            if state.0 { return Ok(()); }
+            let mut stmt = store.conn.prepare("SELECT rowid, source, text, detail FROM queued_messages WHERE run_id=?1 AND delivered_ms IS NULL ORDER BY rowid LIMIT ?2")?;
+            let rows = stmt.query_map(rusqlite::params![run_id, if state.1 { 1 } else { -1 }], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?.collect::<rusqlite::Result<_>>()?;
             rows
         };
         if pending.is_empty() {
+            self.store.lock().unwrap().conn.execute("DELETE FROM queue_states WHERE run_id=?1 AND paused=0", [run_id])?;
             return Ok(());
         }
         let run = self.run(run_id)?;
-        if ACTIVE.contains(&run.status.as_str()) || self.hold_of(run_id).is_some() {
-            return Ok(());
-        }
+        if ACTIVE.contains(&run.status.as_str()) || self.hold_of(run_id).is_some() { return Ok(()); }
         let text = pending.iter().map(|(_, _, t, _)| t.clone()).collect::<Vec<_>>().join("\n\n");
-        let turn = self.start_turn(run_id, &text, true, &TurnOpts { model: None, effort: None, mode: None, images: Vec::new(), ..Default::default() })?;
-        let store = self.store.lock().unwrap();
-        let source = pending[0].1.clone();
-        store.conn.execute("INSERT OR REPLACE INTO turn_sources(turn_id, source, detail) VALUES(?1, ?2, ?3)", rusqlite::params![turn.id, source, pending[0].3])?;
-        for (rowid, _, _, _) in &pending {
-            store.conn.execute("UPDATE queued_messages SET delivered_ms=?2, turn_id=?3 WHERE rowid=?1", rusqlite::params![rowid, crate::daemon::now(), turn.id])?;
+        let detail: Value = serde_json::from_str(&pending[0].3).unwrap_or(json!({}));
+        let opts = if detail["options"].is_object() { TurnOpts::from_params(&detail["options"])? } else { TurnOpts::default() };
+        let turn = self.start_turn(run_id, &text, true, &opts)?;
+        {
+            let store = self.store.lock().unwrap();
+            store.conn.execute("INSERT OR REPLACE INTO turn_sources(turn_id, source, detail) VALUES(?1, ?2, ?3)", rusqlite::params![turn.id, pending[0].1, pending[0].3])?;
+            for (rowid, _, _, _) in &pending {
+                store.conn.execute("UPDATE queued_messages SET delivered_ms=?2, turn_id=?3 WHERE rowid=?1", rusqlite::params![rowid, crate::daemon::now(), turn.id])?;
+            }
+            store.conn.execute("DELETE FROM queue_states WHERE run_id=?1 AND paused=0 AND NOT EXISTS(SELECT 1 FROM queued_messages WHERE run_id=?1 AND delivered_ms IS NULL)", [run_id])?;
         }
+        self.emit(Some(&run.task_id), Some(run_id), "queue_changed", "daemon", "exact", json!({"delivered":pending.len()}))?;
         Ok(())
     }
 
-    /// Queued messages for a run, for the UI.
+    /// Queued messages for a run, for every surface.
     pub fn queued_messages(&self, run_id: &str) -> Result<Value> {
         let store = self.store.lock().unwrap();
-        let mut stmt = store.conn.prepare("SELECT rowid, ts, source, text, detail FROM queued_messages WHERE run_id=?1 AND delivered_ms IS NULL ORDER BY rowid")?;
-        let rows: Vec<Value> = stmt
-            .query_map([run_id], |r| {
-                let detail: Value = r.get::<_, Option<String>>(4)?.and_then(|d| serde_json::from_str(&d).ok()).unwrap_or(json!({}));
-                Ok(json!({"id": r.get::<_, i64>(0)?, "ts": r.get::<_, i64>(1)?, "source": r.get::<_, String>(2)?, "text": r.get::<_, String>(3)?, "redirect": detail["redirect"] == true}))
-            })?
-            .collect::<rusqlite::Result<_>>()?;
-        Ok(json!({"queued": rows}))
+        let owner: String = store.conn.query_row("SELECT owner_id FROM queue_owners WHERE run_id=?1", [run_id], |r| r.get(0)).unwrap_or_else(|_| run_id.to_string());
+        let queue = stored_queue(&store, &owner)?;
+        Ok(json!({"paused":queue["paused"], "queued":queue["messages"]}))
     }
 
     pub fn unqueue_message(&self, run_id: &str, id: i64) -> Result<Value> {
-        let n = self.store.lock().unwrap().conn.execute("DELETE FROM queued_messages WHERE run_id=?1 AND rowid=?2 AND delivered_ms IS NULL", rusqlite::params![run_id, id])?;
+        let owner = self.queue_owner(run_id);
+        let run_id = owner.as_str();
+        let run = self.run(run_id)?;
+        let gate = self.work_unit_gate(&format!("queue:{run_id}"));
+        let _guard = gate.lock().unwrap();
+        if self.queue_owner(run_id) != owner { drop(_guard); return self.unqueue_message(run_id, id); }
+        let n = self.store.lock().unwrap().conn.execute("DELETE FROM queued_messages WHERE run_id=COALESCE((SELECT owner_id FROM queue_owners WHERE run_id=?1), ?1) AND rowid=?2 AND delivered_ms IS NULL", rusqlite::params![run_id, id])?;
+        self.emit(Some(&run.task_id), Some(run_id), "queue_changed", "owner", "exact", json!({"removed":n,"id":id}))?;
         Ok(json!({"removed": n}))
     }
 
@@ -1943,4 +2020,15 @@ pub(crate) fn blocked_on_permission(run: &crate::store::Run) -> Option<String> {
     }
     let tool = a["tool"].as_str().filter(|t| !t.is_empty()).map(|t| format!(" to use {t}")).unwrap_or_default();
     Some(format!("{} is blocked on your permission{tool}", run.title))
+}
+
+/// One durable queue snapshot, read while the caller holds the store (also used by state).
+pub(crate) fn stored_queue(store: &crate::store::Store, run_id: &str) -> Result<Value> {
+    let paused: bool = store.conn.query_row("SELECT paused FROM queue_states WHERE run_id=?1", [run_id], |r| r.get(0)).unwrap_or(false);
+    let mut stmt = store.conn.prepare("SELECT rowid, ts, source, text, detail FROM queued_messages WHERE run_id=?1 AND delivered_ms IS NULL ORDER BY rowid")?;
+    let messages: Vec<Value> = stmt.query_map([run_id], |r| {
+        let detail: Value = r.get::<_, Option<String>>(4)?.and_then(|d| serde_json::from_str(&d).ok()).unwrap_or(json!({}));
+        Ok(json!({"id":r.get::<_, i64>(0)?, "ts":r.get::<_, i64>(1)?, "source":r.get::<_, String>(2)?, "text":r.get::<_, String>(3)?, "redirect":detail["redirect"] == true}))
+    })?.collect::<rusqlite::Result<_>>()?;
+    Ok(json!({"paused":paused,"messages":messages}))
 }

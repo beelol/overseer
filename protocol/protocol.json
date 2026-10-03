@@ -2757,6 +2757,22 @@
         "ok": "boolean",
         "kept": "number"
       }
+    },
+    "run.resume_queue": {
+      "class": "mac_only",
+      "summary": "Send an agent\u2019s paused queue",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "run.clear_queue": {
+      "class": "mac_only",
+      "summary": "Clear an agent\u2019s queue",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
     }
   }
 }

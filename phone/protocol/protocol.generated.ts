@@ -1239,6 +1239,10 @@ export interface Methods {
     ok: boolean;
     kept: number;
   } };
+  /** Send an agent’s paused queue. */
+  "run.resume_queue": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Clear an agent’s queue. */
+  "run.clear_queue": { class: 'mac_only'; params: unknown; result: unknown };
 }
 
 export type MethodName = keyof Methods;
@@ -1514,6 +1518,8 @@ export const METHOD_CLASS = {
   "swarm.worker.reconcile": 'mac_only',
   "menubar.snapshot": 'mac_only',
   "review.seen": 'mac_only',
+  "run.resume_queue": 'mac_only',
+  "run.clear_queue": 'mac_only',
 } as const satisfies Record<MethodName, MethodClass>;
 
 export type PhoneMethod = { [K in MethodName]: Methods[K]['class'] extends 'mac_only' ? never : K }[MethodName];

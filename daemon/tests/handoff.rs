@@ -855,3 +855,34 @@ fn ac84_an_agent_that_only_keeps_reconnecting_is_moved() {
     assert!(l.workspace(&c).join("reconnect.txt").exists());
     assert_eq!(l.d.run(&run)["status"], "handed_off");
 }
+
+#[test]
+fn ac265_stop_on_predecessor_pauses_and_interrupts_the_migrated_queue() {
+    let l = lab(); l.set(json!({"enabled":false}));
+    l.degraded(OPENAI_DOWN, "OpenAI unreachable"); l.behave("network", "stall");
+    let c = l.start("codex", "say original work", None); let old = run_id(&c);
+    l.status(&old, "waiting_for_connection");
+    l.d.call("run.queue", json!({"run_id":old,"text":"typed direction"}));
+    l.d.call("run.queue", json!({"run_id":old,"text":"spoken direction","source":"overseer"}));
+    let moved = l.d.call("run.handoff", json!({"run_id":old,"to":"anthropic"}));
+    let next = moved["successor"]["id"].as_str().unwrap();
+    l.d.call("run.interrupt", json!({"run_id":old}));
+    l.status(next, "interrupted");
+    let queue = l.d.call("run.queued", json!({"run_id":next}));
+    assert_eq!(queue["paused"], true, "a stale Stop control pauses the successor");
+    assert_eq!(queue["queued"].as_array().unwrap().len(), 2);
+    assert_eq!(queue["queued"][0]["text"], "typed direction");
+    std::thread::sleep(Duration::from_millis(700));
+    assert_eq!(l.turns(next).len(), 1, "migrated messages stay queued");
+    let first = queue["queued"][0]["id"].as_i64().unwrap();
+    assert_eq!(l.d.call("run.queued", json!({"run_id":old})), queue);
+    assert_eq!(l.d.call("run.unqueue", json!({"run_id":old,"id":first}))["removed"], 1);
+    l.d.call("run.queue", json!({"run_id":old,"text":"late addition"}));
+    assert_eq!(l.d.call("run.clear_queue", json!({"run_id":old}))["removed"], 2);
+    l.d.call("run.queue", json!({"run_id":old,"text":"send explicitly"}));
+    l.behave("network", "ok");
+    l.d.call("run.resume_queue", json!({"run_id":old}));
+    l.status(next, "completed");
+    assert_eq!(l.turns(next).len(), 2);
+    assert_eq!(l.turns(next)[1]["prompt"], "send explicitly");
+}

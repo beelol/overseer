@@ -2373,6 +2373,23 @@ impl Daemon {
     }
 
     pub fn interrupt(self: &Arc<Self>, run_id: &str) -> Result<Value> {
+        let run = self.run(run_id)?;
+        if run.parent_run_id.is_some() && !matches!(run.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation")) {
+            bail!("native children are interrupted through their parent run");
+        }
+        let owner = self.pause_queue(run_id)?;
+        let run_id = owner.as_str();
+        let children = self.store.lock().unwrap().children(run_id)?;
+        for child in children.iter().filter(|child| child.relation_source.as_deref() == Some("managed-delegation")) {
+            self.pause_queue(&child.id)?;
+        }
+        // Stop still pauses a queued message when the turn finished just before the click.
+        if !ACTIVE.contains(&self.run(run_id)?.status.as_str()) { return Ok(json!({"ok":true})); }
+        self.interrupt_turn(run_id)
+    }
+
+    /// Redirects and holds stop a turn without implicitly pausing the owner's queue.
+    pub(crate) fn interrupt_turn(self: &Arc<Self>, run_id: &str) -> Result<Value> {
         self.interrupt_with_origin(run_id, None)
     }
 
@@ -2431,10 +2448,11 @@ impl Daemon {
                 let _ = shim::control(&sock, &json!({"op": "stdin", "data": msg}));
                 let daemon = self.clone();
                 let run_id = run_id.to_string();
+                let generation = run.process_generation;
                 tokio::spawn(async move {
                     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
                     if let Ok(run) = daemon.run(&run_id) {
-                        if ACTIVE.contains(&run.status.as_str()) {
+                        if run.process_generation == generation && ACTIVE.contains(&run.status.as_str()) {
                             let _ = shim::control(&sock, &json!({"op": "close_stdin"}));
                             let _ = shim::control(&sock, &json!({"op": "signal", "sig": libc::SIGINT}));
                         }
@@ -2445,10 +2463,11 @@ impl Daemon {
         // Escalate if the harness ignores SIGINT.
         let daemon = self.clone();
         let run_id = run_id.to_string();
+        let generation = run.process_generation;
         tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_secs(10)).await;
             if let Ok(run) = daemon.run(&run_id) {
-                if ACTIVE.contains(&run.status.as_str()) {
+                if run.process_generation == generation && ACTIVE.contains(&run.status.as_str()) {
                     if let Ok(sock) = daemon.control_socket(&run) {
                         let _ = shim::control(&sock, &json!({"op": "signal", "sig": libc::SIGTERM}));
                     }
@@ -3743,6 +3762,9 @@ impl Daemon {
         for run in run_values.as_array_mut().expect("runs serialize as an array") {
             if let Some(link) = run["id"].as_str().and_then(|id| memberships.get(id)) {
                 run["swarm_membership"] = link.clone();
+            }
+            if let Some(id) = run["id"].as_str().map(str::to_string) {
+                run["queue"] = crate::overseer::session::stored_queue(&store, &id)?;
             }
             // Why a failed agent stopped, in plain words, for every surface (AC-239); exit_reason
             // keeps the daemon's own record.

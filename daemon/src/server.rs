@@ -2745,8 +2745,12 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "run.result" => d.delegated_result(s(p, "run_id")?)?,
         "run.follow_up" => {
-            // A held agent takes no new turn: the owner's own message offers Release and send.
+            // A paused queue takes additions; sending a new message never resumes old ones.
             let run_id = s(p, "run_id")?;
+            if d.queued_messages(run_id)?["paused"] == true {
+                return Ok(json!({"delivery":d.queue_message(run_id, s(p, "prompt")?, "owner", json!({"options":p}))?}));
+            }
+            // A held agent takes no new turn: the owner's own message offers Release and send.
             if let Some(hold) = d.hold_of(run_id) {
                 if p["release"].as_bool().unwrap_or(false) {
                     d.agent_release(run_id, "owner", "released to send a message")?;
@@ -3217,6 +3221,8 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             None => json!({"cap": d.cap_of(), "self_started_today": d.self_started_today()}),
         },
         "run.queued" => d.queued_messages(s(p, "run_id")?)?,
+        "run.resume_queue" => d.resume_queue(s(p, "run_id")?)?,
+        "run.clear_queue" => d.clear_queue(s(p, "run_id")?)?,
         "run.unqueue" => d.unqueue_message(s(p, "run_id")?, p["id"].as_i64().unwrap_or(0))?,
         "overseer.tools" => d.overseer_tools(s(p, "token")?)?,
         "overseer.tool" => d.overseer_tool(s(p, "token")?, s(p, "name")?, &p["arguments"])?,
