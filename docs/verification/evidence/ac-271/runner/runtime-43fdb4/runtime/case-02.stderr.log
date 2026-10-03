@@ -1,0 +1,22 @@
+
+thread 'runner_simultaneous_stdout_stderr_flood_is_bounded' panicked at daemon/tests/mods_runner.rs:129:5:
+runner worker runner_simultaneous_stdout_stderr_flood_is_bounded failed: 
+running 1 test
+test runner_simultaneous_stdout_stderr_flood_is_bounded ... FAILED
+
+failures:
+
+failures:
+    runner_simultaneous_stdout_stderr_flood_is_bounded
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.23s
+
+
+
+thread 'runner_simultaneous_stdout_stderr_flood_is_bounded' panicked at daemon/tests/mods_runner.rs:218:5:
+assertion `left == right` failed
+  left: Bypass("exit_failure")
+ right: Bypass("output_limit")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

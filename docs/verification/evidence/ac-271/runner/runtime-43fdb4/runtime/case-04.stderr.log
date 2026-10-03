@@ -1,0 +1,22 @@
+
+thread 'runner_enforces_files_network_and_no_fork_with_positive_controls' panicked at daemon/tests/mods_runner.rs:129:5:
+runner worker runner_enforces_files_network_and_no_fork_with_positive_controls failed: 
+running 1 test
+test runner_enforces_files_network_and_no_fork_with_positive_controls ... FAILED
+
+failures:
+
+failures:
+    runner_enforces_files_network_and_no_fork_with_positive_controls
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.35s
+
+
+
+thread 'runner_enforces_files_network_and_no_fork_with_positive_controls' panicked at daemon/tests/mods_runner.rs:309:5:
+assertion `left == right` failed
+  left: Bypass("exit_failure")
+ right: Output([112, 114, 111, 116, 101, 99, 116, 101, 100, 95, 114, 101, 97, 100, 61, 100, 101, 110, 105, 101, 100, 10, 112, 114, 111, 116, 101, 99, 116, 101, 100, 95, 119, 114, 105, 116, 101, 61, 100, 101, 110, 105, 101, 100, 10, 111, 116, 104, 101, 114, 95, 114, 117, 110, 95, 114, 101, 97, 100, 61, 100, 101, 110, 105, 101, 100, 10, 111, 116, 104, 101, 114, 95, 114, 117, 110, 95, 119, 114, 105, 116, 101, 61, 100, 101, 110, 105, 101, 100, 10, 112, 114, 111, 103, 114, 97, 109, 95, 119, 114, 105, 116, 101, 61, 100, 101, 110, 105, 101, 100, 10, 115, 99, 114, 97, 116, 99, 104, 95, 119, 114, 105, 116, 101, 61, 97, 108, 108, 111, 119, 101, 100, 10, 115, 121, 109, 108, 105, 110, 107, 95, 114, 101, 97, 100, 61, 100, 101, 110, 105, 101, 100, 10, 116, 99, 112, 61, 100, 101, 110, 105, 101, 100, 10, 117, 110, 105, 120, 61, 100, 101, 110, 105, 101, 100, 10, 102, 111, 114, 107, 61, 100, 101, 110, 105, 101, 100, 10, 115, 112, 97, 119, 110, 61, 100, 101, 110, 105, 101, 100, 10])
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

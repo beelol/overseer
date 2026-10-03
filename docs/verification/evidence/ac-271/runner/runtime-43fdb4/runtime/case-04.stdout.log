@@ -1,0 +1,11 @@
+
+running 1 test
+test runner_enforces_files_network_and_no_fork_with_positive_controls ... FAILED
+
+failures:
+
+failures:
+    runner_enforces_files_network_and_no_fork_with_positive_controls
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.35s
+

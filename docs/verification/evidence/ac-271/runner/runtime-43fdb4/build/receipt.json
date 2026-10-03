@@ -1,0 +1,45 @@
+{
+  "source": "43fdb4590fde01bfe1e8347aaf74e8a132445bb7",
+  "stages": {
+    "process-baseline": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.078
+    },
+    "package-clean": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 6.832
+    },
+    "no-run": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 25.479
+    },
+    "cleanup": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.577
+    }
+  },
+  "artifacts": [],
+  "tests": [],
+  "allocation": "separate_target_one_worker_during_ui",
+  "since_ms": 1791054988833,
+  "cleanup_counts": {
+    "ours": 0,
+    "others": 0
+  }
+}

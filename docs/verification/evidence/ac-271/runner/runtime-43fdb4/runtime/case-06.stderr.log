@@ -1,0 +1,22 @@
+
+thread 'runner_empty_success_is_distinct_from_failure_and_invalid_text' panicked at daemon/tests/mods_runner.rs:129:5:
+runner worker runner_empty_success_is_distinct_from_failure_and_invalid_text failed: 
+running 1 test
+test runner_empty_success_is_distinct_from_failure_and_invalid_text ... FAILED
+
+failures:
+
+failures:
+    runner_empty_success_is_distinct_from_failure_and_invalid_text
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.26s
+
+
+
+thread 'runner_empty_success_is_distinct_from_failure_and_invalid_text' panicked at daemon/tests/mods_runner.rs:361:5:
+assertion `left == right` failed
+  left: Bypass("exit_failure")
+ right: Output([])
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

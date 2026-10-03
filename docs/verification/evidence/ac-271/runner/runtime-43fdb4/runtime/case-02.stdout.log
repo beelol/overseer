@@ -1,0 +1,11 @@
+
+running 1 test
+test runner_simultaneous_stdout_stderr_flood_is_bounded ... FAILED
+
+failures:
+
+failures:
+    runner_simultaneous_stdout_stderr_flood_is_bounded
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.23s
+

@@ -1,0 +1,11 @@
+
+running 1 test
+test runner_silent_hang_returns_timeout_within_whole_deadline ... FAILED
+
+failures:
+
+failures:
+    runner_silent_hang_returns_timeout_within_whole_deadline
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.23s
+

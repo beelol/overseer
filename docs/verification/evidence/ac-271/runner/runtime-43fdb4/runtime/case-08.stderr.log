@@ -1,0 +1,22 @@
+
+thread 'runner_cancellation_covers_running_and_prelaunch_work' panicked at daemon/tests/mods_runner.rs:129:5:
+runner worker runner_cancellation_covers_running_and_prelaunch_work failed: 
+running 1 test
+test runner_cancellation_covers_running_and_prelaunch_work ... FAILED
+
+failures:
+
+failures:
+    runner_cancellation_covers_running_and_prelaunch_work
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 3.06s
+
+
+
+thread 'runner_cancellation_covers_running_and_prelaunch_work' panicked at daemon/tests/mods_runner.rs:469:9:
+assertion `left == right` failed
+  left: Bypass("exit_failure")
+ right: Bypass("cancelled")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

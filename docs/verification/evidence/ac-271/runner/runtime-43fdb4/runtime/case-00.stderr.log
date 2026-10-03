@@ -1,0 +1,22 @@
+
+thread 'runner_preserves_exact_utf8_and_multiline_bytes' panicked at daemon/tests/mods_runner.rs:129:5:
+runner worker runner_preserves_exact_utf8_and_multiline_bytes failed: 
+running 1 test
+test runner_preserves_exact_utf8_and_multiline_bytes ... FAILED
+
+failures:
+
+failures:
+    runner_preserves_exact_utf8_and_multiline_bytes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.35s
+
+
+
+thread 'runner_preserves_exact_utf8_and_multiline_bytes' panicked at daemon/tests/mods_runner.rs:186:5:
+assertion `left == right` failed
+  left: Bypass("exit_failure")
+ right: Output([119, 97, 114, 110, 105, 110, 103, 58, 32, 99, 97, 102, 195, 169, 10, 115, 101, 99, 111, 110, 100, 32, 108, 105, 110, 101, 10, 10])
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

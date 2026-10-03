@@ -1,0 +1,7 @@
+# Runner runtime qualification at43fdb4
+
+The coordinator ran sixteen exact synthetic runner cases: **six passed and ten failed**. The passing cases cover refusal of changed programs, symlinked ancestors, changed staged bytes, FIFO replacement, replaced staged inode and nonregular source. They do not prove successful sandboxed execution. Nine failed assertions observed `exit_failure`; the blocked-input case observed `input_incomplete`. Several tests stop before later subcases. Successful native execution, cancellation, deadlines, output bounds and OS enforcement remain unqualified. No downloaded transformer or model turn was used.
+
+The first wrapper14388 package-cleaned overseerd and successfully built the test target, then rejected Cargo dep-info because its paths were relative. No test ran in that wrapper. The corrected wrapper82212 resolved the three exact dependency paths against the recorded compiler checkout and used the same fresh:false artifact; it did not rebuild or weaken product assertions. Both original build receipt and corrected runtime receipt are preserved. The original compiler target src_path identifies this checkout. Process baseline IDs are omitted. Runtime cleanup found zero owned and zero other leftovers.
+
+Next: inspect the bounded synthetic child failure at its execution boundary before changing the sandbox profile. These failures do not identify their root cause yet. The runner remains unregistered and AC271–273 remain open.

@@ -1,0 +1,22 @@
+
+thread 'runner_executes_opened_source_after_parent_path_replacement' panicked at daemon/tests/mods_runner.rs:129:5:
+runner worker runner_executes_opened_source_after_parent_path_replacement failed: 
+running 1 test
+test runner_executes_opened_source_after_parent_path_replacement ... FAILED
+
+failures:
+
+failures:
+    runner_executes_opened_source_after_parent_path_replacement
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.27s
+
+
+
+thread 'runner_executes_opened_source_after_parent_path_replacement' panicked at daemon/tests/mods_runner.rs:551:5:
+assertion `left == right` failed
+  left: Bypass("exit_failure")
+ right: Output([111, 112, 101, 110, 101, 100, 32, 105, 110, 111, 100, 101, 44, 32, 111, 114, 105, 103, 105, 110, 97, 108, 32, 98, 121, 116, 101, 115, 10])
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

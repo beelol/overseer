@@ -1,0 +1,11 @@
+
+running 1 test
+test runner_executes_opened_source_after_parent_path_replacement ... FAILED
+
+failures:
+
+failures:
+    runner_executes_opened_source_after_parent_path_replacement
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.27s
+

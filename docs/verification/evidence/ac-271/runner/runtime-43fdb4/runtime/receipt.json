@@ -1,0 +1,388 @@
+{
+  "source": "43fdb4590fde01bfe1e8347aaf74e8a132445bb7",
+  "stages": {
+    "process-baseline": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.082
+    },
+    "case-00-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.213
+    },
+    "case-00": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.355
+    },
+    "case-01-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-01": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.24
+    },
+    "case-02-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-02": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.236
+    },
+    "case-03-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-03": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.065
+    },
+    "case-04-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.004
+    },
+    "case-04": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.352
+    },
+    "case-05-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-05": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.231
+    },
+    "case-06-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-06": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.271
+    },
+    "case-07-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-07": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.261
+    },
+    "case-08-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-08": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 3.076
+    },
+    "case-09-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.01
+    },
+    "case-09": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.079
+    },
+    "case-10-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.006
+    },
+    "case-10": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.28
+    },
+    "case-11-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-11": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.067
+    },
+    "case-12-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-12": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.077
+    },
+    "case-13-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.006
+    },
+    "case-13": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.078
+    },
+    "case-14-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.006
+    },
+    "case-14": {
+      "code": 101,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.258
+    },
+    "case-15-inventory": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.005
+    },
+    "case-15": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.067
+    },
+    "cleanup": {
+      "code": 0,
+      "signal": null,
+      "timed_out": false,
+      "output_limit": false,
+      "reaped": true,
+      "seconds": 0.499
+    }
+  },
+  "artifacts": [
+    {
+      "name": "mods_runner",
+      "source": "/private/tmp/overseer-mods-runner-20261003/daemon/tests/mods_runner.rs",
+      "source_sha256": "675e5908db8075a738a44958711f011c286d3563a87d6f2538c2db1a5b56d77c",
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_runner-75eabce2761fc28f",
+      "sha256": "b05da35890b5677681db34688a933fa16354a66a6a28212fa96913212d16eee8",
+      "fresh": false,
+      "dependency_sha256": "2f306c386686cb175abaae33fe6b18cb593d0d4af0cf62e79f1d6060fc40811e"
+    }
+  ],
+  "tests": [
+    {
+      "target": "mods_runner",
+      "name": "runner_preserves_exact_utf8_and_multiline_bytes",
+      "code": 101
+    },
+    {
+      "target": "mods_runner",
+      "name": "runner_silent_hang_returns_timeout_within_whole_deadline",
+      "code": 101
+    },
+    {
+      "target": "mods_runner",
+      "name": "runner_simultaneous_stdout_stderr_flood_is_bounded",
+      "code": 101
+    },
+    {
+      "target": "mods_runner",
+      "name": "runner_changed_program_is_refused_before_execution",
+      "code": 0
+    },
+    {
+      "target": "mods_runner",
+      "name": "runner_enforces_files_network_and_no_fork_with_positive_controls",
+      "code": 101
+    },
+    {
+      "target": "mods_runner",
+      "name": "runner_environment_is_exact_private_allowlist",
+      "code": 101
+    },
+    {
+      "target": "mods_runner",
+      "name": "runner_empty_success_is_distinct_from_failure_and_invalid_text",
+      "code": 101
+    },
+    {
+      "target": "mods_runner",
+      "name": "runner_blocked_stdin_and_separate_floods_are_bounded",
+      "code": 101
+    },
+    {
+      "target": "mods_runner",
+      "name": "runner_cancellation_covers_running_and_prelaunch_work",
+      "code": 101
+    },
+    {
+      "target": "mods_runner",
+      "name": "runner_refuses_symlinked_program_and_scratch_ancestors",
+      "code": 0
+    },
+    {
+      "target": "mods_runner",
+      "name": "runner_executes_opened_source_after_parent_path_replacement",
+      "code": 101
+    },
+    {
+      "target": "mods_runner",
+      "name": "runner_refuses_changed_copied_bytes_before_execution",
+      "code": 0
+    },
+    {
+      "target": "mods_runner",
+      "name": "runner_refuses_fifo_replacement_of_copied_stage_without_blocking",
+      "code": 0
+    },
+    {
+      "target": "mods_runner",
+      "name": "runner_refuses_replaced_staged_inode_even_with_matching_digest",
+      "code": 0
+    },
+    {
+      "target": "mods_runner",
+      "name": "runner_executes_private_readonly_stage_distinct_from_scratch",
+      "code": 101
+    },
+    {
+      "target": "mods_runner",
+      "name": "runner_refuses_nonregular_source_without_blocking_before_metadata",
+      "code": 0
+    }
+  ],
+  "allocation": "separate_target_one_worker_during_ui",
+  "since_ms": 1791055089241,
+  "build_provenance": {
+    "source": "43fdb4590fde01bfe1e8347aaf74e8a132445bb7",
+    "prior_receipt": "/private/tmp/overseer-mods-runner-43fdb4-qualified-20261003/receipt.json",
+    "compiler_log_sha256": "13fd9faa31741a082cfa932f5a811874c665954faa8039dc3b3fdf564e020825",
+    "reused_after_wrapper_path_assertion": true
+  },
+  "dependency_sources": {
+    "daemon/tests/mods_runner.rs": "675e5908db8075a738a44958711f011c286d3563a87d6f2538c2db1a5b56d77c",
+    "daemon/tests/../src/mods/runner.rs": "526e35e96d1fe201d13c47b278bbdab27a8e7a4b5f9fc6469b0fde417a408448",
+    "daemon/tests/../../fixtures/mods/runner-helper.c": "382281ae4a51db4e266cee785313cbcc85b8473bc9d73e87030ed8551f353eb6"
+  },
+  "dependency_resolution": "Relative dep-info paths resolved against the recorded compiler checkout; fresh:false target src_path is absolute in that same checkout.",
+  "cleanup_counts": {
+    "ours": 0,
+    "others": 0
+  }
+}

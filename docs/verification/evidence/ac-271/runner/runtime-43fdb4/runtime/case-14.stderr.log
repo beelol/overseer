@@ -1,0 +1,22 @@
+
+thread 'runner_executes_private_readonly_stage_distinct_from_scratch' panicked at daemon/tests/mods_runner.rs:129:5:
+runner worker runner_executes_private_readonly_stage_distinct_from_scratch failed: 
+running 1 test
+test runner_executes_private_readonly_stage_distinct_from_scratch ... FAILED
+
+failures:
+
+failures:
+    runner_executes_private_readonly_stage_distinct_from_scratch
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.25s
+
+
+
+thread 'runner_executes_private_readonly_stage_distinct_from_scratch' panicked at daemon/tests/mods_runner.rs:712:5:
+assertion `left == right` failed: actual helper argv0/cwd witness
+  left: Bypass("exit_failure")
+ right: Output([47, 112, 114, 105, 118, 97, 116, 101, 47, 116, 109, 112, 47, 111, 118, 101, 114, 115, 101, 101, 114, 45, 109, 111, 100, 45, 115, 116, 97, 103, 101, 45, 56, 99, 97, 52, 50, 99, 56, 51, 51, 54, 102, 50, 52, 50, 48, 97, 97, 56, 53, 56, 48, 56, 55, 49, 57, 54, 98, 56, 48, 53, 55, 48, 47, 112, 114, 111, 103, 114, 97, 109, 10, 47, 112, 114, 105, 118, 97, 116, 101, 47, 116, 109, 112, 47, 109, 111, 100, 115, 45, 114, 117, 110, 110, 101, 114, 45, 119, 111, 114, 107, 101, 114, 45, 72, 107, 81, 52, 102, 51, 47, 109, 111, 100, 115, 45, 114, 117, 110, 110, 101, 114, 45, 107, 83, 100, 87, 84, 65, 47, 115, 99, 114, 97, 116, 99, 104, 10])
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

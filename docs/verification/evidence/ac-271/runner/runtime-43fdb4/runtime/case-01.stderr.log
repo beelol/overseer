@@ -1,0 +1,22 @@
+
+thread 'runner_silent_hang_returns_timeout_within_whole_deadline' panicked at daemon/tests/mods_runner.rs:129:5:
+runner worker runner_silent_hang_returns_timeout_within_whole_deadline failed: 
+running 1 test
+test runner_silent_hang_returns_timeout_within_whole_deadline ... FAILED
+
+failures:
+
+failures:
+    runner_silent_hang_returns_timeout_within_whole_deadline
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.23s
+
+
+
+thread 'runner_silent_hang_returns_timeout_within_whole_deadline' panicked at daemon/tests/mods_runner.rs:200:5:
+assertion `left == right` failed
+  left: Bypass("exit_failure")
+ right: Bypass("timeout")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
