@@ -526,6 +526,10 @@ mod mac {
             }
             if let Some(status) = status {
                 if !status.success() {
+                    #[cfg(test)]
+                    if std::env::var_os("OVERSEER_MODS_RUNNER_DIAGNOSTICS").is_some() {
+                        eprintln!("synthetic runner child {status}: {}", String::from_utf8_lossy(&err));
+                    }
                     return Err("exit_failure");
                 }
                 if stdout.is_none() && stderr.is_none() {
