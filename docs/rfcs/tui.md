@@ -49,6 +49,7 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | Tab / Shift-Tab (dashboard) | Move the keys between the list, the review and the conversation; Esc gives them back to the list (T-40) |
 | J / K (dashboard) | Pick the next / previous agent from any column: the review and the conversation follow (T-40); in the list column j / k do the same, in the review column the review's keys apply (PgUp/PgDn scroll it), in the conversation column j / k scroll it |
 | `--grid` | `overseer-tui --grid` shows only the grid (no list, no conversation column; `L` and `D` say so), for a second terminal beside one in dashboard mode (T-41) |
+| `--focus RUN` | `overseer-tui --focus RUN` starts on that agent's full view (under a filter that shows it); a notification clicked with VS Code closed opens it in Terminal (AC-240) |
 | i, Enter | Compose a message to the focused agent (Enter sends, Esc closes, Alt-Enter new line) |
 | g, z | The grid ⇄ the focused agent's full view: its whole conversation with scrollback (j/k, PgUp/PgDn, Home/G) and tool details; g, z or Esc returns to the grid on that agent (T-38) |
 | v | Review: the focused agent's changes through the daemon, opening on its default comparison (Since task start) (T-27) |
@@ -404,6 +405,8 @@ Each command in `extension/package.json` has a row: the TUI's key (every key her
 | `overseer.head.toggleMode` | Switch Between Follow and Diffs Only | `F` | |
 | `overseer.head.follow` | Follow the Agent | `F` | |
 | `overseer.head.diffsOnly` | Diffs Only | `F` | |
+| `overseer.head.manualEdit` | Manual Edit (the File Follow Shows) | | VS Code's own editor in the agent's worktree; in the TUI, the review's `e` opens the file in your $EDITOR (AC-252) |
+| `overseer.head.toggleManualEdit` | Switch Between Follow and Manual Edit | | The same: VS Code's editor and its review; the TUI's review has `e` ($EDITOR) and `F` (Follow) (AC-252) |
 | `overseer.backToOverseer` | Back to Overseer's Conversation | `o` | |
 | `overseer.backToAgent` | Back to the Agent | `esc` | |
 | `overseer.switchAgentOverseer` | Switch Between the Agent and Overseer | `o` | |
