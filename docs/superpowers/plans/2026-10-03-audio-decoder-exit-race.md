@@ -56,13 +56,23 @@ became waitable. No retry, larger deadline, sandbox relaxation or detached worke
 - Existing `truncated_wav_and_non_decodable_mp3_refuse_without_committing_selection`
   exercises actual malformed media and worker failure, with unchanged selection.
   Its later assertions are authored but have not yet reached runtime qualification.
-- There is no existing independently injected malformed worker-stdout fixture.
-  Add a bounded synthetic worker-result control before claiming output parsing
-  stayed qualified; do not rely solely on the implementation's parse condition.
-- There is no existing genuine-live unreadable-memory fixture. A deterministic
-  fault-injection control may cover refusal routing, clearly labeled as injected;
-  it cannot qualify real OS memory enforcement. Preserve the live-child refusal
-  and the provisional96MiB supervision limitation in the interim.
+- Follow-up `exited_decoder_with_malformed_stdout_still_refuses_unchanged_source`
+  keeps actual successful native decoding/exit but substitutes a static invalid
+  duration via an armed synthetic worker hook. It requires the exact output
+  refusal and unchanged source, not mere failure at the earlier memory race.
+- `genuinely_failed_decoder_exit_still_refuses_unchanged_source` supplies actual
+  invalid media and observes the real worker exit1, with no status override. It
+  requires malformed-media refusal and unchanged source after the exit witness.
+- `live_held_decoder_with_injected_unreadable_memory_still_refuses` preserves an
+  actual worker held at its unreleased gate. Only its matching-PID footprint
+  response is fault-injected. It requires memory refusal, unchanged source, no
+  playback receipt and the owned leader gone after RPC completion. This checks
+  refusal routing, never real OS memory enforcement or whole-group cleanup.
+
+All four new cases are authored/unrun. The first two refusal controls may fail
+at the earlier zombie memory error on the baseline; preserve that reached
+boundary instead of claiming the exit/output guard was covered. The original
+2s validation limit bounds the worker gates; no deadlines were enlarged.
 
 This checkpoint is test-only/source-only. No compiler, daemon, helper, player,
 private audio, provider or UI ran. No RED/GREEN, auth fix, AC closure, native FD

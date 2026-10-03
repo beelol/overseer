@@ -832,6 +832,96 @@ fn successful_decoder_exit_between_wait_and_memory_check_keeps_valid_selection()
     assert_eq!(selected["revision"].as_i64(), Some(before["revision"].as_i64().unwrap() + 1));
 }
 
+#[cfg(target_os = "macos")]
+fn decoder_exit_refusal_control(malformed_stdout: bool) {
+    let root = tmp();
+    let folder = root.path().join("refusal-pack");
+    pack(&folder, "fixture-exit-refusal");
+    if !malformed_stdout {
+        // Actual native decoder failure, not a synthetic exit status override.
+        for (key, _) in LINES {
+            std::fs::write(folder.join(format!("audio/{key}.wav")), b"not-WAV").unwrap();
+        }
+    }
+    let gate = root.path().join("exit-gate");
+    std::fs::create_dir(&gate).unwrap();
+    std::fs::write(gate.join("armed"), b"armed").unwrap();
+    let release = AudioGate(gate.clone());
+    let log = root.path().join("audio.log");
+    let mut env = vec![
+        ("OVERSEER_TEST_AUDIO_WORKER_HOLD", gate.to_str().unwrap()),
+        ("OVERSEER_TEST_AUDIO_EXIT_BEFORE_MEMORY", gate.to_str().unwrap()),
+        ("OVERSEER_TEST_AUDIO_LOG", log.to_str().unwrap()),
+    ];
+    if malformed_stdout { env.push(("OVERSEER_TEST_AUDIO_WORKER_STDOUT", "malformed")); }
+    let d = Daemon::start(&env);
+    let before = d.call("audio.get", json!({}));
+    let result = d.try_call("audio.source.set", json!({"source":"folder","path":folder,
+        "expected_revision":before["revision"]}));
+    let observed: Value = serde_json::from_slice(&std::fs::read(gate.join("exit-observed.json"))
+        .expect("SETUP: exit boundary must be reached before refusal")).unwrap();
+    let worker: Value = serde_json::from_slice(&std::fs::read(gate.join("ready.json")).unwrap()).unwrap();
+    assert_eq!(observed["pid"], worker["pid"]);
+    assert_eq!(observed["wait_code"], libc::CLD_EXITED);
+    assert_eq!(observed["exit_status"], if malformed_stdout { 0 } else { 1 });
+    assert_eq!(observed["observed_without_reap"], true);
+    assert_eq!(observed["kill_zero"], 0);
+    drop(release);
+    let error = result.expect_err("failed worker/malformed stdout may never commit a source");
+    // Before the race correction this may fail on the earlier memory error;
+    // retain that distinction rather than claiming the later guard was reached.
+    assert!(error.contains("malformed"), "must reach exit/output refusal, not setup/earlier memory refusal: {error}");
+    assert_eq!(d.call("audio.get", json!({})), before);
+    assert!(!log.exists(), "source validation produces no playback receipt");
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn exited_decoder_with_malformed_stdout_still_refuses_unchanged_source() {
+    decoder_exit_refusal_control(true);
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn genuinely_failed_decoder_exit_still_refuses_unchanged_source() {
+    decoder_exit_refusal_control(false);
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn live_held_decoder_with_injected_unreadable_memory_still_refuses() {
+    let root = tmp();
+    let folder = root.path().join("live-memory-pack");
+    pack(&folder, "fixture-live-memory");
+    let gate = root.path().join("worker-gate");
+    std::fs::create_dir(&gate).unwrap();
+    std::fs::write(gate.join("armed"), b"armed").unwrap();
+    let release = AudioGate(gate.clone());
+    let log = root.path().join("audio.log");
+    let d = Daemon::start(&[
+        ("OVERSEER_TEST_AUDIO_WORKER_HOLD", gate.to_str().unwrap()),
+        ("OVERSEER_TEST_AUDIO_MEMORY_UNAVAILABLE", gate.to_str().unwrap()),
+        ("OVERSEER_TEST_AUDIO_LOG", log.to_str().unwrap()),
+    ]);
+    let before = d.call("audio.get", json!({}));
+    let result = d.try_call("audio.source.set", json!({"source":"folder","path":folder,
+        "expected_revision":before["revision"]}));
+    let observed: Value = serde_json::from_slice(&std::fs::read(gate.join("memory-fault-observed.json"))
+        .expect("SETUP: held-live memory fault must be injected at the real boundary")).unwrap();
+    let worker: Value = serde_json::from_slice(&std::fs::read(gate.join("ready.json")).unwrap()).unwrap();
+    assert_eq!(observed["pid"], worker["pid"]);
+    assert_eq!(observed["held_live"], true);
+    assert_eq!(observed["injected"], true);
+    assert_eq!(observed["kill_zero"], 0);
+    assert!(!gate.join("release").exists(), "worker was never released before memory refusal");
+    assert!(!pid_alive(worker["pid"].as_i64().unwrap()), "refused owned worker must be reaped by the completed RPC");
+    drop(release);
+    let error = result.expect_err("live unreadable worker must remain refused");
+    assert!(error.contains("Cannot supervise audio validation memory"), "wrong refusal boundary: {error}");
+    assert_eq!(d.call("audio.get", json!({})), before);
+    assert!(!log.exists());
+}
+
 #[test]
 fn daemon_shutdown_reaps_a_decoder_held_during_source_validation_before_exit() {
     let root = tmp();

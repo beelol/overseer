@@ -70,6 +70,9 @@ pub(super) fn validate(file: &File, outer_deadline: Instant) -> Result<u64> {
     if let Some(gate) = std::env::var_os("OVERSEER_TEST_AUDIO_WORKER_HOLD") {
         if std::path::Path::new(&gate).join("armed").is_file() {
             command.env("OVERSEER_TEST_AUDIO_WORKER_HOLD", gate);
+            if std::env::var("OVERSEER_TEST_AUDIO_WORKER_STDOUT").as_deref() == Ok("malformed") {
+                command.env("OVERSEER_TEST_AUDIO_WORKER_STDOUT", "malformed");
+            }
         }
     }
     group(&mut command);
@@ -260,7 +263,11 @@ fn resident_bytes(pid: u32) -> Result<u64> {
     }
     let mut info = TaskInfo::default();
     let size = std::mem::size_of::<TaskInfo>() as i32;
-    let read = unsafe { proc_pidinfo(pid as i32, 4, 0, (&mut info as *mut TaskInfo).cast(), size) };
+    let read = if test_unreadable_live_memory(pid)? {
+        0
+    } else {
+        unsafe { proc_pidinfo(pid as i32, 4, 0, (&mut info as *mut TaskInfo).cast(), size) }
+    };
     if read != size {
         // Exit may race the inspection. A live worker with unreadable footprint
         // fails closed; no unsupported RSS hard-limit claim is made.
@@ -270,6 +277,42 @@ fn resident_bytes(pid: u32) -> Result<u64> {
         return Ok(0);
     }
     Ok(info.wide[1])
+}
+
+#[cfg(target_os = "macos")]
+fn test_unreadable_live_memory(pid: u32) -> Result<bool> {
+    let Some(gate) = std::env::var_os("OVERSEER_TEST_AUDIO_MEMORY_UNAVAILABLE") else {
+        return Ok(false);
+    };
+    if std::env::var_os("OVERSEER_TEST_AUDIO_WORKER_HOLD").as_ref() != Some(&gate) {
+        bail!("Synthetic memory fault needs its matching worker hold.");
+    }
+    let gate = std::path::PathBuf::from(gate);
+    let Ok(bytes) = std::fs::read(gate.join("ready.json")) else {
+        return Ok(false);
+    };
+    // The existing gate writes the tiny marker before it blocks; an in-progress
+    // write is not readiness. Recheck on the normal bounded supervision loop.
+    let Ok(ready): Result<serde_json::Value, _> = serde_json::from_slice(&bytes) else {
+        return Ok(false);
+    };
+    if ready["pid"].as_u64() != Some(pid as u64) {
+        return Ok(false);
+    }
+    let kill_zero = unsafe { libc::kill(pid as i32, 0) };
+    if gate.join("release").exists() || kill_zero != 0 {
+        bail!("Synthetic memory fault requires the owned worker still held live.");
+    }
+    // Fault injection only: the exact owned worker is blocked at its gate.
+    // This qualifies refusal routing, never actual OS memory enforcement.
+    std::fs::write(
+        gate.join("memory-fault-observed.json"),
+        serde_json::json!({
+        "pid":pid,"held_live":true,"kill_zero":kill_zero,"injected":true})
+        .to_string(),
+    )
+    .map_err(|_| anyhow!("Cannot record the synthetic memory fault."))?;
+    Ok(true)
 }
 #[cfg(not(target_os = "macos"))]
 fn resident_bytes(_pid: u32) -> Result<u64> {
@@ -286,7 +329,12 @@ pub(crate) fn worker() -> i32 {
     {
         match native::decode() {
             Ok(ms) => {
-                println!("{ms}");
+                if std::env::var("OVERSEER_TEST_AUDIO_WORKER_STDOUT").as_deref() == Ok("malformed")
+                {
+                    println!("synthetic-invalid-duration");
+                } else {
+                    println!("{ms}");
+                }
                 0
             }
             Err(_) => 1,
