@@ -1,0 +1,8 @@
+{
+  "manifest_path": "/private/tmp/overseer-mods-runner-20261003/daemon/Cargo.toml",
+  "source": "/private/tmp/overseer-mods-runner-20261003/daemon/tests/mods_runner.rs",
+  "profile_test": true,
+  "fresh": false,
+  "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_runner-75eabce2761fc28f",
+  "sha256": "8dc53d7c368c1383817e0244eff7b41ff647ce048d73839af719335926487c58"
+}

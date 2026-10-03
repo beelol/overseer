@@ -1,0 +1,238 @@
+
+running 10 tests
+test runner_blocked_stdin_and_separate_floods_are_bounded ... 
+thread 'runner_blocked_stdin_and_separate_floods_are_bounded' panicked at daemon/tests/mods_runner.rs:129:5:
+runner worker runner_blocked_stdin_and_separate_floods_are_bounded failed: 
+running 1 test
+test runner_blocked_stdin_and_separate_floods_are_bounded ... FAILED
+
+failures:
+
+failures:
+    runner_blocked_stdin_and_separate_floods_are_bounded
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.13s
+
+
+
+thread 'runner_blocked_stdin_and_separate_floods_are_bounded' panicked at daemon/tests/mods_runner.rs:386:5:
+assertion `left == right` failed
+  left: Bypass("runner_unavailable")
+ right: Bypass("timeout")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test runner_cancellation_covers_running_and_prelaunch_work ... 
+thread 'runner_cancellation_covers_running_and_prelaunch_work' panicked at daemon/tests/mods_runner.rs:129:5:
+runner worker runner_cancellation_covers_running_and_prelaunch_work failed: 
+running 1 test
+test runner_cancellation_covers_running_and_prelaunch_work ... FAILED
+
+failures:
+
+failures:
+    runner_cancellation_covers_running_and_prelaunch_work
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.05s
+
+
+
+thread 'runner_cancellation_covers_running_and_prelaunch_work' panicked at daemon/tests/mods_runner.rs:448:5:
+assertion `left == right` failed
+  left: Bypass("runner_unavailable")
+ right: Bypass("cancelled")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+FAILED
+test runner_changed_program_is_refused_before_execution ... 
+thread 'runner_changed_program_is_refused_before_execution' panicked at daemon/tests/mods_runner.rs:129:5:
+runner worker runner_changed_program_is_refused_before_execution failed: 
+running 1 test
+test runner_changed_program_is_refused_before_execution ... FAILED
+
+failures:
+
+failures:
+    runner_changed_program_is_refused_before_execution
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.05s
+
+
+
+thread 'runner_changed_program_is_refused_before_execution' panicked at daemon/tests/mods_runner.rs:251:5:
+assertion `left == right` failed
+  left: Bypass("runner_unavailable")
+ right: Bypass("program_changed")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+FAILED
+test runner_empty_success_is_distinct_from_failure_and_invalid_text ... 
+thread 'runner_empty_success_is_distinct_from_failure_and_invalid_text' panicked at daemon/tests/mods_runner.rs:129:5:
+runner worker runner_empty_success_is_distinct_from_failure_and_invalid_text failed: 
+running 1 test
+test runner_empty_success_is_distinct_from_failure_and_invalid_text ... FAILED
+
+failures:
+
+failures:
+    runner_empty_success_is_distinct_from_failure_and_invalid_text
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.05s
+
+
+
+thread 'runner_empty_success_is_distinct_from_failure_and_invalid_text' panicked at daemon/tests/mods_runner.rs:361:5:
+assertion `left == right` failed
+  left: Bypass("runner_unavailable")
+ right: Output([])
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+FAILED
+test runner_enforces_files_network_and_no_fork_with_positive_controls ... 
+thread 'runner_enforces_files_network_and_no_fork_with_positive_controls' panicked at daemon/tests/mods_runner.rs:129:5:
+runner worker runner_enforces_files_network_and_no_fork_with_positive_controls failed: 
+running 1 test
+test runner_enforces_files_network_and_no_fork_with_positive_controls ... FAILED
+
+failures:
+
+failures:
+    runner_enforces_files_network_and_no_fork_with_positive_controls
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.24s
+
+
+
+thread 'runner_enforces_files_network_and_no_fork_with_positive_controls' panicked at daemon/tests/mods_runner.rs:309:5:
+assertion `left == right` failed
+  left: Bypass("runner_unavailable")
+ right: Output([112, 114, 111, 116, 101, 99, 116, 101, 100, 95, 114, 101, 97, 100, 61, 100, 101, 110, 105, 101, 100, 10, 112, 114, 111, 116, 101, 99, 116, 101, 100, 95, 119, 114, 105, 116, 101, 61, 100, 101, 110, 105, 101, 100, 10, 111, 116, 104, 101, 114, 95, 114, 117, 110, 95, 114, 101, 97, 100, 61, 100, 101, 110, 105, 101, 100, 10, 111, 116, 104, 101, 114, 95, 114, 117, 110, 95, 119, 114, 105, 116, 101, 61, 100, 101, 110, 105, 101, 100, 10, 112, 114, 111, 103, 114, 97, 109, 95, 119, 114, 105, 116, 101, 61, 100, 101, 110, 105, 101, 100, 10, 115, 99, 114, 97, 116, 99, 104, 95, 119, 114, 105, 116, 101, 61, 97, 108, 108, 111, 119, 101, 100, 10, 115, 121, 109, 108, 105, 110, 107, 95, 114, 101, 97, 100, 61, 100, 101, 110, 105, 101, 100, 10, 116, 99, 112, 61, 100, 101, 110, 105, 101, 100, 10, 117, 110, 105, 120, 61, 100, 101, 110, 105, 101, 100, 10, 102, 111, 114, 107, 61, 100, 101, 110, 105, 101, 100, 10, 115, 112, 97, 119, 110, 61, 100, 101, 110, 105, 101, 100, 10])
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+FAILED
+test runner_environment_is_exact_private_allowlist ... 
+thread 'runner_environment_is_exact_private_allowlist' panicked at daemon/tests/mods_runner.rs:129:5:
+runner worker runner_environment_is_exact_private_allowlist failed: 
+running 1 test
+test runner_environment_is_exact_private_allowlist ... FAILED
+
+failures:
+
+failures:
+    runner_environment_is_exact_private_allowlist
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.07s
+
+
+
+thread 'runner_environment_is_exact_private_allowlist' panicked at daemon/tests/mods_runner.rs:333:9:
+runner must execute the environment witness
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+FAILED
+test runner_preserves_exact_utf8_and_multiline_bytes ... 
+thread 'runner_preserves_exact_utf8_and_multiline_bytes' panicked at daemon/tests/mods_runner.rs:129:5:
+runner worker runner_preserves_exact_utf8_and_multiline_bytes failed: 
+running 1 test
+test runner_preserves_exact_utf8_and_multiline_bytes ... FAILED
+
+failures:
+
+failures:
+    runner_preserves_exact_utf8_and_multiline_bytes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.05s
+
+
+
+thread 'runner_preserves_exact_utf8_and_multiline_bytes' panicked at daemon/tests/mods_runner.rs:186:5:
+assertion `left == right` failed
+  left: Bypass("runner_unavailable")
+ right: Output([119, 97, 114, 110, 105, 110, 103, 58, 32, 99, 97, 102, 195, 169, 10, 115, 101, 99, 111, 110, 100, 32, 108, 105, 110, 101, 10, 10])
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+FAILED
+test runner_refuses_symlinked_program_and_scratch_ancestors ... 
+thread 'runner_refuses_symlinked_program_and_scratch_ancestors' panicked at daemon/tests/mods_runner.rs:129:5:
+runner worker runner_refuses_symlinked_program_and_scratch_ancestors failed: 
+running 1 test
+test runner_refuses_symlinked_program_and_scratch_ancestors ... FAILED
+
+failures:
+
+failures:
+    runner_refuses_symlinked_program_and_scratch_ancestors
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.05s
+
+
+
+thread 'runner_refuses_symlinked_program_and_scratch_ancestors' panicked at daemon/tests/mods_runner.rs:493:5:
+assertion `left == right` failed
+  left: Bypass("runner_unavailable")
+ right: Bypass("unsafe_path")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+FAILED
+test runner_silent_hang_returns_timeout_within_whole_deadline ... 
+thread 'runner_silent_hang_returns_timeout_within_whole_deadline' panicked at daemon/tests/mods_runner.rs:129:5:
+runner worker runner_silent_hang_returns_timeout_within_whole_deadline failed: 
+running 1 test
+test runner_silent_hang_returns_timeout_within_whole_deadline ... FAILED
+
+failures:
+
+failures:
+    runner_silent_hang_returns_timeout_within_whole_deadline
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.05s
+
+
+
+thread 'runner_silent_hang_returns_timeout_within_whole_deadline' panicked at daemon/tests/mods_runner.rs:200:5:
+assertion `left == right` failed
+  left: Bypass("runner_unavailable")
+ right: Bypass("timeout")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+FAILED
+test runner_simultaneous_stdout_stderr_flood_is_bounded ... 
+thread 'runner_simultaneous_stdout_stderr_flood_is_bounded' panicked at daemon/tests/mods_runner.rs:129:5:
+runner worker runner_simultaneous_stdout_stderr_flood_is_bounded failed: 
+running 1 test
+test runner_simultaneous_stdout_stderr_flood_is_bounded ... FAILED
+
+failures:
+
+failures:
+    runner_simultaneous_stdout_stderr_flood_is_bounded
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.05s
+
+
+
+thread 'runner_simultaneous_stdout_stderr_flood_is_bounded' panicked at daemon/tests/mods_runner.rs:218:5:
+assertion `left == right` failed
+  left: Bypass("runner_unavailable")
+ right: Bypass("output_limit")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+FAILED
+
+failures:
+
+failures:
+    runner_blocked_stdin_and_separate_floods_are_bounded
+    runner_cancellation_covers_running_and_prelaunch_work
+    runner_changed_program_is_refused_before_execution
+    runner_empty_success_is_distinct_from_failure_and_invalid_text
+    runner_enforces_files_network_and_no_fork_with_positive_controls
+    runner_environment_is_exact_private_allowlist
+    runner_preserves_exact_utf8_and_multiline_bytes
+    runner_refuses_symlinked_program_and_scratch_ancestors
+    runner_silent_hang_returns_timeout_within_whole_deadline
+    runner_simultaneous_stdout_stderr_flood_is_bounded
+
+test result: FAILED. 0 passed; 10 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s
+
