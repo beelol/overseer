@@ -90,6 +90,7 @@ extern "C" {
     fn SpeakCFString(chan: SpeechChannel, text: CFStringRef, options: CFTypeRef) -> OSStatus;
     fn StopSpeech(chan: SpeechChannel) -> OSStatus;
     fn SpeechBusy() -> i16;
+    fn GetSpeechInfo(chan: SpeechChannel, selector: u32, info: *mut c_void) -> i16;
     fn CountVoices(n: *mut i16) -> OSStatus;
     fn GetIndVoice(index: i16, voice: *mut VoiceSpec) -> OSStatus;
     fn GetVoiceDescription(
@@ -123,6 +124,8 @@ const UTF8: u32 = 0x0800_0100;
 #[derive(Default)]
 struct Mem {
     buf: Vec<u8>,
+    writes: usize,
+    bytes_written: u64,
 }
 
 extern "C" fn read_cb(
@@ -150,6 +153,9 @@ extern "C" fn write_cb(
     done: *mut u32,
 ) -> OSStatus {
     let m = unsafe { &mut *(c as *mut Mem) };
+    m.writes += 1;
+    m.bytes_written += n as u64;
+    if m.writes == 1 { eprintln!("NATIVE first_write pos={pos} bytes={n} us={}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_micros()); }
     let pos = pos.max(0) as usize;
     let end = pos + n as usize;
     if m.buf.len() < end {
@@ -199,6 +205,8 @@ fn voice_named(name: &str) -> Option<VoiceSpec> {
 /// Speaks `text` into 16 kHz mono samples, in memory. A time limit that grows with the text (the
 /// speech service sometimes never finishes on a busy Mac); the caller tries once more.
 pub fn speak(text: &str, voice: Option<&str>, rate: Option<u32>) -> Result<Vec<f32>> {
+    let probe_start = Instant::now();
+    eprintln!("NATIVE start phrase={text:?} requested_voice={voice:?}");
     let mut mem = Box::new(Mem::default());
     let format = Asbd {
         sample_rate: 16_000.0,
@@ -226,11 +234,13 @@ pub fn speak(text: &str, voice: Option<&str>, rate: Option<u32>) -> Result<Vec<f
             &mut file,
         )
     };
+    eprintln!("NATIVE AudioFileInitialize status={e}");
     if e != 0 {
         bail!("the in-memory audio file could not be made ({e})");
     }
     let mut ext: ExtAudioFileRef = std::ptr::null_mut();
     let e = unsafe { ExtAudioFileWrapAudioFileID(file, 1, &mut ext) };
+    eprintln!("NATIVE ExtAudioFileWrap status={e}");
     if e != 0 {
         unsafe { AudioFileClose(file) };
         bail!("the in-memory audio file could not be wrapped ({e})");
@@ -244,6 +254,16 @@ pub fn speak(text: &str, voice: Option<&str>, rate: Option<u32>) -> Result<Vec<f
             &mut chan,
         )
     };
+    eprintln!("NATIVE NewSpeechChannel status={e}");
+    if e == 0 {
+        let mut selected = VoiceSpec::default();
+        let status = unsafe { GetSpeechInfo(chan, u32::from_be_bytes(*b"cvox"), &mut selected as *mut _ as *mut c_void) };
+        let (creator, id) = (selected.creator, selected.id);
+        let mut desc: VoiceDescription = unsafe { std::mem::zeroed() };
+        let describe = unsafe { GetVoiceDescription(&selected, &mut desc, std::mem::size_of::<VoiceDescription>() as i32) };
+        let n = (desc.name[0] as usize).min(63);
+        eprintln!("NATIVE selected status={status} creator={creator} id={id} description_status={describe} name={:?}", String::from_utf8_lossy(&desc.name[1..1+n]));
+    }
     let close = |chan: SpeechChannel| unsafe {
         if !chan.is_null() {
             DisposeSpeechChannel(chan);
@@ -266,6 +286,7 @@ pub fn speak(text: &str, voice: Option<&str>, rate: Option<u32>) -> Result<Vec<f
         };
         let e = unsafe { SetSpeechProperty(chan, kSpeechOutputToExtAudioFileProperty, num) };
         unsafe { CFRelease(num) };
+        eprintln!("NATIVE SetSpeechProperty status={e}");
         if e != 0 {
             bail!("the speech output could not be set ({e})");
         }
@@ -292,13 +313,18 @@ pub fn speak(text: &str, voice: Option<&str>, rate: Option<u32>) -> Result<Vec<f
         };
         let e = unsafe { SpeakCFString(chan, s, std::ptr::null()) };
         unsafe { CFRelease(s) };
+        eprintln!("NATIVE SpeakCFString status={e} elapsed_ms={}", probe_start.elapsed().as_millis());
         if e != 0 {
             bail!("the line could not be spoken ({e})");
         }
         let limit = Duration::from_millis(20_000 + 100 * text.chars().count() as u64);
         let started = Instant::now();
         std::thread::sleep(Duration::from_millis(20));
-        while unsafe { SpeechBusy() } > 0 {
+        let mut last_busy = -1;
+        loop {
+            let busy = unsafe { SpeechBusy() };
+            if busy != last_busy { eprintln!("NATIVE busy={busy} elapsed_ms={}", probe_start.elapsed().as_millis()); last_busy = busy; }
+            if busy <= 0 { break; }
             if started.elapsed() > limit {
                 unsafe { StopSpeech(chan) };
                 bail!("the speech synthesizer did not finish in time");
@@ -309,7 +335,11 @@ pub fn speak(text: &str, voice: Option<&str>, rate: Option<u32>) -> Result<Vec<f
     })();
     close(chan);
     result?;
-    crate::pcm::read_wav(&mem.buf)
+    eprintln!("NATIVE disposed elapsed_ms={} callbacks={} callback_bytes={} wav_bytes={}", probe_start.elapsed().as_millis(), mem.writes, mem.bytes_written, mem.buf.len());
+    let audio = crate::pcm::read_wav(&mem.buf)?;
+    let peak = audio.iter().fold(0.0f32, |p, s| p.max(s.abs()));
+    eprintln!("NATIVE samples={} duration_ms={} peak={peak}", audio.len(), audio.len()*1000/16000);
+    Ok(audio)
 }
 
 #[cfg(test)]
@@ -320,9 +350,9 @@ mod tests {
             .unwrap()
             .filter_map(|e| e.ok().map(|e| e.file_name()))
             .collect();
-        // The speech service can time out on a busy Mac; callers try once more, and so does this test.
+        // Diagnostic branch: exactly one native attempt; preserve the original assertions.
         let line = "On it. Telling Phone to wait.";
-        let audio = super::speak(line, None, None).or_else(|_| super::speak(line, None, None)).unwrap();
+        let audio = super::speak(line, None, None).unwrap();
         assert!(audio.len() > 16_000, "{} samples", audio.len());
         assert!(audio.iter().any(|s| s.abs() > 0.05), "it has sound");
         let after: Vec<_> = std::fs::read_dir(std::env::temp_dir())

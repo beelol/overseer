@@ -9,11 +9,17 @@ on:
     branches: [main]
     paths-ignore: ['docs/**', '**/*.md']
   workflow_dispatch:
+    inputs:
+      diagnostic:
+        description: Run only the isolated native speech and Follow diagnostic
+        type: boolean
+        default: false
 concurrency:
   group: checks-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   checks:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.diagnostic != true }}
     runs-on: macos-latest
     timeout-minutes: 40
     steps:
@@ -29,3 +35,55 @@ jobs:
         run: node test/unit/run.js
       - name: Extension source check
         run: npm run --silent check --prefix extension
+  native-diagnostic:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.diagnostic == true }}
+    runs-on: macos-latest
+    timeout-minutes: 20
+    env:
+      CARGO_BUILD_JOBS: 2
+      RUST_TEST_THREADS: 1
+      OVERSEER_CI_FOLLOW_TRACE: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Runner and source
+        run: |
+          mkdir -p diagnostic
+          { git rev-parse HEAD; sw_vers; uname -a; env | sort | sed -n '/^Image/p;/^RUNNER_OS=/p;/^RUNNER_ARCH=/p'; xcrun --show-sdk-version; rustc --version; node --version; say -v '?'; } > diagnostic/runner.txt
+          cat diagnostic/runner.txt
+      - name: Native memory synthesis (one attempt)
+        id: native
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          nice -n 20 cargo test -p overseer-listener --lib memspeech::tests::a_line_is_made_in_memory_with_no_file -- --exact --nocapture --test-threads=1 2>&1 | tee diagnostic/native.log
+      - name: Independent say comparison (one attempt)
+        id: say
+        continue-on-error: true
+        run: python3 scripts/ci-native-say-probe.py
+      - name: Isolated original T30 assertion (one attempt)
+        id: follow
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          nice -n 20 cargo test -p overseer-tui --test parity t30_follow_in_the_review -- --exact --nocapture --test-threads=1 2>&1 | tee diagnostic/follow.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-follow-diagnostic
+          path: diagnostic/
+      - name: Preserve probe outcomes
+        if: always()
+        env:
+          SAY_OUTCOME: ${{ steps.say.outcome }}
+          NATIVE_OUTCOME: ${{ steps.native.outcome }}
+          FOLLOW_OUTCOME: ${{ steps.follow.outcome }}
+        run: |
+          echo "say=$SAY_OUTCOME native=$NATIVE_OUTCOME follow=$FOLLOW_OUTCOME"
+          test "$SAY_OUTCOME" = success && test "$NATIVE_OUTCOME" = success && test "$FOLLOW_OUTCOME" = success

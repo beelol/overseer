@@ -622,6 +622,13 @@ pub struct Stats {
     pub lag_ms: Vec<i64>,
 }
 
+fn diag_follow(phase: &str) {
+    if std::env::var("OVERSEER_CI_FOLLOW_TRACE").as_deref() == Ok("1") {
+        let us = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_micros();
+        eprintln!("FOLLOW us={us} {phase}");
+    }
+}
+
 impl App {
     pub fn new(client: Arc<dyn Requests>) -> App {
         App {
@@ -726,7 +733,9 @@ impl App {
     }
 
     fn request(&mut self, method: &str, params: Value, why: Pending) {
+        let trace = matches!(method, "workspace.hunks" | "workspace.diff" | "workspace.file");
         let id = self.client.request(method, params);
+        if trace { diag_follow(&format!("request id={id} method={method}")); }
         self.pending.insert(id, why);
     }
 
@@ -1131,6 +1140,7 @@ impl App {
             Msg::Voice(m) => self.on_voice(m),
             Msg::Event(ev) => self.on_event(ev),
             Msg::Reply { id, result } => {
+                diag_follow(&format!("reply id={id} ok={}", result.is_ok()));
                 if let Some(why) = self.pending.remove(&id) {
                     self.on_reply(why, result);
                 }
@@ -1235,6 +1245,7 @@ impl App {
         }
         // Follow (T-30): the file the agent is editing, and the review moves to it when Follow is on.
         if kind == "file_activity" && !run_id.is_empty() {
+            diag_follow(&format!("file_activity run={run_id} payload={}", ev["payload"]));
             let root = self.state.root_of(&run_id);
             let paths: Vec<String> = ev["payload"]["paths"].as_array().map(|a| a.iter().filter_map(|x| x.as_str()).filter(|p| !p.starts_with('/') && !p.starts_with("..")).map(str::to_string).collect()).unwrap_or_default();
             if let Some(path) = paths.last().cloned() {
@@ -2139,6 +2150,7 @@ impl App {
     /// Follow (T-30) moves to `path`, the file the agent just edited: the changed files are
     /// listed again and the change not seen before is shown.
     fn follow_start(&mut self, path: &str) {
+        diag_follow(&format!("follow_start path={path}"));
         let c = &mut self.changes;
         c.follow_known = if c.path == path { c.hunks.iter().map(|h| h.key.clone()).collect() } else { Vec::new() };
         c.follow_to = Some(path.to_string());
@@ -2162,6 +2174,7 @@ impl App {
 
     /// The edit was reported before it reached the disk: look again shortly.
     fn follow_again(&mut self) {
+        diag_follow("follow_again");
         if self.changes.follow_tries == 0 {
             self.changes.follow_to = None;
             return;

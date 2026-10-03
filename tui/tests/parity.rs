@@ -1014,6 +1014,7 @@ fn t30_follow_in_the_review() {
     // Each edit: the review shows that file, at the change the agent made (the line it edited).
     let edit = |tui: &mut Tui, step: usize, file: &str, line: &str| -> std::time::Duration {
         let before = std::fs::read_to_string(wt.join(file)).unwrap();
+        eprintln!("FOLLOW barrier step={step} file={file} us={}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros());
         std::fs::write(barrier.join(format!("go-{step}")), "").unwrap();
         let end = std::time::Instant::now() + std::time::Duration::from_secs(20);
         let mut written = None;
@@ -1021,12 +1022,15 @@ fn t30_follow_in_the_review() {
             assert!(std::time::Instant::now() < end, "step {step}: the review did not move to {file}:\n{}", tui.screen());
             if written.is_none() && std::fs::read_to_string(wt.join(file)).unwrap() != before {
                 written = Some(std::time::Instant::now());
+                eprintln!("FOLLOW disk_observed step={step} file={file} us={}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros());
             }
             let c = &tui.app.changes;
             let there = c.path == file && !c.loading && c.hunks.get(c.change).is_some_and(|h| h.modified_lines.iter().any(|l| l == line)) && c.follow_to.is_none();
             if there {
                 if let Some(at) = written {
-                    return at.elapsed();
+                    let elapsed = at.elapsed();
+                    eprintln!("FOLLOW ready step={step} file={file} elapsed={elapsed:?} us={}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros());
+                    return elapsed;
                 }
             }
             tui.pump(5);
