@@ -2,7 +2,7 @@
 
 # Side RFC: Plugins — rules, skills, styles and limits you plug into your agents
 
-Status: the owner agreed the architecture on 2026-09-27 (see the final two sections) and requested active development on 2026-10-02. Nothing is built yet. The earlier proposal below is historical where it differs from the chosen approach. The [first-release design](mods-first-release.md) develops the two requested bundled options, Clear prose and Less tool noise, with tracked acceptance criteria AC-266–273 in the main RFC and a [Phase 1 implementation plan](../superpowers/plans/2026-10-03-mods-phase1.md). No Mods criterion is verified yet.
+Status: the owner agreed the architecture on 2026-09-27 (see the final two sections) and requested active development on 2026-10-02. Implementation Tasks1–3 are finished in draft PR55, and the VS Code panel is finished in draft PR64; combined/runtime surface qualification is still pending. Neither slice is merged or verified as a complete Mods criterion. The earlier proposal below is historical where it differs from the chosen approach. The [first-release design](mods-first-release.md) develops the two requested bundled options, Clear prose and Less tool noise, with tracked acceptance criteria AC-266–273 in the main RFC and a [Phase 1 implementation plan](../superpowers/plans/2026-10-03-mods-phase1.md). No Mods criterion is verified yet.
 
 ## The request
 
