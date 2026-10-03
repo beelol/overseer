@@ -540,6 +540,7 @@ export interface EventPayloads {
   mods_applied: {
     snapshot: TurnModSnapshot;
   };
+  audio_changed: unknown;
 }
 
 export type KnownEventKind = keyof EventPayloads;
@@ -1018,7 +1019,7 @@ export interface Methods {
   "notices.set": { class: 'mac_only'; params: unknown; result: unknown };
   /** Which agent a window on the Mac is looking at. The Mac only: It describes the Mac's own windows. */
   "ui.focus": { class: 'mac_only'; params: unknown; result: unknown };
-  /** Audio Mode: on or off, the track and the cues. */
+  /** Audio Mode: source availability, revision and twelve line previews. */
   "audio.get": { class: 'read'; params: Record<string, never>; result: unknown };
   /** The Mac's installed voices for System voice. */
   "audio.voices": { class: 'read'; params: Record<string, never>; result: unknown };
@@ -1475,6 +1476,8 @@ export interface Methods {
     confirm: boolean;
     expected_revision: number;
   }; result: unknown };
+  /** Choose Built-in or a local twelve-line audio folder. The Mac only: It selects audio stored on the Mac. */
+  "audio.source.set": { class: 'mac_only'; params: unknown; result: unknown };
 }
 
 export type MethodName = keyof Methods;
@@ -1760,6 +1763,7 @@ export const METHOD_CLASS = {
   "mods.unbind": 'mac_only',
   "mods.why": 'read',
   "mods.remove": 'mac_only',
+  "audio.source.set": 'mac_only',
 } as const satisfies Record<MethodName, MethodClass>;
 
 export type PhoneMethod = { [K in MethodName]: Methods[K]['class'] extends 'mac_only' ? never : K }[MethodName];

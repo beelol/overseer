@@ -508,7 +508,8 @@
     },
     "mods_applied": {
       "snapshot": "TurnModSnapshot"
-    }
+    },
+    "audio_changed": "json"
   },
   "methods": {
     "hello": {
@@ -1375,7 +1376,7 @@
     },
     "audio.get": {
       "class": "read",
-      "summary": "Audio Mode: on or off, the track and the cues",
+      "summary": "Audio Mode: source availability, revision and twelve line previews",
       "phone": "available",
       "params": {},
       "result": "json"
@@ -3035,6 +3036,14 @@
       },
       "result": "json",
       "reason": "Local owner control; phone inspection is read-only"
+    },
+    "audio.source.set": {
+      "class": "mac_only",
+      "summary": "Choose Built-in or a local twelve-line audio folder",
+      "phone": "mac_only",
+      "reason": "It selects audio stored on the Mac",
+      "params": "json",
+      "result": "json"
     }
   }
 }
