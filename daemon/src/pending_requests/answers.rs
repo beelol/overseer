@@ -116,6 +116,34 @@ pub(super) fn migrate(conn: &Connection) -> Result<()> {
             ))?;
         }
     }
+    let added_delivery = !columns.iter().any(|c| c == "receipt_delivery");
+    if added_delivery {
+        conn.execute_batch("ALTER TABLE native_answer_attempts ADD COLUMN receipt_delivery TEXT")?;
+    }
+    if !columns.iter().any(|c| c == "recovery_cursor") {
+        conn.execute_batch("ALTER TABLE native_answer_attempts ADD COLUMN recovery_cursor INTEGER NOT NULL DEFAULT 0")?;
+    }
+    conn.execute_batch("CREATE TABLE IF NOT EXISTS native_receipt_recovery_cursor(
+        id INTEGER PRIMARY KEY CHECK(id=1), value INTEGER NOT NULL);
+        INSERT OR IGNORE INTO native_receipt_recovery_cursor(id,value) VALUES(1,0);
+        CREATE INDEX IF NOT EXISTS native_attempt_recovery ON native_answer_attempts(receipt_delivery,recovery_cursor,created_ms,delivery_token);")?;
+    if added_delivery {
+        let previous: Vec<(String, String)> = conn
+            .prepare(
+                "SELECT delivery_token,result FROM native_answer_attempts WHERE result IS NOT NULL",
+            )?
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        for (token, result) in previous {
+            let result: Value = serde_json::from_str(&result).unwrap_or(Value::Null);
+            if let Some(delivery @ ("written" | "not_written")) = result["delivery"].as_str() {
+                conn.execute(
+                    "UPDATE native_answer_attempts SET receipt_delivery=?2 WHERE delivery_token=?1",
+                    params![token, delivery],
+                )?;
+            }
+        }
+    }
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS native_denial_receipts(
         delivery_token TEXT PRIMARY KEY REFERENCES native_answer_attempts(delivery_token),
@@ -426,6 +454,7 @@ fn seal_no_contact(
         "UPDATE native_answer_attempts SET result=?2 WHERE delivery_token=?1 AND result IS NULL",
         params![token, result.to_string()],
     )?;
+    save_receipt_delivery(&store, token, "not_written")?;
     // Store serialization decides whether same-generation restoration still
     // applies. A concurrently published replacement/resolution is never reset.
     let event = if row.lifecycle == "claimed"
@@ -610,6 +639,7 @@ pub(crate) fn answer(d: &Daemon, p: &Value) -> Result<Value> {
         "UPDATE native_answer_attempts SET result=?2 WHERE delivery_token=?1 AND result IS NULL",
         params![token, result.to_string()],
     )?;
+    save_receipt_delivery(&store, &token, delivery)?;
     if delivery == "written" {
         record_written_denial(&store, &token)?;
     }
@@ -695,75 +725,141 @@ pub(crate) fn bool_answer(
     answer(d, &value).map(Some)
 }
 
-/// Reconciliation is a private status query, never a response reconstruction.
-/// A current daemon-owned claim is skipped; an orphan is queried against the
-/// exact surviving qualified generation. The old public attempt stays immutable.
-pub(crate) fn reconcile(d: &Daemon, run_id: Option<&str>) -> Result<()> {
-    let rows: Vec<(String, String)> = {
-        let store = d.store.lock().unwrap();
-        let mut query=store.conn.prepare("SELECT p.key,p.process_run_id FROM native_pending_requests p JOIN runs r ON r.id=p.process_run_id
-            WHERE p.generation=r.process_generation AND p.lifecycle IN ('claimed','uncertain')
-            AND (?1 IS NULL OR p.process_run_id=?1 OR p.display_run_id=?1) ORDER BY p.arrival_seq LIMIT 16")?;
+/// The inspection cursor is private: reserving a page does not change any
+/// request, public cursor, first answer result or native grant. Advance even
+/// skipped/uncertain candidates so they cannot starve a later orphan receipt.
+struct RecoveryAttempt {
+    key: String,
+    owner: String,
+    token: String,
+    digest: String,
+    generation: i64,
+    actor: String,
+}
+fn recovery_page(store: &Store, run_id: Option<&str>) -> Result<Vec<RecoveryAttempt>> {
+    reserve_recovery_page(&store.conn, run_id)
+}
+fn reserve_recovery_page(conn: &Connection, run_id: Option<&str>) -> Result<Vec<RecoveryAttempt>> {
+    let tx = conn.unchecked_transaction()?;
+    let rows = {
+        let mut query = conn.prepare("SELECT p.key,p.process_run_id,a.delivery_token,a.answer_digest,a.generation,a.actor
+            FROM native_answer_attempts a JOIN native_pending_requests p ON p.key=a.request_key
+            JOIN runs r ON r.id=p.process_run_id
+            WHERE a.receipt_delivery IS NULL AND a.generation=p.generation AND a.generation=r.process_generation
+            AND (?1 IS NULL OR p.process_run_id=?1 OR p.display_run_id=?1)
+            ORDER BY a.recovery_cursor,a.created_ms,a.delivery_token LIMIT 16")?;
         let rows = query
-            .query_map([run_id], |r| Ok((r.get(0)?, r.get(1)?)))?
-            .collect::<rusqlite::Result<_>>()?;
+            .query_map([run_id], |r| {
+                Ok(RecoveryAttempt {
+                    key: r.get(0)?,
+                    owner: r.get(1)?,
+                    token: r.get(2)?,
+                    digest: r.get(3)?,
+                    generation: r.get(4)?,
+                    actor: r.get(5)?,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
         rows
     };
-    for (key, owner) in rows {
-        let process = d.native_process_gate(&owner);
+    if !rows.is_empty() {
+        let cursor: i64 = conn.query_row(
+            "SELECT value FROM native_receipt_recovery_cursor WHERE id=1",
+            [],
+            |r| r.get(0),
+        )?;
+        let next = cursor
+            .checked_add(1)
+            .ok_or_else(|| refuse("native_unqualified"))?;
+        conn.execute(
+            "UPDATE native_receipt_recovery_cursor SET value=?1 WHERE id=1",
+            [next],
+        )?;
+        for row in &rows {
+            conn.execute(
+                "UPDATE native_answer_attempts SET recovery_cursor=?2 WHERE delivery_token=?1",
+                params![row.token, next],
+            )?;
+        }
+    }
+    tx.commit()?;
+    Ok(rows)
+}
+fn save_receipt_delivery(store: &Store, token: &str, delivery: &str) -> Result<()> {
+    if matches!(delivery, "written" | "not_written") {
+        store.conn.execute("UPDATE native_answer_attempts SET receipt_delivery=?2 WHERE delivery_token=?1 AND receipt_delivery IS NULL",params![token,delivery])?;
+    }
+    Ok(())
+}
+/// Status evidence needs the surviving qualified transport, not an active turn.
+/// It never grants permission to send, reopen a request or use a replacement.
+fn historical_socket(
+    store: &Store,
+    row: &Item,
+    attempt: &RecoveryAttempt,
+) -> Result<std::path::PathBuf> {
+    let run = store
+        .run(&attempt.owner)?
+        .ok_or_else(|| refuse("stale_generation"))?;
+    if row.owner != attempt.owner
+        || row.generation != attempt.generation
+        || run.process_generation != attempt.generation
+    {
+        return Err(refuse("stale_generation"));
+    }
+    frozen_socket(store, row)
+}
+fn current_orphan(row: &Item, attempt: &RecoveryAttempt, revision: i64) -> bool {
+    row.revision == revision
+        && row.token.as_deref() == Some(attempt.token.as_str())
+        && row.digest.as_deref() == Some(attempt.digest.as_str())
+        && matches!(row.lifecycle.as_str(), "claimed" | "uncertain")
+}
+
+/// Query receipts only. Historical written policy is independent of live answer
+/// eligibility; terminal/superseded requests retain their exact public state.
+pub(crate) fn reconcile(d: &Daemon, run_id: Option<&str>) -> Result<()> {
+    let rows = recovery_page(&d.store.lock().unwrap(), run_id)?;
+    for attempt in rows {
+        let process = d.native_process_gate(&attempt.owner);
         let _process = match gate_until(&process, Instant::now() + Duration::from_secs(2)) {
             Ok(g) => g,
             Err(_) => continue,
         };
-        // Claim registration happens before publication under this same process
-        // gate. Release the registry guard before taking Store; no inverse lock.
-        let active = d.native_active_claims.lock().unwrap().clone();
-        let (token, digest, generation, socket, revision, actor) = {
+        // Registration precedes claim publication under this process gate.
+        // Release registry before Store: neither queries nor tombstones may
+        // interfere with a daemon-owned answer that has not contacted the shim.
+        if d.native_active_claims
+            .lock()
+            .unwrap()
+            .contains(&attempt.token)
+        {
+            continue;
+        }
+        let (socket, revision) = {
             let store = d.store.lock().unwrap();
-            let row = item(&store, &key)?;
-            if !matches!(row.lifecycle.as_str(), "claimed" | "uncertain")
-                || live(&store, &row, &row.display).is_err()
-            {
-                continue;
-            }
-            let (Some(token), Some(digest)) = (row.token.as_ref(), row.digest.as_ref()) else {
-                continue;
-            };
-            if active.contains(token) {
-                continue;
-            }
-            let socket = match frozen_socket(&store, &row) {
+            let row = item(&store, &attempt.key)?;
+            let socket = match historical_socket(&store, &row, &attempt) {
                 Ok(s) => s,
                 Err(_) => continue,
             };
-            let actor: String = store.conn.query_row(
-                "SELECT actor FROM native_answer_attempts WHERE delivery_token=?1",
-                [token],
-                |r| r.get(0),
-            )?;
-            (
-                token.clone(),
-                digest.clone(),
-                row.generation,
-                socket,
-                row.revision,
-                serde_json::from_str::<Value>(&actor)?,
-            )
+            (socket, row.revision)
         };
-        // Strictly no `data` field, answer decode/encode, launch or native reply.
+        // Strictly no `data`, answer decode/encode, launch or native reply.
         let receipt = crate::shim::native_reply::control(
             &socket,
-            &json!({"op":"request_reply_status",
-            "generation":generation,"delivery_token":token,"answer_digest":digest}),
+            &json!({
+            "op":"request_reply_status","generation":attempt.generation,
+            "delivery_token":attempt.token,"answer_digest":attempt.digest}),
         );
         let delivery = match receipt
             .as_ref()
             .ok()
             .filter(|r| {
                 r["ok"] == true
-                    && r["generation"] == generation
-                    && r["delivery_token"] == token
-                    && r["answer_digest"] == digest
+                    && r["generation"] == attempt.generation
+                    && r["delivery_token"] == attempt.token
+                    && r["answer_digest"] == attempt.digest
             })
             .and_then(|r| r["state"].as_str())
         {
@@ -783,32 +879,50 @@ pub(crate) fn reconcile(d: &Daemon, run_id: Option<&str>) -> Result<()> {
         };
         let event = {
             let store = d.store.lock().unwrap();
-            let row = item(&store, &key)?;
-            if row.revision != revision
-                || row.token.as_deref() != Some(token.as_str())
-                || !matches!(row.lifecycle.as_str(), "claimed" | "uncertain")
-                || live(&store, &row, &row.display).is_err()
-            {
+            let row = item(&store, &attempt.key)?;
+            if historical_socket(&store, &row, &attempt).ok().as_ref() != Some(&socket) {
+                continue;
+            }
+            let saved: Option<(String,i64,Option<String>)> = store.conn.query_row(
+                "SELECT answer_digest,generation,receipt_delivery FROM native_answer_attempts WHERE delivery_token=?1 AND request_key=?2",
+                params![attempt.token,attempt.key],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional()?;
+            if !saved.is_some_and(|(digest, generation, delivery)| {
+                digest == attempt.digest && generation == attempt.generation && delivery.is_none()
+            }) {
                 continue;
             }
             let tx = store.conn.unchecked_transaction()?;
-            let result = json!({"request_key":key,"revision":row.revision+1,"delivery":delivery,"lifecycle":lifecycle});
-            store.conn.execute("UPDATE native_answer_attempts SET result=?2 WHERE delivery_token=?1 AND result IS NULL",params![token,result.to_string()])?;
+            save_receipt_delivery(&store, &attempt.token, delivery)?;
             if delivery == "written" {
-                record_written_denial(&store, &token)?;
+                record_written_denial(&store, &attempt.token)?;
             }
-            let public: String = store.conn.query_row(
-                "SELECT projection FROM native_pending_requests WHERE key=?1",
-                [&key],
-                |r| r.get(0),
-            )?;
-            let public: Value = serde_json::from_str(&public)?;
-            let event =
+            // A historical receipt has no execution/confirmation authority.
+            // Only this exact still-live orphan may change public lifecycle.
+            let event = if current_orphan(&row, &attempt, revision)
+                && live(&store, &row, &row.display).is_ok()
+            {
+                let result = json!({"request_key":attempt.key,"revision":row.revision+1,"delivery":delivery,"lifecycle":lifecycle});
+                store.conn.execute("UPDATE native_answer_attempts SET result=?2 WHERE delivery_token=?1 AND result IS NULL",params![attempt.token,result.to_string()])?;
+                let public: String = store.conn.query_row(
+                    "SELECT projection FROM native_pending_requests WHERE key=?1",
+                    [&attempt.key],
+                    |r| r.get(0),
+                )?;
+                let public: Value = serde_json::from_str(&public)?;
                 if row.lifecycle != lifecycle || public["reason_code"].as_str() != Some(reason) {
-                    Some(update(&store, &row, lifecycle, reason, &actor)?)
+                    Some(update(
+                        &store,
+                        &row,
+                        lifecycle,
+                        reason,
+                        &serde_json::from_str::<Value>(&attempt.actor)?,
+                    )?)
                 } else {
                     None
-                };
+                }
+            } else {
+                None
+            };
             tx.commit()?;
             event
         };
@@ -817,4 +931,96 @@ pub(crate) fn reconcile(d: &Daemon, run_id: Option<&str>) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+
+    #[test]
+    fn unresolved_receipt_pages_advance_past_uncertain_rows_and_survive_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("recovery.sqlite");
+        let conn = Connection::open(&path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE runs(id TEXT PRIMARY KEY,process_generation INTEGER NOT NULL);
+            INSERT INTO runs VALUES('owner',1);",
+        )
+        .unwrap();
+        super::super::migrate(&conn).unwrap();
+        for n in 0..17 {
+            let key = format!("key-{n:02}");
+            let token = format!("token-{n:02}");
+            conn.execute("INSERT INTO native_pending_requests(key,process_run_id,display_run_id,generation,native_id,protocol,envelope,offer_digest,projection,revision,lifecycle,arrival_seq,changed_seq,created_ms)
+                VALUES(?1,'owner','owner',1,?1,'codex-0.158','{}','offer','{}',3,'uncertain',?2,?2,?2)",params![key,n]).unwrap();
+            conn.execute("INSERT INTO native_answer_attempts(delivery_token,request_key,generation,answer_digest,actor,created_ms,result)
+                VALUES(?1,?2,1,'digest','{}',?3,'immutable-first-result')",params![token,key,n]).unwrap();
+        }
+        let first = reserve_recovery_page(&conn, Some("owner")).unwrap();
+        assert_eq!(first.len(), 16);
+        assert_eq!(first[0].token, "token-00");
+        assert_eq!(first[15].token, "token-15");
+        drop(conn);
+        let conn = Connection::open(path).unwrap();
+        let second = reserve_recovery_page(&conn, Some("owner")).unwrap();
+        assert_eq!(second.len(), 16);
+        assert_eq!(
+            second[0].token, "token-16",
+            "earlier uncertain attempts cannot permanently starve the later token"
+        );
+        assert_eq!(conn.query_row("SELECT COUNT(*) FROM native_pending_requests WHERE lifecycle='uncertain' AND revision=3 AND projection='{}'",[],|r|r.get::<_,i64>(0)).unwrap(),17);
+        assert_eq!(conn.query_row("SELECT COUNT(*) FROM native_answer_attempts WHERE result='immutable-first-result' AND receipt_delivery IS NULL",[],|r|r.get::<_,i64>(0)).unwrap(),17);
+        assert_eq!(
+            conn.query_row(
+                "SELECT value FROM native_receipt_recovery_cursor WHERE id=1",
+                [],
+                |r| r.get::<_, i64>(0)
+            )
+            .unwrap(),
+            2
+        );
+    }
+
+    #[test]
+    fn historical_attempt_cannot_settle_a_new_token_or_terminal_request() {
+        let attempt = RecoveryAttempt {
+            key: "key".into(),
+            owner: "owner".into(),
+            token: "old".into(),
+            digest: "digest".into(),
+            generation: 1,
+            actor: "{}".into(),
+        };
+        let mut row = Item {
+            key: "key".into(),
+            owner: "owner".into(),
+            display: "owner".into(),
+            generation: 1,
+            protocol: "codex-0.158".into(),
+            envelope: "{}".into(),
+            offer_digest: "offer".into(),
+            revision: 3,
+            lifecycle: "claimed".into(),
+            token: Some("new".into()),
+            digest: Some("digest".into()),
+        };
+        assert!(
+            !current_orphan(&row, &attempt, 3),
+            "an older status receipt cannot settle a newer claim"
+        );
+        row.token = Some("old".into());
+        assert!(
+            current_orphan(&row, &attempt, 3),
+            "the exact current orphan remains eligible for the separate live check"
+        );
+        assert!(
+            !current_orphan(&row, &attempt, 2),
+            "a changed revision remains frozen"
+        );
+        row.lifecycle = "native_resolved".into();
+        assert!(
+            !current_orphan(&row, &attempt, 3),
+            "terminal historical bookkeeping must not reopen the request"
+        );
+    }
 }
