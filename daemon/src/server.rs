@@ -96,6 +96,19 @@ thread_local! {
 pub(crate) fn native_authority() -> Option<NativeAuthority> {
     NATIVE_AUTHORITY.with(|a| a.borrow().clone())
 }
+/// Synthetic-only observation at the actual token-authenticated tool entrance.
+/// Static labels only; never record tokens, proposal payloads, IDs or answers.
+pub(crate) fn fixture_native_tool_authority() {
+    if std::env::var("OVERSEER_TEST_NET").as_deref()!=Ok("1")
+        || std::env::var("FIXTURE_MODE").as_deref()!=Ok("native-pending") { return; }
+    let Some(dir)=std::env::var_os("OVERSEER_TEST_NATIVE_TOOL_AUTHORITY_PROBE")
+        .map(std::path::PathBuf::from).filter(|p|p.is_dir()) else {return};
+    let authority=match native_authority() {
+        None=>"none",Some(NativeAuthority::LocalOwner)=>"local_owner",
+        Some(NativeAuthority::Device(_))=>"device",Some(_)=>"confirmed",
+    };
+    let _=std::fs::write(dir.join("authority.json"),json!({"authority":authority}).to_string());
+}
 pub(crate) fn with_native_authority<T>(authority: NativeAuthority, f: impl FnOnce() -> T) -> T {
     struct Restore(Option<NativeAuthority>);
     impl Drop for Restore {

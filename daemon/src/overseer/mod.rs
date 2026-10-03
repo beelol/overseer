@@ -201,6 +201,7 @@ impl Daemon {
             return crate::swarm::native::call(self, &holder, name, arguments);
         }
         let (run_id, role) = self.token_holder(token)?;
+        crate::server::fixture_native_tool_authority();
         if !self.tools_of_run(&run_id, &role).iter().any(|t| t["name"] == name) {
             bail!("{role} runs have no tool {name}");
         }

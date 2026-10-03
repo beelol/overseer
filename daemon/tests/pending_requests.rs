@@ -877,6 +877,62 @@ mod slice2 {
     }
 
     #[test]
+    fn absent_receipt_status_tombstone_refuses_delayed_original_after_retry() {
+        let (s,v) = start_vector("command_command_decline");
+        let db = rusqlite::Connection::open(s.daemon.home.path().join("overseer.sqlite")).unwrap();
+        let (dir,generation):(String,i64) = db.query_row(
+            "SELECT run_dir,process_generation FROM runs WHERE id=?1",[s.run()],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+        let launch:Value = serde_json::from_slice(&std::fs::read(Path::new(&dir).join("launch.json")).unwrap()).unwrap();
+        let socket = PathBuf::from(launch["control_socket"].as_str().unwrap());
+        let data = format!("{}\n",v["response"]);
+        let digest = format!("{:x}",Sha256::digest(data.as_bytes()));
+        let old = format!("delivery-{}",uuid::Uuid::new_v4().simple());
+        let original = json!({"op":"request_reply","generation":generation,
+            "delivery_token":old,"answer_digest":digest,"data":data});
+        // The original connection exists before the status query, but its first
+        // request bytes are held by the test. This is an actual delayed client.
+        let mut delayed = UnixStream::connect(&socket).unwrap();
+        delayed.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        delayed.set_write_timeout(Some(Duration::from_secs(5))).unwrap();
+        let status = response(&socket,json!({"op":"request_reply_status","generation":generation,
+            "delivery_token":old,"answer_digest":digest}));
+        assert_eq!(status["state"],"not_written","authoritative absent receipt disposition: {status}");
+        assert!(native_replies(&s).is_empty());
+        let retry = format!("delivery-{}",uuid::Uuid::new_v4().simple());
+        let mut retried = original.clone(); retried["delivery_token"] = json!(retry);
+        assert_eq!(response(&socket,retried)["state"],"written");
+        assert_eq!(wait_replies(&s,1),vec![v["response"].clone()]);
+        writeln!(delayed,"{original}").unwrap();
+        let mut line=String::new(); BufReader::new(delayed).read_line(&mut line).unwrap();
+        let late:Value=serde_json::from_str(&line).unwrap();
+        assert_eq!(late,status,"query tombstone terminally prevents the original delayed token from writing");
+        assert_eq!(native_replies(&s),vec![v["response"].clone()]);
+        let durable:Value=serde_json::from_slice(&std::fs::read(Path::new(&dir)
+            .join("native-receipts").join(format!("{old}.json"))).unwrap()).unwrap();
+        assert_eq!(durable["state"],"not_written","no restoration authority without a durable token tombstone");
+        s.no_protected_action();
+    }
+
+    #[test]
+    fn native_token_tool_cannot_inherit_local_owner_transport_authority() {
+        let probe=tmp();
+        let s=Script::start_with_env("codex-app","codex-cli 0.158.0",
+            vec![emit(command(json!(7),"native-tool-offer")),mark(ONE)], &[
+                ("OVERSEER_TEST_NET","1"),("OVERSEER_CONTINUITY_PROBES","off"),
+                ("OVERSEER_TEST_NATIVE_TOOL_AUTHORITY_PROBE",probe.path().to_str().unwrap()),
+            ]);
+        s.marker(ONE,1); let before=s.requests();
+        let token=s.daemon.call("overseer.token",json!({"run_id":s.run(),"role":"overseer"}));
+        let result=s.daemon.call("overseer.tool",json!({"token":token["token"],"name":"roster",
+            "arguments":{"actor":"the Mac","surface":"owner","proposal":"accepted","request_key":before[0]["key"]}}));
+        assert!(result["text"].is_string(),"the actual authenticated native tool executed");
+        let observed:Value=serde_json::from_slice(&std::fs::read(probe.path().join("authority.json")).unwrap()).unwrap();
+        assert_eq!(observed,json!({"authority":"none"}),
+            "native token/model fields must not inherit transport LocalOwner at the tool entrance");
+        assert_eq!(s.requests(),before); assert!(native_replies(&s).is_empty()); s.no_protected_action();
+    }
+
+    #[test]
     fn competing_answer_claims_emit_one_exact_native_response() {
         let (s,v)=start_vector("command_command_decline");
         let item=s.requests()[0].clone();
