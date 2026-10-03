@@ -1,0 +1,17 @@
+{
+  "schema_files": 440,
+  "sha256": "ba6ceb14f4aaeb7e0713531cb1ed0b8829bdb735fb0d5580f0d4c6dc769e2a86",
+  "server_request_methods": [
+    "item/commandExecution/requestApproval",
+    "item/fileChange/requestApproval",
+    "item/tool/requestUserInput",
+    "mcpServer/elicitation/request",
+    "item/permissions/requestApproval",
+    "item/tool/call",
+    "account/chatgptAuthTokens/refresh",
+    "attestation/generate",
+    "currentTime/read",
+    "applyPatchApproval",
+    "execCommandApproval"
+  ]
+}
