@@ -240,6 +240,134 @@ fn release_calls(d: &Daemon, gate: &Path, run: &str) -> Vec<Value> {
     serde_json::from_str(&std::fs::read_to_string(gate.join("replies.json")).unwrap()).unwrap()
 }
 
+#[test]
+fn ac200_native_finding_cannot_borrow_unrelated_owner_needs_cause() {
+    let r = tmp();
+    let (d, repository, forced, gate, initial) = native_fixture(r.path());
+    let sid = initial["id"].as_str().unwrap();
+    let native_run = initial["run_id"].as_str().unwrap();
+    let subject = run_id(&d.generic(&repository, "worktree", "/bin/sh", &["-c", "echo subject"]));
+    let watcher = run_id(&d.generic(&repository, "worktree", "/bin/sh", &["-c", "echo watcher"]));
+    d.wait_done(&subject, 20);
+    d.wait_done(&watcher, 20);
+    d.call("watch.start", json!({"subject": subject, "watcher": watcher, "brief": "review only", "by": "owner"}));
+    arm_calls(&gate, &forced, json!([
+        {"tool": "propose", "arguments": {"actions": [{"action": "archive", "agent": subject}]}}
+    ]));
+    let watcher_token = d.call("overseer.token", json!({"run_id": watcher, "role": "agent"}))["token"]
+        .as_str().unwrap().to_string();
+    let filed = d.call("overseer.tool", json!({"token": watcher_token, "name": "finding", "arguments": {
+        "result": "concern", "text": "Review data only; no owner instruction to archive."
+    }}));
+    assert_eq!(filed["is_error"], false, "{filed}");
+    wait_file(&gate.join("reached"), &d, native_run);
+    let originating = recorded_cause(&d, sid);
+    assert_eq!(originating.0, "finding");
+    assert_eq!(native_run_status(&d, native_run), "running");
+    // No extra automatic turn may follow the one genuine finding. The owner
+    // builtin below must neither start a replacement nor fabricate a token.
+    d.call("overseer.cap", json!({"cap": 1}));
+
+    // This real permission is unrelated to the review subject and archive. It
+    // arrives while the finding's authenticated native call remains gated.
+    let permission_repo = repo(&r.path().join("permission-repo"));
+    std::fs::write(r.path().join("mode"), "permission").unwrap();
+    let permission_run = run_id(&d.call("task.create", json!({
+        "repo": permission_repo, "harness": "claude", "prompt": "write perm.txt", "title": "Permission agent"
+    })));
+    let waiting = d.wait_status(&permission_run, |s| s == "waiting_for_user", 30);
+    assert_eq!(waiting["attention"]["kind"], "permission");
+    let request = waiting["attention"]["request_id"].as_str().unwrap().to_string();
+    let waiting_permissions: Vec<Value> = d.runs().into_iter().filter(|run|
+        run["status"] == "waiting_for_user" && run["attention"]["kind"] == "permission").collect();
+    assert_eq!(waiting_permissions.len(), 1, "{waiting_permissions:?}");
+    let owner_words = "handle what needs me";
+    let handled = d.call("overseer.send", json!({"text": owner_words, "surface": "ctl"}));
+    assert_eq!(handled["handled"], true, "owner words must use the actual needs builtin: {handled}");
+    assert_eq!(handled["queued"], false);
+    assert!(handled["turn"].is_null(), "the builtin must not launch another model turn: {handled}");
+    let before_release = session(&d);
+    assert_eq!(before_release["id"], sid);
+    assert_eq!(before_release["run_id"], native_run);
+    assert_eq!(native_run_status(&d, native_run), "running");
+    assert_eq!(recorded_cause(&d, sid), originating);
+    let permission_card = before_release["proposals"].as_array().unwrap().iter().find(|p|
+        p["state"] == "open" && p["actions"].as_array().is_some_and(|actions| actions.iter().any(|a|
+            a["action"] == "permission" && a["agent"] == permission_run && a["request"] == request)))
+        .expect("the owner builtin must surface the actual waiting permission").clone();
+    assert_eq!(d.run(&permission_run)["status"], "waiting_for_user");
+    assert!(!d.events(&permission_run).iter().any(|e| e["kind"] == "permission_answered"));
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.busy_timeout(Duration::from_secs(5)).unwrap();
+    let count_before: i64 = db.query_row("SELECT COUNT(*) FROM overseer_turns WHERE session_id=?1", [sid], |row| row.get(0)).unwrap();
+    let current_cause: String = db.query_row("SELECT last_cause FROM overseer_sessions WHERE id=?1", [sid], |row| row.get(0)).unwrap();
+    eprintln!("same session={sid} run={native_run} originating={originating:?}; owner_words={owner_words:?}; current_cause={current_cause}; permission={permission_run}/{request}");
+    drop(db);
+
+    let replies = release_calls(&d, &gate, native_run);
+    let after = session(&d);
+    assert_eq!(after["id"], sid);
+    assert_eq!(after["run_id"], native_run);
+    assert_eq!(recorded_cause(&d, sid), originating);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.busy_timeout(Duration::from_secs(5)).unwrap();
+    let count_after: i64 = db.query_row("SELECT COUNT(*) FROM overseer_turns WHERE session_id=?1", [sid], |row| row.get(0)).unwrap();
+    assert_eq!(count_after, count_before, "no successor model turn may supply authority");
+    let archive_proposals: Vec<Value> = after["proposals"].as_array().unwrap().iter().filter(|p|
+        ["open", "settling"].contains(&p["state"].as_str().unwrap_or("")) && p["actions"].as_array().is_some_and(|actions|
+            actions.iter().any(|a| a["action"] == "archive" && a["agent"] == subject))).cloned().collect();
+    let archived: Option<i64> = db.query_row("SELECT archived_ms FROM tasks WHERE id=?1", [d.run(&subject)["task_id"].as_str().unwrap()], |row| row.get(0)).unwrap();
+    assert_eq!(archived, None, "no archive execution is claimed or approved");
+    drop(db);
+    assert!(!d.events(&subject).iter().any(|e| matches!(e["kind"].as_str(), Some("archived" | "task_archived"))));
+    assert!(after["proposals"].as_array().unwrap().iter().any(|p| p["id"] == permission_card["id"] && p["state"] == "open"),
+        "the legitimate owner permission question must remain intact: {after}");
+    eprintln!("actual same-run native replies={replies:?}; archive proposals={archive_proposals:?}");
+    // Clean up the unrelated waiting native process before the authority
+    // assertion; no archive card is ever answered by this fixture.
+    d.call("run.permission", json!({"run_id": permission_run, "request_id": request, "allow": false, "message": "test cleanup: owner declines"}));
+    d.wait_done(&permission_run, 20);
+    assert_eq!(replies[0]["isError"], true,
+        "a finding's native Confirm proposal cannot borrow an unrelated owner's permission shortcut: {replies:?}; open={archive_proposals:?}");
+    assert!(archive_proposals.is_empty(), "no owner-authorized archive proposal was requested: {archive_proposals:?}");
+}
+
+#[test]
+fn ac200_native_action_refuses_injected_missing_turn_provenance() {
+    let r = tmp();
+    let (d, repository, forced, gate, initial) = native_fixture(r.path());
+    let subject = run_id(&d.generic(&repository, "worktree", "/bin/sh", &["-c", "echo subject"]));
+    d.wait_done(&subject, 20);
+    arm_calls(&gate, &forced, json!([
+        {"tool": "propose", "arguments": {"actions": [{"action": "archive", "agent": subject}]}}
+    ]));
+    let sent = d.call("overseer.send", json!({"text": "Archive the subject.", "surface": "ctl", "harness": "claude"}));
+    let native_run = sent["run_id"].as_str().unwrap();
+    assert_eq!(initial["run_id"], native_run);
+    wait_file(&gate.join("reached"), &d, native_run);
+    let sid = initial["id"].as_str().unwrap();
+    let (cause, turn) = recorded_cause(&d, sid);
+    assert_eq!(cause, "owner");
+    assert_eq!(sent["turn"], turn);
+    // Explicit fixture state injection, not a reproduced launch race: remove
+    // only this genuine turn's provenance while its real native call is gated.
+    // The session/run/token and owner-valued last_cause remain unchanged.
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.busy_timeout(Duration::from_secs(5)).unwrap();
+    assert_eq!(db.execute("DELETE FROM overseer_turns WHERE session_id=?1 AND turn_id=?2", rusqlite::params![sid, turn]).unwrap(), 1);
+    let last_cause: String = db.query_row("SELECT last_cause FROM overseer_sessions WHERE id=?1", [sid], |row| row.get(0)).unwrap();
+    assert_eq!(last_cause, "owner");
+    drop(db);
+    assert_eq!(session(&d)["id"], sid);
+    assert_eq!(native_run_status(&d, native_run), "running");
+    eprintln!("injected missing provenance only: same session={sid} run={native_run} turn={turn}, last_cause={last_cause}");
+    let replies = release_calls(&d, &gate, native_run);
+    let after = session(&d);
+    eprintln!("missing-origin native replies={replies:?}; proposals={}", after["proposals"]);
+    assert_eq!(replies[0]["isError"], true, "missing turn provenance cannot fall back to owner: {replies:?}");
+    assert!(after["proposals"].as_array().unwrap().iter().all(|p| !p["actions"].as_array().unwrap().iter().any(|a| a["action"] == "archive" && a["agent"] == subject)), "no archive proposal without exact turn provenance: {after}");
+}
+
 fn ask(d: &Daemon, run: &str, question: &str) -> String {
     let token = d.call("overseer.token", json!({"run_id": run, "role": "agent"}))["token"]
         .as_str()
