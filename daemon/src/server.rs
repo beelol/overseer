@@ -2835,7 +2835,10 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "run.interrupt" => d.interrupt(s(p, "run_id")?)?,
         "run.request.answer" => crate::pending_requests::answers::answer(d, p)?,
         "run.permission" => d.answer_permission_revision(s(p, "run_id")?, s(p, "request_id")?, p["allow"].as_bool().unwrap_or(false), p["message"].as_str().unwrap_or(""), p["always"].as_bool().unwrap_or(false), p.get("revision").map(|v| v.as_i64().filter(|n| *n > 0).ok_or_else(|| ProtoError::new("invalid_params", "A positive frozen revision is required"))).transpose()?)?,
-        "run.requests" => crate::pending_requests::collection(&d.store.lock().unwrap(), p["run_id"].as_str(), false)?,
+        "run.requests" => {
+            crate::pending_requests::answers::reconcile(d,p["run_id"].as_str())?;
+            crate::pending_requests::collection(&d.store.lock().unwrap(), p["run_id"].as_str(), false)?
+        },
         "run.raw_output" => d.raw_output(s(p, "run_id")?, p["max_bytes"].as_u64().unwrap_or(256 * 1024).min(4 * 1024 * 1024) as usize)?,
         "run.turns" => json!(d.store.lock().unwrap().turns(s(p, "run_id")?)?),
         "run.active" => {

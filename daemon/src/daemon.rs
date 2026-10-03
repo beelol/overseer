@@ -365,6 +365,7 @@ pub struct Daemon {
     workspace_gates: Mutex<BTreeMap<String, Arc<Mutex<()>>>>,
     work_unit_gates: Mutex<BTreeMap<String, std::sync::Weak<Mutex<()>>>>,
     native_gates: Mutex<BTreeMap<String, std::sync::Weak<Mutex<()>>>>,
+    pub(crate) native_active_claims: Mutex<HashSet<String>>,
     pub events: broadcast::Sender<Event>,
     tails: Mutex<HashSet<String>>,
     pub(crate) swarm_launch_lock: Mutex<()>,
@@ -452,7 +453,7 @@ impl Daemon {
         let bus = std::env::var("OVERSEER_TEST_EVENT_BUS").ok().and_then(|v| v.parse::<usize>().ok()).filter(|n| *n >= 16).unwrap_or(4096);
         let (tx, _) = broadcast::channel(bus);
         let exe = std::env::current_exe()?;
-        let daemon = Arc::new(Self { store: Mutex::new(store), profile_gates: Mutex::new(BTreeMap::new()), workspace_gates: Mutex::new(BTreeMap::new()), work_unit_gates: Mutex::new(BTreeMap::new()), native_gates: Mutex::new(BTreeMap::new()), events: tx, tails: Mutex::new(HashSet::new()), swarm_launch_lock: Mutex::new(()), swarm_integration_lock: Mutex::new(()), swarm_storage_blocked: std::sync::atomic::AtomicBool::new(false), exe, started_ms: now(), learning_paused: std::sync::atomic::AtomicBool::new(learning_paused),
+        let daemon = Arc::new(Self { store: Mutex::new(store), profile_gates: Mutex::new(BTreeMap::new()), workspace_gates: Mutex::new(BTreeMap::new()), work_unit_gates: Mutex::new(BTreeMap::new()), native_gates: Mutex::new(BTreeMap::new()), native_active_claims: Mutex::new(HashSet::new()), events: tx, tails: Mutex::new(HashSet::new()), swarm_launch_lock: Mutex::new(()), swarm_integration_lock: Mutex::new(()), swarm_storage_blocked: std::sync::atomic::AtomicBool::new(false), exe, started_ms: now(), learning_paused: std::sync::atomic::AtomicBool::new(learning_paused),
             learning_usage_paused: std::sync::atomic::AtomicBool::new(false), learning_work_paused: std::sync::atomic::AtomicBool::new(false),
             learning_thread_paused: std::sync::atomic::AtomicBool::new(false), learning_account_paused: std::sync::atomic::AtomicBool::new(false),
             learning_maintenance_paused: std::sync::atomic::AtomicBool::new(false),

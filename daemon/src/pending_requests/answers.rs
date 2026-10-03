@@ -6,6 +6,35 @@ use crate::server::{NativeAuthority, ProtoError};
 use crate::shim::LaunchFile;
 use std::sync::{Mutex, MutexGuard, TryLockError};
 
+/// Registration precedes claim publication. Registry guards never survive
+/// entry into a process gate/Store scope, including this guard's destructor.
+struct ActiveClaim<'a> {
+    daemon: &'a Daemon,
+    token: String,
+}
+impl<'a> ActiveClaim<'a> {
+    fn register(daemon: &'a Daemon, token: &str) -> Self {
+        daemon
+            .native_active_claims
+            .lock()
+            .unwrap()
+            .insert(token.to_string());
+        Self {
+            daemon,
+            token: token.to_string(),
+        }
+    }
+}
+impl Drop for ActiveClaim<'_> {
+    fn drop(&mut self) {
+        self.daemon
+            .native_active_claims
+            .lock()
+            .unwrap()
+            .remove(&self.token);
+    }
+}
+
 fn gate_until<T>(lock: &Mutex<T>, deadline: Instant) -> Result<MutexGuard<'_, T>> {
     loop {
         match lock.try_lock() {
@@ -463,6 +492,8 @@ pub(crate) fn answer(d: &Daemon, p: &Value) -> Result<Value> {
         response(&store, &row, &p["answer"])?;
     }
     hold("validated_before_claim", key)?;
+    let token = format!("delivery-{}", uuid::Uuid::new_v4().simple());
+    let _active_claim = ActiveClaim::register(d, &token);
     let (token, digest, data, socket, generation, claimed_revision, actor) = {
         let deadline = Instant::now() + Duration::from_secs(2);
         let _device = device
@@ -483,7 +514,6 @@ pub(crate) fn answer(d: &Daemon, p: &Value) -> Result<Value> {
         let data = response(&store, &row, &p["answer"])?;
         let denial = denial_descriptor(&row, &p["answer"])?;
         let digest = format!("{:x}", Sha256::digest(data.as_bytes()));
-        let token = format!("delivery-{}", uuid::Uuid::new_v4().simple());
         let socket = frozen_socket(&store, &row)?;
         let tx = store.conn.unchecked_transaction()?;
         store.conn.execute("INSERT INTO native_answer_attempts(delivery_token,request_key,generation,answer_digest,actor,created_ms,denied_tool,denied_detail) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
@@ -663,4 +693,128 @@ pub(crate) fn bool_answer(
         json!({"run_id":id,"request_key":key,"revision":revision,"answer":answer})
     };
     answer(d, &value).map(Some)
+}
+
+/// Reconciliation is a private status query, never a response reconstruction.
+/// A current daemon-owned claim is skipped; an orphan is queried against the
+/// exact surviving qualified generation. The old public attempt stays immutable.
+pub(crate) fn reconcile(d: &Daemon, run_id: Option<&str>) -> Result<()> {
+    let rows: Vec<(String, String)> = {
+        let store = d.store.lock().unwrap();
+        let mut query=store.conn.prepare("SELECT p.key,p.process_run_id FROM native_pending_requests p JOIN runs r ON r.id=p.process_run_id
+            WHERE p.generation=r.process_generation AND p.lifecycle IN ('claimed','uncertain')
+            AND (?1 IS NULL OR p.process_run_id=?1 OR p.display_run_id=?1) ORDER BY p.arrival_seq LIMIT 16")?;
+        let rows = query
+            .query_map([run_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        rows
+    };
+    for (key, owner) in rows {
+        let process = d.native_process_gate(&owner);
+        let _process = match gate_until(&process, Instant::now() + Duration::from_secs(2)) {
+            Ok(g) => g,
+            Err(_) => continue,
+        };
+        // Claim registration happens before publication under this same process
+        // gate. Release the registry guard before taking Store; no inverse lock.
+        let active = d.native_active_claims.lock().unwrap().clone();
+        let (token, digest, generation, socket, revision, actor) = {
+            let store = d.store.lock().unwrap();
+            let row = item(&store, &key)?;
+            if !matches!(row.lifecycle.as_str(), "claimed" | "uncertain")
+                || live(&store, &row, &row.display).is_err()
+            {
+                continue;
+            }
+            let (Some(token), Some(digest)) = (row.token.as_ref(), row.digest.as_ref()) else {
+                continue;
+            };
+            if active.contains(token) {
+                continue;
+            }
+            let socket = match frozen_socket(&store, &row) {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+            let actor: String = store.conn.query_row(
+                "SELECT actor FROM native_answer_attempts WHERE delivery_token=?1",
+                [token],
+                |r| r.get(0),
+            )?;
+            (
+                token.clone(),
+                digest.clone(),
+                row.generation,
+                socket,
+                row.revision,
+                serde_json::from_str::<Value>(&actor)?,
+            )
+        };
+        // Strictly no `data` field, answer decode/encode, launch or native reply.
+        let receipt = crate::shim::native_reply::control(
+            &socket,
+            &json!({"op":"request_reply_status",
+            "generation":generation,"delivery_token":token,"answer_digest":digest}),
+        );
+        let delivery = match receipt
+            .as_ref()
+            .ok()
+            .filter(|r| {
+                r["ok"] == true
+                    && r["generation"] == generation
+                    && r["delivery_token"] == token
+                    && r["answer_digest"] == digest
+            })
+            .and_then(|r| r["state"].as_str())
+        {
+            Some("written") => "written",
+            Some("not_written") => "not_written",
+            _ => "uncertain",
+        };
+        let lifecycle = match delivery {
+            "written" => "answered_awaiting_native",
+            "not_written" => "pending",
+            _ => "uncertain",
+        };
+        let reason = if delivery == "not_written" {
+            "definitely_unsent"
+        } else {
+            delivery
+        };
+        let event = {
+            let store = d.store.lock().unwrap();
+            let row = item(&store, &key)?;
+            if row.revision != revision
+                || row.token.as_deref() != Some(token.as_str())
+                || !matches!(row.lifecycle.as_str(), "claimed" | "uncertain")
+                || live(&store, &row, &row.display).is_err()
+            {
+                continue;
+            }
+            let tx = store.conn.unchecked_transaction()?;
+            let result = json!({"request_key":key,"revision":row.revision+1,"delivery":delivery,"lifecycle":lifecycle});
+            store.conn.execute("UPDATE native_answer_attempts SET result=?2 WHERE delivery_token=?1 AND result IS NULL",params![token,result.to_string()])?;
+            if delivery == "written" {
+                record_written_denial(&store, &token)?;
+            }
+            let public: String = store.conn.query_row(
+                "SELECT projection FROM native_pending_requests WHERE key=?1",
+                [&key],
+                |r| r.get(0),
+            )?;
+            let public: Value = serde_json::from_str(&public)?;
+            let event =
+                if row.lifecycle != lifecycle || public["reason_code"].as_str() != Some(reason) {
+                    Some(update(&store, &row, lifecycle, reason, &actor)?)
+                } else {
+                    None
+                };
+            tx.commit()?;
+            event
+        };
+        if let Some(event) = event {
+            let _ = d.events.send(event);
+        }
+    }
+    Ok(())
 }
