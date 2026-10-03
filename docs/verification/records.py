@@ -2936,19 +2936,21 @@ rec(269, "Mods can be managed and inspected from Overseer's surfaces", "partial"
     limits='Draft unmerged; PR64 is excluded from active full2a1bd2a. Do not claim phone/TUI/Gate S management or rendered usability.',
     blocker='Qualify the packaged VS Code slice when the UI slot opens, then implement/test remaining surfaces and governance. Keep AC269 partial.')
 
-rec(270, "Clear prose remains concise, complete and self-contained", "not started",
+rec(270, "Clear prose remains concise, complete and self-contained", "partial",
     date='2026-10-03',
-    commit='3c79d8a731667f97a29e4260d0b375f01ea205a8 (Mods design; no implementation)',
-    verifier='Codex, design publication; no implementation verification',
-    harness='None; documentation only',
-    fixture='No runtime fixture executed for this criterion',
-    steps='Publish reviewed design and primary-RFC Verify clause; record implementation as not started. Future commands and test cases are specified in the linked plan/design.',
-    expected='exact bundle/rules digest and separate agent/Overseer delivery tests; twelve frozen same-input off/on tasks under gpt-5.6-luna at low effort, one attempt per condition, all outputs and human rubric ratings retained. Each on answer preserves every required fact, scores at least 8/10, and has no zero in standalone context, complete sentences or evidence; wording/context scores improve where baseline has headroom. Delivery fixtures alone leave quality partial.',
-    actual='Reviewed design and acceptance scope published only. No Mods implementation, runtime qualification, UI verification, or live comparison has been performed.',
-    evidence='[reviewed Phase 1 plan](../superpowers/plans/2026-10-03-mods-phase1.md); [first-release design](../rfcs/mods-first-release.md); [primary criterion](../overseer-rfc.md); [saved prose rules](../design/mods/clear-prose-rules.md); [evaluation rubric](../design/mods/evaluation.md)',
-    live='No live or fixture implementation coverage claimed.',
-    limits='No model turns, builds, tests, UI launches, owner credentials, or production changes in this publication.',
-    blocker='Implement on codex/mods-bundles, then cover every Verify clause before changing this status. Native/global/child qualification and live prose quality remain unproved.')
+    commit='f7b4a9fc3e135513b9eb53dea9a18b27e549e69a (frozen evaluation inputs, draft PR65; delivery source PR55 975e1588)',
+    verifier='Codex coordinator content and independent hash/template inspection',
+    harness='No model evaluation; existing separate agent/Overseer delivery fixtures only',
+    fixture='Twelve synthetic frozen task inputs and 24 blank off/on records; no paid calls or owner credentials',
+    proven='Exact bundle/style digest recorded, twelve task prompts and required facts frozen before evaluation, and all off/on prompt hashes match. Prior PR55 fixture captures distinguish agent and Overseer delivery.',
+    deferred='All twelve actual off/on Luna-low outputs, reported usage and human fact/rubric ratings remain unrun. No prose quality or token savings established.',
+    steps='Read each frozen task and semantic fact requirement; verify15 artifact hashes,12 prompt hashes and all24 condition records as unrun/unrated. Preserve exact-literal flags as advisory, not automatic quality or completeness judgments.',
+    expected='Complete AC270 quality target with one attempt per condition and retained human ratings, after separate delivery qualification.',
+    actual='Frozen inputs cover every planned category, including a one-fact answer, unknown prior context, paths/errors/numbers/citation and a detailed explanation. The records contain no fabricated outputs or scores. Manifest SHA2560aed779658f28d7d04918a2e1abdedf8d9d9310968c1c002ef8c1213005e5caf; bundle fingerprint86911aa28dbf2da86311b9f9fb289db4cb049c761b7c5de41254b3ce2f09e64a.',
+    evidence='[PR65](https://github.com/beelol/overseer/pull/65); [frozen input set](https://github.com/beelol/overseer/tree/f7b4a9fc3e135513b9eb53dea9a18b27e549e69a/docs/design/mods/evaluation-fixtures/v1); [rubric](../design/mods/evaluation.md); [delivery evidence](https://github.com/beelol/overseer/blob/975e158805e36e1569a9e19843ca8bbdb5883ac6/docs/verification/evidence/ac-268/task3/README.md)',
+    live='No paid model or human quality evaluation performed.',
+    limits='A delivered instruction and a shorter answer do not prove better prose. Numeric exact-literal diagnostics can flag spelled-out facts and require human interpretation.',
+    blocker='Use the frozen set in an authorized isolated Luna-low comparison with identical starting conditions, one attempt each; retain all outputs and human ratings. Keep AC270 partial until every target passes.')
 
 rec(271, "Less tool noise installs privately and runs in isolation", "not started",
     date='2026-10-03',
