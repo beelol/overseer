@@ -10,9 +10,10 @@ const { test } = require('node:test');
 const scriptPath = path.resolve(__dirname, '../../scripts/test-all');
 const helperPath = path.resolve(__dirname, '../../scripts/test-output.js');
 
-function stage(t, result, opts = {}) {
+function stage(t, result, opts = {}, prepare = () => {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'test-all-output-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  prepare(root);
   const script = fs.readFileSync(scriptPath, 'utf8');
   const start = script.indexOf('function run(');
   const end = script.indexOf('\n/**', start);
@@ -88,4 +89,35 @@ test('buffer termination records partial streams and signal instead of implying 
   assert.equal(receipt.signal, 'SIGTERM');
   assert.equal(receipt.spawn_error, 'ENOBUFS');
   assert.equal(receipt.capture_complete, false);
+});
+
+
+test('raw evidence preserves binary bytes rather than UTF8 replacement characters', t => {
+  const run = stage(t, { status: 1, signal: null, stdout: Buffer.from([255, 0, 65]), stderr: Buffer.from([254, 10]) });
+  assert.equal(run.dirs.length, 1);
+  assert.deepEqual(fs.readFileSync(path.join(run.dirs[0], 'stdout.log')), Buffer.from([255, 0, 65]));
+  assert.deepEqual(fs.readFileSync(path.join(run.dirs[0], 'stderr.log')), Buffer.from([254, 10]));
+});
+
+test('unsafe evidence destination fails stage without writing outside its private directory', t => {
+  const run = stage(t, { status: 0, signal: null, stdout: 'test result: ok\n', stderr: '' }, {}, root => {
+    const other = path.join(root, 'outside');
+    fs.mkdirSync(other);
+    fs.symlinkSync(other, path.join(root, '.test-all-logs'));
+  });
+  assert.equal(run.result.ok, false, 'lost or unsafe evidence cannot silently pass');
+  assert.match(run.lines, /raw evidence unavailable: EACCES/);
+  assert.deepEqual(fs.readdirSync(path.join(run.root, 'outside')), []);
+});
+
+test('parallel capture enforces one aggregate byte ceiling and keeps each stream separate', t => {
+  const output = require(helperPath);
+  const captured = output.capture(5);
+  captured.add('stdout', Buffer.from([255, 0, 65, 66]));
+  captured.add('stderr', Buffer.from([67, 68, 69]));
+  captured.add('stdout', Buffer.from([70, 71]));
+  const result = captured.result();
+  assert.deepEqual(result.stdout, Buffer.from([255, 0, 65, 66]));
+  assert.deepEqual(result.stderr, Buffer.from([67]));
+  assert.equal(result.captureTruncated, true);
 });
