@@ -342,6 +342,13 @@
     "trouble": {
       "kind": "string",
       "reason": "string"
+    },
+    "mods_changed": {
+      "operation": "string",
+      "mod_id": "string?",
+      "fingerprint": "string?",
+      "revision": "number",
+      "ended_bindings": "string[]?"
     }
   },
   "methods": {
@@ -2757,6 +2764,58 @@
         "ok": "boolean",
         "kept": "number"
       }
+    },
+    "mods.list": {
+      "summary": "Inspect optional text Mods",
+      "class": "read",
+      "phone": "read",
+      "params": {},
+      "result": {
+        "revision": "number",
+        "installed": "json[]",
+        "bindings": "json[]",
+        "available_bundled": "json[]",
+        "unavailable": "json[]",
+        "support": "json"
+      }
+    },
+    "mods.preview": {
+      "summary": "Manage owner-confirmed text Mods",
+      "class": "mac_only",
+      "phone": "mac_only",
+      "params": {
+        "source": "string",
+        "operation": "'install'|'update'"
+      },
+      "result": "json",
+      "reason": "Local owner control; phone inspection is read-only"
+    },
+    "mods.install": {
+      "summary": "Manage owner-confirmed text Mods",
+      "class": "mac_only",
+      "phone": "mac_only",
+      "params": {
+        "preview_id": "string",
+        "confirm": "boolean"
+      },
+      "result": {
+        "version": "json",
+        "revision": "number"
+      },
+      "reason": "Local owner control; phone inspection is read-only"
+    },
+    "mods.remove": {
+      "summary": "Manage owner-confirmed text Mods",
+      "class": "mac_only",
+      "phone": "mac_only",
+      "params": {
+        "mod_id": "string",
+        "fingerprint": "string",
+        "confirm": "boolean",
+        "expected_revision": "number"
+      },
+      "result": "json",
+      "reason": "Local owner control; phone inspection is read-only"
     }
   }
 }

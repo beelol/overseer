@@ -358,6 +358,13 @@ export interface EventPayloads {
     kind: string;
     reason: string;
   };
+  mods_changed: {
+    operation: string;
+    mod_id?: string | null;
+    fingerprint?: string | null;
+    revision: number;
+    ended_bindings?: Array<string> | null;
+  };
 }
 
 export type KnownEventKind = keyof EventPayloads;
@@ -1239,6 +1246,35 @@ export interface Methods {
     ok: boolean;
     kept: number;
   } };
+  /** Inspect optional text Mods. */
+  "mods.list": { class: 'read'; params: Record<string, never>; result: {
+    revision: number;
+    installed: Array<unknown>;
+    bindings: Array<unknown>;
+    available_bundled: Array<unknown>;
+    unavailable: Array<unknown>;
+    support: unknown;
+  } };
+  /** Manage owner-confirmed text Mods. The Mac only: Local owner control; phone inspection is read-only. */
+  "mods.preview": { class: 'mac_only'; params: {
+    source: string;
+    operation: 'install' | 'update';
+  }; result: unknown };
+  /** Manage owner-confirmed text Mods. The Mac only: Local owner control; phone inspection is read-only. */
+  "mods.install": { class: 'mac_only'; params: {
+    preview_id: string;
+    confirm: boolean;
+  }; result: {
+    version: unknown;
+    revision: number;
+  } };
+  /** Manage owner-confirmed text Mods. The Mac only: Local owner control; phone inspection is read-only. */
+  "mods.remove": { class: 'mac_only'; params: {
+    mod_id: string;
+    fingerprint: string;
+    confirm: boolean;
+    expected_revision: number;
+  }; result: unknown };
 }
 
 export type MethodName = keyof Methods;
@@ -1514,6 +1550,10 @@ export const METHOD_CLASS = {
   "swarm.worker.reconcile": 'mac_only',
   "menubar.snapshot": 'mac_only',
   "review.seen": 'mac_only',
+  "mods.list": 'read',
+  "mods.preview": 'mac_only',
+  "mods.install": 'mac_only',
+  "mods.remove": 'mac_only',
 } as const satisfies Record<MethodName, MethodClass>;
 
 export type PhoneMethod = { [K in MethodName]: Methods[K]['class'] extends 'mac_only' ? never : K }[MethodName];

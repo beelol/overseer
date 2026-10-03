@@ -348,6 +348,11 @@ impl Store {
         self.conn.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
+            CREATE TABLE IF NOT EXISTS mod_versions(fingerprint TEXT PRIMARY KEY, mod_id TEXT NOT NULL, content TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS mod_previews(id TEXT PRIMARY KEY, content TEXT NOT NULL, result TEXT);
+            CREATE TABLE IF NOT EXISTS mod_bindings(id TEXT PRIMARY KEY, content TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS turn_mods(turn_id TEXT PRIMARY KEY REFERENCES turns(id), run_id TEXT NOT NULL, content TEXT NOT NULL);
+            INSERT OR IGNORE INTO meta(key,value) VALUES('mods_revision','0');
             CREATE TABLE IF NOT EXISTS workspaces(
               id TEXT PRIMARY KEY, path TEXT NOT NULL, repo_root TEXT NOT NULL, common_dir TEXT NOT NULL,
               kind TEXT NOT NULL, branch TEXT, owner_run_id TEXT, initial_dirty TEXT, created_ms INTEGER NOT NULL,

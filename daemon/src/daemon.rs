@@ -445,6 +445,7 @@ impl Daemon {
         paths::ensure_private_dir(&paths::runtime_dir())?;
         paths::ensure_private_dir(&paths::runs_dir())?;
         let store = Store::open(&paths::db_path())?;
+        crate::mods::library::recover(&store)?;
         let learning_paused = !store.learning_persistent;
         // The event bus. Tests shrink it (OVERSEER_TEST_EVENT_BUS) to make a subscriber fall behind.
         let bus = std::env::var("OVERSEER_TEST_EVENT_BUS").ok().and_then(|v| v.parse::<usize>().ok()).filter(|n| *n >= 16).unwrap_or(4096);

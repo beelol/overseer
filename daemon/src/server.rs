@@ -1419,6 +1419,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
 
 fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     Ok(match method {
+        "mods.list" => crate::mods::library::list(d)?,
+        "mods.preview" => crate::mods::library::preview(d, p)?,
+        "mods.install" => crate::mods::library::install(d, p)?,
+        "mods.remove" => crate::mods::library::remove(d, p)?,
         "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path(), "instance": paths::instance(), "build": BUILD}),
         "state" => d.state_for(p["include_hidden"].as_bool().unwrap_or(false))?,
         "audio.get" => crate::audio::get(d)?,
