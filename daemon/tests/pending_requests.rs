@@ -760,6 +760,65 @@ mod slice2 {
     }
 
     #[test]
+    fn native_turn_rollover_same_generation_retires_held_answer_and_keeps_current_control() {
+        let hold = AnswerGate::new();
+        let native = tmp(); let release_native = native.path().join("next-turn");
+        let mut next = command(json!(8), "current-turn-offer");
+        next["params"]["turnId"] = json!("fixture-native-turn-B");
+        let s = hold.start(vec![emit(command(json!(7), "old-turn-offer")), mark(ONE),
+            gate(&release_native),
+            emit(json!({"method":"turn/started","params":{"threadId":"$THREAD","turn":{"id":"fixture-native-turn-B"}}})),
+            emit(next), mark(TWO)]);
+        s.marker(ONE, 1); let old = s.requests()[0].clone();
+        let generation = s.daemon.run(&s.run())["process_generation"].clone();
+        hold.arm("claimed_before_send", &old);
+        let mut worker = HeldAnswer::start(&s, &hold, &old, frozen("command_command_decline")["answer"].clone());
+        worker.wait_reached(&hold, "claimed_before_send", &old); assert_claim(&s, &old);
+        std::fs::write(release_native, "release").unwrap(); s.marker(TWO, 1);
+        assert_eq!(s.daemon.run(&s.run())["process_generation"], generation,
+            "real native turn rollover occurs within the same process");
+        let collection = s.requests();
+        assert_eq!(collection[0]["lifecycle"], "native_resolved", "turn A becomes unanswerable on accepted turn B");
+        let current = collection.iter().find(|r| r["lifecycle"] == "pending").unwrap().clone();
+        assert_ne!(current["key"], old["key"]);
+        hold.release(); let reply = worker.finish();
+        assert_eq!(reply["error"]["code"], "request_resolved", "{reply}");
+        assert!(native_replies(&s).is_empty(), "held A must not write under B");
+        assert_eq!(s.daemon.call("run.request.answer", answer_params(&s, &current,
+            frozen("command_command_decline")["answer"].clone()))["delivery"], "written");
+        let mut expected = frozen("command_command_decline")["response"].clone(); expected["id"] = json!(8);
+        assert_eq!(wait_replies(&s, 1), vec![expected]); s.no_protected_action();
+    }
+
+    #[test]
+    fn native_turn_completion_retires_held_answer_before_process_settlement() {
+        let hold = AnswerGate::new();
+        let native = tmp(); let release_native = native.path().join("complete-turn");
+        let s = hold.start(vec![emit(command(json!(7), "completed-turn-offer")), mark(ONE),
+            gate(&release_native), emit(json!({"method":"turn/completed","params":{"threadId":"$THREAD",
+                "turn":{"id":"$TURN","status":"completed","error":null}}}))]);
+        s.marker(ONE, 1); let old = s.requests()[0].clone(); hold.arm("claimed_before_send", &old);
+        let mut worker = HeldAnswer::start(&s, &hold, &old, frozen("command_command_decline")["answer"].clone());
+        worker.wait_reached(&hold, "claimed_before_send", &old); assert_claim(&s, &old);
+        std::fs::write(release_native, "release").unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let events = loop {
+            let events = s.daemon.events(&s.run());
+            if events.iter().any(|e| e["kind"] == "turn_done") { break events; }
+            assert!(Instant::now() < deadline, "actual native completion was not applied");
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        let changed = events.iter().find(|e| e["kind"] == "pending_request_changed"
+            && e["payload"]["key"] == old["key"] && e["payload"]["lifecycle"] == "native_resolved")
+            .expect("native completion retires authority independently of later supervisor exit");
+        let done = events.iter().find(|e| e["kind"] == "turn_done").unwrap();
+        assert!(changed["seq"].as_i64().unwrap() < done["seq"].as_i64().unwrap());
+        hold.release(); let reply = worker.finish();
+        assert_eq!(reply["error"]["code"], "request_resolved", "{reply}");
+        assert!(native_replies(&s).is_empty()); s.no_protected_action();
+    }
+
+    #[test]
     fn replacement_generation_after_claim_before_send_rejects_old_attempt() {
         let hold = AnswerGate::new();
         let s = hold.start(vec![emit(command(json!(7), "old-offer")), mark(ONE)]);
