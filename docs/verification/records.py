@@ -2422,12 +2422,22 @@ rec(228, "You can always tell it is working", "verified", commit="4832c5e0 (bran
     evidence="[one-view](evidence/ui/one-view/) (19 to 21, 30), [voice](evidence/ui/voice/), `daemon/tests/one_view.rs`, `test/unit/plain-words.js`, pull request #27",
     live="Fixtures and the simulated voice; no paid turn.",
     limits="An agent finishing was measured by stopping a waiting agent (a waiting agent cannot finish on its own); the daemon test covers a proposal closing when its agent completes.")
-rec(229, "Heard right before it acts", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
-    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
-rec(230, "Permission modes by conversation", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate R, from the owner's first voice check, added by the owner on 2026-09-28).",
-    actual="Not started: added on 2026-09-28 from the owner's first Voice Mode session (docs/verification/evidence/owner-checks/voice-mode/).", live="—", blocker="To be built by its own agent after the Auto/Swarm merge.")
+rec(229, "Heard right before it acts", "in progress", date="2026-10-02", commit="ba3eb629 (PR #52; source committed after the grouped fixture run)",
+    harness="Synthetic Claude harness and simulated voice; no microphone or paid model calls",
+    steps="CARGO_TARGET_DIR=/private/tmp/overseer-closeout-pr49-target CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2 nice -n 20 cargo test -p overseerd --test voice --test overseer_modes --test permission_card_answers --test voice_confirm_targets",
+    expected="See AC-229's full Verify clause, including recognizer vocabulary and a corrected spoken start.",
+    actual="The four affected test groups passed together: 7 + 11 + 51 + 6 = 75. Voice fixtures cover the spoken start's exact task read-back, correction, named request retention, confirmed and multiple starts, named permission modes, and every action in a mixed confirmation. Review regressions also protect the latest spoken answer target and unrelated permission notices.",
+    evidence="[Takeover fixture evidence](evidence/ac-229-230/2026-10-02-takeover/README.md); [raw grouped run](evidence/ac-229-230/2026-10-02-takeover/voice-integrated.log); [PR #52](https://github.com/beelol/overseer/pull/52)",
+    live="Fixtures only.", limits="The selected command does not run the listener vocabulary unit tests. Full workspace and fresh packaged UI checks are running in the isolated merge copy at 7a7182e2; their result is not yet known.",
+    blocker="Finish the full workspace/vocabulary and packaged UI verification, review its evidence, then merge through AC-146. No verified checkbox yet.")
+rec(230, "Permission modes by conversation", "in progress", date="2026-10-02", commit="ba3eb629 (PR #52; source committed after the grouped fixture run)",
+    harness="Synthetic Claude harness and simulated voice; no microphone or paid model calls",
+    steps="Run the grouped command recorded for AC-229, including overseer_modes, permission_card_answers and voice_confirm_targets.",
+    expected="See AC-230's full Verify clause and the owner's always-ask Auto decision.",
+    actual="Typed and spoken mode changes and an Auto start pass. Every Auto change/start requires explicit yes, including owner-triggered turns; self-initiated suggestions retain the allowed-repository/reason checks. Refusal leaves modes unchanged. Native permissions surface and are read automatically; click, typed and spoken answers target the exact request. Clicking No now denies the native request, ordinary proposal declines stay inert, and answers advance the spoken queue even after a timeout. These fixes have reproduced red regressions and a combined 75/75 affected-test pass.",
+    evidence="[Takeover fixture evidence](evidence/ac-229-230/2026-10-02-takeover/README.md); [raw grouped run](evidence/ac-229-230/2026-10-02-takeover/voice-integrated.log); [PR #52](https://github.com/beelol/overseer/pull/52)",
+    live="Fixtures only.", limits="Fresh packaged view verification and the full-suite result remain pending on the final merged implementation. No production installation or real-room claim.",
+    blocker="Finish full verification and fresh packaged voice/talk checks, then merge through AC-146. No verified checkbox yet.")
 rec(231, "Agents start with what Overseer knows", "verified", date="2026-10-02", commit="752f33d7 (pull request #48, merged 2026-10-02)",
     harness="The Claude Code fixture as Overseer and in echo mode as the agent; daemon tests; no paid turns",
     steps="""1. `cargo test -p overseerd --test overseer_brain ac231_agents_start_with_what_overseer_knows`; unit tests in `overseer::context`.""",
@@ -2841,9 +2851,17 @@ rec(264, "One Overseer layout, and it looks like Focus Mode without its side eff
     live="Fixture agents and the Claude Code fixture only; the owner's VS Code, daemon and logins were never involved.",
     limits="Reopening the window stops what runs in its terminals (said before it happens). Other extensions see the Overseer window as a different workspace, so what they remember per folder is kept separately there. An unsaved untitled file stays with the owner's folder (VS Code keeps it there; not measured here).")
 
-rec(265, "Stop pauses an agent's queue", "not started", date="—", commit="—",
-    expected="See the RFC criterion (the owner, 2026-10-02: \"stop should pause the queue; you have to manually play the queue of messages again for them to keep sending\").",
-    actual="Not started: today a stop ends the turn and the next queued message (a spoken redirect, say) starts the next turn, so the agent keeps going (found by pull request #50's scenario).", live="—", blocker="A builder, after the current pull requests.")
+rec(265, "Stop pauses an agent's queue", "partial", date="2026-10-02", commit="a8edd4d8b99a5dac3c030492f973f3f5ab71bcec (PR #53)",
+    harness="Synthetic Claude/Continuity harnesses and simulated speech; no paid turns or owner credentials",
+    fixture="Isolated real daemon, VSIX profile, disposable repositories and offscreen TUI; optional fixture interrupt latency defaults to zero",
+    expected="See AC-265's full Verify clause.",
+    steps="Queue a typed AltEnter redirect and an actual spoken addition while the fixture is mid-turn; Stop; assert no queued turn for ten seconds; inspect ordered paused chat/grid/TUI; resume FIFO; remove one or clear and observe ten seconds without delivery. Exercise restart, hold/release, model calls, predecessor controls and a deterministic handoff during Stop.",
+    actual="The exact typed redirect (redirect:true) plus spoken addition were both queued before Stop. Packaged UI at 80c38620 passed 7/7, parity 5/5 and unit files 27/27. Independent review found a migration-during-Stop false-success race; a deterministic test failed before the fix, then passed with a stable task gate and fresh owner resolution. Final handoff 17/17 and queue 11/11 (counts include common helpers), plus TUI 1/1 passed. Independent final source review found no remaining blocker.",
+    proven="Exact paused queue flow in chat/grid/TUI, FIFO resume, clear/remove, durable pause, owner-only resume, predecessor controls, normal batching, and the handoff/Stop regression.",
+    deferred="Coordinated full scripts/test-all and fresh packaged validation of final a8edd4d8; UI/parity screenshots are from 80c38620 before the last daemon race fix.",
+    evidence="[PR #53](https://github.com/beelol/overseer/pull/53); [final logs and race evidence](https://github.com/beelol/overseer/tree/a8edd4d8b99a5dac3c030492f973f3f5ab71bcec/docs/verification/evidence/ac-265); [packaged evidence](https://github.com/beelol/overseer/tree/80c386208d7e04ba6a08029533d3f16bc52fc404/docs/verification/evidence/ui/queue-pause)",
+    live="Fixtures only.", limits="The final race fix has daemon/TUI evidence but not a newly built VSIX check. No full-suite or production claim.",
+    blocker="Builder finished with a clean worktree and no owned test processes. Keep PR #53 draft until the parent finishes integration/full/fresh-package verification.")
 
 SHORT_BLOCKERS = {
     154: "verified",
@@ -3002,8 +3020,8 @@ SHORT_BLOCKERS = {
     226: "not started (added by the owner on 2026-09-28)",
     227: "not started (added by the owner on 2026-09-28)",
     228: "not started (added by the owner on 2026-09-28)",
-    229: "not started (added by the owner on 2026-09-28)",
-    230: "not started (added by the owner on 2026-09-28)",
+    229: "75 affected fixtures pass; vocabulary/full/UI verification pending in #52",
+    230: "75 affected fixtures pass; full/UI verification pending in #52",
     231: "verified",
     232: "not started (added by the owner on 2026-09-28)",
     233: "not started (added by the owner on 2026-09-28)",
@@ -3038,7 +3056,7 @@ SHORT_BLOCKERS = {
     262: "verified",
     263: "verified",
     264: "verified",
-    265: "not started (the owner, 2026-10-02)",
+    265: "fixture flow and handoff fix pass; final full/package verification pending in #53",
 }
 TOTAL = 53
 

@@ -7,7 +7,7 @@ The handoff has the active branches, agents, tests and owner decisions. Old bloc
 | Criteria | Remaining work | Owner | Current action |
 | --- | --- | --- | --- |
 | AC-229, AC-230 | Voice read-back and permission modes | goal | #52 takes over #49; red/green fixes for Auto confirmation, native permission answers/queue and complete task read-back; full regression pending. |
-| AC-265 | Stop pauses queued messages | agent: queue_pause | codex/queue-pause; daemon, voice, chat/grid and TUI evidence required. |
+| AC-265 | Stop pauses queued messages | agent: queue_pause | Draft #53 at a8edd4d8; exact fixture and reviewed handoff fix pass. Parent owes final full suite and fresh packaged validation. |
 | AC-224, AC-225 | Per-agent and global goals | goal | Approved choices in handoff: 20 tries or 4 hours, native harness goals where supported, Overseer monitors each stop; design in orchestrator RFC. Implement and verify. |
 | AC-128, AC-246 | Phone Overseer conversation and shared Needs you count | goal | Phone gateway/client integration and parity verification; Gate S and phone are already on main. |
 | AC-210, AC-213 | Phone development isolation and production pairing guard | goal | Build and verify against merged phone/dev-daemon code; old waiting-for-#10 blocker is stale. |
