@@ -40,6 +40,26 @@ const ACCOUNTS_14: &[&str] = &[
     "answer",
     "propose",
 ];
+// Combined catalog expectation frozen independently from Mods read116c9cb.
+// Historical inputs above remain unchanged; this is the actual new launch.
+const MODS_15: &[&str] = &[
+    "roster",
+    "mods",
+    "agent",
+    "conflicts",
+    "conversation",
+    "changes",
+    "diff",
+    "file",
+    "search",
+    "usage",
+    "accounts",
+    "check_in",
+    "rally",
+    "answer",
+    "propose",
+];
+const MODS_CLAUDE_ALLOWED: &str = "mcp__overseer__roster,mcp__overseer__mods,mcp__overseer__agent,mcp__overseer__conflicts,mcp__overseer__conversation,mcp__overseer__changes,mcp__overseer__diff,mcp__overseer__file,mcp__overseer__search,mcp__overseer__usage,mcp__overseer__accounts,mcp__overseer__check_in,mcp__overseer__rally,mcp__overseer__answer,mcp__overseer__propose";
 const DENIED: &str = "Bash,Edit,Write,MultiEdit,NotebookEdit,WebFetch,WebSearch,Agent,Task,TodoWrite,KillShell,BashOutput,ToolSearch,AskUserQuestion,EnterPlanMode,ExitPlanMode";
 
 fn idle(d: &Daemon) -> Value {
@@ -208,6 +228,13 @@ fn migration(harness: &str, names: &[&str]) {
                 .unwrap()
         );
         assert!(actual.contains(&"--strict-mcp-config"));
+        assert_eq!(actual.iter().filter(|a| **a == "--allowedTools").count(), 1);
+        let allowed = actual.iter().position(|a| *a == "--allowedTools").unwrap();
+        assert_eq!(
+            actual[allowed + 1],
+            MODS_CLAUDE_ALLOWED,
+            "migrated private Claude launch advertises exact combined15, including mods"
+        );
         let denied = actual
             .iter()
             .position(|a| *a == "--disallowedTools")
@@ -225,6 +252,26 @@ fn migration(harness: &str, names: &[&str]) {
             .iter()
             .any(|a| a.starts_with("mcp_servers.overseer.env=")));
         assert!(actual.iter().any(|a| a.contains("--capability-file")));
+        assert_eq!(
+            actual
+                .iter()
+                .filter(|arg| arg.starts_with("mcp_servers.overseer.tools."))
+                .count(),
+            MODS_15.len()
+        );
+        let configured: Vec<&str> = actual
+            .windows(2)
+            .filter(|pair| pair[0] == "-c" && pair[1].starts_with("mcp_servers.overseer.tools."))
+            .map(|pair| pair[1])
+            .collect();
+        let expected: Vec<String> = MODS_15
+            .iter()
+            .map(|name| format!("mcp_servers.overseer.tools.{name}.approval_mode=\"approve\""))
+            .collect();
+        assert_eq!(
+            configured, expected,
+            "migrated private Codex launch advertises exact combined15 approvals, including mods"
+        );
         assert!(
             actual.contains(&"sandbox_mode=\"read-only\""),
             "native Codex remains read-only"
