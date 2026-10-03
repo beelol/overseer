@@ -2,7 +2,7 @@
 
 # Side RFC: Plugins — rules, skills, styles and limits you plug into your agents
 
-Status: the owner agreed the architecture on 2026-09-27 (see the final two sections) and requested active development on 2026-10-02. Nothing is built yet. The earlier proposal below is historical where it differs from the chosen approach. The [first-release design](mods-first-release.md) develops the two requested bundled options, Clear prose and Less tool noise, with proposed verification criteria. Draft criteria are not verified ACs.
+Status: the owner agreed the architecture on 2026-09-27 (see the final two sections) and requested active development on 2026-10-02. Nothing is built yet. The earlier proposal below is historical where it differs from the chosen approach. The [first-release design](mods-first-release.md) develops the two requested bundled options, Clear prose and Less tool noise, with tracked acceptance criteria AC-266–273 in the main RFC and a [Phase 1 implementation plan](../superpowers/plans/2026-10-03-mods-phase1.md). No Mods criterion is verified yet.
 
 ## The request
 
@@ -502,10 +502,11 @@ owner's decision for Gate S was that agents outside Overseer are ignored for now
 11. **Defaults for the token case.** Caveman at *full* for agents and *ultra* for Overseer's
     check-ins, or nothing on until you choose?
 
-## Draft — not agreed: acceptance criteria
+## Historical draft acceptance criteria
 
-These are a draft for discussion. They are not on the ledger, have no AC numbers and bind nothing
-until the owner agrees on the product above; then they are renumbered on `main`.
+The PLUG labels below preserve the earlier proposal; they are not ledger IDs. The chosen approach
+and owner-authorized implementation are now tracked by AC-266–273 on main. No further planning
+approval is needed; product install and changed-code confirmations still apply.
 
 - [ ] **PLUG-01 — Install is not enable.** Installing from a Git URL and commit, a Claude Code
   marketplace entry, a local folder, a `SKILL.md` folder or a typed rule adds a version to the

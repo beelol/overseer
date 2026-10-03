@@ -15,7 +15,7 @@ EACH PASS
    - merge main into a throwaway copy, keep both sides working;
    - run `nice -n 20 scripts/test-all --jobs=1` (one full run on the Mac at a time) and the UI scenarios it touches;
    - send failures back to its agent, or fix them if it is gone;
-   - squash-merge and record its criteria.
+   - land a merge commit preserving both histories, then record its criteria (AGENTS.md/AC-146).
    Stacked pull requests merge after their base. Never force-push.
 5. Partial merges (AC-204): when a slice is finished and tested, and main gains from it or another agent is blocked on it, merge that slice without waiting for the rest. Each unfinished part stays partial with its gap, or becomes a new criterion with a Verify clause and a tracker row. Unfinished features stay behind a setting or fixture gate.
 6. This goal's own rows, in the tracker's order:
