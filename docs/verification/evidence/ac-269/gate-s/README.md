@@ -1,0 +1,9 @@
+# Gate S read fixture baseline
+
+Source `e122b1236887a66b965f3f21c4abeb99e3fe45e5`, separate isolated clone `/private/tmp/overseer-mods-gate-s-20261003`, base `55ebf1d22760280ba750007c9d49cd315ddda919`. No production changes in this checkpoint. No criterion is verified by this baseline.
+
+Coordinator-approved bounded slot: nice20, one Cargo job, one Rust test worker, shared verify target. Built the standalone daemon first, then compiled this test without running it. Standalone `.d` points to this clone, replacing the previously built native-pending source. Test `.d` uses relative paths but records this clone in CARGO_MANIFEST_DIR and the exact daemon in CARGO_BIN_EXE; source/executable/manifests SHA256 are in read-artifacts.json. An initial validation script incorrectly required an absolute test-source path; corrected metadata checks passed without rerunning fixtures. This was artifact-validation setup, not a fixture result.
+
+The eleven-test executable ran once: four shared base32/Noise helpers passed, six new cases reached intended missing native `mods` tool/capability assertions, and daemon_created_watcher_reads_only_its_actual_subject failed SETUP (generic subject completed with no immediate qualifying wake; watcher=null, wakes=0). That case is not a seventh feature RED. It requires the genuine turn-completion fixture setup before qualification.
+
+Direct valid-token `overseer.tool` calls cover the authenticated daemon boundary, not actual MCP-wire delivery. Private body, unrelated projection, strict parameter, once/lock/cause and later mutation assertions remain unqualified until their paths execute. Runtime implementation, green, full suite, UI, installed/native qualification and all Gate S governance work remain pending. Processes exited and compiler was released; no production/owner settings, paid calls or UI used.
