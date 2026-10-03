@@ -376,6 +376,11 @@ impl Daemon {
             }
             let group = vec!["--mcp-config".into(), path.clone(), "--strict-mcp-config".into(), "--allowedTools".into(), allowed, "--disallowedTools".into(), denied.into()];
             remove_legacy_group(&mut args, at, &group)?;
+            // Replacing the generated group later in the launch must not
+            // change precedence of an additional saved role tool policy.
+            if args.iter().any(|arg| matches!(arg.as_str(), "--mcp-config" | "--strict-mcp-config" | "--allowedTools" | "--disallowedTools")) {
+                bail!("ambiguous remaining legacy Overseer tool policy");
+            }
         } else if harness == "codex" {
             let Some(at) = args.windows(2).position(|pair|pair[0]=="-c" && pair[1].starts_with("mcp_servers.overseer.")) else { return Ok(args) };
             let credential = args.get(at+5).and_then(|a|a.strip_prefix("mcp_servers.overseer.env={ OVERSEER_MCP_TOKEN = ")).and_then(|a|a.strip_suffix(" }"))
