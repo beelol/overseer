@@ -226,7 +226,7 @@ fn migration(harness: &str, names: &[&str]) {
             .any(|a| a.starts_with("mcp_servers.overseer.env=")));
         assert!(actual.iter().any(|a| a.contains("--capability-file")));
         assert!(
-            actual.contains(&"read-only"),
+            actual.contains(&"sandbox_mode=\"read-only\""),
             "native Codex remains read-only"
         );
     }

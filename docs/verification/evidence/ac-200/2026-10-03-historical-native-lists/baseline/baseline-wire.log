@@ -1,0 +1,28 @@
+
+running 6 tests
+test ac200_claude_frozen_accounts_14_migrates ... ok
+test ac200_claude_frozen_gate_s_13_migrates ... 
+thread 'ac200_claude_frozen_gate_s_13_migrates' panicked at daemon/tests/overseer_native_legacy_lists.rs:170:5:
+exact frozen claude 13-tool group must migrate: Err("legacy Overseer MCP argument group is ambiguous")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test ac200_claude_modified_historical_groups_refuse ... ok
+test ac200_codex_frozen_accounts_14_migrates ... 
+thread 'ac200_codex_frozen_accounts_14_migrates' panicked at daemon/tests/overseer_native_legacy_lists.rs:228:9:
+native Codex remains read-only
+FAILED
+test ac200_codex_frozen_gate_s_13_migrates ... 
+thread 'ac200_codex_frozen_gate_s_13_migrates' panicked at daemon/tests/overseer_native_legacy_lists.rs:170:5:
+exact frozen codex 13-tool group must migrate: Err("legacy Overseer MCP argument group is ambiguous")
+FAILED
+test ac200_codex_modified_historical_groups_refuse ... ok
+
+failures:
+
+failures:
+    ac200_claude_frozen_gate_s_13_migrates
+    ac200_codex_frozen_accounts_14_migrates
+    ac200_codex_frozen_gate_s_13_migrates
+
+test result: FAILED. 3 passed; 3 failed; 0 ignored; 0 measured; 4 filtered out; finished in 8.72s
+
