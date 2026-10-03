@@ -2607,6 +2607,7 @@ impl Daemon {
                         }
                     }
                     off += chunk.len() as i64;
+                    follow_diag(&format!("tail_read run={} lines={}", run.id, lines.len()));
                     self.apply_lines(&run, &lines, seg, off, &mut state)?;
                     progressed = true;
                 }
@@ -2683,6 +2684,7 @@ impl Daemon {
     }
 
     fn apply_lines(self: &Arc<Self>, run: &Run, lines: &[Value], seg: i64, off: i64, state: &mut TailState) -> Result<()> {
+        follow_diag(&format!("apply_enter run={}", run.id));
         let mut emitted = Vec::new();
         let mut pending_learning = Vec::new();
         {
@@ -2726,6 +2728,7 @@ impl Daemon {
             }
         }
         for e in emitted {
+            follow_diag(&format!("broadcast seq={} kind={}", e.seq, e.kind));
             let _ = self.events.send(e);
         }
         let sends = std::mem::take(&mut state.sends);
@@ -3990,4 +3993,15 @@ pub fn codex_identity(auth: &Path) -> Option<Value> {
         "auth_mode": data["auth_mode"].clone(),
         "has_api_key": data["OPENAI_API_KEY"].as_str().map(|k| !k.is_empty()).unwrap_or(false),
     }))
+}
+
+// Scratch-branch timing diagnostic. Never records prompt/output content.
+pub(crate) fn follow_diag(phase: &str) {
+    if let Some(path) = std::env::var_os("OVERSEER_FOLLOW_TRACE_FILE") {
+        use std::io::Write;
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+            let us = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_micros();
+            let _ = writeln!(f, "FOLLOW us={us} {phase}");
+        }
+    }
 }

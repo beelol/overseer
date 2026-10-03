@@ -178,6 +178,9 @@ impl Tui {
     }
 
     fn step(&mut self, wait: Duration) {
+        let trace = std::env::var("OVERSEER_CI_FOLLOW_TRACE").as_deref() == Ok("1");
+        let stamp = || std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros();
+        if trace { eprintln!("FOLLOW pump_enter us={}", stamp()); }
         if let Ok(m) = self.rx.recv_timeout(wait) {
             self.app.handle_msg(m);
             while let Ok(m) = self.rx.try_recv() {
@@ -185,6 +188,7 @@ impl Tui {
             }
         }
         self.app.tick(Instant::now());
+        if trace { eprintln!("FOLLOW pump_exit us={}", stamp()); }
     }
 
     /// Pumps until `cond` holds (panics after `secs`).

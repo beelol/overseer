@@ -997,7 +997,7 @@ fn t30_follow_in_the_review() {
     let barrier = t.path().join("barrier");
     std::fs::create_dir_all(&barrier).unwrap();
     let barrier_s = barrier.display().to_string();
-    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture("claude-fixture.js")), ("CLAUDE_FIXTURE_MODE", "editor"), ("FIXTURE_EDIT_BARRIER", &barrier_s), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE,FIXTURE_EDIT_BARRIER")]);
+    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture("claude-fixture.js")), ("CLAUDE_FIXTURE_MODE", "editor"), ("FIXTURE_EDIT_BARRIER", &barrier_s), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE,FIXTURE_EDIT_BARRIER,OVERSEER_FOLLOW_TRACE_FILE")]);
     let r = five_files(&t.path().join("follow"));
     let run = d.ctl("task.create", json!({ "repo": r, "harness": "claude", "prompt": "edit a.txt:8 edit b.txt:1 edit c.txt:1 edit d.txt:1 edit a.txt:2", "title": "Edits three files in turn" }))["run"]["id"].as_str().unwrap().to_string();
     d.wait_status(&run, |s| s == "running", 20);
@@ -1014,6 +1014,7 @@ fn t30_follow_in_the_review() {
     // Each edit: the review shows that file, at the change the agent made (the line it edited).
     let edit = |tui: &mut Tui, step: usize, file: &str, line: &str| -> std::time::Duration {
         let before = std::fs::read_to_string(wt.join(file)).unwrap();
+        eprintln!("FOLLOW barrier step={step} file={file} us={}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros());
         std::fs::write(barrier.join(format!("go-{step}")), "").unwrap();
         let end = std::time::Instant::now() + std::time::Duration::from_secs(20);
         let mut written = None;
@@ -1021,12 +1022,15 @@ fn t30_follow_in_the_review() {
             assert!(std::time::Instant::now() < end, "step {step}: the review did not move to {file}:\n{}", tui.screen());
             if written.is_none() && std::fs::read_to_string(wt.join(file)).unwrap() != before {
                 written = Some(std::time::Instant::now());
+                eprintln!("FOLLOW disk_observed step={step} file={file} us={}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros());
             }
             let c = &tui.app.changes;
             let there = c.path == file && !c.loading && c.hunks.get(c.change).is_some_and(|h| h.modified_lines.iter().any(|l| l == line)) && c.follow_to.is_none();
             if there {
                 if let Some(at) = written {
-                    return at.elapsed();
+                    let elapsed = at.elapsed();
+                    eprintln!("FOLLOW ready step={step} file={file} elapsed={elapsed:?} us={}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros());
+                    return elapsed;
                 }
             }
             tui.pump(5);

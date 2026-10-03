@@ -9,11 +9,17 @@ on:
     branches: [main]
     paths-ignore: ['docs/**', '**/*.md']
   workflow_dispatch:
+    inputs:
+      diagnostic:
+        description: Trace isolated Follow latency once
+        type: boolean
+        default: false
 concurrency:
   group: checks-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   checks:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.diagnostic != true }}
     runs-on: macos-latest
     timeout-minutes: 40
     steps:
@@ -29,3 +35,31 @@ jobs:
         run: node test/unit/run.js
       - name: Extension source check
         run: npm run --silent check --prefix extension
+  follow-diagnostic:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.diagnostic == true }}
+    runs-on: macos-latest
+    timeout-minutes: 20
+    env:
+      CARGO_BUILD_JOBS: 2
+      RUST_TEST_THREADS: 1
+      OVERSEER_CI_FOLLOW_TRACE: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Isolated original Follow assertion with boundary traces
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p diagnostic
+          export OVERSEER_FOLLOW_TRACE_FILE="$PWD/diagnostic/daemon.log"
+          { git rev-parse HEAD; sw_vers; rustc --version; } > diagnostic/runner.txt
+          nice -n 20 cargo test -p overseer-tui --test parity t30_follow_in_the_review -- --exact --nocapture --test-threads=1 2>&1 | tee diagnostic/follow.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: follow-boundary-diagnostic
+          path: diagnostic/

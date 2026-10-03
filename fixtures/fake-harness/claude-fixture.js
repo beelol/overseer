@@ -702,6 +702,7 @@ async function mcpClient() {
     result(false, reply);
     if (mcp) mcp.close();
   } else if (mode === 'editor') {
+    if (process.env.OVERSEER_FOLLOW_TRACE_FILE) fs.appendFileSync(process.env.OVERSEER_FOLLOW_TRACE_FILE, `FOLLOW fixture_editor_start ms=${Date.now()}\n`);
     // An agent editing files one at a time (AC-233's Follow): its prompt lists the steps, "edit
     // a.txt:40" (append to lines), "add a.txt:10" (two new lines before line 10), "remove
     // a.txt:5-7". Each is an Edit tool call, written to disk as reported. With FIXTURE_EDIT_BARRIER
@@ -724,7 +725,9 @@ async function mcpClient() {
       const id = `toolu_e_${i}`;
       assistant([{ type: 'tool_use', id, name: 'Edit', input: { file_path: file, old_string: op === 'add' ? lines[a + 2] : oldText, new_string: newText } }]);
       fs.writeFileSync(file, lines.join('\n'));
+      if (process.env.OVERSEER_FOLLOW_TRACE_FILE) fs.appendFileSync(process.env.OVERSEER_FOLLOW_TRACE_FILE, `FOLLOW fixture_disk step=${i} ms=${Date.now()}\n`);
       user([{ type: 'tool_result', tool_use_id: id, content: 'The file ' + file + ' has been updated.' }]);
+      if (process.env.OVERSEER_FOLLOW_TRACE_FILE) fs.appendFileSync(process.env.OVERSEER_FOLLOW_TRACE_FILE, `FOLLOW fixture_emitted step=${i} ms=${Date.now()}\n`);
     }
     assistant([{ type: 'text', text: `Made ${steps.length} edits.` }]);
     result(false, `Made ${steps.length} edits.`);

@@ -101,6 +101,7 @@ impl SegmentWriter {
                 self.len = 0;
             }
         }
+        crate::daemon::follow_diag(&format!("shim_write stream={stream} record_ms={}", rec["t"]));
         if self.file.write_all(line.as_bytes()).is_ok() {
             self.len += line.len() as u64;
             let _ = self.file.flush();

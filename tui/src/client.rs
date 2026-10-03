@@ -225,6 +225,7 @@ impl Inner {
                     return;
                 }
                 self.cursor.store(seq, Ordering::SeqCst);
+                crate::app::diag_follow(&format!("client_event seq={} kind={}", msg["params"]["seq"], msg["params"]["kind"]));
                 let _ = self.tx.send(Msg::Event(msg["params"].clone()));
             }
             Some("replayed") => {
@@ -263,6 +264,7 @@ impl Inner {
                 } else {
                     Ok(msg["result"].clone())
                 };
+                crate::app::diag_follow(&format!("client_reply id={id}"));
                 let _ = self.tx.send(Msg::Reply { id, result });
             }
         }
