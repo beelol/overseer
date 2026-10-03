@@ -1774,4 +1774,62 @@ mod ac274_native_vectors {
         }
     }
 
+    fn numeric_form_case(field:&str,bound:Value,value:Value)->Value {
+        let mut case=vector("claude_form_accept");
+        let mut rule=json!({"type":"number"});rule[field]=bound;
+        case["request"]["request"]["requested_schema"]["properties"]["count"]=rule;
+        case["answer"]["content"]["count"]=value;
+        case
+    }
+
+    #[test]
+    fn ac274_numeric_form_bounds_compare_integral_limits_exactly() {
+        use native_requests::*;
+        let pairs=[
+            ("minimum",json!(9007199254740993u64),json!(9007199254740992u64)),
+            ("maximum",json!(9007199254740992u64),json!(9007199254740993u64)),
+            ("minimum",json!(-9007199254740992i64),json!(-9007199254740993i64)),
+            ("maximum",json!(-9007199254740993i64),json!(-9007199254740992i64)),
+            ("minimum",json!(u64::MAX),json!(u64::MAX-1)),
+            ("maximum",json!(u64::MAX-1),json!(u64::MAX)),
+            ("minimum",json!(i64::MIN+1),json!(i64::MIN)),
+            ("maximum",json!(i64::MIN),json!(i64::MIN+1)),
+        ];
+        for (field,bound,value) in pairs {
+            let invalid=numeric_form_case(field,bound.clone(),value);
+            assert_eq!(typed_reply(&invalid),Err(CodecError::WrongAnswer),"{field}={bound} rounded distinct integers into authority");
+            let boundary=numeric_form_case(field,bound.clone(),bound.clone());
+            assert_eq!(typed_reply(&boundary).unwrap()["response"]["response"]["content"]["count"],bound);
+        }
+    }
+
+    #[test]
+    fn ac274_numeric_form_bounds_reject_unsafe_float_conversion() {
+        use native_requests::*;
+        for field in ["minimum","maximum"] {
+            for bound in [json!(9007199254740992.0f64),json!(-9007199254740992.0f64)] {
+                let case=numeric_form_case(field,bound.clone(),bound.clone());
+                assert_eq!(typed_reply(&case),Err(CodecError::Unqualified),"unsafe float bound {bound} silently accepted");
+            }
+        }
+        for (field,bound,value) in [
+            ("minimum",json!(9007199254740993u64),json!(9007199254740992.0f64)),
+            ("maximum",json!(9007199254740992u64),json!(9007199254740994.0f64)),
+            ("minimum",json!(-9007199254740992i64),json!(-9007199254740994.0f64)),
+            ("maximum",json!(-9007199254740993i64),json!(-9007199254740992.0f64)),
+        ] {
+            assert_eq!(typed_reply(&numeric_form_case(field,bound,value)),Err(CodecError::WrongAnswer));
+        }
+        for (field,bound,value) in [
+            ("minimum",json!(1.5),json!(2)),("maximum",json!(1.5),json!(1)),
+            ("minimum",json!(1.5),json!(u64::MAX)),("maximum",json!(-1.5),json!(i64::MIN)),
+        ] {
+            let case=numeric_form_case(field,bound,value.clone());
+            assert_eq!(typed_reply(&case).unwrap()["response"]["response"]["content"]["count"],value);
+        }
+        for (field,value) in [("minimum",json!(1)),("maximum",json!(2))] {
+            assert_eq!(typed_reply(&numeric_form_case(field,json!(1.5),value)),Err(CodecError::WrongAnswer));
+        }
+    }
+
 }

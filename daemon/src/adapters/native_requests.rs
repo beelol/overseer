@@ -794,7 +794,7 @@ fn supported_schema(s: &Value, depth: usize) -> bool {
         }
     }
     for k in ["minimum", "maximum"] {
-        if o.get(k).is_some_and(|v| !v.is_number()) {
+        if o.get(k).is_some_and(|v| !supported_numeric_bound(v)) {
             return false;
         }
     }
@@ -830,6 +830,41 @@ fn form_content(s: &Value, v: &Value) -> bool {
         }
     }
     true
+}
+
+// Integral JSON operands span i64/u64 and both fit exactly in i128. Float
+// bounds at/above 2^53 are explicitly unqualified: parsing/comparing them as
+// doubles must not silently discard a stricter native integer constraint.
+const FLOAT_INTEGER_BOUNDARY: i128 = 1i128 << 53;
+fn integral_number(v: &Value) -> Option<i128> {
+    v.as_i64()
+        .map(i128::from)
+        .or_else(|| v.as_u64().map(i128::from))
+}
+fn safe_float(v: &Value) -> Option<f64> {
+    v.as_f64()
+        .filter(|n| n.is_finite() && n.abs() < FLOAT_INTEGER_BOUNDARY as f64)
+}
+fn supported_numeric_bound(v: &Value) -> bool {
+    integral_number(v).is_some() || safe_float(v).is_some()
+}
+fn integer_float_cmp(integer: i128, float: f64) -> std::cmp::Ordering {
+    if integer >= FLOAT_INTEGER_BOUNDARY {
+        return std::cmp::Ordering::Greater;
+    }
+    if integer <= -FLOAT_INTEGER_BOUNDARY {
+        return std::cmp::Ordering::Less;
+    }
+    // Every integer strictly inside this range has an exact f64 representation.
+    (integer as f64).partial_cmp(&float).unwrap()
+}
+fn compare_numbers(a: &Value, b: &Value) -> Option<std::cmp::Ordering> {
+    match (integral_number(a), integral_number(b)) {
+        (Some(a), Some(b)) => Some(a.cmp(&b)),
+        (Some(a), None) => safe_float(b).map(|b| integer_float_cmp(a, b)),
+        (None, Some(b)) => safe_float(a).map(|a| integer_float_cmp(b, a).reverse()),
+        (None, None) => safe_float(a)?.partial_cmp(&safe_float(b)?),
+    }
 }
 
 // Frozen native schema validation is intentionally bounded. It rejects every
@@ -976,11 +1011,22 @@ fn schema_matches(s: &Value, v: &Value, doc: &Value, depth: usize) -> bool {
             }
         }
     }
-    if let Some(n) = v.as_f64() {
-        if s["minimum"].as_f64().is_some_and(|b| n < b)
-            || s["maximum"].as_f64().is_some_and(|b| n > b)
-        {
-            return false;
+    if v.is_number() {
+        if let Some(bound) = s.get("minimum") {
+            if !matches!(
+                compare_numbers(v, bound),
+                Some(std::cmp::Ordering::Equal | std::cmp::Ordering::Greater)
+            ) {
+                return false;
+            }
+        }
+        if let Some(bound) = s.get("maximum") {
+            if !matches!(
+                compare_numbers(v, bound),
+                Some(std::cmp::Ordering::Equal | std::cmp::Ordering::Less)
+            ) {
+                return false;
+            }
         }
         match s["format"].as_str() {
             Some("int64") if v.as_i64().is_none() => return false,
