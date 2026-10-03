@@ -2867,19 +2867,22 @@ rec(265, "Stop pauses an agent's queue", "partial", date="2026-10-02", commit="a
     live="Fixtures only.", limits="The final race fix has daemon/TUI evidence but not a newly built VSIX check. No full-suite or production claim.",
     blocker="Builder finished with a clean worktree and no owned test processes. Keep PR #53 draft until the parent finishes integration/full/fresh-package verification.")
 
-rec(266, "Text Mods have a pinned library and usable local controls", "not started",
-    date='2026-10-03',
-    commit='3c79d8a731667f97a29e4260d0b375f01ea205a8 (Mods design; no implementation)',
-    verifier='Codex, design publication; no implementation verification',
-    harness='None; documentation only',
-    fixture='No runtime fixture executed for this criterion',
-    steps='Publish reviewed design and primary-RFC Verify clause; record implementation as not started. Future commands and test cases are specified in the linked plan/design.',
-    expected='daemon/CLI round trips and migration/restart fixtures; unconfirmed mutation refused; changed source after preview and changed bytes under the same version leave existing bindings pinned; import size/path/symlink/UTF-8/schema boundaries and interrupted cleanup; removal preserves active and historical turn snapshots.',
-    actual='Reviewed design and acceptance scope published only. No Mods implementation, runtime qualification, UI verification, or live comparison has been performed.',
-    evidence='[reviewed Phase 1 plan](../superpowers/plans/2026-10-03-mods-phase1.md); [first-release design](../rfcs/mods-first-release.md); [primary criterion](../overseer-rfc.md)',
-    live='No live or fixture implementation coverage claimed.',
-    limits='No model turns, builds, tests, UI launches, owner credentials, or production changes in this publication.',
-    blocker='Implement on codex/mods-bundles, then cover every Verify clause before changing this status. Native/global/child qualification and live prose quality remain unproved.')
+rec(266, "Text Mods have a pinned library and usable local controls", "partial",
+    date="2026-10-03",
+    commit="adc4bccb9b1b007de7aaa50b366e626ef4402bbb (codex/mods-bundles, draft PR #55)",
+    verifier="Codex, focused library fixture checks; final slice/full review pending",
+    harness="Isolated fixture daemon and existing CLI; native harness paths disabled; no paid turns",
+    fixture="daemon/tests/mods.rs with private OVERSEER_HOME and task-specific Cargo target, CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2, nice -n 20",
+    proven="Task 1 text library pins preview bytes/fingerprints, never enables on install, refuses unconfirmed changes and unsupported code declarations, survives restart, bounds imports, reconciles crash states and retries failed filesystem deletion. Existing CLI round trip and method/device classes are covered.",
+    steps="""1. Focused black-box `cargo test -p overseerd --test mods`: 13 passed, including 9 Mods cases and 4 common helpers; crash/traversal cases failed before the fixes.
+2. `cargo test -p overseerd --bin overseerd gateway::classes::tests`: 4 passed; protocol generation/README checks and git diff --check passed.
+3. Initial library checkpoint 4ef4fd9e: `cargo test -p overseerd --bin overseerd mods::`: 2 passed for bundle/source byte equality and additive migration preserving task/account rows. Final full-suite rerun remains due.""",
+    expected="daemon/CLI round trips and migration/restart fixtures; unconfirmed mutation refused; changed source after preview and changed bytes under the same version leave existing bindings pinned; import size/path/symlink/UTF-8/schema boundaries and interrupted cleanup; removal preserves active and historical turn snapshots.",
+    actual="Library checkpoint exists on a draft implementation branch. Exact preview bytes survive source changes; distinct bytes under one version stay separately pinned. Completed previews/orphan versions reconcile on restart and incomplete installed trees rebuild from DB. Real filesystem deletion failure leaves the version disabled and cleanup succeeds on retry. Delivery reports unsupported; no binding or turn delivery exists yet.",
+    evidence="[draft PR #55](https://github.com/beelol/overseer/pull/55); [reviewed Phase 1 plan](../superpowers/plans/2026-10-03-mods-phase1.md); [first-release design](../rfcs/mods-first-release.md). Coordinator logs: /private/tmp/overseer-mods-task1-final.log and /private/tmp/overseer-mods-classes.log; initial units /private/tmp/overseer-mods-library-unit.log.",
+    live="Fixture/CLI coverage only; no native, UI, model or production run.",
+    deferred="Binding pinning after same-version updates and active/historical turn-snapshot preservation require Tasks 2/3, which have not started. Independent final slice review and exact-head full-suite integration remain due. Native/global/child qualification, surfaces and live prose quality are not established.",
+    blocker="Builder paused for queue regressions and the planned voice capture/completion race. Resume Tasks 2/3 when assigned the sole builder slot; keep PR #55 draft and AC-266 partial.")
 
 rec(267, "Mod scopes resolve separately for agents and Overseer", "not started",
     date='2026-10-03',
