@@ -140,6 +140,10 @@ impl Daemon {
         let Some(ask) = ask(words) else { return Ok(None) };
         let owner = self.append_session_message(&sid, "owner", Some(surface), owner_text.unwrap_or(words), None)?;
         let waiting = self.needs_waiting();
+        // Synthetic seam after capture, with no Store/authority/process lock.
+        if let [w] = waiting.as_slice() {
+            crate::pending_requests::answers::hold("needs_captured", &w.request)?;
+        }
         let open: Vec<Value> = session["proposals"].as_array().cloned().unwrap_or_default().into_iter().filter(|x| x["state"] == "open").collect();
         let (text, card) = match (ask, waiting.as_slice()) {
             (Ask::Handle, [w]) => {

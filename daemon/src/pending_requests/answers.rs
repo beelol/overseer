@@ -275,7 +275,7 @@ fn frozen_socket(store: &Store, row: &Item) -> Result<std::path::PathBuf> {
 
 /// Startup-only synthetic seam. Caller enters only after all locks are dropped.
 /// Timeout never approves or sends; the final recheck still decides authority.
-fn hold(phase: &str, key: &str) -> Result<()> {
+pub(crate) fn hold(phase: &str, key: &str) -> Result<()> {
     if std::env::var("OVERSEER_TEST_NET").as_deref() != Ok("1")
         || std::env::var("FIXTURE_MODE").as_deref() != Ok("native-pending")
     {

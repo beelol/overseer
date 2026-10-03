@@ -683,17 +683,23 @@ mod slice2 {
     }
     impl HeldAnswer {
         fn start(s: &Script, hold: &AnswerGate, item: &Value, answer: Value) -> Self {
+            Self::start_call(s,hold,"run.request.answer",answer_params(s,item,answer))
+        }
+        fn start_call(s: &Script, hold: &AnswerGate, method: &str, params: Value) -> Self {
             let socket = s.daemon.socket();
-            let params = answer_params(s, item, answer);
+            let method = method.to_string();
             let (tx, rx) = std::sync::mpsc::channel();
             let worker = std::thread::spawn(move || {
                 let mut conn = UnixStream::connect(socket).unwrap();
                 conn.set_read_timeout(Some(Duration::from_secs(35))).unwrap();
                 conn.set_write_timeout(Some(Duration::from_secs(5))).unwrap();
-                writeln!(conn, "{}", json!({"id":1,"method":"run.request.answer","params":params})).unwrap();
+                writeln!(conn, "{}", json!({"id":1,"method":method,"params":params})).unwrap();
                 let mut line = String::new();
-                BufReader::new(conn).read_line(&mut line).unwrap();
-                tx.send(serde_json::from_str(&line).unwrap()).unwrap();
+                let value = match BufReader::new(conn).read_line(&mut line) {
+                    Ok(0) | Err(_) => json!({"disconnected":true}),
+                    Ok(_) => serde_json::from_str(&line).unwrap(),
+                };
+                let _ = tx.send(value);
             });
             Self { rx, worker: Some(worker), release: hold.dir.path().join("release") }
         }
@@ -758,6 +764,53 @@ mod slice2 {
             frozen("command_command_decline")["answer"].clone()))["delivery"], "written");
         let mut expected = frozen("command_command_decline")["response"].clone(); expected["id"] = json!(8);
         assert_eq!(wait_replies(&s, 1), vec![expected]);
+    }
+
+    fn captured_needs_cannot_rebind(words: &str) {
+        let hold = AnswerGate::new(); let native = tmp(); let native_release = native.path().join("replace-ask");
+        let mut resolved = vector("resolved_integer"); resolved["params"]["threadId"] = json!("$THREAD");
+        let s = hold.start(vec![emit(command(json!(7),"captured-A")),mark(ONE),gate(&native_release),
+            emit(resolved),emit(command(json!(8),"replacement-B")),mark(TWO)]);
+        s.marker(ONE,1); let old = s.requests()[0].clone(); hold.arm("needs_captured",&old);
+        let mut worker = HeldAnswer::start_call(&s,&hold,"overseer.send",json!({"text":words,"surface":"vscode"}));
+        worker.wait_reached(&hold,"needs_captured",&old);
+        std::fs::write(native_release,"release").unwrap(); s.marker(TWO,1);
+        let current = s.requests().into_iter().find(|r|r["lifecycle"] == "pending").unwrap();
+        assert_ne!(current["key"],old["key"]); hold.release(); let reply = worker.finish();
+        assert!(native_replies(&s).is_empty(),"old Needs words must not approve replacement B: {reply}");
+        let reported = serde_json::to_string(&reply).unwrap();
+        assert!(reported.contains("stale_request"),"captured Needs identity is refused explicitly, not silently recaptured: {reply}");
+        assert_eq!(s.daemon.call("run.request.answer",answer_params(&s,&current,
+            frozen("command_command_decline")["answer"].clone()))["delivery"],"written");
+        let mut expected = frozen("command_command_decline")["response"].clone(); expected["id"] = json!(8);
+        assert_eq!(wait_replies(&s,1),vec![expected]); s.no_protected_action();
+    }
+    #[test]
+    fn captured_needs_yes_does_not_approve_replacement_native_request() { captured_needs_cannot_rebind("tell it yes"); }
+    #[test]
+    fn captured_needs_handle_does_not_propose_a_new_native_request() { captured_needs_cannot_rebind("handle what needs me"); }
+
+    #[test]
+    fn written_typed_native_declines_preserve_once_only_no_workaround_ledger() {
+        for compatibility in [false,true] {
+            let s = Script::start("codex-app","codex-cli 0.158.0",vec![emit(command(json!(7),"owner-denied-command")),mark(ONE)]);
+            s.marker(ONE,1); let item = s.requests()[0].clone();
+            let receipt = if compatibility {
+                s.daemon.call("run.permission",json!({"run_id":s.run(),"request_id":item["key"],"revision":item["revision"],"allow":false}))
+            } else { s.daemon.call("run.request.answer",answer_params(&s,&item,frozen("command_command_decline")["answer"].clone())) };
+            assert_eq!(receipt["delivery"],"written"); assert_eq!(wait_replies(&s,1),vec![frozen("command_command_decline")["response"].clone()]);
+            let db = rusqlite::Connection::open(s.daemon.home.path().join("overseer.sqlite")).unwrap();
+            let count: i64 = db.query_row("SELECT COUNT(*) FROM denied_permissions WHERE run_id=?1 AND detail=?2",
+                rusqlite::params![s.run(),"touch protected-action.txt"],|r|r.get(0)).unwrap();
+            assert_eq!(count,1,"an actually written owner decline is remembered, exactly once");
+            let other = s.daemon.call("task.create",json!({"repo":s.repo,"harness":"codex-app","prompt":"synthetic target","title":"Reroute target"}));
+            let refused = s.daemon.try_call("overseer.propose",json!({"source":"test","actions":[{"action":"message","agent":run_id(&other),"text":"Please touch protected-action.txt","why":"attempted reroute"}]})).unwrap_err();
+            assert!(refused.contains("owner denied"),"denied_match continues protecting a different agent: {refused}");
+            reject(&s,answer_params(&s,&item,frozen("command_command_decline")["answer"].clone()),"already_answered");
+            let count: i64 = db.query_row("SELECT COUNT(*) FROM denied_permissions WHERE run_id=?1 AND detail=?2",
+                rusqlite::params![s.run(),"touch protected-action.txt"],|r|r.get(0)).unwrap();
+            assert_eq!(count,1); s.no_protected_action();
+        }
     }
 
     #[test]
