@@ -370,7 +370,8 @@ fn ac140_no_model_over_the_budget_is_loaded_by_any_path() {
     o.install(ollama::qwen3_coder_30b()).install(ollama::qwen3_coder_30b_64k()).install(ollama::qwen25_coder_14b()).install(ollama::qwen35_122b());
     o.state.lock().unwrap().loaded_size.insert("qwen3-coder:30b-64k".into(), 25_411_736_042);
     let w = World::new();
-    let d = w.start(&o.url(), &[]);
+    let sample_file = w.file("load-samples.jsonl");
+    let d = w.start(&o.url(), &[("OVERSEER_TEST_LOAD_SAMPLES", sample_file.to_str().unwrap())]);
 
     // The 122B model: refused by the guard and by a load, at the smallest context, at the widest
     // ceiling, with unverified models allowed. Nothing reaches Ollama.
@@ -384,8 +385,30 @@ fn ac140_no_model_over_the_budget_is_loaded_by_any_path() {
     d.call("settings.set", json!({"values": {"ramCeilingPercent": 40, "allowUnverifiedModels": false}}));
 
     // A model inside the budget loads, watched, and what Ollama measures is recorded.
-    o.state.lock().unwrap().load_ms = 200;
-    let l = d.call("local.load", json!({"tag": "qwen3-coder:30b", "context": 65536}));
+    // Hold only the synthetic response until actual sampler reads have been acknowledged;
+    // elapsed wall time under a descheduled sampler is not evidence that sampling happened.
+    let gate = o.hold_next_load();
+    let l = std::thread::scope(|s| {
+        let loading = s.spawn(|| d.call("local.load", json!({"tag": "qwen3-coder:30b", "context": 65536})));
+        gate.wait_entered();
+        let samples = w.wait_load_samples("qwen3-coder:30b-64k", 0, 2);
+        assert_eq!(samples[0]["sample"], 1);
+        assert_eq!(samples[1]["sample"], 2);
+        w.memory(128.0, 110.0, "normal");
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        loop {
+            let samples = w.load_samples();
+            if samples.iter().any(|sample| sample["memory"]["available"] == 118_111_600_640u64) { break; }
+            assert!(std::time::Instant::now() < deadline, "the changed memory was not sampled: {samples:?}");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        gate.release();
+        loading.join().unwrap()
+    });
+    let samples = w.load_samples();
+    assert_eq!(l["loaded"]["samples"].as_u64(), Some(samples.len() as u64), "acknowledgements are actual load samples");
+    assert_eq!(l["loaded"]["lowest_available"], 118_111_600_640u64, "the lower safe reading was included");
+    w.memory(128.0, 115.2, "normal");
     assert_eq!(l["detail"]["run_tag"], "qwen3-coder:30b-64k", "the installed tag that already sets the context is used");
     assert!(l["loaded"]["samples"].as_u64().unwrap() >= 2, "memory was sampled while it loaded: {}", l["loaded"]);
     assert_eq!(l["detail"]["measured"]["size"].as_u64(), Some(25_411_736_042));
@@ -404,24 +427,32 @@ fn ac140_no_model_over_the_budget_is_loaded_by_any_path() {
 
     // Memory runs short while a model loads: the load is cancelled and the model unloaded.
     w.memory(128.0, 115.2, "normal");
-    o.state.lock().unwrap().load_ms = 1500;
+    let gate = o.hold_next_load();
+    let before = w.load_samples().len();
     std::thread::scope(|s| {
         let loading = s.spawn(|| d.try_call("local.load", json!({"tag": "qwen3-coder:30b", "context": 65536})));
-        std::thread::sleep(Duration::from_millis(400));
+        gate.wait_entered();
+        w.wait_load_samples("qwen3-coder:30b-64k", before, 1);
         w.memory(128.0, 5.0, "normal");
         let e = loading.join().unwrap().unwrap_err();
         assert_eq!(e, "the load of qwen3-coder:30b-64k was cancelled and the model unloaded: available memory fell to 5 GiB, under half the headroom of 12.8 GiB");
     });
     assert_eq!(o.asked("/api/generate").last().unwrap(), &json!({"model": "qwen3-coder:30b-64k", "keep_alive": 0}));
+    assert_eq!(d.call("local.inventory", json!({}))["loaded"], json!([]), "cancelled load leaves /api/ps empty");
+    drop(gate);
     // The system's own critical signal stops a load the same way.
     w.memory(128.0, 115.2, "normal");
+    let gate = o.hold_next_load();
+    let before = w.load_samples().len();
     std::thread::scope(|s| {
         let loading = s.spawn(|| d.try_call("local.load", json!({"tag": "qwen2.5-coder:14b", "context": 16384})));
-        std::thread::sleep(Duration::from_millis(400));
+        gate.wait_entered();
+        w.wait_load_samples("qwen2.5-coder:14b", before, 1);
         w.memory(128.0, 115.2, "critical");
         assert!(loading.join().unwrap().unwrap_err().contains("cancelled and the model unloaded: the system reports critical memory pressure"));
     });
-    std::thread::sleep(Duration::from_millis(1700)); // the fixture finishes its pretend loads
+    assert_eq!(d.call("local.inventory", json!({}))["loaded"], json!([]), "critical pressure unloads the pending model");
+    drop(gate);
     // Every load, allowed or stopped, is in the event log with memory before and after.
     let loads: Vec<Value> = d.call("events.list", json!({"limit": 5000}))["events"].as_array().unwrap().iter().filter(|e| e["kind"] == "local_load").cloned().collect();
     assert_eq!(loads.len(), 4, "one load, one unload, two stopped loads");

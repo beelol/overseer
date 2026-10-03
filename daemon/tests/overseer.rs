@@ -442,6 +442,55 @@ fn overseer_daemon(mode_file: &Path) -> Daemon {
     claude_daemon(mode_file)
 }
 
+/// PR52's fixture-only session capture barrier: harness completion continues while the
+/// derived conversation consumer is held. Initially released, armed only for the reply under test.
+struct SessionCaptureGate {
+    dir: tempfile::TempDir,
+}
+
+impl SessionCaptureGate {
+    fn new() -> Self {
+        let gate = Self { dir: tmp() };
+        gate.release();
+        gate
+    }
+    fn arm(&self) {
+        let reached = self.dir.path().join("reached");
+        if reached.exists() { std::fs::remove_file(reached).unwrap(); }
+        std::fs::remove_file(self.dir.path().join("release")).unwrap();
+    }
+    fn wait_completed(&self, d: &Daemon) -> Value {
+        let deadline = std::time::Instant::now() + Duration::from_secs(20);
+        loop {
+            let s = session(d);
+            if self.dir.path().join("reached").exists() && s["run_status"] == "completed" { return s; }
+            assert!(std::time::Instant::now() < deadline, "reply capture was not gated after raw completion: {s}");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+    fn release(&self) { std::fs::write(self.dir.path().join("release"), "").unwrap(); }
+}
+
+impl Drop for SessionCaptureGate {
+    fn drop(&mut self) { let _ = std::fs::write(self.dir.path().join("release"), ""); }
+}
+
+fn overseer_daemon_with_capture_gate(mode_file: &Path, gate: &SessionCaptureGate) -> Daemon {
+    std::fs::write(mode_file, "overseer").unwrap();
+    let mode_s = mode_file.display().to_string();
+    let gate_s = gate.dir.path().display().to_string();
+    Daemon::start(&[("OVERSEER_CLAUDE_PATH", &claude_fixture()),
+        ("CLAUDE_FIXTURE_MODE_FILE", &mode_s),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE"),
+        ("OVERSEER_TEST_NET", "1"), ("OVERSEER_VOICE_SIMULATE", "1"),
+        ("OVERSEER_CONTINUITY_PROBES", "off"),
+        ("OVERSEER_TEST_SESSION_CAPTURE_GATE", &gate_s)])
+}
+
+fn latest_overseer_message(s: &Value) -> Option<&Value> {
+    s["messages"].as_array()?.iter().rev().find(|message| message["source"] == "overseer")
+}
+
 fn session(d: &Daemon) -> Value {
     d.call("overseer.session", json!({}))
 }
@@ -1618,7 +1667,8 @@ fn ac190_rally_asks_only_where_the_digests_cannot_answer() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let mode_file = r.path().join("mode");
-    let d = overseer_daemon(&mode_file);
+    let capture = SessionCaptureGate::new();
+    let d = overseer_daemon_with_capture_gate(&mode_file, &capture);
     d.call("overseer.session", json!({}));
     d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
     d.call("agent.channel", json!({"default": "on", "by": "owner"}));
@@ -1643,7 +1693,10 @@ fn ac190_rally_asks_only_where_the_digests_cannot_answer() {
     assert_eq!(docs_line["suggested_area"], json!(["docs"]));
     // From the conversation: the report requests are one proposal that says the cost.
     d.call("overseer.send", json!({"text": format!("Rally my agents in {}", repo.display()), "surface": "ctl", "harness": "claude"}));
-    let s = wait_overseer_idle(&d, 30);
+    let s = wait_overseer(&d, "Rally proposal and its captured cost reply", 30, |s| {
+        Some(s.clone()).filter(|s| !s["proposals"].as_array().unwrap().is_empty()
+            && latest_overseer_message(s).is_some_and(|m| m["text"].as_str().unwrap_or("").starts_with("Rally:")))
+    });
     let open = s["proposals"].as_array().unwrap().clone();
     assert_eq!(open.len(), 1, "{open:?}\n{}", overseer_trace(&d));
     let actions = open[0]["actions"].as_array().unwrap();
@@ -1653,7 +1706,10 @@ fn ac190_rally_asks_only_where_the_digests_cannot_answer() {
     let said = s["messages"].as_array().unwrap().iter().rev().find(|m| m["source"] == "overseer").unwrap()["text"].as_str().unwrap().to_string();
     assert!(said.contains("2 agent turns"), "the cost before it is spent: {said}");
     // One yes: the two are asked, their reports come back through the channel, and Overseer's
-    // next turn (the reports' own) proposes the areas.
+    // next turn (the reports' own) proposes the areas. Hold its derived Map capture after raw
+    // completion to prove idle + proposal is insufficient conversation readiness.
+    let rally_message = latest_overseer_message(&s).unwrap()["id"].clone();
+    capture.arm();
     d.call("overseer.answer", json!({"id": open[0]["id"], "yes": true, "surface": "ctl", "by": "owner"}));
     for id in [&docs, &tests] {
         wait_event(&d, id, |e| e["kind"] == "report" && e["payload"]["doing"].as_str().unwrap_or("").starts_with("working in"), 30);
@@ -1664,7 +1720,14 @@ fn ac190_rally_asks_only_where_the_digests_cannot_answer() {
     let card = d.call("overseer.card", json!({"id": open[0]["id"]}));
     // Through the channel a request reads picked up (the tool call) and then answered (the report).
     assert!(card["rows"].as_array().unwrap().iter().all(|x| x["state"] == "answered" && x["picked_ms"].is_number() && x["answered_ms"].is_number()), "the reports came back: {card}");
-    let s = wait_overseer(&d, "the reports' turn proposing the areas", 90, |s| Some(s.clone()).filter(|s| s["proposals"].as_array().unwrap().iter().any(|p| p["actions"][0]["action"] == "area")));
+    let held = capture.wait_completed(&d);
+    assert!(held["proposals"].as_array().unwrap().iter().any(|p| p["actions"][0]["action"] == "area"), "the area proposal arrived before capture: {held}");
+    assert_eq!(latest_overseer_message(&held).unwrap()["id"], rally_message, "raw completion still shows the earlier Rally message");
+    capture.release();
+    let s = wait_overseer(&d, "the reports' area proposal and captured Map reply", 90, |s| {
+        Some(s.clone()).filter(|s| s["proposals"].as_array().unwrap().iter().any(|p| p["actions"][0]["action"] == "area")
+            && latest_overseer_message(s).is_some_and(|m| m["id"] != rally_message && m["text"].as_str().unwrap_or("").starts_with("Map:")))
+    });
     let open = s["proposals"].as_array().unwrap().clone();
     assert_eq!(open.len(), 1, "{open:?}");
     let actions = open[0]["actions"].as_array().unwrap();
@@ -1966,9 +2029,12 @@ fn ac193_one_agent_watches_another() {
     let e = d.try_call("watch.start", json!({"subject": watcher, "brief": "x", "harness": "claude", "by": "owner"})).unwrap_err();
     assert!(e.contains("no watcher of a watcher"), "{e}");
     let a = claude_task(&d, &repo, &mode_file, "echo", "A", "hello");
-    let b = claude_task(&d, &repo, &mode_file, "echo", "B", "hello");
+    // A named watcher must actually be idle. Starting B while A is still working can queue
+    // a legitimate companion briefing that starts after A's first completed status.
     d.wait_done(&a, 30);
+    let b = claude_task(&d, &repo, &mode_file, "echo", "B", "hello");
     d.wait_done(&b, 30);
+    assert!(d.call("run.queued", json!({"run_id": a}))["queued"].as_array().unwrap().is_empty());
     let ab = d.call("watch.start", json!({"subject": b, "watcher": a, "brief": "look", "by": "owner"}));
     let e = d.try_call("watch.start", json!({"subject": a, "watcher": b, "brief": "look back", "by": "owner"})).unwrap_err();
     assert!(e.contains("circle"), "{e}");
@@ -1989,6 +2055,56 @@ fn ac193_one_agent_watches_another() {
     d.call("run.follow_up", json!({"run_id": b, "prompt": "one more"}));
     d.wait_done(&b, 30);
     wait_event(&d, &b, |e| e["kind"] == "watch_capped" && e["payload"]["watch"] == ab_id, 10);
+}
+
+/// AC-190/193: a queued companion briefing is real future work, so the named watcher busy
+/// guard must still refuse the agent after its first turn ended and that briefing began.
+#[test]
+fn ac193_a_queued_briefing_keeps_a_named_watcher_busy() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call("agent.channel", json!({"default": "on", "by": "owner"}));
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    let a = claude_task(&d, &repo, &mode_file, "gated-briefing", "A", "hello");
+    wait_event(&d, &a, |e| e["kind"] == "output" && e["payload"]["text"] == "waiting at initial fixture gate", 30);
+    let b = claude_task(&d, &repo, &mode_file, "gated-briefing", "B", "hello");
+    wait_event(&d, &b, |e| e["kind"] == "output" && e["payload"]["text"] == "waiting at briefing fixture gate", 30);
+    wait_event(&d, &a, |e| e["kind"] == "queued" && e["source"] == "briefing", 30);
+    let queued = d.call("run.queued", json!({"run_id": a}))["queued"].as_array().unwrap().clone();
+    assert_eq!(queued.len(), 1, "one companion briefing: {queued:?}");
+    assert_eq!(queued[0]["source"], "briefing");
+    let text = queued[0]["text"].as_str().unwrap().to_string();
+    assert!(text.contains("“B”"), "{text}");
+    assert_eq!(turns(&d, &a).len(), 1, "the briefing is held behind the first turn");
+
+    std::fs::write(mode_file.with_extension("gate"), "").unwrap();
+    wait_event(&d, &a, |e| e["kind"] == "output" && e["payload"]["text"] == "waiting at briefing fixture gate", 30);
+    let a_turns = turns(&d, &a);
+    assert_eq!(a_turns.len(), 2, "one first turn and one briefing: {a_turns:?}");
+    assert_eq!(a_turns[0]["status"], "completed");
+    assert_eq!(a_turns[1]["prompt"], text, "the queued bytes became the next turn");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let source: String = db.query_row("SELECT source FROM turn_sources WHERE turn_id=?1",
+        [a_turns[1]["id"].as_str().unwrap()], |row| row.get(0)).unwrap();
+    assert_eq!(source, "briefing");
+    assert!(d.call("run.queued", json!({"run_id": a}))["queued"].as_array().unwrap().is_empty());
+    let error = d.try_call("watch.start", json!({"subject": b, "watcher": a, "brief": "look", "by": "owner"})).unwrap_err();
+    assert!(error.contains("A is busy; name an idle agent"), "{error}");
+    assert!(d.call("watch.list", json!({"run_id": b}))["watches"].as_array().unwrap().is_empty(), "busy refusal creates no watch");
+
+    std::fs::write(mode_file.with_extension("briefing.gate"), "").unwrap();
+    d.wait_done(&a, 30);
+    d.wait_done(&b, 30);
+    assert_eq!(turns(&d, &a).len(), 2, "the briefing was delivered once");
+    let watch = d.call("watch.start", json!({"subject": b, "watcher": a, "brief": "look", "by": "owner"}));
+    assert_eq!(watch["watcher"], a, "the same agent is accepted when actually idle");
+    d.call("watch.end", json!({"id": watch["id"], "by": "owner"}));
 }
 
 fn now_ms() -> i64 {
@@ -2299,7 +2415,8 @@ fn ac198_quiet_and_bounded() {
     std::fs::write(repo.join("README.md"), "# Demo\n").unwrap();
     git(&repo, &["add", "README.md"]);
     git(&repo, &["commit", "-qm", "readme"]);
-    let d = overseer_daemon(&mode_file);
+    let capture = SessionCaptureGate::new();
+    let d = overseer_daemon_with_capture_gate(&mode_file, &capture);
     d.call("overseer.session", json!({}));
     d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
     d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
@@ -2344,8 +2461,16 @@ fn ac198_quiet_and_bounded() {
     let s = wait_overseer(&d, "the cap said", 60, |s| Some(s.clone()).filter(|s| s["messages"].as_array().unwrap().iter().any(|m| m["text"].as_str().unwrap_or("").starts_with("At the cap"))));
     assert_eq!(overseer_turn_causes(&d).len(), before, "the turn Overseer would start by itself does not happen");
     assert!(s["messages"].as_array().unwrap().iter().any(|m| m["text"].as_str().unwrap_or("").starts_with("At the cap")), "it says so");
+    let cap_message = latest_overseer_message(&s).unwrap()["id"].clone();
+    capture.arm();
     d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
-    let s = wait_overseer_idle(&d, 30);
+    let held = capture.wait_completed(&d);
+    assert_eq!(latest_overseer_message(&held).unwrap()["id"], cap_message, "raw completion is not an observed answer to the owner");
+    capture.release();
+    let s = wait_overseer(&d, "the owner's actual captured answer at the cap", 30, |s| {
+        Some(s.clone()).filter(|s| latest_overseer_message(s).is_some_and(|m| m["id"] != cap_message
+            && m["text"].as_str().unwrap_or("").contains("everyone is doing")))
+    });
     assert_eq!(overseer_turn_causes(&d).len(), before + 1);
     assert_eq!(d.call("overseer.cap", json!({}))["self_started_today"].as_i64().unwrap(), so_far, "the owner's turn is not counted");
     assert!(s["messages"].as_array().unwrap().iter().rev().find(|m| m["source"] == "overseer").map(|m| m["text"].as_str().unwrap_or("").contains("everyone is doing")).unwrap_or(false), "and answered");

@@ -341,6 +341,17 @@ async function mcpClient() {
     while (!(modeFile && fs.existsSync(modeFile + '.gate'))) await sleep(50);
     assistant([{ type: 'text', text: 'gate opened' }]);
     result(false, 'gate opened');
+  } else if (mode === 'gated-briefing') {
+    // The initial lone turn and queued companion briefing have separate fixture barriers.
+    // A test can let the first turn finish while keeping the automatically queued next one busy.
+    const briefing = firstText.includes('[Briefing from Overseer:');
+    const gate = modeFile && modeFile + (briefing ? '.briefing.gate' : '.gate');
+    assistant([{ type: 'text', text: 'waiting at ' + (briefing ? 'briefing' : 'initial') + ' fixture gate' }]);
+    const deadline = Date.now() + 30000;
+    while (!(gate && fs.existsSync(gate)) && Date.now() < deadline) await sleep(10);
+    if (!(gate && fs.existsSync(gate))) throw new Error('briefing fixture barrier timed out');
+    assistant([{ type: 'text', text: 'gate opened' }]);
+    result(false, 'gate opened');
   } else if (mode === 'echo') {
     // Reports what Overseer sent: arguments (effort, permission mode, model, resume) and the content kinds.
     const content = first.message.content;
