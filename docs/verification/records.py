@@ -2982,18 +2982,18 @@ rec(273, "Reduction measurements show their actual scope and cost", "not started
     limits='No model turns, builds, tests, UI launches, owner credentials, or production changes in this publication.',
     blocker='Required second bundle remains later implementation work after the text release. Qualify isolated execution and each adapter; preserve missing runtime/live evidence explicitly.')
 
-rec(274, "Browser use and harness approvals work through pending requests", "not started",
-    date="2026-10-03", commit="9dc165d0b33fc69af9056b105fd1947040dce8b6 (inspected baseline; requirement publication only)",
-    verifier="Codex; source and official protocol inspection, no runtime qualification",
-    harness="Claude Code and Codex installed-version/transport inventory pending",
-    fixture="No new browser runtime fixture executed",
-    steps="Inspect existing adapters and official native approval/browser contracts; publish owner-requested AC and main-tracking goal instructions.",
+rec(274, "Browser use and harness approvals work through pending requests", "partial",
+    date="2026-10-03", commit="1129e35eebb2e26a8d631666a009a6418457e61c (focused implementation tested; draft PR62 head d924926732c66a78fff170da992bf1a6c8ca343c; not merged)",
+    verifier="Codex coordinator and independent builder; source review and deterministic fixture tests",
+    harness="Installed Claude Code2.1.288 and Codex CLI0.158.0 schemas inspected; synthetic Claude/Codex fixtures exercised, no native browser/model run",
+    fixture="Disposable daemon, synthetic two-request harnesses and bounded gates; no owner profiles, credentials or paid turns",
+    steps="Record 11 daemon regressions and one adapter veto assertion failing before the fix. Run answer_waiting, always_allow_tests, protocol_shapes and menubar after typed grant identity and native veto corrections. Review the exact source and preserve logs at PR62 head.",
     expected="Complete AC-274 inventory, typed native responses, shared pending lifecycle, isolated browser flows and recorded native qualification.",
-    actual="Existing Claude can_use_tool and selected Codex approvals are bridged. Codex MCP elicitation is declined by the unknown-request branch; generic Codex decisions do not implement the documented permission-grant response. Claude Chrome has separate extension site authorization. These are inspection findings, not passing capability coverage.",
-    evidence="[browser and permission assessment](../audits/2026-10-03-browser-permissions.md); [criterion](../overseer-rfc.md)",
-    live="None; no paid turn or owner browser/profile access.",
-    limits="The generated environment/version header is historical ledger metadata, not a runtime qualification for AC-274. No claim that every native capability or external authorization is supported. Provider, extension and OS authority must be preserved.",
-    blocker="Implement the versioned request inventory and missing bridges, then verify all pending lifecycles and native browser routes; keep unavailable or unqualified routes explicit.")
+    actual="The focused grant slice passes: answer_waiting 18/18 (11 new cases plus existing controls/helpers), unit 7/7, protocol 8/8 and menubar 6/6. Display labels no longer authorize host replay; exact validated Claude tool-wide session rules require daemon-owned run/session/process identity. Codex session decisions still reach the native harness, while host replay remains unqualified and disabled. Claude persistent-choice suppression hides Always and rejects stale Always answers. Broader request handling and browser verification are incomplete.",
+    evidence="[draft PR62](https://github.com/beelol/overseer/pull/62); [exact red/green evidence](https://github.com/beelol/overseer/blob/d924926732c66a78fff170da992bf1a6c8ca343c/docs/verification/evidence/native-session-grants/README.md); [reviewed inventory and plan](../superpowers/plans/2026-10-03-harness-pending-requests.md); [installed evidence](evidence/ac-274/installed-2026-10-03/README.md)",
+    live="Fixture-only behavior proof; installed schema inspection is not native runtime or browser qualification.",
+    limits="Draft implementation is unmerged and excluded from the currently running combined suite. Full integration, schema-correct remaining families, concurrent/stale/disconnected pending lifecycle, default_to_no rendering, native grant caching/revocation, all VS Code/TUI/phone flows and isolated native browser scenarios remain unverified. The generated environment/version header is historical ledger metadata, not qualification for this slice.",
+    blocker="Integrate and fully test the reviewed grant slice; continue the typed request and pending lifecycle plan, then qualify native browser/external authorization and all surface outcomes. Keep unqualified routes explicit; AC-274 stays unchecked.")
 
 SHORT_BLOCKERS = {
     154: "verified",
