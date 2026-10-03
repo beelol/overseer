@@ -40,6 +40,9 @@ pub const ACTION_CLASSES: &[(&str, &str)] = &[
     // AC-239: an agent that stopped goes on elsewhere, or tries again.
     ("continue", STEER),
     ("retry", STEER),
+    // AC-230: an agent's permission mode, by conversation; Auto set by Overseer itself only in
+    // the repositories the owner allows, with its reason (checked in the session).
+    ("mode", STEER),
     ("archive", CONFIRM),
     ("permission", CONFIRM),
     ("merge_back", CONFIRM),
@@ -80,7 +83,7 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     // Voice Mode (Gate R): the owner's own, never from the conversation.
     ("voice.get", "read"), ("voice.requests", "read"), ("voice.subscribe", "read"), ("voice.set", NEVER), ("voice.say", NEVER), ("voice.simulate", NEVER),
     ("voice.speak", NEVER), ("voice.focus", NEVER), ("voice.download", NEVER), ("voice.cancel", NEVER), ("voice.read_back", NEVER), ("voice.answer", NEVER),
-    ("overseer.token", NEVER), ("overseer.level", NEVER), ("agent.share_deny", NEVER), ("overseer.cap", NEVER), ("overseer.fresh", NEVER), ("overseer.send", NEVER), ("overseer.visit", NEVER), ("overseer.answer", NEVER), ("overseer.cancel", NEVER),
+    ("overseer.token", NEVER), ("overseer.level", NEVER), ("overseer.auto_repos", NEVER), ("agent.share_deny", NEVER), ("overseer.cap", NEVER), ("overseer.fresh", NEVER), ("overseer.send", NEVER), ("overseer.visit", NEVER), ("overseer.answer", NEVER), ("overseer.cancel", NEVER),
     // Auto Mode and Swarm (claude/auto-swarm). Reads are reads. Starting a swarm, raising its
     // limits or deadline, changing its targets, resuming it, or starting an Auto root need the
     // owner's confirmation (the Swarm/Auto contract: Overseer's level grants no route, allocation

@@ -18,26 +18,27 @@
             "status": "running"
           }
         ],
-        "summary": "Started API tests (claude) in talk-repo\nwrite the API\nAsk Overseer instead\nStarted Frontend fixer (claude) in talk-repo\nfix the header\nAsk Overseer instead\nStarted Build watcher (generic) in talk-repo\nAsk Overseer instead\nYou\nWhat is everyone doing?\nOverseer is still thinking\nStart as an agent\nOverseer\n\nHere is what everyone is doing:\n\nBuild watcher: running\nFrontend fixer: completed\nAPI tests: completed"
+        "summary": "Started API tests (claude) in talk-repo\nClaude Fixture · fix…@example.test · write the API\nAsk Overseer instead\nStarted Frontend fixer (claude) in talk-repo\nClaude Fixture · fix…@example.test · fix the header\nAsk Overseer instead\nStarted Build watcher (generic) in talk-repo\nAsk Overseer instead\nYou\nWhat is everyone doing?\nOverseer is still thinking\nStart as an agent\nOverseer\n\nHere is what everyone is doing:\n\nBuild watcher: running\nFrontend fixer: completed\nAPI tests: completed"
       }
     },
     {
       "name": "the agents' state goes with the message but is not shown as text",
       "ok": true,
       "detail": {
-        "sent": 3816
+        "sent": 4318
       }
     },
     {
       "name": "Overseer's own conversation is not listed as an agent",
       "ok": true,
       "detail": [
+        "1 working · 2 to review",
         "talk-repo",
         "Build watcher",
         "Frontend fixer",
         "API tests",
         "Claude",
-        "Your login"
+        "Mac's default login"
       ]
     },
     {
@@ -69,6 +70,25 @@
       "ok": true,
       "detail": {
         "turns": 1
+      }
+    },
+    {
+      "name": "a waiting permission comes up by itself as a yes/no, with no request id and no turn of Overseer's",
+      "ok": true,
+      "detail": {
+        "card": "Sessions wants to change perm.txt. Allow it?",
+        "proposal": "Overseer will\nAllow Sessions to change perm.txt\nYes\nNo",
+        "yes": true,
+        "no": true,
+        "turns": 3,
+        "before": 3
+      }
+    },
+    {
+      "name": "a click on Yes answers it: the agent goes on and finishes",
+      "ok": true,
+      "detail": {
+        "status": "completed"
       }
     }
   ]
