@@ -1,4 +1,5 @@
 //! Opt-in, daemon-owned audio cues. No playback occurs while disabled.
+pub(crate) mod lines;
 use crate::daemon::Daemon;
 use crate::paths;
 use crate::store::Event;
