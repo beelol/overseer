@@ -16,6 +16,10 @@ class Voice {
     // The Overseer view's webview (home is the voice view) and how to bring home forward.
     this.view = view || (() => undefined); this.showHome = showHome || (async () => {});
     this.voice = null;
+    this.connectionEpoch = 0;
+    this.refreshTicket = 0;
+    this.liveRevision = 0;
+    this.liveProjection = {};
     this.targeted = new Set(); // agents that open spoken requests are for (a voice mark, AC-169)
     this.heard = '';
     this.asking = false; // a read-back or a plan waits for a yes
@@ -27,7 +31,11 @@ class Voice {
     context.subscriptions.push(this.status);
     client.on('voice', m => this.live(m));
     client.on('connected', () => this.refresh());
-    client.on('disconnected', () => { this.voice = null; this.render(); });
+    client.on('disconnected', () => {
+      this.connectionEpoch++; this.refreshTicket++;
+      this.voice = null; this.liveProjection = {};
+      this.targeted = new Set(); this.render();
+    });
     // Reduced motion follows VS Code's own setting as well as the system's.
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => { if (e.affectsConfiguration('workbench.reduceMotion')) this.refresh(); }));
   }
@@ -57,9 +65,30 @@ class Voice {
   }
 
   async refresh() {
-    try { this.voice = await this.client.request('voice.get'); } catch { this.voice = null; }
-    this.targeted = new Set(this.voice?.targeted || []);
-    await this.titleTarget();
+    const epoch = this.connectionEpoch, ticket = ++this.refreshTicket;
+    const revision = this.liveRevision, hadSnapshot = !!this.voice;
+    let v;
+    try { v = await this.client.request('voice.get'); } catch { return; }
+    if (epoch !== this.connectionEpoch || ticket !== this.refreshTicket || !v) return;
+    // Keep the complete snapshot's static fields, with dynamic events that arrived
+    // while it was in flight (or before the first snapshot on this connection).
+    v = { ...v };
+    for (const [kind, projection] of Object.entries(this.liveProjection)) {
+      if (hadSnapshot && projection.revision <= revision) continue;
+      if (kind === 'state') Object.assign(v, projection.value);
+      if (kind === 'target') v.target = projection.value;
+      if (kind === 'targets') v.targeted = projection.value;
+    }
+    v.target_title = !v.target || v.target === 'overseer' ? 'Overseer' : v.target;
+    this.voice = v;
+    this.targeted = new Set(v.targeted || []);
+    this.publishSnapshot();
+    // Rendering never waits on roster I/O. A late title may enrich only this
+    // still-current snapshot and target, and publishes its current live state.
+    await this.titleTarget(v, epoch);
+  }
+
+  publishSnapshot() {
     vscode.commands.executeCommand('setContext', 'overseer.voiceSimulated', !!this.voice?.simulated);
     vscode.commands.executeCommand('setContext', 'overseer.voiceOn', !!this.voice?.enabled);
     this.render();
@@ -68,12 +97,18 @@ class Voice {
     this.changed('targets');
   }
 
-  async titleTarget() {
-    if (!this.voice) return;
-    if (this.voice.target && this.voice.target !== 'overseer') {
-      try { const { roster } = await this.client.request('agents.roster'); this.voice.target_title = (roster || []).find(a => a.id === this.voice.target)?.title || this.voice.target; }
-      catch { this.voice.target_title = this.voice.target; }
-    } else this.voice.target_title = 'Overseer';
+  async titleTarget(v = this.voice, epoch = this.connectionEpoch) {
+    if (!v) return false;
+    const target = v.target, targetRevision = this.liveProjection.target?.revision;
+    if (!target || target === 'overseer') return false;
+    let title = target;
+    try { const { roster } = await this.client.request('agents.roster'); title = (roster || []).find(a => a.id === target)?.title || target; }
+    catch { /* Keep the captured target as a fallback. */ }
+    if (epoch !== this.connectionEpoch || this.voice !== v || v.target !== target || this.liveProjection.target?.revision !== targetRevision) return false;
+    if (v.target_title === title) return false;
+    v.target_title = title;
+    this.publishSnapshot();
+    return true;
   }
 
   render() {
@@ -88,6 +123,9 @@ class Voice {
 
   live(m) {
     if (!m) return;
+    if (m.kind === 'state') this.liveProjection.state = { revision: ++this.liveRevision, value: { state: m.state, reason: m.reason, enabled: m.state !== 'off', muted: m.state === 'muted' } };
+    if (m.kind === 'target') this.liveProjection.target = { revision: ++this.liveRevision, value: m.target };
+    if (m.kind === 'targets') this.liveProjection.targets = { revision: ++this.liveRevision, value: [...(m.runs || [])] };
     // On and off from another surface too (the terminal's ctrl+v, T-35): any state but off is on.
     if (m.kind === 'state' && this.voice) {
       const was = !!this.voice.enabled;
@@ -95,7 +133,13 @@ class Voice {
       if (was !== this.voice.enabled) vscode.commands.executeCommand('setContext', 'overseer.voiceOn', this.voice.enabled);
       this.render(); this.changed();
     }
-    if (m.kind === 'target' && this.voice) { this.voice.target = m.target; this.titleTarget().then(() => { this.render(); this.changed(); this.post({ type: 'live', msg: { ...m, target_title: this.voice.target_title } }); }); return; }
+    if (m.kind === 'target' && this.voice) {
+      const v = this.voice, epoch = this.connectionEpoch;
+      v.target = m.target; v.target_title = !m.target || m.target === 'overseer' ? 'Overseer' : m.target;
+      this.render(); this.changed(); this.post({ type: 'live', msg: { ...m, target_title: v.target_title } });
+      this.titleTarget(v, epoch);
+      return;
+    }
     if (m.kind === 'targets') { this.targeted = new Set(m.runs || []); this.changed('targets'); }
     if (m.kind === 'heard' || m.kind === 'not_meant') { this.heard = m.text || ''; this.changed(); }
     if (m.kind === 'read_back') { this.askReadBack = !m.lapsed && !!m.agent; this.updateAsking(); }

@@ -1,0 +1,97 @@
+FAIL late_starting_snapshot_cannot_replace_live_listening
+AssertionError [ERR_ASSERTION]: older snapshot cannot regress the host
++ actual - expected
+
++ 'starting'
+- 'listening'
+
+    at /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:52:10
+    at async /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:162:11
+PASS off_state_then_toggle_explicitly_reenables
+FAIL initial_live_state_and_target_keep_snapshot_static_fields
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'starting'
+- 'listening'
+
+    at /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:75:10
+    at async /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:162:11
+FAIL newest_refresh_wins_when_older_success_arrives_last
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'starting'
+- 'listening'
+
+    at /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:89:10
+    at async /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:162:11
+FAIL older_failed_refresh_cannot_clear_newer_success
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ undefined
+- 'listening'
+
+    at /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:97:10
+    at async /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:162:11
+FAIL disconnect_invalidates_held_snapshot_without_resurrection
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ {
++   available: true,
++   enabled: true,
++   listener: {
++     last_error: null,
++     restarts: 0,
++     running: true
++   },
++   model: {
++     downloaded: true
++   },
++   muted: false,
++   simulated: true,
++   state: 'starting',
++   target: 'overseer',
++   target_title: 'Overseer',
++   targeted: []
++ }
+- null
+
+    at /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:105:10
+    at async /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:162:11
+FAIL prior_connection_error_cannot_clear_reconnected_snapshot
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ undefined
+- 'listening'
+
+    at /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:117:10
+    at async /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:162:11
+FAIL older_target_title_lookup_cannot_relabel_newer_target
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+'b' !== 'Agent B'
+
+    at /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:128:10
+    at async /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:162:11
+FAIL target_title_lookup_after_disconnect_is_inert
+AssertionError [ERR_ASSERTION]: Got unwanted rejection.
+Actual message: "Cannot read properties of null (reading 'target')"
+    at async /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:136:49
+    at async /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:162:11
+PASS live_off_during_title_lookup_remains_off_in_snapshot
+FAIL live_targets_cannot_be_replaced_by_deferred_badges
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
++ []
+- [
+-   'b'
+- ]
+
+    at /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:156:10
+    at async /private/tmp/overseer-voice-state-ordering-20261003/test/unit/voice-state-ordering.js:162:11
+2/11 Voice state ordering tests passed
