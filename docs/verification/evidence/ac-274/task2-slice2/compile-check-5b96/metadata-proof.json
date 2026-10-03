@@ -1,0 +1,965 @@
+{
+  "compile_metadata_only": true,
+  "artifacts": [
+    {
+      "package": "path+file:///private/tmp/overseer-native-pending-20261003/daemon#overseerd@0.1.0",
+      "manifest": "/private/tmp/overseer-native-pending-20261003/daemon/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "pending_requests",
+        "src_path": "/private/tmp/overseer-native-pending-20261003/daemon/tests/pending_requests.rs",
+        "edition": "2021",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "metadata_file": "/private/tmp/overseer-native-session-grants-target/debug/deps/libpending_requests-800670125c0de37c.rmeta",
+      "metadata_size": 0,
+      "metadata_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "dep_info": "/private/tmp/overseer-native-session-grants-target/debug/deps/pending_requests-800670125c0de37c.d",
+      "dep_sha256": "97d9324c9f980c35cb7922343ed248060e64fe987193be39b59f481c7f6d0cf7",
+      "dep_sources": [
+        "/private/tmp/overseer-native-session-grants-target/debug/deps/pending_requests-800670125c0de37c.d: daemon/tests/pending_requests.rs daemon/tests/common/mod.rs daemon/tests/common/../../src/gateway/base32.rs daemon/tests/common/../../src/gateway/noise.rs daemon/tests/common/phone.rs daemon/tests/../../fixtures/transcripts/ac274/native-vectors.json"
+      ]
+    },
+    {
+      "package": "path+file:///private/tmp/overseer-native-pending-20261003/daemon#overseerd@0.1.0",
+      "manifest": "/private/tmp/overseer-native-pending-20261003/daemon/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "overseerd",
+        "src_path": "/private/tmp/overseer-native-pending-20261003/daemon/src/main.rs",
+        "edition": "2021",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "metadata_file": "/private/tmp/overseer-native-session-grants-target/debug/deps/liboverseerd-8fbd1d91fbf61143.rmeta",
+      "metadata_size": 0,
+      "metadata_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "dep_info": "/private/tmp/overseer-native-session-grants-target/debug/deps/overseerd-8fbd1d91fbf61143.d",
+      "dep_sha256": "151b04ad1a70c183049e0f0b18f42d986ee1da46217611d931d161efb583b6fa",
+      "dep_sources": [
+        "/private/tmp/overseer-native-session-grants-target/debug/deps/overseerd-8fbd1d91fbf61143.d: daemon/src/main.rs daemon/src/accounts.rs daemon/src/account_booking.rs daemon/src/upper_draw.rs daemon/src/auto_telemetry.rs daemon/src/auto_quota.rs daemon/src/auto_route.rs daemon/src/auto_opencode.rs daemon/src/auto_collect.rs daemon/src/auto_consumption.rs daemon/src/auto_fit.rs daemon/src/auto_select.rs daemon/src/auto_health.rs daemon/src/auto_maintenance.rs daemon/src/auto_mcp.rs daemon/src/audio.rs daemon/src/adapters.rs daemon/src/adapters/native_requests.rs daemon/src/background.rs daemon/src/notices.rs daemon/src/broker.rs daemon/src/claims.rs daemon/src/continuity.rs daemon/src/daemon.rs daemon/src/device_login.rs daemon/src/downloads.rs daemon/src/files.rs daemon/src/gateway/mod.rs daemon/src/gateway/base32.rs daemon/src/gateway/classes.rs daemon/src/gateway/devices.rs daemon/src/gateway/local.rs daemon/src/gateway/net.rs daemon/src/gateway/noise.rs daemon/src/gateway/pairing.rs daemon/src/gateway/power.rs daemon/src/gateway/push.rs daemon/src/gateway/remote.rs daemon/src/usage.rs daemon/src/voice/mod.rs daemon/src/voice/candidates.rs daemon/src/voice/floor.rs daemon/src/voice/model.rs daemon/src/voice/proc.rs daemon/src/voice/request.rs daemon/src/git.rs daemon/src/handoff.rs daemon/src/local.rs daemon/src/menubar.rs daemon/src/merge.rs daemon/src/net.rs daemon/src/ollama_install.rs daemon/src/opencode_bridge.rs daemon/src/overseer/mod.rs daemon/src/overseer/away.rs daemon/src/overseer/channel.rs daemon/src/overseer/checkin.rs daemon/src/overseer/conflicts.rs daemon/src/overseer/context.rs daemon/src/overseer/control.rs daemon/src/overseer/digest.rs daemon/src/overseer/finished.rs daemon/src/overseer/mcp.rs daemon/src/overseer/modes.rs daemon/src/overseer/needs.rs daemon/src/overseer/session.rs daemon/src/overseer/trouble.rs daemon/src/overseer/watch.rs daemon/src/paths.rs daemon/src/pending_requests.rs daemon/src/pending_requests/answers.rs daemon/src/mods/mod.rs daemon/src/mods/bindings.rs daemon/src/mods/delivery.rs daemon/src/mods/library.rs daemon/src/mods/manifest.rs daemon/src/pr.rs daemon/src/redact.rs daemon/src/review.rs daemon/src/server.rs daemon/src/shim.rs daemon/src/shim/native_reply.rs daemon/src/store.rs daemon/src/swarm/mod.rs daemon/src/swarm/artifacts.rs daemon/src/swarm/audit.rs daemon/src/swarm/admission.rs daemon/src/swarm/availability.rs daemon/src/swarm/benefit.rs daemon/src/swarm/broker.rs daemon/src/swarm/completion.rs daemon/src/swarm/conflicts.rs daemon/src/swarm/coverage.rs daemon/src/swarm/control.rs daemon/src/swarm/context.rs daemon/src/swarm/director.rs daemon/src/swarm/owner.rs daemon/src/swarm/dispatch.rs daemon/src/swarm/effects.rs daemon/src/swarm/findings.rs daemon/src/swarm/integration.rs daemon/src/swarm/limits.rs daemon/src/swarm/verification.rs daemon/src/swarm/plan.rs daemon/src/swarm/policy.rs daemon/src/swarm/revision.rs daemon/src/swarm/requirements.rs daemon/src/swarm/route.rs daemon/src/swarm/runtime.rs daemon/src/swarm/scheduler.rs daemon/src/swarm/settings.rs daemon/src/swarm/start.rs daemon/src/swarm/native.rs daemon/src/swarm/schema.rs daemon/src/sys.rs daemon/src/../assets/reactor/manifest.json daemon/src/../assets/reactor/agent_queued.mp3 daemon/src/../assets/reactor/agent_started.mp3 daemon/src/../assets/reactor/agent_resumed.mp3 daemon/src/../assets/reactor/agent_progress.mp3 daemon/src/../assets/reactor/agent_complete.mp3 daemon/src/../assets/reactor/agent_stopped.mp3 daemon/src/../assets/reactor/agent_needs_attention.mp3 daemon/src/../assets/reactor/agent_failed.mp3 daemon/src/../assets/reactor/agent_unblocked.mp3 daemon/src/../assets/reactor/review_ready.mp3 daemon/src/../assets/reactor/delivery_ready.mp3 daemon/src/../assets/reactor/verification_passed.mp3 daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/ExecCommandApprovalParams.json daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/ExecCommandApprovalResponse.json daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/ApplyPatchApprovalParams.json daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/ApplyPatchApprovalResponse.json daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/CommandExecutionRequestApprovalParams.json daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/CommandExecutionRequestApprovalResponse.json daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/FileChangeRequestApprovalParams.json daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/FileChangeRequestApprovalResponse.json daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/PermissionsRequestApprovalParams.json daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/PermissionsRequestApprovalResponse.json daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/ToolRequestUserInputParams.json daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/ToolRequestUserInputResponse.json daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/McpServerElicitationRequestParams.json daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/McpServerElicitationRequestResponse.json daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/ServerRequestResolvedNotification.json daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/DynamicToolCallParams.json daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/ChatgptAuthTokensRefreshParams.json daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/AttestationGenerateParams.json daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/CurrentTimeReadParams.json daemon/src/../../fixtures/transcripts/ac274/native-vectors.json daemon/src/gateway/../../../protocol/protocol.json daemon/src/voice/../../../voice/tests/fixtures/words-small-en.json daemon/src/local_catalogue.json daemon/src/mods/../../../mods/clear-prose/mod.toml daemon/src/mods/../../../mods/clear-prose/style.md daemon/src/mods/../../../docs/design/mods/clear-prose-rules.md"
+      ]
+    }
+  ],
+  "diagnostic_warnings": [
+    {
+      "target": "downloads",
+      "code": {
+        "code": "unused_mut",
+        "explanation": null
+      },
+      "message": "variable does not need to be mutable",
+      "spans": [
+        {
+          "byte_end": 16616,
+          "byte_start": 16608,
+          "column_end": 17,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "daemon/tests/common/ollama.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 364,
+          "line_start": 364,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 17,
+              "highlight_start": 9,
+              "text": "    let mut send = |conn: &mut TcpStream, v: Value| -> std::io::Result<()> {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "swarm_admission",
+      "code": {
+        "code": "unused_mut",
+        "explanation": null
+      },
+      "message": "variable does not need to be mutable",
+      "spans": [
+        {
+          "byte_end": 92444,
+          "byte_start": 92431,
+          "column_end": 22,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "daemon/tests/swarm_admission.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 1724,
+          "line_start": 1724,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 22,
+              "highlight_start": 9,
+              "text": "    let mut try_admit = |n: usize, when: i64| admit(&d, &id, &format!(\"j{n}\"), \"codex-a\","
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "overseerd",
+      "code": {
+        "code": "unused_imports",
+        "explanation": null
+      },
+      "message": "unused import: `revision`",
+      "spans": [
+        {
+          "byte_end": 170,
+          "byte_start": 162,
+          "column_end": 13,
+          "column_start": 5,
+          "expansion": null,
+          "file_name": "daemon/src/mods/bindings.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 5,
+          "line_start": 5,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 13,
+              "highlight_start": 5,
+              "text": "    revision,"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "overseerd",
+      "code": {
+        "code": "unused_assignments",
+        "explanation": null
+      },
+      "message": "value assigned to `note` is never read",
+      "spans": [
+        {
+          "byte_end": 19752,
+          "byte_start": 19748,
+          "column_end": 21,
+          "column_start": 17,
+          "expansion": null,
+          "file_name": "daemon/src/background.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 377,
+          "line_start": 377,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 21,
+              "highlight_start": 17,
+              "text": "        let mut note = String::new();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "overseerd",
+      "code": {
+        "code": "dead_code",
+        "explanation": null
+      },
+      "message": "methods `workspace_diff` and `state` are never used",
+      "spans": [
+        {
+          "byte_end": 19376,
+          "byte_start": 19365,
+          "column_end": 12,
+          "column_start": 1,
+          "expansion": null,
+          "file_name": "daemon/src/daemon.rs",
+          "is_primary": false,
+          "label": "methods in this implementation",
+          "line_end": 435,
+          "line_start": 435,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 12,
+              "highlight_start": 1,
+              "text": "impl Daemon {"
+            }
+          ]
+        },
+        {
+          "byte_end": 225817,
+          "byte_start": 225803,
+          "column_end": 26,
+          "column_start": 12,
+          "expansion": null,
+          "file_name": "daemon/src/daemon.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 3865,
+          "line_start": 3865,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 26,
+              "highlight_start": 12,
+              "text": "    pub fn workspace_diff(&self, workspace_id: &str, base: &str) -> Result<Value> {"
+            }
+          ]
+        },
+        {
+          "byte_end": 229094,
+          "byte_start": 229089,
+          "column_end": 17,
+          "column_start": 12,
+          "expansion": null,
+          "file_name": "daemon/src/daemon.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 3920,
+          "line_start": 3920,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 17,
+              "highlight_start": 12,
+              "text": "    pub fn state(&self) -> Result<Value> {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "overseerd",
+      "code": {
+        "code": "dead_code",
+        "explanation": null
+      },
+      "message": "field `device_name` is never read",
+      "spans": [
+        {
+          "byte_end": 2922,
+          "byte_start": 2915,
+          "column_end": 19,
+          "column_start": 12,
+          "expansion": null,
+          "file_name": "daemon/src/gateway/mod.rs",
+          "is_primary": false,
+          "label": "field in this struct",
+          "line_end": 84,
+          "line_start": 84,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 19,
+              "highlight_start": 12,
+              "text": "pub struct Session {"
+            }
+          ]
+        },
+        {
+          "byte_end": 2971,
+          "byte_start": 2960,
+          "column_end": 20,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "daemon/src/gateway/mod.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 86,
+          "line_start": 86,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 20,
+              "highlight_start": 9,
+              "text": "    pub device_name: String,"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "overseerd",
+      "code": {
+        "code": "dead_code",
+        "explanation": null
+      },
+      "message": "function `decorate` is never used",
+      "spans": [
+        {
+          "byte_end": 91327,
+          "byte_start": 91319,
+          "column_end": 16,
+          "column_start": 8,
+          "expansion": null,
+          "file_name": "daemon/src/voice/request.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 2164,
+          "line_start": 2164,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 16,
+              "highlight_start": 8,
+              "text": "pub fn decorate(d: &Daemon, actions: &mut [Value]) -> Result<bool> {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "overseerd",
+      "code": {
+        "code": "dead_code",
+        "explanation": null
+      },
+      "message": "method `is_clean` is never used",
+      "spans": [
+        {
+          "byte_end": 12867,
+          "byte_start": 12856,
+          "column_end": 12,
+          "column_start": 1,
+          "expansion": null,
+          "file_name": "daemon/src/git.rs",
+          "is_primary": false,
+          "label": "method in this implementation",
+          "line_end": 298,
+          "line_start": 298,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 12,
+              "highlight_start": 1,
+              "text": "impl Status {"
+            }
+          ]
+        },
+        {
+          "byte_end": 12889,
+          "byte_start": 12881,
+          "column_end": 20,
+          "column_start": 12,
+          "expansion": null,
+          "file_name": "daemon/src/git.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 299,
+          "line_start": 299,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 20,
+              "highlight_start": 12,
+              "text": "    pub fn is_clean(&self) -> bool {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "overseerd",
+      "code": {
+        "code": "dead_code",
+        "explanation": null
+      },
+      "message": "function `tree_has` is never used",
+      "spans": [
+        {
+          "byte_end": 15214,
+          "byte_start": 15206,
+          "column_end": 16,
+          "column_start": 8,
+          "expansion": null,
+          "file_name": "daemon/src/git.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 356,
+          "line_start": 356,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 16,
+              "highlight_start": 8,
+              "text": "pub fn tree_has(workspace: &Path, tree_ish: &str, path: &str) -> bool {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "overseerd",
+      "code": {
+        "code": "dead_code",
+        "explanation": null
+      },
+      "message": "function `show_blob` is never used",
+      "spans": [
+        {
+          "byte_end": 15369,
+          "byte_start": 15360,
+          "column_end": 17,
+          "column_start": 8,
+          "expansion": null,
+          "file_name": "daemon/src/git.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 360,
+          "line_start": 360,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 17,
+              "highlight_start": 8,
+              "text": "pub fn show_blob(workspace: &Path, tree_ish: &str, path: &str) -> Result<Vec<u8>> {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "overseerd",
+      "code": {
+        "code": "dead_code",
+        "explanation": null
+      },
+      "message": "function `worktree_list` is never used",
+      "spans": [
+        {
+          "byte_end": 15748,
+          "byte_start": 15735,
+          "column_end": 21,
+          "column_start": 8,
+          "expansion": null,
+          "file_name": "daemon/src/git.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 368,
+          "line_start": 368,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 21,
+              "highlight_start": 8,
+              "text": "pub fn worktree_list(repo: &Path) -> Vec<PathBuf> {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "overseerd",
+      "code": {
+        "code": "dead_code",
+        "explanation": null
+      },
+      "message": "field `model` is never read",
+      "spans": [
+        {
+          "byte_end": 13098,
+          "byte_start": 13094,
+          "column_end": 16,
+          "column_start": 12,
+          "expansion": null,
+          "file_name": "daemon/src/opencode_bridge.rs",
+          "is_primary": false,
+          "label": "field in this struct",
+          "line_end": 243,
+          "line_start": 243,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 16,
+              "highlight_start": 12,
+              "text": "pub struct Turn {"
+            }
+          ]
+        },
+        {
+          "byte_end": 13812,
+          "byte_start": 13807,
+          "column_end": 14,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "daemon/src/opencode_bridge.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 260,
+          "line_start": 260,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 14,
+              "highlight_start": 9,
+              "text": "    pub model: String,"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "overseerd",
+      "code": {
+        "code": "dead_code",
+        "explanation": null
+      },
+      "message": "function `is_session_event` is never used",
+      "spans": [
+        {
+          "byte_end": 150733,
+          "byte_start": 150717,
+          "column_end": 24,
+          "column_start": 8,
+          "expansion": null,
+          "file_name": "daemon/src/overseer/session.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 2216,
+          "line_start": 2216,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 24,
+              "highlight_start": 8,
+              "text": "pub fn is_session_event(kind: &str) -> bool {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "overseerd",
+      "code": {
+        "code": "dead_code",
+        "explanation": null
+      },
+      "message": "method `child_by_native` is never used",
+      "spans": [
+        {
+          "byte_end": 5905,
+          "byte_start": 5895,
+          "column_end": 11,
+          "column_start": 1,
+          "expansion": null,
+          "file_name": "daemon/src/store.rs",
+          "is_primary": false,
+          "label": "method in this implementation",
+          "line_end": 189,
+          "line_start": 189,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 11,
+              "highlight_start": 1,
+              "text": "impl Store {"
+            }
+          ]
+        },
+        {
+          "byte_end": 63559,
+          "byte_start": 63544,
+          "column_end": 27,
+          "column_start": 12,
+          "expansion": null,
+          "file_name": "daemon/src/store.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 1123,
+          "line_start": 1123,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 27,
+              "highlight_start": 12,
+              "text": "    pub fn child_by_native(&self, parent: &str, native: &str) -> Result<Option<Run>> {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "netsim",
+      "code": {
+        "code": "unused_mut",
+        "explanation": null
+      },
+      "message": "variable does not need to be mutable",
+      "spans": [
+        {
+          "byte_end": 16616,
+          "byte_start": 16608,
+          "column_end": 17,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "daemon/tests/common/ollama.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 364,
+          "line_start": 364,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 17,
+              "highlight_start": 9,
+              "text": "    let mut send = |conn: &mut TcpStream, v: Value| -> std::io::Result<()> {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "overseer_continuity",
+      "code": {
+        "code": "unused_mut",
+        "explanation": null
+      },
+      "message": "variable does not need to be mutable",
+      "spans": [
+        {
+          "byte_end": 16616,
+          "byte_start": 16608,
+          "column_end": 17,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "daemon/tests/common/ollama.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 364,
+          "line_start": 364,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 17,
+              "highlight_start": 9,
+              "text": "    let mut send = |conn: &mut TcpStream, v: Value| -> std::io::Result<()> {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "overseer",
+      "code": {
+        "code": "unused_mut",
+        "explanation": null
+      },
+      "message": "variable does not need to be mutable",
+      "spans": [
+        {
+          "byte_end": 76170,
+          "byte_start": 76165,
+          "column_end": 14,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "daemon/tests/overseer.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 1202,
+          "line_start": 1202,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 14,
+              "highlight_start": 9,
+              "text": "    let mut d = overseer_daemon(&mode_file);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "overseer",
+      "code": {
+        "code": "dead_code",
+        "explanation": null
+      },
+      "message": "function `wait_check_ins` is never used",
+      "spans": [
+        {
+          "byte_end": 83026,
+          "byte_start": 83012,
+          "column_end": 18,
+          "column_start": 4,
+          "expansion": null,
+          "file_name": "daemon/tests/overseer.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 1313,
+          "line_start": 1313,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 18,
+              "highlight_start": 4,
+              "text": "fn wait_check_ins(d: &Daemon, run: &str, n: usize, secs: u64) -> Vec<Value> {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "continuity",
+      "code": {
+        "code": "unused_mut",
+        "explanation": null
+      },
+      "message": "variable does not need to be mutable",
+      "spans": [
+        {
+          "byte_end": 16616,
+          "byte_start": 16608,
+          "column_end": 17,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "daemon/tests/common/ollama.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 364,
+          "line_start": 364,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 17,
+              "highlight_start": 9,
+              "text": "    let mut send = |conn: &mut TcpStream, v: Value| -> std::io::Result<()> {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "ollama_install",
+      "code": {
+        "code": "unused_mut",
+        "explanation": null
+      },
+      "message": "variable does not need to be mutable",
+      "spans": [
+        {
+          "byte_end": 16616,
+          "byte_start": 16608,
+          "column_end": 17,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "daemon/tests/common/ollama.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 364,
+          "line_start": 364,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 17,
+              "highlight_start": 9,
+              "text": "    let mut send = |conn: &mut TcpStream, v: Value| -> std::io::Result<()> {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "local_runs",
+      "code": {
+        "code": "unused_mut",
+        "explanation": null
+      },
+      "message": "variable does not need to be mutable",
+      "spans": [
+        {
+          "byte_end": 16616,
+          "byte_start": 16608,
+          "column_end": 17,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "daemon/tests/common/ollama.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 364,
+          "line_start": 364,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 17,
+              "highlight_start": 9,
+              "text": "    let mut send = |conn: &mut TcpStream, v: Value| -> std::io::Result<()> {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "handoff",
+      "code": {
+        "code": "unused_mut",
+        "explanation": null
+      },
+      "message": "variable does not need to be mutable",
+      "spans": [
+        {
+          "byte_end": 16616,
+          "byte_start": 16608,
+          "column_end": 17,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "daemon/tests/common/ollama.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 364,
+          "line_start": 364,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 17,
+              "highlight_start": 9,
+              "text": "    let mut send = |conn: &mut TcpStream, v: Value| -> std::io::Result<()> {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "overseer_surfaces",
+      "code": {
+        "code": "unused_variables",
+        "explanation": null
+      },
+      "message": "unused variable: `phone`",
+      "spans": [
+        {
+          "byte_end": 4301,
+          "byte_start": 4296,
+          "column_end": 14,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "daemon/tests/overseer_surfaces.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 101,
+          "line_start": 101,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 14,
+              "highlight_start": 9,
+              "text": "    let phone = sleeper(&env.d, &repo, \"Phone\");"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "swarm_runtime",
+      "code": {
+        "code": "unused_assignments",
+        "explanation": null
+      },
+      "message": "value assigned to `wave` is never read",
+      "spans": [
+        {
+          "byte_end": 110452,
+          "byte_start": 110448,
+          "column_end": 17,
+          "column_start": 13,
+          "expansion": null,
+          "file_name": "daemon/tests/swarm_runtime.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 1850,
+          "line_start": 1850,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 17,
+              "highlight_start": 13,
+              "text": "    let mut wave = 0;"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "gateway",
+      "code": {
+        "code": "unused_mut",
+        "explanation": null
+      },
+      "message": "variable does not need to be mutable",
+      "spans": [
+        {
+          "byte_end": 46043,
+          "byte_start": 46034,
+          "column_end": 18,
+          "column_start": 9,
+          "expansion": null,
+          "file_name": "daemon/tests/gateway.rs",
+          "is_primary": true,
+          "label": null,
+          "line_end": 771,
+          "line_start": 771,
+          "suggested_replacement": null,
+          "suggestion_applicability": null,
+          "text": [
+            {
+              "highlight_end": 18,
+              "highlight_start": 9,
+              "text": "    let mut hello = |label: &str, d: &Daemon, p: &mut phone::Paired| {"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "diagnostic_errors": []
+}

@@ -1,0 +1,19 @@
+{
+  "source": "5b96da3ab6714d0cc2c23d5d78a14a96f3fcf01b",
+  "cwd": "/private/tmp/overseer-native-pending-20261003",
+  "command": [
+    "cargo",
+    "check",
+    "-p",
+    "overseerd",
+    "--tests",
+    "--message-format=json"
+  ],
+  "target": "/private/tmp/overseer-native-session-grants-target",
+  "build_jobs": 1,
+  "nice": 20,
+  "compile_check_only": true,
+  "test_bodies_executed": false,
+  "status": "terminal",
+  "exit_code": 0
+}
