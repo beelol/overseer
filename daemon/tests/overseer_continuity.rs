@@ -141,8 +141,7 @@ fn flag(args: &[String], name: &str) -> Option<String> {
 
 /// The token a Claude Code launch was given for the daemon's tools, from its MCP configuration.
 fn mcp_token(args: &[String]) -> String {
-    let config: Value = serde_json::from_str(&std::fs::read_to_string(flag(args, "--mcp-config").expect("an MCP configuration")).unwrap()).unwrap();
-    config["mcpServers"]["overseer"]["env"]["OVERSEER_MCP_TOKEN"].as_str().unwrap().to_string()
+    native_capability_from_args(args, "claude")
 }
 
 /// A handoff of a held, watched agent with an area and a guardrail: the successor is held,
@@ -342,7 +341,7 @@ fn ac197_overseers_own_run_follows_continuity() {
     assert!(tools.contains(&"propose".to_string()), "{tools:?}");
     let old = l.starts("codex").into_iter().find(|s| s["prompt"].as_str().unwrap().contains("What is everyone doing?")).unwrap();
     let old_args = args_of(&old);
-    let old_token = old_args.iter().find_map(|a| a.strip_prefix("mcp_servers.overseer.env={ OVERSEER_MCP_TOKEN = \"").map(|t| t.trim_end_matches("\" }").to_string())).expect("Codex was given a token");
+    let old_token = native_capability_from_args(&old_args, "codex");
     assert!(l.d.try_call("overseer.tools", json!({"token": old_token})).unwrap_err().contains("unknown token"));
     // The next message is Overseer's next turn on the successor.
     l.behave("ok", "ok");

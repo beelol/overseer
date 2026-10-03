@@ -1,0 +1,9 @@
+# Required CI time budget
+
+PR81 run37132940231/checks job111231573766 failed its job budget with the explicit annotation **The job has exceeded the maximum execution time of 40m0s**. Actual checkout was GitHub synthetic merge `33dc49c3e4df2390e6dbc3cc5992df625f5e075e` (maina8914d + PRheadf3c79729), not the PR head itself. Retrieved workflow/voice source blobs match the frozen local `abf572ef` and PRhead byte-for-byte; the receipt retains exact workflow blob/hash.
+
+The job lasted40m18s including cleanup. Rust consumed39m30s: initial build4m21s plus34m approximately of completed test-target durations (2032.76s), then only72.655s of the57-case daemon Voice target. Fourteen Voice cases had passed when cancellation arrived;43 had no reported completion. Extension unit/source steps were skipped because Rust never reached terminal completion. This is insufficient evidence of a hung Voice case. The independent earlier native synthesis failure (85samples at memspeech326) remains an actual failure and is not addressed by this timeout change.
+
+Increase only the required checks job budget40→60minutes so the existing remaining test targets and extension stages have room to complete and report actual failures. All commands, --no-fail-fast, assertions, selection, image, concurrency and cache settings remain unchanged. This is a budget correction grounded in measured workload, not a pass claim or unlimited retry. No new CI dispatch/local build/helper/speech/UI/provider run was performed. Full changed-workflow completion and whole AC148 verification remain pending; PR stays draft.
+
+Private full logs remain outside this branch. Committed evidence contains only exact public source provenance, phase timestamps/counts and the timeout annotation; no runner hostname, account/usage snapshot, credentials or audio is included.

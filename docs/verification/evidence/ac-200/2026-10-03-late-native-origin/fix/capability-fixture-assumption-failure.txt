@@ -1,0 +1,21 @@
+
+running 6 tests
+test ac200_exact_legacy_scratch_migration_keeps_unrelated_arguments ... ok
+test ac200_failed_native_successor_launch_never_revives_predecessor_capability ...
+thread 'ac200_failed_native_successor_launch_never_revives_predecessor_capability' panicked at daemon/tests/overseer_native_capabilities.rs:187:5:
+assertion `left == right` failed: fixture expected run_status=failed; actual prior run_status=completed, queued=true, retrying="claude executable not found" [synthetic session/usage envelope omitted]
+  left: String("completed")
+ right: "failed"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test ac200_missing_or_unprivate_capability_file_never_uses_environment_fallback ... ok
+test ac200_modified_legacy_config_refuses_without_discarding_added_policy ... ok
+test ac200_native_capability_restart_retains_exact_origin_and_owner_control ... ok
+test ac200_unbound_direct_and_revoked_native_capabilities_cannot_propose ... ok
+
+failures:
+
+failures:
+    ac200_failed_native_successor_launch_never_revives_predecessor_capability
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 6.97s

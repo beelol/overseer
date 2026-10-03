@@ -1,0 +1,19 @@
+
+running 14 tests
+test all_agents_excludes_watchers_and_overseer_with_separate_overrides ... ok
+test binding_revisions_metadata_locks_and_targets_fail_without_mutation ... ok
+test common::base32::tests::base32_round_trips_and_matches_rfc_vectors ... ok
+test common::noise::tests::a_wrong_pairing_secret_fails_in_the_first_message ... ok
+test common::noise::tests::large_messages_are_chunked_and_joined ... ok
+test common::noise::tests::noise_vectors_match_the_shared_file ... ok
+test concurrent_clients_cannot_overwrite_each_others_revision ... ok
+test existing_agent_enters_and_leaves_watcher_scope_with_actual_watch_membership ... ok
+test filters_match_exact_harness_model_and_shared_account_not_profile_name ... ok
+test group_precedence_disjoint_styles_and_locked_off_parent_are_explicit ... ok
+test locked_style_holds_when_watch_end_changes_applicable_scope ... ok
+test overlapping_styles_are_rejected_before_any_run_and_rules_order_is_stable ... ok
+test repository_identity_is_shared_by_linked_worktrees_and_override_is_narrow ... ok
+test same_named_version_update_keeps_binding_pinned_after_restart ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.37s
+

@@ -1,0 +1,31 @@
+
+running 2 tests
+test ac189_overseer_keeps_agents_on_task has been running for over 60 seconds
+test ac190_briefing_and_channel has been running for over 60 seconds
+
+thread 'ac189_overseer_keeps_agents_on_task' panicked at daemon/tests/overseer.rs:522:9:
+the finished check-in of Steady
+causes ["owner"]
+"turn_started" {"snapshot":"f8988bd526d369392cfd8fc37702779bf0b77133","turn":{"ended_ms":null,"id":"u-3e6cb3b2a24d","n":1,"prompt":"<overseer-state>\nYou are Overseer, the orchestrator of the coding agents listed below. You read the agents through your tools (roster, agent, conflicts) when you have them, and through the state sent with each message. Answer the owner's questions about the agents from that state; be brief and concrete. You never write code, edit files or run commands: agents do the work, you orchestrate them.\nTo act, use the propose tool with a JSON array of actions, or, if you have no tools, say in plain words exactly what you will do and end your reply with one fenced block tagged oversee
+"output" {"role":"system","text":"session started (model fixture)"}
+"tool" {"id":"toolu_mcp_1","name":"mcp__overseer__roster","summary":"{}"}
+"tool_result" {"id":"toolu_mcp_1","input":{},"is_error":false,"output":null,"status":"started"}
+"overseer_tool_call" {"bytes":10,"name":"roster","role":"overseer"}
+"tool_result" {"id":"toolu_mcp_1","input":null,"is_error":false,"output":"No agents.","status":"completed"}
+"output" {"role":"assistant","text":"No agents are running."}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test ac189_overseer_keeps_agents_on_task ... FAILED
+
+thread 'ac190_briefing_and_channel' panicked at daemon/tests/overseer.rs:1569:5:
+second r-434d3ff7fee2: [Object {"ended_ms": Number(1791026436233), "id": String("u-a513d7c86ad3"), "n": Number(1), "prompt": String("claim: web/login; report: building the login page; ask: what does the login endpoint return?; write: web/login/page.ts"), "run_id": String("r-434d3ff7fee2"), "snapshot_id": String("s-97c242e17ab4"), "started_ms": Number(1791026436158), "status": String("completed")}]
+first r-13eab53d9920: [Object {"ended_ms": Null, "id": String("u-9d593309ee7e"), "n": Number(1), "prompt": String("build the login API"), "run_id": String("r-13eab53d9920"), "snapshot_id": String("s-a2422b6c713e"), "started_ms": Number(1791026435621), "status": String("running")}]
+test ac190_briefing_and_channel ... FAILED
+
+failures:
+
+failures:
+    ac189_overseer_keeps_agents_on_task
+    ac190_briefing_and_channel
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 35 filtered out; finished in 99.37s
+

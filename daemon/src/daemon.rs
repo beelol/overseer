@@ -445,6 +445,7 @@ impl Daemon {
         paths::ensure_private_dir(&paths::runtime_dir())?;
         paths::ensure_private_dir(&paths::runs_dir())?;
         let store = Store::open(&paths::db_path())?;
+        crate::mods::library::recover(&store)?;
         let learning_paused = !store.learning_persistent;
         // The event bus. Tests shrink it (OVERSEER_TEST_EVENT_BUS) to make a subscriber fall behind.
         let bus = std::env::var("OVERSEER_TEST_EVENT_BUS").ok().and_then(|v| v.parse::<usize>().ok()).filter(|n| *n >= 16).unwrap_or(4096);
@@ -1820,6 +1821,37 @@ impl Daemon {
         self.start_turn_internal(run_id, prompt, follow_up, opts, None)
     }
 
+    /// Structural restrictions apply before accepting a future turn, as well as at launch.
+    /// This only reads target identity and workspace state; it neither admits nor starts work.
+    pub(crate) fn validate_follow_up_target(&self, run: &Run) -> Result<()> {
+        self.validate_turn_target(run, true, false).map(|_| ())
+    }
+
+    fn validate_turn_target(&self, run: &Run, follow_up: bool, swarm_launch: bool) -> Result<Workspace> {
+        if follow_up && run.relation_source.as_deref() == Some("managed-delegation") {
+            bail!("a managed work unit has one result; delegate a new work unit instead");
+        }
+        if run.parent_run_id.is_some() && !matches!(run.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation")) {
+            bail!("follow-ups go to the top-level run; native children are controlled by their parent harness");
+        }
+        if !swarm_launch {
+            let store = self.store.lock().unwrap();
+            if store.conn.prepare("SELECT 1 FROM swarm_worker_launches WHERE overseer_run_id=?1")?
+                .exists([run.id.as_str()])? {
+                bail!("Swarm worker runs cannot receive ordinary follow-ups; continue through the Swarm director");
+            }
+            if store.conn.prepare("SELECT 1 FROM swarm_director_owners WHERE overseer_run_id=?1")?
+                .exists([run.id.as_str()])? {
+                bail!("Swarm director runs cannot receive ordinary follow-ups; continue through Swarm coordination");
+            }
+        }
+        let ws = self.workspace(&run.workspace_id)?;
+        if ws.removed_ms.is_some() {
+            bail!("workspace was removed");
+        }
+        Ok(ws)
+    }
+
     fn start_turn_internal(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool, opts: &TurnOpts, swarm_identity: Option<&SwarmLaunchIdentity<'_>>) -> Result<Turn> {
         let initial = self.run(run_id)?;
         let continuity = opts.retry_of.is_some() || opts.handoff;
@@ -1887,27 +1919,7 @@ impl Daemon {
                 }
             }
         }
-        if follow_up && run.relation_source.as_deref() == Some("managed-delegation") {
-            bail!("a managed work unit has one result; delegate a new work unit instead");
-        }
-        if run.parent_run_id.is_some() && !matches!(run.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation")) {
-            bail!("follow-ups go to the top-level run; native children are controlled by their parent harness");
-        }
-        if swarm_identity.is_none() {
-            let store = self.store.lock().unwrap();
-            if store.conn.prepare("SELECT 1 FROM swarm_worker_launches WHERE overseer_run_id=?1")?
-                .exists([run_id])? {
-                bail!("Swarm worker runs cannot receive ordinary follow-ups; continue through the Swarm director");
-            }
-            if store.conn.prepare("SELECT 1 FROM swarm_director_owners WHERE overseer_run_id=?1")?
-                .exists([run_id])? {
-                bail!("Swarm director runs cannot receive ordinary follow-ups; continue through Swarm coordination");
-            }
-        }
-        let ws = self.workspace(&run.workspace_id)?;
-        if ws.removed_ms.is_some() {
-            bail!("workspace was removed");
-        }
+        let ws = self.validate_turn_target(&run, follow_up, swarm_identity.is_some())?;
         if follow_up && !continuity && run.status == crate::handoff::HANDED_OFF {
             bail!("run handoff changed while preparing the follow-up; retry it");
         }
@@ -2013,12 +2025,14 @@ impl Daemon {
             generic_meta = json!({});
         }
         generic_meta["opts"] = json!({"effort": effort, "mode": mode});
-        let turn = match &opts.retry_of {
+        let (turn, turn_mods) = match &opts.retry_of {
             // A turn sent again after a wait is the same turn: no new record and no new snapshot.
             Some(id) => {
                 let store = self.store.lock().unwrap();
                 store.conn.execute("UPDATE turns SET status='running', ended_ms=NULL WHERE id=?1 AND run_id=?2", rusqlite::params![id, run_id])?;
-                store.turns(run_id)?.into_iter().find(|t| &t.id == id).ok_or_else(|| anyhow!("turn {id} is not a turn of this run"))?
+                let turn = store.turns(run_id)?.into_iter().find(|t| &t.id == id).ok_or_else(|| anyhow!("turn {id} is not a turn of this run"))?;
+                let saved = crate::mods::delivery::snapshot(&store, id)?;
+                (turn, saved.map(|saved| crate::mods::delivery::TurnMods { saved }))
             }
             None => {
                 let snap = self.take_snapshot(&ws, "run-start")?;
@@ -2029,19 +2043,31 @@ impl Daemon {
                 // A successor's first turn carries the guardrails it took over (AC-187, AC-197).
                 let preface = if opts.handoff && !follow_up { [self.guardrail_preface(run_id), preface].into_iter().filter(|p| !p.is_empty()).collect::<Vec<_>>().join("\n\n") } else { preface };
                 let prompt_owned = if preface.is_empty() { prompt.to_string() } else { format!("{preface}\n\n{prompt}") };
-                let turn = Turn { id: format!("u-{}", short_id()), run_id: run_id.into(), n, prompt: prompt_owned, snapshot_id: Some(snap.id.clone()), started_ms: now(), ended_ms: None, status: "running".into() };
-                {
+                let (turn, turn_mods) = {
                     let store = self.store.lock().unwrap();
-                    if let (None, Some(profile_id)) = (run.relation_source.as_deref(), run.profile_id.as_deref()) {
-                        if !store.insert_turn_if_no_auto_claim(&turn, profile_id)? {
-                            bail!("{MANUAL_POOL_CONFLICT}");
-                        }
-                    } else {
-                        store.insert_turn(&turn)?;
-                    }
-                }
+                    // Watch membership is only a Mods selector. The stored security
+                    // role, harness arguments and tool permissions stay unchanged.
+                    let context = crate::mods::bindings::context_from_store(&store, &run, &ws)?;
+                    let bindings = crate::mods::bindings::stored(&store)?;
+                    let plan = crate::mods::bindings::resolve(&crate::mods::library::versions(&store)?,
+                        &bindings, &context, crate::mods::revision(&store)?)?;
+                    let prepared = crate::mods::delivery::prepare(plan, &context)?;
+                    let prompt_owned = match &prepared.message_preface {
+                        Some(text) => format!("{text}{prompt_owned}"), None => prompt_owned,
+                    };
+                    let turn = Turn { id: format!("u-{}", short_id()), run_id: run_id.into(), n,
+                        prompt: prompt_owned, snapshot_id: Some(snap.id.clone()), started_ms: now(),
+                        ended_ms: None, status: "running".into() };
+                    let mut saved = prepared.snapshot(&turn.id, run_id, &run.harness);
+                    saved["binding_snapshot"] = json!(bindings.iter().filter(|b| prepared.plan.decisions.iter()
+                        .any(|decision| decision.binding_id == b.id && decision.status != "not_in_scope"))
+                        .collect::<Vec<_>>());
+                    let profile = if run.relation_source.is_none() { run.profile_id.as_deref() } else { None };
+                    if !store.insert_turn_with_mods(&turn, profile, &saved)? { bail!("{MANUAL_POOL_CONFLICT}"); }
+                    (turn, Some(crate::mods::delivery::TurnMods { saved }))
+                };
                 self.emit(Some(&run.task_id), Some(run_id), "turn_started", "daemon", "exact", json!({"turn": turn, "snapshot": snap.commit_sha}))?;
-                turn
+                (turn, turn_mods)
             }
         };
         // What the harness receives: the turn's prompt, with its preface when it has one.
@@ -2049,6 +2075,7 @@ impl Daemon {
         let prompt = prompt_owned.as_str();
         let mut external_effect_attempted = false;
         let launch_result = (|| -> Result<()> {
+        if let Some(mods) = &turn_mods { mods.validate_prompt(prompt)?; }
         if follow_up && !continuity && ACTIVE.contains(&run.status.as_str()) {
             if let Some(line) = adapters::follow_up_via_stdin(&run.harness, prompt) {
                 external_effect_attempted = true;
@@ -2096,6 +2123,12 @@ impl Daemon {
         }
         let args: Option<Vec<String>> = generic_meta["args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect());
         let mut extra_args: Vec<String> = generic_meta["extra_args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
+        if coordinating && matches!(run.harness.as_str(), "claude" | "codex" | "opencode") {
+            extra_args = self.without_legacy_overseer_args(run_id, &run.harness, Path::new(&ws.path), extra_args)?;
+            let (native_args, native_env) = self.native_overseer_launch(&run.harness, run_id, &turn.id, run.process_generation + 1)?;
+            extra_args.extend(native_args);
+            profile_env.extend(native_env);
+        }
         if follow_up || opts.handoff {
             extra_args.extend(self.guardrail_launch_args(run_id, &run.harness));
         }
@@ -2128,6 +2161,7 @@ impl Daemon {
             &LaunchReq {
                 cwd: Path::new(&ws.path),
                 prompt,
+                mods: turn_mods.as_ref(),
                 model: run.model.as_deref(),
                 effort: effort.as_deref().or(run.effort.as_deref()),
                 sandbox: Some(&sandbox),
@@ -2224,11 +2258,16 @@ impl Daemon {
                      WHERE id=?1 AND run_id=?2 AND ended_ms IS NULL",
                     rusqlite::params![turn.id, run.id, now()])?;
             }
+            crate::mods::delivery::record_outcome(self, &turn.id,
+                if external_effect_attempted { "uncertain_after_effect" } else { "failed_before_effect" },
+                "Message transport did not confirm acceptance; model consumption is unknown")?;
             return Err(error);
         }
         if let Some(reservation) = &mut resume_slot {
             reservation.release_after_start();
         }
+        crate::mods::delivery::record_outcome(self, &turn.id, "transport_accepted",
+            "Existing stdin or supervisor launch accepted the request; model consumption is unverified")?;
         Ok(turn)
     }
 
@@ -2363,7 +2402,7 @@ impl Daemon {
         Ok(PathBuf::from(launch.control_socket))
     }
 
-    fn send_stdin(&self, run: &Run, data: &str) -> Result<()> {
+    pub(crate) fn send_stdin(&self, run: &Run, data: &str) -> Result<()> {
         let sock = self.control_socket(run)?;
         let reply = shim::control(&sock, &json!({"op": "stdin", "data": data}))?;
         if reply["ok"] != true {
@@ -2373,6 +2412,40 @@ impl Daemon {
     }
 
     pub fn interrupt(self: &Arc<Self>, run_id: &str) -> Result<Value> {
+        let run = self.run(run_id)?;
+        if run.parent_run_id.is_some() && !matches!(run.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation")) {
+            bail!("native children are interrupted through their parent run");
+        }
+        let owner = self.pause_queue(run_id)?;
+        // Synthetic network fixture only: expose the otherwise brief ownership-change window.
+        if std::env::var_os("OVERSEER_TEST_NET").is_some() {
+            if let Some(gate) = std::env::var_os("OVERSEER_TEST_STOP_AFTER_PAUSE_GATE") {
+                let gate = PathBuf::from(gate);
+                std::fs::write(gate.with_extension("paused"), &owner)?;
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+                while !gate.exists() {
+                    if std::time::Instant::now() >= deadline { bail!("fixture Stop gate was not released"); }
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+            }
+        }
+        let run_id = owner.as_str();
+        let children = self.store.lock().unwrap().children(run_id)?;
+        for child in children.iter().filter(|child| child.relation_source.as_deref() == Some("managed-delegation")) {
+            self.pause_queue(&child.id)?;
+        }
+        // Take this only after pause_queue released its delivery gate: delivering a queued
+        // follow-up can itself enter Continuity. Handoff uses the same stable task boundary.
+        let gate = self.work_unit_gate(&format!("handoff-stop:{}", run.task_id));
+        let _guard = gate.lock().unwrap();
+        let current = self.queue_owner(run_id);
+        // Stop still pauses a queued message when the turn finished just before the click.
+        if !ACTIVE.contains(&self.run(&current)?.status.as_str()) { return Ok(json!({"ok":true})); }
+        self.interrupt_turn(&current)
+    }
+
+    /// Redirects and holds stop a turn without implicitly pausing the owner's queue.
+    pub(crate) fn interrupt_turn(self: &Arc<Self>, run_id: &str) -> Result<Value> {
         self.interrupt_with_origin(run_id, None)
     }
 
@@ -2431,10 +2504,11 @@ impl Daemon {
                 let _ = shim::control(&sock, &json!({"op": "stdin", "data": msg}));
                 let daemon = self.clone();
                 let run_id = run_id.to_string();
+                let generation = run.process_generation;
                 tokio::spawn(async move {
                     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
                     if let Ok(run) = daemon.run(&run_id) {
-                        if ACTIVE.contains(&run.status.as_str()) {
+                        if run.process_generation == generation && ACTIVE.contains(&run.status.as_str()) {
                             let _ = shim::control(&sock, &json!({"op": "close_stdin"}));
                             let _ = shim::control(&sock, &json!({"op": "signal", "sig": libc::SIGINT}));
                         }
@@ -2445,10 +2519,11 @@ impl Daemon {
         // Escalate if the harness ignores SIGINT.
         let daemon = self.clone();
         let run_id = run_id.to_string();
+        let generation = run.process_generation;
         tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_secs(10)).await;
             if let Ok(run) = daemon.run(&run_id) {
-                if ACTIVE.contains(&run.status.as_str()) {
+                if run.process_generation == generation && ACTIVE.contains(&run.status.as_str()) {
                     if let Ok(sock) = daemon.control_socket(&run) {
                         let _ = shim::control(&sock, &json!({"op": "signal", "sig": libc::SIGTERM}));
                     }
@@ -2484,19 +2559,22 @@ impl Daemon {
     /// `always`: allow, and take the request's Always allow offer (the harness's session rule,
     /// AC-262). Refused when the request offers none.
     pub fn answer_permission_with(&self, run_id: &str, request_id: &str, allow: bool, message: &str, always: bool) -> Result<Value> {
-        let run = self.run(run_id)?;
-        if always {
-            let offered = run.attention.as_ref().filter(|a| a["request_id"].as_str() == Some(request_id)).map(|a| !a["always"].is_null());
-            if offered == Some(false) {
-                return Err(crate::server::ProtoError::new("no_always_allow", format!("{} offers no Always allow for this request", run.harness)).into());
-            }
-        }
         let allow = allow || always;
-        // Several surfaces can answer the same request (VS Code, the terminal, a phone). The
-        // request is claimed under the store's lock, so exactly one answer reaches the harness;
-        // a later one is told what the first one was.
+        // Several surfaces can answer the same request. Validate the fresh native offer and
+        // claim attention under one store lock, so a stale Always choice cannot bypass a veto.
         let by = crate::server::actor().unwrap_or_else(|| "the Mac".to_string());
-        let claimed = self.store.lock().unwrap().claim_run_attention(run_id, request_id, allow, &by, now())?;
+        let (run, claimed) = {
+            let store = self.store.lock().unwrap();
+            let run = store.run(run_id)?.ok_or_else(|| anyhow!("unknown run {run_id}"))?;
+            if always {
+                let offered = run.attention.as_ref().filter(|a| a["request_id"].as_str() == Some(request_id)).map(|a| !a["always"].is_null());
+                if offered == Some(false) {
+                    return Err(crate::server::ProtoError::new("no_always_allow", format!("{} offers no Always allow for this request", run.harness)).into());
+                }
+            }
+            let claimed = store.claim_run_attention(run_id, request_id, allow, &by, now())?;
+            (run, claimed)
+        };
         let Some(attention) = claimed else {
             if let Some(first) = self.store.lock().unwrap().permission_answer(run_id, request_id)? {
                 let by = first["by"].as_str().unwrap_or("someone").to_string();
@@ -2509,6 +2587,12 @@ impl Daemon {
             bail!("permission request {request_id} is not pending");
         };
         let offer = attention.get("always").filter(|o| always && !o.is_null());
+        // Hash the private native descriptor before event redaction, with ownership read
+        // atomically alongside the claimed request. No caller can supply this authority.
+        let grant = offer.and_then(|offer| adapters::native_session_grant(
+            &adapters::NativeGrantContext { harness:&run.harness, run_id:&run.id,
+                native_id:run.native_id.as_deref(), process_generation:run.process_generation },
+            attention["tool"].as_str().unwrap_or(""), &attention["input"], offer));
         let sent = adapters::permission_reply_always(&run.harness, request_id, allow, &attention["input"], if message.is_empty() { "Denied by user in Overseer" } else { message }, offer)
             .ok_or_else(|| anyhow!("{} does not support permission replies", run.harness))
             .and_then(|reply| self.send_stdin(&run, &reply));
@@ -2520,6 +2604,7 @@ impl Daemon {
         self.store.lock().unwrap().update_run_status(run_id, "running", None, None)?;
         let mut answered = json!({"request_id": request_id, "allow": allow, "by": by});
         if let Some(o) = offer { answered["always"] = o["label"].clone(); }
+        if let Some(grant) = grant { answered["grant"] = serde_json::to_value(grant)?; }
         self.emit(Some(&run.task_id), Some(run_id), "permission_answered", "user", "exact", answered)?;
         self.emit(Some(&run.task_id), Some(run_id), "status", "daemon", "exact", json!({"status": "running"}))?;
         if !allow {
@@ -2949,9 +3034,16 @@ impl Daemon {
                     ev("permission", "daemon", "exact", json!({"kind": "permission", "request_id": request_id, "tool": tool, "auto_allowed": "Overseer's own tool"}), None)?;
                     return Ok(());
                 }
-                // Allowed for this session already (AC-241): the same offer is answered by the
-                // daemon, so the owner is not asked again even if the harness asks.
-                if let Some(offer) = always.as_ref().filter(|o| o["label"].as_str().is_some_and(|l| store.allowed_for_session(&run.id, l).unwrap_or(false))) {
+                // AC-241 reuses the harness's actual qualified grant, never its display label.
+                // A Session event in this batch may have set native_id since tail_loop read Run.
+                let current = store.run(&run.id)?.ok_or_else(|| anyhow!("unknown run {}", run.id))?;
+                let grant = always.as_ref().and_then(|offer| adapters::native_session_grant(
+                    &adapters::NativeGrantContext { harness:&current.harness, run_id:&current.id,
+                        native_id:current.native_id.as_deref(), process_generation:current.process_generation },
+                    &tool, &input, offer));
+                let replay = grant.as_ref().map(|grant| store.allowed_for_session(&run.id, grant))
+                    .transpose()?.unwrap_or(false);
+                if let Some(offer) = always.as_ref().filter(|_| replay) {
                     if let Some(reply) = adapters::permission_reply_always(&run.harness, &request_id, true, &input, "", Some(offer)) {
                         state.sends.push(reply);
                         ev("permission", "daemon", "exact", json!({"kind": "permission", "request_id": request_id, "tool": tool, "input": input, "auto_allowed": "allowed for this session", "always": offer["label"]}), None)?;
@@ -3744,6 +3836,9 @@ impl Daemon {
             if let Some(link) = run["id"].as_str().and_then(|id| memberships.get(id)) {
                 run["swarm_membership"] = link.clone();
             }
+            if let Some(id) = run["id"].as_str().map(str::to_string) {
+                run["queue"] = crate::overseer::session::stored_queue(&store, &id)?;
+            }
             // Why a failed agent stopped, in plain words, for every surface (AC-239); exit_reason
             // keeps the daemon's own record.
             if run["status"] == "failed" {
@@ -3796,7 +3891,9 @@ impl Daemon {
             let session: Option<(String, String, Option<String>)> = store.conn.query_row("SELECT id, level, run_id FROM overseer_sessions WHERE archived_ms IS NULL ORDER BY started_ms DESC LIMIT 1", [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).optional()?;
             match session {
                 Some((id, level, run_id)) => {
-                    let open: i64 = store.conn.query_row("SELECT COUNT(*) FROM overseer_proposals WHERE session_id=?1 AND state='open'", [&id], |r| r.get(0))?;
+                    // A waiting permission put to the owner as a yes/no (AC-230) counts once, as
+                    // its agent's own Needs you item.
+                    let open: i64 = store.conn.query_row("SELECT COUNT(*) FROM overseer_proposals WHERE session_id=?1 AND state='open' AND COALESCE(cause, '') <> 'needs'", [&id], |r| r.get(0))?;
                     let decisions: i64 = store.conn.query_row("SELECT COUNT(*) FROM conflicts WHERE state='open' AND kind IN ('same_lines', 'area_crossed')", [], |r| r.get(0))?;
                     let last: Option<i64> = store.conn.query_row("SELECT MAX(ts) FROM overseer_messages WHERE session_id=?1", [&id], |r| r.get::<_, Option<i64>>(0)).ok().flatten();
                     json!({"session": id, "level": level, "run_id": run_id, "open_proposals": open, "conflicts_needing_decision": decisions, "last_message_ms": last})
@@ -3934,12 +4031,15 @@ fn error_suffix(state: &TailState) -> String {
     state.last_error.as_ref().map(|(c, m)| format!("; last error [{c}]: {}", m.chars().take(200).collect::<String>())).unwrap_or_default()
 }
 
-fn redact_value(v: Value) -> Value {
+// Redact decoded values; serializing first can hide escaped text or corrupt JSON.
+pub(crate) fn redact_value(v: Value) -> Value {
     match v {
         Value::String(s) => Value::String(redact(&s)),
         Value::Array(a) => Value::Array(a.into_iter().map(redact_value).collect()),
         Value::Object(o) => Value::Object(o.into_iter().map(|(k, v)| {
+            // Classify with the original field name, then redact credentials in key text too.
             let lower = k.to_ascii_lowercase();
+            let k = redact(&k);
             let secret = ["token", "access_token", "refresh_token", "id_token", "oauth_token", "api_key", "apikey", "authorization", "password", "secret", "client_secret", "cookie"];
             if secret.contains(&lower.as_str()) {
                 (k, Value::String("[redacted]".into()))

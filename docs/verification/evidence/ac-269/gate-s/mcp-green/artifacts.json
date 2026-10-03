@@ -1,0 +1,24 @@
+{
+  "commit": "83e882143f4c38a3dba6d9b7b73a02edba7eed9c",
+  "source_root": "/private/tmp/overseer-mods-gate-s-20261003",
+  "jobs": 1,
+  "test_threads": 1,
+  "executables": {
+    "mods_gate_s": "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_gate_s-00b0d44fe604f213"
+  },
+  "sha256": {
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/mods/library.rs": "bc26154e515e958c9575fbb3a5ec8b656dceb6fe6e7994ac83a0904f33a381cb",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/mods/manifest.rs": "f81260ae6212547a7fba814465b077f86c57eaf3a547481cf867c5f9f7ae0a79",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/mods/delivery.rs": "105653af7a1e76b4b4ed9274eaa616e7d30d5058a61333425a8b44c1a120f7ac",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/mods/mod.rs": "2bc212c10a66d9d7acd6513f5987a74e64101e68d9bbd09c87cc2c1ea812223e",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/mods/read.rs": "2d4f934c14cf13fb792f51c1fa23f317fdb8b66e3596f98731cea88faf37b66a",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/mods/bindings.rs": "ed2622f08f10cb8cd57ace4f9f73adcf18673e6c105bd89074ae0ff5b7bf5f86",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/overseer/mod.rs": "47899fbd11b745a8f426313a061a1647f880a84eca37903e71df58f8397bd6b4",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/overseer/session.rs": "dfc0a1c1b842748e3d9a0c5843a19fd272a61dfb1ca36c0f66fbec6134bb35df",
+    "/private/tmp/overseer-closeout-verify-target/debug/overseerd.d": "09ac07e60b15063381fad648d1c9710f71a95de6951d3e743577671398976600",
+    "/private/tmp/overseer-closeout-verify-target/debug/overseerd": "fd45abc66c700e7f299e69d59fcb9d0a9c404c86afedf931848c36fe9c7edbba",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/tests/mods_gate_s.rs": "8dbb9282c93b6606b63289b9c4ed5dbbeb1c94d408d313b8b2032d6f6a97b09e",
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_gate_s-00b0d44fe604f213": "4222ed6358778a60f1b99fa7cd4c6aa90be682ea3196f19c4d06dfb28d874d84",
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_gate_s-00b0d44fe604f213.d": "88983da802bae9785cb7256c0f5fedef1d1a89cb6acc7cc275b2e963892be7ea"
+  }
+}

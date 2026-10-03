@@ -10,6 +10,7 @@ const { auditExpression } = require('./audit');
 const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
+const { initialSettings, runSettings } = require('./settings-qualification');
 
 (async () => {
   const s = new Session('home');
@@ -25,6 +26,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
       CLAUDE_FIXTURE_MODE_FILE: modeFile, OVERSEER_HARNESS_ENV_PASSTHROUGH: 'CLAUDE_FIXTURE_MODE_FILE' });
     const cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
+    initialSettings(s, result);
     const overseerTurns = () => { const sess = s.ctl('overseer.session'); return sess.run_id ? s.ctl('run.turns', { run_id: sess.run_id }).length : 0; };
     const runs = () => s.ctl('state').runs.filter(r => !r.parent_run_id);
     // Keyboard only: Tab (or Shift+Tab) until the element the predicate names has focus; Enter acts on it.
@@ -61,6 +63,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await s.screenshot('home-started');
     check('the start appears in the conversation as a card', true);
     for (let i = 0; i < 60 && runs().find(r => r.id === started.id).status !== 'completed'; i++) await delay(250);
+    runSettings(s, result, started.id);
     // The start opened the agent's chat (AC-59); home is one command away (Overseer: New Agent).
     const goHome = async () => {
       for (let i = 0; i < 3; i++) {

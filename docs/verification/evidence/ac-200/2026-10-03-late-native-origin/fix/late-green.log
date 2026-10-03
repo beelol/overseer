@@ -1,0 +1,7 @@
+
+running 1 test
+test ac200_interrupted_native_finding_cannot_borrow_successor_owner_turn ... same sid=os-3556cfd870e5 run=r-82421aef3bbb; actual old finding turn=u-1c7d93c85a78 generation=2; actual successor owner turn=u-3dc304c6a06a generation=3; predecessor MCP exit={"actual_interrupt":true,"mcp_exit":{"code":null,"signal":"SIGTERM"},"mcp_pid":60069}; shim exit={"code":130,"ended_ms":1791035639749,"signal":null,"spawn_error":null}; actual completed dispatch={"result":{"is_error":true,"text":"refused: native capability was revoked"}}; matching proposals=[]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 8.57s
+

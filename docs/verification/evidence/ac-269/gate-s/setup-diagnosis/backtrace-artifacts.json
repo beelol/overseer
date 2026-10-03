@@ -1,0 +1,10 @@
+{
+  "head": "116c9cb8c5ebfe02dfdcd05c7003e69a6ded1f7b",
+  "delta": "temporary test-only session INSERT backtrace; staged cadence trace",
+  "sha256": {
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/src/overseer/session.rs": "f16588c7011c311ddc5372fc86703654c28dec0a275f1f7acb35fe465e48c835",
+    "/private/tmp/overseer-mods-gate-s-20261003/daemon/tests/mods_gate_s.rs": "5e37c9ddc1afb04d56716e86c7bb1819b087fd634b89206bd53132f16374a72c",
+    "/private/tmp/overseer-closeout-verify-target/debug/overseerd": "f4fbff625fd4d90f9f58a641e028d9cb7ad595ef18e2d7899818592b4bec129b",
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/mods_gate_s-00b0d44fe604f213": "c1bdd38ad862540be47567600a5e3e53e66e9653de01d8d663bf772f0da45a9e"
+  }
+}

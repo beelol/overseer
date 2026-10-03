@@ -1,0 +1,4592 @@
+[
+  {
+    "name": "legacy_execCommandApproval_allow",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "execCommandApproval",
+      "params": {
+        "callId": "call-fixture",
+        "conversationId": "thread-fixture",
+        "command": [
+          "printf",
+          "fixture"
+        ],
+        "cwd": "/fixture/work",
+        "parsedCmd": []
+      }
+    },
+    "family": "legacy_command",
+    "request_schema": "ExecCommandApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "approved"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "approved"
+      }
+    },
+    "response_schema": "ExecCommandApprovalResponse.json"
+  },
+  {
+    "name": "legacy_execCommandApproval_session",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "execCommandApproval",
+      "params": {
+        "callId": "call-fixture",
+        "conversationId": "thread-fixture",
+        "command": [
+          "printf",
+          "fixture"
+        ],
+        "cwd": "/fixture/work",
+        "parsedCmd": []
+      }
+    },
+    "family": "legacy_command",
+    "request_schema": "ExecCommandApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "approved_for_session"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "approved_for_session"
+      }
+    },
+    "response_schema": "ExecCommandApprovalResponse.json"
+  },
+  {
+    "name": "legacy_execCommandApproval_deny",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "execCommandApproval",
+      "params": {
+        "callId": "call-fixture",
+        "conversationId": "thread-fixture",
+        "command": [
+          "printf",
+          "fixture"
+        ],
+        "cwd": "/fixture/work",
+        "parsedCmd": []
+      }
+    },
+    "family": "legacy_command",
+    "request_schema": "ExecCommandApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": {
+        "denied": {
+          "rejection": "Owner declined"
+        }
+      }
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": {
+          "denied": {
+            "rejection": "Owner declined"
+          }
+        }
+      }
+    },
+    "response_schema": "ExecCommandApprovalResponse.json"
+  },
+  {
+    "name": "legacy_execCommandApproval_cancel",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "execCommandApproval",
+      "params": {
+        "callId": "call-fixture",
+        "conversationId": "thread-fixture",
+        "command": [
+          "printf",
+          "fixture"
+        ],
+        "cwd": "/fixture/work",
+        "parsedCmd": []
+      }
+    },
+    "family": "legacy_command",
+    "request_schema": "ExecCommandApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "abort"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "abort"
+      }
+    },
+    "response_schema": "ExecCommandApprovalResponse.json"
+  },
+  {
+    "name": "legacy_applyPatchApproval_allow",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "applyPatchApproval",
+      "params": {
+        "callId": "call-fixture",
+        "conversationId": "thread-fixture",
+        "fileChanges": {}
+      }
+    },
+    "family": "legacy_file",
+    "request_schema": "ApplyPatchApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "approved"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "approved"
+      }
+    },
+    "response_schema": "ApplyPatchApprovalResponse.json"
+  },
+  {
+    "name": "legacy_applyPatchApproval_session",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "applyPatchApproval",
+      "params": {
+        "callId": "call-fixture",
+        "conversationId": "thread-fixture",
+        "fileChanges": {}
+      }
+    },
+    "family": "legacy_file",
+    "request_schema": "ApplyPatchApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "approved_for_session"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "approved_for_session"
+      }
+    },
+    "response_schema": "ApplyPatchApprovalResponse.json"
+  },
+  {
+    "name": "legacy_applyPatchApproval_deny",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "applyPatchApproval",
+      "params": {
+        "callId": "call-fixture",
+        "conversationId": "thread-fixture",
+        "fileChanges": {}
+      }
+    },
+    "family": "legacy_file",
+    "request_schema": "ApplyPatchApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": {
+        "denied": {
+          "rejection": "Owner declined"
+        }
+      }
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": {
+          "denied": {
+            "rejection": "Owner declined"
+          }
+        }
+      }
+    },
+    "response_schema": "ApplyPatchApprovalResponse.json"
+  },
+  {
+    "name": "legacy_applyPatchApproval_cancel",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "applyPatchApproval",
+      "params": {
+        "callId": "call-fixture",
+        "conversationId": "thread-fixture",
+        "fileChanges": {}
+      }
+    },
+    "family": "legacy_file",
+    "request_schema": "ApplyPatchApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "abort"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "abort"
+      }
+    },
+    "response_schema": "ApplyPatchApprovalResponse.json"
+  },
+  {
+    "name": "command_command_accept",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "kind": "command",
+        "command": "printf fixture",
+        "approvalId": "approval-command",
+        "environmentId": "environment-fixture",
+        "availableDecisions": [
+          "accept",
+          "decline",
+          "cancel",
+          "acceptForSession"
+        ]
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "accept"
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "command_command_decline",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "kind": "command",
+        "command": "printf fixture",
+        "approvalId": "approval-command",
+        "environmentId": "environment-fixture",
+        "availableDecisions": [
+          "accept",
+          "decline",
+          "cancel",
+          "acceptForSession"
+        ]
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "decline"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "decline"
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "command_command_cancel",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "kind": "command",
+        "command": "printf fixture",
+        "approvalId": "approval-command",
+        "environmentId": "environment-fixture",
+        "availableDecisions": [
+          "accept",
+          "decline",
+          "cancel",
+          "acceptForSession"
+        ]
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "cancel"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "cancel"
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "command_command_acceptForSession",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "kind": "command",
+        "command": "printf fixture",
+        "approvalId": "approval-command",
+        "environmentId": "environment-fixture",
+        "availableDecisions": [
+          "accept",
+          "decline",
+          "cancel",
+          "acceptForSession"
+        ]
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "acceptForSession"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "acceptForSession"
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "command_writeStdin_accept",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "kind": "writeStdin",
+        "command": null,
+        "approvalId": "approval-writeStdin",
+        "environmentId": "environment-fixture",
+        "availableDecisions": [
+          "accept",
+          "decline",
+          "cancel",
+          "acceptForSession"
+        ]
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "accept"
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "command_writeStdin_decline",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "kind": "writeStdin",
+        "command": null,
+        "approvalId": "approval-writeStdin",
+        "environmentId": "environment-fixture",
+        "availableDecisions": [
+          "accept",
+          "decline",
+          "cancel",
+          "acceptForSession"
+        ]
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "decline"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "decline"
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "command_writeStdin_cancel",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "kind": "writeStdin",
+        "command": null,
+        "approvalId": "approval-writeStdin",
+        "environmentId": "environment-fixture",
+        "availableDecisions": [
+          "accept",
+          "decline",
+          "cancel",
+          "acceptForSession"
+        ]
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "cancel"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "cancel"
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "command_writeStdin_acceptForSession",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "kind": "writeStdin",
+        "command": null,
+        "approvalId": "approval-writeStdin",
+        "environmentId": "environment-fixture",
+        "availableDecisions": [
+          "accept",
+          "decline",
+          "cancel",
+          "acceptForSession"
+        ]
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "acceptForSession"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "acceptForSession"
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "command_network_accept",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "kind": "command",
+        "command": null,
+        "approvalId": "approval-network",
+        "environmentId": "environment-fixture",
+        "availableDecisions": [
+          "accept",
+          "decline",
+          "cancel",
+          "acceptForSession"
+        ],
+        "networkApprovalContext": {
+          "host": "site-a.test",
+          "protocol": "https"
+        }
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "accept"
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "command_network_decline",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "kind": "command",
+        "command": null,
+        "approvalId": "approval-network",
+        "environmentId": "environment-fixture",
+        "availableDecisions": [
+          "accept",
+          "decline",
+          "cancel",
+          "acceptForSession"
+        ],
+        "networkApprovalContext": {
+          "host": "site-a.test",
+          "protocol": "https"
+        }
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "decline"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "decline"
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "command_network_cancel",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "kind": "command",
+        "command": null,
+        "approvalId": "approval-network",
+        "environmentId": "environment-fixture",
+        "availableDecisions": [
+          "accept",
+          "decline",
+          "cancel",
+          "acceptForSession"
+        ],
+        "networkApprovalContext": {
+          "host": "site-a.test",
+          "protocol": "https"
+        }
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "cancel"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "cancel"
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "command_network_acceptForSession",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "kind": "command",
+        "command": null,
+        "approvalId": "approval-network",
+        "environmentId": "environment-fixture",
+        "availableDecisions": [
+          "accept",
+          "decline",
+          "cancel",
+          "acceptForSession"
+        ],
+        "networkApprovalContext": {
+          "host": "site-a.test",
+          "protocol": "https"
+        }
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "acceptForSession"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "acceptForSession"
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "raw_id_integer_7",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "command": "printf fixture"
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "accept"
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "raw_id_string_7",
+    "harness": "codex-app",
+    "request": {
+      "id": "7",
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "command": "printf fixture"
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "response": {
+      "id": "7",
+      "result": {
+        "decision": "accept"
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "raw_id_-9223372036854775808",
+    "harness": "codex-app",
+    "request": {
+      "id": -9223372036854775808,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "command": "printf fixture"
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "response": {
+      "id": -9223372036854775808,
+      "result": {
+        "decision": "accept"
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "raw_id_9223372036854775807",
+    "harness": "codex-app",
+    "request": {
+      "id": 9223372036854775807,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "command": "printf fixture"
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "response": {
+      "id": 9223372036854775807,
+      "result": {
+        "decision": "accept"
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "invalid_raw_id_7.5",
+    "harness": "codex-app",
+    "request": {
+      "id": 7.5,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "command": "printf fixture"
+      }
+    },
+    "family": "invalid",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "reject": "invalid_native_id"
+  },
+  {
+    "name": "invalid_raw_id_9223372036854775808",
+    "harness": "codex-app",
+    "request": {
+      "id": 9223372036854775808,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "command": "printf fixture"
+      }
+    },
+    "family": "invalid",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "reject": "invalid_native_id"
+  },
+  {
+    "name": "invalid_raw_id_-9223372036854775809",
+    "harness": "codex-app",
+    "request": {
+      "id": -9223372036854775809,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "command": "printf fixture"
+      }
+    },
+    "family": "invalid",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "reject": "invalid_native_id"
+  },
+  {
+    "name": "invalid_raw_id_None",
+    "harness": "codex-app",
+    "request": {
+      "id": null,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "command": "printf fixture"
+      }
+    },
+    "family": "invalid",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "reject": "invalid_native_id"
+  },
+  {
+    "name": "invalid_raw_id_True",
+    "harness": "codex-app",
+    "request": {
+      "id": true,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "command": "printf fixture"
+      }
+    },
+    "family": "invalid",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "reject": "invalid_native_id"
+  },
+  {
+    "name": "invalid_raw_id_{}",
+    "harness": "codex-app",
+    "request": {
+      "id": {},
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "command": "printf fixture"
+      }
+    },
+    "family": "invalid",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "reject": "invalid_native_id"
+  },
+  {
+    "name": "invalid_raw_id_[]",
+    "harness": "codex-app",
+    "request": {
+      "id": [],
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "command": "printf fixture"
+      }
+    },
+    "family": "invalid",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "reject": "invalid_native_id"
+  },
+  {
+    "name": "file_accept",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/fileChange/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "grantRoot": "/fixture/work"
+      }
+    },
+    "family": "file",
+    "request_schema": "FileChangeRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "accept"
+      }
+    },
+    "response_schema": "FileChangeRequestApprovalResponse.json"
+  },
+  {
+    "name": "file_acceptForSession",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/fileChange/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "grantRoot": "/fixture/work"
+      }
+    },
+    "family": "file",
+    "request_schema": "FileChangeRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "acceptForSession"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "acceptForSession"
+      }
+    },
+    "response_schema": "FileChangeRequestApprovalResponse.json"
+  },
+  {
+    "name": "file_decline",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/fileChange/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "grantRoot": "/fixture/work"
+      }
+    },
+    "family": "file",
+    "request_schema": "FileChangeRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "decline"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "decline"
+      }
+    },
+    "response_schema": "FileChangeRequestApprovalResponse.json"
+  },
+  {
+    "name": "file_cancel",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/fileChange/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "grantRoot": "/fixture/work"
+      }
+    },
+    "family": "file",
+    "request_schema": "FileChangeRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "cancel"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "cancel"
+      }
+    },
+    "response_schema": "FileChangeRequestApprovalResponse.json"
+  },
+  {
+    "name": "offered_execpolicy",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "command": "printf fixture",
+        "proposedExecpolicyAmendment": [
+          "printf",
+          "fixture"
+        ],
+        "availableDecisions": [
+          {
+            "acceptWithExecpolicyAmendment": {
+              "execpolicy_amendment": [
+                "printf",
+                "fixture"
+              ]
+            }
+          },
+          "decline"
+        ]
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": {
+        "acceptWithExecpolicyAmendment": {
+          "execpolicy_amendment": [
+            "printf",
+            "fixture"
+          ]
+        }
+      }
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": {
+          "acceptWithExecpolicyAmendment": {
+            "execpolicy_amendment": [
+              "printf",
+              "fixture"
+            ]
+          }
+        }
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "widened_execpolicy",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "command": "printf fixture",
+        "proposedExecpolicyAmendment": [
+          "printf",
+          "fixture"
+        ],
+        "availableDecisions": [
+          {
+            "acceptWithExecpolicyAmendment": {
+              "execpolicy_amendment": [
+                "printf",
+                "fixture"
+              ]
+            }
+          },
+          "decline"
+        ]
+      }
+    },
+    "family": "command",
+    "answer": {
+      "kind": "decision",
+      "decision": {
+        "acceptWithExecpolicyAmendment": {
+          "execpolicy_amendment": [
+            "*"
+          ]
+        }
+      }
+    },
+    "reject": "unoffered_decision"
+  },
+  {
+    "name": "offered_networkpolicy",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "command": "printf fixture",
+        "proposedNetworkPolicyAmendments": [
+          {
+            "host": "site-a.test",
+            "action": "allow"
+          }
+        ],
+        "availableDecisions": [
+          {
+            "applyNetworkPolicyAmendment": {
+              "network_policy_amendment": {
+                "host": "site-a.test",
+                "action": "allow"
+              }
+            }
+          },
+          "decline"
+        ]
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": {
+        "applyNetworkPolicyAmendment": {
+          "network_policy_amendment": {
+            "host": "site-a.test",
+            "action": "allow"
+          }
+        }
+      }
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": {
+          "applyNetworkPolicyAmendment": {
+            "network_policy_amendment": {
+              "host": "site-a.test",
+              "action": "allow"
+            }
+          }
+        }
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "widened_networkpolicy",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "command": "printf fixture",
+        "proposedNetworkPolicyAmendments": [
+          {
+            "host": "site-a.test",
+            "action": "allow"
+          }
+        ],
+        "availableDecisions": [
+          {
+            "applyNetworkPolicyAmendment": {
+              "network_policy_amendment": {
+                "host": "site-a.test",
+                "action": "allow"
+              }
+            }
+          },
+          "decline"
+        ]
+      }
+    },
+    "family": "command",
+    "answer": {
+      "kind": "decision",
+      "decision": {
+        "applyNetworkPolicyAmendment": {
+          "network_policy_amendment": {
+            "host": "site-b.test",
+            "action": "allow"
+          }
+        }
+      }
+    },
+    "reject": "unoffered_decision"
+  },
+  {
+    "name": "unoffered_accept",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "command": "printf fixture",
+        "availableDecisions": [
+          "decline"
+        ]
+      }
+    },
+    "family": "command",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "reject": "unoffered_decision"
+  },
+  {
+    "name": "unoffered_acceptForSession",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "command": "printf fixture",
+        "availableDecisions": [
+          "decline"
+        ]
+      }
+    },
+    "family": "command",
+    "answer": {
+      "kind": "decision",
+      "decision": "acceptForSession"
+    },
+    "reject": "unoffered_decision"
+  },
+  {
+    "name": "permissions_turn",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/permissions/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "cwd": "/fixture/work",
+        "permissions": {
+          "fileSystem": {
+            "entries": [
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work"
+                },
+                "access": "write"
+              },
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work/private"
+                },
+                "access": "deny"
+              },
+              {
+                "path": {
+                  "type": "glob_pattern",
+                  "pattern": "/fixture/work/*.txt"
+                },
+                "access": "read"
+              },
+              {
+                "path": {
+                  "type": "special",
+                  "value": {
+                    "kind": "project_roots",
+                    "subpath": "assets"
+                  }
+                },
+                "access": "read"
+              }
+            ],
+            "read": [
+              "/fixture/read"
+            ],
+            "write": [
+              "/fixture/work"
+            ],
+            "globScanMaxDepth": 3
+          },
+          "network": {
+            "enabled": true
+          }
+        }
+      }
+    },
+    "family": "permissions",
+    "request_schema": "PermissionsRequestApprovalParams.json",
+    "answer": {
+      "kind": "permissions",
+      "permissions": {
+        "fileSystem": {
+          "entries": [
+            {
+              "path": {
+                "type": "path",
+                "path": "/fixture/work"
+              },
+              "access": "write"
+            },
+            {
+              "path": {
+                "type": "path",
+                "path": "/fixture/work/private"
+              },
+              "access": "deny"
+            },
+            {
+              "path": {
+                "type": "glob_pattern",
+                "pattern": "/fixture/work/*.txt"
+              },
+              "access": "read"
+            },
+            {
+              "path": {
+                "type": "special",
+                "value": {
+                  "kind": "project_roots",
+                  "subpath": "assets"
+                }
+              },
+              "access": "read"
+            }
+          ],
+          "read": [
+            "/fixture/read"
+          ],
+          "write": [
+            "/fixture/work"
+          ],
+          "globScanMaxDepth": 3
+        },
+        "network": {
+          "enabled": true
+        }
+      },
+      "scope": "turn",
+      "strictAutoReview": true
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "permissions": {
+          "fileSystem": {
+            "entries": [
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work"
+                },
+                "access": "write"
+              },
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work/private"
+                },
+                "access": "deny"
+              },
+              {
+                "path": {
+                  "type": "glob_pattern",
+                  "pattern": "/fixture/work/*.txt"
+                },
+                "access": "read"
+              },
+              {
+                "path": {
+                  "type": "special",
+                  "value": {
+                    "kind": "project_roots",
+                    "subpath": "assets"
+                  }
+                },
+                "access": "read"
+              }
+            ],
+            "read": [
+              "/fixture/read"
+            ],
+            "write": [
+              "/fixture/work"
+            ],
+            "globScanMaxDepth": 3
+          },
+          "network": {
+            "enabled": true
+          }
+        },
+        "scope": "turn",
+        "strictAutoReview": true
+      }
+    },
+    "response_schema": "PermissionsRequestApprovalResponse.json"
+  },
+  {
+    "name": "permissions_session",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/permissions/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "cwd": "/fixture/work",
+        "permissions": {
+          "fileSystem": {
+            "entries": [
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work"
+                },
+                "access": "write"
+              },
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work/private"
+                },
+                "access": "deny"
+              },
+              {
+                "path": {
+                  "type": "glob_pattern",
+                  "pattern": "/fixture/work/*.txt"
+                },
+                "access": "read"
+              },
+              {
+                "path": {
+                  "type": "special",
+                  "value": {
+                    "kind": "project_roots",
+                    "subpath": "assets"
+                  }
+                },
+                "access": "read"
+              }
+            ],
+            "read": [
+              "/fixture/read"
+            ],
+            "write": [
+              "/fixture/work"
+            ],
+            "globScanMaxDepth": 3
+          },
+          "network": {
+            "enabled": true
+          }
+        }
+      }
+    },
+    "family": "permissions",
+    "request_schema": "PermissionsRequestApprovalParams.json",
+    "answer": {
+      "kind": "permissions",
+      "permissions": {
+        "fileSystem": {
+          "entries": [
+            {
+              "path": {
+                "type": "path",
+                "path": "/fixture/work"
+              },
+              "access": "write"
+            },
+            {
+              "path": {
+                "type": "path",
+                "path": "/fixture/work/private"
+              },
+              "access": "deny"
+            },
+            {
+              "path": {
+                "type": "glob_pattern",
+                "pattern": "/fixture/work/*.txt"
+              },
+              "access": "read"
+            },
+            {
+              "path": {
+                "type": "special",
+                "value": {
+                  "kind": "project_roots",
+                  "subpath": "assets"
+                }
+              },
+              "access": "read"
+            }
+          ],
+          "read": [
+            "/fixture/read"
+          ],
+          "write": [
+            "/fixture/work"
+          ],
+          "globScanMaxDepth": 3
+        },
+        "network": {
+          "enabled": true
+        }
+      },
+      "scope": "session",
+      "strictAutoReview": true
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "permissions": {
+          "fileSystem": {
+            "entries": [
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work"
+                },
+                "access": "write"
+              },
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work/private"
+                },
+                "access": "deny"
+              },
+              {
+                "path": {
+                  "type": "glob_pattern",
+                  "pattern": "/fixture/work/*.txt"
+                },
+                "access": "read"
+              },
+              {
+                "path": {
+                  "type": "special",
+                  "value": {
+                    "kind": "project_roots",
+                    "subpath": "assets"
+                  }
+                },
+                "access": "read"
+              }
+            ],
+            "read": [
+              "/fixture/read"
+            ],
+            "write": [
+              "/fixture/work"
+            ],
+            "globScanMaxDepth": 3
+          },
+          "network": {
+            "enabled": true
+          }
+        },
+        "scope": "session",
+        "strictAutoReview": true
+      }
+    },
+    "response_schema": "PermissionsRequestApprovalResponse.json"
+  },
+  {
+    "name": "permissions_restricted_subset",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/permissions/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "cwd": "/fixture/work",
+        "permissions": {
+          "fileSystem": {
+            "entries": [
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work"
+                },
+                "access": "write"
+              },
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work/private"
+                },
+                "access": "deny"
+              },
+              {
+                "path": {
+                  "type": "glob_pattern",
+                  "pattern": "/fixture/work/*.txt"
+                },
+                "access": "read"
+              },
+              {
+                "path": {
+                  "type": "special",
+                  "value": {
+                    "kind": "project_roots",
+                    "subpath": "assets"
+                  }
+                },
+                "access": "read"
+              }
+            ],
+            "read": [
+              "/fixture/read"
+            ],
+            "write": [
+              "/fixture/work"
+            ],
+            "globScanMaxDepth": 3
+          },
+          "network": {
+            "enabled": true
+          }
+        }
+      }
+    },
+    "family": "permissions",
+    "request_schema": "PermissionsRequestApprovalParams.json",
+    "answer": {
+      "kind": "permissions",
+      "permissions": {
+        "fileSystem": {
+          "entries": [
+            {
+              "path": {
+                "type": "path",
+                "path": "/fixture/work/private"
+              },
+              "access": "deny"
+            }
+          ],
+          "read": [
+            "/fixture/read"
+          ],
+          "write": [],
+          "globScanMaxDepth": 3
+        },
+        "network": {
+          "enabled": false
+        }
+      },
+      "scope": "turn"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "permissions": {
+          "fileSystem": {
+            "entries": [
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work/private"
+                },
+                "access": "deny"
+              }
+            ],
+            "read": [
+              "/fixture/read"
+            ],
+            "write": [],
+            "globScanMaxDepth": 3
+          },
+          "network": {
+            "enabled": false
+          }
+        },
+        "scope": "turn"
+      }
+    },
+    "response_schema": "PermissionsRequestApprovalResponse.json"
+  },
+  {
+    "name": "permissions_empty_deny",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/permissions/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "cwd": "/fixture/work",
+        "permissions": {
+          "fileSystem": {
+            "entries": [
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work"
+                },
+                "access": "write"
+              },
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work/private"
+                },
+                "access": "deny"
+              },
+              {
+                "path": {
+                  "type": "glob_pattern",
+                  "pattern": "/fixture/work/*.txt"
+                },
+                "access": "read"
+              },
+              {
+                "path": {
+                  "type": "special",
+                  "value": {
+                    "kind": "project_roots",
+                    "subpath": "assets"
+                  }
+                },
+                "access": "read"
+              }
+            ],
+            "read": [
+              "/fixture/read"
+            ],
+            "write": [
+              "/fixture/work"
+            ],
+            "globScanMaxDepth": 3
+          },
+          "network": {
+            "enabled": true
+          }
+        }
+      }
+    },
+    "family": "permissions",
+    "request_schema": "PermissionsRequestApprovalParams.json",
+    "answer": {
+      "kind": "permissions",
+      "permissions": {},
+      "scope": "turn"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "permissions": {},
+        "scope": "turn"
+      }
+    },
+    "response_schema": "PermissionsRequestApprovalResponse.json"
+  },
+  {
+    "name": "permissions_drop_deny",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/permissions/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "cwd": "/fixture/work",
+        "permissions": {
+          "fileSystem": {
+            "entries": [
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work"
+                },
+                "access": "write"
+              },
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work/private"
+                },
+                "access": "deny"
+              },
+              {
+                "path": {
+                  "type": "glob_pattern",
+                  "pattern": "/fixture/work/*.txt"
+                },
+                "access": "read"
+              },
+              {
+                "path": {
+                  "type": "special",
+                  "value": {
+                    "kind": "project_roots",
+                    "subpath": "assets"
+                  }
+                },
+                "access": "read"
+              }
+            ],
+            "read": [
+              "/fixture/read"
+            ],
+            "write": [
+              "/fixture/work"
+            ],
+            "globScanMaxDepth": 3
+          },
+          "network": {
+            "enabled": true
+          }
+        }
+      }
+    },
+    "family": "permissions",
+    "answer": {
+      "kind": "permissions",
+      "permissions": {
+        "fileSystem": {
+          "entries": [
+            {
+              "path": {
+                "type": "path",
+                "path": "/fixture/work"
+              },
+              "access": "write"
+            },
+            {
+              "path": {
+                "type": "glob_pattern",
+                "pattern": "/fixture/work/*.txt"
+              },
+              "access": "read"
+            },
+            {
+              "path": {
+                "type": "special",
+                "value": {
+                  "kind": "project_roots",
+                  "subpath": "assets"
+                }
+              },
+              "access": "read"
+            }
+          ],
+          "read": [
+            "/fixture/read"
+          ],
+          "write": [
+            "/fixture/work"
+          ],
+          "globScanMaxDepth": 3
+        },
+        "network": {
+          "enabled": true
+        }
+      },
+      "scope": "turn"
+    },
+    "reject": "enlarged_permissions"
+  },
+  {
+    "name": "permissions_widen_glob",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/permissions/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "cwd": "/fixture/work",
+        "permissions": {
+          "fileSystem": {
+            "entries": [
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work"
+                },
+                "access": "write"
+              },
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work/private"
+                },
+                "access": "deny"
+              },
+              {
+                "path": {
+                  "type": "glob_pattern",
+                  "pattern": "/fixture/work/*.txt"
+                },
+                "access": "read"
+              },
+              {
+                "path": {
+                  "type": "special",
+                  "value": {
+                    "kind": "project_roots",
+                    "subpath": "assets"
+                  }
+                },
+                "access": "read"
+              }
+            ],
+            "read": [
+              "/fixture/read"
+            ],
+            "write": [
+              "/fixture/work"
+            ],
+            "globScanMaxDepth": 3
+          },
+          "network": {
+            "enabled": true
+          }
+        }
+      }
+    },
+    "family": "permissions",
+    "answer": {
+      "kind": "permissions",
+      "permissions": {
+        "fileSystem": {
+          "entries": [
+            {
+              "path": {
+                "type": "path",
+                "path": "/fixture/work"
+              },
+              "access": "write"
+            },
+            {
+              "path": {
+                "type": "path",
+                "path": "/fixture/work/private"
+              },
+              "access": "deny"
+            },
+            {
+              "path": {
+                "type": "glob_pattern",
+                "pattern": "/fixture/**"
+              },
+              "access": "read"
+            },
+            {
+              "path": {
+                "type": "special",
+                "value": {
+                  "kind": "project_roots",
+                  "subpath": "assets"
+                }
+              },
+              "access": "read"
+            }
+          ],
+          "read": [
+            "/fixture/read"
+          ],
+          "write": [
+            "/fixture/work"
+          ],
+          "globScanMaxDepth": 3
+        },
+        "network": {
+          "enabled": true
+        }
+      },
+      "scope": "turn"
+    },
+    "reject": "enlarged_permissions"
+  },
+  {
+    "name": "permissions_widen_special",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/permissions/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "cwd": "/fixture/work",
+        "permissions": {
+          "fileSystem": {
+            "entries": [
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work"
+                },
+                "access": "write"
+              },
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work/private"
+                },
+                "access": "deny"
+              },
+              {
+                "path": {
+                  "type": "glob_pattern",
+                  "pattern": "/fixture/work/*.txt"
+                },
+                "access": "read"
+              },
+              {
+                "path": {
+                  "type": "special",
+                  "value": {
+                    "kind": "project_roots",
+                    "subpath": "assets"
+                  }
+                },
+                "access": "read"
+              }
+            ],
+            "read": [
+              "/fixture/read"
+            ],
+            "write": [
+              "/fixture/work"
+            ],
+            "globScanMaxDepth": 3
+          },
+          "network": {
+            "enabled": true
+          }
+        }
+      }
+    },
+    "family": "permissions",
+    "answer": {
+      "kind": "permissions",
+      "permissions": {
+        "fileSystem": {
+          "entries": [
+            {
+              "path": {
+                "type": "path",
+                "path": "/fixture/work"
+              },
+              "access": "write"
+            },
+            {
+              "path": {
+                "type": "path",
+                "path": "/fixture/work/private"
+              },
+              "access": "deny"
+            },
+            {
+              "path": {
+                "type": "glob_pattern",
+                "pattern": "/fixture/work/*.txt"
+              },
+              "access": "read"
+            },
+            {
+              "path": {
+                "type": "special",
+                "value": {
+                  "kind": "root"
+                }
+              },
+              "access": "read"
+            }
+          ],
+          "read": [
+            "/fixture/read"
+          ],
+          "write": [
+            "/fixture/work"
+          ],
+          "globScanMaxDepth": 3
+        },
+        "network": {
+          "enabled": true
+        }
+      },
+      "scope": "turn"
+    },
+    "reject": "enlarged_permissions"
+  },
+  {
+    "name": "permissions_enlarge_write",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/permissions/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "cwd": "/fixture/work",
+        "permissions": {
+          "fileSystem": {
+            "entries": [
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work"
+                },
+                "access": "write"
+              },
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work/private"
+                },
+                "access": "deny"
+              },
+              {
+                "path": {
+                  "type": "glob_pattern",
+                  "pattern": "/fixture/work/*.txt"
+                },
+                "access": "read"
+              },
+              {
+                "path": {
+                  "type": "special",
+                  "value": {
+                    "kind": "project_roots",
+                    "subpath": "assets"
+                  }
+                },
+                "access": "read"
+              }
+            ],
+            "read": [
+              "/fixture/read"
+            ],
+            "write": [
+              "/fixture/work"
+            ],
+            "globScanMaxDepth": 3
+          },
+          "network": {
+            "enabled": true
+          }
+        }
+      }
+    },
+    "family": "permissions",
+    "answer": {
+      "kind": "permissions",
+      "permissions": {
+        "fileSystem": {
+          "entries": [
+            {
+              "path": {
+                "type": "path",
+                "path": "/fixture/work"
+              },
+              "access": "write"
+            },
+            {
+              "path": {
+                "type": "path",
+                "path": "/fixture/work/private"
+              },
+              "access": "deny"
+            },
+            {
+              "path": {
+                "type": "glob_pattern",
+                "pattern": "/fixture/work/*.txt"
+              },
+              "access": "read"
+            },
+            {
+              "path": {
+                "type": "special",
+                "value": {
+                  "kind": "project_roots",
+                  "subpath": "assets"
+                }
+              },
+              "access": "read"
+            }
+          ],
+          "read": [
+            "/fixture/read"
+          ],
+          "write": [
+            "/fixture/work",
+            "/outside"
+          ],
+          "globScanMaxDepth": 3
+        },
+        "network": {
+          "enabled": true
+        }
+      },
+      "scope": "turn"
+    },
+    "reject": "enlarged_permissions"
+  },
+  {
+    "name": "permissions_raise_depth",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/permissions/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "cwd": "/fixture/work",
+        "permissions": {
+          "fileSystem": {
+            "entries": [
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work"
+                },
+                "access": "write"
+              },
+              {
+                "path": {
+                  "type": "path",
+                  "path": "/fixture/work/private"
+                },
+                "access": "deny"
+              },
+              {
+                "path": {
+                  "type": "glob_pattern",
+                  "pattern": "/fixture/work/*.txt"
+                },
+                "access": "read"
+              },
+              {
+                "path": {
+                  "type": "special",
+                  "value": {
+                    "kind": "project_roots",
+                    "subpath": "assets"
+                  }
+                },
+                "access": "read"
+              }
+            ],
+            "read": [
+              "/fixture/read"
+            ],
+            "write": [
+              "/fixture/work"
+            ],
+            "globScanMaxDepth": 3
+          },
+          "network": {
+            "enabled": true
+          }
+        }
+      }
+    },
+    "family": "permissions",
+    "answer": {
+      "kind": "permissions",
+      "permissions": {
+        "fileSystem": {
+          "entries": [
+            {
+              "path": {
+                "type": "path",
+                "path": "/fixture/work"
+              },
+              "access": "write"
+            },
+            {
+              "path": {
+                "type": "path",
+                "path": "/fixture/work/private"
+              },
+              "access": "deny"
+            },
+            {
+              "path": {
+                "type": "glob_pattern",
+                "pattern": "/fixture/work/*.txt"
+              },
+              "access": "read"
+            },
+            {
+              "path": {
+                "type": "special",
+                "value": {
+                  "kind": "project_roots",
+                  "subpath": "assets"
+                }
+              },
+              "access": "read"
+            }
+          ],
+          "read": [
+            "/fixture/read"
+          ],
+          "write": [
+            "/fixture/work"
+          ],
+          "globScanMaxDepth": 100
+        },
+        "network": {
+          "enabled": true
+        }
+      },
+      "scope": "turn"
+    },
+    "reject": "enlarged_permissions"
+  },
+  {
+    "name": "codex_question_id",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/tool/requestUserInput",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "isBlocking": true,
+        "questions": [
+          {
+            "header": "Choice",
+            "id": "question-id",
+            "question": "Which option?",
+            "isOther": false,
+            "isSecret": false,
+            "options": [
+              {
+                "label": "A",
+                "description": "First"
+              },
+              {
+                "label": "B",
+                "description": "Second"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "family": "questions",
+    "request_schema": "ToolRequestUserInputParams.json",
+    "answer": {
+      "kind": "questions",
+      "answers": {
+        "question-id": [
+          "A"
+        ]
+      }
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "answers": {
+          "question-id": {
+            "answers": [
+              "A"
+            ]
+          }
+        }
+      }
+    },
+    "response_schema": "ToolRequestUserInputResponse.json"
+  },
+  {
+    "name": "codex_question_wrong_id",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/tool/requestUserInput",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "isBlocking": true,
+        "questions": [
+          {
+            "header": "Choice",
+            "id": "question-id",
+            "question": "Which option?",
+            "isOther": false,
+            "isSecret": false,
+            "options": [
+              {
+                "label": "A",
+                "description": "First"
+              },
+              {
+                "label": "B",
+                "description": "Second"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "family": "questions",
+    "answer": {
+      "kind": "questions",
+      "answers": {
+        "Which option?": [
+          "A"
+        ]
+      }
+    },
+    "reject": "invalid_answers"
+  },
+  {
+    "name": "codex_question_wrong_option",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/tool/requestUserInput",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "isBlocking": true,
+        "questions": [
+          {
+            "header": "Choice",
+            "id": "question-id",
+            "question": "Which option?",
+            "isOther": false,
+            "isSecret": false,
+            "options": [
+              {
+                "label": "A",
+                "description": "First"
+              },
+              {
+                "label": "B",
+                "description": "Second"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "family": "questions",
+    "answer": {
+      "kind": "questions",
+      "answers": {
+        "question-id": [
+          "C"
+        ]
+      }
+    },
+    "reject": "invalid_answers"
+  },
+  {
+    "name": "codex_question_missing",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/tool/requestUserInput",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "isBlocking": true,
+        "questions": [
+          {
+            "header": "Choice",
+            "id": "question-id",
+            "question": "Which option?",
+            "isOther": false,
+            "isSecret": false,
+            "options": [
+              {
+                "label": "A",
+                "description": "First"
+              },
+              {
+                "label": "B",
+                "description": "Second"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "family": "questions",
+    "answer": {
+      "kind": "questions",
+      "answers": {}
+    },
+    "reject": "invalid_answers"
+  },
+  {
+    "name": "codex_elicitation_form_decline",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "form",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "message": "Provide fixture input",
+        "requestedSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "confirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "label",
+            "confirmed"
+          ]
+        }
+      }
+    },
+    "family": "elicitation",
+    "request_schema": "McpServerElicitationRequestParams.json",
+    "answer": {
+      "kind": "elicitation",
+      "action": "decline"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "action": "decline"
+      }
+    },
+    "response_schema": "McpServerElicitationRequestResponse.json"
+  },
+  {
+    "name": "codex_elicitation_form_cancel",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "form",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "message": "Provide fixture input",
+        "requestedSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "confirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "label",
+            "confirmed"
+          ]
+        }
+      }
+    },
+    "family": "elicitation",
+    "request_schema": "McpServerElicitationRequestParams.json",
+    "answer": {
+      "kind": "elicitation",
+      "action": "cancel"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "action": "cancel"
+      }
+    },
+    "response_schema": "McpServerElicitationRequestResponse.json"
+  },
+  {
+    "name": "codex_form_accept",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "form",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "message": "Provide fixture input",
+        "requestedSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "confirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "label",
+            "confirmed"
+          ]
+        }
+      }
+    },
+    "family": "elicitation",
+    "request_schema": "McpServerElicitationRequestParams.json",
+    "answer": {
+      "kind": "elicitation",
+      "action": "accept",
+      "content": {
+        "label": "fixture",
+        "confirmed": true,
+        "count": 2
+      }
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "action": "accept",
+        "content": {
+          "label": "fixture",
+          "confirmed": true,
+          "count": 2
+        }
+      }
+    },
+    "response_schema": "McpServerElicitationRequestResponse.json"
+  },
+  {
+    "name": "codex_form_missing_required",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "form",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "message": "Provide fixture input",
+        "requestedSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "confirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "label",
+            "confirmed"
+          ]
+        }
+      }
+    },
+    "family": "elicitation",
+    "answer": {
+      "kind": "elicitation",
+      "action": "accept",
+      "content": {
+        "label": "fixture"
+      }
+    },
+    "reject": "invalid_form"
+  },
+  {
+    "name": "codex_form_wrong_type",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "form",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "message": "Provide fixture input",
+        "requestedSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "confirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "label",
+            "confirmed"
+          ]
+        }
+      }
+    },
+    "family": "elicitation",
+    "answer": {
+      "kind": "elicitation",
+      "action": "accept",
+      "content": {
+        "label": 7,
+        "confirmed": true
+      }
+    },
+    "reject": "invalid_form"
+  },
+  {
+    "name": "codex_form_unknown_field",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "form",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "message": "Provide fixture input",
+        "requestedSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "confirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "label",
+            "confirmed"
+          ]
+        }
+      }
+    },
+    "family": "elicitation",
+    "answer": {
+      "kind": "elicitation",
+      "action": "accept",
+      "content": {
+        "label": "fixture",
+        "confirmed": true,
+        "token": "not-offered"
+      }
+    },
+    "reject": "invalid_form"
+  },
+  {
+    "name": "codex_elicitation_openai_form_decline",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "openai/form",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "message": "Provide fixture input",
+        "requestedSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "confirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "label",
+            "confirmed"
+          ]
+        }
+      }
+    },
+    "family": "elicitation",
+    "request_schema": "McpServerElicitationRequestParams.json",
+    "answer": {
+      "kind": "elicitation",
+      "action": "decline"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "action": "decline"
+      }
+    },
+    "response_schema": "McpServerElicitationRequestResponse.json"
+  },
+  {
+    "name": "codex_elicitation_openai_form_cancel",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "openai/form",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "message": "Provide fixture input",
+        "requestedSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "confirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "label",
+            "confirmed"
+          ]
+        }
+      }
+    },
+    "family": "elicitation",
+    "request_schema": "McpServerElicitationRequestParams.json",
+    "answer": {
+      "kind": "elicitation",
+      "action": "cancel"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "action": "cancel"
+      }
+    },
+    "response_schema": "McpServerElicitationRequestResponse.json"
+  },
+  {
+    "name": "unqualified_accept_openai_form",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "openai/form",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "message": "Provide fixture input",
+        "requestedSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "confirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "label",
+            "confirmed"
+          ]
+        }
+      }
+    },
+    "family": "elicitation",
+    "answer": {
+      "kind": "elicitation",
+      "action": "accept",
+      "content": {
+        "proof": "unqualified"
+      }
+    },
+    "reject": "unqualified_variant"
+  },
+  {
+    "name": "codex_elicitation_openaiForm_decline",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "openaiForm",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "message": "Provide fixture input",
+        "requestedSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "confirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "label",
+            "confirmed"
+          ]
+        }
+      }
+    },
+    "family": "elicitation",
+    "request_schema": "McpServerElicitationRequestParams.json",
+    "answer": {
+      "kind": "elicitation",
+      "action": "decline"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "action": "decline"
+      }
+    },
+    "response_schema": "McpServerElicitationRequestResponse.json"
+  },
+  {
+    "name": "codex_elicitation_openaiForm_cancel",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "openaiForm",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "message": "Provide fixture input",
+        "requestedSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "confirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "label",
+            "confirmed"
+          ]
+        }
+      }
+    },
+    "family": "elicitation",
+    "request_schema": "McpServerElicitationRequestParams.json",
+    "answer": {
+      "kind": "elicitation",
+      "action": "cancel"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "action": "cancel"
+      }
+    },
+    "response_schema": "McpServerElicitationRequestResponse.json"
+  },
+  {
+    "name": "unqualified_accept_openaiForm",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "openaiForm",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "message": "Provide fixture input",
+        "requestedSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "confirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "label",
+            "confirmed"
+          ]
+        }
+      }
+    },
+    "family": "elicitation",
+    "answer": {
+      "kind": "elicitation",
+      "action": "accept",
+      "content": {
+        "proof": "unqualified"
+      }
+    },
+    "reject": "unqualified_variant"
+  },
+  {
+    "name": "codex_elicitation_url_decline",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "url",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "message": "Authorize fixture",
+        "url": "https://site-a.test/authorize",
+        "elicitationId": "elicitation-fixture"
+      }
+    },
+    "family": "elicitation",
+    "request_schema": "McpServerElicitationRequestParams.json",
+    "answer": {
+      "kind": "elicitation",
+      "action": "decline"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "action": "decline"
+      }
+    },
+    "response_schema": "McpServerElicitationRequestResponse.json"
+  },
+  {
+    "name": "codex_elicitation_url_cancel",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "url",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "message": "Authorize fixture",
+        "url": "https://site-a.test/authorize",
+        "elicitationId": "elicitation-fixture"
+      }
+    },
+    "family": "elicitation",
+    "request_schema": "McpServerElicitationRequestParams.json",
+    "answer": {
+      "kind": "elicitation",
+      "action": "cancel"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "action": "cancel"
+      }
+    },
+    "response_schema": "McpServerElicitationRequestResponse.json"
+  },
+  {
+    "name": "unqualified_accept_url",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "url",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "message": "Authorize fixture",
+        "url": "https://site-a.test/authorize",
+        "elicitationId": "elicitation-fixture"
+      }
+    },
+    "family": "elicitation",
+    "answer": {
+      "kind": "elicitation",
+      "action": "accept",
+      "content": {
+        "proof": "unqualified"
+      }
+    },
+    "reject": "unqualified_variant"
+  },
+  {
+    "name": "codex_elicitation_openai_userVerification_decline",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "openai/userVerification",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "challenge": "fixture-challenge",
+        "title": "Verify",
+        "description": "External native proof required"
+      }
+    },
+    "family": "elicitation",
+    "request_schema": "McpServerElicitationRequestParams.json",
+    "answer": {
+      "kind": "elicitation",
+      "action": "decline"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "action": "decline"
+      }
+    },
+    "response_schema": "McpServerElicitationRequestResponse.json"
+  },
+  {
+    "name": "codex_elicitation_openai_userVerification_cancel",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "openai/userVerification",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "challenge": "fixture-challenge",
+        "title": "Verify",
+        "description": "External native proof required"
+      }
+    },
+    "family": "elicitation",
+    "request_schema": "McpServerElicitationRequestParams.json",
+    "answer": {
+      "kind": "elicitation",
+      "action": "cancel"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "action": "cancel"
+      }
+    },
+    "response_schema": "McpServerElicitationRequestResponse.json"
+  },
+  {
+    "name": "unqualified_accept_openai_userVerification",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "openai/userVerification",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "challenge": "fixture-challenge",
+        "title": "Verify",
+        "description": "External native proof required"
+      }
+    },
+    "family": "elicitation",
+    "answer": {
+      "kind": "elicitation",
+      "action": "accept",
+      "content": {
+        "proof": "unqualified"
+      }
+    },
+    "reject": "unqualified_variant"
+  },
+  {
+    "name": "claude_allow_once",
+    "harness": "claude",
+    "request": {
+      "type": "control_request",
+      "request_id": "request-7",
+      "request": {
+        "subtype": "can_use_tool",
+        "tool_name": "Write",
+        "input": {
+          "file_path": "/fixture/work/a.txt",
+          "content": "fixture"
+        },
+        "permission_suggestions": [
+          {
+            "type": "addRules",
+            "rules": [
+              {
+                "toolName": "Write"
+              }
+            ],
+            "behavior": "allow",
+            "destination": "session"
+          }
+        ],
+        "tool_use_id": "tool-fixture",
+        "default_to_no": true,
+        "display_name": "Fixture write",
+        "description": "Write fixture",
+        "tool_kind": "browser",
+        "mcp_server": "browser-fixture"
+      }
+    },
+    "family": "tool",
+    "answer": {
+      "kind": "tool",
+      "allow": true
+    },
+    "response": {
+      "type": "control_response",
+      "response": {
+        "subtype": "success",
+        "request_id": "request-7",
+        "response": {
+          "behavior": "allow",
+          "updatedInput": {
+            "file_path": "/fixture/work/a.txt",
+            "content": "fixture"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "claude_session",
+    "harness": "claude",
+    "request": {
+      "type": "control_request",
+      "request_id": "request-7",
+      "request": {
+        "subtype": "can_use_tool",
+        "tool_name": "Write",
+        "input": {
+          "file_path": "/fixture/work/a.txt",
+          "content": "fixture"
+        },
+        "permission_suggestions": [
+          {
+            "type": "addRules",
+            "rules": [
+              {
+                "toolName": "Write"
+              }
+            ],
+            "behavior": "allow",
+            "destination": "session"
+          }
+        ],
+        "tool_use_id": "tool-fixture",
+        "default_to_no": true,
+        "display_name": "Fixture write",
+        "description": "Write fixture",
+        "tool_kind": "browser",
+        "mcp_server": "browser-fixture"
+      }
+    },
+    "family": "tool",
+    "answer": {
+      "kind": "tool",
+      "allow": true,
+      "updatedPermissions": [
+        {
+          "type": "addRules",
+          "rules": [
+            {
+              "toolName": "Write"
+            }
+          ],
+          "behavior": "allow",
+          "destination": "session"
+        }
+      ]
+    },
+    "response": {
+      "type": "control_response",
+      "response": {
+        "subtype": "success",
+        "request_id": "request-7",
+        "response": {
+          "behavior": "allow",
+          "updatedInput": {
+            "file_path": "/fixture/work/a.txt",
+            "content": "fixture"
+          },
+          "updatedPermissions": [
+            {
+              "type": "addRules",
+              "rules": [
+                {
+                  "toolName": "Write"
+                }
+              ],
+              "behavior": "allow",
+              "destination": "session"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "claude_deny",
+    "harness": "claude",
+    "request": {
+      "type": "control_request",
+      "request_id": "request-7",
+      "request": {
+        "subtype": "can_use_tool",
+        "tool_name": "Write",
+        "input": {
+          "file_path": "/fixture/work/a.txt",
+          "content": "fixture"
+        },
+        "permission_suggestions": [
+          {
+            "type": "addRules",
+            "rules": [
+              {
+                "toolName": "Write"
+              }
+            ],
+            "behavior": "allow",
+            "destination": "session"
+          }
+        ],
+        "tool_use_id": "tool-fixture",
+        "default_to_no": true,
+        "display_name": "Fixture write",
+        "description": "Write fixture",
+        "tool_kind": "browser",
+        "mcp_server": "browser-fixture"
+      }
+    },
+    "family": "tool",
+    "answer": {
+      "kind": "tool",
+      "allow": false,
+      "message": "Owner declined"
+    },
+    "response": {
+      "type": "control_response",
+      "response": {
+        "subtype": "success",
+        "request_id": "request-7",
+        "response": {
+          "behavior": "deny",
+          "message": "Owner declined"
+        }
+      }
+    }
+  },
+  {
+    "name": "claude_native_veto",
+    "harness": "claude",
+    "request": {
+      "type": "control_request",
+      "request_id": "request-7",
+      "request": {
+        "subtype": "can_use_tool",
+        "tool_name": "Write",
+        "input": {
+          "file_path": "/fixture/work/a.txt",
+          "content": "fixture"
+        },
+        "permission_suggestions": [
+          {
+            "type": "addRules",
+            "rules": [
+              {
+                "toolName": "Write"
+              }
+            ],
+            "behavior": "allow",
+            "destination": "session"
+          }
+        ],
+        "tool_use_id": "tool-fixture",
+        "default_to_no": true,
+        "display_name": "Fixture write",
+        "description": "Write fixture",
+        "tool_kind": "browser",
+        "mcp_server": "browser-fixture",
+        "suppress_always_allow_rule": true
+      }
+    },
+    "family": "tool",
+    "answer": {
+      "kind": "tool",
+      "allow": true,
+      "updatedPermissions": [
+        {
+          "type": "addRules",
+          "rules": [
+            {
+              "toolName": "Write"
+            }
+          ],
+          "behavior": "allow",
+          "destination": "session"
+        }
+      ]
+    },
+    "reject": "native_persistent_veto"
+  },
+  {
+    "name": "claude_unoffered_grant",
+    "harness": "claude",
+    "request": {
+      "type": "control_request",
+      "request_id": "request-7",
+      "request": {
+        "subtype": "can_use_tool",
+        "tool_name": "Write",
+        "input": {
+          "file_path": "/fixture/work/a.txt",
+          "content": "fixture"
+        },
+        "permission_suggestions": [
+          {
+            "type": "addRules",
+            "rules": [
+              {
+                "toolName": "Write"
+              }
+            ],
+            "behavior": "allow",
+            "destination": "session"
+          }
+        ],
+        "tool_use_id": "tool-fixture",
+        "default_to_no": true,
+        "display_name": "Fixture write",
+        "description": "Write fixture",
+        "tool_kind": "browser",
+        "mcp_server": "browser-fixture"
+      }
+    },
+    "family": "tool",
+    "answer": {
+      "kind": "tool",
+      "allow": true,
+      "updatedPermissions": [
+        {
+          "type": "addRules",
+          "rules": [
+            {
+              "toolName": "Bash"
+            }
+          ],
+          "behavior": "allow",
+          "destination": "userSettings"
+        }
+      ]
+    },
+    "reject": "unoffered_permissions"
+  },
+  {
+    "name": "claude_question_text",
+    "harness": "claude",
+    "request": {
+      "type": "control_request",
+      "request_id": "request-7",
+      "request": {
+        "subtype": "can_use_tool",
+        "tool_name": "AskUserQuestion",
+        "input": {
+          "questions": [
+            {
+              "question": "Which option?",
+              "header": "Choice",
+              "multiSelect": true,
+              "options": [
+                {
+                  "label": "A",
+                  "description": "First"
+                },
+                {
+                  "label": "B",
+                  "description": "Second"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "family": "questions",
+    "answer": {
+      "kind": "questions",
+      "answers": {
+        "Which option?": [
+          "A",
+          "B"
+        ]
+      }
+    },
+    "response": {
+      "type": "control_response",
+      "response": {
+        "subtype": "success",
+        "request_id": "request-7",
+        "response": {
+          "behavior": "allow",
+          "updatedInput": {
+            "questions": [
+              {
+                "question": "Which option?",
+                "header": "Choice",
+                "multiSelect": true,
+                "options": [
+                  {
+                    "label": "A",
+                    "description": "First"
+                  },
+                  {
+                    "label": "B",
+                    "description": "Second"
+                  }
+                ]
+              }
+            ],
+            "answers": {
+              "Which option?": "A, B"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "claude_question_wrong_id",
+    "harness": "claude",
+    "request": {
+      "type": "control_request",
+      "request_id": "request-7",
+      "request": {
+        "subtype": "can_use_tool",
+        "tool_name": "AskUserQuestion",
+        "input": {
+          "questions": [
+            {
+              "question": "Which option?",
+              "header": "Choice",
+              "multiSelect": true,
+              "options": [
+                {
+                  "label": "A",
+                  "description": "First"
+                },
+                {
+                  "label": "B",
+                  "description": "Second"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "family": "questions",
+    "answer": {
+      "kind": "questions",
+      "answers": {
+        "question-id": [
+          "A"
+        ]
+      }
+    },
+    "reject": "invalid_answers"
+  },
+  {
+    "name": "claude_elicitation_form_decline",
+    "harness": "claude",
+    "request": {
+      "type": "control_request",
+      "request_id": "request-7",
+      "request": {
+        "subtype": "elicitation",
+        "mcp_server_name": "mcp-fixture",
+        "message": "Provide fixture input",
+        "mode": "form",
+        "title": "Fixture",
+        "requested_schema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "confirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "label",
+            "confirmed"
+          ]
+        }
+      }
+    },
+    "family": "elicitation",
+    "answer": {
+      "kind": "elicitation",
+      "action": "decline"
+    },
+    "response": {
+      "type": "control_response",
+      "response": {
+        "subtype": "success",
+        "request_id": "request-7",
+        "response": {
+          "action": "decline"
+        }
+      }
+    }
+  },
+  {
+    "name": "claude_elicitation_form_cancel",
+    "harness": "claude",
+    "request": {
+      "type": "control_request",
+      "request_id": "request-7",
+      "request": {
+        "subtype": "elicitation",
+        "mcp_server_name": "mcp-fixture",
+        "message": "Provide fixture input",
+        "mode": "form",
+        "title": "Fixture",
+        "requested_schema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "confirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "label",
+            "confirmed"
+          ]
+        }
+      }
+    },
+    "family": "elicitation",
+    "answer": {
+      "kind": "elicitation",
+      "action": "cancel"
+    },
+    "response": {
+      "type": "control_response",
+      "response": {
+        "subtype": "success",
+        "request_id": "request-7",
+        "response": {
+          "action": "cancel"
+        }
+      }
+    }
+  },
+  {
+    "name": "claude_form_accept",
+    "harness": "claude",
+    "request": {
+      "type": "control_request",
+      "request_id": "request-7",
+      "request": {
+        "subtype": "elicitation",
+        "mcp_server_name": "mcp-fixture",
+        "message": "Provide fixture input",
+        "mode": "form",
+        "title": "Fixture",
+        "requested_schema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "confirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "label",
+            "confirmed"
+          ]
+        }
+      }
+    },
+    "family": "elicitation",
+    "answer": {
+      "kind": "elicitation",
+      "action": "accept",
+      "content": {
+        "label": "fixture",
+        "confirmed": true
+      }
+    },
+    "response": {
+      "type": "control_response",
+      "response": {
+        "subtype": "success",
+        "request_id": "request-7",
+        "response": {
+          "action": "accept",
+          "content": {
+            "label": "fixture",
+            "confirmed": true
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "claude_elicitation_url_decline",
+    "harness": "claude",
+    "request": {
+      "type": "control_request",
+      "request_id": "request-7",
+      "request": {
+        "subtype": "elicitation",
+        "mcp_server_name": "mcp-fixture",
+        "message": "Provide fixture input",
+        "mode": "url",
+        "title": "Fixture",
+        "url": "https://site-a.test/authorize",
+        "elicitation_id": "elicitation-fixture"
+      }
+    },
+    "family": "elicitation",
+    "answer": {
+      "kind": "elicitation",
+      "action": "decline"
+    },
+    "response": {
+      "type": "control_response",
+      "response": {
+        "subtype": "success",
+        "request_id": "request-7",
+        "response": {
+          "action": "decline"
+        }
+      }
+    }
+  },
+  {
+    "name": "claude_elicitation_url_cancel",
+    "harness": "claude",
+    "request": {
+      "type": "control_request",
+      "request_id": "request-7",
+      "request": {
+        "subtype": "elicitation",
+        "mcp_server_name": "mcp-fixture",
+        "message": "Provide fixture input",
+        "mode": "url",
+        "title": "Fixture",
+        "url": "https://site-a.test/authorize",
+        "elicitation_id": "elicitation-fixture"
+      }
+    },
+    "family": "elicitation",
+    "answer": {
+      "kind": "elicitation",
+      "action": "cancel"
+    },
+    "response": {
+      "type": "control_response",
+      "response": {
+        "subtype": "success",
+        "request_id": "request-7",
+        "response": {
+          "action": "cancel"
+        }
+      }
+    }
+  },
+  {
+    "name": "claude_unknown_dialog_no_cancel",
+    "harness": "claude",
+    "request": {
+      "type": "control_request",
+      "request_id": "request-7",
+      "request": {
+        "subtype": "request_user_dialog",
+        "dialog_kind": "unqualified-native-dialog",
+        "payload": {
+          "opaque": "fixture"
+        },
+        "tool_use_id": "tool-fixture"
+      }
+    },
+    "family": "unsupported",
+    "answer": {
+      "kind": "dialog",
+      "behavior": "cancelled"
+    },
+    "reject": "undeclared_dialog",
+    "unsupported": true
+  },
+  {
+    "name": "machine_item_tool_call",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/tool/call",
+      "params": {
+        "callId": "call-fixture",
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "tool": "not-registered",
+        "arguments": {}
+      }
+    },
+    "family": "machine",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "reject": "machine_request",
+    "unsupported": true,
+    "request_schema": "DynamicToolCallParams.json"
+  },
+  {
+    "name": "machine_account_chatgptAuthTokens_refresh",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "account/chatgptAuthTokens/refresh",
+      "params": {
+        "reason": "unauthorized",
+        "previousAccountId": null
+      }
+    },
+    "family": "machine",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "reject": "machine_request",
+    "unsupported": true,
+    "request_schema": "ChatgptAuthTokensRefreshParams.json"
+  },
+  {
+    "name": "machine_attestation_generate",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "attestation/generate",
+      "params": {}
+    },
+    "family": "machine",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "reject": "machine_request",
+    "unsupported": true,
+    "request_schema": "AttestationGenerateParams.json"
+  },
+  {
+    "name": "machine_currentTime_read",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "currentTime/read",
+      "params": {
+        "threadId": "thread-fixture"
+      }
+    },
+    "family": "machine",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "reject": "machine_request",
+    "unsupported": true,
+    "request_schema": "CurrentTimeReadParams.json"
+  },
+  {
+    "name": "claude_machine_hook",
+    "harness": "claude",
+    "request": {
+      "type": "control_request",
+      "request_id": "request-7",
+      "request": {
+        "subtype": "hook_callback",
+        "callback_id": "unregistered-fixture",
+        "input": {},
+        "tool_use_id": "tool-fixture"
+      }
+    },
+    "family": "machine",
+    "answer": {
+      "kind": "tool",
+      "allow": true
+    },
+    "reject": "machine_request",
+    "unsupported": true
+  },
+  {
+    "name": "unknown_codex_method",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/unknown/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000
+      }
+    },
+    "family": "unsupported",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "reject": "unsupported_method",
+    "unsupported": true
+  },
+  {
+    "name": "resolved_integer",
+    "harness": "codex-app",
+    "request": {
+      "method": "serverRequest/resolved",
+      "params": {
+        "threadId": "thread-fixture",
+        "requestId": 7
+      }
+    },
+    "family": "resolved"
+  },
+  {
+    "name": "resolved_string",
+    "harness": "codex-app",
+    "request": {
+      "method": "serverRequest/resolved",
+      "params": {
+        "threadId": "thread-fixture",
+        "requestId": "7"
+      }
+    },
+    "family": "resolved"
+  },
+  {
+    "name": "claude_cancel",
+    "harness": "claude",
+    "request": {
+      "type": "control_cancel_request",
+      "request_id": "request-7"
+    },
+    "family": "resolved"
+  },
+  {
+    "name": "command_additional_permissions_preserved",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "kind": "command",
+        "command": "printf fixture",
+        "approvalId": "approval-command",
+        "environmentId": "environment-fixture",
+        "availableDecisions": [
+          "accept",
+          "decline",
+          "cancel",
+          "acceptForSession"
+        ],
+        "additionalPermissions": {
+          "network": {
+            "enabled": true
+          },
+          "fileSystem": {
+            "write": [
+              "/fixture/work"
+            ]
+          }
+        }
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept"
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "decision": "accept"
+      }
+    },
+    "response_schema": "CommandExecutionRequestApprovalResponse.json"
+  },
+  {
+    "name": "command_unoffered_additional_permissions",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "startedAtMs": 1000,
+        "kind": "command",
+        "command": "printf fixture",
+        "approvalId": "approval-command",
+        "environmentId": "environment-fixture",
+        "availableDecisions": [
+          "accept",
+          "decline",
+          "cancel",
+          "acceptForSession"
+        ],
+        "additionalPermissions": {
+          "network": {
+            "enabled": true
+          },
+          "fileSystem": {
+            "write": [
+              "/fixture/work"
+            ]
+          }
+        }
+      }
+    },
+    "family": "command",
+    "request_schema": "CommandExecutionRequestApprovalParams.json",
+    "answer": {
+      "kind": "decision",
+      "decision": "accept",
+      "additionalPermissions": {
+        "network": {
+          "enabled": true
+        },
+        "fileSystem": {
+          "write": [
+            "/outside"
+          ]
+        }
+      }
+    },
+    "reject": "unoffered_permissions"
+  },
+  {
+    "name": "codex_question_free_text",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/tool/requestUserInput",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "isBlocking": true,
+        "questions": [
+          {
+            "header": "Choice",
+            "id": "question-id",
+            "question": "Which option?",
+            "isOther": false,
+            "isSecret": true,
+            "options": null
+          }
+        ]
+      }
+    },
+    "family": "questions",
+    "request_schema": "ToolRequestUserInputParams.json",
+    "answer": {
+      "kind": "questions",
+      "answers": {
+        "question-id": [
+          "Owner fixture text"
+        ]
+      }
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "answers": {
+          "question-id": {
+            "answers": [
+              "Owner fixture text"
+            ]
+          }
+        }
+      }
+    },
+    "response_schema": "ToolRequestUserInputResponse.json"
+  },
+  {
+    "name": "codex_question_other",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "item/tool/requestUserInput",
+      "params": {
+        "threadId": "thread-fixture",
+        "turnId": "turn-fixture",
+        "itemId": "item-fixture",
+        "isBlocking": true,
+        "questions": [
+          {
+            "header": "Choice",
+            "id": "question-id",
+            "question": "Which option?",
+            "isOther": true,
+            "isSecret": true,
+            "options": [
+              {
+                "label": "A",
+                "description": "First"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "family": "questions",
+    "request_schema": "ToolRequestUserInputParams.json",
+    "answer": {
+      "kind": "questions",
+      "answers": {
+        "question-id": [
+          "Owner custom choice"
+        ]
+      }
+    },
+    "response": {
+      "id": 7,
+      "result": {
+        "answers": {
+          "question-id": {
+            "answers": [
+              "Owner custom choice"
+            ]
+          }
+        }
+      }
+    },
+    "response_schema": "ToolRequestUserInputResponse.json"
+  },
+  {
+    "name": "elicitation_unknown_mode",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "future-native-mode",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "message": "Provide fixture input",
+        "requestedSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "confirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "label",
+            "confirmed"
+          ]
+        }
+      }
+    },
+    "family": "invalid",
+    "answer": {
+      "kind": "elicitation",
+      "action": "accept",
+      "content": {
+        "label": "fixture",
+        "confirmed": true,
+        "count": 2
+      }
+    },
+    "reject": "unsupported_or_malformed"
+  },
+  {
+    "name": "elicitation_malformed_schema",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "threadId": "thread-fixture",
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "form",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "message": "Provide fixture input",
+        "requestedSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "future-type"
+            }
+          }
+        }
+      }
+    },
+    "family": "invalid",
+    "answer": {
+      "kind": "elicitation",
+      "action": "accept",
+      "content": {
+        "label": "fixture",
+        "confirmed": true,
+        "count": 2
+      }
+    },
+    "reject": "unsupported_or_malformed"
+  },
+  {
+    "name": "elicitation_missing_thread",
+    "harness": "codex-app",
+    "request": {
+      "id": 7,
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "serverName": "mcp-fixture",
+        "turnId": null,
+        "mode": "form",
+        "_meta": {
+          "purpose": "fixture"
+        },
+        "message": "Provide fixture input",
+        "requestedSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "confirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "label",
+            "confirmed"
+          ]
+        }
+      }
+    },
+    "family": "invalid",
+    "answer": {
+      "kind": "elicitation",
+      "action": "accept",
+      "content": {
+        "label": "fixture",
+        "confirmed": true,
+        "count": 2
+      }
+    },
+    "reject": "unsupported_or_malformed"
+  },
+  {
+    "name": "claude_veto_allow_once",
+    "harness": "claude",
+    "request": {
+      "type": "control_request",
+      "request_id": "request-7",
+      "request": {
+        "subtype": "can_use_tool",
+        "tool_name": "Write",
+        "input": {
+          "file_path": "/fixture/work/a.txt",
+          "content": "fixture"
+        },
+        "permission_suggestions": [
+          {
+            "type": "addRules",
+            "rules": [
+              {
+                "toolName": "Write"
+              }
+            ],
+            "behavior": "allow",
+            "destination": "session"
+          }
+        ],
+        "tool_use_id": "tool-fixture",
+        "default_to_no": true,
+        "display_name": "Fixture write",
+        "description": "Write fixture",
+        "tool_kind": "browser",
+        "mcp_server": "browser-fixture",
+        "suppress_always_allow_rule": true
+      }
+    },
+    "family": "tool",
+    "answer": {
+      "kind": "tool",
+      "allow": true
+    },
+    "response": {
+      "type": "control_response",
+      "response": {
+        "subtype": "success",
+        "request_id": "request-7",
+        "response": {
+          "behavior": "allow",
+          "updatedInput": {
+            "file_path": "/fixture/work/a.txt",
+            "content": "fixture"
+          }
+        }
+      }
+    }
+  }
+]

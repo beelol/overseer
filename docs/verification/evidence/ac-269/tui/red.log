@@ -1,0 +1,100 @@
+nice: setpriority: Operation not permitted
+   Compiling syn v3.0.6
+   Compiling thiserror v2.0.21
+   Compiling smallvec v1.16.1
+   Compiling parking_lot_core v0.9.12
+   Compiling parking_lot v0.12.5
+   Compiling crossterm v0.29.0
+   Compiling darling_core v0.24.1
+   Compiling thiserror-impl v2.0.21
+   Compiling darling_macro v0.24.1
+   Compiling darling v0.24.1
+   Compiling kasuari v0.4.12
+   Compiling instability v0.3.14
+   Compiling ratatui-core v0.1.2
+   Compiling serde_derive v1.0.229
+   Compiling ratatui-widgets v0.3.2
+   Compiling ratatui-crossterm v0.1.2
+   Compiling serde v1.0.229
+   Compiling ratatui-macros v0.7.2
+   Compiling ratatui v0.30.2
+   Compiling overseer-tui v0.1.0 (/private/tmp/overseer-mods-tui-20261003/tui)
+   Compiling tempfile v3.27.0
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.32s
+     Running tests/mods.rs (/private/tmp/overseer-closeout-verify-target/debug/deps/mods-e138392e91c00e69)
+
+running 10 tests
+test actual_overseer_target_is_read_from_state_without_creating_a_session ... FAILED
+test absent_turn_and_planned_bundle_remain_truthful_at_narrow_width ... FAILED
+test compose_input_keeps_literal_m_and_does_not_open_mods ... ok
+test control_events_refresh_only_global_or_current_envelope_target ... FAILED
+test disconnect_invalidates_pending_reads_and_reconnect_refreshes ... FAILED
+test grid_zoom_and_dashboard_entry_restore_the_original_view ... FAILED
+test mixed_read_revisions_require_refresh_before_any_binding_write ... FAILED
+test no_focus_opens_library_without_requesting_an_empty_target ... FAILED
+test preview_confirmation_is_explicit_immutable_and_never_enables ... FAILED
+test scoped_enable_and_explicit_disable_pin_exact_daemon_identifiers ... FAILED
+
+failures:
+
+---- actual_overseer_target_is_read_from_state_without_creating_a_session stdout ----
+
+thread 'actual_overseer_target_is_read_from_state_without_creating_a_session' panicked at tui/tests/mods.rs:24:32:
+missing mods.list request: [(2, "gateway.status", Object {}), (3, "audio.get", Object {}), (4, "voice.subscribe", Object {}), (5, "events.list", Object {"after": Number(0), "limit": Number(5000), "run_id": String("agent-a")})]
+
+---- absent_turn_and_planned_bundle_remain_truthful_at_narrow_width stdout ----
+
+thread 'absent_turn_and_planned_bundle_remain_truthful_at_narrow_width' panicked at tui/tests/mods.rs:24:32:
+missing mods.list request: [(2, "gateway.status", Object {}), (3, "audio.get", Object {}), (4, "voice.subscribe", Object {}), (5, "events.list", Object {"after": Number(0), "limit": Number(5000), "run_id": String("agent-a")})]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- control_events_refresh_only_global_or_current_envelope_target stdout ----
+
+thread 'control_events_refresh_only_global_or_current_envelope_target' panicked at tui/tests/mods.rs:24:32:
+missing mods.list request: [(2, "gateway.status", Object {}), (3, "audio.get", Object {}), (4, "voice.subscribe", Object {}), (5, "events.list", Object {"after": Number(0), "limit": Number(5000), "run_id": String("agent-a")})]
+
+---- disconnect_invalidates_pending_reads_and_reconnect_refreshes stdout ----
+
+thread 'disconnect_invalidates_pending_reads_and_reconnect_refreshes' panicked at tui/tests/mods.rs:24:32:
+missing mods.list request: [(2, "gateway.status", Object {}), (3, "audio.get", Object {}), (4, "voice.subscribe", Object {}), (5, "events.list", Object {"after": Number(0), "limit": Number(5000), "run_id": String("agent-a")})]
+
+---- grid_zoom_and_dashboard_entry_restore_the_original_view stdout ----
+
+thread 'grid_zoom_and_dashboard_entry_restore_the_original_view' panicked at tui/tests/mods.rs:24:32:
+missing mods.list request: [(2, "gateway.status", Object {}), (3, "audio.get", Object {}), (4, "voice.subscribe", Object {}), (5, "events.list", Object {"after": Number(0), "limit": Number(5000), "run_id": String("agent-a")})]
+
+---- mixed_read_revisions_require_refresh_before_any_binding_write stdout ----
+
+thread 'mixed_read_revisions_require_refresh_before_any_binding_write' panicked at tui/tests/mods.rs:24:32:
+missing mods.list request: [(2, "gateway.status", Object {}), (3, "audio.get", Object {}), (4, "voice.subscribe", Object {}), (5, "events.list", Object {"after": Number(0), "limit": Number(5000), "run_id": String("agent-a")})]
+
+---- no_focus_opens_library_without_requesting_an_empty_target stdout ----
+
+thread 'no_focus_opens_library_without_requesting_an_empty_target' panicked at tui/tests/mods.rs:24:32:
+missing mods.list request: [(2, "gateway.status", Object {}), (3, "audio.get", Object {}), (4, "voice.subscribe", Object {}), (5, "events.list", Object {"after": Number(0), "limit": Number(5000), "run_id": String("agent-a")})]
+
+---- preview_confirmation_is_explicit_immutable_and_never_enables stdout ----
+
+thread 'preview_confirmation_is_explicit_immutable_and_never_enables' panicked at tui/tests/mods.rs:24:32:
+missing mods.list request: [(2, "gateway.status", Object {}), (3, "audio.get", Object {}), (4, "voice.subscribe", Object {}), (5, "events.list", Object {"after": Number(0), "limit": Number(5000), "run_id": String("agent-a")})]
+
+---- scoped_enable_and_explicit_disable_pin_exact_daemon_identifiers stdout ----
+
+thread 'scoped_enable_and_explicit_disable_pin_exact_daemon_identifiers' panicked at tui/tests/mods.rs:24:32:
+missing mods.list request: [(2, "gateway.status", Object {}), (3, "audio.get", Object {}), (4, "voice.subscribe", Object {}), (5, "events.list", Object {"after": Number(0), "limit": Number(5000), "run_id": String("agent-a")})]
+
+
+failures:
+    absent_turn_and_planned_bundle_remain_truthful_at_narrow_width
+    actual_overseer_target_is_read_from_state_without_creating_a_session
+    control_events_refresh_only_global_or_current_envelope_target
+    disconnect_invalidates_pending_reads_and_reconnect_refreshes
+    grid_zoom_and_dashboard_entry_restore_the_original_view
+    mixed_read_revisions_require_refresh_before_any_binding_write
+    no_focus_opens_library_without_requesting_an_empty_target
+    preview_confirmation_is_explicit_immutable_and_never_enables
+    scoped_enable_and_explicit_disable_pin_exact_daemon_identifiers
+
+test result: FAILED. 1 passed; 9 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p overseer-tui --test mods`

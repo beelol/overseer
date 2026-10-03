@@ -1,0 +1,14 @@
+{
+  "reason": "compiler-artifact",
+  "manifest_path": "/private/tmp/overseer-settings-qualification-20261003/daemon/Cargo.toml",
+  "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/overseer-9ab135698735fa27",
+  "fresh": false,
+  "source_commit": "2566e833cb3a9f9d7e65ed3338e3751aa42d0fbb",
+  "target": {
+    "name": "overseer",
+    "kind": [
+      "test"
+    ],
+    "src_path": "/private/tmp/overseer-settings-qualification-20261003/daemon/tests/overseer.rs"
+  }
+}

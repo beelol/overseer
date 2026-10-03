@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "set_version": "1",
+  "id": "CP-08",
+  "category": "permission_block",
+  "title": "Explain a permission block and recovery",
+  "synthetic": true,
+  "prompt": "The reader has no earlier conversation.\nReport why the requested action could not happen and what the owner can do next. Preserve the refusal reason exactly. Do not imply that the action ran or bypass the restriction.\n\nFixed synthetic input (not a report about real Overseer behavior):\n- Requested action: enable Clear prose for this repository.\n- The current workspace is untrusted.\n- Refusal: \"Managing Mods requires a trusted workspace. This view is read-only.\"\n- No binding changed.\n- The owner can inspect existing state now, or explicitly trust the workspace before trying the change again.",
+  "prompt_sha256_utf8": "d3fde7f6905d8a31e31db7118362f66f314175ee4f5689903d83c7f0d4d7908d",
+  "input_facts": [
+    "Requested action: enable Clear prose for this repository.",
+    "The current workspace is untrusted.",
+    "Refusal: \"Managing Mods requires a trusted workspace. This view is read-only.\"",
+    "No binding changed.",
+    "The owner can inspect existing state now, or explicitly trust the workspace before trying the change again."
+  ],
+  "required_facts_for_human_review": [
+    {
+      "id": "F1",
+      "description": "The blocked action was enabling Clear prose for this repository."
+    },
+    {
+      "id": "F2",
+      "description": "Workspace trust is absent and the exact refusal reason is retained."
+    },
+    {
+      "id": "F3",
+      "description": "No binding changed."
+    },
+    {
+      "id": "F4",
+      "description": "Existing state remains inspectable; an explicit owner trust decision is needed before retrying."
+    },
+    {
+      "id": "F5",
+      "description": "The restriction is not bypassed."
+    }
+  ],
+  "literal_checks": [
+    {
+      "id": "L1",
+      "kind": "contains_exact",
+      "literal": "Managing Mods requires a trusted workspace. This view is read-only.",
+      "required_fact_id": "F2",
+      "advisory_only": true
+    }
+  ],
+  "literal_check_notice": "Advisory exact-evidence diagnostics only. A literal flag cannot decide acceptance or fact preservation. Numeric substring matches can be misleading; a human may mark the semantic fact preserved despite a missing numeric literal (for example, a correctly spelled-out number). Verbatim paths, errors, commands and citations matter where the prompt requests them. All semantic facts and quality ratings require a human."
+}

@@ -16,6 +16,8 @@ pub fn data_dir() -> PathBuf {
     standard_data_dir()
 }
 
+pub fn mods_dir() -> PathBuf { data_dir().join("mods") }
+
 /// The standard (production) data folder: the platform default, whatever `OVERSEER_HOME` says.
 pub fn standard_data_dir() -> PathBuf {
     if cfg!(target_os = "macos") {
