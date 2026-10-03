@@ -474,10 +474,12 @@ impl Daemon {
 
     fn file_text(&self, run_id: &str, path: &str) -> Result<String> {
         let (_, full) = self.inside_worktree(run_id, path)?;
+        file_read_fixture_gate()?;
         if !full.is_file() {
             bail!("{path:?} is not a file in the worktree");
         }
         let bytes = std::fs::read(&full)?;
+        file_read_fixture_bytes(bytes.len())?;
         if bytes.len() > 4 * 1024 * 1024 {
             bail!("{path:?} is too large to read here ({} bytes)", bytes.len());
         }
@@ -501,4 +503,27 @@ impl Daemon {
         let diff = crate::git::git(&root, &["diff", "--no-color", &base, &trees.worktree_tree, "--", path])?;
         Ok(if diff.is_empty() { format!("{path} is unchanged against the task's base.") } else { diff })
     }
+}
+
+
+// Environment-only observation points for the isolated AC200 race fixtures.
+// Static markers/counts contain no path, file content or request authority.
+fn file_read_fixture_gate() -> Result<()> {
+    if std::env::var_os("OVERSEER_TEST_NET").is_none() { return Ok(()); }
+    let Some(dir) = std::env::var_os("OVERSEER_TEST_FILE_READ_GATE") else { return Ok(()); };
+    let dir = std::path::PathBuf::from(dir);
+    if !dir.join("armed").exists() { return Ok(()); }
+    std::fs::write(dir.join("entered"), b"validated\n")?;
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while !dir.join("release").exists() {
+        if std::time::Instant::now() >= end { bail!("file read fixture hold expired"); }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    Ok(())
+}
+fn file_read_fixture_bytes(bytes: usize) -> Result<()> {
+    if std::env::var_os("OVERSEER_TEST_NET").is_none() { return Ok(()); }
+    let Some(dir) = std::env::var_os("OVERSEER_TEST_FILE_READ_GATE") else { return Ok(()); };
+    std::fs::write(std::path::PathBuf::from(dir).join("read-bytes"), bytes.to_string())?;
+    Ok(())
 }
