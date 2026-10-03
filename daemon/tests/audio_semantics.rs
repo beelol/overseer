@@ -93,8 +93,8 @@ fn enable(d: &Daemon) {
     std::fs::write(folder.join("audio-pack.json"),serde_json::to_vec(&json!({
         "schema":1,"id":"semantic-fixture","label":"Synthetic semantic fixture","lines":lines})).unwrap()).unwrap();
     let revision=d.call("audio.get",json!({}))["revision"].as_i64().unwrap();
-    d.call("audio.source.set",json!({"source":"folder","path":folder,"expected_revision":revision}));
-    assert_eq!(d.call("audio.set", json!({"enabled":true}))["enabled"], true);
+    let selected=d.call("audio.source.set",json!({"source":"folder","path":folder,"expected_revision":revision}));
+    assert_eq!(d.call("audio.set", json!({"enabled":true,"expected_revision":selected["revision"]}))["enabled"], true);
 }
 
 #[test]
