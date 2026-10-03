@@ -447,7 +447,8 @@ fn ac140_no_model_over_the_budget_is_loaded_by_any_path() {
     std::thread::scope(|s| {
         let loading = s.spawn(|| d.try_call("local.load", json!({"tag": "qwen2.5-coder:14b", "context": 16384})));
         gate.wait_entered();
-        w.wait_load_samples("qwen2.5-coder:14b", before, 1);
+        assert_eq!(o.asked("/api/generate").last().unwrap()["model"], "overseer/qwen2.5-coder-14b:16k", "the load uses its created context tag");
+        w.wait_load_samples("overseer/qwen2.5-coder-14b:16k", before, 1);
         w.memory(128.0, 115.2, "critical");
         assert!(loading.join().unwrap().unwrap_err().contains("cancelled and the model unloaded: the system reports critical memory pressure"));
     });
