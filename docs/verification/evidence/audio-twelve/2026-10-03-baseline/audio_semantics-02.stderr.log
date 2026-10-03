@@ -1,0 +1,6 @@
+
+thread 'legacy_permission_and_waiting_projection_announce_the_same_specific_need_once' panicked at daemon/tests/audio_semantics.rs:121:5:
+assertion `left == right` failed
+  left: ["agent_needs_attention"]
+ right: ["agent_permission_required"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

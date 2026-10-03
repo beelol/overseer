@@ -1,0 +1,6 @@
+
+thread 'two_distinct_live_permission_needs_use_plural_instead_of_individual_lines' panicked at daemon/tests/audio_semantics.rs:217:5:
+assertion `left == right` failed
+  left: ["agent_needs_attention"]
+ right: ["agents_need_attention"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

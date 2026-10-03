@@ -1,0 +1,11 @@
+
+running 1 test
+test unsafe_manifest_paths_and_non_audio_files_are_refused_without_private_path_errors ... FAILED
+
+failures:
+
+failures:
+    unsafe_manifest_paths_and_non_audio_files_are_refused_without_private_path_errors
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.11s
+

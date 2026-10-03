@@ -1,0 +1,4 @@
+
+thread 'unsafe_manifest_paths_and_non_audio_files_are_refused_without_private_path_errors' panicked at daemon/tests/audio_packs.rs:57:10:
+complete twelve-key folder source must be selectable: "unknown method audio.source.set"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

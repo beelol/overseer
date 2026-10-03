@@ -1,0 +1,11 @@
+
+running 1 test
+test legacy_private_selection_migrates_unavailable_without_enabling_or_falling_back ... FAILED
+
+failures:
+
+failures:
+    legacy_private_selection_migrates_unavailable_without_enabling_or_falling_back
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.17s
+
