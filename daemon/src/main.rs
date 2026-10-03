@@ -91,6 +91,7 @@ fn main() {
             Some(build) => println!("overseerd {} (protocol {}, build {build})", env!("CARGO_PKG_VERSION"), server::PROTOCOL_VERSION),
             None => println!("overseerd {} (protocol {})", env!("CARGO_PKG_VERSION"), server::PROTOCOL_VERSION),
         },
+        Some("audio-validate") => std::process::exit(audio::decode::worker()),
         Some("socket-path") => println!("{}", paths::socket_path().display()),
         Some("shim") => {
             let dir = args.get(2).unwrap_or_else(|| usage());

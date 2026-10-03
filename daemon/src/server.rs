@@ -1444,6 +1444,7 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "state" => d.state_for(p["include_hidden"].as_bool().unwrap_or(false))?,
         "audio.get" => crate::audio::get(d)?,
         "audio.set" => crate::audio::set(d, p)?,
+        "audio.source.set" => crate::audio::source_set(d, p)?,
         "audio.preview" => crate::audio::preview(d, p)?,
         "audio.import_commander" => crate::audio::import_commander(d, p)?,
         "audio.voices" => crate::audio::voices()?,

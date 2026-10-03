@@ -1,5 +1,9 @@
 //! Opt-in, daemon-owned audio cues. No playback occurs while disabled.
 pub(crate) mod lines;
+pub(crate) mod decode;
+mod pack;
+mod source;
+pub(super) mod player;
 use crate::daemon::Daemon;
 use crate::paths;
 use crate::store::Event;
@@ -175,89 +179,23 @@ fn playback_available(selected: &Selection) -> bool {
     }
 }
 
-pub fn get(d: &Arc<Daemon>) -> Result<Value> {
-    let selected = selection(d)?;
-    Ok(json!({
-        "enabled": stored_enabled(d)?,
-        "available": playback_available(&selected),
-        "track": selected.track.name(),
-        "voice": selected.voice,
-        "commander_imported": selected.commander_dir.as_deref().is_some_and(|dir| valid_commander_pack(dir).is_ok()),
-        "pack": "reactor",
-        "keys": KEYS,
-        "default_keys": DEFAULT_KEYS,
-        "manifest": serde_json::from_str::<Value>(MANIFEST)?,
-    }))
-}
+pub fn get(d: &Arc<Daemon>) -> Result<Value> { source::get(d) }
+
+pub fn source_set(d: &Arc<Daemon>, p: &Value) -> Result<Value> { source::select(d, p) }
 
 pub fn set(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
-    if p.get("enabled").is_none() && p.get("track").is_none() && p.get("voice").is_none() {
-        return Err(anyhow!("provide enabled, track, or voice"));
+    let (state, transition) = source::set_enabled(d, p)?;
+    if let Some(enabled) = transition {
+        // Interim enablement bridge until the canonical semantic runtime dependency
+        // lands: that runtime owns epoch/drain/cancel, not the source resolver.
+        if let Some(runtime) = RUNTIME.get() { runtime.enabled.store(enabled, Ordering::SeqCst); }
+        if !enabled { player::cancel(d); }
     }
-    let enabled = match p.get("enabled") {
-        Some(value) => value
-            .as_bool()
-            .ok_or_else(|| anyhow!("enabled must be a boolean"))?,
-        None => stored_enabled(d)?,
-    };
-    let mut selected = selection(d)?;
-    if let Some(value) = p.get("track") {
-        selected.track = Track::parse(
-            value
-                .as_str()
-                .ok_or_else(|| anyhow!("track must be a string"))?,
-        )?;
-    }
-    if let Some(value) = p.get("voice") {
-        selected.voice = value
-            .as_str()
-            .ok_or_else(|| anyhow!("voice must be a string"))?
-            .to_string();
-        if !selected.voice.is_empty()
-            && !test_sink()
-            && !installed_voices()?
-                .iter()
-                .any(|(name, _)| name == &selected.voice)
-        {
-            return Err(anyhow!("system voice is not installed"));
-        }
-    }
-    if selected.track == Track::Commander && !playback_available(&selected) {
-        return Err(anyhow!("import the private Commander pack first"));
-    }
-    if enabled && !playback_available(&selected) {
-        return Err(anyhow!("selected audio track is unavailable on this Mac"));
-    }
-    {
-        let store = d.store.lock().unwrap();
-        let transaction = store.conn.unchecked_transaction()?;
-        for (key, value) in [
-            ("audio.reactor.enabled", if enabled { "1" } else { "0" }),
-            ("audio.track", selected.track.name()),
-            ("audio.system_voice", selected.voice.as_str()),
-        ] {
-            transaction.execute("INSERT INTO meta(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value", params![key, value])?;
-        }
-        transaction.commit()?;
-    }
-    if let Some(runtime) = RUNTIME.get() {
-        runtime.enabled.store(enabled, Ordering::Relaxed);
-    }
-    get(d)
+    Ok(state)
 }
 
-pub fn import_commander(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
-    let path = p["path"]
-        .as_str()
-        .ok_or_else(|| anyhow!("path must be a string"))?;
-    let directory =
-        std::fs::canonicalize(path).map_err(|_| anyhow!("that folder does not exist"))?;
-    valid_commander_pack(&directory)?;
-    d.store.lock().unwrap().conn.execute(
-        "INSERT INTO meta(key,value) VALUES('audio.commander_dir',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-        [directory.to_string_lossy().as_ref()],
-    )?;
-    Ok(json!({"imported": true}))
+pub fn import_commander(_d: &Arc<Daemon>, _p: &Value) -> Result<Value> {
+    Err(anyhow!("Use From folder with a complete twelve-line audio-pack.json manifest and the displayed revision."))
 }
 
 fn installed_voices() -> Result<Vec<(String, String)>> {
@@ -297,25 +235,10 @@ pub fn voices() -> Result<Value> {
 }
 
 pub fn preview(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
-    let key = p["key"]
-        .as_str()
-        .ok_or_else(|| anyhow!("key must be a string"))?;
-    let selected = KEYS
-        .iter()
-        .copied()
-        .find(|candidate| *candidate == key)
-        .ok_or_else(|| anyhow!("unknown audio cue"))?;
-    let config = selection(d)?;
-    if config.track != Track::Reactor && !DEFAULT_KEYS.contains(&selected) {
-        return Err(anyhow!("this track has only the three core cues"));
-    }
-    if !playback_available(&config) {
-        return Err(anyhow!("selected audio track is unavailable"));
-    }
-    if !enqueue(selected, true, config) {
-        return Err(anyhow!("audio is busy; try the preview again"));
-    }
-    Ok(json!({"queued": true, "key": selected}))
+    let _line = source::validate_preview(d, p)?;
+    // Canonical queue dependency is authored separately. No legacy three-cue
+    // fallback or optimistic queue acknowledgement in this interim checkpoint.
+    Err(anyhow!("The canonical Audio Mode preview queue is not yet integrated."))
 }
 
 /// A cue Voice Mode plays (the heard signal, a permission answered by voice), under Audio Mode's

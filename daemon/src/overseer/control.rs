@@ -82,7 +82,7 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     ("workspace.merge_complete", CONFIRM), ("workspace.merge_abort", CONFIRM), ("workspace.pr_prepare", CONFIRM), ("workspace.pr_opened", CONFIRM),
     // Not from the conversation.
     ("profile.create", NEVER), ("profile.rename", NEVER), ("profile.login_command", NEVER), ("profile.logout", NEVER),
-    ("account.create", NEVER), ("account.remove", NEVER), ("workspace.cleanup", NEVER), ("audio.set", NEVER), ("audio.preview", NEVER),
+    ("account.create", NEVER), ("account.remove", NEVER), ("workspace.cleanup", NEVER), ("audio.set", NEVER), ("audio.source.set", NEVER), ("audio.preview", NEVER),
     ("audio.import_commander", NEVER), ("run.resume_queue", NEVER), ("run.clear_queue", NEVER), ("daemon.shutdown", NEVER), ("daemon.stop_all", NEVER), ("daemon.test_notice", NEVER), ("notices.set", NEVER),
     // Voice Mode (Gate R): the owner's own, never from the conversation.
     ("voice.get", "read"), ("voice.requests", "read"), ("voice.subscribe", "read"), ("voice.set", NEVER), ("voice.say", NEVER), ("voice.simulate", NEVER),
