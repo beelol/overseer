@@ -1,0 +1,13 @@
+
+> @overseer/phone-core@0.1.0 typecheck
+> tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json
+
+
+ RUN  v5.0.2 /Users/bilal/.codex/worktrees/queue-pause/overseer/phone/core
+
+
+ Test Files  13 passed (13)
+      Tests  219 passed (219)
+   Start at  00:27:02
+   Duration  8.39s (tests 96%, import 2%, transform 2%)
+

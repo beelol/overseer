@@ -63,6 +63,7 @@ export interface Run {
   capabilities: unknown;
   process_generation: number;
   attention?: Attention | null;
+  queue?: QueueSnapshot | null;
 }
 
 export interface Turn {
@@ -330,6 +331,25 @@ export interface TurnModSnapshot {
   text_redacted: boolean;
 }
 
+export interface QueuedMessage {
+  id: number;
+  ts: number;
+  source: string;
+  text: string;
+  redirect: boolean;
+}
+
+export interface QueueSnapshot {
+  paused: boolean;
+  messages: Array<QueuedMessage>;
+}
+
+export interface QueuedDelivery {
+  delivery: 'queued';
+}
+
+export type FollowUpResult = Turn | QueuedDelivery;
+
 /** The payload of every kind of event the app reads. Other kinds arrive as `unknown`. */
 export interface EventPayloads {
   task_created: {
@@ -479,6 +499,17 @@ export interface EventPayloads {
   };
   mods_applied: {
     snapshot: TurnModSnapshot;
+  };
+  queue_changed: {
+    paused?: boolean | null;
+    removed?: number | null;
+    id?: number | null;
+    delivered?: number | null;
+  };
+  queued: {
+    text: string;
+    detail: unknown;
+    paused?: boolean | null;
   };
 }
 
@@ -766,7 +797,7 @@ export interface Methods {
     effort?: string | null;
     permission_mode?: string | null;
     images?: Array<unknown> | null;
-  }; result: Turn };
+  }; result: FollowUpResult };
   /** Stop an agent's turn. */
   "run.interrupt": { class: 'control'; params: {
     run_id: string;
@@ -1409,6 +1440,10 @@ export interface Methods {
     confirm: boolean;
     expected_revision: number;
   }; result: unknown };
+  /** Send an agent’s paused queue. */
+  "run.resume_queue": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Clear an agent’s queue. */
+  "run.clear_queue": { class: 'mac_only'; params: unknown; result: unknown };
 }
 
 export type MethodName = keyof Methods;
@@ -1691,6 +1726,8 @@ export const METHOD_CLASS = {
   "mods.unbind": 'mac_only',
   "mods.why": 'read',
   "mods.remove": 'mac_only',
+  "run.resume_queue": 'mac_only',
+  "run.clear_queue": 'mac_only',
 } as const satisfies Record<MethodName, MethodClass>;
 
 export type PhoneMethod = { [K in MethodName]: Methods[K]['class'] extends 'mac_only' ? never : K }[MethodName];

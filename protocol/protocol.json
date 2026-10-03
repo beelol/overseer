@@ -63,7 +63,8 @@
       "relation_confidence": "string?",
       "capabilities": "json",
       "process_generation": "number",
-      "attention": "Attention?"
+      "attention": "Attention?",
+      "queue": "QueueSnapshot?"
     },
     "Turn": {
       "id": "string",
@@ -304,7 +305,22 @@
       "outcome_detail": "string?",
       "planned_fingerprints": "string[]",
       "text_redacted": "boolean"
-    }
+    },
+    "QueuedMessage": {
+      "id": "number",
+      "ts": "number",
+      "source": "string",
+      "text": "string",
+      "redirect": "boolean"
+    },
+    "QueueSnapshot": {
+      "paused": "boolean",
+      "messages": "QueuedMessage[]"
+    },
+    "QueuedDelivery": {
+      "delivery": "'queued'"
+    },
+    "FollowUpResult": "Turn|QueuedDelivery"
   },
   "events": {
     "task_created": {
@@ -454,6 +470,17 @@
     },
     "mods_applied": {
       "snapshot": "TurnModSnapshot"
+    },
+    "queue_changed": {
+      "paused": "boolean?",
+      "removed": "number?",
+      "id": "number?",
+      "delivered": "number?"
+    },
+    "queued": {
+      "text": "string",
+      "detail": "json",
+      "paused": "boolean?"
     }
   },
   "methods": {
@@ -901,7 +928,7 @@
         "permission_mode": "string?",
         "images": "json[]?"
       },
-      "result": "Turn"
+      "result": "FollowUpResult"
     },
     "run.interrupt": {
       "class": "control",
@@ -2931,14 +2958,18 @@
         "binding_id": "string",
         "expected_revision": "number"
       },
-      "result": { "revision": "number" },
+      "result": {
+        "revision": "number"
+      },
       "reason": "Local owner control; phone inspection is read-only"
     },
     "mods.why": {
       "summary": "Explain a run's desired and applied Mods",
       "class": "read",
       "phone": "available",
-      "params": { "run_id": "string" },
+      "params": {
+        "run_id": "string"
+      },
       "result": "AppliedMods"
     },
     "mods.remove": {
@@ -2953,6 +2984,22 @@
       },
       "result": "json",
       "reason": "Local owner control; phone inspection is read-only"
+    },
+    "run.resume_queue": {
+      "class": "mac_only",
+      "summary": "Send an agent\u2019s paused queue",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
+    },
+    "run.clear_queue": {
+      "class": "mac_only",
+      "summary": "Clear an agent\u2019s queue",
+      "phone": "not_yet",
+      "reason": "Overseer itself (Gate S) came after the phone's first milestone; Talk to Overseer on the phone (AC-128) opens what it needs",
+      "params": "json",
+      "result": "json"
     }
   }
 }

@@ -514,6 +514,8 @@ impl Store {
             CREATE TABLE IF NOT EXISTS queued_messages(
               run_id TEXT NOT NULL, ts INTEGER NOT NULL, source TEXT NOT NULL, text TEXT NOT NULL, detail TEXT,
               delivered_ms INTEGER, turn_id TEXT);
+            CREATE TABLE IF NOT EXISTS queue_states(run_id TEXT PRIMARY KEY, paused INTEGER NOT NULL DEFAULT 0, serial INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS queue_owners(run_id TEXT PRIMARY KEY, owner_id TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS channels(run_id TEXT PRIMARY KEY, briefing INTEGER NOT NULL, channel INTEGER NOT NULL, set_by TEXT NOT NULL, set_ms INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS briefings(run_id TEXT NOT NULL, ts INTEGER NOT NULL, text TEXT NOT NULL, how TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS agent_messages(

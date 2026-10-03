@@ -1,0 +1,112 @@
+{
+  "checks": [
+    {
+      "name": "a pasted image reaches the agent (an image block in the message)",
+      "ok": true,
+      "detail": [
+        "text",
+        "image:image/png:132"
+      ]
+    },
+    {
+      "name": "an @-mentioned worktree file is picked from the popup and named in the message",
+      "ok": true,
+      "detail": {
+        "text": "Compare the image with @README.md ",
+        "sent": "Compare the image with @README.md\n\nFiles mentioned (paths relative to the repository root): `README.md`"
+      }
+    },
+    {
+      "name": "per-turn model, reasoning effort and permission mode reach the harness",
+      "ok": true,
+      "detail": {
+        "argv": [
+          "-p",
+          "--output-format",
+          "stream-json",
+          "--input-format",
+          "stream-json",
+          "--verbose",
+          "--permission-prompt-tool",
+          "stdio",
+          "--model",
+          "opus",
+          "--effort",
+          "high",
+          "--resume",
+          "fixture-session-1",
+          "--effort",
+          "high",
+          "--permission-mode",
+          "plan"
+        ],
+        "tray": "red.pngopus · high effort · Plan only"
+      }
+    },
+    {
+      "name": "a message sent while the agent works is queued (shown) and sent when the turn ends",
+      "ok": true,
+      "detail": {
+        "queued": "QueuedClearQueued1. queued messageRemove",
+        "turns": [
+          [
+            1,
+            "first turn",
+            "completed"
+          ],
+          [
+            2,
+            "Compare the image with @README.md\n\nFiles mentioned (paths relative to the repository root): `README.md`",
+            "completed"
+          ],
+          [
+            3,
+            "start a slow turn",
+            "completed"
+          ],
+          [
+            4,
+            "queued message",
+            "completed"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "⌥Enter stops the agent and sends the message right away",
+      "ok": true,
+      "detail": [
+        [
+          1,
+          "first turn",
+          "completed"
+        ],
+        [
+          2,
+          "Compare the image with @README.md\n\nFiles mentioned (paths relative to the repository root): `README.md`",
+          "completed"
+        ],
+        [
+          3,
+          "start a slow turn",
+          "completed"
+        ],
+        [
+          4,
+          "queued message",
+          "completed"
+        ],
+        [
+          5,
+          "another slow turn",
+          "interrupted"
+        ],
+        [
+          6,
+          "stop and do this",
+          "running"
+        ]
+      ]
+    }
+  ]
+}

@@ -1821,6 +1821,37 @@ impl Daemon {
         self.start_turn_internal(run_id, prompt, follow_up, opts, None)
     }
 
+    /// Structural restrictions apply before accepting a future turn, as well as at launch.
+    /// This only reads target identity and workspace state; it neither admits nor starts work.
+    pub(crate) fn validate_follow_up_target(&self, run: &Run) -> Result<()> {
+        self.validate_turn_target(run, true, false).map(|_| ())
+    }
+
+    fn validate_turn_target(&self, run: &Run, follow_up: bool, swarm_launch: bool) -> Result<Workspace> {
+        if follow_up && run.relation_source.as_deref() == Some("managed-delegation") {
+            bail!("a managed work unit has one result; delegate a new work unit instead");
+        }
+        if run.parent_run_id.is_some() && !matches!(run.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation")) {
+            bail!("follow-ups go to the top-level run; native children are controlled by their parent harness");
+        }
+        if !swarm_launch {
+            let store = self.store.lock().unwrap();
+            if store.conn.prepare("SELECT 1 FROM swarm_worker_launches WHERE overseer_run_id=?1")?
+                .exists([run.id.as_str()])? {
+                bail!("Swarm worker runs cannot receive ordinary follow-ups; continue through the Swarm director");
+            }
+            if store.conn.prepare("SELECT 1 FROM swarm_director_owners WHERE overseer_run_id=?1")?
+                .exists([run.id.as_str()])? {
+                bail!("Swarm director runs cannot receive ordinary follow-ups; continue through Swarm coordination");
+            }
+        }
+        let ws = self.workspace(&run.workspace_id)?;
+        if ws.removed_ms.is_some() {
+            bail!("workspace was removed");
+        }
+        Ok(ws)
+    }
+
     fn start_turn_internal(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool, opts: &TurnOpts, swarm_identity: Option<&SwarmLaunchIdentity<'_>>) -> Result<Turn> {
         let initial = self.run(run_id)?;
         let continuity = opts.retry_of.is_some() || opts.handoff;
@@ -1888,27 +1919,7 @@ impl Daemon {
                 }
             }
         }
-        if follow_up && run.relation_source.as_deref() == Some("managed-delegation") {
-            bail!("a managed work unit has one result; delegate a new work unit instead");
-        }
-        if run.parent_run_id.is_some() && !matches!(run.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation")) {
-            bail!("follow-ups go to the top-level run; native children are controlled by their parent harness");
-        }
-        if swarm_identity.is_none() {
-            let store = self.store.lock().unwrap();
-            if store.conn.prepare("SELECT 1 FROM swarm_worker_launches WHERE overseer_run_id=?1")?
-                .exists([run_id])? {
-                bail!("Swarm worker runs cannot receive ordinary follow-ups; continue through the Swarm director");
-            }
-            if store.conn.prepare("SELECT 1 FROM swarm_director_owners WHERE overseer_run_id=?1")?
-                .exists([run_id])? {
-                bail!("Swarm director runs cannot receive ordinary follow-ups; continue through Swarm coordination");
-            }
-        }
-        let ws = self.workspace(&run.workspace_id)?;
-        if ws.removed_ms.is_some() {
-            bail!("workspace was removed");
-        }
+        let ws = self.validate_turn_target(&run, follow_up, swarm_identity.is_some())?;
         if follow_up && !continuity && run.status == crate::handoff::HANDED_OFF {
             bail!("run handoff changed while preparing the follow-up; retry it");
         }
@@ -2395,6 +2406,40 @@ impl Daemon {
     }
 
     pub fn interrupt(self: &Arc<Self>, run_id: &str) -> Result<Value> {
+        let run = self.run(run_id)?;
+        if run.parent_run_id.is_some() && !matches!(run.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation")) {
+            bail!("native children are interrupted through their parent run");
+        }
+        let owner = self.pause_queue(run_id)?;
+        // Synthetic network fixture only: expose the otherwise brief ownership-change window.
+        if std::env::var_os("OVERSEER_TEST_NET").is_some() {
+            if let Some(gate) = std::env::var_os("OVERSEER_TEST_STOP_AFTER_PAUSE_GATE") {
+                let gate = PathBuf::from(gate);
+                std::fs::write(gate.with_extension("paused"), &owner)?;
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+                while !gate.exists() {
+                    if std::time::Instant::now() >= deadline { bail!("fixture Stop gate was not released"); }
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+            }
+        }
+        let run_id = owner.as_str();
+        let children = self.store.lock().unwrap().children(run_id)?;
+        for child in children.iter().filter(|child| child.relation_source.as_deref() == Some("managed-delegation")) {
+            self.pause_queue(&child.id)?;
+        }
+        // Take this only after pause_queue released its delivery gate: delivering a queued
+        // follow-up can itself enter Continuity. Handoff uses the same stable task boundary.
+        let gate = self.work_unit_gate(&format!("handoff-stop:{}", run.task_id));
+        let _guard = gate.lock().unwrap();
+        let current = self.queue_owner(run_id);
+        // Stop still pauses a queued message when the turn finished just before the click.
+        if !ACTIVE.contains(&self.run(&current)?.status.as_str()) { return Ok(json!({"ok":true})); }
+        self.interrupt_turn(&current)
+    }
+
+    /// Redirects and holds stop a turn without implicitly pausing the owner's queue.
+    pub(crate) fn interrupt_turn(self: &Arc<Self>, run_id: &str) -> Result<Value> {
         self.interrupt_with_origin(run_id, None)
     }
 
@@ -2453,10 +2498,11 @@ impl Daemon {
                 let _ = shim::control(&sock, &json!({"op": "stdin", "data": msg}));
                 let daemon = self.clone();
                 let run_id = run_id.to_string();
+                let generation = run.process_generation;
                 tokio::spawn(async move {
                     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
                     if let Ok(run) = daemon.run(&run_id) {
-                        if ACTIVE.contains(&run.status.as_str()) {
+                        if run.process_generation == generation && ACTIVE.contains(&run.status.as_str()) {
                             let _ = shim::control(&sock, &json!({"op": "close_stdin"}));
                             let _ = shim::control(&sock, &json!({"op": "signal", "sig": libc::SIGINT}));
                         }
@@ -2467,10 +2513,11 @@ impl Daemon {
         // Escalate if the harness ignores SIGINT.
         let daemon = self.clone();
         let run_id = run_id.to_string();
+        let generation = run.process_generation;
         tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_secs(10)).await;
             if let Ok(run) = daemon.run(&run_id) {
-                if ACTIVE.contains(&run.status.as_str()) {
+                if run.process_generation == generation && ACTIVE.contains(&run.status.as_str()) {
                     if let Ok(sock) = daemon.control_socket(&run) {
                         let _ = shim::control(&sock, &json!({"op": "signal", "sig": libc::SIGTERM}));
                     }
@@ -3765,6 +3812,9 @@ impl Daemon {
         for run in run_values.as_array_mut().expect("runs serialize as an array") {
             if let Some(link) = run["id"].as_str().and_then(|id| memberships.get(id)) {
                 run["swarm_membership"] = link.clone();
+            }
+            if let Some(id) = run["id"].as_str().map(str::to_string) {
+                run["queue"] = crate::overseer::session::stored_queue(&store, &id)?;
             }
             // Why a failed agent stopped, in plain words, for every surface (AC-239); exit_reason
             // keeps the daemon's own record.
