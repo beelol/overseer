@@ -13,7 +13,7 @@ A legitimate first native action could arrive before its token/session was bound
 | Existing native origin/session/authority compatibility | 9/9, 17.82s (5 specific tests plus 4 shared helpers) | `native-refusal-compat.log` |
 | Existing direct and wire refusal redaction | 6/6, 1.36s (2 specific tests plus 4 shared helpers) | `native-refusal-compat.log` |
 
-The two-case baseline ran in 2.21s, 0/2 passed. Its actual native responses distinguish support RED from setup timeout. One initial build invocation mistakenly selected the nonexistent `overseer-daemon` package and exited before tests; `setup-wrong-package.stderr` preserves that setup error separately. The corrected package is `overseerd`. Existing compiler warnings are preserved in the green/compatibility logs. Four common helper tests were deliberately filtered from the two-case publication run.
+The two-case baseline ran in 2.21s, 0/2 passed. Its actual native responses distinguish support RED from setup timeout. One initial build invocation mistakenly selected the nonexistent `overseer-daemon` package and exited before tests; `setup-wrong-package.stderr` preserves that setup error separately. The corrected package is `overseerd`. Existing compiler warnings are preserved in the green/compatibility logs. Four common helper tests were deliberately filtered from the two-case publication run. Source whitespace checks pass; the three unmodified raw logs retain terminal blank lines at EOF, reported by the evidence whitespace check.
 
 Build and checks used `nice -n 20`, `CARGO_BUILD_JOBS=2`, `RUST_TEST_THREADS=2`, and the exclusively coordinated `/private/tmp/overseer-closeout-verify-target`. Commands:
 
