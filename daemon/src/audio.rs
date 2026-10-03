@@ -79,14 +79,43 @@ pub fn get(d: &Arc<Daemon>) -> Result<Value> { source::get(d) }
 pub fn source_set(d: &Arc<Daemon>, p: &Value) -> Result<Value> { source::select(d, p) }
 
 pub fn set(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
-    let (state, transition) = source::set_enabled(d, p)?;
-    if let Some(enabled) = transition {
-        // Interim enablement bridge until the canonical semantic runtime dependency
-        // lands: that runtime owns epoch/drain/cancel, not the source resolver.
+    source::set_enabled(d, p, |enabled, revision| {
+        // Interim bridge: canonical runtime integration replaces only this hook
+        // with enablement_changed(enabled). Source owns commit/runtime ordering.
         if let Some(runtime) = RUNTIME.get() { runtime.enabled.store(enabled, Ordering::SeqCst); }
         if !enabled { player::cancel(d); }
+        test_transition_applied(revision);
+    })
+}
+
+// Environment-only synthetic observation gates; never expose an RPC or authority.
+// Bounded waits and release-on-Drop test guards prevent an abandoned fixture hang.
+pub(super) fn test_hold(point: &str, payload: &Value) -> Result<()> {
+    let Some(root) = std::env::var_os(format!("OVERSEER_TEST_AUDIO_{point}_HOLD")) else { return Ok(()); };
+    if let Some(key) = std::env::var_os(format!("OVERSEER_TEST_AUDIO_{point}_KEY")) {
+        if payload["key"].as_str() != key.to_str() { return Ok(()); }
     }
-    Ok(state)
+    let dir = PathBuf::from(root);
+    match std::fs::OpenOptions::new().write(true).create_new(true).open(dir.join("claimed")) {
+        Ok(_) => {},
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => return Ok(()),
+        Err(_) => return Err(anyhow!("Cannot create the synthetic audio gate.")),
+    }
+    std::fs::write(dir.join("ready.json"), payload.to_string()).map_err(|_| anyhow!("Cannot publish the synthetic audio gate."))?;
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while !dir.join("release").exists() {
+        if Instant::now() >= deadline { return Err(anyhow!("The synthetic audio gate exceeded its deadline.")); }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    Ok(())
+}
+fn test_transition_applied(revision: i64) {
+    use std::io::Write;
+    if let (Some(path), Some(runtime)) = (std::env::var_os("OVERSEER_TEST_AUDIO_TRANSITION_LOG"), RUNTIME.get()) {
+        if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+            let _ = writeln!(file, "{}", json!({"revision":revision,"enabled":runtime.enabled.load(Ordering::SeqCst)}));
+        }
+    }
 }
 
 pub fn import_commander(_d: &Arc<Daemon>, _p: &Value) -> Result<Value> {

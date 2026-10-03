@@ -10,7 +10,17 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard};
+
+// Serializes committed source identity/enablement with final player admission.
+// Decode, availability inspection and response/event projection stay outside it.
+static ADMISSION: Mutex<()> = Mutex::new(());
+pub(super) fn admission_guard() -> MutexGuard<'static, ()> {
+    ADMISSION.lock().unwrap()
+}
+pub(super) fn current_revision(d: &Arc<Daemon>) -> Result<i64> {
+    revision(&d.store.lock().unwrap().conn)
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 struct Selection {
@@ -181,6 +191,7 @@ pub(super) fn select(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         _ => bail!("Choose Built-in or From folder; Built-in cannot include a folder path."),
     };
     {
+        let _admission = admission_guard();
         let store = d.store.lock().unwrap();
         let tx = store.conn.unchecked_transaction()?;
         if revision(&tx)? != expected {
@@ -205,9 +216,13 @@ pub(super) fn select(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     changed(d, &state)?;
     Ok(state)
 }
-/// Returns the actual enablement transition so the shared semantic runtime can
-/// invalidate its queued automatic cues and cancel/reap the player only when needed.
-pub(super) fn set_enabled(d: &Arc<Daemon>, p: &Value) -> Result<(Value, Option<bool>)> {
+/// Commit and publish the runtime transition in the same settings order, without
+/// retaining Store through the callback, filesystem work or public event emission.
+pub(super) fn set_enabled(
+    d: &Arc<Daemon>,
+    p: &Value,
+    apply_runtime: impl FnOnce(bool, i64),
+) -> Result<Value> {
     object(p, &["enabled", "expected_revision"])?;
     let expected = expected(p)?;
     let enabled = p["enabled"]
@@ -221,6 +236,7 @@ pub(super) fn set_enabled(d: &Arc<Daemon>, p: &Value) -> Result<(Value, Option<b
         bail!("The selected audio source is unavailable; Audio Mode remains unchanged.");
     }
     let transition;
+    let admission = admission_guard();
     {
         let store = d.store.lock().unwrap();
         let tx = store.conn.unchecked_transaction()?;
@@ -248,9 +264,17 @@ pub(super) fn set_enabled(d: &Arc<Daemon>, p: &Value) -> Result<(Value, Option<b
         )?;
         tx.commit()?;
     }
+    if let Some(enabled) = transition {
+        super::test_hold(
+            "TRANSITION",
+            &json!({"revision":expected + 1,"enabled":enabled}),
+        )?;
+        apply_runtime(enabled, expected + 1);
+    }
+    drop(admission);
     let state = get(d)?;
     changed(d, &state)?;
-    Ok((state, transition))
+    Ok(state)
 }
 pub(super) fn validate_preview(d: &Arc<Daemon>, p: &Value) -> Result<Line> {
     object(p, &["key"])?;

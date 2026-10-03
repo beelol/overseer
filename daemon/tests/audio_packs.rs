@@ -509,3 +509,278 @@ fn source_fields_and_enablement_revision_are_strict_and_never_model_authority() 
         .is_err());
     assert_eq!(d.call("audio.get", json!({})), selected);
 }
+
+struct AudioGate(PathBuf);
+impl Drop for AudioGate {
+    fn drop(&mut self) {
+        let _ = std::fs::write(self.0.join("release"), b"release");
+    }
+}
+fn gate_ready(gate: &Path) -> Value {
+    let deadline = Instant::now() + Duration::from_secs(15);
+    loop {
+        if let Ok(bytes) = std::fs::read(gate.join("ready.json")) {
+            if let Ok(value) = serde_json::from_slice(&bytes) {
+                return value;
+            }
+        }
+        assert!(
+            Instant::now() < deadline,
+            "synthetic audio admission gate never reached"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+fn audio_rpc(socket: &Path, method: &str, params: Value) -> Result<Value, String> {
+    use std::io::{BufRead, BufReader, Write};
+    let mut stream = std::os::unix::net::UnixStream::connect(socket).map_err(|e| e.to_string())?;
+    stream
+        .set_read_timeout(Some(Duration::from_secs(15)))
+        .unwrap();
+    writeln!(
+        stream,
+        "{}",
+        json!({"id":1,"method":method,"params":params})
+    )
+    .map_err(|e| e.to_string())?;
+    let mut line = String::new();
+    BufReader::new(stream)
+        .read_line(&mut line)
+        .map_err(|e| e.to_string())?;
+    let result: Value = serde_json::from_str(&line).map_err(|e| e.to_string())?;
+    if result.get("error").is_some() {
+        Err(result["error"]["message"].to_string())
+    } else {
+        Ok(result["result"].clone())
+    }
+}
+
+#[test]
+fn an_older_enable_cannot_publish_runtime_after_a_later_disable() {
+    let root = tmp();
+    let folder = root.path().join("ordering");
+    pack(&folder, "fixture-ordering");
+    let gate = root.path().join("transition-gate");
+    std::fs::create_dir(&gate).unwrap();
+    let release = AudioGate(gate.clone());
+    let log = root.path().join("audio.log");
+    let trace = root.path().join("transitions.log");
+    let d = Daemon::start(&[
+        ("OVERSEER_TEST_AUDIO_LOG", log.to_str().unwrap()),
+        (
+            "OVERSEER_TEST_AUDIO_TRANSITION_HOLD",
+            gate.to_str().unwrap(),
+        ),
+        (
+            "OVERSEER_TEST_AUDIO_TRANSITION_LOG",
+            trace.to_str().unwrap(),
+        ),
+    ]);
+    let initial = select(&d, &folder);
+    let socket = d.socket();
+    let enable_socket = socket.clone();
+    let initial_revision = initial["revision"].clone();
+    let enable = std::thread::spawn(move || {
+        audio_rpc(
+            &enable_socket,
+            "audio.set",
+            json!({"enabled":true,"expected_revision":initial_revision}),
+        )
+    });
+    let committed = gate_ready(&gate);
+    assert_eq!(committed["enabled"], true);
+    assert_eq!(
+        d.call("audio.get", json!({}))["revision"],
+        committed["revision"],
+        "older enable really committed before the hold"
+    );
+    let (tx, rx) = std::sync::mpsc::channel();
+    let disable_socket = socket.clone();
+    let expected = committed["revision"].clone();
+    let disable = std::thread::spawn(move || {
+        let r = audio_rpc(
+            &disable_socket,
+            "audio.set",
+            json!({"enabled":false,"expected_revision":expected}),
+        );
+        let _ = tx.send(r.clone());
+        r
+    });
+    // On the old source the disable completes during this hold, then the released
+    // older enable wrongly writes the runtime true. On the guarded source it waits
+    // only for the short commit/runtime boundary. Completion itself is not the assertion.
+    let _ = rx.recv_timeout(Duration::from_secs(2));
+    drop(release);
+    enable.join().unwrap().unwrap();
+    disable.join().unwrap().unwrap();
+    assert_eq!(d.call("audio.get", json!({}))["enabled"], false);
+    let values: Vec<Value> = std::fs::read_to_string(&trace)
+        .unwrap()
+        .lines()
+        .map(|s| serde_json::from_str(s).unwrap())
+        .collect();
+    assert_eq!(
+        values.len(),
+        2,
+        "both actual runtime updates must be observed"
+    );
+    assert_eq!(
+        values.last().unwrap()["enabled"],
+        false,
+        "actual runtime must agree with the last committed disable"
+    );
+    assert_eq!(
+        values.last().unwrap()["revision"],
+        d.call("audio.get", json!({}))["revision"]
+    );
+}
+
+#[test]
+fn source_change_after_decode_preserves_live_preview_in_new_pack_only() {
+    let root = tmp();
+    let a = root.path().join("pack-a");
+    let b = root.path().join("pack-b");
+    pack(&a, "fixture-a");
+    pack(&b, "fixture-b");
+    let gate = root.path().join("decoded-gate");
+    std::fs::create_dir(&gate).unwrap();
+    let release = AudioGate(gate.clone());
+    let log = root.path().join("audio.log");
+    let d = Daemon::start(&[
+        ("OVERSEER_TEST_AUDIO_LOG", log.to_str().unwrap()),
+        ("OVERSEER_TEST_AUDIO_DECODED_HOLD", gate.to_str().unwrap()),
+    ]);
+    let selected = select(&d, &a);
+    assert_eq!(
+        d.call("audio.preview", json!({"key":"agent_started"}))["queued"],
+        true
+    );
+    let decoded = gate_ready(&gate);
+    assert_eq!(decoded["revision"], selected["revision"]);
+    assert!(!log.exists(), "A decoded but has not been admitted");
+    let switched = select(&d, &b);
+    assert!(switched["revision"].as_i64() > decoded["revision"].as_i64());
+    drop(release);
+    assert_eq!(
+        wait_log(&log, 1),
+        "fixture-b:agent_started\n",
+        "the original live cue resolves B; A is never admitted"
+    );
+    std::thread::sleep(Duration::from_millis(100));
+    assert_eq!(
+        std::fs::read_to_string(&log).unwrap(),
+        "fixture-b:agent_started\n",
+        "there is exactly one receipt, without a second preview request"
+    );
+    assert_eq!(d.call("audio.get", json!({}))["enabled"], false);
+}
+
+#[test]
+fn disable_after_source_switch_cancels_unstarted_preview_and_next_explicit_preview_works() {
+    let root = tmp();
+    let a = root.path().join("cancel-a");
+    let b = root.path().join("cancel-b");
+    pack(&a, "fixture-cancel-a");
+    pack(&b, "fixture-cancel-b");
+    let log = root.path().join("audio.log");
+    let gate = root.path().join("cancel-gate");
+    std::fs::create_dir(&gate).unwrap();
+    let release = AudioGate(gate.clone());
+    let d = Daemon::start(&[
+        ("OVERSEER_TEST_AUDIO_LOG", log.to_str().unwrap()),
+        ("OVERSEER_TEST_AUDIO_DECODED_HOLD", gate.to_str().unwrap()),
+    ]);
+    let selected = select(&d, &a);
+    let on = d.call(
+        "audio.set",
+        json!({"enabled":true,"expected_revision":selected["revision"]}),
+    );
+    assert_eq!(on["enabled"], true);
+    d.call("audio.preview", json!({"key":"agent_started"}));
+    gate_ready(&gate);
+    assert!(!log.exists());
+    let switched = select(&d, &b);
+    let off = d.call(
+        "audio.set",
+        json!({"enabled":false,"expected_revision":switched["revision"]}),
+    );
+    assert_eq!(off["enabled"], false);
+    drop(release);
+    // A second explicit preview is an ordered positive progress marker behind
+    // the cancelled one; no elapsed-time-only absence assertion is used.
+    d.call("audio.preview", json!({"key":"agent_complete"}));
+    assert_eq!(
+        wait_log(&log, 1),
+        "fixture-cancel-b:agent_complete\n",
+        "cancelled A must not be re-resolved/admitted in B"
+    );
+    assert_eq!(d.call("audio.get", json!({}))["enabled"], false);
+}
+
+#[test]
+fn resolved_permission_after_source_switch_never_reappears_in_new_pack() {
+    let root = tmp();
+    let a = root.path().join("need-a");
+    let b = root.path().join("need-b");
+    pack(&a, "fixture-need-a");
+    pack(&b, "fixture-need-b");
+    let log = root.path().join("audio.log");
+    let checkout = repo(&root.path().join("repo"));
+    let fixture = repo_root().join("fixtures/fake-harness/claude-fixture.js");
+    let gate = root.path().join("need-gate");
+    std::fs::create_dir(&gate).unwrap();
+    let release = AudioGate(gate.clone());
+    let d = Daemon::start(&[
+        ("OVERSEER_TEST_AUDIO_LOG", log.to_str().unwrap()),
+        ("OVERSEER_TEST_AUDIO_DECODED_HOLD", gate.to_str().unwrap()),
+        (
+            "OVERSEER_TEST_AUDIO_DECODED_KEY",
+            "agent_permission_required",
+        ),
+        ("OVERSEER_TEST_AUTO_DISABLED", "1"),
+        ("OVERSEER_CLAUDE_PATH", fixture.to_str().unwrap()),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "permission"),
+    ]);
+    let selected = select(&d, &a);
+    d.call(
+        "audio.set",
+        json!({"enabled":true,"expected_revision":selected["revision"]}),
+    );
+    let run=run_id(&d.call("task.create",json!({"repo":checkout,"harness":"claude","prompt":"write perm.txt","title":"synthetic current need"})));
+    assert_eq!(
+        d.wait_status(&run, |s| s == "waiting_for_user", 15)["attention"]["request_id"],
+        "req-1"
+    );
+    let decoded = gate_ready(&gate);
+    assert_eq!(decoded["key"], "agent_permission_required");
+    assert!(!std::fs::read_to_string(&log)
+        .unwrap_or_default()
+        .contains("agent_permission_required"));
+    select(&d, &b);
+    d.call(
+        "run.permission",
+        json!({"run_id":run,"request_id":"req-1","allow":true}),
+    );
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    drop(release);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let captures = std::fs::read_to_string(&log).unwrap_or_default();
+        assert!(
+            !captures.contains("agent_permission_required"),
+            "resolved need may not be admitted from either pack: {captures}"
+        );
+        if captures
+            .lines()
+            .any(|s| s == "fixture-need-b:agent_complete")
+        {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "current completion must progress after stale need drops: {captures}"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
