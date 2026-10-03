@@ -882,7 +882,9 @@ mod slice2 {
         }
         assert!(native_replies(&s).is_empty());let proxy=LostAckProxy::start(&s);
         let first=s.daemon.call("run.request.answer",answer_params(&s,&items[16],frozen("command_command_decline")["answer"].clone()));
-        assert_eq!(first["delivery"],"uncertain");let receipt=proxy.written();assert_eq!(native_replies(&s).len(),1);
+        assert_eq!(first["delivery"],"uncertain");let receipt=proxy.written();
+        let mut expected=frozen("command_command_decline")["response"].clone();expected["id"]=json!(23);
+        assert_eq!(wait_replies(&s,1),vec![expected.clone()],"only the exact seventeenth request reached native stdin");
         let mut current=Value::Null;
         // Bounded repeated reads must advance, even though earlier claims stay
         // active; there is no sleep/first16 state change that can hide starvation.
@@ -893,7 +895,7 @@ mod slice2 {
         assert_eq!(current["requests"][16]["lifecycle"],"answered_awaiting_native",
             "later orphan receipt must progress beyond sixteen active earlier claims");
         for item in current["requests"].as_array().unwrap().iter().take(16) {assert_eq!(item["lifecycle"],"claimed");}
-        assert_eq!(denied_count(&s),1);assert_eq!(native_replies(&s).len(),1,"status recovery never sends response bytes");
+        assert_eq!(denied_count(&s),1);assert_eq!(native_replies(&s),vec![expected],"status recovery keeps the exact seventeenth response and never sends response bytes");
         let db=rusqlite::Connection::open(s.daemon.home.path().join("overseer.sqlite")).unwrap();
         let saved:String=db.query_row("SELECT result FROM native_answer_attempts WHERE delivery_token=?1",
             [receipt["delivery_token"].as_str().unwrap()],|r|r.get(0)).unwrap();
