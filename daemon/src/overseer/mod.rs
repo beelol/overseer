@@ -243,11 +243,11 @@ impl Daemon {
                 let agents = arguments["agents"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect::<Vec<_>>());
                 serde_json::to_string_pretty(&self.rally(arguments["repo"].as_str(), agents)?)?
             }
-            "answer" => match self.overseer_propose(&json!([{"action": "answer", "ask": arguments["ask"], "text": arguments["text"]}]), "tool") {
+            "answer" => match self.overseer_propose_native(&json!([{"action": "answer", "ask": arguments["ask"], "text": arguments["text"]}]), &run_id) {
                 Ok(r) => format!("{} (proposal {})", r["result"].as_str().unwrap_or(""), r["proposal"].as_str().unwrap_or("")),
                 Err(e) => return Ok(json!({"text": format!("refused: {e}"), "is_error": true})),
             },
-            "propose" => match self.overseer_propose(&arguments["actions"], "tool") {
+            "propose" => match self.overseer_propose_native(&arguments["actions"], &run_id) {
                 // A start says where it runs and why (AC-237), for the reply's one line.
                 Ok(r) => format!("{} (proposal {}){}", r["result"].as_str().unwrap_or(""), r["proposal"].as_str().unwrap_or(""), r["starts"].as_array().filter(|s| !s.is_empty()).map(|s| format!(" {}", s.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(" "))).unwrap_or_default()),
                 Err(e) => {

@@ -733,8 +733,35 @@ impl Daemon {
         self.overseer_propose_for_turn(actions, source, cause_now, None)
     }
 
+    /// Native action tools belong to their authenticated run's active conversation.
+    /// Read and bind the session and cause together, then pass that snapshot through
+    /// proposal handling: an archived run never borrows a replacement's authority.
+    pub(crate) fn overseer_propose_native(self: &Arc<Self>, actions: &Value, caller_run: &str) -> Result<Value> {
+        use rusqlite::OptionalExtension;
+        let (session, cause) = {
+            let store = self.store.lock().unwrap();
+            let row: Option<(String, Option<String>, String, String)> = store.conn.query_row(
+                "SELECT id, run_id, level, COALESCE(last_cause, 'owner') FROM overseer_sessions WHERE archived_ms IS NULL ORDER BY started_ms DESC LIMIT 1",
+                [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))).optional()?;
+            let (id, run, level, cause) = row.ok_or_else(|| anyhow!("native action has no active Overseer conversation"))?;
+            if run.as_deref() != Some(caller_run) || store.run(caller_run)?.is_none() {
+                bail!("native action is not from the active Overseer conversation");
+            }
+            (json!({"id": id, "run_id": run, "level": level}), cause)
+        };
+        self.overseer_propose_in_session(actions, "tool", &cause, None, &session, Some(caller_run))
+    }
+
     fn overseer_propose_for_turn(self: &Arc<Self>, actions: &Value, source: &str, cause_now: Option<&str>, turn: Option<&Value>) -> Result<Value> {
         let session = self.overseer_session()?;
+        let cause: String = match cause_now {
+            Some(c) => c.to_string(),
+            None => self.store.lock().unwrap().conn.query_row("SELECT COALESCE(last_cause, 'owner') FROM overseer_sessions WHERE id=?1", [session["id"].as_str()], |r| r.get(0)).unwrap_or_else(|_| "owner".into()),
+        };
+        self.overseer_propose_in_session(actions, source, &cause, turn, &session, None)
+    }
+
+    fn overseer_propose_in_session(self: &Arc<Self>, actions: &Value, source: &str, cause: &str, turn: Option<&Value>, session: &Value, native_run: Option<&str>) -> Result<Value> {
         let sid = session["id"].as_str().unwrap().to_string();
         let level = session["level"].as_str().unwrap_or("ask_first").to_string();
         let list = actions.as_array().cloned().unwrap_or_else(|| vec![actions.clone()]);
@@ -742,10 +769,6 @@ impl Daemon {
             bail!("no actions");
         }
         let mut checked = Vec::new();
-        let cause: String = match cause_now {
-            Some(c) => c.to_string(),
-            None => self.store.lock().unwrap().conn.query_row("SELECT COALESCE(last_cause, 'owner') FROM overseer_sessions WHERE id=?1", [&sid], |r| r.get(0)).unwrap_or_else(|_| "owner".into()),
-        };
         let owner_asked = cause == "owner" || cause == "voice";
         let voice = cause == "voice";
         for a in &list {
@@ -956,12 +979,26 @@ impl Daemon {
         let now = crate::daemon::now();
         let lines: Vec<String> = checked.iter().map(|a| self.describe(a)).collect();
         let blocked: Vec<String> = checked.iter().filter_map(|a| a["blocked_on"].as_str().map(str::to_string)).collect();
-        let last_message: Option<String> = self.store.lock().unwrap().conn.query_row("SELECT id FROM overseer_messages WHERE session_id=?1 AND source='overseer' ORDER BY seq DESC LIMIT 1", [&sid], |r| r.get(0)).ok();
-        self.store.lock().unwrap().conn.execute("INSERT INTO overseer_proposals(id, session_id, message_id, ts, actions, state, source) VALUES(?1, ?2, ?3, ?4, ?5, 'open', ?6)", rusqlite::params![id, sid, last_message, now, serde_json::to_string(&checked)?, source])?;
         let state = if settle { "settling" } else { "open" };
         let settle_ms = if voice { crate::voice::request::settle_ms(self, &checked) } else { SETTLE_MS };
         let settle_until = if settle { Some(now + settle_ms) } else { None };
-        self.store.lock().unwrap().conn.execute("UPDATE overseer_proposals SET state=?2, settle_until=?3, cause=?4 WHERE id=?1", rusqlite::params![id, state, settle_until, cause])?;
+        {
+            let store = self.store.lock().unwrap();
+            if let Some(caller_run) = native_run {
+                // Fresh may have happened during action checks. Revalidate under the
+                // insertion lock, without looking up or substituting a new context.
+                let still_bound: bool = store.conn.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM overseer_sessions WHERE id=?1 AND run_id=?2 AND archived_ms IS NULL AND id=(SELECT id FROM overseer_sessions WHERE archived_ms IS NULL ORDER BY started_ms DESC LIMIT 1))",
+                    rusqlite::params![sid, caller_run], |r| r.get(0))?;
+                if !still_bound {
+                    bail!("native action's Overseer conversation was archived or replaced");
+                }
+            }
+            let last_message: Option<String> = store.conn.query_row("SELECT id FROM overseer_messages WHERE session_id=?1 AND source='overseer' ORDER BY seq DESC LIMIT 1", [&sid], |r| r.get(0)).ok();
+            // Publish final state and cause atomically. A later Fresh can mark it stale;
+            // a separate update must not resurrect that archived proposal as settling.
+            store.conn.execute("INSERT INTO overseer_proposals(id, session_id, message_id, ts, actions, state, source, settle_until, cause) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)", rusqlite::params![id, sid, last_message, now, serde_json::to_string(&checked)?, state, source, settle_until, cause])?;
+        }
         let card = json!({"id": id, "actions": checked, "lines": lines, "state": state, "level": level, "via": source, "cause": cause, "settle_until": settle_until, "confirm": confirm, "turn": turn,
             "note": if source == "text" { "Proposed in text: this harness has no tools, so the state was sent with the message." } else { "" }});
         let run_id = session["run_id"].as_str().map(str::to_string);
@@ -1252,7 +1289,7 @@ impl Daemon {
             "INSERT INTO overseer_proposals(id, session_id, ts, actions, state, source, cause, answered_by, answered_ms, result) VALUES(?1, ?2, ?3, ?4, 'cancelled', ?5, ?6, 'the daemon', ?3, ?7)",
             rusqlite::params![id, sid, now, serde_json::to_string(&actions)?, source, cause, why],
         )?;
-        let run_id: Option<String> = self.overseer_session().ok().and_then(|s| s["run_id"].as_str().map(str::to_string));
+        let run_id: Option<String> = self.store.lock().unwrap().conn.query_row("SELECT run_id FROM overseer_sessions WHERE id=?1", [sid], |r| r.get(0)).ok().flatten();
         self.emit(None, run_id.as_deref(), "proposal", "overseer", "exact", json!({"id": id, "actions": actions, "lines": lines, "state": "cancelled", "via": source, "cause": cause, "confirm": false, "note": why, "turn": turn}))?;
         self.emit(None, run_id.as_deref(), "proposal_answered", "daemon", "exact", json!({"id": id, "state": "cancelled", "result": why, "by": "the daemon"}))?;
         Ok(json!({"proposal": id, "state": "cancelled", "done": false, "result": why}))

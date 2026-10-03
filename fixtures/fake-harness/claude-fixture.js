@@ -105,7 +105,7 @@ const next = pred => new Promise(resolve => { const check = () => { const i = li
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /** The MCP server named in --mcp-config (Gate S), spoken to over stdio like the live harness does; null without one. */
-async function mcpClient() {
+async function mcpClient(requestTimeoutMs = 0) {
   const at = process.argv.indexOf('--mcp-config');
   if (at < 0) return null;
   const config = JSON.parse(fs.readFileSync(process.argv[at + 1], 'utf8'));
@@ -116,7 +116,17 @@ async function mcpClient() {
   const pending = new Map();
   let id = 0;
   require('readline').createInterface({ input: child.stdout }).on('line', l => { let m; try { m = JSON.parse(l); } catch { return; } const p = pending.get(m.id); if (p) { pending.delete(m.id); p(m); } });
-  const request = (method, params) => new Promise((resolve, reject) => { const rid = ++id; pending.set(rid, m => m.error ? reject(new Error(m.error.message)) : resolve(m.result)); child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: rid, method, params }) + '\n'); });
+  const request = (method, params) => new Promise((resolve, reject) => {
+    const rid = ++id;
+    const timeout = requestTimeoutMs && setTimeout(() => {
+      pending.delete(rid); child.kill(); reject(new Error(`fixture MCP ${method} timed out`));
+    }, requestTimeoutMs);
+    pending.set(rid, m => {
+      if (timeout) clearTimeout(timeout);
+      m.error ? reject(new Error(m.error.message)) : resolve(m.result);
+    });
+    child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: rid, method, params }) + '\n');
+  });
   await request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'claude-fixture', version: '0' } });
   child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
   const tools = (await request('tools/list', {})).tools.map(t => t.name);
@@ -448,6 +458,51 @@ async function mcpClient() {
     // A failed turn whose reason arrives once, as the result text.
     assistant([{ type: 'text', text: 'Trying the migration…' }]);
     result(true, 'Migration failed: relation users_v2 does not exist');
+  } else if (mode === 'overseer-gated-propose') {
+    // AC-200: load this turn's actual native MCP config before a new conversation can
+    // replace it, then hold one call until the test establishes that later owner cause.
+    // No token is manufactured by the fixture or written to the trace.
+    const dir = process.env.CLAUDE_FIXTURE_PROPOSE_GATE_DIR;
+    if (!dir) throw new Error('missing native propose fixture gate');
+    const mcp = await mcpClient(15000);
+    if (!mcp) throw new Error('native propose fixture needs its launch MCP config');
+    try {
+      const callsFile = path.join(dir, 'calls.json');
+      const planDeadline = Date.now() + 15000;
+      while (!fs.existsSync(callsFile) && !fs.existsSync(path.join(dir, 'actions.json')) && Date.now() < planDeadline) await sleep(10);
+      const calls = fs.existsSync(callsFile) ? JSON.parse(fs.readFileSync(callsFile, 'utf8'))
+        : [{ tool: 'propose', arguments: { actions: JSON.parse(fs.readFileSync(path.join(dir, 'actions.json'), 'utf8')) } }];
+      const replies = [];
+      for (let i = 0; i < calls.length; i++) {
+        const call = calls[i];
+        const tool = `mcp__overseer__${call.tool}`;
+        const requestId = `req-delayed-${i}`;
+        const useId = `toolu_delayed_${i}`;
+        assistant([{ type: 'tool_use', id: useId, name: tool, input: call.arguments }]);
+        out({ type: 'control_request', request_id: requestId, request: { subtype: 'can_use_tool', tool_name: tool, input: call.arguments } });
+        const permission = await Promise.race([
+          next(m => m.type === 'control_response' && m.response?.request_id === requestId),
+          sleep(15000).then(() => { throw new Error('native tool permission timed out'); })
+        ]);
+        if (permission.response.response.behavior !== 'allow') throw new Error('native tool permission refused');
+        if (i === 0) {
+          fs.writeFileSync(path.join(dir, 'reached'), 'loaded native turn config and allowed native tool');
+          const deadline = Date.now() + 60000;
+          while (!fs.existsSync(path.join(dir, 'release')) && Date.now() < deadline) await sleep(10);
+          if (!fs.existsSync(path.join(dir, 'release'))) throw new Error('native propose fixture gate timed out');
+        }
+        const reply = await mcp.call(call.tool, call.arguments);
+        replies.push(reply);
+        user([{ type: 'tool_result', tool_use_id: useId, content: reply.content, is_error: reply.isError }]);
+      }
+      fs.writeFileSync(path.join(dir, 'replies.json.part'), JSON.stringify(replies));
+      fs.renameSync(path.join(dir, 'replies.json.part'), path.join(dir, 'replies.json'));
+      fs.writeFileSync(path.join(dir, 'reply.json.part'), JSON.stringify(replies[0]));
+      fs.renameSync(path.join(dir, 'reply.json.part'), path.join(dir, 'reply.json'));
+      result(false, 'native delayed proposal returned');
+    } finally {
+      mcp.close();
+    }
   } else if (mode === 'overseer') {
     // A slow orchestrator (Voice Mode's holding line, AC-165): nothing at all for a while.
     if (process.env.FIXTURE_OVERSEER_DELAY_MS) await sleep(Number(process.env.FIXTURE_OVERSEER_DELAY_MS));

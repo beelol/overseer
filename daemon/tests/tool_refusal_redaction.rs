@@ -90,14 +90,45 @@ fn assert_redacted(text: &str) {
 fn ac200_daemon_and_mcp_refusals_redact_invalid_claim_action_and_file() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
-    let d = Daemon::start(&[]);
-    let run = run_id(&d.generic(&repo, "worktree", "/bin/sh", &["-c", "echo safe"]));
-    d.wait_done(&run, 20);
-    let agent_token = d.call("overseer.token", json!({"run_id":run,"role":"agent"}))["token"]
+    let fixture = repo_root().join("fixtures/fake-harness/claude-fixture.js");
+    let d = Daemon::start(&[
+        ("OVERSEER_CLAUDE_PATH", &fixture.display().to_string()),
+        ("OVERSEER_TEST_AUTO_DISABLED", "1"),
+    ]);
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call(
+        "overseer.send",
+        json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}),
+    );
+    // Native action tools now require the actual active Overseer run. Retain the
+    // invalid-action redaction assertion using its real synthetic launch token,
+    // rather than an Overseer-role token issued for an unrelated generic agent.
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        let session = d.call("overseer.session", json!({}));
+        if session["run_id"].is_string()
+            && !["queued", "starting", "running", "waiting_for_user"]
+                .contains(&session["run_status"].as_str().unwrap_or(""))
+        {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "native fixture did not finish: {session}"
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let config: Value = serde_json::from_str(
+        &std::fs::read_to_string(d.home.path().join("overseer/scratch/mcp.json")).unwrap(),
+    )
+    .unwrap();
+    let overseer_token = config["mcpServers"]["overseer"]["env"]["OVERSEER_MCP_TOKEN"]
         .as_str()
         .unwrap()
         .to_string();
-    let overseer_token = d.call("overseer.token", json!({"run_id":run,"role":"overseer"}))["token"]
+    let run = run_id(&d.generic(&repo, "worktree", "/bin/sh", &["-c", "echo safe"]));
+    d.wait_done(&run, 20);
+    let agent_token = d.call("overseer.token", json!({"run_id":run,"role":"agent"}))["token"]
         .as_str()
         .unwrap()
         .to_string();
