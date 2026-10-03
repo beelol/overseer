@@ -1,0 +1,1 @@
+{"stage":"before Cargo/package clean/test","failure":"initial os.nice/getpriority guard differed from actual requested nice20","classification":"wrapper SETUP; no product RED","correction":"launch wrapper with nice -n20; verify ps NI20"}

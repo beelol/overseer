@@ -1,0 +1,236 @@
+warning: unused import: `revision`
+ --> daemon/src/mods/bindings.rs:5:5
+  |
+5 |     revision,
+  |     ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: value assigned to `note` is never read
+   --> daemon/src/background.rs:377:17
+    |
+377 |         let mut note = String::new();
+    |                 ^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` on by default
+
+warning: methods `book_shared_account`, `shared_booking_draw`, and `mark_shared_booking_uncertain` are never used
+    --> daemon/src/account_booking.rs:1203:12
+     |
+1171 | impl Store {
+     | ---------- methods in this implementation
+...
+1203 |     pub fn book_shared_account(&self, req: &AccountBookingRequest<'_>) -> Result<BookingDecision> {
+     |            ^^^^^^^^^^^^^^^^^^^
+...
+1255 |     pub fn shared_booking_draw(
+     |            ^^^^^^^^^^^^^^^^^^^
+...
+1387 |     pub fn mark_shared_booking_uncertain(&self, id: &str) -> Result<()> {
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` on by default
+
+warning: methods `blocking_window` and `allowance_unknown` are never used
+   --> daemon/src/auto_quota.rs:139:12
+    |
+60  | impl QuotaSnapshot {
+    | ------------------ methods in this implementation
+...
+139 |     pub fn blocking_window(&self, model: &str) -> Option<&QuotaWindow> {
+    |            ^^^^^^^^^^^^^^^
+...
+145 |     pub fn allowance_unknown(&self, model: &str) -> bool {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: function `auto_local_execution_guard` is never used
+   --> daemon/src/auto_opencode.rs:177:8
+    |
+177 | pub fn auto_local_execution_guard(profile: &crate::store::Profile, project: &Path,
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: fields `resolved_model_version` and `task_signature` are never read
+   --> daemon/src/auto_consumption.rs:169:9
+    |
+166 | pub struct DeltaContext<'a> {
+    |            ------------ fields in this struct
+...
+169 |     pub resolved_model_version: Option<&'a str>,
+    |         ^^^^^^^^^^^^^^^^^^^^^^
+170 |     pub task_signature: Option<&'a crate::auto_select::TaskSignature>,
+    |         ^^^^^^^^^^^^^^
+    |
+    = note: `DeltaContext` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: function `estimate_from_actual_window_delta` is never used
+   --> daemon/src/auto_consumption.rs:291:8
+    |
+291 | pub fn estimate_from_actual_window_delta(
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `apply_scoped_fit` is never used
+   --> daemon/src/auto_fit.rs:204:8
+    |
+204 | pub fn apply_scoped_fit(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: variant `Provider` is never constructed
+  --> daemon/src/auto_health.rs:10:5
+   |
+9  | pub enum Scope {
+   |          ----- variant in this enum
+10 |     Provider(String),
+   |     ^^^^^^^^
+   |
+   = note: `Scope` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: methods `workspace_diff` and `state` are never used
+    --> daemon/src/daemon.rs:3865:12
+     |
+435  | impl Daemon {
+     | ----------- methods in this implementation
+...
+3865 |     pub fn workspace_diff(&self, workspace_id: &str, base: &str) -> Result<Value> {
+     |            ^^^^^^^^^^^^^^
+...
+3920 |     pub fn state(&self) -> Result<Value> {
+     |            ^^^^^
+
+warning: field `device_name` is never read
+  --> daemon/src/gateway/mod.rs:86:9
+   |
+84 | pub struct Session {
+   |            ------- field in this struct
+85 |     pub device_id: String,
+86 |     pub device_name: String,
+   |         ^^^^^^^^^^^
+
+warning: field `public` is never read
+  --> daemon/src/gateway/noise.rs:40:9
+   |
+38 | pub struct Keypair {
+   |            ------- field in this struct
+39 |     pub private: Vec<u8>,
+40 |     pub public: Vec<u8>,
+   |         ^^^^^^
+
+warning: constant `ALLOWED_FIELDS` is never used
+  --> daemon/src/gateway/push.rs:16:11
+   |
+16 | pub const ALLOWED_FIELDS: &[&str] = &[
+   |           ^^^^^^^^^^^^^^
+
+warning: function `decorate` is never used
+    --> daemon/src/voice/request.rs:2164:8
+     |
+2164 | pub fn decorate(d: &Daemon, actions: &mut [Value]) -> Result<bool> {
+     |        ^^^^^^^^
+
+warning: method `is_clean` is never used
+   --> daemon/src/git.rs:299:12
+    |
+298 | impl Status {
+    | ----------- method in this implementation
+299 |     pub fn is_clean(&self) -> bool {
+    |            ^^^^^^^^
+
+warning: function `tree_has` is never used
+   --> daemon/src/git.rs:356:8
+    |
+356 | pub fn tree_has(workspace: &Path, tree_ish: &str, path: &str) -> bool {
+    |        ^^^^^^^^
+
+warning: function `show_blob` is never used
+   --> daemon/src/git.rs:360:8
+    |
+360 | pub fn show_blob(workspace: &Path, tree_ish: &str, path: &str) -> Result<Vec<u8>> {
+    |        ^^^^^^^^^
+
+warning: function `worktree_list` is never used
+   --> daemon/src/git.rs:368:8
+    |
+368 | pub fn worktree_list(repo: &Path) -> Vec<PathBuf> {
+    |        ^^^^^^^^^^^^^
+
+warning: struct `Reading` is never constructed
+  --> daemon/src/net.rs:79:12
+   |
+79 | pub struct Reading {
+   |            ^^^^^^^
+
+warning: function `read` is never used
+  --> daemon/src/net.rs:97:8
+   |
+97 | pub fn read(probes: bool) -> Reading {
+   |        ^^^^
+
+warning: field `model` is never read
+   --> daemon/src/opencode_bridge.rs:260:9
+    |
+243 | pub struct Turn {
+    |            ---- field in this struct
+...
+260 |     pub model: String,
+    |         ^^^^^
+
+warning: constant `METHOD_CLASSES` is never used
+  --> daemon/src/overseer/control.rs:60:11
+   |
+60 | pub const METHOD_CLASSES: &[(&str, &str)] = &[
+   |           ^^^^^^^^^^^^^^
+
+warning: function `method_class` is never used
+   --> daemon/src/overseer/control.rs:137:8
+    |
+137 | pub fn method_class(method: &str) -> Option<&'static str> {
+    |        ^^^^^^^^^^^^
+
+warning: function `is_session_event` is never used
+    --> daemon/src/overseer/session.rs:2216:8
+     |
+2216 | pub fn is_session_event(kind: &str) -> bool {
+     |        ^^^^^^^^^^^^^^^^
+
+warning: methods `insert_task_and_run`, `insert_task_and_run_bound`, `child_by_native`, `insert_turn_if_no_auto_claim`, and `put_auto_allowance_estimate` are never used
+    --> daemon/src/store.rs:968:12
+     |
+189  | impl Store {
+     | ---------- methods in this implementation
+...
+968  |     pub fn insert_task_and_run(&self, t: &Task, r: &Run, attempt_id: Option<&str>,
+     |            ^^^^^^^^^^^^^^^^^^^
+...
+975  |     pub fn insert_task_and_run_bound(&self, t: &Task, r: &Run, attempt_id: Option<&str>,
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1123 |     pub fn child_by_native(&self, parent: &str, native: &str) -> Result<Option<Run>> {
+     |            ^^^^^^^^^^^^^^^
+...
+1800 |     pub fn insert_turn_if_no_auto_claim(&self, t: &Turn, profile_id: &str) -> Result<bool> {
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+2541 |     pub fn put_auto_allowance_estimate(&self, profile_id: &str, generation: i64,
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `parse_meminfo` is never used
+   --> daemon/src/sys.rs:114:8
+    |
+114 | pub fn parse_meminfo(text: &str) -> Result<(u64, u64)> {
+    |        ^^^^^^^^^^^^^
+
+warning: function `parse_psi` is never used
+   --> daemon/src/sys.rs:127:8
+    |
+127 | pub fn parse_psi(text: &str) -> Pressure {
+    |        ^^^^^^^^^
+
+warning: `overseerd` (bin "overseerd") generated 27 warnings (run `cargo fix --bin "overseerd"` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running tests/pending_requests.rs (/private/tmp/overseer-closeout-verify-target/debug/deps/pending_requests-3634fd170cfd2bc6)
+
+running 1 test
+test slice2::frozen_typed_family_answers_reach_exact_native_transport ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 8.39s
+

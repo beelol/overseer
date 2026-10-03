@@ -1,0 +1,52 @@
+{
+  "status": "source-only; no compiler/artifacts/test bodies/helpers invoked",
+  "baseline": {
+    "checkout": "/private/tmp/overseer-native-recovery-baseline-20261003",
+    "head": "fff9216a54904077e855a5de1da4720574ceb4af",
+    "status": "",
+    "sha256": {
+      "daemon/src/pending_requests/answers.rs": "67ad600bdebf9352447fa89fd6f3367dff5e13afc74109244f61b9311ebc30dd",
+      "daemon/src/pending_requests.rs": "a0acc6c71655ee593a11feca65e6447bee7fd8d323b14ed8b7751b8f94f17ee1",
+      "daemon/src/shim/native_reply.rs": "334f34db829d64c8065e9e25fecb6ed44684e8a37be23396e4ae8a0c84de4bee",
+      "daemon/tests/pending_requests.rs": "77f139a51fec49f40d2cace52e0934e166d9e745e288f19ee3e8e2536851dd5d",
+      "daemon/tests/common/mod.rs": "11bc55d15721149148447deb8a9690beb935ffb72079da0da764ff0ae9af2227",
+      "fixtures/fake-harness/codex-app-fixture.js": "a2ebfc943a6f4578826ddeb451c112ac14faf39384d2b6320e4b18b5682e5e8b",
+      "fixtures/fake-harness/claude-fixture.js": "3c356c0285dae6fed189c610fd43410f88a0d94953f89ef149f984daae3ac29f",
+      "fixtures/transcripts/ac274/native-vectors.json": "efb671cc39ad8e551850411552f04705c2c5542b334a12c3f235a786790ae1e6",
+      "Cargo.lock": "da29c39c6583cf512a6517de1d1cb0edd71b12cf2f3bcba82da3dbb93ae15ea2"
+    }
+  },
+  "correction": {
+    "checkout": "/private/tmp/overseer-native-pending-20261003",
+    "head": "79cae03c359f75b1d684cfe4f72e2ff98a9492ce",
+    "status": "",
+    "sha256": {
+      "daemon/src/pending_requests/answers.rs": "bcb74904628c4a3db04b9094acf33c0c48fd33bf4e5a0fa8ae6659c790068527",
+      "daemon/src/pending_requests.rs": "a0acc6c71655ee593a11feca65e6447bee7fd8d323b14ed8b7751b8f94f17ee1",
+      "daemon/src/shim/native_reply.rs": "334f34db829d64c8065e9e25fecb6ed44684e8a37be23396e4ae8a0c84de4bee",
+      "daemon/tests/pending_requests.rs": "77f139a51fec49f40d2cace52e0934e166d9e745e288f19ee3e8e2536851dd5d",
+      "daemon/tests/common/mod.rs": "11bc55d15721149148447deb8a9690beb935ffb72079da0da764ff0ae9af2227",
+      "fixtures/fake-harness/codex-app-fixture.js": "a2ebfc943a6f4578826ddeb451c112ac14faf39384d2b6320e4b18b5682e5e8b",
+      "fixtures/fake-harness/claude-fixture.js": "3c356c0285dae6fed189c610fd43410f88a0d94953f89ef149f984daae3ac29f",
+      "fixtures/transcripts/ac274/native-vectors.json": "efb671cc39ad8e551850411552f04705c2c5542b334a12c3f235a786790ae1e6",
+      "Cargo.lock": "da29c39c6583cf512a6517de1d1cb0edd71b12cf2f3bcba82da3dbb93ae15ea2"
+    }
+  },
+  "baseline_runtime_reference": "5b96da3ab6714d0cc2c23d5d78a14a96f3fcf01b",
+  "baseline_vs_runtime_changes": [
+    "daemon/tests/pending_requests.rs",
+    "docs/superpowers/plans/2026-10-03-native-pending-answer-lock-audit.md",
+    "docs/superpowers/plans/2026-10-03-native-receipt-recovery-correction.md",
+    "docs/verification/evidence/ac-274/task2-slice2/compile-check-5b96/README.md",
+    "docs/verification/evidence/ac-274/task2-slice2/compile-check-5b96/check.log",
+    "docs/verification/evidence/ac-274/task2-slice2/compile-check-5b96/metadata-proof.json",
+    "docs/verification/evidence/ac-274/task2-slice2/compile-check-5b96/proof.json"
+  ],
+  "baseline_answer_source_blob": "591cb7877b3925714f84b9a6bc64b29c2140a5c7",
+  "frozen_runtime_answer_source_blob": "591cb7877b3925714f84b9a6bc64b29c2140a5c7",
+  "test_selections": [
+    "slice2::receipt_recovery_progresses_past_sixteen_active_claims_without_tombstoning_them",
+    "slice2::resolved_native_decline_recovers_written_policy_without_reopening_request"
+  ],
+  "artifact_requirement": "After explicit allocation: package-clean overseerd only in assigned target; standalone build plus exact integration no-run; nonzero test listing, fresh:false .d paths and executable hashes before runtime."
+}

@@ -1,0 +1,237 @@
+{
+  "cwd": "/private/tmp/overseer-native-recovery-baseline-20261003",
+  "source": "fff9216a54904077e855a5de1da4720574ceb4af",
+  "target": "/private/tmp/overseer-closeout-verify-target",
+  "nice": 20,
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/overseer-closeout-verify-target",
+    "CARGO_BUILD_JOBS": "1",
+    "RUST_TEST_THREADS": "1",
+    "OVERSEER_TEST_RUN": "native-recovery-baseline-20261003"
+  },
+  "commands": [
+    {
+      "label": "package-clean",
+      "command": [
+        "nice",
+        "-n",
+        "20",
+        "cargo",
+        "clean",
+        "-p",
+        "overseerd"
+      ],
+      "timeout_s": 120,
+      "start": 1791047675.291011,
+      "exit": 0,
+      "end": 1791047680.048147
+    },
+    {
+      "label": "standalone-build",
+      "command": [
+        "nice",
+        "-n",
+        "20",
+        "cargo",
+        "build",
+        "-p",
+        "overseerd",
+        "--bin",
+        "overseerd",
+        "--message-format=json"
+      ],
+      "timeout_s": 1200,
+      "start": 1791047680.0485098,
+      "exit": 0,
+      "end": 1791047701.68271
+    },
+    {
+      "label": "test-build",
+      "command": [
+        "nice",
+        "-n",
+        "20",
+        "cargo",
+        "test",
+        "-p",
+        "overseerd",
+        "--test",
+        "pending_requests",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "timeout_s": 1200,
+      "start": 1791047701.683027,
+      "exit": 0,
+      "end": 1791047724.313338
+    },
+    {
+      "label": "test-list",
+      "command": [
+        "nice",
+        "-n",
+        "20",
+        "/private/tmp/overseer-closeout-verify-target/debug/deps/pending_requests-3634fd170cfd2bc6",
+        "--list"
+      ],
+      "timeout_s": 30,
+      "start": 1791047724.46735,
+      "exit": 0,
+      "end": 1791047724.836855
+    },
+    {
+      "label": "baseline-1",
+      "command": [
+        "nice",
+        "-n",
+        "20",
+        "cargo",
+        "test",
+        "-p",
+        "overseerd",
+        "--test",
+        "pending_requests",
+        "slice2::receipt_recovery_progresses_past_sixteen_active_claims_without_tombstoning_them",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "timeout_s": 300,
+      "start": 1791047724.838464,
+      "exit": 101,
+      "end": 1791047727.883921
+    },
+    {
+      "label": "baseline-2",
+      "command": [
+        "nice",
+        "-n",
+        "20",
+        "cargo",
+        "test",
+        "-p",
+        "overseerd",
+        "--test",
+        "pending_requests",
+        "slice2::resolved_native_decline_recovers_written_policy_without_reopening_request",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "timeout_s": 300,
+      "start": 1791047727.884619,
+      "exit": 101,
+      "end": 1791047729.895927
+    }
+  ],
+  "artifacts": [
+    {
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "overseerd",
+        "src_path": "/private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/main.rs",
+        "edition": "2021",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "filenames": [
+        "/private/tmp/overseer-closeout-verify-target/debug/overseerd"
+      ],
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      }
+    },
+    {
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "pending_requests",
+        "src_path": "/private/tmp/overseer-native-recovery-baseline-20261003/daemon/tests/pending_requests.rs",
+        "edition": "2021",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "filenames": [
+        "/private/tmp/overseer-closeout-verify-target/debug/deps/pending_requests-3634fd170cfd2bc6"
+      ],
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/deps/pending_requests-3634fd170cfd2bc6",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      }
+    },
+    {
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "overseerd",
+        "src_path": "/private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/main.rs",
+        "edition": "2021",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "filenames": [
+        "/private/tmp/overseer-closeout-verify-target/debug/overseerd"
+      ],
+      "executable": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      }
+    }
+  ],
+  "executables": {
+    "/private/tmp/overseer-closeout-verify-target/debug/overseerd": {
+      "sha256": "b0f602532455c60131f9489bc9d891a8d90a7bfd3514e9918f98fd7d5d2a0fd7",
+      "mtime_ns": 1791047724274985878
+    },
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/pending_requests-3634fd170cfd2bc6": {
+      "sha256": "7df5e402448e92b62fe4a53ceff800b6d7ffa752b240581b69b9863763d7146d",
+      "mtime_ns": 1791047703529744540
+    }
+  },
+  "dependency_files": {
+    "/private/tmp/overseer-closeout-verify-target/debug/overseerd.d": {
+      "sha256": "540e47f0865453c45074ae878dcfa595ab06183000a684d30a4ff5b05938887d",
+      "source_lines": [
+        "/private/tmp/overseer-closeout-verify-target/debug/overseerd: /private/tmp/overseer-native-recovery-baseline-20261003/daemon/assets/reactor/agent_complete.mp3 /private/tmp/overseer-native-recovery-baseline-20261003/daemon/assets/reactor/agent_failed.mp3 /private/tmp/overseer-native-recovery-baseline-20261003/daemon/assets/reactor/agent_needs_attention.mp3 /private/tmp/overseer-native-recovery-baseline-20261003/daemon/assets/reactor/agent_progress.mp3 /private/tmp/overseer-native-recovery-baseline-20261003/daemon/assets/reactor/agent_queued.mp3 /private/tmp/overseer-native-recovery-baseline-20261003/daemon/assets/reactor/agent_resumed.mp3 /private/tmp/overseer-native-recovery-baseline-20261003/daemon/assets/reactor/agent_started.mp3 /private/tmp/overseer-native-recovery-baseline-20261003/daemon/assets/reactor/agent_stopped.mp3 /private/tmp/overseer-native-recovery-baseline-20261003/daemon/assets/reactor/agent_unblocked.mp3 /private/tmp/overseer-native-recovery-baseline-20261003/daemon/assets/reactor/delivery_ready.mp3 /private/tmp/overseer-native-recovery-baseline-20261003/daemon/assets/reactor/manifest.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/assets/reactor/review_ready.mp3 /private/tmp/overseer-native-recovery-baseline-20261003/daemon/assets/reactor/verification_passed.mp3 /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/account_booking.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/accounts.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/ApplyPatchApprovalParams.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/ApplyPatchApprovalResponse.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/AttestationGenerateParams.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/ChatgptAuthTokensRefreshParams.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/CommandExecutionRequestApprovalParams.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/CommandExecutionRequestApprovalResponse.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/CurrentTimeReadParams.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/DynamicToolCallParams.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/ExecCommandApprovalParams.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/ExecCommandApprovalResponse.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/FileChangeRequestApprovalParams.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/FileChangeRequestApprovalResponse.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/McpServerElicitationRequestParams.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/McpServerElicitationRequestResponse.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/PermissionsRequestApprovalParams.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/PermissionsRequestApprovalResponse.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/ServerRequestResolvedNotification.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/ToolRequestUserInputParams.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/../../../fixtures/transcripts/ac274/schemas/codex-0.158.0/ToolRequestUserInputResponse.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters/native_requests.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/adapters.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/audio.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/auto_collect.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/auto_consumption.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/auto_fit.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/auto_health.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/auto_maintenance.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/auto_mcp.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/auto_opencode.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/auto_quota.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/auto_route.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/auto_select.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/auto_telemetry.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/background.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/broker.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/claims.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/continuity.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/daemon.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/device_login.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/downloads.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/files.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/gateway/../../../protocol/protocol.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/gateway/base32.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/gateway/classes.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/gateway/devices.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/gateway/local.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/gateway/mod.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/gateway/net.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/gateway/noise.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/gateway/pairing.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/gateway/power.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/gateway/push.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/gateway/remote.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/git.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/handoff.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/local.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/local_catalogue.json /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/main.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/menubar.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/merge.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/mods/../../../mods/clear-prose/mod.toml /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/mods/../../../mods/clear-prose/style.md /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/mods/bindings.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/mods/delivery.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/mods/library.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/mods/manifest.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/mods/mod.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/net.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/notices.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/ollama_install.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/opencode_bridge.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/overseer/away.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/overseer/channel.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/overseer/checkin.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/overseer/conflicts.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/overseer/context.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/overseer/control.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/overseer/digest.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/overseer/finished.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/overseer/mcp.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/overseer/mod.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/overseer/modes.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/overseer/needs.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/overseer/session.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/overseer/trouble.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/overseer/watch.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/paths.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/pending_requests/answers.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/pending_requests.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/pr.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/redact.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/review.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/server.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/shim/native_reply.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/shim.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/store.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/admission.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/artifacts.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/audit.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/availability.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/benefit.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/broker.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/completion.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/conflicts.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/context.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/control.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/coverage.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/director.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/dispatch.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/effects.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/findings.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/integration.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/limits.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/mod.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/native.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/owner.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/plan.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/policy.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/requirements.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/revision.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/route.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/runtime.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/scheduler.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/schema.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/settings.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/start.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/swarm/verification.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/sys.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/upper_draw.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/usage.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/voice/candidates.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/voice/floor.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/voice/mod.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/voice/model.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/voice/proc.rs /private/tmp/overseer-native-recovery-baseline-20261003/daemon/src/voice/request.rs"
+      ]
+    },
+    "/private/tmp/overseer-closeout-verify-target/debug/deps/pending_requests-3634fd170cfd2bc6.d": {
+      "sha256": "9813ce4dd768c1e621d7ecbba3abf1b9865a7d4f5fa463ac8ec20af4687ff085",
+      "source_lines": [
+        "# env-dep:CARGO_MANIFEST_DIR=/private/tmp/overseer-native-recovery-baseline-20261003/daemon"
+      ]
+    }
+  }
+}

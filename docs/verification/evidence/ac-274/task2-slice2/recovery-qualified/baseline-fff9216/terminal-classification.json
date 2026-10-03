@@ -1,0 +1,6 @@
+{
+  "owned_temp_daemon_directories_remaining": [],
+  "owned_process_scan": "no matches; ps filter exited1 as expected for empty scan",
+  "baseline1": "actual claimed later-orphan lifecycle assertion reached: uncertain vs answered_awaiting_native",
+  "baseline2": "actual native_resolved retained; written-denial ledger assertion reached:0 vs1"
+}

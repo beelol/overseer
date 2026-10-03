@@ -1,0 +1,26 @@
+# Query-only receipt recovery and basic typed answer qualification
+
+Tested correction source: **79cae03c359f75b1d684cfe4f72e2ff98a9492ce**. Baseline: **fff9216a54904077e855a5de1da4720574ceb4af**, separate clean checkout, unchanged5b runtime (matching answers.rs Git blob591cb787). Root independently source-reviewed79ca correction/manifest and accepted runtime qualification, not shipping.
+
+Both batches used only the exclusively allocated retired `/private/tmp/overseer-closeout-verify-target`: package-only overseerd invalidation, fresh standalone daemon and pending_requests integration artifact builds, exact source `.d` paths, fresh:false named artifacts, executable SHA256/mtime, and nonzero test listings. Proofs and complete build/test output are retained. Jobs1/testthreads1; actual ps NI20 of wrapper/Cargo/compiler recorded. An initial Python priority guard stopped before any Cargo/package invalidation/runtime; its wrapper SETUP classification is retained separately, and the authorized corrected launch used actual ps NI20 rather than interpreting os.nice return.
+
+| Exact test (slice2:: prefix) | Unchanged baseline | Current79ca result | Reached evidence |
+|---|---|---|---|
+| receipt_recovery_progresses_past_sixteen_active_claims_without_tombstoning_them | 0/1 FAIL,2.87s | 1/1 PASS,2.73s |16 real persisted active presend claims; exact request17 response ID23 reached native stdin; repeated read now reaches later orphan without tombstoning/releasing earlier owners; afterward16 explicit owners write; status does not resend. |
+| resolved_native_decline_recovers_written_policy_without_reopening_request | 0/1 FAIL,1.89s | 1/1 PASS,2.02s | Lost-ack written denial followed by actual native Resolved BEFORE collection; terminal public projection/cursor unchanged, private ledger count1 exactly once, first result unchanged, native response count1. |
+| frozen_typed_family_answers_reach_exact_native_transport | Not run in this baseline batch | 1/1 PASS,8.39s | Seven independently frozen native response envelopes captured through actual fixture stdin, listed below; transport ack stays answered_awaiting_native. |
+| persistent_native_veto_refuses_stale_always_but_allows_once | Original12 baseline veto had separate SETUP failure | 1/1 PASS,1.87s | Corrected fixture version setup reaches veto refusal and exact allowed once response. |
+| competing_answer_claims_emit_one_exact_native_response | Not run in this baseline batch | 1/1 PASS,1.85s | Two actual competing owner calls yield one exact native response. |
+| wrong_family_revision_and_caller_authority_emit_no_response | Not run in this baseline batch | 0/1 FAIL,1.81s | FIRST wrong-family assertion reached: expected invalid_answer, actual native_unqualified. Later revision/forged actor/surface/generation/ID/protocol/offer negatives and healthy control were NOT reached. This is a real qualification failure; not6/6 and no broad authority-negative verification claim. |
+
+Current batch totals **5 passed,1 failed** (each exact selection ran1 test). Baseline both genuine intended recovery REDs, not setup: later orphan remained uncertain instead of answered_awaiting_native; surviving retired write had denied ledger count0 instead of1. Baseline wrapper terminal79996; current wrapper terminal90729. Source remained clean/frozen during execution.
+
+Seven matrix vectors actually compared in the passing native/mock capture test: `file_decline`, `permissions_empty_deny`, `codex_question_id`, `codex_form_accept`, `claude_deny`, `claude_question_text`, `claude_form_accept`. This count describes seven fixture/native response captures, **not** Task1's pure codec59 responses/40 refusals, every installed native route or browser availability. Other passing controls include command responses separately.
+
+Source diagnosis of the final failure: response() starts Questions field-ID translation even when the stored native request is a command; its absent saved params.questions array returns native_unqualified before the codec's WrongAnswer category. Proposed narrow family guard is awaiting the coordinator's source gate; expected refusal is not relaxed and no correction rerun is claimed here.
+
+## Cleanup and remaining qualification
+
+Terminal process scans matched no owned wrapper/test/daemon/shim/native mock programs, and no `ovs-t*` marker for either owned test-run remained. Drop releases/joins held answers, restores proxy socket and stops owned process groups. Compiler/runtime slot released after the bounded six-case batch; evidence publication only continued afterward.
+
+No provider turns, installed harness calls beyond synthetic --version, browser/UI, owner login/profile/audio or production daemon access. Current recovery storage unit controls are authored but UNRUN. Prior frozen authority/tombstone/context/Needs/confirmation/recovery witnesses not selected here remain unqualified; partial-write/dead-shim/file-denial identity, richer three-surface renderers, browser/external flows, full integration and installed native behavior remain explicit AC274 gaps. Historical written evidence grants no fresh native execution/device/proposal authority and does not prove the protected operation completed. No ready/merge/AC274 completion claim.

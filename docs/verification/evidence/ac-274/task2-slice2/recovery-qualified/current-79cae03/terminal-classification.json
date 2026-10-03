@@ -1,0 +1,20 @@
+{
+  "source": "79cae03c359f75b1d684cfe4f72e2ff98a9492ce",
+  "counts": {
+    "pass": 5,
+    "fail": 1
+  },
+  "matrix_exact_native_vector_captures": 7,
+  "matrix_names": [
+    "file_decline",
+    "permissions_empty_deny",
+    "codex_question_id",
+    "codex_form_accept",
+    "claude_deny",
+    "claude_question_text",
+    "claude_form_accept"
+  ],
+  "last_failure": "first wrong-family refusal expected invalid_answer, got native_unqualified; subsequent negative cases not reached",
+  "owned_temp_daemon_directories_remaining": [],
+  "owned_process_scan": "no matches; ps filter exited1 for empty scan"
+}
