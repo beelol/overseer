@@ -1,0 +1,9 @@
+# AC274 Task2 Slice1 baseline
+
+Baseline source: `e4d8c7b02436f3d4626ceaf0e3db94daebc32d3f`; no pending runtime implementation existed. The exact command `CARGO_TARGET_DIR=/private/tmp/overseer-closeout-verify-target CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2 nice -n 20 cargo test -p overseerd --test pending_requests -- --nocapture` compiled the integration test from `/private/tmp/overseer-native-pending-20261003/daemon` and executed `/private/tmp/overseer-closeout-verify-target/debug/deps/pending_requests-3634fd170cfd2bc6`.
+
+`baseline-red.log`: 15 total tests = all11 authored boundary tests failed plus4 shared noise/base32 helper tests passed, in5.21s, exit101. No setup failure or zero-match run. Six collection/identity tests reached `unknown method run.requests`. Five privacy tests independently reproduced existing public exposure of arbitrary synthetic private values before any proposed method: future control and undeclared dialog through raw_unparsed events; machine auth-refresh context and secret question identity through raw_output; unknown-version AskUserQuestion content through public attention/state. These are separate missing-feature and actual privacy RED classes.
+
+A missing collection method stops the six collection tests before later assertions. This baseline does not independently qualify restart/replay/stale-key/child behavior; those assertions must execute and pass on the implementation. Privacy tests likewise stop at their first exposed public boundary; later event replay/diagnostic/no-response checks remain unqualified until GREEN. Nothing here establishes native/provider/browser availability, Slices2/3 or AC274 completion.
+
+Coordinator reviewed the actual baseline and authorized Slice1 collection/quarantine/projection implementation only. No UI, provider, paid, profile or production activity. All test/shim/fixture processes exited; exclusive compiler slot released before source work.

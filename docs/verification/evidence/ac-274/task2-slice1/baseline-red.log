@@ -1,0 +1,301 @@
+warning: unused import: `revision`
+ --> daemon/src/mods/bindings.rs:5:5
+  |
+5 |     revision,
+  |     ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: value assigned to `note` is never read
+   --> daemon/src/background.rs:377:17
+    |
+377 |         let mut note = String::new();
+    |                 ^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` on by default
+
+warning: methods `book_shared_account`, `shared_booking_draw`, and `mark_shared_booking_uncertain` are never used
+    --> daemon/src/account_booking.rs:1203:12
+     |
+1171 | impl Store {
+     | ---------- methods in this implementation
+...
+1203 |     pub fn book_shared_account(&self, req: &AccountBookingRequest<'_>) -> Result<BookingDecision> {
+     |            ^^^^^^^^^^^^^^^^^^^
+...
+1255 |     pub fn shared_booking_draw(
+     |            ^^^^^^^^^^^^^^^^^^^
+...
+1387 |     pub fn mark_shared_booking_uncertain(&self, id: &str) -> Result<()> {
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` on by default
+
+warning: methods `blocking_window` and `allowance_unknown` are never used
+   --> daemon/src/auto_quota.rs:139:12
+    |
+60  | impl QuotaSnapshot {
+    | ------------------ methods in this implementation
+...
+139 |     pub fn blocking_window(&self, model: &str) -> Option<&QuotaWindow> {
+    |            ^^^^^^^^^^^^^^^
+...
+145 |     pub fn allowance_unknown(&self, model: &str) -> bool {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: function `auto_local_execution_guard` is never used
+   --> daemon/src/auto_opencode.rs:177:8
+    |
+177 | pub fn auto_local_execution_guard(profile: &crate::store::Profile, project: &Path,
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: fields `resolved_model_version` and `task_signature` are never read
+   --> daemon/src/auto_consumption.rs:169:9
+    |
+166 | pub struct DeltaContext<'a> {
+    |            ------------ fields in this struct
+...
+169 |     pub resolved_model_version: Option<&'a str>,
+    |         ^^^^^^^^^^^^^^^^^^^^^^
+170 |     pub task_signature: Option<&'a crate::auto_select::TaskSignature>,
+    |         ^^^^^^^^^^^^^^
+    |
+    = note: `DeltaContext` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: function `estimate_from_actual_window_delta` is never used
+   --> daemon/src/auto_consumption.rs:291:8
+    |
+291 | pub fn estimate_from_actual_window_delta(
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `apply_scoped_fit` is never used
+   --> daemon/src/auto_fit.rs:204:8
+    |
+204 | pub fn apply_scoped_fit(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: variant `Provider` is never constructed
+  --> daemon/src/auto_health.rs:10:5
+   |
+9  | pub enum Scope {
+   |          ----- variant in this enum
+10 |     Provider(String),
+   |     ^^^^^^^^
+   |
+   = note: `Scope` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: methods `workspace_diff` and `state` are never used
+    --> daemon/src/daemon.rs:3738:12
+     |
+433  | impl Daemon {
+     | ----------- methods in this implementation
+...
+3738 |     pub fn workspace_diff(&self, workspace_id: &str, base: &str) -> Result<Value> {
+     |            ^^^^^^^^^^^^^^
+...
+3793 |     pub fn state(&self) -> Result<Value> {
+     |            ^^^^^
+
+warning: field `device_name` is never read
+  --> daemon/src/gateway/mod.rs:86:9
+   |
+84 | pub struct Session {
+   |            ------- field in this struct
+85 |     pub device_id: String,
+86 |     pub device_name: String,
+   |         ^^^^^^^^^^^
+
+warning: field `public` is never read
+  --> daemon/src/gateway/noise.rs:40:9
+   |
+38 | pub struct Keypair {
+   |            ------- field in this struct
+39 |     pub private: Vec<u8>,
+40 |     pub public: Vec<u8>,
+   |         ^^^^^^
+
+warning: constant `ALLOWED_FIELDS` is never used
+  --> daemon/src/gateway/push.rs:16:11
+   |
+16 | pub const ALLOWED_FIELDS: &[&str] = &[
+   |           ^^^^^^^^^^^^^^
+
+warning: function `decorate` is never used
+    --> daemon/src/voice/request.rs:2158:8
+     |
+2158 | pub fn decorate(d: &Daemon, actions: &mut [Value]) -> Result<bool> {
+     |        ^^^^^^^^
+
+warning: method `is_clean` is never used
+   --> daemon/src/git.rs:299:12
+    |
+298 | impl Status {
+    | ----------- method in this implementation
+299 |     pub fn is_clean(&self) -> bool {
+    |            ^^^^^^^^
+
+warning: function `tree_has` is never used
+   --> daemon/src/git.rs:356:8
+    |
+356 | pub fn tree_has(workspace: &Path, tree_ish: &str, path: &str) -> bool {
+    |        ^^^^^^^^
+
+warning: function `show_blob` is never used
+   --> daemon/src/git.rs:360:8
+    |
+360 | pub fn show_blob(workspace: &Path, tree_ish: &str, path: &str) -> Result<Vec<u8>> {
+    |        ^^^^^^^^^
+
+warning: function `worktree_list` is never used
+   --> daemon/src/git.rs:368:8
+    |
+368 | pub fn worktree_list(repo: &Path) -> Vec<PathBuf> {
+    |        ^^^^^^^^^^^^^
+
+warning: struct `Reading` is never constructed
+  --> daemon/src/net.rs:79:12
+   |
+79 | pub struct Reading {
+   |            ^^^^^^^
+
+warning: function `read` is never used
+  --> daemon/src/net.rs:97:8
+   |
+97 | pub fn read(probes: bool) -> Reading {
+   |        ^^^^
+
+warning: field `model` is never read
+   --> daemon/src/opencode_bridge.rs:260:9
+    |
+243 | pub struct Turn {
+    |            ---- field in this struct
+...
+260 |     pub model: String,
+    |         ^^^^^
+
+warning: constant `METHOD_CLASSES` is never used
+  --> daemon/src/overseer/control.rs:60:11
+   |
+60 | pub const METHOD_CLASSES: &[(&str, &str)] = &[
+   |           ^^^^^^^^^^^^^^
+
+warning: function `method_class` is never used
+   --> daemon/src/overseer/control.rs:137:8
+    |
+137 | pub fn method_class(method: &str) -> Option<&'static str> {
+    |        ^^^^^^^^^^^^
+
+warning: function `is_session_event` is never used
+    --> daemon/src/overseer/session.rs:2278:8
+     |
+2278 | pub fn is_session_event(kind: &str) -> bool {
+     |        ^^^^^^^^^^^^^^^^
+
+warning: methods `insert_task_and_run`, `insert_task_and_run_bound`, `child_by_native`, `insert_turn_if_no_auto_claim`, and `put_auto_allowance_estimate` are never used
+    --> daemon/src/store.rs:967:12
+     |
+189  | impl Store {
+     | ---------- methods in this implementation
+...
+967  |     pub fn insert_task_and_run(&self, t: &Task, r: &Run, attempt_id: Option<&str>,
+     |            ^^^^^^^^^^^^^^^^^^^
+...
+974  |     pub fn insert_task_and_run_bound(&self, t: &Task, r: &Run, attempt_id: Option<&str>,
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1122 |     pub fn child_by_native(&self, parent: &str, native: &str) -> Result<Option<Run>> {
+     |            ^^^^^^^^^^^^^^^
+...
+1791 |     pub fn insert_turn_if_no_auto_claim(&self, t: &Turn, profile_id: &str) -> Result<bool> {
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+2532 |     pub fn put_auto_allowance_estimate(&self, profile_id: &str, generation: i64,
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `parse_meminfo` is never used
+   --> daemon/src/sys.rs:114:8
+    |
+114 | pub fn parse_meminfo(text: &str) -> Result<(u64, u64)> {
+    |        ^^^^^^^^^^^^^
+
+warning: function `parse_psi` is never used
+   --> daemon/src/sys.rs:127:8
+    |
+127 | pub fn parse_psi(text: &str) -> Pressure {
+    |        ^^^^^^^^^
+
+   Compiling overseerd v0.1.0 (/private/tmp/overseer-native-pending-20261003/daemon)
+warning: `overseerd` (bin "overseerd") generated 27 warnings (run `cargo fix --bin "overseerd"` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.56s
+     Running tests/pending_requests.rs (/private/tmp/overseer-closeout-verify-target/debug/deps/pending_requests-3634fd170cfd2bc6)
+
+running 15 tests
+test common::base32::tests::base32_round_trips_and_matches_rfc_vectors ... ok
+test common::noise::tests::a_wrong_pairing_secret_fails_in_the_first_message ... ok
+test common::noise::tests::noise_vectors_match_the_shared_file ... ok
+test common::noise::tests::large_messages_are_chunked_and_joined ... ok
+
+thread 'live_duplicate_id_changed_offer_conflicts_without_authority' panicked at daemon/tests/common/mod.rs:138:66:
+run.requests {"run_id":"r-75b21dca3f68"} failed: unknown method run.requests
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test live_duplicate_id_changed_offer_conflicts_without_authority ... FAILED
+
+thread 'future_native_control_secret_payload_is_quarantined_and_observable' panicked at daemon/tests/pending_requests.rs:422:9:
+private native envelope escaped through events: [{"confidence":"exact","kind":"task_created","payload":{"run":{"attention":null,"capabilities":{"account_login":"Claude.ai account via claude auth login (CLAUDE_CONFIG_DIR per profile)","approvals":"supported (--permission-prompt-tool stdio)","children":"supported (Agent/Task tool_use ids, parent_tool_use_id nesting, system task_* events)","effort":"supported (--effort, per turn)","file_activity":"supported (Write/Edit tool inputs)","follow_up":"supported (--resume <session>)","images":"supported (stream-json image blocks)","interrupt":"supported (control_request interrupt, then SIGINT)","launch":"supported","model":"supported (--model, per turn)","output":"supported","permission_mode":"supported (--permission-mode: acceptEdits, plan, auto, manual)","quota":"unknown (error text classification only)","resume":"supported","transport":"claude -p stream-json (stdin/stdout)","usage":"supported (result usage)","verification":"live-verified on macOS with a claude.ai account (Claude Code 2.1.246): edit, permissions, nested subagents, follow-up, interrupt"},"created_ms":1791031367706,"effort":null,"ended_ms":null,"exit_reason":null,"harness":"claude","harness_version":"2.1.288 (Claude Code)","id":"r-c945f023dd71","model":null,"native_id":null,"parent_run_id":null,"process_generation":0,"profile_id":"system-claude","relation_confidence":null,"relation_source":null,"status":"queued","task_id":"t-4eda35ad14d4","title":"Pending fixture","workspace_id":"w-d661e80adeca"},"task":{"archived_ms":null,"created_ms":1791031367197,"fork_commit":"93a41fd3c75c2103b0c4938c98375db1112c66ab","fork_provenance":"recorded: worktree branch overseer/pending-fixture created from HEAD at 93a41fd3c75c2103b0c4938c98375db1112c66ab","id":"t-4eda35ad14d4","prompt":"synthetic pending boundary","repo_root":"/private/tmp/ovs-r3ANUHq/repo","start_snapshot":"s-f6c9e5195b7f","target_ref":null,"title":"Pending fixture","workspace_id":"w-d661e80adeca"},"workspace":{"branch":"overseer/pending-fixture","common_dir":"/private/tmp/ovs-r3ANUHq/repo/.git","created_ms":1791031367197,"id":"w-d661e80adeca","initial_dirty":{"clean":true},"kind":"worktree","owner_run_id":null,"path":"/private/tmp/ovs-t0Or8mn/worktrees/repo-7bac8fec/pending-fixture","removed_ms":null,"repo_root":"/private/tmp/ovs-r3ANUHq/repo"}},"run_id":"r-c945f023dd71","seq":4,"source":"daemon","task_id":"t-4eda35ad14d4","ts":1791031367707},{"confidence":"exact","kind":"turn_started","payload":{"snapshot":"83d49a0f0c205e5f26e40088643a6b1a9277d8f6","turn":{"ended_ms":null,"id":"u-5d8559491711","n":1,"prompt":"synthetic pending boundary","run_id":"r-c945f023dd71","snapshot_id":"s-876d431e7e6e","started_ms":1791031367835,"status":"running"}},"run_id":"r-c945f023dd71","seq":6,"source":"daemon","task_id":"t-4eda35ad14d4","ts":1791031367835},{"confidence":"exact","kind":"status","payload":{"generation":1,"program":"/private/tmp/overseer-native-pending-20261003/fixtures/fake-harness/claude-fixture.js","status":"starting"},"run_id":"r-c945f023dd71","seq":7,"source":"daemon","task_id":"t-4eda35ad14d4","ts":1791031367837},{"confidence":"exact","kind":"mods_applied","payload":{"snapshot":{"activation":"next_turn","added_bytes":0,"applied_fingerprints":[],"binding_snapshot":[],"children":"unknown","context":{"account_id":null,"harness":"claude","harness_version":"2.1.288 (Claude Code)","local_model_selection":false,"model":null,"native_thread_exists":false,"repo_key":"/private/tmp/ovs-r3ANUHq/repo/.git","role":"agent","run_id":"r-c945f023dd71"},"delivery":"none","digest":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","outcome":"transport_accepted","outcome_detail":"Existing stdin or supervisor launch accepted the request; model consumption is unverified","outcome_ms":1791031367838,"plan":{"decisions":[],"revision":0,"rules_text":"","style_text":"","versions":[]},"planned_fingerprints":[],"run_id":"r-c945f023dd71","text":"","text_redacted":false,"transport":"claude","turn_id":"u-5d8559491711"}},"run_id":"r-c945f023dd71","seq":8,"source":"daemon","task_id":null,"ts":1791031367838},{"confidence":"exact","kind":"status","payload":{"status":"running","why":"harness process started"},"run_id":"r-c945f023dd71","seq":9,"source":"supervisor","task_id":"t-4eda35ad14d4","ts":1791031367906},{"confidence":"exact","kind":"session","payload":{"native_id":"fixture-session-1"},"run_id":"r-c945f023dd71","seq":10,"source":"harness","task_id":"t-4eda35ad14d4","ts":1791031367906},{"confidence":"exact","kind":"output","payload":{"role":"system","text":"session started (model fixture)"},"run_id":"r-c945f023dd71","seq":11,"source":"harness","task_id":"t-4eda35ad14d4","ts":1791031367907},{"confidence":"unknown","kind":"raw_unparsed","payload":{"parser_version":"2026-09-24.1","text":"{\"request\":{\"payload\":{\"opaque\":\"fixtureOpaquePrivate63827\"},\"subtype\":\"future_native_dialog\"},\"request_id\":\"fixtureOpaquePrivate63827\",\"type\":\"control_request\"}"},"run_id":"r-c945f023dd71","seq":12,"source":"harness","task_id":"t-4eda35ad14d4","ts":1791031367907},{"confidence":"exact","kind":"output","payload":{"role":"assistant","text":"native-pending-batch-one"},"run_id":"r-c945f023dd71","seq":13,"source":"harness","task_id":"t-4eda35ad14d4","ts":1791031367907}]
+test future_native_control_secret_payload_is_quarantined_and_observable ... FAILED
+
+thread 'machine_callbacks_are_private_and_never_owner_cards' panicked at daemon/tests/pending_requests.rs:422:9:
+private native envelope escaped through raw_output: {"lines":[{"d":"{\"id\":\"ovs-init\",\"method\":\"initialize\",\"params\":{\"capabilities\":null,\"clientInfo\":{\"name\":\"overseer\",\"title\":\"Overseer\",\"version\":\"0.1.0\"}}}\n{\"method\":\"initialized\"}","s":"i","t":1791031368459},{"d":"{\"id\":\"ovs-init\",\"result\":{\"userAgent\":\"fixture\"}}","s":"o","t":1791031368481},{"d":"{\"id\":\"ovs-thread\",\"method\":\"thread/start\",\"params\":{\"approvalPolicy\":\"untrusted\",\"cwd\":\"/private/tmp/ovs-tx6LGAu/worktrees/repo-1f3236a4/pending-fixture\",\"sandbox\":\"workspace-write\"}}","s":"i","t":1791031368524},{"d":"{\"id\":\"ovs-thread\",\"result\":{\"thread\":{\"id\":\"thr-fixture-1\"},\"model\":\"fixture\"}}","s":"o","t":1791031368524},{"d":"{\"method\":\"thread/started\",\"params\":{\"thread\":{\"id\":\"thr-fixture-1\"}}}","s":"o","t":1791031368524},{"d":"{\"id\":\"ovs-turn\",\"method\":\"turn/start\",\"params\":{\"input\":[{\"text\":\"synthetic pending boundary\",\"text_elements\":[],\"type\":\"text\"}],\"threadId\":\"thr-fixture-1\"}}","s":"i","t":1791031368525},{"d":"{\"id\":\"ovs-turn\",\"result\":{\"turn\":{\"id\":\"turn-1791031368525\",\"status\":\"inProgress\"}}}","s":"o","t":1791031368525},{"d":"{\"method\":\"turn/started\",\"params\":{\"threadId\":\"thr-fixture-1\",\"turn\":{\"id\":\"turn-1791031368525\"}}}","s":"o","t":1791031368525},{"d":"{\"id\":7,\"method\":\"account/chatgptAuthTokens/refresh\",\"params\":{\"previousAccountId\":\"fixtureOpaquePrivate63827\",\"reason\":\"unauthorized\"}}","s":"o","t":1791031368525},{"d":"{\"method\":\"item/completed\",\"params\":{\"threadId\":\"thr-fixture-1\",\"turnId\":\"turn-1791031368525\",\"item\":{\"type\":\"agentMessage\",\"id\":\"native-pending-batch-one\",\"text\":\"native-pending-batch-one\"}}}","s":"o","t":1791031368525},{"d":"{\"error\":{\"code\":-32601,\"message\":\"account/chatgptAuthTokens/refresh not supported by Overseer\"},\"id\":7}","s":"i","t":1791031368596}],"note":"","truncated":false}
+test machine_callbacks_are_private_and_never_owner_cards ... FAILED
+
+thread 'native_child_pending_identity_keeps_owning_parent_transport' panicked at daemon/tests/common/mod.rs:138:66:
+run.requests {"run_id":"r-128e219393bc"} failed: unknown method run.requests
+test native_child_pending_identity_keeps_owning_parent_transport ... FAILED
+
+thread 'replayed_frame_preserves_key_and_cursor' panicked at daemon/tests/common/mod.rs:138:66:
+run.requests {"run_id":"r-8300e7fc4b2a"} failed: unknown method run.requests
+test replayed_frame_preserves_key_and_cursor ... FAILED
+
+thread 'same_item_distinct_approval_requests_do_not_overwrite' panicked at daemon/tests/common/mod.rs:138:66:
+run.requests {"run_id":"r-a2c489ab9b90"} failed: unknown method run.requests
+test same_item_distinct_approval_requests_do_not_overwrite ... FAILED
+
+thread 'same_raw_id_after_generation_restart_refuses_old_key' panicked at daemon/tests/common/mod.rs:138:66:
+run.requests {"run_id":"r-2fa572966759"} failed: unknown method run.requests
+test same_raw_id_after_generation_restart_refuses_old_key ... FAILED
+
+thread 'secret_question_native_identity_is_private_and_not_a_bool_permission' panicked at daemon/tests/pending_requests.rs:422:9:
+private native envelope escaped through raw_output: {"lines":[{"d":"{\"id\":\"ovs-init\",\"method\":\"initialize\",\"params\":{\"capabilities\":null,\"clientInfo\":{\"name\":\"overseer\",\"title\":\"Overseer\",\"version\":\"0.1.0\"}}}\n{\"method\":\"initialized\"}","s":"i","t":1791031369952},{"d":"{\"id\":\"ovs-init\",\"result\":{\"userAgent\":\"fixture\"}}","s":"o","t":1791031369973},{"d":"{\"id\":\"ovs-thread\",\"method\":\"thread/start\",\"params\":{\"approvalPolicy\":\"untrusted\",\"cwd\":\"/private/tmp/ovs-tGScxnn/worktrees/repo-e2be23b8/pending-fixture\",\"sandbox\":\"workspace-write\"}}","s":"i","t":1791031370015},{"d":"{\"id\":\"ovs-thread\",\"result\":{\"thread\":{\"id\":\"thr-fixture-1\"},\"model\":\"fixture\"}}","s":"o","t":1791031370015},{"d":"{\"method\":\"thread/started\",\"params\":{\"thread\":{\"id\":\"thr-fixture-1\"}}}","s":"o","t":1791031370015},{"d":"{\"id\":\"ovs-turn\",\"method\":\"turn/start\",\"params\":{\"input\":[{\"text\":\"synthetic pending boundary\",\"text_elements\":[],\"type\":\"text\"}],\"threadId\":\"thr-fixture-1\"}}","s":"i","t":1791031370016},{"d":"{\"id\":\"ovs-turn\",\"result\":{\"turn\":{\"id\":\"turn-1791031370016\",\"status\":\"inProgress\"}}}","s":"o","t":1791031370016},{"d":"{\"method\":\"turn/started\",\"params\":{\"threadId\":\"thr-fixture-1\",\"turn\":{\"id\":\"turn-1791031370016\"}}}","s":"o","t":1791031370016},{"d":"{\"id\":\"fixtureOpaquePrivate63827\",\"method\":\"item/tool/requestUserInput\",\"params\":{\"isBlocking\":true,\"itemId\":\"item-fixture\",\"questions\":[{\"header\":\"Choice\",\"id\":\"fixtureOpaquePrivate63827\",\"isOther\":false,\"isSecret\":true,\"options\":null,\"question\":\"Which option?\"}],\"threadId\":\"thr-fixture-1\",\"turnId\":\"turn-1791031370016\"}}","s":"o","t":1791031370017},{"d":"{\"method\":\"item/completed\",\"params\":{\"threadId\":\"thr-fixture-1\",\"turnId\":\"turn-1791031370016\",\"item\":{\"type\":\"agentMessage\",\"id\":\"native-pending-batch-one\",\"text\":\"native-pending-batch-one\"}}}","s":"o","t":1791031370017},{"d":"{\"error\":{\"code\":-32601,\"message\":\"item/tool/requestUserInput not supported by Overseer\"},\"id\":\"fixtureOpaquePrivate63827\"}","s":"i","t":1791031370087}],"note":"","truncated":false}
+test secret_question_native_identity_is_private_and_not_a_bool_permission ... FAILED
+
+thread 'two_native_requests_preserve_order_and_tagged_ids' panicked at daemon/tests/common/mod.rs:138:66:
+run.requests {"run_id":"r-eec33643458a"} failed: unknown method run.requests
+
+thread 'unknown_dialog_does_not_fabricate_cancel' panicked at daemon/tests/pending_requests.rs:422:9:
+private native envelope escaped through events: [{"confidence":"exact","kind":"task_created","payload":{"run":{"attention":null,"capabilities":{"account_login":"Claude.ai account via claude auth login (CLAUDE_CONFIG_DIR per profile)","approvals":"supported (--permission-prompt-tool stdio)","children":"supported (Agent/Task tool_use ids, parent_tool_use_id nesting, system task_* events)","effort":"supported (--effort, per turn)","file_activity":"supported (Write/Edit tool inputs)","follow_up":"supported (--resume <session>)","images":"supported (stream-json image blocks)","interrupt":"supported (control_request interrupt, then SIGINT)","launch":"supported","model":"supported (--model, per turn)","output":"supported","permission_mode":"supported (--permission-mode: acceptEdits, plan, auto, manual)","quota":"unknown (error text classification only)","resume":"supported","transport":"claude -p stream-json (stdin/stdout)","usage":"supported (result usage)","verification":"live-verified on macOS with a claude.ai account (Claude Code 2.1.246): edit, permissions, nested subagents, follow-up, interrupt"},"created_ms":1791031370551,"effort":null,"ended_ms":null,"exit_reason":null,"harness":"claude","harness_version":"2.1.288 (Claude Code)","id":"r-e1bcba9109bf","model":null,"native_id":null,"parent_run_id":null,"process_generation":0,"profile_id":"system-claude","relation_confidence":null,"relation_source":null,"status":"queued","task_id":"t-4b902e9b0d51","title":"Pending fixture","workspace_id":"w-959dc4743ab6"},"task":{"archived_ms":null,"created_ms":1791031370395,"fork_commit":"2123ee3ad679aeee9832757fd24c675ecf81265e","fork_provenance":"recorded: worktree branch overseer/pending-fixture created from HEAD at 2123ee3ad679aeee9832757fd24c675ecf81265e","id":"t-4b902e9b0d51","prompt":"synthetic pending boundary","repo_root":"/private/tmp/ovs-rPRN7aO/repo","start_snapshot":"s-3743eb603f9d","target_ref":null,"title":"Pending fixture","workspace_id":"w-959dc4743ab6"},"workspace":{"branch":"overseer/pending-fixture","common_dir":"/private/tmp/ovs-rPRN7aO/repo/.git","created_ms":1791031370395,"id":"w-959dc4743ab6","initial_dirty":{"clean":true},"kind":"worktree","owner_run_id":null,"path":"/private/tmp/ovs-t80uvDu/worktrees/repo-603f0f3c/pending-fixture","removed_ms":null,"repo_root":"/private/tmp/ovs-rPRN7aO/repo"}},"run_id":"r-e1bcba9109bf","seq":4,"source":"daemon","task_id":"t-4b902e9b0d51","ts":1791031370552},{"confidence":"exact","kind":"turn_started","payload":{"snapshot":"171bb9022636332aebcf73fe3f7a7345d0483062","turn":{"ended_ms":null,"id":"u-d2370a6f090f","n":1,"prompt":"synthetic pending boundary","run_id":"r-e1bcba9109bf","snapshot_id":"s-d17328a65711","started_ms":1791031370680,"status":"running"}},"run_id":"r-e1bcba9109bf","seq":6,"source":"daemon","task_id":"t-4b902e9b0d51","ts":1791031370680},{"confidence":"exact","kind":"status","payload":{"generation":1,"program":"/private/tmp/overseer-native-pending-20261003/fixtures/fake-harness/claude-fixture.js","status":"starting"},"run_id":"r-e1bcba9109bf","seq":7,"source":"daemon","task_id":"t-4b902e9b0d51","ts":1791031370682},{"confidence":"exact","kind":"mods_applied","payload":{"snapshot":{"activation":"next_turn","added_bytes":0,"applied_fingerprints":[],"binding_snapshot":[],"children":"unknown","context":{"account_id":null,"harness":"claude","harness_version":"2.1.288 (Claude Code)","local_model_selection":false,"model":null,"native_thread_exists":false,"repo_key":"/private/tmp/ovs-rPRN7aO/repo/.git","role":"agent","run_id":"r-e1bcba9109bf"},"delivery":"none","digest":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","outcome":"transport_accepted","outcome_detail":"Existing stdin or supervisor launch accepted the request; model consumption is unverified","outcome_ms":1791031370682,"plan":{"decisions":[],"revision":0,"rules_text":"","style_text":"","versions":[]},"planned_fingerprints":[],"run_id":"r-e1bcba9109bf","text":"","text_redacted":false,"transport":"claude","turn_id":"u-d2370a6f090f"}},"run_id":"r-e1bcba9109bf","seq":8,"source":"daemon","task_id":null,"ts":1791031370682},{"confidence":"exact","kind":"status","payload":{"status":"running","why":"harness process started"},"run_id":"r-e1bcba9109bf","seq":9,"source":"supervisor","task_id":"t-4b902e9b0d51","ts":1791031370748},{"confidence":"exact","kind":"session","payload":{"native_id":"fixture-session-1"},"run_id":"r-e1bcba9109bf","seq":10,"source":"harness","task_id":"t-4b902e9b0d51","ts":1791031370749},{"confidence":"exact","kind":"output","payload":{"role":"system","text":"session started (model fixture)"},"run_id":"r-e1bcba9109bf","seq":11,"source":"harness","task_id":"t-4b902e9b0d51","ts":1791031370749},{"confidence":"unknown","kind":"raw_unparsed","payload":{"parser_version":"2026-09-24.1","text":"{\"request\":{\"dialog_kind\":\"unqualified-native-dialog\",\"payload\":{\"opaque\":\"fixtureOpaquePrivate63827\"},\"subtype\":\"request_user_dialog\",\"tool_use_id\":\"tool-fixture\"},\"request_id\":\"request-7\",\"type\":\"control_request\"}"},"run_id":"r-e1bcba9109bf","seq":12,"source":"harness","task_id":"t-4b902e9b0d51","ts":1791031370749},{"confidence":"exact","kind":"output","payload":{"role":"assistant","text":"native-pending-batch-one"},"run_id":"r-e1bcba9109bf","seq":13,"source":"harness","task_id":"t-4b902e9b0d51","ts":1791031370749}]
+test two_native_requests_preserve_order_and_tagged_ids ... FAILED
+test unknown_dialog_does_not_fabricate_cancel ... FAILED
+
+thread 'unknown_protocol_version_secret_question_is_quarantined_before_legacy_parse' panicked at daemon/tests/pending_requests.rs:422:9:
+private native envelope escaped through state: {"cursor":16,"daemon":{"parser_version":"2026-09-24.1","pid":80052,"started_ms":1791031370912,"swarm_storage":"ready","version":"0.1.0"},"landings":{},"overseer":{"conflicts_needing_decision":0,"last_message_ms":1791031371376,"level":"ask_first","open_proposals":0,"run_id":null,"session":"os-81707bb0f30e"},"oversight":{},"profiles":[{"account":{"default":true,"email":null,"label":"Claude · Mac's default login","name":"Mac's default login","plan":null,"provider":"Claude","short":"Claude · Mac's default login"},"created_ms":1791031370912,"harness":"claude","home":null,"id":"system-claude","is_system":true,"name":"claude (existing login)"},{"account":{"default":true,"email":null,"label":"ChatGPT · Mac's default login","name":"Mac's default login","plan":null,"provider":"ChatGPT","short":"ChatGPT · Mac's default login"},"created_ms":1791031370912,"harness":"codex","home":null,"id":"system-codex","is_system":true,"name":"codex (existing login)"},{"account":{"default":true,"email":null,"label":"OpenCode · Mac's default login","name":"Mac's default login","plan":null,"provider":"OpenCode","short":"OpenCode · Mac's default login"},"created_ms":1791031370912,"harness":"opencode","home":null,"id":"system-opencode","is_system":true,"name":"opencode (existing login)"}],"reviewed":{},"runs":[{"attention":{"input":{"answers":{"Which option?":"fixtureOpaquePrivate63827"},"questions":[{"header":"Choice","multiSelect":true,"options":[{"description":"First","label":"A"},{"description":"Second","label":"B"}],"question":"Which option?"}]},"kind":"permission","request_id":"request-7","tool":"AskUserQuestion"},"capabilities":{"account_login":"Claude.ai account via claude auth login (CLAUDE_CONFIG_DIR per profile)","approvals":"supported (--permission-prompt-tool stdio)","children":"supported (Agent/Task tool_use ids, parent_tool_use_id nesting, system task_* events)","effort":"supported (--effort, per turn)","file_activity":"supported (Write/Edit tool inputs)","follow_up":"supported (--resume <session>)","images":"supported (stream-json image blocks)","interrupt":"supported (control_request interrupt, then SIGINT)","launch":"supported","model":"supported (--model, per turn)","output":"supported","permission_mode":"supported (--permission-mode: acceptEdits, plan, auto, manual)","quota":"unknown (error text classification only)","resume":"supported","transport":"claude -p stream-json (stdin/stdout)","usage":"supported (result usage)","verification":"live-verified on macOS with a claude.ai account (Claude Code 2.1.246): edit, permissions, nested subagents, follow-up, interrupt"},"created_ms":1791031371178,"effort":null,"ended_ms":null,"exit_reason":null,"harness":"claude","harness_version":"99.0.0 (Claude Code)","id":"r-a6cacb3030a8","model":null,"native_id":"fixture-session-1","parent_run_id":null,"process_generation":1,"profile_id":"system-claude","queue":{"messages":[],"paused":false},"relation_confidence":null,"relation_source":null,"status":"waiting_for_user","task_id":"t-0aacfa051641","title":"Pending fixture","workspace_id":"w-398bb2aaa6d2"}],"tasks":[{"archived_ms":null,"created_ms":1791031371038,"fork_commit":"2123ee3ad679aeee9832757fd24c675ecf81265e","fork_provenance":"recorded: worktree branch overseer/pending-fixture created from HEAD at 2123ee3ad679aeee9832757fd24c675ecf81265e","id":"t-0aacfa051641","prompt":"synthetic pending boundary","repo_root":"/private/tmp/ovs-rScUvqZ/repo","start_snapshot":"s-cbd3383619fb","target_ref":null,"title":"Pending fixture","workspace_id":"w-398bb2aaa6d2"}],"turns":{"r-a6cacb3030a8":[{"ended_ms":null,"id":"u-b879b8000679","n":1,"prompt":"synthetic pending boundary","run_id":"r-a6cacb3030a8","snapshot_id":"s-8db638f897d9","started_ms":1791031371301,"status":"running"}]},"workspaces":[{"branch":"overseer/pending-fixture","common_dir":"/private/tmp/ovs-rScUvqZ/repo/.git","created_ms":1791031371038,"id":"w-398bb2aaa6d2","initial_dirty":{"clean":true},"kind":"worktree","owner_run_id":"r-a6cacb3030a8","path":"/private/tmp/ovs-tnZxUu5/worktrees/repo-925e50a3/pending-fixture","removed_ms":null,"repo_root":"/private/tmp/ovs-rScUvqZ/repo"}]}
+test unknown_protocol_version_secret_question_is_quarantined_before_legacy_parse ... FAILED
+
+failures:
+
+failures:
+    future_native_control_secret_payload_is_quarantined_and_observable
+    live_duplicate_id_changed_offer_conflicts_without_authority
+    machine_callbacks_are_private_and_never_owner_cards
+    native_child_pending_identity_keeps_owning_parent_transport
+    replayed_frame_preserves_key_and_cursor
+    same_item_distinct_approval_requests_do_not_overwrite
+    same_raw_id_after_generation_restart_refuses_old_key
+    secret_question_native_identity_is_private_and_not_a_bool_permission
+    two_native_requests_preserve_order_and_tagged_ids
+    unknown_dialog_does_not_fabricate_cancel
+    unknown_protocol_version_secret_question_is_quarantined_before_legacy_parse
+
+test result: FAILED. 4 passed; 11 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.21s
+
+error: test failed, to rerun pass `-p overseerd --test pending_requests`
