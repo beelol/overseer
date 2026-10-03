@@ -1,0 +1,5 @@
+nice: setpriority: Operation not permitted
+
+> overseer-phone@0.1.0 typecheck
+> tsc --noEmit
+

@@ -654,3 +654,55 @@ async fn ac130_rejecting_a_hunk_never_writes_through_a_link() {
     assert!(through.get("error").is_some(), "{through}");
     assert!(std::fs::read_dir(&outside).unwrap().next().is_none(), "nothing was written or created outside");
 }
+
+// AC269: Mods inspection is remote, while installation and scope changes stay local.
+// This is an actual encrypted full/watch gateway check, not only a class-table assertion.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn ac269_mods_phone_reads_and_all_local_management_refused() {
+    let d = daemon("echo", &[]);
+    phone::enable(&d);
+    let dir = tmp();
+    let source_repo = repo(&dir.path().join("repo"));
+    let created = d.generic(&source_repo, "folder", "/usr/bin/true", &[]);
+    let run = run_id(&created);
+    d.wait_done(&run, 15);
+    let preview = d.call("mods.preview", json!({"source":"bundled:clear-prose","operation":"install"}));
+    let version = d.call("mods.install", json!({"preview_id":preview["id"],"confirm":true}))["version"].clone();
+    let binding = json!({"mod_id":version["id"],"version":version["version"],"fingerprint":version["fingerprint"],
+        "scope":{"kind":"agent","run_id":run},"enabled":false,"required":false,"locked":false,
+        "filters":{"harnesses":[],"accounts":[],"models":[]}});
+    let rev = d.call("mods.list", json!({}))["revision"].clone();
+    let saved = d.call("mods.bind", json!({"binding":binding,"expected_revision":rev}))["binding"].clone();
+    let before = d.call("mods.list", json!({}));
+    let before_why = d.call("mods.why", json!({"run_id":run}));
+    let update = d.call("mods.preview", json!({"source":"bundled:clear-prose","operation":"update"}));
+    // Valid local payloads, including confirmation/revision, cannot bypass the phone boundary.
+    let methods = [
+        ("mods.preview", json!({"source":"bundled:clear-prose","operation":"install"})),
+        ("mods.install", json!({"preview_id":update["id"],"confirm":true})),
+        ("mods.bind", json!({"binding":binding,"expected_revision":before["revision"]})),
+        ("mods.unbind", json!({"binding_id":saved["id"],"expected_revision":before["revision"]})),
+        ("mods.remove", json!({"mod_id":version["id"],"fingerprint":version["fingerprint"],"confirm":true,"expected_revision":before["revision"]})),
+    ];
+    let protocol: Value = serde_json::from_str(include_str!("../../protocol/protocol.json")).unwrap();
+    let declared: std::collections::BTreeSet<_> = protocol["methods"].as_object().unwrap().iter()
+        .filter(|(name, spec)| name.starts_with("mods.") && spec["class"] == "mac_only")
+        .map(|(name, _)| name.as_str()).collect();
+    assert_eq!(declared, methods.iter().map(|(name, _)| *name).collect::<std::collections::BTreeSet<_>>(), "every declared Mods mutation must be exercised");
+    for scope in ["full", "watch"] {
+        let (mut remote, paired) = pair(&d, &format!("Mods {scope} fixture")).await;
+        if scope == "watch" {
+            d.call("gateway.device_scope", json!({"id":paired.device,"scope":"watch"}));
+        }
+        assert_eq!(remote.call("mods.list", json!({})).await, before, "{scope} reads the same public library");
+        assert_eq!(remote.call("mods.why", json!({"run_id":run})).await, before_why, "{scope} reads the same public run plan");
+        for (method, params) in &methods {
+            let reply = remote.act(method, params.clone()).await;
+            assert_eq!(Phone::code(&reply), "mac_only", "{scope} {method}: {reply}");
+        }
+        let update_refused = remote.act("mods.preview", json!({"source":"bundled:clear-prose","operation":"update"})).await;
+        assert_eq!(Phone::code(&update_refused), "mac_only", "{scope} update uses the same local preview boundary");
+        assert_eq!(d.call("mods.list", json!({})), before, "refused requests cannot change library revision or bindings");
+        assert_eq!(d.call("mods.why", json!({"run_id":run})), before_why, "refused requests cannot change desired/applied state");
+    }
+}
