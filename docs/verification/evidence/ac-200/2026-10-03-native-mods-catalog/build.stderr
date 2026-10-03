@@ -1,0 +1,4 @@
+   Compiling overseer-tui v0.1.0 (/private/tmp/overseer-closeout-corrected-20261003/tui)
+   Compiling overseer-listener v0.1.0 (/private/tmp/overseer-closeout-corrected-20261003/voice)
+   Compiling overseerd v0.1.0 (/private/tmp/overseer-closeout-corrected-20261003/daemon)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.98s
