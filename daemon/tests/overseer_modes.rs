@@ -230,11 +230,23 @@ fn ac230_overseer_sets_auto_by_itself_only_where_allowed_and_says_why() {
     assert_eq!(d.runs().len(), before, "no new Auto agent before a yes");
     d.call("overseer.answer", json!({"id": start["proposal"], "yes": false, "surface": "ctl", "by": "owner"}));
     assert_eq!(d.runs().len(), before, "no new Auto agent after no");
-    // The owner asked: no repository rule (it is the owner's own choice).
-    d.call("overseer.level", json!({"level": "ask_first"}));
-    sql(&d, "UPDATE overseer_sessions SET last_cause='owner';");
-    let p = d.call("overseer.propose", json!({"actions": [{"action": "mode", "agent": in_notes, "mode": "Auto"}], "source": "ctl"}));
-    assert_eq!(p["state"], "open", "{p}");
+    // A turn triggered by the owner is not evidence that they asked for Auto.
+    // Both typed and spoken requests still need a separate yes, at every level.
+    for cause in ["owner", "voice"] {
+        sql(&d, &format!("UPDATE overseer_sessions SET last_cause='{cause}';"));
+        for level in ["auto", "steer", "ask_first"] {
+            d.call("overseer.level", json!({"level": level}));
+            for action in [
+                json!({"action": "mode", "agent": in_notes, "mode": "Auto", "class": "steer"}),
+                json!({"action": "start", "repo": notes, "prompt": "write notes", "title": "Notes", "harness": "claude", "permission_mode": "Auto", "class": "steer"}),
+            ] {
+                let p = d.call("overseer.propose", json!({"actions": [action], "source": cause}));
+                assert_eq!(p["state"], "open", "{cause} at {level}: {p}");
+                assert_eq!(p["done"], false, "{cause} at {level}: {p}");
+                d.call("overseer.answer", json!({"id": p["proposal"], "yes": false, "surface": "ctl", "by": "owner"}));
+            }
+        }
+    }
     for run in [&in_site, &in_notes] {
         let _ = d.try_call("run.interrupt", json!({"run_id": run}));
     }

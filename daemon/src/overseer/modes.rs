@@ -91,7 +91,13 @@ impl Daemon {
     }
 
     fn check_auto_by_itself(&self, mode: &str, repo: &str, owner_asked: bool, cause: &str, a: &mut Value) -> Result<()> {
-        if mode != "auto" || owner_asked {
+        if mode != "auto" {
+            return Ok(());
+        }
+        // The turn's cause is not proof that the owner requested a permission change.
+        // Every Auto transition waits for an explicit yes, including owner/voice turns.
+        a["class"] = json!(super::control::CONFIRM);
+        if owner_asked {
             return Ok(());
         }
         let allowed = self.auto_repos();
@@ -102,9 +108,6 @@ impl Daemon {
         if a["why"].as_str().map(str::trim).unwrap_or("").is_empty() {
             bail!("say why: Overseer setting Auto by itself is recorded with its reason");
         }
-        // Permission to suggest Auto is not permission to switch without the owner.
-        // The daemon sets the class after validation, for both mode changes and starts.
-        a["class"] = json!(super::control::CONFIRM);
         Ok(())
     }
 
