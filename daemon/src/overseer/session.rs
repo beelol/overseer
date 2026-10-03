@@ -734,6 +734,17 @@ impl Daemon {
     }
 
     fn overseer_propose_for_turn(self: &Arc<Self>, actions: &Value, source: &str, cause_now: Option<&str>, turn: Option<&Value>) -> Result<Value> {
+        self.overseer_propose_checked(actions,source,cause_now,turn,None)
+    }
+
+    /// Only a captured daemon Waiting enters here. Model JSON selectors still
+    /// use normal preparation, which replaces them rather than trusting them.
+    pub(super) fn overseer_propose_expected_permission(self: &Arc<Self>, expected: &super::needs::Waiting, allow: bool) -> Result<Value> {
+        self.overseer_propose_checked(&json!([{"action":"permission","agent":expected.run,
+            "allow_request":allow,"why":"the owner answered the captured Needs question"}]),"needs",Some("needs"),None,Some(expected))
+    }
+
+    fn overseer_propose_checked(self: &Arc<Self>, actions: &Value, source: &str, cause_now: Option<&str>, turn: Option<&Value>, expected: Option<&super::needs::Waiting>) -> Result<Value> {
         let session = self.overseer_session()?;
         let sid = session["id"].as_str().unwrap().to_string();
         let level = session["level"].as_str().unwrap_or("ask_first").to_string();
@@ -837,6 +848,12 @@ impl Daemon {
                 if kind == "permission" {
                     let att = run.attention.as_ref().filter(|x| x["kind"] == "permission")
                         .ok_or_else(|| anyhow!("{} has no permission request waiting", run.title))?;
+                    if let Some(expected) = expected {
+                        if expected.run != id || att["request_id"].as_str() != Some(expected.request.as_str())
+                            || (att["typed_native"] == true && att["revision"].as_i64() != expected.revision) {
+                            bail!("stale_request: the captured Needs question changed; read it again");
+                        }
+                    }
                     a["request"] = att["request_id"].clone();
                     // Overwrite/remove model-owned selectors; only the daemon freezes this offer.
                     a.as_object_mut().unwrap().remove("revision");

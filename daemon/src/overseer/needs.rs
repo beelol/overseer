@@ -143,6 +143,13 @@ impl Daemon {
         // Synthetic seam after capture, with no Store/authority/process lock.
         if let [w] = waiting.as_slice() {
             crate::pending_requests::answers::hold("needs_captured", &w.request)?;
+            let store = self.store.lock().unwrap();
+            let current = store.run(&w.run)?.and_then(|run|run.attention);
+            if !current.as_ref().is_some_and(|a|a["kind"] == "permission"
+                && a["request_id"].as_str() == Some(w.request.as_str())
+                && (a["typed_native"] != true || a["revision"].as_i64() == w.revision)) {
+                return Err(crate::server::ProtoError::new("stale_request", "The captured Needs question changed; read it again").into());
+            }
         }
         let open: Vec<Value> = session["proposals"].as_array().cloned().unwrap_or_default().into_iter().filter(|x| x["state"] == "open").collect();
         let (text, card) = match (ask, waiting.as_slice()) {
@@ -151,11 +158,11 @@ impl Daemon {
                 let _ = self.overseer_set_cause(if surface == "voice" { "voice" } else { "owner" });
                 // The question that came up by itself (AC-230) is the same one: asked again, not
                 // proposed twice.
-                let already = open.iter().find(|x| x["actions"].as_array().is_some_and(|a| a.iter().any(|y| y["action"] == "permission" && y["agent"] == w.run.as_str() && y["request"] == w.request.as_str()))).and_then(|x| x["id"].as_str().map(str::to_string));
+                let already = open.iter().find(|x| x["actions"].as_array().is_some_and(|a| a.iter().any(|y| y["action"] == "permission" && y["agent"] == w.run.as_str() && y["request"] == w.request.as_str() && (w.revision.is_none() || y["revision"].as_i64() == w.revision))))).and_then(|x| x["id"].as_str().map(str::to_string));
                 let proposal = if already.is_some() {
                     already
                 } else if answer {
-                    self.overseer_propose(&json!([{"action": "permission", "agent": w.run, "request": w.request, "allow_request": true, "why": "the owner asked to handle what needs them"}]), "needs").ok().and_then(|r| r["proposal"].as_str().map(str::to_string))
+                    self.overseer_propose_expected_permission(w,true).ok().and_then(|r| r["proposal"].as_str().map(str::to_string))
                 } else {
                     None
                 };
@@ -165,7 +172,7 @@ impl Daemon {
                 let allow = ask == Ask::Yes;
                 if answer {
                     let result = if w.revision.is_some() {
-                        self.overseer_propose(&json!([{"action":"permission","agent":w.run,"allow_request":allow,"why":"the owner answered the current Needs question"}]), "needs")
+                        self.overseer_propose_expected_permission(w,allow)
                             .and_then(|p| self.overseer_answer(p["proposal"].as_str().unwrap_or(""), true, surface, "owner"))
                     } else { self.answer_permission(&w.run, &w.request, allow, "Denied by the owner through Overseer") };
                     match result {
