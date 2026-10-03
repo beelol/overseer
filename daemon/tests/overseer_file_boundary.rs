@@ -187,3 +187,23 @@ fn ac200_successful_file_consumption_preserves_context_and_redacts_secret() {
         .iter()
         .any(|e| e["kind"] == "overseer_tool_call" && e["payload"]["name"] == "file"));
 }
+
+#[test]
+fn ac200_contained_symlinks_keep_existing_file_read_behavior() {
+    use std::os::unix::fs::symlink;
+    let root = tmp();
+    let gate = root.path().join("gate");
+    std::fs::create_dir(&gate).unwrap();
+    let hold = Hold(gate);
+    let (d, run, token, ws) = setup(root.path(), &hold);
+    std::fs::create_dir(ws.join("notes")).unwrap();
+    std::fs::write(ws.join("notes/note.txt"), "contained linked text\n").unwrap();
+    symlink("notes/note.txt", ws.join("relative.txt")).unwrap();
+    symlink(ws.join("notes/note.txt"), ws.join("absolute.txt")).unwrap();
+    symlink("notes", ws.join("alias")).unwrap();
+    for path in ["relative.txt", "absolute.txt", "alias/note.txt"] {
+        let answer = read(&d, &run, &token, path).expect("contained symlink remains readable");
+        assert_eq!(answer["is_error"], false);
+        assert_eq!(answer["text"], "contained linked text\n");
+    }
+}
