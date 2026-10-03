@@ -241,6 +241,13 @@ fn ordinary_native_reads_project_self_and_hide_unrelated_library() {
     );
     let mine = bind(&d, &visible, &own);
     let theirs = bind(&d, &hidden, &other);
+    // Populate an actual immutable last-turn snapshot with both private text
+    // and out-of-scope decisions; the native projection must hide those too.
+    d.call(
+        "run.follow_up",
+        json!({"run_id":own,"prompt":"Continue the synthetic task."}),
+    );
+    d.wait_done(&own, 20);
     let token = token(&d, &own, "agent");
     let before = authority_snapshot(&d);
     let list = tool(&d, &token, json!({"operation":"list"}));
@@ -482,7 +489,7 @@ fn daemon_created_watcher_reads_only_its_actual_subject() {
     let t = tmp();
     let repo = repo(&t.path().join("repo"));
     let mode = t.path().join("mode");
-    std::fs::write(&mode, "watcher").unwrap();
+    std::fs::write(&mode, "slow").unwrap();
     let fixture = repo_root().join("fixtures/fake-harness/claude-fixture.js");
     let d = Daemon::start(&[
         ("OVERSEER_TEST_AUTO_DISABLED", "1"),
@@ -494,18 +501,9 @@ fn daemon_created_watcher_reads_only_its_actual_subject() {
         ),
     ]);
     d.call("agent.cadence", json!({"cadence":"off","by":"owner"}));
-    let release = t.path().join("release-subject");
-    let created = d.generic(
-        &repo,
-        "worktree",
-        "/bin/sh",
-        &[
-            "-c",
-            "while [ ! -f \"$1\" ]; do sleep 0.05; done",
-            "fixture",
-            release.to_str().unwrap(),
-        ],
-    );
+    // A generic quiet exit emits status, not an immediate turn_done wake.
+    // Use the established local Claude fixture's genuine completion event.
+    let created = d.call("task.create", json!({"repo":repo,"harness":"claude","prompt":"Synthetic watched turn.","title":"Actual watched subject"}));
     let subject = run_id(&created);
     d.wait_status(&subject, |status| status == "running", 20);
     let version = install_local(
@@ -520,7 +518,7 @@ fn daemon_created_watcher_reads_only_its_actual_subject() {
         watch["watcher"].is_null(),
         "the daemon creates the watcher on the genuine first wake"
     );
-    std::fs::write(&release, "release").unwrap();
+    std::fs::write(&mode, "watcher").unwrap();
     d.wait_done(&subject, 20);
     let deadline = Instant::now() + Duration::from_secs(30);
     let watcher = loop {

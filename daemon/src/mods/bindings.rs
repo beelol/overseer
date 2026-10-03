@@ -37,7 +37,7 @@ impl ModScope {
             Self::Agent { .. } => 3,
         }
     }
-    fn matches(&self, c: &ModContext) -> bool {
+    pub(super) fn matches(&self, c: &ModContext) -> bool {
         match self {
             Self::AllAgents => c.role == "agent",
             Self::Repository { repo_key } => {
@@ -219,7 +219,7 @@ pub fn context_from_store(store: &Store, run: &Run, workspace: &Workspace) -> Re
         local_model_selection: crate::continuity::is_local(run),
     })
 }
-fn context(store: &Store, id: &str) -> Result<ModContext> {
+pub(super) fn context(store: &Store, id: &str) -> Result<ModContext> {
     let run = store
         .run(id)?
         .ok_or_else(|| error("invalid_mod", "unknown run target"))?;

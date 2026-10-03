@@ -31,6 +31,13 @@ pub(crate) fn tool_list(role: &str) -> Vec<Value> {
         "description": "Every agent Overseer runs, one line each: id, title, status, harness, repository, worktree, files changed.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false}
     })];
+    if ["agent", "watcher", "overseer"].contains(&role) {
+        tools.push(json!({
+            "name": "mods",
+            "description": "Read installed Mods metadata (list) or desired, last applied, pending and unsupported delivery (why, run_id). Agents read themselves; watchers read their actual subject. Private text/source files and management authority are not exposed.",
+            "inputSchema": {"type":"object","properties":{"operation":{"type":"string","enum":["list","why"]},"run_id":{"type":"string"}},"required":["operation"],"additionalProperties":false}
+        }));
+    }
     if role == "agent" {
         // The channel (AC-190): report, ask and claim, attributed by the token.
         tools.push(json!({
@@ -232,6 +239,7 @@ impl Daemon {
             }
         }
         let text = match name {
+            "mods" => serde_json::to_string(&crate::mods::read::call(self, &run_id, &role, arguments)?)?,
             "roster" => self.roster_text()?,
             "agent" => {
                 let id = arguments["id"].as_str().unwrap_or_default();

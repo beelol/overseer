@@ -147,6 +147,11 @@ fn effective(snapshot: &Value) -> Value {
 }
 pub fn applied(d: &Daemon, run_id: &str) -> Result<Value> {
     let store = d.store.lock().unwrap();
+    applied_from_store(&store, run_id)
+}
+
+/// Native reads authorize and project from the same Store snapshot.
+pub(super) fn applied_from_store(store: &Store, run_id: &str) -> Result<Value> {
     let run = store
         .run(run_id)?
         .ok_or_else(|| error("invalid_mod", "unknown run target"))?;
