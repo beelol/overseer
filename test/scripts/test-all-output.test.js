@@ -121,3 +121,12 @@ test('parallel capture enforces one aggregate byte ceiling and keeps each stream
   assert.deepEqual(result.stderr, Buffer.from([67]));
   assert.equal(result.captureTruncated, true);
 });
+
+test('Node observed cross marker retains the failed test identity before assertion frames', t => {
+  // Node's actual baseline RED reporter uses U+2716 (✖), distinct from U+2717 (✗).
+  const stdout = "✔ successful_error_handling (1ms)\n✖ node_actual_boundary_failure (2ms)\n  AssertionError [ERR_ASSERTION]: synthetic boundary failed\n      at TestContext.<anonymous> (test.js:42:10)\n      at Test.run (node:internal/test_runner/test:1397:25)\n";
+  const run = stage(t, { status: 1, signal: null, stdout, stderr: '' });
+  assert.match(run.lines, /✖ node_actual_boundary_failure \(2ms\)/);
+  assert.match(run.lines, /AssertionError \[ERR_ASSERTION\]: synthetic boundary failed/);
+  assert.doesNotMatch(run.lines, /✔ successful_error_handling/);
+});

@@ -1,0 +1,5 @@
+{
+  "private_fixture_roots_remaining": [],
+  "child_process_boundary": "stubbed; no Cargo/UI/daemon/provider subprocesses launched",
+  "cleanup": "each node:test context after-hook recursively removed its owned temporary root"
+}
