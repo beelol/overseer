@@ -1,0 +1,13 @@
+{
+  "source_commit": "7fde880438ad9dfb64ed97802cd7050148556822",
+  "source": "/private/tmp/overseer-native-pending-20261003",
+  "binary": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+  "dep_source_present": true,
+  "binary_newer_than_source": true,
+  "sha256": {
+    "/private/tmp/overseer-closeout-verify-target/debug/overseerd": "f290ed40c670df596d85dd0a30f1674c5bb462f3b799177867e5d2232c8c9e05",
+    "/private/tmp/overseer-native-pending-20261003/daemon/src/pending_requests.rs": "999b8d95e002d833138046354ede591adb4b81dbd9960d81cb588644ff407422",
+    "/private/tmp/overseer-native-pending-20261003/daemon/src/daemon.rs": "7b18612854c0e6a7d3c90dbb6c404cc23806dee22407d52ceb37a7b849f20f46",
+    "/private/tmp/overseer-native-pending-20261003/daemon/tests/pending_requests.rs": "981bf0d1014418bced7931e8b1fe82897ac36adec0e452a49a3a8d48dff2f291"
+  }
+}

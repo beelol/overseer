@@ -1,0 +1,36 @@
+# Task2 Slice1 focused qualification — intermediate, not shippable
+
+Qualified source: `7fde880438ad9dfb64ed97802cd7050148556822`. The implementation first checkpoint was `6d6e60375aeb1a603a15377d95d5024f39bcdc66`. Earlier baseline source `e4d8c7b02436f3d4626ceaf0e3db94daebc32d3f` had actual 11 failing boundary tests (six missing-API and five exposed private-envelope cases), documented in README.md and baseline-red.log. This document records execution after the collection/quarantine/projection implementation and grounded review corrections; it does not replace the earlier baseline classification.
+
+All commands ran in `/private/tmp/overseer-native-pending-20261003`, with `CARGO_TARGET_DIR=/private/tmp/overseer-closeout-verify-target CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 nice -n 20 cargo ...`. This was the coordinator's exclusively assigned retired target, separate from the ongoing full gate. No UI, provider, paid turn, owner profile or production daemon was used. Fixtures used private homes and scratch repositories. Target source path, dependency file, executable freshness and SHA256 proof are in qualified-artifact-proof.json; baseline-artifact-proof.json proves the actual pre-correction binary. A synthetic model discovery catalog is fixture data, not a paid model execution.
+
+## Grounded failures, retained separately
+
+- `launch-failure-red.log`: actual source-fresh supervisor-exec failure regression, zero passed / one failed, exit101. Generation advanced to1, recorded process was NULL and no supervisor metadata existed, yet status remained queued instead of failed. `initial-collection.log` separately records all11 original boundaries plus4 helpers passing and this same regression failing (15 passed / one failed). The new private executable copy was removed only after its isolated daemon started; shared binaries and owner binaries were untouched.
+- `projection-red.log`: actual nonempty native collection/Run/event schema check, zero passed / one failed, exit101. Public boolean `secret` became a redacted string through the general credential redactor. The correction names this metadata `secret_input`, retaining general redaction unchanged.
+- `invalid-stale-binary-setup.log`: initial one-pass launch run used a stale standalone daemon and is **invalid evidence**. Only overseerd artifacts in the exclusively assigned target were invalidated; explicit standalone and test builds followed. Baseline build logs and dependency/hash proof are retained. This was a setup correction, never a successful behavioral qualification.
+- `invalid-attention-fixture-setup.log`: an early direct boundary fixture did not explicitly persist attention through the Store setter and failed before its intended live-process assertion. It is **fixture setup failure**, not a product regression. The final fixture persists attention and isolates all environment setup in a bounded child process; normal workspace tests need no hidden environment variable and parent test environment is unchanged.
+
+## Focused GREEN
+
+| Command after `cargo` | Exact evidence | Result and asserted behavior |
+| --- | --- | --- |
+| `build -p overseerd --bin overseerd` | corrected-build.log | exit0, source-fresh standalone daemon |
+| `test -p overseerd --test pending_requests -- --nocapture` | collection-green.log | 16/16: original11 private collection/projection boundaries, real failed-exec settlement1, shared helpers4 |
+| `test -p overseerd --test protocol_shapes -- --nocapture` | protocol-green.log | 11/11: actual nonempty pending collection/shared Run/events shapes plus existing grant/Mods/queue/captured-reply protocol controls and helpers |
+| `test -p overseerd --test answer_waiting -- --nocapture` | answer-waiting-green.log | 18/18: existing AC241 bool path and native session-grant/veto compatibility14, helpers4 |
+| `test -p overseerd --bin overseerd adapters:: -- --nocapture` | adapters-green.log | 34/34: frozen typed codec12 and incumbent adapter/turn-option/session-grant controls22 |
+| `test -p overseerd --bin overseerd daemon::native_pending_generation_tests::stale_observed_generation_cannot_settle_or_clear_successor -- --exact --nocapture` | stale-generation-final.log | 1/1: injected old settlement observation cannot mutate the real live replacement process/turn/attention; cleanup verifies supervisor and child PIDs dead and tail gone |
+| `test -p overseerd --test protocol auto_supervisor_is_not_spawned_before_its_durable_identity_is_written -- --exact --nocapture` | durable-pre-spawn.log | 1/1, durable identity must precede spawn |
+| `test -p overseerd --test protocol auto_post_spawn_write_failure_keeps_unknown_draw_claim_until_supervisor_settles -- --exact --nocapture` | post-spawn-claim.log | 1/1, uncertain post-effect claim preserved until settlement |
+| `test -p overseerd --test protocol auto_post_spawn_write_failure_reattaches_without_a_daemon_restart -- --exact --nocapture` | post-spawn-reattach.log | 1/1, live replacement identity reattached |
+| `test -p overseerd --test swarm_director_process orphaned_supervisor_is_reattached_by_verified_director_identity -- --exact --nocapture` | director-reattach.log | 1/1, verified director process identity |
+| `test -p overseerd --test swarm_dispatch worker_spawn_record_failure_keeps_one_attempt_and_reattaches_after_restart -- --exact --nocapture` | worker-reattach.log | 1/1, no duplicate worker attempt across reattachment/restart |
+
+85 passing tests in the final focused sequence; all counts are nonzero and all listed commands exited0. The stale-observer outer test captures child harness output privately, so its success summary is counted once. It exercises actual production settlement and shim code against a real current process, while the old observation is injected; it does not claim an end-to-end prior-generation tail race. Its default invocation runs every assertion without caller-supplied fixture environment or skipped coverage.
+
+Protocol generation checks (`node protocol/gen-ts.mjs --check`, `python3 protocol/capabilities.py --check`) and `git diff --check` passed. No full suite claim follows. Focused fixture processes terminated through their cleanup and asserted private live-process teardown; the compiler slot was explicitly released after the last command exited. Coordinator independently accepted corrective source7fde880 after inspecting the isolated fixture, exact settlement boundary and focused logs; acceptance explicitly retains the independently unshippable Slice1 boundary.
+
+## Required remaining work
+
+This remains **independently unshippable** under AC204: it intercepts qualified installed native permissions but deliberately refuses typed delivery. Slice2 must implement exact generation-bound atomic answers, authenticated actor provenance, native veto/descriptor validation, private response delivery and honest receipt ambiguity. Slice3 lifecycle/race cleanup, shared VS Code/TUI/phone renderers and Needs-key deduplication, default_to_no controls, private answer/outbox handling, installed browser/provider/native-cache qualification and full gates remain required. No AC274 completion, broad native runtime availability, browser capability or usable current typed answer path is claimed. Keep this branch draft/unmerged until those boundaries or an explicitly reviewed fixture/feature gate are complete.

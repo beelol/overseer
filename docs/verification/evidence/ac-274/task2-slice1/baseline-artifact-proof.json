@@ -1,0 +1,10 @@
+{
+  "source_checkpoint": "6d6e60375aeb1a603a15377d95d5024f39bcdc66",
+  "source_root": "/private/tmp/overseer-native-pending-20261003",
+  "binary": "/private/tmp/overseer-closeout-verify-target/debug/overseerd",
+  "binary_sha256": "8faf2ab3bfa0b71e7156772f37e6b08cc3d522bac3729e52d5663c9cbc295ad6",
+  "binary_mtime": 1791033933.205657,
+  "depfile_has_exact_new_module": true,
+  "module_sha256": "cc769ff52559f33167570152dbd406af299511d7f5af874cdfa7a46c599b72f6",
+  "pending_test_sha256": "981bf0d1014418bced7931e8b1fe82897ac36adec0e452a49a3a8d48dff2f291"
+}

@@ -7,3 +7,5 @@ Baseline source: `e4d8c7b02436f3d4626ceaf0e3db94daebc32d3f`; no pending runtime 
 A missing collection method stops the six collection tests before later assertions. This baseline does not independently qualify restart/replay/stale-key/child behavior; those assertions must execute and pass on the implementation. Privacy tests likewise stop at their first exposed public boundary; later event replay/diagnostic/no-response checks remain unqualified until GREEN. Nothing here establishes native/provider/browser availability, Slices2/3 or AC274 completion.
 
 Coordinator reviewed the actual baseline and authorized Slice1 collection/quarantine/projection implementation only. No UI, provider, paid, profile or production activity. All test/shim/fixture processes exited; exclusive compiler slot released before source work.
+
+Subsequent implementation and grounded failures/GREEN are recorded in [qualification.md](qualification.md), with exact source7fde880 and 85 focused passing tests. This remains an independently unshippable Task2 intermediate checkpoint; typed answering and the remaining lifecycle/surface/native qualification are required.
