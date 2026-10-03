@@ -225,6 +225,8 @@ fn ordinary_native_reads_project_self_and_hide_unrelated_library() {
     let t = tmp();
     let repo = repo(&t.path().join("repo"));
     let own = run(&d, &repo, "Own synthetic task");
+    assert_eq!(d.run(&own)["status"], "completed");
+    assert_eq!(d.run(&own)["exit_reason"], "exit 0");
     let other = run(&d, &repo, "Unrelated synthetic task");
     let visible = install_local(
         &d,
@@ -248,6 +250,15 @@ fn ordinary_native_reads_project_self_and_hide_unrelated_library() {
         json!({"run_id":own,"prompt":"Continue the synthetic task."}),
     );
     d.wait_done(&own, 20);
+    // task_created legitimately inserts a Started card and shared session.
+    // These reads must preserve that existing session, not require its absence.
+    let initial_sessions: i64 = db(&d)
+        .query_row("SELECT count(*) FROM overseer_sessions", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(
+        initial_sessions, 1,
+        "the ordinary start created its session card"
+    );
     let token = token(&d, &own, "agent");
     let before = authority_snapshot(&d);
     let list = tool(&d, &token, json!({"operation":"list"}));
@@ -294,7 +305,7 @@ fn ordinary_native_reads_project_self_and_hide_unrelated_library() {
         .query_row("SELECT count(*) FROM overseer_sessions", [], |r| r.get(0))
         .unwrap();
     assert_eq!(
-        sessions, 0,
+        sessions, initial_sessions,
         "native self reads must not create an Overseer session"
     );
 }
@@ -469,6 +480,24 @@ fn watcher_without_active_subject_has_no_native_mods_read_fallback() {
 #[test]
 fn unknown_native_token_cannot_read_even_when_arguments_claim_owner() {
     let d = Daemon::start(&[("OVERSEER_TEST_AUTO_DISABLED", "1")]);
+    // No real task has started: this proves a rejected unauthenticated read
+    // creates no session. Authenticated real-run reads retain the start card.
+    let zero_sessions: i64 = db(&d)
+        .query_row("SELECT count(*) FROM overseer_sessions", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(zero_sessions, 0);
+    let fresh_before = authority_snapshot(&d);
+    refuses(
+        &d,
+        "unrecognized-token",
+        "mods",
+        json!({"operation":"list","role":"overseer","actor":"owner"}),
+    );
+    assert_eq!(authority_snapshot(&d), fresh_before);
+    let after_refusal: i64 = db(&d)
+        .query_row("SELECT count(*) FROM overseer_sessions", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(after_refusal, 0, "unknown-token refusal created a session");
     let t = tmp();
     let repo = repo(&t.path().join("repo"));
     let own = run(&d, &repo, "Real reader");
