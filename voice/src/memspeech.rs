@@ -358,3 +358,8 @@ mod voices {
         assert!(super::voice_named("No Such Voice").is_none());
     }
 }
+
+// Explicit opt-in diagnostic only; the ordinary synthesis and tests above are unchanged.
+#[cfg(test)]
+#[path = "memspeech_diagnostic.rs"]
+mod diagnostic;
