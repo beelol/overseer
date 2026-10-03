@@ -53,6 +53,9 @@ struct Script {
 }
 impl Script {
     fn start(harness: &str, version: &str, steps: Vec<Value>) -> Self {
+        Self::start_with_env(harness, version, steps, &[])
+    }
+    fn start_with_env(harness: &str, version: &str, steps: Vec<Value>, extra: &[(&str, &str)]) -> Self {
         let scratch = tmp();
         let repo = repo(&scratch.path().join("repo"));
         let file = scratch.path().join("script.json");
@@ -63,7 +66,7 @@ impl Script {
         std::fs::create_dir_all(&stdin).unwrap();
         let codex = repo_root().join("fixtures/fake-harness/codex-app-fixture.js");
         let claude = repo_root().join("fixtures/fake-harness/claude-fixture.js");
-        let daemon = Daemon::start(&[
+        let mut env = vec![
             ("OVERSEER_CODEX_PATH", codex.to_str().unwrap()),
             ("OVERSEER_CLAUDE_PATH", claude.to_str().unwrap()),
             ("FIXTURE_MODE", "native-pending"),
@@ -73,7 +76,9 @@ impl Script {
             ("FIXTURE_STDIN_LOG_DIR", stdin.to_str().unwrap()),
             ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_NATIVE_REQUESTS_FILE,FIXTURE_VERSION_FILE,CLAUDE_FIXTURE_VERSION,FIXTURE_STDIN_LOG_DIR"),
             ("OVERSEER_TEST_AUTO_DISABLED", "1"),
-        ]);
+        ];
+        env.extend_from_slice(extra);
+        let daemon = Daemon::start(&env);
         daemon.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
         let created = daemon.call(
             "task.create",
@@ -636,6 +641,239 @@ mod slice2 {
         assert_eq!(reply["error"]["code"],code,"intended typed refusal, not an unrelated setup/internal failure: {reply}");
         assert!(native_replies(s).is_empty(),"rejected answer emits no native bytes");
         s.no_protected_action();
+    }
+
+    // These gates are startup-only fixture contracts, not method parameters.
+    // Corresponding runtime seams remain unimplemented until their baseline is
+    // reviewed; reaching a missing API must be reported before a hold timeout.
+    struct AnswerGate {
+        dir: tempfile::TempDir,
+    }
+    impl AnswerGate {
+        fn new() -> Self { Self { dir: tmp() } }
+        fn start(&self, steps: Vec<Value>) -> Script {
+            Script::start_with_env("codex-app", "codex-cli 0.158.0", steps, &[
+                ("OVERSEER_TEST_NET", "1"),
+                ("OVERSEER_CONTINUITY_PROBES", "off"),
+                ("OVERSEER_TEST_NATIVE_ANSWER_GATE", self.dir.path().to_str().unwrap()),
+            ])
+        }
+        fn arm(&self, phase: &str, item: &Value) {
+            std::fs::write(self.dir.path().join("config.json"),
+                json!({"phase":phase,"request_key":item["key"]}).to_string()).unwrap();
+        }
+        fn reached(&self, phase: &str, item: &Value) -> bool {
+            let marker = std::fs::read(self.dir.path().join("reached.json")).ok()
+                .and_then(|b| serde_json::from_slice::<Value>(&b).ok());
+            let Some(marker) = marker else { return false };
+            assert_eq!(marker, json!({"phase":phase,"request_key":item["key"]}),
+                "hold marker exposes only the daemon-issued selector and phase");
+            true
+        }
+        fn release(&self) { std::fs::write(self.dir.path().join("release"), "release").unwrap(); }
+    }
+    impl Drop for AnswerGate {
+        fn drop(&mut self) { let _ = std::fs::write(self.dir.path().join("release"), "release"); }
+    }
+    struct HeldAnswer {
+        rx: std::sync::mpsc::Receiver<Value>,
+        worker: Option<std::thread::JoinHandle<()>>,
+        release: PathBuf,
+    }
+    impl HeldAnswer {
+        fn start(s: &Script, hold: &AnswerGate, item: &Value, answer: Value) -> Self {
+            let socket = s.daemon.socket();
+            let params = answer_params(s, item, answer);
+            let (tx, rx) = std::sync::mpsc::channel();
+            let worker = std::thread::spawn(move || {
+                let mut conn = UnixStream::connect(socket).unwrap();
+                conn.set_read_timeout(Some(Duration::from_secs(35))).unwrap();
+                conn.set_write_timeout(Some(Duration::from_secs(5))).unwrap();
+                writeln!(conn, "{}", json!({"id":1,"method":"run.request.answer","params":params})).unwrap();
+                let mut line = String::new();
+                BufReader::new(conn).read_line(&mut line).unwrap();
+                tx.send(serde_json::from_str(&line).unwrap()).unwrap();
+            });
+            Self { rx, worker: Some(worker), release: hold.dir.path().join("release") }
+        }
+        fn wait_reached(&self, hold: &AnswerGate, phase: &str, item: &Value) {
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while !hold.reached(phase, item) {
+                match self.rx.try_recv() {
+                    Ok(reply) => panic!("answer returned before the intended {phase} boundary: {reply}"),
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => panic!("answer worker ended before {phase}"),
+                    Err(std::sync::mpsc::TryRecvError::Empty) => {},
+                }
+                assert!(Instant::now() < deadline, "answer did not reach {phase}");
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        }
+        fn finish(&mut self) -> Value {
+            let value = self.rx.recv_timeout(Duration::from_secs(10)).expect("released answer disposition");
+            self.worker.take().unwrap().join().unwrap();
+            value
+        }
+    }
+    impl Drop for HeldAnswer {
+        fn drop(&mut self) {
+            // Release even while an assertion unwinds, then reap this owned
+            // worker before the daemon/test directory can disappear.
+            let _ = std::fs::write(&self.release, "release");
+            if let Some(worker) = self.worker.take() { let _ = worker.join(); }
+        }
+    }
+    fn assert_claim(s: &Script, item: &Value) -> String {
+        let db = rusqlite::Connection::open(s.daemon.home.path().join("overseer.sqlite")).unwrap();
+        let (token, digest, lifecycle): (String, String, String) = db.query_row(
+            "SELECT delivery_token,answer_digest,lifecycle FROM native_pending_requests WHERE key=?1",
+            [item["key"].as_str().unwrap()], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap();
+        assert!(token.starts_with("delivery-"));
+        assert_eq!(digest.len(), 64);
+        assert_eq!(lifecycle, "claimed", "presend marker follows the committed immutable claim");
+        token
+    }
+
+    #[test]
+    fn native_resolution_after_claim_before_send_prevents_reply() {
+        let hold = AnswerGate::new();
+        let native = tmp(); let native_release = native.path().join("resolve");
+        let mut resolved = vector("resolved_integer");
+        resolved["params"]["threadId"] = json!("$THREAD");
+        let s = hold.start(vec![emit(command(json!(7), "claimed-offer")),
+            emit(command(json!(8), "other-offer")), mark(ONE), gate(&native_release), emit(resolved), mark(TWO)]);
+        s.marker(ONE, 1); let items = s.requests(); assert_eq!(items.len(), 2);
+        hold.arm("claimed_before_send", &items[0]);
+        let mut worker = HeldAnswer::start(&s, &hold, &items[0], frozen("command_command_decline")["answer"].clone());
+        worker.wait_reached(&hold, "claimed_before_send", &items[0]);
+        assert_claim(&s, &items[0]); assert!(native_replies(&s).is_empty());
+        std::fs::write(native_release, "release").unwrap(); s.marker(TWO, 1);
+        let current = s.requests();
+        assert_eq!(current[0]["lifecycle"], "native_resolved", "actual tail resolution wins while answer is held");
+        assert_eq!(current[1], items[1], "unrelated pending request is unchanged");
+        hold.release(); let reply = worker.finish();
+        assert_eq!(reply["error"]["code"], "request_resolved", "{reply}");
+        assert!(native_replies(&s).is_empty()); s.no_protected_action();
+        assert_eq!(s.daemon.call("run.request.answer", answer_params(&s, &items[1],
+            frozen("command_command_decline")["answer"].clone()))["delivery"], "written");
+        let mut expected = frozen("command_command_decline")["response"].clone(); expected["id"] = json!(8);
+        assert_eq!(wait_replies(&s, 1), vec![expected]);
+    }
+
+    #[test]
+    fn replacement_generation_after_claim_before_send_rejects_old_attempt() {
+        let hold = AnswerGate::new();
+        let s = hold.start(vec![emit(command(json!(7), "old-offer")), mark(ONE)]);
+        s.marker(ONE, 1); let old = s.requests()[0].clone();
+        let generation = s.daemon.run(&s.run())["process_generation"].clone();
+        hold.arm("claimed_before_send", &old);
+        let mut worker = HeldAnswer::start(&s, &hold, &old, frozen("command_command_decline")["answer"].clone());
+        worker.wait_reached(&hold, "claimed_before_send", &old); assert_claim(&s, &old);
+        s.daemon.call("run.interrupt", json!({"run_id":s.run()})); s.daemon.wait_done(&s.run(), 20);
+        let queued = s.daemon.call("run.follow_up", json!({"run_id":s.run(),"prompt":"explicit replacement"}));
+        assert_eq!(queued["delivery"], "queued");
+        assert_eq!(s.daemon.run(&s.run())["queue"]["paused"], true, "Stop cannot resume a held answer or followup");
+        s.daemon.call("run.resume_queue", json!({"run_id":s.run()})); s.marker(ONE, 2);
+        assert_ne!(s.daemon.run(&s.run())["process_generation"], generation);
+        let current = s.requests().into_iter().find(|r| r["lifecycle"] == "pending").unwrap();
+        assert_ne!(current["key"], old["key"]);
+        hold.release(); let reply = worker.finish();
+        assert_eq!(reply["error"]["code"], "stale_generation", "{reply}");
+        assert!(native_replies(&s).is_empty()); s.no_protected_action();
+        assert_eq!(s.daemon.call("run.request.answer", answer_params(&s, &current,
+            frozen("command_command_decline")["answer"].clone()))["delivery"], "written");
+        assert_eq!(wait_replies(&s, 1), vec![frozen("command_command_decline")["response"].clone()]);
+    }
+
+    #[tokio::test(flavor="multi_thread", worker_threads=2)]
+    async fn full_device_downgrade_before_claim_cannot_send() {
+        let hold = AnswerGate::new();
+        let s = hold.start(vec![emit(command(json!(7), "device-offer")), mark(ONE)]);
+        s.marker(ONE, 1); let item = s.requests()[0].clone(); hold.arm("validated_before_claim", &item);
+        common::phone::enable(&s.daemon);
+        let (mut phone, paired) = common::phone::pair(&s.daemon, "Held full fixture").await;
+        let params = answer_params(&s, &item, frozen("command_command_decline")["answer"].clone());
+        let mut work = tokio::spawn(async move { let reply = phone.act("run.request.answer", params).await; (phone, reply) });
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !hold.reached("validated_before_claim", &item) {
+            if work.is_finished() {
+                let (_, reply) = (&mut work).await.unwrap();
+                panic!("full-device answer returned before validation hold: {reply}");
+            }
+            assert!(Instant::now() < deadline, "full-device answer did not reach validation hold");
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        assert_eq!(s.requests(), vec![item.clone()], "preclaim hold has not accepted or revised the item");
+        let changed = s.daemon.call("gateway.device_scope", json!({"id":paired.device,"scope":"watch"}));
+        assert_eq!(changed["scope"], "watch", "actual owner mutation acknowledged before release");
+        hold.release(); let (_, reply) = work.await.unwrap();
+        assert_eq!(common::phone::Phone::code(&reply), "watch_only", "{reply}");
+        assert!(native_replies(&s).is_empty()); assert_eq!(s.requests(), vec![item.clone()]);
+        assert_eq!(s.daemon.call("run.request.answer", answer_params(&s, &item,
+            frozen("command_command_decline")["answer"].clone()))["delivery"], "written");
+        assert_eq!(wait_replies(&s, 1), vec![frozen("command_command_decline")["response"].clone()]);
+        s.no_protected_action();
+    }
+
+    async fn held_device_revocation(phase: &str) {
+        let hold = AnswerGate::new();
+        let s = hold.start(vec![emit(command(json!(7), "revoked-offer")), mark(ONE)]);
+        s.marker(ONE, 1); let item = s.requests()[0].clone(); hold.arm(phase, &item);
+        common::phone::enable(&s.daemon);
+        let (mut phone, paired) = common::phone::pair(&s.daemon, "Revoked held fixture").await;
+        let rid = common::phone::uuid();
+        phone.send(&json!({"id":777,"method":"run.request.answer","request_id":rid,
+            "params":answer_params(&s, &item, frozen("command_command_decline")["answer"].clone())})).await.unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !hold.reached(phase, &item) {
+            if let Some(reply) = phone.next(Duration::from_millis(10)).await {
+                if reply["id"] == 777 { panic!("phone answer returned before {phase}: {reply}"); }
+                phone.inbox.push(reply);
+            }
+            assert!(Instant::now() < deadline, "phone answer did not reach {phase}");
+        }
+        if phase == "claimed_before_send" { assert_claim(&s, &item); }
+        else { assert_eq!(s.requests(), vec![item.clone()]); }
+        let revoked = s.daemon.call("gateway.device_revoke", json!({"id":paired.device}));
+        assert_eq!(revoked["revoked"], true, "revocation acknowledged while the answer cannot send");
+        hold.release(); assert!(phone.ends_within(Duration::from_secs(5)).await);
+        // Revocation closes the real phone, so inspect its existing private
+        // once-cache for the immutable refusal rather than fabricate a reply.
+        let db = rusqlite::Connection::open(s.daemon.home.path().join("overseer.sqlite")).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let cached = loop {
+            let value: Result<String, _> = db.query_row(
+                "SELECT reply FROM remote_requests WHERE device_id=?1 AND request_id=?2",
+                rusqlite::params![paired.device, rid], |r| r.get(0));
+            if let Ok(value) = value { break serde_json::from_str::<Value>(&value).unwrap(); }
+            assert!(Instant::now() < deadline, "revoked attempt has no final once-cache disposition");
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        };
+        assert_eq!(cached["error"]["code"], "revoked", "{cached}");
+        assert!(native_replies(&s).is_empty()); s.no_protected_action();
+        let pending = s.requests()[0].clone();
+        assert_eq!(pending["key"], item["key"]); assert_eq!(pending["lifecycle"], "pending");
+        if phase == "claimed_before_send" {
+            assert!(pending["revision"].as_i64().unwrap() > item["revision"].as_i64().unwrap(),
+                "a definitely-unsent restored item requires a fresh explicit owner action");
+        }
+        assert_eq!(s.daemon.call("run.request.answer", answer_params(&s, &pending,
+            frozen("command_command_decline")["answer"].clone()))["delivery"], "written");
+        assert_eq!(wait_replies(&s, 1), vec![frozen("command_command_decline")["response"].clone()]);
+        let unchanged: String = db.query_row(
+            "SELECT reply FROM remote_requests WHERE device_id=?1 AND request_id=?2",
+            rusqlite::params![paired.device, rid], |r| r.get(0)).unwrap();
+        assert_eq!(serde_json::from_str::<Value>(&unchanged).unwrap(), cached,
+            "later local action does not rewrite the phone's first disposition");
+    }
+
+    #[tokio::test(flavor="multi_thread", worker_threads=2)]
+    async fn revoked_full_device_before_claim_cannot_send() {
+        held_device_revocation("validated_before_claim").await;
+    }
+
+    #[tokio::test(flavor="multi_thread", worker_threads=2)]
+    async fn device_revocation_after_claim_before_send_prevents_held_reply() {
+        held_device_revocation("claimed_before_send").await;
     }
 
     #[test]
