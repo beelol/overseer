@@ -8,10 +8,10 @@ pub(super) mod player;
 use crate::daemon::Daemon;
 use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use lines::Line;
 use semantics::Ticket;
@@ -80,10 +80,8 @@ pub fn source_set(d: &Arc<Daemon>, p: &Value) -> Result<Value> { source::select(
 
 pub fn set(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     source::set_enabled(d, p, |enabled, revision| {
-        // Interim bridge: canonical runtime integration replaces only this hook
-        // with enablement_changed(enabled). Source owns commit/runtime ordering.
-        if let Some(runtime) = RUNTIME.get() { runtime.enabled.store(enabled, Ordering::SeqCst); }
-        if !enabled { player::cancel(d); }
+        // Source owns commit/runtime ordering under its short admission guard.
+        enablement_changed(enabled);
         test_transition_applied(revision);
     })
 }
