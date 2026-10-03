@@ -1,5 +1,5 @@
-//! AC-200 candidate: an interrupted native finding's received request cannot
-//! borrow a later owner turn. Runtime/path qualification is intentionally pending.
+//! AC-200: an interrupted native finding's received request cannot borrow
+//! a later owner turn. Its actual predecessor capability is superseded.
 mod common;
 use common::*;
 use serde_json::{json, Value};
@@ -77,7 +77,7 @@ fn native_token_hash(d: &Daemon, run: &str) -> String {
     let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
     db.busy_timeout(Duration::from_secs(5)).unwrap();
     let hashes: Vec<String> = db
-        .prepare("SELECT sha FROM overseer_tokens WHERE run_id=?1 AND role='overseer'")
+        .prepare("SELECT sha FROM overseer_tokens WHERE run_id=?1 AND role='overseer' AND revoked_ms IS NULL")
         .unwrap()
         .query_map([run], |r| r.get(0))
         .unwrap()
@@ -260,11 +260,24 @@ fn ac200_interrupted_native_finding_cannot_borrow_successor_owner_turn() {
         process(&d, run).1 > old_process.1,
         "new real native process generation"
     );
-    assert_eq!(
+    assert_ne!(
         native_token_hash(&d, run),
         original_token_hash,
-        "same real native capability across the two turns; no injected token"
+        "actual successor launch must rotate its private capability"
     );
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let revoked: bool = db
+        .query_row(
+            "SELECT revoked_ms IS NOT NULL FROM overseer_tokens WHERE sha=?1 AND native_turn_id=?2",
+            rusqlite::params![original_token_hash, old_origin.1],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(
+        revoked,
+        "the actual predecessor capability remains bound to its old turn and revoked"
+    );
+    drop(db);
     assert!(later["proposals"].as_array().unwrap().is_empty());
     assert!(
         !gate.join("completed.json").exists(),
@@ -309,7 +322,8 @@ fn ac200_interrupted_native_finding_cannot_borrow_successor_owner_turn() {
     );
     eprintln!("same sid={sid} run={run}; actual old finding turn={} generation={}; actual successor owner turn={} generation={}; predecessor MCP exit={canceled}; shim exit={exited}; actual completed dispatch={completed}; matching proposals={actions:?}",old_origin.1,old_process.1,new_origin.1,process(&d,run).1);
     // Actual cancellation, transport closure, successor and dispatch completion
-    // precede this intended authority assertion. No runtime RED claimed yet.
+    // precede this authority assertion. The original baseline at 11bd1c1
+    // proved same-capability misuse; rotation is the explicit fix assertion.
     assert!(completed["result"]["is_error"]==true || completed["error"].is_string(), "old finding archive must refuse instead of borrowing successor owner authority: {completed}");
     assert!(actions.is_empty(), "an interrupted finding must not create a successor owner-authorized archive Confirm proposal: {actions:?}");
 }

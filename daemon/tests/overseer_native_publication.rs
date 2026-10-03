@@ -196,10 +196,17 @@ fn first_native_call(stage: &str) {
         )
         .unwrap();
     assert_eq!(origins, 0, "real publication window must be open");
+    let token_turn: String = db.query_row("SELECT native_turn_id FROM overseer_tokens WHERE run_id=?1 AND role='overseer' AND revoked_ms IS NULL", [&run], |r| r.get(0)).unwrap();
+    assert_eq!(
+        token_turn, turn,
+        "initial launch has immutable actual turn binding"
+    );
     match stage {
         "before_bind" => {
             assert_eq!(bound, None);
-            assert_eq!(token_run, "pending");
+            // The capability is bound to the already-created actual run/turn
+            // before launch, while session/origin publication remains pending.
+            assert_eq!(token_run, run);
         }
         "before_origin" => {
             assert_eq!(bound.as_deref(), Some(run.as_str()));

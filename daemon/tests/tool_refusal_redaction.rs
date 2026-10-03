@@ -118,14 +118,8 @@ fn ac200_daemon_and_mcp_refusals_redact_invalid_claim_action_and_file() {
         );
         std::thread::sleep(Duration::from_millis(20));
     }
-    let config: Value = serde_json::from_str(
-        &std::fs::read_to_string(d.home.path().join("overseer/scratch/mcp.json")).unwrap(),
-    )
-    .unwrap();
-    let overseer_token = config["mcpServers"]["overseer"]["env"]["OVERSEER_MCP_TOKEN"]
-        .as_str()
-        .unwrap()
-        .to_string();
+    let native_run = d.call("overseer.session", json!({}))["run_id"].as_str().unwrap().to_string();
+    let overseer_token = native_capability(&d, &native_run);
     let run = run_id(&d.generic(&repo, "worktree", "/bin/sh", &["-c", "echo safe"]));
     d.wait_done(&run, 20);
     let agent_token = d.call("overseer.token", json!({"run_id":run,"role":"agent"}))["token"]

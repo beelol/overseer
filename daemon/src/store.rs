@@ -557,6 +557,12 @@ impl Store {
         if !has_share_branch {
             self.conn.execute_batch("ALTER TABLE shares ADD COLUMN branch TEXT; ALTER TABLE shares ADD COLUMN commit_sha TEXT;")?;
         }
+        for (column, definition) in [("native_turn_id", "TEXT"), ("revoked_ms", "INTEGER")] {
+            let present = self.conn.prepare("SELECT 1 FROM pragma_table_info('overseer_tokens') WHERE name=?1")?.exists([column])?;
+            if !present {
+                self.conn.execute_batch(&format!("ALTER TABLE overseer_tokens ADD COLUMN {column} {definition};"))?;
+            }
+        }
         let has_archived: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('tasks') WHERE name='archived_ms'")?.exists([])?;
         if !has_archived {
             self.conn.execute_batch("ALTER TABLE tasks ADD COLUMN archived_ms INTEGER;")?;

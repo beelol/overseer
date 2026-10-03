@@ -45,6 +45,7 @@ pub(super) fn native_turn_start_guard() -> Result<std::sync::MutexGuard<'static,
 
 pub(super) struct NativeOrigin {
     caller_run: String,
+    capability_sha: String,
     session: Value,
     cause: String,
     turn: Value,
@@ -72,6 +73,14 @@ fn fixture_native_publication(stage: &str) -> Result<()> {
     }
     Ok(())
 }
+fn remove_legacy_group(args: &mut Vec<String>, at: usize, group: &[String]) -> Result<()> {
+    if args.get(at..at+group.len()) != Some(group) {
+        bail!("legacy Overseer MCP argument group is ambiguous");
+    }
+    args.drain(at..at+group.len());
+    Ok(())
+}
+
 pub const OPEN: &str = "<overseer-state>";
 /// What Overseer replies to a spoken request it judges was not meant for it (Voice Mode).
 pub const NOT_FOR_OVERSEER: &str = "NOT_FOR_OVERSEER";
@@ -285,10 +294,99 @@ impl Daemon {
         Ok(dir)
     }
 
-    /// The harness arguments and files that give Overseer's run its tools and take away its
-    /// shell, file and network tools (the spike's decisions, AC-180).
-    fn overseer_launch(&self, harness: &str, scratch: &Path, token: &str) -> Result<(Vec<String>, Option<&'static str>)> {
-        self.tools_launch(harness, scratch, token, "overseer", true)
+    /// Each native process gets an immutable private config/capability. The
+    /// bridge reads only that file once, so an old process cannot adopt a new
+    /// turn's capability by rereading a shared scratch configuration.
+    pub(crate) fn native_overseer_launch(&self, harness: &str, run_id: &str, turn_id: &str, generation: i64) -> Result<(Vec<String>, std::collections::BTreeMap<String, String>)> {
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+        let token = self.native_launch_token(run_id, turn_id)?;
+        let dir = crate::paths::runs_dir().join(run_id).join(format!("p{generation}"))
+            .join(format!("overseer-{}", uuid::Uuid::new_v4().simple()));
+        crate::paths::ensure_private_dir(&dir)?;
+        let write_private = |path: &Path, bytes: &[u8]| -> Result<()> {
+            let mut file = std::fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(path)?;
+            file.write_all(bytes)?;
+            Ok(())
+        };
+        let capability = dir.join("native.cap");
+        write_private(&capability, token.as_bytes())?;
+        let socket = crate::paths::socket_path().display().to_string();
+        let exe = self.exe.display().to_string();
+        let command_args = json!(["mcp", "--socket", socket, "--capability-file", capability.display().to_string()]);
+        let allowed = super::tool_list("overseer").iter().map(|t| format!("mcp__overseer__{}", t["name"].as_str().unwrap_or(""))).collect::<Vec<_>>().join(",");
+        let mut env = std::collections::BTreeMap::new();
+        let args = match harness {
+            "claude" => {
+                let config = dir.join("mcp.json");
+                write_private(&config, &serde_json::to_vec_pretty(&json!({"mcpServers": {"overseer": {"type": "stdio", "command": exe, "args": command_args}}}))?)?;
+                vec!["--mcp-config".into(), config.display().to_string(), "--strict-mcp-config".into(), "--allowedTools".into(), allowed,
+                    "--disallowedTools".into(), "Bash,Edit,Write,MultiEdit,NotebookEdit,WebFetch,WebSearch,Agent,Task,TodoWrite,KillShell,BashOutput,ToolSearch,AskUserQuestion,EnterPlanMode,ExitPlanMode".into()]
+            }
+            "codex" => {
+                let mut args = vec!["-c".into(), format!("mcp_servers.overseer.command={}", json!(exe)), "-c".into(), format!("mcp_servers.overseer.args={command_args}")];
+                for tool in super::tool_list("overseer") {
+                    args.extend(["-c".into(), format!("mcp_servers.overseer.tools.{}.approval_mode=\"approve\"", tool["name"].as_str().unwrap_or(""))]);
+                }
+                args
+            }
+            "opencode" => {
+                let body = json!({"$schema": "https://opencode.ai/config.json", "mcp": {"overseer": {"type": "local", "command": [exe, "mcp", "--socket", socket, "--capability-file", capability.display().to_string()], "enabled": true}},
+                    "tools": {"bash": false, "write": false, "edit": false, "patch": false, "multiedit": false, "task": false, "webfetch": false}});
+                write_private(&dir.join("opencode.json"), &serde_json::to_vec_pretty(&body)?)?;
+                env.insert("OPENCODE_CONFIG_CONTENT".into(), body.to_string());
+                Vec::new()
+            }
+            _ => bail!("native Overseer tools do not support {harness}"),
+        };
+        Ok((args, env))
+    }
+
+    /// Migrate only an exactly identified daemon-generated legacy tool group.
+    /// Ambiguous/overwritten configuration refuses instead of dropping policy
+    /// or allowing two competing MCP configurations in the native launch.
+    pub(crate) fn without_legacy_overseer_args(&self, run_id: &str, harness: &str, workspace: &Path, mut args: Vec<String>) -> Result<Vec<String>> {
+        let allowed = super::tool_list("overseer").iter().map(|t| format!("mcp__overseer__{}", t["name"].as_str().unwrap_or(""))).collect::<Vec<_>>().join(",");
+        let denied = "Bash,Edit,Write,MultiEdit,NotebookEdit,WebFetch,WebSearch,Agent,Task,TodoWrite,KillShell,BashOutput,ToolSearch,AskUserQuestion,EnterPlanMode,ExitPlanMode";
+        let socket = crate::paths::socket_path().display().to_string();
+        let exe = self.exe.display().to_string();
+        let qualify_token = |token: &str| -> Result<()> {
+            let binding = self.token_binding(token)?;
+            if binding.run_id != run_id || binding.role != "overseer" || binding.native_turn_id.is_some() || binding.revoked_ms.is_some() {
+                bail!("legacy Overseer MCP config has no matching unbound run credential");
+            }
+            Ok(())
+        };
+        if harness == "claude" {
+            let positions: Vec<usize> = args.iter().enumerate().filter_map(|(i,a)|(a=="--mcp-config").then_some(i)).collect();
+            if positions.is_empty() { return Ok(args); }
+            if positions.len() != 1 { bail!("ambiguous legacy Overseer MCP configurations"); }
+            let at = positions[0];
+            let path = args.get(at+1).ok_or_else(|| anyhow!("legacy Overseer MCP path is missing"))?;
+            let known = [crate::paths::data_dir().join("overseer/scratch/mcp.json"), workspace.join("mcp.json")];
+            if !known.iter().any(|known| known == Path::new(path)) { bail!("legacy Overseer MCP config is not a known daemon layout"); }
+            let body: Value = serde_json::from_slice(&std::fs::read(path)?)?;
+            let server = &body["mcpServers"]["overseer"];
+            if server["command"] != exe || server["args"] != json!(["mcp", "--socket", socket]) || server["type"] != "stdio" {
+                bail!("legacy Overseer MCP config does not match the daemon launch");
+            }
+            qualify_token(server["env"]["OVERSEER_MCP_TOKEN"].as_str().ok_or_else(|| anyhow!("legacy Overseer MCP credential is absent"))?)?;
+            let group = vec!["--mcp-config".into(), path.clone(), "--strict-mcp-config".into(), "--allowedTools".into(), allowed, "--disallowedTools".into(), denied.into()];
+            remove_legacy_group(&mut args, at, &group)?;
+        } else if harness == "codex" {
+            let Some(at) = args.windows(2).position(|pair|pair[0]=="-c" && pair[1].starts_with("mcp_servers.overseer.")) else { return Ok(args) };
+            let credential = args.get(at+5).and_then(|a|a.strip_prefix("mcp_servers.overseer.env={ OVERSEER_MCP_TOKEN = ")).and_then(|a|a.strip_suffix(" }"))
+                .ok_or_else(||anyhow!("legacy Overseer Codex config has no exact credential group"))?;
+            let token: String = serde_json::from_str(credential)?;
+            qualify_token(&token)?;
+            let mut group = vec!["-c".into(), format!("mcp_servers.overseer.command={}",json!(exe)), "-c".into(), format!("mcp_servers.overseer.args=[\"mcp\",\"--socket\",{}]",json!(socket)), "-c".into(), format!("mcp_servers.overseer.env={{ OVERSEER_MCP_TOKEN = {} }}",json!(token))];
+            for tool in super::tool_list("overseer") {
+                group.extend(["-c".into(),format!("mcp_servers.overseer.tools.{}.approval_mode=\"approve\"",tool["name"].as_str().unwrap_or(""))]);
+            }
+            remove_legacy_group(&mut args, at, &group)?;
+            if args.iter().any(|arg|arg.starts_with("mcp_servers.overseer.")) { bail!("ambiguous remaining legacy Overseer Codex config"); }
+        }
+        Ok(args)
     }
 
     /// The harness arguments and files that give a run of the daemon's own (Overseer, a watcher)
@@ -341,9 +439,8 @@ impl Daemon {
             bail!("Overseer runs on claude, codex or opencode, not {harness}");
         }
         let scratch = self.scratch_dir()?;
-        let token = self.overseer_token("pending", "overseer")?["token"].as_str().unwrap().to_string();
-        let (extra_args, mode) = self.overseer_launch(harness, &scratch, &token)?;
-        let mut params = json!({"repo": scratch.display().to_string(), "harness": harness, "prompt": first_prompt, "title": "Talk to Overseer", "workspace_mode": "current", "extra_args": extra_args, "role": "overseer"});
+        let mode = (harness == "codex").then_some("read-only");
+        let mut params = json!({"repo": scratch.display().to_string(), "harness": harness, "prompt": first_prompt, "title": "Talk to Overseer", "workspace_mode": "current", "role": "overseer"});
         if let Some(m) = model.filter(|m| !m.is_empty()) {
             params["model"] = json!(m);
         }
@@ -357,7 +454,6 @@ impl Daemon {
         {
             let store = self.store.lock().unwrap();
             store.conn.execute("INSERT OR REPLACE INTO run_roles(run_id, role) VALUES(?1, 'overseer')", [&run_id])?;
-            store.conn.execute("UPDATE overseer_tokens SET run_id=?1 WHERE run_id='pending' AND role='overseer'", [&run_id])?;
             store.conn.execute("UPDATE overseer_sessions SET run_id=?2, harness=?3, model=?4, task_id=?5 WHERE id=?1", rusqlite::params![sid, run_id, harness, model, task_id])?;
         }
         // A harness that cannot start (not installed, no login) ends the run with the reason, so it
@@ -788,7 +884,10 @@ impl Daemon {
     /// Native action tools belong to their authenticated run's active conversation.
     /// Read and bind the session and cause together, then pass that snapshot through
     /// proposal handling: an archived run never borrows a replacement's authority.
-    pub(super) fn capture_native_origin(&self, caller_run: &str) -> Result<NativeOrigin> {
+    pub(super) fn capture_native_origin(&self, capability: &super::TokenHolder) -> Result<NativeOrigin> {
+        let caller_run = capability.run_id.as_str();
+        if capability.revoked_ms.is_some() { bail!("native capability was revoked"); }
+        let bound_turn = capability.native_turn_id.as_deref().ok_or_else(|| anyhow!("native capability has no bound turn"))?;
         use rusqlite::OptionalExtension;
         let (session, cause, turn) = {
             let store = self.store.lock().unwrap();
@@ -805,19 +904,19 @@ impl Daemon {
             // provenance still refuses rather than assuming owner authority.
             let origin: Option<(String, String, String)> = store.conn.query_row(
                 "SELECT t.id,t.prompt,o.cause FROM turns t JOIN overseer_turns o ON o.turn_id=t.id AND o.session_id=?1
-                 WHERE t.run_id=?2 AND t.id=(SELECT id FROM turns WHERE run_id=?2 ORDER BY n DESC LIMIT 1)
+                 WHERE t.run_id=?2 AND t.id=?3 AND t.id=(SELECT id FROM turns WHERE run_id=?2 ORDER BY n DESC LIMIT 1)
                  ORDER BY o.rowid LIMIT 1",
-                rusqlite::params![id, caller_run], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).optional()?;
+                rusqlite::params![id, caller_run, bound_turn], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).optional()?;
             let (turn_id, prompt, cause) = origin.ok_or_else(|| anyhow!("native action has no recorded origin for its turn"))?;
             let mut turn = crate::voice::request::captured_turn(&turn_id, &prompt);
             turn["cause"] = json!(cause);
             (json!({"id": id, "run_id": run, "level": level}), cause, turn)
         };
-        Ok(NativeOrigin { caller_run: caller_run.to_string(), session, cause, turn })
+        Ok(NativeOrigin { caller_run: caller_run.to_string(), capability_sha: capability.sha.clone(), session, cause, turn })
     }
 
     pub(super) fn overseer_propose_native(self: &Arc<Self>, actions: &Value, origin: &NativeOrigin) -> Result<Value> {
-        self.overseer_propose_in_session(actions, "tool", &origin.cause, Some(&origin.turn), &origin.session, Some(&origin.caller_run))
+        self.overseer_propose_in_session(actions, "tool", &origin.cause, Some(&origin.turn), &origin.session, Some(origin))
     }
 
     fn overseer_propose_for_turn(self: &Arc<Self>, actions: &Value, source: &str, cause_now: Option<&str>, turn: Option<&Value>) -> Result<Value> {
@@ -829,7 +928,7 @@ impl Daemon {
         self.overseer_propose_in_session(actions, source, &cause, turn, &session, None)
     }
 
-    fn overseer_propose_in_session(self: &Arc<Self>, actions: &Value, source: &str, cause: &str, turn: Option<&Value>, session: &Value, native_run: Option<&str>) -> Result<Value> {
+    fn overseer_propose_in_session(self: &Arc<Self>, actions: &Value, source: &str, cause: &str, turn: Option<&Value>, session: &Value, native_origin: Option<&NativeOrigin>) -> Result<Value> {
         let sid = session["id"].as_str().unwrap().to_string();
         let level = session["level"].as_str().unwrap_or("ask_first").to_string();
         let list = actions.as_array().cloned().unwrap_or_else(|| vec![actions.clone()]);
@@ -1052,7 +1151,12 @@ impl Daemon {
         let settle_until = if settle { Some(now + settle_ms) } else { None };
         {
             let store = self.store.lock().unwrap();
-            if let Some(caller_run) = native_run {
+            if let Some(origin) = native_origin {
+                let caller_run = &origin.caller_run;
+                let capability_valid: bool = store.conn.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM overseer_tokens WHERE sha=?1 AND run_id=?2 AND role='overseer' AND native_turn_id=?3 AND revoked_ms IS NULL)",
+                    rusqlite::params![origin.capability_sha, caller_run, origin.turn["id"].as_str()], |r| r.get(0))?;
+                if !capability_valid { bail!("native capability was revoked or lost its turn binding"); }
                 // Fresh may have happened during action checks. Revalidate under the
                 // insertion lock, without looking up or substituting a new context.
                 let still_bound: bool = store.conn.query_row(
@@ -2299,4 +2403,30 @@ pub(crate) fn stored_queue(store: &crate::store::Store, run_id: &str) -> Result<
         Ok(json!({"id":r.get::<_, i64>(0)?, "ts":r.get::<_, i64>(1)?, "source":r.get::<_, String>(2)?, "text":r.get::<_, String>(3)?, "redirect":detail["redirect"] == true}))
     })?.collect::<rusqlite::Result<_>>()?;
     Ok(json!({"paused":paused,"messages":messages}))
+}
+
+#[cfg(test)]
+mod native_migration_tests {
+    use super::remove_legacy_group;
+
+    #[test]
+    fn exact_scratch_and_continuity_argument_groups_preserve_neighbor_policy() {
+        for path in ["/synthetic/home/overseer/scratch/mcp.json", "/synthetic/workspaces/successor/mcp.json"] {
+            let group = vec!["--mcp-config".into(),path.into(),"--strict-mcp-config".into(),"--allowedTools".into(),"generated-tools".into(),"--disallowedTools".into(),"generated-denials".into()];
+            let mut args = vec!["--allowedTools".into(),"unrelated-policy".into()];
+            args.extend(group.iter().cloned());
+            args.extend(["--disallowedTools".into(),"unrelated-denials".into()]);
+            remove_legacy_group(&mut args,2,&group).unwrap();
+            assert_eq!(args,["--allowedTools","unrelated-policy","--disallowedTools","unrelated-denials"]);
+        }
+    }
+
+    #[test]
+    fn ambiguous_group_refuses_without_removing_saved_arguments() {
+        let mut args = vec!["--mcp-config".into(),"known-layout".into(),"--allowedTools".into(),"owner-policy".into()];
+        let original = args.clone();
+        let expected = vec!["--mcp-config".into(),"known-layout".into(),"--strict-mcp-config".into(),"--allowedTools".into(),"generated-tools".into()];
+        assert!(remove_legacy_group(&mut args,0,&expected).is_err());
+        assert_eq!(args,original);
+    }
 }

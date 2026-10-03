@@ -759,7 +759,8 @@ fn ac184_overseer_reads_on_demand_and_only_reads() {
     assert!(joined.contains("--disallowedTools Bash,Edit,Write"), "{joined}");
     assert!(joined.contains("--allowedTools mcp__overseer__roster"), "{joined}");
     assert!(!joined.contains("--permission-mode plan"));
-    let mcp: Value = serde_json::from_slice(&std::fs::read(d.home.path().join("overseer/scratch/mcp.json")).unwrap()).unwrap();
+    let config_at = args.iter().position(|a| a == "--mcp-config").unwrap();
+    let mcp: Value = serde_json::from_slice(&std::fs::read(&args[config_at + 1]).unwrap()).unwrap();
     assert_eq!(mcp["mcpServers"]["overseer"]["args"][0], "mcp");
     // Its folder holds nothing but its own files: no code was produced.
     let scratch = d.home.path().join("overseer/scratch");
