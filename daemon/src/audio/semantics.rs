@@ -8,7 +8,7 @@ use serde_json::json;
 
 const MAX_ROWS: i64 = 4096;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct Ticket {
     pub subject: String,
     pub slot: String,
@@ -40,8 +40,8 @@ pub(crate) fn migrate(conn: &rusqlite::Connection) -> Result<()> {
 fn subject(store: &Store, run: &Run, routine: bool) -> Result<Option<(String, bool)>> {
     if run.parent_run_id.is_some() { return Ok(None); }
     let director: Option<String> = store.conn.query_row(
-        "SELECT run_id FROM swarm_director_owners WHERE overseer_run_id=?1
-         AND status='active' AND generation=(SELECT generation FROM swarm_runs WHERE id=run_id)",
+        "SELECT o.run_id FROM swarm_director_owners o JOIN swarm_runs s ON s.id=o.run_id
+         WHERE o.overseer_run_id=?1 AND o.status='active' AND o.generation=s.generation",
         [&run.id], |r| r.get(0)).optional()?;
     if let Some(id) = director { return Ok(Some((format!("swarm:{id}"), true))); }
     if store.is_swarm_linked_run(&run.id)? { return Ok(None); }
@@ -63,7 +63,7 @@ fn record(store: &Store, run: &Run, subject: &str, slot: &str, line: Line,
             params![subject,slot], |r| Ok((r.get(0)?,r.get(1)?))).optional()?;
         if existing.as_ref().is_some_and(|(old,live)| old == identity && *live) { return Ok(None); }
         if existing.is_none() {
-            // Remove only already delivered, inactive archived/orphan state.
+            // Remove only already delivered archived/orphan state.
             // Never evict unresolved identities to make room. At the hard cap
             // refuse another audio candidate with a bounded diagnostic.
             store.conn.execute("DELETE FROM audio_semantic_state WHERE rowid IN (
@@ -137,6 +137,9 @@ pub(crate) fn settled(store: &Store, observed: &Run, settlement: Settlement) -> 
     let attempt=(|| -> Result<Option<Event>> {
         let Some(run)=store.run(&observed.id)? else {return Ok(None)};
         if run.process_generation!=observed.process_generation {return Ok(None)};
+        let owner:Option<String>=store.conn.query_row("SELECT owner_id FROM queue_owners WHERE run_id=?1",
+            [&run.id],|r|r.get(0)).optional()?;
+        if owner.is_some_and(|id|id!=run.id) {return Ok(None)};
         let Some((subject,swarm))=subject(store,&run,true)? else {return Ok(None)};
         // Director/worker process failure or success is never the objective's
         // recovery or completion authority. Only whole-Swarm producers qualify.
@@ -184,7 +187,10 @@ fn current(store: &Store, ticket: &Ticket) -> Result<Option<Line>> {
     if run.process_generation!=generation {return Ok(None)};
     if let Some(id)=ticket.subject.strip_prefix("swarm:") {
         let state:String=store.conn.query_row("SELECT status FROM swarm_runs WHERE id=?1",[id],|r|r.get(0))?;
-        if line==Line::SwarmComplete {return Ok((state=="completed").then_some(line));}
+        if line==Line::SwarmComplete {
+            let invalid=store.conn.prepare("SELECT 1 FROM swarm_completion_invalidations WHERE run_id=?1")?.exists([id])?;
+            return Ok((state=="completed" && !invalid).then_some(line));
+        }
         if !store.conn.prepare("SELECT 1 FROM swarm_director_owners WHERE run_id=?1
             AND overseer_run_id=?2 AND status='active' AND generation=(SELECT generation FROM swarm_runs WHERE id=?1)")?
             .exists(params![id,owner])? {return Ok(None)};
@@ -192,6 +198,9 @@ fn current(store: &Store, ticket: &Ticket) -> Result<Option<Line>> {
         return Ok((run.status=="waiting_for_user" && run.attention.is_some()).then_some(line));
     }
     if store.task(&run.task_id)?.is_none_or(|task| task.archived_ms.is_some()) {return Ok(None)};
+    let owner:Option<String>=store.conn.query_row("SELECT owner_id FROM queue_owners WHERE run_id=?1",
+        [&run.id],|r|r.get(0)).optional()?;
+    if owner.is_some_and(|id|id!=run.id) {return Ok(None)};
     let other_live=store.conn.prepare("SELECT 1 FROM runs WHERE task_id=?1 AND id<>?2
         AND status IN ('queued','starting','running','waiting_for_user','waiting_for_connection','waiting_for_memory')")?
         .exists(params![run.task_id,run.id])?;
@@ -204,7 +213,7 @@ fn current(store: &Store, ticket: &Ticket) -> Result<Option<Line>> {
     if queued {return Ok(None)};
     let live=match line {
         Line::AgentComplete=>run.status=="completed" && run.attention.is_none(),
-        Line::AgentStoppedUnexpectedly=>run.status=="disconnected",
+        Line::AgentStoppedUnexpectedly=>["disconnected","failed"].contains(&run.status.as_str()),
         Line::AgentFailed|Line::AgentSignInRequired=>run.status=="failed",
         Line::AgentCannotContinue=>run.status=="failed" && run.attention.is_some(),
         _=>false,
@@ -212,14 +221,25 @@ fn current(store: &Store, ticket: &Ticket) -> Result<Option<Line>> {
     Ok(live.then_some(line))
 }
 
-pub(super) fn fresh(store: &Store, tickets: &[Ticket]) -> Result<Option<Line>> {
-    let mut live=Vec::new();
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct Selection {
+    pub line: Line,
+    pub tickets: Vec<Ticket>,
+}
+
+pub(super) fn selection(store: &Store, tickets: &[Ticket]) -> Result<Option<Selection>> {
+    let mut live=Vec::<(Ticket,Line)>::new();
     for ticket in tickets {
         if let Some(line)=current(store,ticket)? {
-            if !live.iter().any(|(subject,_)|subject==&ticket.subject) {live.push((ticket.subject.clone(),line));}
+            if !live.iter().any(|(saved,_)|saved.subject==ticket.subject) {live.push((ticket.clone(),line));}
         }
     }
-    Ok(match live.as_slice() { []=>None,[(_,line)]=>Some(*line),_=>Some(Line::AgentsNeedAttention) })
+    let line=match live.as_slice() { []=>return Ok(None),[(_,line)]=>*line,_=>Line::AgentsNeedAttention };
+    Ok(Some(Selection{line,tickets:live.into_iter().map(|(ticket,_)|ticket).collect()}))
+}
+
+pub(super) fn fresh(store: &Store, tickets: &[Ticket]) -> Result<Option<Line>> {
+    Ok(selection(store,tickets)?.map(|selection|selection.line))
 }
 
 pub(super) fn played(store: &Store, tickets: &[Ticket]) -> Result<()> {

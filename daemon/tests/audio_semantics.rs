@@ -1,7 +1,7 @@
 //! Canonical Audio Mode meanings at actual daemon boundaries (AC275–286).
-//! These tests intentionally use the incumbent event-to-player test sink before
-//! the shared manifest resolver lands. A key capture is not spoken-content or
-//! complete pack qualification. No provider process or private audio is used.
+//! The original baseline used the incumbent sink. Current qualification selects
+//! a synthetic twelve-file manifest through the real resolver before enabling.
+//! Captured keys do not qualify spoken content. No provider/private audio is used.
 mod common;
 use common::*;
 use serde_json::{json, Value};
@@ -61,6 +61,39 @@ fn gated_run(d: &Daemon, checkout: &Path, gate: &Path, exit: &str) -> (String, R
 }
 
 fn enable(d: &Daemon) {
+    // Independent spec vector, not copied from Line::ALL by the test. Synthetic
+    // bytes live in the owned daemon fixture folder and never use private audio.
+    const KEYS: [&str;12] = ["agent_started","agent_complete","agent_permission_required",
+        "agent_reply_required","agent_sign_in_required","agent_cannot_continue",
+        "agent_failed","agent_stopped_unexpectedly","agents_need_attention",
+        "swarm_initiated","swarm_complete","swarm_needs_attention"];
+    let folder=d.home.path().join("semantic-fixture-pack");
+    std::fs::create_dir_all(folder.join("audio")).unwrap();
+    let mut lines=serde_json::Map::new();
+    for (n,key) in KEYS.iter().enumerate() {
+        let frames=160u32;
+        let mut bytes=Vec::new();
+        bytes.extend_from_slice(b"RIFF");
+        bytes.extend_from_slice(&(36+frames*2).to_le_bytes());
+        bytes.extend_from_slice(b"WAVEfmt ");
+        bytes.extend_from_slice(&16u32.to_le_bytes());
+        bytes.extend_from_slice(&1u16.to_le_bytes());
+        bytes.extend_from_slice(&1u16.to_le_bytes());
+        bytes.extend_from_slice(&8000u32.to_le_bytes());
+        bytes.extend_from_slice(&16000u32.to_le_bytes());
+        bytes.extend_from_slice(&2u16.to_le_bytes());
+        bytes.extend_from_slice(&16u16.to_le_bytes());
+        bytes.extend_from_slice(b"data");
+        bytes.extend_from_slice(&(frames*2).to_le_bytes());
+        for _ in 0..frames {bytes.extend_from_slice(&(n as i16+1).to_le_bytes());}
+        let relative=format!("audio/{key}.wav");
+        std::fs::write(folder.join(&relative),bytes).unwrap();
+        lines.insert((*key).into(),json!(relative));
+    }
+    std::fs::write(folder.join("audio-pack.json"),serde_json::to_vec(&json!({
+        "schema":1,"id":"semantic-fixture","label":"Synthetic semantic fixture","lines":lines})).unwrap()).unwrap();
+    let revision=d.call("audio.get",json!({}))["revision"].as_i64().unwrap();
+    d.call("audio.source.set",json!({"source":"folder","path":folder,"expected_revision":revision}));
     assert_eq!(d.call("audio.set", json!({"enabled":true}))["enabled"], true);
 }
 

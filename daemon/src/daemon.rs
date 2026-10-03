@@ -2602,6 +2602,7 @@ impl Daemon {
             return Err(e);
         }
         self.store.lock().unwrap().update_run_status(run_id, "running", None, None)?;
+        let _=crate::audio::semantics::attention_changed(&self.store.lock().unwrap(),run_id);
         let mut answered = json!({"request_id": request_id, "allow": allow, "by": by});
         if let Some(o) = offer { answered["always"] = o["label"].clone(); }
         if let Some(grant) = grant { answered["grant"] = serde_json::to_value(grant)?; }
@@ -2619,22 +2620,27 @@ impl Daemon {
     // ------------------------------------------------------------------ output tailing
 
     pub fn spawn_tail(self: &Arc<Self>, run_id: &str) {
+        self.spawn_tail_provenance(run_id,false,None);
+    }
+
+    fn spawn_tail_provenance(self: &Arc<Self>, run_id: &str, historical_exit: bool, replay_boundary: Option<(i64,i64)>) {
         if !self.tails.lock().unwrap().insert(run_id.to_string()) {
             return;
         }
         let daemon = self.clone();
         let run_id = run_id.to_string();
         tokio::task::spawn_blocking(move || {
-            if let Err(e) = daemon.tail_loop(&run_id) {
+            if let Err(e) = daemon.tail_loop(&run_id,historical_exit,replay_boundary) {
                 let _ = daemon.emit(None, Some(&run_id), "daemon_error", "daemon", "exact", json!({"message": e.to_string()}));
             }
             daemon.tails.lock().unwrap().remove(&run_id);
         });
     }
 
-    fn tail_loop(self: &Arc<Self>, run_id: &str) -> Result<()> {
+    fn tail_loop(self: &Arc<Self>, run_id: &str, historical_exit: bool, replay_boundary: Option<(i64,i64)>) -> Result<()> {
         let mut last_liveness = std::time::Instant::now();
         let mut state = TailState::default();
+        state.historical_exit=historical_exit;
         let mut announced = false;
         let auto_deadline = {
             let store = self.store.lock().unwrap();
@@ -2668,8 +2674,19 @@ impl Daemon {
                 if let Some((dir, _, _)) = process {
                     if Path::new(&dir).join("shim.json").exists() {
                         announced = true;
-                        self.store.lock().unwrap().update_run_status(run_id, "running", None, None)?;
-                        self.emit(Some(&run.task_id), Some(run_id), "status", "supervisor", "exact", json!({"status": "running", "why": "harness process started"}))?;
+                        let events={
+                            let store=self.store.lock().unwrap();
+                            let tx=store.conn.unchecked_transaction()?;
+                            store.update_run_status(run_id,"running",None,None)?;
+                            let mut events=vec![store.insert_event(now(),Some(&run.task_id),Some(run_id),
+                                "status","supervisor","exact",&json!({"status":"running","why":"harness process started"}))?];
+                            if !historical_exit && replay_boundary.is_none() {
+                                if let Some(event)=crate::audio::semantics::started(&store,&run) {events.push(event);}
+                            }
+                            tx.commit()?;
+                            events
+                        };
+                        for event in events {let _=self.events.send(event);}
                         continue;
                     }
                 }
@@ -2685,14 +2702,28 @@ impl Daemon {
                 file.by_ref().take(1024 * 1024).read_to_end(&mut buf)?;
                 if let Some(end) = buf.iter().rposition(|b| *b == b'\n') {
                     let chunk = &buf[..=end];
+                    // A reattached live supervisor may have unread pre-boot
+                    // bytes. Preserve ordinary parsing/cursor behavior, but
+                    // separate exact segment-byte provenance for Audio only.
+                    // A partially written record beginning before the boundary
+                    // remains historical when its newline arrives afterward.
                     let mut lines = Vec::new();
-                    for line in chunk.split(|b| *b == b'\n').filter(|l| !l.is_empty()) {
-                        if let Ok(rec) = serde_json::from_slice::<Value>(line) {
-                            lines.push(rec);
+                    let mut batch_historical = None;
+                    for line in chunk.split_inclusive(|b| *b == b'\n') {
+                        let historical = replay_boundary.is_some_and(|(segment,offset)|
+                            seg < segment || (seg == segment && off < offset));
+                        if batch_historical.is_some_and(|prior|prior!=historical) {
+                            state.historical_batch=batch_historical.unwrap();
+                            self.apply_lines(&run,&lines,seg,off,&mut state)?;
+                            lines.clear();
                         }
+                        batch_historical=Some(historical);
+                        if let Ok(rec) = serde_json::from_slice::<Value>(line) {lines.push(rec);}
+                        off += line.len() as i64;
                     }
-                    off += chunk.len() as i64;
+                    state.historical_batch=batch_historical.unwrap_or(false);
                     self.apply_lines(&run, &lines, seg, off, &mut state)?;
+                    state.historical_batch=false;
                     progressed = true;
                 }
             }
@@ -2732,7 +2763,9 @@ impl Daemon {
                     }
                     let spawned = dir.join("shim.json").exists();
                     let reason = if spawned { "supervisor process disappeared without recording an exit (killed externally?); harness state unknown" } else { "supervisor never started" };
-                    self.mark_ended(&run, "disconnected", reason)?;
+                    let audio=(!historical_exit && spawned && run.harness=="generic")
+                        .then_some(crate::audio::semantics::Settlement::LostGenericExecutionWithoutRestore);
+                    self.mark_ended_audio(&run,"disconnected",reason,audio)?;
                     return Ok(());
                 }
             }
@@ -2856,6 +2889,9 @@ impl Daemon {
                 if status == "starting" || status == "queued" {
                     store.update_run_status(&run.id, "running", None, None)?;
                     ev("status", "harness", "exact", json!({"status": "running"}), None)?;
+                    if !state.historical_exit && !state.historical_batch {
+                        if let Some(event)=crate::audio::semantics::started(store,run) {out.push(event);}
+                    }
                 }
             }
             Norm::Text { role, text } => ev("output", "harness", "exact", json!({"role": role, "text": text}), None)?,
@@ -2865,7 +2901,10 @@ impl Daemon {
                     store.update_run_status(&run.id, "running", None, None)?;
                     ev("status", "harness", "inferred", json!({"status": "running", "why": "tool activity"}), None)?;
                 }
-                ev("tool", "harness", "exact", json!({"name": name, "id": id, "summary": summary}), None)?
+                ev("tool", "harness", "exact", json!({"name": name, "id": id, "summary": summary}), None)?;
+                if status == "starting" && !state.historical_exit && !state.historical_batch {
+                    if let Some(event)=crate::audio::semantics::started(store,run) {out.push(event);}
+                }
             }
             Norm::ToolDetail { id, input, output, status, is_error } => {
                 ev("tool_result", "harness", "exact", json!({"id": id, "input": input, "output": output, "status": status, "is_error": is_error}), None)?
@@ -3056,6 +3095,9 @@ impl Daemon {
                 store.update_run_status(&run.id, "waiting_for_user", None, None)?;
                 ev("permission", "harness", "exact", attention, None)?;
                 ev("status", "harness", "exact", json!({"status": "waiting_for_user"}), None)?;
+                if !state.historical_exit && !state.historical_batch {
+                    if let Some(event)=crate::audio::semantics::permission(store,run,&request_id) {out.push(event);}
+                }
             }
             Norm::Error { class, message } => {
                 state.last_error = Some((class.clone(), message.clone()));
@@ -3354,10 +3396,39 @@ impl Daemon {
         if crate::handoff::park(self, run, status, state.last_error.as_ref(), dir)? {
             return Ok(());
         }
-        self.mark_ended(run, status, &reason)
+        // Actual outcomes and registered policy, never displayed reason text.
+        // Other native/Auto recovery families remain explicitly unqualified.
+        let audio=if state.historical_exit || interrupted || auto_budget || exit.spawn_error.is_some() {
+            None
+        } else if status=="completed" {
+            Some(crate::audio::semantics::Settlement::Success)
+        } else if status=="failed" && run.harness=="generic" && exit.signal.is_some() {
+            Some(crate::audio::semantics::Settlement::LostGenericExecutionWithoutRestore)
+        } else if status=="failed" && run.harness=="generic" {
+            Some(crate::audio::semantics::Settlement::FailedWithoutAutomaticRecovery)
+        } else if status=="failed" && state.last_error.as_ref().is_some_and(|(class,_)|class=="auth")
+            && !crate::continuity::settings().enabled && !self.store.lock().unwrap().auto_mode_enabled()? {
+            Some(crate::audio::semantics::Settlement::AuthenticationWithoutPermittedFallback)
+        } else {None};
+        self.mark_ended_audio(run,status,&reason,audio)
     }
 
     pub(crate) fn mark_ended(&self, run: &Run, status: &str, reason: &str) -> Result<()> {
+        self.mark_ended_audio(run,status,reason,None)
+    }
+
+    pub(crate) fn mark_ended_audio(&self, run: &Run, status: &str, reason: &str,
+        audio: Option<crate::audio::semantics::Settlement>) -> Result<()> {
+        self.mark_ended_semantic(run,status,reason,audio,None)
+    }
+
+    pub(crate) fn mark_ended_blocked(&self, run: &Run, reason: &str,
+        audio: crate::audio::semantics::Settlement, attention: &Value) -> Result<()> {
+        self.mark_ended_semantic(run,"failed",reason,Some(audio),Some(attention))
+    }
+
+    fn mark_ended_semantic(&self, run: &Run, status: &str, reason: &str,
+        audio: Option<crate::audio::semantics::Settlement>, attention: Option<&Value>) -> Result<()> {
         let mut emitted = Vec::new();
         // Every other end status comes after an exit record or before any
         // supervisor; a lost supervisor may leave its harness running.
@@ -3368,12 +3439,19 @@ impl Daemon {
             let settled = (|| -> Result<()> {
                 let ended = now();
                 store.update_run_status(&run.id, status, Some(reason), Some(ended))?;
-                store.set_run_attention(&run.id, None)?;
+                store.set_run_attention(&run.id, attention)?;
+                if attention.is_some() {
+                    store.conn.execute("UPDATE continuity_waits SET note='expired', next_ms=?2 WHERE run_id=?1",
+                        rusqlite::params![run.id,i64::MAX])?;
+                }
                 let turn_status = if status == "completed" { "completed" } else { status };
                 store.finish_open_turns(&run.id, turn_status, ended)?;
                 store.release_settled_auto_pool_claim(&run.id)?;
                 store.settle_shared_launch_run(&run.id, process_gone)?;
                 emitted.push(store.insert_event(ended, Some(&run.task_id), Some(&run.id), "status", "daemon", "exact", &json!({"status": status, "reason": reason}))?);
+                if let Some(settlement)=audio {
+                    if let Some(event)=crate::audio::semantics::settled(&store,run,settlement) {emitted.push(event);}
+                }
                 if status == "completed" && run.relation_source.as_deref() == Some("managed-delegation") {
                     if let Some(notice) = store.publish_managed_result_notice(run, ended)? {
                         emitted.push(notice);
@@ -3572,7 +3650,7 @@ impl Daemon {
                     process = self.store.lock().unwrap().run_process(&run.id)?;
                 }
             }
-            let Some((dir, _, _)) = process else {
+            let Some((dir, replay_segment, _)) = process else {
                 if ACTIVE.contains(&run.status.as_str()) {
                     let uncertain = {
                         let store = self.store.lock().unwrap();
@@ -3593,14 +3671,24 @@ impl Daemon {
             };
             let dir = PathBuf::from(dir);
             if dir.join("exit.json").exists() {
-                self.spawn_tail(&run.id);
+                self.spawn_tail_provenance(&run.id,true,None);
                 report.push(json!({"run": run.id, "result": "exited while daemon was down; replaying output"}));
             } else if self.supervisor_alive(&dir) {
                 if run.status == "disconnected" {
                     self.store.lock().unwrap().update_run_status(&run.id, "running", None, None)?;
                 }
                 self.emit(Some(&run.task_id), Some(&run.id), "reattached", "daemon", "exact", json!({"note": "daemon restarted; supervisor still running"}))?;
-                self.spawn_tail(&run.id);
+                // Snapshot the existing byte boundary, not a wall-clock
+                // heuristic or mutable event cursor. Future native needs are
+                // still parsed/announced; unread historical records are quiet.
+                let mut boundary_segment=replay_segment;
+                for _ in 0..10_000 {
+                    if !shim::segment_path(&dir,boundary_segment as u64+1).exists() {break;}
+                    boundary_segment+=1;
+                }
+                let boundary_offset=std::fs::metadata(shim::segment_path(&dir,boundary_segment as u64))
+                    .map(|metadata|metadata.len() as i64).unwrap_or(0);
+                self.spawn_tail_provenance(&run.id,false,Some((boundary_segment,boundary_offset)));
                 if run.harness == "codex-app" && run.native_id.is_none()
                     && dir.join("auto-account-deadline").exists() {
                     self.watch_codex_account_handshake(run.id.clone(), run.process_generation, dir.clone());
@@ -3942,6 +4030,9 @@ impl Daemon {
 }
 
 struct TailState {
+    /// Exit existed at reconciliation: output/settlement replay is not live.
+    historical_exit: bool,
+    historical_batch: bool,
     session: Option<String>,
     turn_done: Option<bool>,
     last_error: Option<(String, String)>,
@@ -3963,7 +4054,7 @@ struct TailState {
 
 impl Default for TailState {
     fn default() -> Self {
-        Self { session: None, turn_done: None, last_error: None, since_prune: 0, store_polled: std::time::Instant::now(), store_seen: Default::default(), close_stdin: false, sends: Vec::new(), background: 0, expected_turns: 1, unread_notices: 0, between_turns: false, backgrounded: Default::default() }
+        Self { historical_exit:false, historical_batch:false, session: None, turn_done: None, last_error: None, since_prune: 0, store_polled: std::time::Instant::now(), store_seen: Default::default(), close_stdin: false, sends: Vec::new(), background: 0, expected_turns: 1, unread_notices: 0, between_turns: false, backgrounded: Default::default() }
     }
 }
 

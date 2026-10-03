@@ -500,9 +500,9 @@ fn speak_when_free(v: &Arc<Voice>, text: &str) {
     });
 }
 
-/// The heard signal: a soft Reactor cue under Audio Mode's rules (AC-165, AC-172).
+/// Dedicated nonspoken feedback, separate from the twelve Audio Mode lines.
 fn heard_signal(v: &Voice) {
-    crate::audio::cue(&v.d, "agent_queued");
+    crate::audio::heard(&v.d);
     v.emit(json!({"kind": "heard_signal"}));
 }
 
@@ -1420,15 +1420,8 @@ impl Voice {
             });
         }
         self.st.lock().unwrap().awaiting_answer = false;
-        // No doubt it was taken: a cue under Audio Mode's rules, and a toast with Cancel.
-        crate::audio::cue(
-            &d,
-            if allow {
-                "agent_unblocked"
-            } else {
-                "agent_stopped"
-            },
-        );
+        // The owner already took this action. Keep confirmation and Cancel,
+        // without a redundant automatic Audio Mode notification.
         self.emit(json!({"kind": "toast", "request": id, "text": format!("{}: {} for {}", if allow { "Allowed" } else { "Denied" }, "the request", rb.title), "cancel": true, "seconds": s.settle_seconds}));
         announce(self, &id);
         json!({"taken": true, "request": id, "allow": allow, "window_s": s.settle_seconds})

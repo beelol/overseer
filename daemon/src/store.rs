@@ -1711,6 +1711,12 @@ impl Store {
     }
 
     pub fn set_run_attention(&self, id: &str, attention: Option<&Value>) -> Result<()> {
+        let prior=self.run(id)?.and_then(|run|run.attention);
+        if prior.as_ref().is_some_and(|old| Some(old)!=attention) {
+            if crate::audio::semantics::attention_changed(self,id).is_err() {
+                crate::log("audio attention retirement unavailable");
+            }
+        }
         self.conn.execute("UPDATE runs SET attention=?2 WHERE id=?1", params![id, attention.map(|v| v.to_string())])?;
         Ok(())
     }

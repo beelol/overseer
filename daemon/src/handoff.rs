@@ -534,10 +534,10 @@ fn wait_more(d: &Daemon, run: &Run, wait: &Wait, note: Option<String>, offers: V
 fn give_up(d: &Daemon, run: &Run, wait: &Wait) -> Result<()> {
     let hours = continuity::settings().retry_for_hours;
     let reason = if wait.kind == "memory" { format!("memory pressure stayed critical for {hours} hours") } else { format!("no connection for {hours} hours") };
-    d.store.lock().unwrap().conn.execute("UPDATE continuity_waits SET note='expired', next_ms=?2 WHERE run_id=?1", rusqlite::params![run.id, i64::MAX])?;
-    d.mark_ended(run, "failed", &reason)?;
     let attention = json!({"kind": wait.kind, "reason": reason, "message_kept": true, "turn": wait.turn_id, "actions": ["retry_now", "use_local"]});
-    d.store.lock().unwrap().set_run_attention(&run.id, Some(&attention))?;
+    let cause=if wait.kind=="memory" {crate::audio::semantics::Settlement::ExhaustedMemoryRecovery}
+        else {crate::audio::semantics::Settlement::ExhaustedConnectionRecovery};
+    d.mark_ended_blocked(run,&reason,cause,&attention)?;
     d.emit(Some(&run.task_id), Some(&run.id), "attention", "daemon", "exact", attention)?;
     Ok(())
 }
