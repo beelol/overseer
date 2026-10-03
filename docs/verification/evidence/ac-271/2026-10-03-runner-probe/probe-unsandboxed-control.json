@@ -1,0 +1,9 @@
+{
+  "exit": 0,
+  "stdout": "{\"forbidden_read\": \"allowed\", \"forbidden_write\": \"allowed\", \"loopback_connect\": \"allowed\", \"program_write\": \"allowed\", \"scratch_write\": \"allowed\", \"symlink_escape\": \"allowed\", \"unix_connect\": \"allowed\"}\n",
+  "stderr": "",
+  "listeners": {
+    "loopback": "connection accepted",
+    "unix": "connection accepted"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "exit": 1,
+  "stdout": "",
+  "stderr": "Fatal Python error: _Py_HashRandomization_Init: failed to get random numbers to initialize Python\nPython runtime state: preinitialized\n\n"
+}

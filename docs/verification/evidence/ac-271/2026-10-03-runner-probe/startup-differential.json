@@ -1,0 +1,30 @@
+[
+  {
+    "profile": "system-cache",
+    "command": "/usr/bin/true",
+    "exit": -6,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "profile": "inert-read-control",
+    "command": "/usr/bin/true",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "profile": "inert-mach-control",
+    "command": "/usr/bin/true",
+    "exit": -6,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "profile": "inert-read-mach-control",
+    "command": "/usr/bin/true",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+]
