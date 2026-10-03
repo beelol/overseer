@@ -1,0 +1,104 @@
+▶ Rust (cargo test --workspace) … FAILED (1765s) 1680 passed, 1 failed
+    test t23_the_daemon_is_asked_again_every_second_and_rarely_after_an_error ... ok
+    test adapters::tests::classify_errors ... ok
+    test adapters::tests::network_errors_are_their_own_class ... ok
+    test adapters::tests::structured_retry_after_is_bounded_and_never_read_from_error_prose ... ok
+    test auto_health::tests::managed_local_error_scopes_to_endpoint_and_blocks_shared_loopback_url ... ok
+    test auto_health::tests::persisted_managed_local_error_uses_its_selected_endpoint_not_the_harness_name ... ok
+    test auto_health::tests::unrelated_error_burst_cannot_hide_an_active_structured_cooldown ... ok
+    test net::tests::transport_errors_are_classified ... ok
+    test opencode_bridge::tests::errors_from_the_server_are_classified ... ok
+    test malformed_manifest_error_redacts_source_without_losing_error_code ... ok
+    test ac16_fixture_error_classes_stay_distinct ... ok
+    test malformed_and_unauthorized_reports_return_bounded_errors_without_inbox_effects ... ok
+▶ Unit (test/unit) … ok (12s) 30 of 30 passed
+▶ Check (extension sources) … ok (0s)
+▶ Links (README and ledger) … ok (0s) 904 links checked in 278 files; 0 broken
+▶ Phone model (phone/model: types, vitest) … ok (20s) 161 passed
+▶ Phone app (phone: generated files, lint, types, jest) … ok (45s) 503 passed
+▶ Dev daemons (test/dev) … ok (25s) 14 of 14 passed
+▶ Guided owner tests (test/dev/guided.js) … ok (2s) 7 of 7 passed
+▶ Deploy (test/deploy) … ok (170s) 6 of 6 passed
+▶ Build the VSIX … ok (41s)
+▶ UI account-shown … ok (28s)
+▶ UI accounts … ok (55s)
+▶ UI agent-head … ok (48s)
+▶ UI answer-waiting … ok (42s)
+▶ UI arrangement … ok (26s)
+▶ UI audio … ok (32s)
+▶ UI audit … ok (69s)
+▶ UI auto-root … ok (28s)
+▶ UI away … ok (18s)
+▶ UI brand … ok (26s)
+▶ UI center … ok (49s)
+▶ UI chat … ok (29s)
+▶ UI composer … ok (56s)
+▶ UI composer-friction … ok (25s)
+▶ UI continuity … ok (60s)
+▶ UI continuity-settings … ok (55s)
+▶ UI conversation … ok (29s)
+▶ UI dev-instance … ok (49s)
+▶ UI dragout … ok (13s)
+▶ UI endings … ok (36s)
+▶ UI first-click … ok (28s)
+▶ UI follow … ok (29s)
+▶ UI followups … ok (88s)
+▶ UI gallery … ok (94s)
+▶ UI grid … ok (38s)
+▶ UI grid-drag … ok (37s)
+▶ UI grid-track … ok (29s)
+▶ UI history … ok (183s)
+▶ UI home … ok (88s)
+▶ UI home-input … ok (18s)
+▶ UI home-overseer … ok (38s)
+▶ UI hunks … ok (43s)
+▶ UI inventory … ok (68s)
+▶ UI keyboard … ok (28s)
+▶ UI keys-on-screen … ok (30s)
+▶ UI look … ok (73s)
+▶ UI main … ok (52s)
+▶ UI modes … ok (16s)
+▶ UI mods … ok (17s)
+▶ UI narrow-chat … ok (40s)
+▶ UI notify … ok (13s)
+▶ UI notify-agents … ok (15s)
+▶ UI one-signin … ok (17s)
+▶ UI one-view … ok (98s)
+▶ UI overseer-window … ok (211s)
+▶ UI oversight … ok (68s)
+▶ UI own-layout … ok (20s)
+▶ UI parity … ok (27s)
+▶ UI phone-access … ok (127s)
+▶ UI place … ok (37s)
+▶ UI popout … ok (24s)
+▶ UI pr … ok (26s)
+▶ UI queue-pause … ok (35s)
+▶ UI restore … ok (68s)
+▶ UI review … ok (59s)
+▶ UI review-compare … ok (36s)
+▶ UI review-files … ok (38s)
+▶ UI review-marks … ok (40s)
+▶ UI review-merge … ok (23s)
+▶ UI review-width … ok (21s)
+▶ UI scopes … ok (42s)
+▶ UI sidebar … ok (14s)
+▶ UI sidebar-search … ok (150s)
+▶ UI signin … ok (32s)
+▶ UI swarm-allowance … ok (9s)
+▶ UI swarm-scale … ok (38s)
+▶ UI swarm-status … ok (13s)
+▶ UI talk … ok (30s)
+▶ UI theme … ok (71s)
+▶ UI trouble … ok (36s)
+▶ UI trust … ok (11s)
+▶ UI tui-parity … ok (24s)
+▶ UI usage … ok (25s)
+▶ UI voice … ok (256s)
+▶ UI voice-turn-on … ok (36s)
+▶ UI vscode-chat … ok (38s)
+▶ UI windows … ok (48s)
+▶ UI zero-friction … ok (116s)
+(not run: background, claude-live, codex-approval, codex-follow, codex-live, conversation-live, live-gatej, menubar, merge, offline-session, perf, talk-live; LIVE ones need --live, perf needs --perf, ON SCREEN ones need --only=NAME)
+▶ Leftovers (no process left running) … ok (0s)
+
+88 of 89 passed; failed: Rust (cargo test --workspace)

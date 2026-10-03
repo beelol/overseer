@@ -1,0 +1,11 @@
+# Combined full run — failed, with separate passing Voice57 capture
+
+Frozen source: `abf572ef53705db0e8f8b32e72a46057661057fc`, normal combined implementation commits plus main in an isolated clone. Full process14253 ended exit1: **88/89 stages passed**. `CARGO_TARGET_DIR=/private/tmp/overseer-closeout-integration-target CARGO_BUILD_JOBS=4 RUST_TEST_THREADS=4 nice -n20 scripts/test-all --jobs=1` respected the full-run machine lock and one-UI cap. [Unmodified summary](full-summary.log) and [source/hash receipt](full-receipt.json) are preserved.
+
+Rust reported1680 passes/1 failure in1765s. The old summary filter selected passing names containing “error” and hid the actual failure identity; those twelve lines are not failure proof. The complete Rust output was not retained by that reporter. No failing name or cause is invented here.
+
+All78 selected packaged UI scenarios passed, including Voice256s, parity24s, Mods17s, home88s, home-overseer38s, oversight68s and talk30s. Unit30, source check, links904/0broken, phone model161/app503, dev14, guided7, deploy6, VSIX and leftovers cleanup also passed. The summary lists live/perf/on-screen exclusions explicitly. This run is not all scenarios, paid harness qualification or the AC201 settings matrix.
+
+After terminal cleanup, root ran the frozen daemon Voice57 executable once, alone, at nice20 with four test threads: **57/57 passed in191.59s**, exit0, no leftovers or other competing test processes recorded. [Before source/executable receipt](voice57-alone/source.json), [result and unchanged after-hash](voice57-alone/result.json), [complete small stdout](voice57-alone/stdout.log) and [empty stderr](voice57-alone/stderr.log) are retained. The existing artifact was reused without recompilation (`fresh:false`), SHA256 `420061e770062e28704240d61b9bca4e7ffbd8faf40cfc03cdc0f60a5d6b99ed` before and after. The source is the same frozen abf commit; this is a separate diagnostic capture, not another full run.
+
+The passing target capture neither reproduces nor resolves the original unidentified Rust failure. It does not identify which full-run case failed. No full pass, merge-readiness or new acceptance-criterion closure is claimed. AC200/201/269 and other explicit gaps remain. Verified count stays207/274. All tests were synthetic; no paid model or owner profile/private audio was used.
