@@ -111,7 +111,7 @@ impl Script {
             std::thread::sleep(Duration::from_millis(20));
         }
     }
-    fn requests(&self) -> Vec<Value> {
+    fn collection(&self) -> Value {
         let result = self
             .daemon
             .call("run.requests", json!({"run_id": self.run()}));
@@ -121,8 +121,11 @@ impl Script {
         );
         result["requests"]
             .as_array()
-            .expect("typed request collection")
-            .clone()
+            .expect("typed request collection");
+        result
+    }
+    fn requests(&self) -> Vec<Value> {
+        self.collection()["requests"].as_array().unwrap().clone()
     }
     fn no_protected_action(&self) {
         assert!(!ws_path(&self.daemon, &self.created)
@@ -231,20 +234,30 @@ fn replayed_frame_preserves_key_and_cursor() {
         ],
     );
     s.marker(ONE, 1);
-    let before = s.requests();
-    assert_eq!(before.len(), 1);
+    let before = s.collection();
+    assert_eq!(before["requests"].as_array().unwrap().len(), 1);
     s.daemon.kill9();
     s.daemon.spawn();
     assert_eq!(
-        s.requests(),
-        before,
+        s.collection()["cursor"],
+        before["cursor"],
+        "daemon restart cannot advance the pending-collection cursor"
+    );
+    assert_eq!(
+        s.collection()["requests"],
+        before["requests"],
         "pending survives daemon crash without a new identity"
     );
     std::fs::write(release, "release").unwrap();
     s.marker(TWO, 1);
     assert_eq!(
-        s.requests(),
-        before,
+        s.collection()["cursor"],
+        before["cursor"],
+        "duplicate native frame cannot advance the pending-collection cursor"
+    );
+    assert_eq!(
+        s.collection()["requests"],
+        before["requests"],
         "replayed frame cannot duplicate or revise authority"
     );
     assert_eq!(

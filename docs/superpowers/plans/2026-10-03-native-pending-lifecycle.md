@@ -62,7 +62,7 @@ Proposed `PendingRequest` tagged union exposes opaque key/revision, display agen
 
 Minimal protocol in Task2 (Task3 later consumes it):
 
-- `run.requests` read method, optional run_id, returns ordered public requests and cursor; include hidden shared Overseer only through its authorized session/read projection, consistent with current hidden-role behavior.
+- `run.requests` read method, optional run_id, returns ordered public requests and cursor (last durable pending-collection change; unrelated output/daemon restart/duplicate source replay do not advance it, distinct from the global events/state cursor); include hidden shared Overseer only through its authorized session/read projection, consistent with current hidden-role behavior.
 - `run.request.answer` control method `{run_id,request_key,revision,answer:RequestAnswer}`, typed answer discriminator and typed disposition `{request_key,revision,lifecycle,delivery}`. No arbitrary native message channel. Bounded lengths/content, deny unknown fields; encoder must succeed against the private stored request before claim.
 - `pending_request`/`pending_request_changed` events carry only public union/lifecycle; answered summary contains actor and disposition, not secret answer content. No whole envelope in error.data.
 - Add optional `Run.pending_requests` plus pending-item count; legacy attention projects the oldest compatible bool permission and its opaque key. Other typed families expose a safe pending descriptor/actionable unsupported-renderer reason, never `kind:permission` with bool buttons.
