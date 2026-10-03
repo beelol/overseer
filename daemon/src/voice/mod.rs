@@ -200,16 +200,20 @@ impl Voice {
     /// What the recognizer is told to expect besides its own vocabulary (AC-229): the agents'
     /// titles and the repositories' names, so "the site repo" is heard as said.
     pub fn recognizer_hint(&self) -> String {
-        let repos: Vec<String> = self
-            .d
-            .known_repos()
-            .ok()
-            .and_then(|r| r["repos"].as_array().cloned())
-            .unwrap_or_default()
-            .iter()
-            .filter_map(|r| r["name"].as_str().map(str::to_string))
-            .collect();
-        hint_words(&self.agent_names(), &repos)
+        // The names only, from the store: no git per repository (voice.get is asked often).
+        let agents = self.agent_names();
+        let repos: Vec<String> = {
+            let store = self.d.store.lock().unwrap();
+            let rows: Vec<String> = store
+                .conn
+                .prepare("SELECT repo_root FROM tasks GROUP BY repo_root ORDER BY MAX(created_ms) DESC LIMIT 50")
+                .and_then(|mut stmt| stmt.query_map([], |r| r.get::<_, String>(0)).map(|it| it.flatten().collect()))
+                .unwrap_or_default();
+            rows.iter()
+                .filter_map(|r| std::path::Path::new(r).file_name().map(|n| n.to_string_lossy().to_string()))
+                .collect()
+        };
+        hint_words(&agents, &repos)
     }
 
     /// The state the mark shows (AC-177).
@@ -609,6 +613,8 @@ pub fn get(d: &Arc<Daemon>) -> Result<Value> {
     let (state, reason) = v.state(&s);
     // Before the state's lock: the targets read the request list and the cards.
     let targeted = request::targeted(d);
+    // Also before it: the hint reads the store and the roster (AC-229).
+    let hint = v.recognizer_hint();
     let st = v.st.lock().unwrap();
     let model_path = model::path(&s.model);
     Ok(json!({
@@ -629,7 +635,7 @@ pub fn get(d: &Arc<Daemon>) -> Result<Value> {
         "model": {"name": s.model, "downloaded": model_path.exists() || simulated(), "bytes": model::size(&s.model), "download": st.download},
         "targeted": targeted,
         // What the recognizer is told to expect besides its vocabulary (AC-229).
-        "hint": v.recognizer_hint(),
+        "hint": hint,
         "listener": {"running": st.pid.is_some(), "pid": st.pid, "restarts": st.restarts.len(),
             "last_error": st.last_error.as_ref().map(|(m, at)| json!({"message": m, "at": at}))},
     }))
